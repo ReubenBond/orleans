@@ -77,6 +77,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CodeGenTests\IRuntimeCodeGenGrain.cs" />
+    <Compile Include="CodeGenTests\RuntimeCodeGenerationTests.cs" />
     <Compile Include="ConcreteStateClassTests.cs" />
     <Compile Include="GenericGrainTests.cs" />
     <Compile Include="GrainInterfaceHierarchyTests.cs" />
@@ -130,6 +132,10 @@
     <ProjectReference Include="..\OrleansCounterControl\OrleansCounterControl.csproj">
       <Project>{606b9647-cc0c-4058-bfbc-b5b7ed4f3c56}</Project>
       <Name>OrleansCounterControl</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\OrleansCodeGenerator\OrleansCodeGenerator.csproj">
+      <Project>{8d937706-f6da-4d33-b0a9-24a260bd3080}</Project>
+      <Name>OrleansCodeGenerator</Name>
     </ProjectReference>
     <ProjectReference Include="..\OrleansHost\OrleansHost.csproj">
       <Project>{5c177f58-a40c-449f-8c2f-a2657f963edc}</Project>
