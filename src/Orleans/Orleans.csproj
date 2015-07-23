@@ -410,7 +410,7 @@
     <!-- Finally invoke code generator on the recently built Orleans.dll -->
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - Preprocessing $(TargetName)$(TargetExt) with ClientGenerator.exe" Importance="high" />
     <PropertyGroup>
-      <CodeGenToolExecCmd>"$(ProjectDir)$(IntermediateOutputPath)Generated\ClientGenerator.exe" /nomerge /bootstrap "/in:$(IntermediateOutputPath)Generated\$(TargetName)$(TargetExt)" "/keyfile:$(AssemblyOriginatorKeyFile)" "/reference:@(ReferencePath)" "/sources:@(Compile)" "/define:$(DefineConstants)" $(ClientGenOptions)</CodeGenToolExecCmd>
+      <CodeGenToolExecCmd>"$(OutDir)ClientGenerator.exe" /nomerge /bootstrap "/in:$(IntermediateOutputPath)\$(TargetName)$(TargetExt)" "/keyfile:$(AssemblyOriginatorKeyFile)" "/reference:@(ReferencePath)" "/sources:@(Compile)" "/define:$(DefineConstants)" $(ClientGenOptions)</CodeGenToolExecCmd>
     </PropertyGroup>
     <Message Text="[OrleansDllBootstrapUsingCodeGen] - CodeGen Cmd = $(CodeGenToolExecCmd)" />
     <Exec Command="$(CodeGenToolExecCmd)" />
