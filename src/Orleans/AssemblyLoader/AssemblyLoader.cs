@@ -102,6 +102,36 @@ namespace Orleans.Runtime
             return discoveredAssemblyLocations;
         }
 
+        public static T TryLoadAndCreateInstance<T>(string assemblyName, TraceLogger logger) where T : class
+        {
+            try
+            {
+                var assembly = Assembly.Load(assemblyName);
+                var foundType =
+                    TypeUtils.GetTypes(
+                        assembly,
+                        type =>
+                        typeof(T).IsAssignableFrom(type) && !type.IsInterface
+                        && type.GetConstructor(Type.EmptyTypes) != null).FirstOrDefault();
+                if (foundType == null)
+                {
+                    return null;
+                }
+
+                return (T)Activator.CreateInstance(foundType, true);
+            }
+            catch (FileNotFoundException exception)
+            {
+                logger.Warn(ErrorCode.Loader_TryLoadAndCreateInstance_Failure, exception.Message, exception);
+                return null;
+            }
+            catch (Exception exc)
+            {
+                logger.Error(ErrorCode.Loader_TryLoadAndCreateInstance_Failure, exc.Message, exc);
+                throw;
+            }
+        }
+
         public static T LoadAndCreateInstance<T>(string assemblyName, TraceLogger logger) where T : class
         {
             try

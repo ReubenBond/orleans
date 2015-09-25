@@ -87,6 +87,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CodeGenTests\IRuntimeCodeGenGrain.cs" />
+    <Compile Include="CodeGenTests\RuntimeCodeGenerationTests.cs" />
     <Compile Include="ConcreteStateClassTests.cs" />
     <Compile Include="GenericGrainTests.cs" />
     <Compile Include="GrainInterfaceHierarchyTests.cs" />

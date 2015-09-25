@@ -51,6 +51,8 @@ using Orleans.Timers;
 
 namespace Orleans.Runtime
 {
+    using Orleans.CodeGeneration;
+
     /// <summary>
     /// Orleans silo.
     /// </summary>
@@ -182,6 +184,7 @@ namespace Orleans.Runtime
 
             ActivationData.Init(config, nodeConfig);
             StatisticsCollector.Initialize(nodeConfig);
+            CodeGenerator.CodeGenerator.Instance.GenerateAndLoadForAllAssemblies();
             SerializationManager.Initialize(globalConfig.UseStandardSerializer);
             initTimeout = globalConfig.MaxJoinAttemptTime;
             if (Debugger.IsAttached)

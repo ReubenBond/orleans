@@ -205,32 +205,37 @@ namespace Orleans.Streams
                         continue;
                     }
 
-                    Task addSubscriberPromise = producer.Producer.AddSubscriber(subscriptionId, streamId, streamConsumer, filter)
-                        .ContinueWith(t =>
-                        {
-                            if (t.IsFaulted)
-                            {
-                                var exc = t.Exception.GetBaseException();
-                                if (exc is GrainExtensionNotInstalledException)
+                    Task addSubscriberPromise =
+                        producer.Producer.AddSubscriber(subscriptionId, streamId, streamConsumer, filter)
+                            .ContinueWith(
+                                t =>
                                 {
-                                    logger.Warn((int) ErrorCode.Stream_ProducerIsDead,
-                                        "Producer {0} on stream {1} is no longer active - discarding.", 
-                                        producer, streamId);
+                                    if (t.IsFaulted)
+                                    {
+                                        var exc = t.Exception.GetBaseException();
+                                        if (exc is GrainExtensionNotInstalledException)
+                                        {
+                                            logger.Warn(
+                                                (int)ErrorCode.Stream_ProducerIsDead,
+                                                "Producer {0} on stream {1} is no longer active - discarding.",
+                                                producer,
+                                                streamId);
 
-                                    // This publisher has gone away, so we should cleanup pub-sub state.
-                                    bool removed = State.Producers.Remove(producer);
-                                    someProducersRemoved = true; // Re-save state changes at end
-                                    counterProducersRemoved.Increment();
-                                    counterProducersTotal.DecrementBy(removed ? 1 : 0);
+                                            // This publisher has gone away, so we should cleanup pub-sub state.
+                                            bool removed = State.Producers.Remove(producer);
+                                            someProducersRemoved = true; // Re-save state changes at end
+                                            counterProducersRemoved.Increment();
+                                            counterProducersTotal.DecrementBy(removed ? 1 : 0);
 
-                                    // And ignore this error
-                                }
-                                else
-                                {
-                                    throw exc;
-                                }
-                            }
-                        }, TaskContinuationOptions.OnlyOnFaulted);
+                                            // And ignore this error
+                                        }
+                                        else
+                                        {
+                                            throw exc;
+                                        }
+                                    }
+                                },
+                                TaskContinuationOptions.ExecuteSynchronously);
                     tasks.Add(addSubscriberPromise);
                 }
 

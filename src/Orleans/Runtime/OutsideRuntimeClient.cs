@@ -177,6 +177,7 @@ namespace Orleans
                 AppDomain.CurrentDomain.AssemblyLoad += NewAssemblyHandler;
 
                 // Load serialization info for currently-loaded assemblies
+                CodeGeneratorManager.GenerateAndCacheCodeForAllAssemblies();
                 foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
                 {
                     if (!assembly.ReflectionOnly)
