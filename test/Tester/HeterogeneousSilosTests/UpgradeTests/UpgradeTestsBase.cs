@@ -182,7 +182,6 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         {
             var handle = await StartSilo(assemblyGrainsV1Dir);
             await Task.Delay(waitDelay);
-            await Task.Delay(TimeSpan.FromSeconds(90));
             return handle;
         }
 
