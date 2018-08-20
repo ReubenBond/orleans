@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Clustering.ServiceFabric.Models;
 using Orleans.Clustering.ServiceFabric.Utilities;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -252,12 +253,12 @@ namespace Orleans.Clustering.ServiceFabric
         }
 
         /// <inheritdoc />
-        public void OnUpdate(FabricSiloInfo[] partitions)
+        public void OnUpdate(ServicePartitionSilos[] partitions)
         {
             var hasChanges = false;
             lock (this.updateLock)
             {
-                foreach (var updatedSilo in partitions)
+                foreach (var updatedSilo in partitions.SelectMany(_ => _.Silos))
                 {
                     // Update the silo if it was not previously seen or if the existing entry's status
                     // does not match the updated status.
@@ -268,9 +269,21 @@ namespace Orleans.Clustering.ServiceFabric
 
                         if (existing.Status != SiloStatus.Active)
                         {
-                            this.log.Error(
-                                (int) ErrorCode.ServiceFabric_MembershipOracle_EncounteredUndeadSilo,
-                                $"Encountered status update indicating a silo which was previously declared dead is now active. Name: {existing.Name}, Address: {updatedSilo.SiloAddress}");
+                            // Mark the existing silo as being refreshed.
+                            existing.Refreshed = true;
+
+                            if (existing.Status != SiloStatus.Active)
+                            {
+                                this.log.LogError(
+                                    (int)Utilities.ErrorCode.ServiceFabric_MembershipOracle_EncounteredUndeadSilo,
+                                    "Encountered status update indicating a silo which was previously declared dead is now active. Name: {SiloName}, Address: {SiloAddress}",
+                                    existing.Name,
+                                    updatedSilo.SiloAddress);
+
+                                existing.Status = SiloStatus.Active;
+                                this.notifications.Add(new StatusChangeNotification(updatedSilo.SiloAddress, SiloStatus.Active));
+                                hasChanges = true;
+                            }
                         }
                     }
                     else
@@ -363,7 +376,7 @@ namespace Orleans.Clustering.ServiceFabric
                         catch (Exception exception)
                         {
                             this.log.Warn(
-                                (int)ErrorCode.ServiceFabric_MembershipOracle_ExceptionNotifyingSubscribers,
+                                (int)Utilities.ErrorCode.ServiceFabric_MembershipOracle_ExceptionNotifyingSubscribers,
                                 "Exception notifying subscriber.",
                                 exception);
                         }
@@ -383,7 +396,7 @@ namespace Orleans.Clustering.ServiceFabric
             catch (Exception exception)
             {
                 this.log?.Warn(
-                    (int) ErrorCode.ServiceFabric_MembershipOracle_ExceptionRefreshingPartitions,
+                    (int)Utilities.ErrorCode.ServiceFabric_MembershipOracle_ExceptionRefreshingPartitions,
                     "Exception refreshing partitions.",
                     exception);
                 throw;

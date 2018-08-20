@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Fabric;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -103,11 +103,26 @@ namespace Orleans.Clustering.ServiceFabric
             // Use Service Fabric for cluster membership.
             services.TryAddSingleton<IFabricServiceSiloResolver>(
                     sp => ActivatorUtilities.CreateInstance<FabricServiceSiloResolver>(sp, context.ServiceName));
-            services.TryAddSingleton<IMembershipOracle, FabricMembershipOracle>();
-            services.TryAddSingleton<IGatewayListProvider, FabricGatewayProvider>();
             services.TryAddSingleton<ISiloStatusOracle>(provider => provider.GetService<IMembershipOracle>());
             services.TryAddSingleton<ServiceContext>(context);
-            services.TryAddSingleton<UnknownSiloMonitor>();
+
+            if (context is StatefulServiceContext stateful)
+            {
+                services.TryAddSingleton<StatefulServiceContext>(stateful);
+                services.TryAddSingleton<IMembershipOracle, FabricMembershipOracle>();
+                services.TryAddSingleton<UnknownSiloMonitor>();
+                services.AddPlacementDirector<StatefulServicePlacement, StatefulServicePlacementDirector>();
+            }
+            else if (context is StatelessServiceContext stateless)
+            {
+                services.TryAddSingleton<StatelessServiceContext>(stateless);
+                services.TryAddSingleton<IMembershipOracle, FabricMembershipOracle>();
+                services.TryAddSingleton<UnknownSiloMonitor>();
+            }
+            else
+            {
+                throw new NotSupportedException($"Services with context of type {context.GetType()} are not supported.");
+            }
         }
     }
 }

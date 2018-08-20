@@ -15,6 +15,6 @@ namespace Orleans.Runtime
         /// Returns a value indicating whether or not activations using this strategy must have deterministic activation ids.
         /// If true then activations have activation ids equal to their grain id, otherwise activations are given unique ids.
         /// </summary>
-        internal virtual bool IsDeterministicActivationId => false;
+        protected internal virtual bool IsDeterministicActivationId => false;
     }
 }
