@@ -204,7 +204,7 @@ namespace Orleans.Runtime
             Exception exc, 
             string rejectInfo = null)
         {
-            if (message.Direction == Message.Directions.Request)
+            if (message.Direction == Message.Directions.Request || (message.Direction == Message.Directions.OneWay && message.HasCacheInvalidationHeader))
             {
                 var str = String.Format("{0} {1}", rejectInfo ?? "", exc == null ? "" : exc.ToString());
                 MessagingStatisticsGroup.OnRejectedMessage(message);
@@ -568,11 +568,21 @@ namespace Orleans.Runtime
             }
             finally
             {
+                var sentRejection = false;
+
+                // If the message was a one-way message, send a cache invalidation response even if the message was successfully forwarded.
+                if (message.Direction == Message.Directions.OneWay)
+                {
+                    this.RejectMessage(message, Message.RejectionTypes.CacheInvalidation, exc, "OneWay message sent to invalid activation");
+                    sentRejection = true;
+                }
+
                 if (!forwardingSucceded)
                 {
                     var str = $"Forwarding failed: tried to forward message {message} for {message.ForwardCount} times after {failedOperation} to invalid activation. Rejecting now.";
                     logger.Warn(ErrorCode.Messaging_Dispatcher_TryForwardFailed, str, exc);
-                    RejectMessage(message, Message.RejectionTypes.Transient, exc, str);
+
+                    if (!sentRejection) RejectMessage(message, Message.RejectionTypes.Transient, exc, str);
                 }
             }
         }
@@ -636,8 +646,7 @@ namespace Orleans.Runtime
         {
             return message.ForwardCount < messagingOptions.MaxForwardCount
                 // allow one more forward hop for multi-cluster case
-                + (message.IsReturnedFromRemoteCluster ? 1 : 0)
-                ;
+                + (message.IsReturnedFromRemoteCluster ? 1 : 0);
         }
 
         /// <summary>

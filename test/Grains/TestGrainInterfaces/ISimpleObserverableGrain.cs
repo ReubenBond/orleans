@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Concurrency;
 
 namespace UnitTests.GrainInterfaces
 {
@@ -12,6 +13,7 @@ namespace UnitTests.GrainInterfaces
 
     public interface ISimpleGrainObserver : IGrainObserver
     {
+        [AlwaysInterleave]
         void StateChanged(int a, int b);
     }
 }
