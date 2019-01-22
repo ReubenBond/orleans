@@ -2,14 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using Hagar.CodeGenerator.SyntaxGeneration;
-using Hagar.CodeGenerator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using Orleans.CodeGenerator.Model;
 
-namespace Hagar.CodeGenerator
+namespace Orleans.CodeGenerator.Generators
 {
     /// <summary>
     /// Generates RPC stub objects called invokers.
@@ -18,24 +16,24 @@ namespace Hagar.CodeGenerator
     {
         public static (ClassDeclarationSyntax, IGeneratedProxyDescription) Generate(
             Compilation compilation,
-            LibraryTypes libraryTypes,
+            WellKnownTypes WellKnownTypes,
             IInvokableInterfaceDescription interfaceDescription,
             MetadataModel metadataModel)
         {
             var generatedClassName = GetSimpleClassName(interfaceDescription.InterfaceType);
 
-            /*var fieldDescriptions = GetFieldDescriptions(methodDescription.Method, libraryTypes);
+            /*var fieldDescriptions = GetFieldDescriptions(methodDescription.Method, WellKnownTypes);
             var fields = GetFieldDeclarations(fieldDescriptions);*/
-            var ctors = GenerateConstructors(generatedClassName, libraryTypes, interfaceDescription).ToArray();
-            var proxyMethods = CreateProxyMethods(libraryTypes, interfaceDescription, metadataModel).ToArray();
+            var ctors = GenerateConstructors(generatedClassName, WellKnownTypes, interfaceDescription).ToArray();
+            var proxyMethods = CreateProxyMethods(WellKnownTypes, interfaceDescription, metadataModel).ToArray();
 
-            var classDeclaration = ClassDeclaration(generatedClassName)
+            var classDeclaration = SyntaxFactory.ClassDeclaration(generatedClassName)
                 .AddBaseListTypes(
-                    SimpleBaseType(interfaceDescription.ProxyBaseType.ToTypeSyntax()),
-                    SimpleBaseType(interfaceDescription.InterfaceType.ToTypeSyntax()))
-                .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
+                    SyntaxFactory.SimpleBaseType(interfaceDescription.ProxyBaseType.ToTypeSyntax()),
+                    SyntaxFactory.SimpleBaseType(interfaceDescription.InterfaceType.ToTypeSyntax()))
+                .AddModifiers(SyntaxFactory.Token(SyntaxKind.InternalKeyword), SyntaxFactory.Token(SyntaxKind.SealedKeyword))
                 .AddAttributeLists(
-                    AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
+                    SyntaxFactory.AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
                 .AddMembers(ctors)
                 .AddMembers(proxyMethods);
 
@@ -73,14 +71,14 @@ namespace Hagar.CodeGenerator
                 if (constraints.Count > 0)
                 {
                     classDeclaration = classDeclaration.AddConstraintClauses(
-                        TypeParameterConstraintClause(name).AddConstraints(constraints.ToArray()));
+                        SyntaxFactory.TypeParameterConstraintClause(name).AddConstraints(constraints.ToArray()));
                 }
             }
 
             if (typeParameters.Count > 0)
             {
                 classDeclaration = classDeclaration.WithTypeParameterList(
-                    TypeParameterList(SeparatedList(typeParameters.Select(tp => TypeParameter(tp.Item1)))));
+                    SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList(typeParameters.Select(tp => SyntaxFactory.TypeParameter(tp.Item1)))));
             }
 
             return classDeclaration;
@@ -94,22 +92,22 @@ namespace Hagar.CodeGenerator
                 var constraints = new List<TypeParameterConstraintSyntax>();
                 if (tp.HasReferenceTypeConstraint)
                 {
-                    constraints.Add(ClassOrStructConstraint(SyntaxKind.ClassConstraint));
+                    constraints.Add(SyntaxFactory.ClassOrStructConstraint(SyntaxKind.ClassConstraint));
                 }
 
                 if (tp.HasValueTypeConstraint)
                 {
-                    constraints.Add(ClassOrStructConstraint(SyntaxKind.StructConstraint));
+                    constraints.Add(SyntaxFactory.ClassOrStructConstraint(SyntaxKind.StructConstraint));
                 }
 
                 foreach (var c in tp.ConstraintTypes)
                 {
-                    constraints.Add(TypeConstraint(c.ToTypeSyntax()));
+                    constraints.Add(SyntaxFactory.TypeConstraint(c.ToTypeSyntax()));
                 }
 
                 if (tp.HasConstructorConstraint)
                 {
-                    constraints.Add(ConstructorConstraint());
+                    constraints.Add(SyntaxFactory.ConstructorConstraint());
                 }
 
                 allConstraints.Add((tp.Name, constraints));
@@ -127,24 +125,24 @@ namespace Hagar.CodeGenerator
                 switch (description)
                 {
                     case MethodParameterFieldDescription serializable:
-                        return FieldDeclaration(
-                                VariableDeclaration(
+                        return SyntaxFactory.FieldDeclaration(
+                                SyntaxFactory.VariableDeclaration(
                                     description.FieldType.ToTypeSyntax(),
-                                    SingletonSeparatedList(VariableDeclarator(description.FieldName))))
-                            .AddModifiers(Token(SyntaxKind.PublicKeyword));
+                                    SyntaxFactory.SingletonSeparatedList(SyntaxFactory.VariableDeclarator(description.FieldName))))
+                            .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword));
                     default:
-                        return FieldDeclaration(
-                                VariableDeclaration(
+                        return SyntaxFactory.FieldDeclaration(
+                                SyntaxFactory.VariableDeclaration(
                                     description.FieldType.ToTypeSyntax(),
-                                    SingletonSeparatedList(VariableDeclarator(description.FieldName))))
-                            .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+                                    SyntaxFactory.SingletonSeparatedList(SyntaxFactory.VariableDeclarator(description.FieldName))))
+                            .AddModifiers(SyntaxFactory.Token(SyntaxKind.PrivateKeyword), SyntaxFactory.Token(SyntaxKind.ReadOnlyKeyword));
                 }
             }
         }
 
         private static IEnumerable<MemberDeclarationSyntax> GenerateConstructors(
             string simpleClassName,
-            LibraryTypes libraryTypes,
+            WellKnownTypes WellKnownTypes,
             IInvokableInterfaceDescription interfaceDescription)
         {
             var baseType = interfaceDescription.ProxyBaseType;
@@ -158,15 +156,15 @@ namespace Hagar.CodeGenerator
 
             ConstructorDeclarationSyntax CreateConstructor(IMethodSymbol baseConstructor)
             {
-                return ConstructorDeclaration(simpleClassName)
+                return SyntaxFactory.ConstructorDeclaration(simpleClassName)
                     .AddParameterListParameters(baseConstructor.Parameters.Select(GetParameterSyntax).ToArray())
-                    .WithModifiers(TokenList(GetModifiers(baseConstructor)))
+                    .WithModifiers(SyntaxFactory.TokenList(GetModifiers(baseConstructor)))
                     .WithInitializer(
-                        ConstructorInitializer(
+                        SyntaxFactory.ConstructorInitializer(
                             SyntaxKind.BaseConstructorInitializer,
-                            ArgumentList(
-                                SeparatedList(baseConstructor.Parameters.Select(GetBaseInitializerArgument)))))
-                    .WithBody(Block());
+                            SyntaxFactory.ArgumentList(
+                                SyntaxFactory.SeparatedList(baseConstructor.Parameters.Select(GetBaseInitializerArgument)))))
+                    .WithBody(SyntaxFactory.Block());
             }
 
             IEnumerable<SyntaxToken> GetModifiers(IMethodSymbol method)
@@ -175,12 +173,12 @@ namespace Hagar.CodeGenerator
                 {
                     case Accessibility.Public:
                     case Accessibility.Protected:
-                        yield return Token(SyntaxKind.PublicKeyword);
+                        yield return SyntaxFactory.Token(SyntaxKind.PublicKeyword);
                         break;
                     case Accessibility.Internal:
                     case Accessibility.ProtectedOrInternal:
                     case Accessibility.ProtectedAndInternal:
-                        yield return Token(SyntaxKind.InternalKeyword);
+                        yield return SyntaxFactory.Token(SyntaxKind.InternalKeyword);
                         break;
                     default:
                         break;
@@ -189,16 +187,16 @@ namespace Hagar.CodeGenerator
 
             ArgumentSyntax GetBaseInitializerArgument(IParameterSymbol parameter)
             {
-                var result = Argument(IdentifierName(parameter.Name));
+                var result = SyntaxFactory.Argument(SyntaxFactory.IdentifierName(parameter.Name));
                 switch (parameter.RefKind)
                 {
                     case RefKind.None:
                         break;
                     case RefKind.Ref:
-                        result = result.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
+                        result = result.WithRefOrOutKeyword(SyntaxFactory.Token(SyntaxKind.RefKeyword));
                         break;
                     case RefKind.Out:
-                        result = result.WithRefOrOutKeyword(Token(SyntaxKind.OutKeyword));
+                        result = result.WithRefOrOutKeyword(SyntaxFactory.Token(SyntaxKind.OutKeyword));
                         break;
                     default:
                         break;
@@ -209,7 +207,7 @@ namespace Hagar.CodeGenerator
         }
 
         private static IEnumerable<MemberDeclarationSyntax> CreateProxyMethods(
-            LibraryTypes libraryTypes,
+            WellKnownTypes WellKnownTypes,
             IInvokableInterfaceDescription interfaceDescription,
             MetadataModel metadataModel)
         {
@@ -222,10 +220,10 @@ namespace Hagar.CodeGenerator
             {
                 var method = methodDescription.Method;
                 var declaration = MethodDeclaration(method.ReturnType.ToTypeSyntax(), method.Name)
-                    .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AsyncKeyword))
+                    .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.AsyncKeyword))
                     .AddParameterListParameters(method.Parameters.Select(GetParameterSyntax).ToArray())
                     .WithBody(
-                        CreateProxyMethodBody(libraryTypes, metadataModel, interfaceDescription, methodDescription));
+                        CreateProxyMethodBody(WellKnownTypes, metadataModel, interfaceDescription, methodDescription));
 
                 var typeParameters = GetTypeParametersWithConstraints(method.TypeParameters);
                 foreach (var (name, constraints) in typeParameters)
@@ -233,14 +231,14 @@ namespace Hagar.CodeGenerator
                     if (constraints.Count > 0)
                     {
                         declaration = declaration.AddConstraintClauses(
-                            TypeParameterConstraintClause(name).AddConstraints(constraints.ToArray()));
+                            SyntaxFactory.TypeParameterConstraintClause(name).AddConstraints(constraints.ToArray()));
                     }
                 }
 
                 if (typeParameters.Count > 0)
                 {
                     declaration = declaration.WithTypeParameterList(
-                        TypeParameterList(SeparatedList(typeParameters.Select(tp => TypeParameter(tp.Item1)))));
+                        SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList(typeParameters.Select(tp => SyntaxFactory.TypeParameter(tp.Item1)))));
                 }
 
                 return declaration;
@@ -248,7 +246,7 @@ namespace Hagar.CodeGenerator
         }
 
         private static BlockSyntax CreateProxyMethodBody(
-            LibraryTypes libraryTypes,
+            WellKnownTypes WellKnownTypes,
             MetadataModel metadataModel,
             IInvokableInterfaceDescription interfaceDescription,
             MethodDescription methodDescription)
@@ -256,29 +254,29 @@ namespace Hagar.CodeGenerator
             var statements = new List<StatementSyntax>();
 
             // Create request object
-            var requestVar = IdentifierName("request");
+            var requestVar = SyntaxFactory.IdentifierName("request");
 
             var requestDescription = metadataModel.GeneratedInvokables[methodDescription];
-            var createRequestExpr = ObjectCreationExpression(requestDescription.TypeSyntax)
-                .WithArgumentList(ArgumentList(SeparatedList<ArgumentSyntax>()));
+            var createRequestExpr = SyntaxFactory.ObjectCreationExpression(requestDescription.TypeSyntax)
+                .WithArgumentList(SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList<ArgumentSyntax>()));
 
             statements.Add(
-                LocalDeclarationStatement(
-                    VariableDeclaration(
-                        ParseTypeName("var"),
-                        SingletonSeparatedList(
-                            VariableDeclarator(
-                                    Identifier("request"))
+                SyntaxFactory.LocalDeclarationStatement(
+                    SyntaxFactory.VariableDeclaration(
+                        SyntaxFactory.ParseTypeName("var"),
+                        SyntaxFactory.SingletonSeparatedList(
+                            SyntaxFactory.VariableDeclarator(
+                                    SyntaxFactory.Identifier("request"))
                                 .WithInitializer(
-                                    EqualsValueClause(createRequestExpr))))));
+                                    SyntaxFactory.EqualsValueClause(createRequestExpr))))));
 
             // Set request object fields from method parameters.
             var parameterIndex = 0;
             foreach (var parameter in methodDescription.Method.Parameters)
             {
                 statements.Add(
-                    ExpressionStatement(
-                        AssignmentExpression(
+                    SyntaxFactory.ExpressionStatement(
+                        SyntaxFactory.AssignmentExpression(
                             SyntaxKind.SimpleAssignmentExpression,
                             requestVar.Member($"arg{parameterIndex}"),
                             IdentifierName(parameter.Name))));
@@ -288,36 +286,36 @@ namespace Hagar.CodeGenerator
 
             // Issue request
             statements.Add(
-                ExpressionStatement(
-                    AwaitExpression(
-                        InvocationExpression(
-                            BaseExpression().Member("Invoke"),
-                            ArgumentList(SingletonSeparatedList(Argument(requestVar)))))));
+                SyntaxFactory.ExpressionStatement(
+                    SyntaxFactory.AwaitExpression(
+                        SyntaxFactory.InvocationExpression(
+                            SyntaxFactory.BaseExpression().Member("Invoke"),
+                            SyntaxFactory.ArgumentList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Argument(requestVar)))))));
 
             // Return result
             if (methodDescription.Method.ReturnType is INamedTypeSymbol named && named.TypeParameters.Length == 1)
             {
-                statements.Add(ReturnStatement(requestVar.Member("result")));
+                statements.Add(SyntaxFactory.ReturnStatement(requestVar.Member("result")));
             }
 
-            return Block(statements);
+            return SyntaxFactory.Block(statements);
         }
 
         private static ParameterSyntax GetParameterSyntax(IParameterSymbol parameter)
         {
-            var result = Parameter(Identifier(parameter.Name)).WithType(parameter.Type.ToTypeSyntax());
+            var result = SyntaxFactory.Parameter(SyntaxFactory.Identifier(parameter.Name)).WithType(parameter.Type.ToTypeSyntax());
             switch (parameter.RefKind)
             {
                 case RefKind.None:
                     break;
                 case RefKind.Ref:
-                    result = result.WithModifiers(TokenList(Token(SyntaxKind.RefKeyword)));
+                    result = result.WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.RefKeyword)));
                     break;
                 case RefKind.Out:
-                    result = result.WithModifiers(TokenList(Token(SyntaxKind.OutKeyword)));
+                    result = result.WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.OutKeyword)));
                     break;
                 case RefKind.In:
-                    result = result.WithModifiers(TokenList(Token(SyntaxKind.InKeyword)));
+                    result = result.WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.InKeyword)));
                     break;
                 default:
                     break;
@@ -326,7 +324,7 @@ namespace Hagar.CodeGenerator
             return result;
         }
 
-        private static List<FieldDescription> GetFieldDescriptions(IMethodSymbol method, LibraryTypes libraryTypes)
+        private static List<FieldDescription> GetFieldDescriptions(IMethodSymbol method, WellKnownTypes WellKnownTypes)
         {
             var fields = new List<FieldDescription>();
 

@@ -89,4 +89,96 @@ namespace Orleans.CodeGeneration
             return (options & InvokeMethodOptions.TransactionMask) == test;
         }
     }
+
+    /// <summary>
+    /// Represents an object which holds an invocation target as well as target extensions.
+    /// </summary>
+    public interface IGrainHolder
+    {
+        /// <summary>
+        /// Gets the target.
+        /// </summary>
+        /// <typeparam name="TTarget">The target type.</typeparam>
+        /// <returns>The target.</returns>
+        TTarget GetTarget<TTarget>();
+
+        /// <summary>
+        /// Gets the extension object with the specified type.
+        /// </summary>
+        /// <typeparam name="TExtension">The extension type.</typeparam>
+        /// <returns>The extension object with the specified type.</returns>
+        TExtension GetExtension<TExtension>();
+    }
+
+    /// <summary>
+    /// Represents an object which can be invoked asynchronously.
+    /// </summary>
+    public interface IInvokable
+    {
+        /// <summary>
+        /// Gets the invocation target.
+        /// </summary>
+        /// <typeparam name="TTarget">The target type.</typeparam>
+        /// <returns>The invocation target.</returns>
+        TTarget GetTarget<TTarget>();
+
+        /// <summary>
+        /// Sets the invocation target from an instance of <see cref="IGrainHolder"/>.
+        /// </summary>
+        /// <typeparam name="TGrainHolder">The target holder type.</typeparam>
+        /// <param name="holder">The invocation target.</param>
+        void SetTarget<TGrainHolder>(TGrainHolder holder) where TGrainHolder : IGrainHolder;
+
+        /// <summary>
+        /// Invoke the object.
+        /// </summary>
+        /// <returns>A <see cref="ValueTask"/> which will complete when the invocation is complete.</returns>
+        ValueTask Invoke();
+
+        /// <summary>
+        /// Gets or sets the result of invocation.
+        /// </summary>
+        /// <remarks>This property is internally set by <see cref="Invoke"/>.</remarks>
+        object Result { get; set; }
+
+        /// <summary>
+        /// Gets the result.
+        /// </summary>
+        /// <typeparam name="TResult">The result type.</typeparam>
+        /// <returns>The result.</returns>
+        TResult GetResult<TResult>();
+
+        /// <summary>
+        /// Sets the result.
+        /// </summary>
+        /// <typeparam name="TResult">The result type.</typeparam>
+        /// <param name="value">The result value.</param>
+        void SetResult<TResult>(in TResult value);
+
+        /// <summary>
+        /// Gets the number of arguments.
+        /// </summary>
+        int ArgumentCount { get; }
+
+        /// <summary>
+        /// Gets the argument at the specified index.
+        /// </summary>
+        /// <typeparam name="TArgument">The argument type.</typeparam>
+        /// <param name="index">The argument index.</param>
+        /// <returns>The argument at the specified index.</returns>
+        TArgument GetArgument<TArgument>(int index);
+
+        /// <summary>
+        /// Sets the argument at the specified index.
+        /// </summary>
+        /// <typeparam name="TArgument">The argument type.</typeparam>
+        /// <param name="index">The argument index.</param>
+        /// <param name="value">The argument value</param>
+        void SetArgument<TArgument>(int index, in TArgument value);
+
+        /// <summary>
+        /// Resets this instance.
+        /// </summary>
+        void Reset();
+    }
 }
