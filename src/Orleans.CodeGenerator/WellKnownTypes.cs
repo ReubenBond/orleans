@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 
@@ -93,6 +93,7 @@ namespace Orleans.CodeGenerator
                 UInt16 = compilation.GetSpecialType(SpecialType.System_UInt16),
                 UIntPtr = compilation.GetSpecialType(SpecialType.System_UIntPtr),
                 UnorderedAttribute = Type("Orleans.Concurrency.UnorderedAttribute"),
+                ValueTask = Type("System.Threading.Tasks.ValueTask"),
                 ValueTypeSetter_2 = Type("Orleans.Serialization.ValueTypeSetter`2"),
                 VersionAttribute = Type("Orleans.CodeGeneration.VersionAttribute"),
                 Void = compilation.GetSpecialType(SpecialType.System_Void),
@@ -101,6 +102,11 @@ namespace Orleans.CodeGenerator
                 KnownBaseTypeAttribute = Type("Orleans.CodeGeneration.KnownBaseTypeAttribute"),
                 ConsiderForCodeGenerationAttribute = Type("Orleans.CodeGeneration.ConsiderForCodeGenerationAttribute"),
                 OrleansCodeGenerationTargetAttribute = Type("Orleans.CodeGeneration.OrleansCodeGenerationTargetAttribute"),
+                InvalidOperationException = Type("System.InvalidOperationException"),
+                ITargetHolder = Type("Orleans.CodeGeneration.ITargetHolder"),
+                Invokable = Type("Orleans.CodeGeneration.Invokable"),
+                IInvokable = Type("Orleans.CodeGeneration.IInvokable"),
+                GenerateMethodSerializersAttribute = Type("Orleans.CodeGeneration.GenerateMethodSerializersAttribute"),
             };
 
             INamedTypeSymbol Type(string type)
@@ -127,8 +133,7 @@ namespace Orleans.CodeGenerator
                 {
                     foreach (var reference in compilation.References)
                     {
-                        var asm = compilation.GetAssemblyOrModuleSymbol(reference) as IAssemblySymbol;
-                        if (asm == null) continue;
+                        if (!(compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol asm)) continue;
                         result = asm.GetTypeByMetadataName(type);
                         if (result != null) break;
                     }
@@ -137,6 +142,16 @@ namespace Orleans.CodeGenerator
                 return result;
             }
         }
+
+        public INamedTypeSymbol GenerateMethodSerializersAttribute { get; set; }
+
+        public INamedTypeSymbol Invokable { get; private set; }
+        public INamedTypeSymbol IInvokable { get; private set; }
+
+        public INamedTypeSymbol InvalidOperationException { get; private set; }
+        public INamedTypeSymbol ITargetHolder { get; private set; }
+
+        public INamedTypeSymbol ValueTask { get; private set; }
 
         public IAssemblySymbol AbstractionsAssembly { get; private set; }
         public INamedTypeSymbol Attribute { get; private set; }

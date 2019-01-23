@@ -8,17 +8,6 @@ using Orleans.CodeGenerator.Utilities;
 
 namespace Orleans.CodeGenerator.Model
 {
-    internal class MethodDescription
-    {
-        public MethodDescription(IMethodSymbol method)
-        {
-            this.Method = method;
-        }
-
-        public IMethodSymbol Method { get; }
-
-        public override int GetHashCode() => this.Method.GetHashCode();
-    }
     internal interface IMemberDescription
     {
         uint FieldId { get; }
@@ -105,15 +94,14 @@ namespace Orleans.CodeGenerator.Model
     internal interface IInvokableInterfaceDescription
     {
         INamedTypeSymbol InterfaceType { get; }
-        List<MethodDescription> Methods { get; }
-        INamedTypeSymbol ProxyBaseType { get; }
+        List<GrainMethodDescription> Methods { get; }
         bool IsExtension { get; }
     }
 
     internal interface IGeneratedProxyDescription
     {
         TypeSyntax TypeSyntax { get; }
-        IInvokableInterfaceDescription InterfaceDescription { get; }
+        GrainInterfaceDescription InterfaceDescription { get; }
     }
 
     internal class InvokableInterfaceDescription : IInvokableInterfaceDescription
@@ -121,7 +109,7 @@ namespace Orleans.CodeGenerator.Model
         public InvokableInterfaceDescription(
             WellKnownTypes WellKnownTypes,
             INamedTypeSymbol interfaceType,
-            IEnumerable<MethodDescription> methods,
+            IEnumerable<GrainMethodDescription> methods,
             INamedTypeSymbol proxyBaseType,
             bool isExtension)
         {
@@ -154,7 +142,7 @@ namespace Orleans.CodeGenerator.Model
         }
 
         public INamedTypeSymbol InterfaceType { get; }
-        public List<MethodDescription> Methods { get; }
+        public List<GrainMethodDescription> Methods { get; }
         public INamedTypeSymbol ProxyBaseType { get; }
         public bool IsExtension { get; }
     }

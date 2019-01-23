@@ -1,4 +1,7 @@
 using System;
+using System.Runtime.Serialization;
+using System.Threading.Tasks;
+using Orleans.Runtime;
 
 
 namespace Orleans.CodeGeneration
@@ -91,16 +94,16 @@ namespace Orleans.CodeGeneration
     }
 
     /// <summary>
-    /// Represents an object which holds an invocation target as well as target extensions.
+    /// Represents an object which holds a grain as well as grain extensions.
     /// </summary>
     public interface IGrainHolder
     {
         /// <summary>
-        /// Gets the target.
+        /// Gets the grain.
         /// </summary>
-        /// <typeparam name="TTarget">The target type.</typeparam>
-        /// <returns>The target.</returns>
-        TTarget GetTarget<TTarget>();
+        /// <typeparam name="TTarget">The grain type.</typeparam>
+        /// <returns>The grain.</returns>
+        TTarget GetGrain<TTarget>();
 
         /// <summary>
         /// Gets the extension object with the specified type.
@@ -180,5 +183,67 @@ namespace Orleans.CodeGeneration
         /// Resets this instance.
         /// </summary>
         void Reset();
+    }
+
+    public abstract class Invokable : GrainReference, IInvokable
+    {
+        /// <inheritdoc />
+        public abstract TTarget GetTarget<TTarget>();
+
+        /// <inheritdoc />
+        public abstract void SetTarget<TTargetHolder>(TTargetHolder holder) where TTargetHolder : IGrainHolder;
+
+        /// <inheritdoc />
+        public abstract ValueTask Invoke();
+
+        /// <inheritdoc />
+        public object Result
+        {
+            get => this.GetResult<object>();
+            set => this.SetResult(in value);
+        }
+
+        /// <inheritdoc />
+        public abstract TResult GetResult<TResult>();
+
+        /// <inheritdoc />
+        public abstract void SetResult<TResult>(in TResult value);
+        
+        /// <inheritdoc />
+        public abstract int ArgumentCount { get; }
+
+        /// <inheritdoc />
+        public abstract TArgument GetArgument<TArgument>(int index);
+
+        /// <inheritdoc />
+        public abstract void SetArgument<TArgument>(int index, in TArgument value);
+
+        /// <inheritdoc />
+        public abstract void Reset();
+
+        protected Invokable(GrainReference other) : base(other)
+        {
+        }
+
+        protected Invokable(GrainReference other, InvokeMethodOptions invokeMethodOptions) : base(other, invokeMethodOptions)
+        {
+        }
+
+        protected Invokable(SerializationInfo info, StreamingContext context) : base(info, context)
+        {
+        }
+    }
+
+    [AttributeUsage(AttributeTargets.Interface, AllowMultiple = true)]
+    public sealed class GenerateMethodSerializersAttribute : Attribute
+    {
+        public GenerateMethodSerializersAttribute(Type proxyBase, bool isExtension = false)
+        {
+            this.ProxyBase = proxyBase;
+            this.IsExtension = isExtension;
+        }
+
+        public Type ProxyBase { get; }
+        public bool IsExtension { get; }
     }
 }

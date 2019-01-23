@@ -6,6 +6,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.Model;
+using Orleans.CodeGenerator.Utilities;
+using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator.Generators
 {
@@ -16,24 +18,21 @@ namespace Orleans.CodeGenerator.Generators
     {
         public static (ClassDeclarationSyntax, IGeneratedProxyDescription) Generate(
             Compilation compilation,
-            WellKnownTypes WellKnownTypes,
-            IInvokableInterfaceDescription interfaceDescription,
-            MetadataModel metadataModel)
+            WellKnownTypes wellKnownTypes,
+            GrainInterfaceDescription interfaceDescription)
         {
             var generatedClassName = GetSimpleClassName(interfaceDescription.InterfaceType);
 
             /*var fieldDescriptions = GetFieldDescriptions(methodDescription.Method, WellKnownTypes);
             var fields = GetFieldDeclarations(fieldDescriptions);*/
-            var ctors = GenerateConstructors(generatedClassName, WellKnownTypes, interfaceDescription).ToArray();
-            var proxyMethods = CreateProxyMethods(WellKnownTypes, interfaceDescription, metadataModel).ToArray();
+            var ctors = GenerateConstructors(generatedClassName, wellKnownTypes, interfaceDescription).ToArray();
+            var proxyMethods = CreateProxyMethods(wellKnownTypes, interfaceDescription).ToArray();
 
-            var classDeclaration = SyntaxFactory.ClassDeclaration(generatedClassName)
+            var classDeclaration = ClassDeclaration(generatedClassName)
                 .AddBaseListTypes(
-                    SyntaxFactory.SimpleBaseType(interfaceDescription.ProxyBaseType.ToTypeSyntax()),
-                    SyntaxFactory.SimpleBaseType(interfaceDescription.InterfaceType.ToTypeSyntax()))
-                .AddModifiers(SyntaxFactory.Token(SyntaxKind.InternalKeyword), SyntaxFactory.Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(
-                    SyntaxFactory.AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
+                    SimpleBaseType(wellKnownTypes.Invokable.ToTypeSyntax()),
+                    SimpleBaseType(interfaceDescription.InterfaceType.ToTypeSyntax()))
+                .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
                 .AddMembers(ctors)
                 .AddMembers(proxyMethods);
 
@@ -47,19 +46,29 @@ namespace Orleans.CodeGenerator.Generators
 
         private class GeneratedProxyDescription : IGeneratedProxyDescription
         {
-            public GeneratedProxyDescription(IInvokableInterfaceDescription interfaceDescription)
+            public GeneratedProxyDescription(GrainInterfaceDescription interfaceDescription)
             {
                 this.InterfaceDescription = interfaceDescription;
             }
 
             public TypeSyntax TypeSyntax => this.GetProxyTypeName();
-            public IInvokableInterfaceDescription InterfaceDescription { get; }
+            public GrainInterfaceDescription InterfaceDescription { get; }
+
+            private TypeSyntax GetProxyTypeName()
+            {
+                var interfaceType = this.InterfaceDescription.InterfaceType;
+                var genericArity = interfaceType.TypeParameters.Length;
+                var name = ProxyGenerator.GetSimpleClassName(interfaceType);
+                if (genericArity > 0)
+                {
+                    name += $"<{new string(',', genericArity - 1)}>";
+                }
+
+                return ParseTypeName(name);
+            }
         }
 
-        public static string GetSimpleClassName(INamedTypeSymbol type)
-        {
-            return $"{CodeGenerator.CodeGeneratorName}_Proxy_{type.Name}";
-        }
+        public static string GetSimpleClassName(INamedTypeSymbol type) => $"{CodeGenerator.ToolName}_Proxy_{type.Name}";
 
         private static ClassDeclarationSyntax AddGenericTypeConstraints(
             ClassDeclarationSyntax classDeclaration,
@@ -71,14 +80,14 @@ namespace Orleans.CodeGenerator.Generators
                 if (constraints.Count > 0)
                 {
                     classDeclaration = classDeclaration.AddConstraintClauses(
-                        SyntaxFactory.TypeParameterConstraintClause(name).AddConstraints(constraints.ToArray()));
+                        TypeParameterConstraintClause(name).AddConstraints(constraints.ToArray()));
                 }
             }
 
             if (typeParameters.Count > 0)
             {
                 classDeclaration = classDeclaration.WithTypeParameterList(
-                    SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList(typeParameters.Select(tp => SyntaxFactory.TypeParameter(tp.Item1)))));
+                    TypeParameterList(SeparatedList(typeParameters.Select(tp => TypeParameter(tp.Item1)))));
             }
 
             return classDeclaration;
@@ -92,22 +101,22 @@ namespace Orleans.CodeGenerator.Generators
                 var constraints = new List<TypeParameterConstraintSyntax>();
                 if (tp.HasReferenceTypeConstraint)
                 {
-                    constraints.Add(SyntaxFactory.ClassOrStructConstraint(SyntaxKind.ClassConstraint));
+                    constraints.Add(ClassOrStructConstraint(SyntaxKind.ClassConstraint));
                 }
 
                 if (tp.HasValueTypeConstraint)
                 {
-                    constraints.Add(SyntaxFactory.ClassOrStructConstraint(SyntaxKind.StructConstraint));
+                    constraints.Add(ClassOrStructConstraint(SyntaxKind.StructConstraint));
                 }
 
                 foreach (var c in tp.ConstraintTypes)
                 {
-                    constraints.Add(SyntaxFactory.TypeConstraint(c.ToTypeSyntax()));
+                    constraints.Add(TypeConstraint(c.ToTypeSyntax()));
                 }
 
                 if (tp.HasConstructorConstraint)
                 {
-                    constraints.Add(SyntaxFactory.ConstructorConstraint());
+                    constraints.Add(ConstructorConstraint());
                 }
 
                 allConstraints.Add((tp.Name, constraints));
@@ -125,27 +134,27 @@ namespace Orleans.CodeGenerator.Generators
                 switch (description)
                 {
                     case MethodParameterFieldDescription serializable:
-                        return SyntaxFactory.FieldDeclaration(
-                                SyntaxFactory.VariableDeclaration(
+                        return FieldDeclaration(
+                                VariableDeclaration(
                                     description.FieldType.ToTypeSyntax(),
-                                    SyntaxFactory.SingletonSeparatedList(SyntaxFactory.VariableDeclarator(description.FieldName))))
-                            .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword));
+                                    SingletonSeparatedList(VariableDeclarator(description.FieldName))))
+                            .AddModifiers(Token(SyntaxKind.PublicKeyword));
                     default:
-                        return SyntaxFactory.FieldDeclaration(
-                                SyntaxFactory.VariableDeclaration(
+                        return FieldDeclaration(
+                                VariableDeclaration(
                                     description.FieldType.ToTypeSyntax(),
-                                    SyntaxFactory.SingletonSeparatedList(SyntaxFactory.VariableDeclarator(description.FieldName))))
-                            .AddModifiers(SyntaxFactory.Token(SyntaxKind.PrivateKeyword), SyntaxFactory.Token(SyntaxKind.ReadOnlyKeyword));
+                                    SingletonSeparatedList(VariableDeclarator(description.FieldName))))
+                            .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
                 }
             }
         }
 
         private static IEnumerable<MemberDeclarationSyntax> GenerateConstructors(
             string simpleClassName,
-            WellKnownTypes WellKnownTypes,
+            WellKnownTypes wellKnownTypes,
             IInvokableInterfaceDescription interfaceDescription)
         {
-            var baseType = interfaceDescription.ProxyBaseType;
+            var baseType = wellKnownTypes.GrainReference;
             foreach (var member in baseType.GetMembers())
             {
                 if (!(member is IMethodSymbol method)) continue;
@@ -156,15 +165,15 @@ namespace Orleans.CodeGenerator.Generators
 
             ConstructorDeclarationSyntax CreateConstructor(IMethodSymbol baseConstructor)
             {
-                return SyntaxFactory.ConstructorDeclaration(simpleClassName)
+                return ConstructorDeclaration(simpleClassName)
                     .AddParameterListParameters(baseConstructor.Parameters.Select(GetParameterSyntax).ToArray())
-                    .WithModifiers(SyntaxFactory.TokenList(GetModifiers(baseConstructor)))
+                    .WithModifiers(TokenList(GetModifiers(baseConstructor)))
                     .WithInitializer(
-                        SyntaxFactory.ConstructorInitializer(
+                        ConstructorInitializer(
                             SyntaxKind.BaseConstructorInitializer,
-                            SyntaxFactory.ArgumentList(
-                                SyntaxFactory.SeparatedList(baseConstructor.Parameters.Select(GetBaseInitializerArgument)))))
-                    .WithBody(SyntaxFactory.Block());
+                            ArgumentList(
+                                SeparatedList(baseConstructor.Parameters.Select(GetBaseInitializerArgument)))))
+                    .WithBody(Block());
             }
 
             IEnumerable<SyntaxToken> GetModifiers(IMethodSymbol method)
@@ -173,12 +182,12 @@ namespace Orleans.CodeGenerator.Generators
                 {
                     case Accessibility.Public:
                     case Accessibility.Protected:
-                        yield return SyntaxFactory.Token(SyntaxKind.PublicKeyword);
+                        yield return Token(SyntaxKind.PublicKeyword);
                         break;
                     case Accessibility.Internal:
                     case Accessibility.ProtectedOrInternal:
                     case Accessibility.ProtectedAndInternal:
-                        yield return SyntaxFactory.Token(SyntaxKind.InternalKeyword);
+                        yield return Token(SyntaxKind.InternalKeyword);
                         break;
                     default:
                         break;
@@ -187,16 +196,16 @@ namespace Orleans.CodeGenerator.Generators
 
             ArgumentSyntax GetBaseInitializerArgument(IParameterSymbol parameter)
             {
-                var result = SyntaxFactory.Argument(SyntaxFactory.IdentifierName(parameter.Name));
+                var result = Argument(IdentifierName(parameter.Name));
                 switch (parameter.RefKind)
                 {
                     case RefKind.None:
                         break;
                     case RefKind.Ref:
-                        result = result.WithRefOrOutKeyword(SyntaxFactory.Token(SyntaxKind.RefKeyword));
+                        result = result.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
                         break;
                     case RefKind.Out:
-                        result = result.WithRefOrOutKeyword(SyntaxFactory.Token(SyntaxKind.OutKeyword));
+                        result = result.WithRefOrOutKeyword(Token(SyntaxKind.OutKeyword));
                         break;
                     default:
                         break;
@@ -207,23 +216,22 @@ namespace Orleans.CodeGenerator.Generators
         }
 
         private static IEnumerable<MemberDeclarationSyntax> CreateProxyMethods(
-            WellKnownTypes WellKnownTypes,
-            IInvokableInterfaceDescription interfaceDescription,
-            MetadataModel metadataModel)
+            WellKnownTypes wellKnownTypes,
+            GrainInterfaceDescription interfaceDescription)
         {
             foreach (var methodDescription in interfaceDescription.Methods)
             {
                 yield return CreateProxyMethod(methodDescription);
             }
 
-            MethodDeclarationSyntax CreateProxyMethod(MethodDescription methodDescription)
+            MethodDeclarationSyntax CreateProxyMethod(GrainMethodDescription methodDescription)
             {
                 var method = methodDescription.Method;
                 var declaration = MethodDeclaration(method.ReturnType.ToTypeSyntax(), method.Name)
-                    .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.AsyncKeyword))
+                    .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AsyncKeyword))
                     .AddParameterListParameters(method.Parameters.Select(GetParameterSyntax).ToArray())
                     .WithBody(
-                        CreateProxyMethodBody(WellKnownTypes, metadataModel, interfaceDescription, methodDescription));
+                        CreateProxyMethodBody(wellKnownTypes, interfaceDescription, methodDescription));
 
                 var typeParameters = GetTypeParametersWithConstraints(method.TypeParameters);
                 foreach (var (name, constraints) in typeParameters)
@@ -231,14 +239,14 @@ namespace Orleans.CodeGenerator.Generators
                     if (constraints.Count > 0)
                     {
                         declaration = declaration.AddConstraintClauses(
-                            SyntaxFactory.TypeParameterConstraintClause(name).AddConstraints(constraints.ToArray()));
+                            TypeParameterConstraintClause(name).AddConstraints(constraints.ToArray()));
                     }
                 }
 
                 if (typeParameters.Count > 0)
                 {
                     declaration = declaration.WithTypeParameterList(
-                        SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList(typeParameters.Select(tp => SyntaxFactory.TypeParameter(tp.Item1)))));
+                        TypeParameterList(SeparatedList(typeParameters.Select(tp => TypeParameter(tp.Item1)))));
                 }
 
                 return declaration;
@@ -246,37 +254,36 @@ namespace Orleans.CodeGenerator.Generators
         }
 
         private static BlockSyntax CreateProxyMethodBody(
-            WellKnownTypes WellKnownTypes,
-            MetadataModel metadataModel,
-            IInvokableInterfaceDescription interfaceDescription,
-            MethodDescription methodDescription)
+            WellKnownTypes wellKnownTypes,
+            GrainInterfaceDescription interfaceDescription,
+            GrainMethodDescription methodDescription)
         {
             var statements = new List<StatementSyntax>();
 
             // Create request object
-            var requestVar = SyntaxFactory.IdentifierName("request");
+            var requestVar = IdentifierName("request");
 
-            var requestDescription = metadataModel.GeneratedInvokables[methodDescription];
-            var createRequestExpr = SyntaxFactory.ObjectCreationExpression(requestDescription.TypeSyntax)
-                .WithArgumentList(SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList<ArgumentSyntax>()));
+            var requestDescription = interfaceDescription.Invokers[methodDescription];
+            var createRequestExpr = ObjectCreationExpression(requestDescription.TypeSyntax)
+                .WithArgumentList(ArgumentList(SeparatedList<ArgumentSyntax>()));
 
             statements.Add(
-                SyntaxFactory.LocalDeclarationStatement(
-                    SyntaxFactory.VariableDeclaration(
-                        SyntaxFactory.ParseTypeName("var"),
-                        SyntaxFactory.SingletonSeparatedList(
-                            SyntaxFactory.VariableDeclarator(
-                                    SyntaxFactory.Identifier("request"))
+                LocalDeclarationStatement(
+                    VariableDeclaration(
+                        ParseTypeName("var"),
+                        SingletonSeparatedList(
+                            VariableDeclarator(
+                                    Identifier("request"))
                                 .WithInitializer(
-                                    SyntaxFactory.EqualsValueClause(createRequestExpr))))));
+                                    EqualsValueClause(createRequestExpr))))));
 
             // Set request object fields from method parameters.
             var parameterIndex = 0;
             foreach (var parameter in methodDescription.Method.Parameters)
             {
                 statements.Add(
-                    SyntaxFactory.ExpressionStatement(
-                        SyntaxFactory.AssignmentExpression(
+                    ExpressionStatement(
+                        AssignmentExpression(
                             SyntaxKind.SimpleAssignmentExpression,
                             requestVar.Member($"arg{parameterIndex}"),
                             IdentifierName(parameter.Name))));
@@ -286,36 +293,36 @@ namespace Orleans.CodeGenerator.Generators
 
             // Issue request
             statements.Add(
-                SyntaxFactory.ExpressionStatement(
-                    SyntaxFactory.AwaitExpression(
-                        SyntaxFactory.InvocationExpression(
-                            SyntaxFactory.BaseExpression().Member("Invoke"),
-                            SyntaxFactory.ArgumentList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Argument(requestVar)))))));
+                ExpressionStatement(
+                    AwaitExpression(
+                        InvocationExpression(
+                            BaseExpression().Member("Invoke"),
+                            ArgumentList(SingletonSeparatedList(Argument(requestVar)))))));
 
             // Return result
             if (methodDescription.Method.ReturnType is INamedTypeSymbol named && named.TypeParameters.Length == 1)
             {
-                statements.Add(SyntaxFactory.ReturnStatement(requestVar.Member("result")));
+                statements.Add(ReturnStatement(requestVar.Member("result")));
             }
 
-            return SyntaxFactory.Block(statements);
+            return Block(statements);
         }
 
         private static ParameterSyntax GetParameterSyntax(IParameterSymbol parameter)
         {
-            var result = SyntaxFactory.Parameter(SyntaxFactory.Identifier(parameter.Name)).WithType(parameter.Type.ToTypeSyntax());
+            var result = Parameter(Identifier(parameter.Name)).WithType(parameter.Type.ToTypeSyntax());
             switch (parameter.RefKind)
             {
                 case RefKind.None:
                     break;
                 case RefKind.Ref:
-                    result = result.WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.RefKeyword)));
+                    result = result.WithModifiers(TokenList(Token(SyntaxKind.RefKeyword)));
                     break;
                 case RefKind.Out:
-                    result = result.WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.OutKeyword)));
+                    result = result.WithModifiers(TokenList(Token(SyntaxKind.OutKeyword)));
                     break;
                 case RefKind.In:
-                    result = result.WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.InKeyword)));
+                    result = result.WithModifiers(TokenList(Token(SyntaxKind.InKeyword)));
                     break;
                 default:
                     break;
@@ -324,7 +331,7 @@ namespace Orleans.CodeGenerator.Generators
             return result;
         }
 
-        private static List<FieldDescription> GetFieldDescriptions(IMethodSymbol method, WellKnownTypes WellKnownTypes)
+        private static List<FieldDescription> GetFieldDescriptions(IMethodSymbol method, WellKnownTypes wellKnownTypes)
         {
             var fields = new List<FieldDescription>();
 
@@ -372,31 +379,6 @@ namespace Orleans.CodeGenerator.Generators
             }
 
             public override bool IsInjected => true;
-        }
-
-        internal class CodecFieldDescription : FieldDescription, ICodecDescription
-        {
-            public CodecFieldDescription(ITypeSymbol fieldType, string fieldName, ITypeSymbol underlyingType)
-                : base(fieldType, fieldName)
-            {
-                this.UnderlyingType = underlyingType;
-            }
-
-            public ITypeSymbol UnderlyingType { get; }
-            public override bool IsInjected => true;
-        }
-
-        internal class TypeFieldDescription : FieldDescription
-        {
-            public TypeFieldDescription(ITypeSymbol fieldType, string fieldName, ITypeSymbol underlyingType) : base(
-                fieldType,
-                fieldName)
-            {
-                this.UnderlyingType = underlyingType;
-            }
-
-            public ITypeSymbol UnderlyingType { get; }
-            public override bool IsInjected => false;
         }
 
         internal class MethodParameterFieldDescription : FieldDescription, IMemberDescription

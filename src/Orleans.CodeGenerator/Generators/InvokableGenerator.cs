@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.Model;
+using Orleans.CodeGenerator.Utilities;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator.Generators
@@ -17,37 +18,35 @@ namespace Orleans.CodeGenerator.Generators
     {
         public static (ClassDeclarationSyntax, IGeneratedInvokerDescription) Generate(
             Compilation compilation,
-            WellKnownTypes WellKnownTypes,
+            WellKnownTypes wellKnownTypes,
             IInvokableInterfaceDescription interfaceDescription,
-            MethodDescription methodDescription)
+            GrainMethodDescription methodDescription)
         {
             var method = methodDescription.Method;
             var generatedClassName = GetSimpleClassName(method);
 
             var fieldDescriptions = GetFieldDescriptions(methodDescription.Method, interfaceDescription);
-            var fields = GetFieldDeclarations(fieldDescriptions, WellKnownTypes);
+            var fields = GetFieldDeclarations(fieldDescriptions, wellKnownTypes);
             var ctor = GenerateConstructor(generatedClassName, fieldDescriptions);
 
             var targetField = fieldDescriptions.OfType<TargetFieldDescription>().Single();
             var resultField = fieldDescriptions.OfType<ResultFieldDescription>().FirstOrDefault();
 
-            var classDeclaration = SyntaxFactory.ClassDeclaration(generatedClassName)
-                .AddBaseListTypes(SyntaxFactory.SimpleBaseType(WellKnownTypes.Invokable.ToTypeSyntax()))
-                .AddModifiers(SyntaxFactory.Token(SyntaxKind.InternalKeyword), SyntaxFactory.Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(
-                    SyntaxFactory.AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
+            var classDeclaration = ClassDeclaration(generatedClassName)
+                .AddBaseListTypes(SimpleBaseType(wellKnownTypes.Invokable.ToTypeSyntax()))
+                .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
                 .AddMembers(fields)
                 .AddMembers(ctor)
                 .AddMembers(
-                    GenerateGetArgumentCount(WellKnownTypes, methodDescription),
-                    GenerateSetTargetMethod(WellKnownTypes, interfaceDescription, targetField),
-                    GenerateGetTargetMethod(WellKnownTypes, targetField),
-                    GenerateResetMethod(WellKnownTypes, fieldDescriptions),
-                    GenerateGetArgumentMethod(WellKnownTypes, methodDescription, fieldDescriptions),
-                    GenerateSetArgumentMethod(WellKnownTypes, methodDescription, fieldDescriptions),
-                    GenerateInvokeMethod(WellKnownTypes, methodDescription, fieldDescriptions, targetField, resultField),
-                    GenerateSetResultProperty(WellKnownTypes, resultField),
-                    GenerateGetResultProperty(WellKnownTypes, resultField));
+                    GenerateGetArgumentCount(wellKnownTypes, methodDescription),
+                    GenerateSetTargetMethod(wellKnownTypes, interfaceDescription, targetField),
+                    GenerateGetTargetMethod(wellKnownTypes, targetField),
+                    GenerateResetMethod(wellKnownTypes, fieldDescriptions),
+                    GenerateGetArgumentMethod(wellKnownTypes, methodDescription, fieldDescriptions),
+                    GenerateSetArgumentMethod(wellKnownTypes, methodDescription, fieldDescriptions),
+                    GenerateInvokeMethod(wellKnownTypes, methodDescription, fieldDescriptions, targetField, resultField),
+                    GenerateSetResultProperty(wellKnownTypes, resultField),
+                    GenerateGetResultProperty(wellKnownTypes, resultField));
 
             var typeParameters = interfaceDescription.InterfaceType.TypeParameters.Select(tp => (tp, tp.Name))
                 .Concat(method.TypeParameters.Select(tp => (tp, tp.Name)))
@@ -66,62 +65,62 @@ namespace Orleans.CodeGenerator.Generators
         }
 
         private static MemberDeclarationSyntax GenerateSetTargetMethod(
-            WellKnownTypes WellKnownTypes,
+            WellKnownTypes wellKnownTypes,
             IInvokableInterfaceDescription interfaceDescription,
             TargetFieldDescription targetField)
         {
-            var type = SyntaxFactory.IdentifierName("TTargetHolder");
-            var typeToken = SyntaxFactory.Identifier("TTargetHolder");
-            var holderParameter = SyntaxFactory.Identifier("holder");
-            var holder = SyntaxFactory.IdentifierName("holder");
+            var type = IdentifierName("TTargetHolder");
+            var typeToken = Identifier("TTargetHolder");
+            var holderParameter = Identifier("holder");
+            var holder = IdentifierName("holder");
 
-            var getTarget = SyntaxFactory.InvocationExpression(
-                    SyntaxFactory.MemberAccessExpression(
+            var getTarget = InvocationExpression(
+                    MemberAccessExpression(
                         SyntaxKind.SimpleMemberAccessExpression,
                         holder,
-                        SyntaxFactory.GenericName(interfaceDescription.IsExtension ? "GetExtension" : "GetTarget")
+                        GenericName(interfaceDescription.IsExtension ? "GetExtension" : "GetTarget")
                             .WithTypeArgumentList(
-                                SyntaxFactory.TypeArgumentList(
+                                TypeArgumentList(
                                     SingletonSeparatedList(interfaceDescription.InterfaceType.ToTypeSyntax())))))
-                .WithArgumentList(SyntaxFactory.ArgumentList());
+                .WithArgumentList(ArgumentList());
 
             var body =
-                SyntaxFactory.AssignmentExpression(
+                AssignmentExpression(
                     SyntaxKind.SimpleAssignmentExpression,
-                    SyntaxFactory.ThisExpression().Member(targetField.FieldName),
+                    ThisExpression().Member(targetField.FieldName),
                     getTarget);
-            return SyntaxFactory.MethodDeclaration(WellKnownTypes.Void.ToTypeSyntax(), "SetTarget")
-                .WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.TypeParameter(typeToken))))
-                .WithParameterList(SyntaxFactory.ParameterList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Parameter(holderParameter).WithType(type))))
-                .WithExpressionBody(SyntaxFactory.ArrowExpressionClause(body))
-                .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken))
-                .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.OverrideKeyword)));
+            return MethodDeclaration(wellKnownTypes.Void.ToTypeSyntax(), "SetTarget")
+                .WithTypeParameterList(TypeParameterList(SingletonSeparatedList(TypeParameter(typeToken))))
+                .WithParameterList(ParameterList(SingletonSeparatedList(Parameter(holderParameter).WithType(type))))
+                .WithExpressionBody(ArrowExpressionClause(body))
+                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
+                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
 
         private static MemberDeclarationSyntax GenerateGetTargetMethod(
-            WellKnownTypes WellKnownTypes,
+            WellKnownTypes wellKnownTypes,
             TargetFieldDescription targetField)
         {
-            var type = SyntaxFactory.IdentifierName("TTarget");
-            var typeToken = SyntaxFactory.Identifier("TTarget");
+            var type = IdentifierName("TTarget");
+            var typeToken = Identifier("TTarget");
 
-            var body = SyntaxFactory.CastExpression(type, SyntaxFactory.ThisExpression().Member(targetField.FieldName));
-            return SyntaxFactory.MethodDeclaration(type, "GetTarget")
-                .WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.TypeParameter(typeToken))))
-                .WithParameterList(SyntaxFactory.ParameterList())
-                .WithExpressionBody(SyntaxFactory.ArrowExpressionClause(body))
-                .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken))
-                .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.OverrideKeyword)));
+            var body = CastExpression(type, ThisExpression().Member(targetField.FieldName));
+            return MethodDeclaration(type, "GetTarget")
+                .WithTypeParameterList(TypeParameterList(SingletonSeparatedList(TypeParameter(typeToken))))
+                .WithParameterList(ParameterList())
+                .WithExpressionBody(ArrowExpressionClause(body))
+                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
+                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
 
         private static MemberDeclarationSyntax GenerateGetArgumentMethod(
-            WellKnownTypes WellKnownTypes,
-            MethodDescription methodDescription,
+            WellKnownTypes wellKnownTypes,
+            GrainMethodDescription methodDescription,
             List<FieldDescription> fields)
         {
-            var index = SyntaxFactory.IdentifierName("index");
-            var type = SyntaxFactory.IdentifierName("TArgument");
-            var typeToken = SyntaxFactory.Identifier("TArgument");
+            var index = IdentifierName("index");
+            var type = IdentifierName("TArgument");
+            var typeToken = Identifier("TArgument");
 
             var cases = new List<SwitchSectionSyntax>();
             foreach (var field in fields)
@@ -129,66 +128,66 @@ namespace Orleans.CodeGenerator.Generators
                 if (!(field is MethodParameterFieldDescription parameter)) continue;
 
                 // C#: case {index}: return (TArgument)(object){field}
-                var label = SyntaxFactory.CaseSwitchLabel(
-                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(parameter.ParameterOrdinal)));
+                var label = CaseSwitchLabel(
+                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(parameter.ParameterOrdinal)));
                 cases.Add(
-                    SyntaxFactory.SwitchSection(
-                        SyntaxFactory.SingletonList<SwitchLabelSyntax>(label),
+                    SwitchSection(
+                        SingletonList<SwitchLabelSyntax>(label),
                         new SyntaxList<StatementSyntax>(
-                            SyntaxFactory.ReturnStatement(
-                                SyntaxFactory.CastExpression(
+                            ReturnStatement(
+                                CastExpression(
                                     type,
-                                    SyntaxFactory.CastExpression(
-                                        WellKnownTypes.Object.ToTypeSyntax(),
-                                        SyntaxFactory.ThisExpression().Member(parameter.FieldName)))))));
+                                    CastExpression(
+                                        wellKnownTypes.Object.ToTypeSyntax(),
+                                        ThisExpression().Member(parameter.FieldName)))))));
             }
 
             // C#: default: return HagarGeneratedCodeHelper.InvokableThrowArgumentOutOfRange<TArgument>(index, {maxArgs})
-            var throwHelperMethod = SyntaxFactory.MemberAccessExpression(
+            var throwHelperMethod = MemberAccessExpression(
                 SyntaxKind.SimpleMemberAccessExpression,
-                SyntaxFactory.IdentifierName("HagarGeneratedCodeHelper"),
-                SyntaxFactory.GenericName("InvokableThrowArgumentOutOfRange")
+                IdentifierName("HagarGeneratedCodeHelper"),
+                GenericName("InvokableThrowArgumentOutOfRange")
                     .WithTypeArgumentList(
-                        SyntaxFactory.TypeArgumentList(
-                            SyntaxFactory.SingletonSeparatedList<TypeSyntax>(type))));
+                        TypeArgumentList(
+                            SingletonSeparatedList<TypeSyntax>(type))));
             cases.Add(
-                SyntaxFactory.SwitchSection(
-                    SyntaxFactory.SingletonList<SwitchLabelSyntax>(SyntaxFactory.DefaultSwitchLabel()),
+                SwitchSection(
+                    SingletonList<SwitchLabelSyntax>(DefaultSwitchLabel()),
                     new SyntaxList<StatementSyntax>(
-                        SyntaxFactory.ReturnStatement(
-                            SyntaxFactory.InvocationExpression(
+                        ReturnStatement(
+                            InvocationExpression(
                                 throwHelperMethod,
-                                SyntaxFactory.ArgumentList(
-                                    SyntaxFactory.SeparatedList(
+                                ArgumentList(
+                                    SeparatedList(
                                         new[]
                                         {
-                                            SyntaxFactory.Argument(index),
-                                            SyntaxFactory.Argument(
-                                                SyntaxFactory.LiteralExpression(
+                                            Argument(index),
+                                            Argument(
+                                                LiteralExpression(
                                                     SyntaxKind.NumericLiteralExpression,
-                                                    SyntaxFactory.Literal(
+                                                    Literal(
                                                         Math.Max(0, methodDescription.Method.Parameters.Length - 1))))
                                         })))))));
-            var body = SyntaxFactory.SwitchStatement(index, new SyntaxList<SwitchSectionSyntax>(cases));
-            return SyntaxFactory.MethodDeclaration(type, "GetArgument")
-                .WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.TypeParameter(typeToken))))
+            var body = SwitchStatement(index, new SyntaxList<SwitchSectionSyntax>(cases));
+            return MethodDeclaration(type, "GetArgument")
+                .WithTypeParameterList(TypeParameterList(SingletonSeparatedList(TypeParameter(typeToken))))
                 .WithParameterList(
-                    SyntaxFactory.ParameterList(
-                        SyntaxFactory.SingletonSeparatedList(
-                            SyntaxFactory.Parameter(SyntaxFactory.Identifier("index")).WithType(WellKnownTypes.Int32.ToTypeSyntax()))))
-                .WithBody(SyntaxFactory.Block(body))
-                .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.OverrideKeyword)));
+                    ParameterList(
+                        SingletonSeparatedList(
+                            Parameter(Identifier("index")).WithType(wellKnownTypes.Int32.ToTypeSyntax()))))
+                .WithBody(Block(body))
+                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
 
         private static MemberDeclarationSyntax GenerateSetArgumentMethod(
-            WellKnownTypes WellKnownTypes,
-            MethodDescription methodDescription,
+            WellKnownTypes wellKnownTypes,
+            GrainMethodDescription methodDescription,
             List<FieldDescription> fields)
         {
-            var index = SyntaxFactory.IdentifierName("index");
-            var value = SyntaxFactory.IdentifierName("value");
-            var type = SyntaxFactory.IdentifierName("TArgument");
-            var typeToken = SyntaxFactory.Identifier("TArgument");
+            var index = IdentifierName("index");
+            var value = IdentifierName("value");
+            var type = IdentifierName("TArgument");
+            var typeToken = Identifier("TArgument");
 
             var cases = new List<SwitchSectionSyntax>();
             foreach (var field in fields)
@@ -196,120 +195,120 @@ namespace Orleans.CodeGenerator.Generators
                 if (!(field is MethodParameterFieldDescription parameter)) continue;
 
                 // C#: case {index}: {field} = (TField)(object)value; return;
-                var label = SyntaxFactory.CaseSwitchLabel(
-                    SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(parameter.ParameterOrdinal)));
+                var label = CaseSwitchLabel(
+                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(parameter.ParameterOrdinal)));
                 cases.Add(
-                    SyntaxFactory.SwitchSection(
-                        SyntaxFactory.SingletonList<SwitchLabelSyntax>(label),
+                    SwitchSection(
+                        SingletonList<SwitchLabelSyntax>(label),
                         new SyntaxList<StatementSyntax>(
                             new StatementSyntax[]
                             {
-                                SyntaxFactory.ExpressionStatement(
-                                    SyntaxFactory.AssignmentExpression(
+                                ExpressionStatement(
+                                    AssignmentExpression(
                                         SyntaxKind.SimpleAssignmentExpression,
-                                        SyntaxFactory.ThisExpression().Member(parameter.FieldName),
-                                        SyntaxFactory.CastExpression(
+                                        ThisExpression().Member(parameter.FieldName),
+                                        CastExpression(
                                             parameter.FieldType.ToTypeSyntax(),
-                                            SyntaxFactory.CastExpression(
-                                                WellKnownTypes.Object.ToTypeSyntax(),
+                                            CastExpression(
+                                                wellKnownTypes.Object.ToTypeSyntax(),
                                                 value
                                             )))),
-                                SyntaxFactory.ReturnStatement()
+                                ReturnStatement()
                             })));
             }
 
             // C#: default: return HagarGeneratedCodeHelper.InvokableThrowArgumentOutOfRange<TArgument>(index, {maxArgs})
             var maxArgs = Math.Max(0, methodDescription.Method.Parameters.Length - 1);
-            var throwHelperMethod = SyntaxFactory.MemberAccessExpression(
+            var throwHelperMethod = MemberAccessExpression(
                 SyntaxKind.SimpleMemberAccessExpression,
-                SyntaxFactory.IdentifierName("HagarGeneratedCodeHelper"),
-                SyntaxFactory.GenericName("InvokableThrowArgumentOutOfRange")
+                IdentifierName("HagarGeneratedCodeHelper"),
+                GenericName("InvokableThrowArgumentOutOfRange")
                     .WithTypeArgumentList(
-                        SyntaxFactory.TypeArgumentList(
-                            SyntaxFactory.SingletonSeparatedList<TypeSyntax>(type))));
+                        TypeArgumentList(
+                            SingletonSeparatedList<TypeSyntax>(type))));
             cases.Add(
-                SyntaxFactory.SwitchSection(
-                    SyntaxFactory.SingletonList<SwitchLabelSyntax>(SyntaxFactory.DefaultSwitchLabel()),
+                SwitchSection(
+                    SingletonList<SwitchLabelSyntax>(DefaultSwitchLabel()),
                     new SyntaxList<StatementSyntax>(
                         new StatementSyntax[]
                         {
-                            SyntaxFactory.ExpressionStatement(
-                                SyntaxFactory.InvocationExpression(
+                            ExpressionStatement(
+                                InvocationExpression(
                                     throwHelperMethod,
-                                    SyntaxFactory.ArgumentList(
-                                        SyntaxFactory.SeparatedList(
+                                    ArgumentList(
+                                        SeparatedList(
                                             new[]
                                             {
-                                                SyntaxFactory.Argument(index),
-                                                SyntaxFactory.Argument(
-                                                    SyntaxFactory.LiteralExpression(
+                                                Argument(index),
+                                                Argument(
+                                                    LiteralExpression(
                                                         SyntaxKind.NumericLiteralExpression,
-                                                        SyntaxFactory.Literal(maxArgs)))
+                                                        Literal(maxArgs)))
                                             })))),
-                            SyntaxFactory.ReturnStatement()
+                            ReturnStatement()
                         })));
-            var body = SyntaxFactory.SwitchStatement(index, new SyntaxList<SwitchSectionSyntax>(cases));
-            return SyntaxFactory.MethodDeclaration(WellKnownTypes.Void.ToTypeSyntax(), "SetArgument")
-                .WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.TypeParameter(typeToken))))
+            var body = SwitchStatement(index, new SyntaxList<SwitchSectionSyntax>(cases));
+            return MethodDeclaration(wellKnownTypes.Void.ToTypeSyntax(), "SetArgument")
+                .WithTypeParameterList(TypeParameterList(SingletonSeparatedList(TypeParameter(typeToken))))
                 .WithParameterList(
-                    SyntaxFactory.ParameterList(
-                        SyntaxFactory.SeparatedList(
+                    ParameterList(
+                        SeparatedList(
                             new[]
                             {
-                                SyntaxFactory.Parameter(SyntaxFactory.Identifier("index")).WithType(WellKnownTypes.Int32.ToTypeSyntax()),
-                                SyntaxFactory.Parameter(SyntaxFactory.Identifier("value"))
+                                Parameter(Identifier("index")).WithType(wellKnownTypes.Int32.ToTypeSyntax()),
+                                Parameter(Identifier("value"))
                                     .WithType(type)
-                                    .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.InKeyword)))
+                                    .WithModifiers(TokenList(Token(SyntaxKind.InKeyword)))
                             }
                         )))
-                .WithBody(SyntaxFactory.Block(body))
-                .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.OverrideKeyword)));
+                .WithBody(Block(body))
+                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
 
         private static MemberDeclarationSyntax GenerateInvokeMethod(
-            WellKnownTypes WellKnownTypes,
-            MethodDescription method,
+            WellKnownTypes wellKnownTypes,
+            GrainMethodDescription method,
             List<FieldDescription> fields,
             TargetFieldDescription target,
             ResultFieldDescription result)
         {
             var body = new List<StatementSyntax>();
 
-            var resultTask = SyntaxFactory.IdentifierName("resultTask");
+            var resultTask = IdentifierName("resultTask");
 
             // C# var resultTask = this.target.{Method}({params});
-            var args = SyntaxFactory.SeparatedList(
+            var args = SeparatedList(
                 fields.OfType<MethodParameterFieldDescription>()
                     .OrderBy(p => p.ParameterOrdinal)
-                    .Select(p => SyntaxFactory.Argument(SyntaxFactory.ThisExpression().Member(p.FieldName))));
+                    .Select(p => Argument(ThisExpression().Member(p.FieldName))));
             ExpressionSyntax methodCall;
             if (method.Method.TypeParameters.Length > 0)
             {
-                methodCall = SyntaxFactory.MemberAccessExpression(
+                methodCall = MemberAccessExpression(
                     SyntaxKind.SimpleMemberAccessExpression,
-                    SyntaxFactory.ThisExpression().Member(target.FieldName),
-                    SyntaxFactory.GenericName(
-                        SyntaxFactory.Identifier(method.Method.Name),
-                        SyntaxFactory.TypeArgumentList(
+                    ThisExpression().Member(target.FieldName),
+                    GenericName(
+                        Identifier(method.Method.Name),
+                        TypeArgumentList(
                             SeparatedList<TypeSyntax>(
                                 method.Method.TypeParameters.Select(p => IdentifierName(p.Name))))));
             }
             else
             {
-                methodCall = SyntaxFactory.ThisExpression().Member(target.FieldName).Member(method.Method.Name);
+                methodCall = ThisExpression().Member(target.FieldName).Member(method.Method.Name);
             }
             
             body.Add(
-                SyntaxFactory.LocalDeclarationStatement(
-                    SyntaxFactory.VariableDeclaration(
-                        SyntaxFactory.ParseTypeName("var"),
-                        SyntaxFactory.SingletonSeparatedList(
-                            SyntaxFactory.VariableDeclarator(resultTask.Identifier)
+                LocalDeclarationStatement(
+                    VariableDeclaration(
+                        ParseTypeName("var"),
+                        SingletonSeparatedList(
+                            VariableDeclarator(resultTask.Identifier)
                                 .WithInitializer(
-                                    SyntaxFactory.EqualsValueClause(
-                                        SyntaxFactory.InvocationExpression(
+                                    EqualsValueClause(
+                                        InvocationExpression(
                                             methodCall,
-                                            SyntaxFactory.ArgumentList(args))))))));
+                                            ArgumentList(args))))))));
 
             // C#: if (resultTask.IsCompleted) // Even if it failed.
             // C#: {
@@ -320,66 +319,66 @@ namespace Orleans.CodeGenerator.Generators
             if (result != null)
             {
                 synchronousCompletionBody.Add(
-                    SyntaxFactory.ExpressionStatement(
-                        SyntaxFactory.AssignmentExpression(
+                    ExpressionStatement(
+                        AssignmentExpression(
                             SyntaxKind.SimpleAssignmentExpression,
-                            SyntaxFactory.ThisExpression().Member(result.FieldName),
-                            SyntaxFactory.InvocationExpression(
-                                SyntaxFactory.InvocationExpression(resultTask.Member("GetAwaiter")).Member("GetResult")))));
+                            ThisExpression().Member(result.FieldName),
+                            InvocationExpression(
+                                InvocationExpression(resultTask.Member("GetAwaiter")).Member("GetResult")))));
             }
 
-            synchronousCompletionBody.Add(SyntaxFactory.ReturnStatement(SyntaxFactory.DefaultExpression(WellKnownTypes.ValueTask.ToTypeSyntax())));
-            body.Add(SyntaxFactory.IfStatement(resultTask.Member("IsCompleted"), SyntaxFactory.Block(synchronousCompletionBody)));
+            synchronousCompletionBody.Add(ReturnStatement(DefaultExpression(wellKnownTypes.ValueTask.ToTypeSyntax())));
+            body.Add(IfStatement(resultTask.Member("IsCompleted"), Block(synchronousCompletionBody)));
 
             // C#: async ValueTask InvokeAsync(ValueTask<int> asyncValue)
             // C#: {
             // C#:     this.result = await asyncValue.ConfigureAwait(false);
             // C#: }
-            var invokeAsyncParam = SyntaxFactory.IdentifierName("asyncTask");
+            var invokeAsyncParam = IdentifierName("asyncTask");
             var invokeAsyncBody = new List<StatementSyntax>();
-            var awaitExpression = SyntaxFactory.AwaitExpression(
-                SyntaxFactory.InvocationExpression(
+            var awaitExpression = AwaitExpression(
+                InvocationExpression(
                     invokeAsyncParam.Member("ConfigureAwait"),
-                    SyntaxFactory.ArgumentList(
-                        SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Argument(SyntaxFactory.LiteralExpression(SyntaxKind.FalseLiteralExpression))))));
+                    ArgumentList(
+                        SingletonSeparatedList(Argument(LiteralExpression(SyntaxKind.FalseLiteralExpression))))));
             if (result != null)
             {
                 invokeAsyncBody.Add(
-                    SyntaxFactory.ExpressionStatement(
-                        SyntaxFactory.AssignmentExpression(
+                    ExpressionStatement(
+                        AssignmentExpression(
                             SyntaxKind.SimpleAssignmentExpression,
-                            SyntaxFactory.ThisExpression().Member(result.FieldName),
+                            ThisExpression().Member(result.FieldName),
                             awaitExpression)));
             }
             else
             {
-                invokeAsyncBody.Add(SyntaxFactory.ExpressionStatement(SyntaxFactory.AwaitExpression(invokeAsyncParam)));
+                invokeAsyncBody.Add(ExpressionStatement(AwaitExpression(invokeAsyncParam)));
             }
 
-            var invokeAsync = SyntaxFactory.LocalFunctionStatement(WellKnownTypes.ValueTask.ToTypeSyntax(), "InvokeAsync")
-                .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.AsyncKeyword)))
+            var invokeAsync = LocalFunctionStatement(wellKnownTypes.ValueTask.ToTypeSyntax(), "InvokeAsync")
+                .WithModifiers(TokenList(Token(SyntaxKind.AsyncKeyword)))
                 .WithParameterList(
-                    SyntaxFactory.ParameterList(
-                        SyntaxFactory.SingletonSeparatedList(
-                            SyntaxFactory.Parameter(invokeAsyncParam.Identifier).WithType(method.Method.ReturnType.ToTypeSyntax()))))
-                .WithBody(SyntaxFactory.Block(invokeAsyncBody));
+                    ParameterList(
+                        SingletonSeparatedList(
+                            Parameter(invokeAsyncParam.Identifier).WithType(method.Method.ReturnType.ToTypeSyntax()))))
+                .WithBody(Block(invokeAsyncBody));
 
             // C#: return InvokeAsync(resultTask);
             body.Add(
-                SyntaxFactory.ReturnStatement(
-                    SyntaxFactory.InvocationExpression(
-                        SyntaxFactory.IdentifierName("InvokeAsync"),
-                        SyntaxFactory.ArgumentList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Argument(resultTask))))));
+                ReturnStatement(
+                    InvocationExpression(
+                        IdentifierName("InvokeAsync"),
+                        ArgumentList(SingletonSeparatedList(Argument(resultTask))))));
             body.Add(invokeAsync);
 
-            return SyntaxFactory.MethodDeclaration(WellKnownTypes.ValueTask.ToTypeSyntax(), "Invoke")
-                .WithParameterList(SyntaxFactory.ParameterList())
-                .WithBody(SyntaxFactory.Block(body))
-                .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.OverrideKeyword)));
+            return MethodDeclaration(wellKnownTypes.ValueTask.ToTypeSyntax(), "Invoke")
+                .WithParameterList(ParameterList())
+                .WithBody(Block(body))
+                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
 
         private static MemberDeclarationSyntax GenerateResetMethod(
-            WellKnownTypes WellKnownTypes,
+            WellKnownTypes wellKnownTypes,
             List<FieldDescription> fields)
         {
             var body = new List<StatementSyntax>();
@@ -389,139 +388,139 @@ namespace Orleans.CodeGenerator.Generators
                 if (!field.IsInjected)
                 {
                     body.Add(
-                        SyntaxFactory.ExpressionStatement(
-                            SyntaxFactory.AssignmentExpression(
+                        ExpressionStatement(
+                            AssignmentExpression(
                                 SyntaxKind.SimpleAssignmentExpression,
-                                SyntaxFactory.ThisExpression().Member(field.FieldName),
-                                SyntaxFactory.DefaultExpression(field.FieldType.ToTypeSyntax()))));
+                                ThisExpression().Member(field.FieldName),
+                                DefaultExpression(field.FieldType.ToTypeSyntax()))));
                 }
             }
 
-            return SyntaxFactory.MethodDeclaration(WellKnownTypes.Void.ToTypeSyntax(), "Reset")
-                .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.OverrideKeyword)))
-                .WithBody(SyntaxFactory.Block(body));
+            return MethodDeclaration(wellKnownTypes.Void.ToTypeSyntax(), "Reset")
+                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
+                .WithBody(Block(body));
         }
 
         private static MemberDeclarationSyntax GenerateGetArgumentCount(
-            WellKnownTypes WellKnownTypes,
-            MethodDescription methodDescription) =>
-            SyntaxFactory.PropertyDeclaration(WellKnownTypes.Int32.ToTypeSyntax(), "ArgumentCount")
+            WellKnownTypes wellKnownTypes,
+            GrainMethodDescription methodDescription) =>
+            PropertyDeclaration(wellKnownTypes.Int32.ToTypeSyntax(), "ArgumentCount")
                 .WithExpressionBody(
-                    SyntaxFactory.ArrowExpressionClause(
-                        SyntaxFactory.LiteralExpression(
+                    ArrowExpressionClause(
+                        LiteralExpression(
                             SyntaxKind.NumericLiteralExpression,
                             Literal(methodDescription.Method.Parameters.Length))))
-                .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.OverrideKeyword)))
-                .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken));
+                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
+                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
 
         private static MemberDeclarationSyntax GenerateResultProperty(
-            WellKnownTypes WellKnownTypes,
+            WellKnownTypes wellKnownTypes,
             ResultFieldDescription resultField)
         {
-            var getter = SyntaxFactory.AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
+            var getter = AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
                 .WithExpressionBody(
-                    SyntaxFactory.ArrowExpressionClause(
-                        SyntaxFactory.CastExpression(
-                            WellKnownTypes.Object.ToTypeSyntax(),
-                            SyntaxFactory.ThisExpression().Member(resultField.FieldName))))
-                .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken));
+                    ArrowExpressionClause(
+                        CastExpression(
+                            wellKnownTypes.Object.ToTypeSyntax(),
+                            ThisExpression().Member(resultField.FieldName))))
+                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
 
-            var setter = SyntaxFactory.AccessorDeclaration(SyntaxKind.SetAccessorDeclaration)
+            var setter = AccessorDeclaration(SyntaxKind.SetAccessorDeclaration)
                 .WithExpressionBody(
-                    SyntaxFactory.ArrowExpressionClause(
-                        SyntaxFactory.AssignmentExpression(
+                    ArrowExpressionClause(
+                        AssignmentExpression(
                             SyntaxKind.SimpleAssignmentExpression,
-                            SyntaxFactory.ThisExpression().Member(resultField.FieldName),
-                            SyntaxFactory.CastExpression(resultField.FieldType.ToTypeSyntax(), SyntaxFactory.IdentifierName("value")))))
-                .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken));
+                            ThisExpression().Member(resultField.FieldName),
+                            CastExpression(resultField.FieldType.ToTypeSyntax(), IdentifierName("value")))))
+                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
 
-            return SyntaxFactory.PropertyDeclaration(WellKnownTypes.Object.ToTypeSyntax(), "Result")
+            return PropertyDeclaration(wellKnownTypes.Object.ToTypeSyntax(), "Result")
                 .WithAccessorList(
-                    SyntaxFactory.AccessorList()
+                    AccessorList()
                         .AddAccessors(
                             getter,
                             setter))
-                .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.OverrideKeyword)));
+                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
 
         private static MemberDeclarationSyntax GenerateSetResultProperty(
-            WellKnownTypes WellKnownTypes,
+            WellKnownTypes wellKnownTypes,
             ResultFieldDescription resultField)
         {
 
-            var type = SyntaxFactory.IdentifierName("TResult");
-            var typeToken = SyntaxFactory.Identifier("TResult");
+            var type = IdentifierName("TResult");
+            var typeToken = Identifier("TResult");
 
             ExpressionSyntax body;
             if (resultField != null)
             {
-                body = SyntaxFactory.AssignmentExpression(
+                body = AssignmentExpression(
                     SyntaxKind.SimpleAssignmentExpression,
-                    SyntaxFactory.ThisExpression().Member(resultField.FieldName),
-                    SyntaxFactory.CastExpression(
+                    ThisExpression().Member(resultField.FieldName),
+                    CastExpression(
                         resultField.FieldType.ToTypeSyntax(),
-                        SyntaxFactory.CastExpression(WellKnownTypes.Object.ToTypeSyntax(), SyntaxFactory.IdentifierName("value"))));
+                        CastExpression(wellKnownTypes.Object.ToTypeSyntax(), IdentifierName("value"))));
             }
             else
             {
-                body = SyntaxFactory.ThrowExpression(
-                    SyntaxFactory.ObjectCreationExpression(WellKnownTypes.InvalidOperationException.ToTypeSyntax())
-                        .WithArgumentList(SyntaxFactory.ArgumentList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.Argument("Method does not have a return value.".GetLiteralExpression())))));
+                body = ThrowExpression(
+                    ObjectCreationExpression(wellKnownTypes.InvalidOperationException.ToTypeSyntax())
+                        .WithArgumentList(ArgumentList(SingletonSeparatedList(Argument("Method does not have a return value.".ToLiteralExpression())))));
             }
 
-            return SyntaxFactory.MethodDeclaration(WellKnownTypes.Void.ToTypeSyntax(), "SetResult")
-                .WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.TypeParameter(typeToken))))
+            return MethodDeclaration(wellKnownTypes.Void.ToTypeSyntax(), "SetResult")
+                .WithTypeParameterList(TypeParameterList(SingletonSeparatedList(TypeParameter(typeToken))))
                 .WithParameterList(
-                    SyntaxFactory.ParameterList(
-                        SyntaxFactory.SingletonSeparatedList(
-                            SyntaxFactory.Parameter(SyntaxFactory.Identifier("value"))
+                    ParameterList(
+                        SingletonSeparatedList(
+                            Parameter(Identifier("value"))
                                 .WithType(type)
-                                .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.InKeyword))))))
-                .WithExpressionBody(SyntaxFactory.ArrowExpressionClause(body))
-                .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.OverrideKeyword)))
-                .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken));
+                                .WithModifiers(TokenList(Token(SyntaxKind.InKeyword))))))
+                .WithExpressionBody(ArrowExpressionClause(body))
+                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
+                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
         }
 
         private static MemberDeclarationSyntax GenerateGetResultProperty(
-            WellKnownTypes WellKnownTypes,
+            WellKnownTypes wellKnownTypes,
             ResultFieldDescription resultField)
         {
 
-            var type = SyntaxFactory.IdentifierName("TResult");
-            var typeToken = SyntaxFactory.Identifier("TResult");
+            var type = IdentifierName("TResult");
+            var typeToken = Identifier("TResult");
 
             ExpressionSyntax body;
             if (resultField != null)
             {
-                body = SyntaxFactory.CastExpression(
+                body = CastExpression(
                     type,
-                    SyntaxFactory.CastExpression(WellKnownTypes.Object.ToTypeSyntax(), SyntaxFactory.ThisExpression().Member(resultField.FieldName)));
+                    CastExpression(wellKnownTypes.Object.ToTypeSyntax(), ThisExpression().Member(resultField.FieldName)));
             }
             else
             {
-                body = SyntaxFactory.ThrowExpression(
-                    SyntaxFactory.ObjectCreationExpression(WellKnownTypes.InvalidOperationException.ToTypeSyntax())
+                body = ThrowExpression(
+                    ObjectCreationExpression(wellKnownTypes.InvalidOperationException.ToTypeSyntax())
                         .WithArgumentList(
-                            SyntaxFactory.ArgumentList(
-                                SyntaxFactory.SingletonSeparatedList(
-                                    SyntaxFactory.Argument("Method does not have a return value.".GetLiteralExpression())))));
+                            ArgumentList(
+                                SingletonSeparatedList(
+                                    Argument("Method does not have a return value.".ToLiteralExpression())))));
             }
 
-            return SyntaxFactory.MethodDeclaration(type, "GetResult")
-                .WithTypeParameterList(SyntaxFactory.TypeParameterList(SyntaxFactory.SingletonSeparatedList(SyntaxFactory.TypeParameter(typeToken))))
-                .WithParameterList(SyntaxFactory.ParameterList())
-                .WithExpressionBody(SyntaxFactory.ArrowExpressionClause(body))
-                .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword), SyntaxFactory.Token(SyntaxKind.OverrideKeyword)))
-                .WithSemicolonToken(SyntaxFactory.Token(SyntaxKind.SemicolonToken));
+            return MethodDeclaration(type, "GetResult")
+                .WithTypeParameterList(TypeParameterList(SingletonSeparatedList(TypeParameter(typeToken))))
+                .WithParameterList(ParameterList())
+                .WithExpressionBody(ArrowExpressionClause(body))
+                .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
+                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
         }
 
         private class GeneratedInvokerDescription : IGeneratedInvokerDescription
         {
-            private readonly MethodDescription methodDescription;
+            private readonly GrainMethodDescription methodDescription;
 
             public GeneratedInvokerDescription(
                 IInvokableInterfaceDescription interfaceDescription,
-                MethodDescription methodDescription,
+                GrainMethodDescription methodDescription,
                 string generatedClassName,
                 List<IMemberDescription> members)
             {
@@ -543,17 +542,17 @@ namespace Orleans.CodeGenerator.Generators
 
                     if (this.TypeParameters.Length > 0)
                     {
-                        return SyntaxFactory.GenericName(
-                            SyntaxFactory.Identifier(name),
-                            SyntaxFactory.TypeArgumentList(
-                                SyntaxFactory.SeparatedList<TypeSyntax>(this.TypeParameters.Select(p => SyntaxFactory.IdentifierName(p.Name)))));
+                        return GenericName(
+                            Identifier(name),
+                            TypeArgumentList(
+                                SeparatedList<TypeSyntax>(this.TypeParameters.Select(p => IdentifierName(p.Name)))));
                     }
 
-                    return SyntaxFactory.IdentifierName(name);
+                    return IdentifierName(name);
                 }
             }
 
-            public TypeSyntax UnboundTypeSyntax => this.methodDescription.GetInvokableTypeName();
+            public TypeSyntax UnboundTypeSyntax => this.GetInvokableTypeName();
             public bool HasComplexBaseType => false;
             public INamedTypeSymbol BaseType => throw new NotImplementedException();
             public string Name { get; }
@@ -562,6 +561,18 @@ namespace Orleans.CodeGenerator.Generators
             public ImmutableArray<ITypeParameterSymbol> TypeParameters { get; }
             public List<IMemberDescription> Members { get; }
             public IInvokableInterfaceDescription InterfaceDescription { get; }
+
+            public TypeSyntax GetInvokableTypeName()
+            {
+                var genericArity = this.methodDescription.Method.TypeParameters.Length + this.methodDescription.Method.ContainingType.TypeParameters.Length;
+                var name = GetSimpleClassName(this.methodDescription.Method);
+                if (genericArity > 0)
+                {
+                    name += $"<{new string(',', genericArity - 1)}>";
+                }
+
+                return ParseTypeName(name);
+            }
         }
 
         public static string GetSimpleClassName(IMethodSymbol method)
@@ -571,7 +582,7 @@ namespace Orleans.CodeGenerator.Generators
                 ? "_" + string.Join("_", method.Parameters.Select(p => p.Type.Name))
                 : string.Empty;
             return
-                $"{CodeGenerator.CodeGeneratorName}_Invokable_{method.ContainingType.Name}_{method.Name}{typeArgs}{args}";
+                $"{CodeGenerator.ToolName}_Invokable_{method.ContainingType.Name}_{method.Name}{typeArgs}{args}";
         }
 
         private static ClassDeclarationSyntax AddGenericTypeConstraints(
@@ -579,35 +590,35 @@ namespace Orleans.CodeGenerator.Generators
             List<(ITypeParameterSymbol, string)> typeParameters)
         {
             classDeclaration = classDeclaration.WithTypeParameterList(
-                SyntaxFactory.TypeParameterList(SyntaxFactory.SeparatedList(typeParameters.Select(tp => SyntaxFactory.TypeParameter(tp.Item2)))));
+                TypeParameterList(SeparatedList(typeParameters.Select(tp => TypeParameter(tp.Item2)))));
             var constraints = new List<TypeParameterConstraintSyntax>();
             foreach (var (tp, _) in typeParameters)
             {
                 constraints.Clear();
                 if (tp.HasReferenceTypeConstraint)
                 {
-                    constraints.Add(SyntaxFactory.ClassOrStructConstraint(SyntaxKind.ClassConstraint));
+                    constraints.Add(ClassOrStructConstraint(SyntaxKind.ClassConstraint));
                 }
 
                 if (tp.HasValueTypeConstraint)
                 {
-                    constraints.Add(SyntaxFactory.ClassOrStructConstraint(SyntaxKind.StructConstraint));
+                    constraints.Add(ClassOrStructConstraint(SyntaxKind.StructConstraint));
                 }
 
                 foreach (var c in tp.ConstraintTypes)
                 {
-                    constraints.Add(SyntaxFactory.TypeConstraint(c.ToTypeSyntax()));
+                    constraints.Add(TypeConstraint(c.ToTypeSyntax()));
                 }
 
                 if (tp.HasConstructorConstraint)
                 {
-                    constraints.Add(SyntaxFactory.ConstructorConstraint());
+                    constraints.Add(ConstructorConstraint());
                 }
 
                 if (constraints.Count > 0)
                 {
                     classDeclaration = classDeclaration.AddConstraintClauses(
-                        SyntaxFactory.TypeParameterConstraintClause(tp.Name).AddConstraints(constraints.ToArray()));
+                        TypeParameterConstraintClause(tp.Name).AddConstraints(constraints.ToArray()));
                 }
             }
 
@@ -616,44 +627,30 @@ namespace Orleans.CodeGenerator.Generators
 
         private static MemberDeclarationSyntax[] GetFieldDeclarations(
             List<FieldDescription> fieldDescriptions,
-            WellKnownTypes WellKnownTypes)
+            WellKnownTypes wellKnownTypes)
         {
             return fieldDescriptions.Select(GetFieldDeclaration).ToArray();
 
             MemberDeclarationSyntax GetFieldDeclaration(FieldDescription description)
             {
-                var field = SyntaxFactory.FieldDeclaration(
-                    SyntaxFactory.VariableDeclaration(
+                var field = FieldDeclaration(
+                    VariableDeclaration(
                         description.FieldType.ToTypeSyntax(),
-                        SyntaxFactory.SingletonSeparatedList(SyntaxFactory.VariableDeclarator(description.FieldName))));
+                        SingletonSeparatedList(VariableDeclarator(description.FieldName))));
 
                 switch (description)
                 {
                     case ResultFieldDescription _:
                     case MethodParameterFieldDescription _:
-                        field = field.AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword));
+                        field = field.AddModifiers(Token(SyntaxKind.PublicKeyword));
                         break;
                 }
 
                 if (!description.IsSerializable)
                 {
                     field = field.AddAttributeLists(
-                            SyntaxFactory.AttributeList()
-                                .AddAttributes(SyntaxFactory.Attribute(WellKnownTypes.NonSerializedAttribute.ToNameSyntax())));
-                }
-                else if (description is MethodParameterFieldDescription parameter)
-                {
-                    field = field.AddAttributeLists(
-                        SyntaxFactory.AttributeList()
-                            .AddAttributes(
-                                SyntaxFactory.Attribute(
-                                    WellKnownTypes.IdAttribute.ToNameSyntax(),
-                                    SyntaxFactory.AttributeArgumentList()
-                                        .AddArguments(
-                                            SyntaxFactory.AttributeArgument(
-                                                SyntaxFactory.LiteralExpression(
-                                                    SyntaxKind.NumericLiteralExpression,
-                                                    SyntaxFactory.Literal(parameter.FieldId)))))));
+                            AttributeList()
+                                .AddAttributes(Attribute(wellKnownTypes.NonSerializedAttribute.ToNameSyntax())));
                 }
 
                 return field;
@@ -666,26 +663,26 @@ namespace Orleans.CodeGenerator.Generators
         {
             var injected = fieldDescriptions.Where(f => f.IsInjected).ToList();
             var parameters = injected.Select(
-                f => SyntaxFactory.Parameter(f.FieldName.ToIdentifier()).WithType(f.FieldType.ToTypeSyntax()));
+                f => Parameter(f.FieldName.ToIdentifier()).WithType(f.FieldType.ToTypeSyntax()));
             var body = injected.Select(
-                f => (StatementSyntax)SyntaxFactory.ExpressionStatement(
-                    SyntaxFactory.AssignmentExpression(
+                f => (StatementSyntax)ExpressionStatement(
+                    AssignmentExpression(
                         SyntaxKind.SimpleAssignmentExpression,
-                        SyntaxFactory.ThisExpression().Member(f.FieldName.ToIdentifierName()),
+                        ThisExpression().Member(f.FieldName.ToIdentifierName()),
                         Unwrapped(f.FieldName.ToIdentifierName()))));
-            return SyntaxFactory.ConstructorDeclaration(simpleClassName)
-                .AddModifiers(SyntaxFactory.Token(SyntaxKind.PublicKeyword))
+            return ConstructorDeclaration(simpleClassName)
+                .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters.ToArray())
                 .AddBodyStatements(body.ToArray());
 
             ExpressionSyntax Unwrapped(ExpressionSyntax expr)
             {
-                return SyntaxFactory.InvocationExpression(
-                    SyntaxFactory.MemberAccessExpression(
+                return InvocationExpression(
+                    MemberAccessExpression(
                         SyntaxKind.SimpleMemberAccessExpression,
-                        SyntaxFactory.IdentifierName("HagarGeneratedCodeHelper"),
-                        SyntaxFactory.IdentifierName("UnwrapService")),
-                    SyntaxFactory.ArgumentList(SyntaxFactory.SeparatedList(new[] {SyntaxFactory.Argument(SyntaxFactory.ThisExpression()), SyntaxFactory.Argument(expr)})));
+                        IdentifierName("HagarGeneratedCodeHelper"),
+                        IdentifierName("UnwrapService")),
+                    ArgumentList(SeparatedList(new[] {Argument(ThisExpression()), Argument(expr)})));
             }
         }
 
@@ -732,20 +729,6 @@ namespace Orleans.CodeGenerator.Generators
             {
             }
 
-            public override bool IsInjected => true;
-            public override bool IsSerializable => false;
-        }
-
-        internal class CodecFieldDescription : FieldDescription, ICodecDescription
-        {
-            public CodecFieldDescription(ITypeSymbol fieldType, string fieldName, ITypeSymbol underlyingType) : base(
-                fieldType,
-                fieldName)
-            {
-                this.UnderlyingType = underlyingType;
-            }
-
-            public ITypeSymbol UnderlyingType { get; }
             public override bool IsInjected => true;
             public override bool IsSerializable => false;
         }

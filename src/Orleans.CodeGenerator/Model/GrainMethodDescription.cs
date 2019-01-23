@@ -1,4 +1,4 @@
-﻿using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis;
 
 namespace Orleans.CodeGenerator.Model
 {
@@ -12,5 +12,29 @@ namespace Orleans.CodeGenerator.Model
 
         public int MethodId { get; }
         public IMethodSymbol Method { get; }
+        
+        public override int GetHashCode() => this.Method != null ? this.Method.GetHashCode() : 0;
+
+        protected bool Equals(GrainMethodDescription other) => Equals(this.Method, other.Method);
+
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(null, obj))
+            {
+                return false;
+            }
+
+            if (ReferenceEquals(this, obj))
+            {
+                return true;
+            }
+
+            if (obj.GetType() != this.GetType())
+            {
+                return false;
+            }
+
+            return this.Equals((GrainMethodDescription) obj);
+        }
     }
 }
