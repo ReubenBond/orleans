@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -129,6 +129,35 @@ namespace Orleans.CodeGenerator.Utilities
             }
 
             return false;
+        }
+
+        public static AttributeData GetAttributeOrDefault(this ISymbol symbol, ISymbol attributeType, bool inherited = false)
+        {
+            foreach (var attribute in symbol.GetAttributes())
+            {
+                if (attribute.AttributeClass.Equals(attributeType)) return attribute;
+            }
+
+            if (inherited && symbol is INamedTypeSymbol named)
+            {
+                foreach (var iface in named.AllInterfaces)
+                {
+                    foreach (var attribute in iface.GetAttributes())
+                    {
+                        if (attribute.AttributeClass.Equals(attributeType)) return attribute;
+                    }
+                }
+
+                while ((symbol = named.BaseType) != null)
+                {
+                    foreach (var attribute in symbol.GetAttributes())
+                    {
+                        if (attribute.AttributeClass.Equals(attributeType)) return attribute;
+                    }
+                }
+            }
+
+            return null;
         }
 
         public static bool HasAttribute(this ISymbol symbol, string attributeTypeName)

@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using BenchmarkGrainInterfaces.Ping;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -15,28 +16,44 @@ namespace Benchmarks.Ping
     {
         private readonly ISiloHost host;
         private readonly IPingGrain grain;
+        private readonly IEchoGrain echoGrain;
+        private readonly INewEchoGrain newEchoGrain;
         private readonly IClusterClient client;
 
         public SequentialPingBenchmark()
         {
-            this.host = new SiloHostBuilder().UseLocalhostClustering().Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev").Build();
+            this.host = new SiloHostBuilder().UseLocalhostClustering()/*.ConfigureLogging(l => l.AddConsole())*/.Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev").Build();
             this.host.StartAsync().GetAwaiter().GetResult();
 
-            this.client = new ClientBuilder().UseLocalhostClustering().Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev").Build();
+            this.client = new ClientBuilder().UseLocalhostClustering()/*.ConfigureLogging(l => l.AddConsole())*/.Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev").Build();
             this.client.Connect().GetAwaiter().GetResult();
-            
+
             this.grain = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
             this.grain.Run().GetAwaiter().GetResult();
+
+            Console.WriteLine("started");
+            this.echoGrain = this.client.GetGrain<IEchoGrain>(Guid.NewGuid().GetHashCode());
+            this.echoGrain.Echo(0).GetAwaiter().GetResult();
+            this.newEchoGrain = this.client.GetGrain<INewEchoGrain>(Guid.NewGuid().GetHashCode());
+            this.newEchoGrain.Echo(0).GetAwaiter().GetResult();
+            Console.WriteLine("Init complete");
         }
-        
+
+        //[Benchmark]
+        // public Task Ping() => grain.Run();
+
         [Benchmark]
-        public Task Ping() => grain.Run();
+        public ValueTask<int> Echo() => this.echoGrain.Echo(7);
+
+        [Benchmark]
+        public ValueTask<int> NewEcho() => this.newEchoGrain.Echo(7);
 
         public async Task PingForever()
         {
             while (true)
             {
-                await grain.Run();
+                await echoGrain.Echo(21);
+                await this.newEchoGrain.Echo(21);
             }
         }
 

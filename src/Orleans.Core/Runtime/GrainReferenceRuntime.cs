@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using System;
@@ -84,6 +84,11 @@ namespace Orleans.Runtime
 
             resultTask = OrleansTaskExtentions.ConvertTaskViaTcs(resultTask);
             return resultTask.ToTypedTask<T>();
+        }
+
+        public void InvokeAsync<TInvokable>(GrainReference reference, TInvokable invokable) where TInvokable : IInvokable
+        {
+            this.RuntimeClient.SendRequest(reference, invokable, reference.GenericArguments);
         }
 
         public TGrainInterface Convert<TGrainInterface>(IAddressable grain)

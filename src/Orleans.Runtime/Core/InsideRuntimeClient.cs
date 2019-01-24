@@ -112,6 +112,12 @@ namespace Orleans.Runtime
 
         public IGrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime ?? (this.grainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>());
 
+
+        public void SendRequest<TInvokable>(GrainReference target, TInvokable request, string genericArguments = null) where TInvokable : CodeGeneration.IInvokable
+        {
+            var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
+            SendRequestMessage(target, message, genericArguments);
+        }
         public void SendRequest(
             GrainReference target,
             InvokeMethodRequest request,
@@ -127,9 +133,9 @@ namespace Orleans.Runtime
         private void SendRequestMessage(
             GrainReference target,
             Message message,
-            TaskCompletionSource<object> context,
-            string debugContext,
-            InvokeMethodOptions options,
+            object context,
+            string debugContext = null,
+            InvokeMethodOptions options = InvokeMethodOptions.None,
             string genericArguments = null)
         {
             // fill in sender
@@ -317,38 +323,56 @@ namespace Orleans.Runtime
                 object resultObject;
                 try
                 {
-                    var request = (InvokeMethodRequest) message.GetDeserializedBody(this.serializationManager);
-                    if (request.Arguments != null)
+                    var request = message.GetDeserializedBody(this.serializationManager);
+                    if (request is InvokeMethodRequest invokeMethodRequest)
+                        resultObject = await InvokeInvokeMethodRequest(invokeMethodRequest);
+                    else if (request is Invokable inv)
                     {
-                        CancellationSourcesExtension.RegisterCancellationTokens(target, request, this.loggerFactory, logger, this, this.cancellationTokenRuntime);
+                        inv.SetTarget((ActivationData)invokable);
+                        var resultTask = inv.Invoke();
+                        if (!resultTask.IsCompletedSuccessfully)
+                        {
+                            await resultTask;
+                        }
+
+                        resultObject = inv.Result;
                     }
+                    else throw null;
 
-                    var invoker = invokable.GetInvoker(typeManager, request.InterfaceId, message.GenericGrainType);
-
-                    if (invoker is IGrainExtensionMethodInvoker &&
-                        !(target is IGrainExtension) &&
-                        !TryInstallExtension(request.InterfaceId, invokable, message.GenericGrainType, ref invoker))
+                    async Task<object> InvokeInvokeMethodRequest(InvokeMethodRequest imr)
                     {
-                        // We are trying the invoke a grain extension method on a grain 
-                        // -- most likely reason is that the dynamic extension is not installed for this grain
-                        // So throw a specific exception here rather than a general InvalidCastException
-                        var error = String.Format(
-                            "Extension not installed on grain {0} attempting to invoke type {1} from invokable {2}",
-                            target.GetType().FullName, invoker.GetType().FullName, invokable.GetType().FullName);
-                        var exc = new GrainExtensionNotInstalledException(error);
-                        string extraDebugInfo = null;
+                        if (imr.Arguments != null)
+                        {
+                            CancellationSourcesExtension.RegisterCancellationTokens(target, imr, this.loggerFactory, logger, this, this.cancellationTokenRuntime);
+                        }
+
+                        var invoker = invokable.GetInvoker(typeManager, imr.InterfaceId, message.GenericGrainType);
+
+                        if (invoker is IGrainExtensionMethodInvoker &&
+                            !(target is IGrainExtension) &&
+                            !TryInstallExtension(imr.InterfaceId, invokable, message.GenericGrainType, ref invoker))
+                        {
+                            // We are trying the invoke a grain extension method on a grain 
+                            // -- most likely reason is that the dynamic extension is not installed for this grain
+                            // So throw a specific exception here rather than a general InvalidCastException
+                            var error = String.Format(
+                                "Extension not installed on grain {0} attempting to invoke type {1} from invokable {2}",
+                                target.GetType().FullName, invoker.GetType().FullName, invokable.GetType().FullName);
+                            var exc = new GrainExtensionNotInstalledException(error);
+                            string extraDebugInfo = null;
 #if DEBUG
-                        extraDebugInfo = Utils.GetStackTrace();
+                            extraDebugInfo = Utils.GetStackTrace();
 #endif
-                        logger.Warn(ErrorCode.Stream_ExtensionNotInstalled,
-                            string.Format("{0} for message {1} {2}", error, message, extraDebugInfo), exc);
+                            logger.Warn(ErrorCode.Stream_ExtensionNotInstalled,
+                                string.Format("{0} for message {1} {2}", error, message, extraDebugInfo), exc);
 
-                        throw exc;
+                            throw exc;
+                        }
+
+                        var requestInvoker = new GrainMethodInvoker(target, imr, invoker, GrainCallFilters, interfaceToImplementationMapping);
+                        await requestInvoker.Invoke();
+                        return requestInvoker.Result;
                     }
-                    
-                    var requestInvoker = new GrainMethodInvoker(target, request, invoker, GrainCallFilters, interfaceToImplementationMapping);
-                    await requestInvoker.Invoke();
-                    resultObject = requestInvoker.Result;
                 }
                 catch (Exception exc1)
                 {

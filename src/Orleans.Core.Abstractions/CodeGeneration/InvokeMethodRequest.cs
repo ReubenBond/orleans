@@ -1,6 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Sources;
 using Orleans.Runtime;
 
 
@@ -14,9 +20,12 @@ namespace Orleans.CodeGeneration
     {
         /// <summary> InterfaceId for this Invoke request. </summary>
         public int InterfaceId { get; private set; }
+
         public ushort InterfaceVersion { get; private set; }
+
         /// <summary> MethodId for this Invoke request. </summary>
         public int MethodId { get; private set; }
+
         /// <summary> Arguments for this Invoke request. </summary>
         public object[] Arguments { get; private set; }
 
@@ -185,7 +194,7 @@ namespace Orleans.CodeGeneration
         void Reset();
     }
 
-    public abstract class Invokable : GrainReference, IInvokable
+    public abstract class Invokable : IInvokable
     {
         /// <inheritdoc />
         public abstract TTarget GetTarget<TTarget>();
@@ -208,7 +217,7 @@ namespace Orleans.CodeGeneration
 
         /// <inheritdoc />
         public abstract void SetResult<TResult>(in TResult value);
-        
+
         /// <inheritdoc />
         public abstract int ArgumentCount { get; }
 
@@ -221,17 +230,19 @@ namespace Orleans.CodeGeneration
         /// <inheritdoc />
         public abstract void Reset();
 
-        protected Invokable(GrainReference other) : base(other)
-        {
-        }
+        public abstract void Complete(object responseData);
+        public abstract void CompleteWithException(Exception responseException);
+    }
 
-        protected Invokable(GrainReference other, InvokeMethodOptions invokeMethodOptions) : base(other, invokeMethodOptions)
-        {
-        }
+    public abstract class Invokable<T> : Invokable
+    {
+        [NonSerialized]
+        protected readonly TaskCompletionSource<T> completion = new TaskCompletionSource<T>();
 
-        protected Invokable(SerializationInfo info, StreamingContext context) : base(info, context)
-        {
-        }
+        public sealed override void Complete(object responseData) => this.completion.TrySetResult((T)responseData);
+        public sealed override void CompleteWithException(Exception responseException) => this.completion.TrySetException(responseException);
+
+        public TaskAwaiter<T> GetAwaiter() => this.completion.Task.GetAwaiter();
     }
 
     [AttributeUsage(AttributeTargets.Interface, AllowMultiple = true)]
@@ -245,5 +256,12 @@ namespace Orleans.CodeGeneration
 
         public Type ProxyBase { get; }
         public bool IsExtension { get; }
+    }
+
+    public sealed class OrleansGeneratedCodeHelper
+    {
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static TArgument InvokableThrowArgumentOutOfRange<TArgument>(int index, int maxArgs) =>
+            throw new ArgumentOutOfRangeException($"The argument index value {index} must be between 0 and {maxArgs}");
     }
 }

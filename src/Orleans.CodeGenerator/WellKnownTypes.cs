@@ -103,8 +103,9 @@ namespace Orleans.CodeGenerator
                 ConsiderForCodeGenerationAttribute = Type("Orleans.CodeGeneration.ConsiderForCodeGenerationAttribute"),
                 OrleansCodeGenerationTargetAttribute = Type("Orleans.CodeGeneration.OrleansCodeGenerationTargetAttribute"),
                 InvalidOperationException = Type("System.InvalidOperationException"),
-                ITargetHolder = Type("Orleans.CodeGeneration.ITargetHolder"),
+                IGrainHolder = Type("Orleans.CodeGeneration.IGrainHolder"),
                 Invokable = Type("Orleans.CodeGeneration.Invokable"),
+                Invokable_1 = Type("Orleans.CodeGeneration.Invokable`1"),
                 IInvokable = Type("Orleans.CodeGeneration.IInvokable"),
                 GenerateMethodSerializersAttribute = Type("Orleans.CodeGeneration.GenerateMethodSerializersAttribute"),
             };
@@ -146,10 +147,11 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol GenerateMethodSerializersAttribute { get; set; }
 
         public INamedTypeSymbol Invokable { get; private set; }
+        public INamedTypeSymbol Invokable_1 { get; private set; }
         public INamedTypeSymbol IInvokable { get; private set; }
 
         public INamedTypeSymbol InvalidOperationException { get; private set; }
-        public INamedTypeSymbol ITargetHolder { get; private set; }
+        public INamedTypeSymbol IGrainHolder { get; private set; }
 
         public INamedTypeSymbol ValueTask { get; private set; }
 

@@ -1,4 +1,4 @@
-﻿using Orleans.CodeGeneration;
+using Orleans.CodeGeneration;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime
@@ -32,5 +32,7 @@ namespace Orleans.Runtime
         /// <param name="grain">The grain reference being cast.</param>
         /// <returns>A reference to <paramref name="grain"/> which implements <typeparamref name="TGrainInterface"/>.</returns>
         TGrainInterface Convert<TGrainInterface>(IAddressable grain);
+
+        void InvokeAsync<TInvokable>(GrainReference reference, TInvokable invokable) where TInvokable : IInvokable;
     }
 }

@@ -50,6 +50,7 @@ namespace Orleans.Runtime
         void SetResponseTimeout(TimeSpan timeout);
 
         void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null);
+        void SendRequest<TInvokable>(GrainReference target, TInvokable request, string genericArguments = null) where TInvokable : IInvokable;
 
         void SendResponse(Message request, Response response);
 

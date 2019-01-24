@@ -471,5 +471,10 @@ namespace Orleans.Runtime
             var serializerContext = context.Context as ISerializerContext;
             this.runtime = serializerContext?.ServiceProvider.GetService(typeof(IGrainReferenceRuntime)) as IGrainReferenceRuntime;
         }
+
+        protected void Invoke<TInvokable>(TInvokable invokable) where TInvokable : IInvokable
+        {
+            this.Runtime.InvokeAsync(this, invokable);
+        }
     }
 }

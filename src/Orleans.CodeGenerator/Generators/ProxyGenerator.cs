@@ -1,4 +1,4 @@
-using System;
+/*using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -24,7 +24,7 @@ namespace Orleans.CodeGenerator.Generators
             var generatedClassName = GetSimpleClassName(interfaceDescription.InterfaceType);
 
             /*var fieldDescriptions = GetFieldDescriptions(methodDescription.Method, WellKnownTypes);
-            var fields = GetFieldDeclarations(fieldDescriptions);*/
+            var fields = GetFieldDeclarations(fieldDescriptions);#1#
             var ctors = GenerateConstructors(generatedClassName, wellKnownTypes, interfaceDescription).ToArray();
             var proxyMethods = CreateProxyMethods(wellKnownTypes, interfaceDescription).ToArray();
 
@@ -398,4 +398,4 @@ namespace Orleans.CodeGenerator.Generators
             public string Name => this.FieldName;
         }
     }
-}
+}*/

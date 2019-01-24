@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Serialization;
 
@@ -46,7 +47,7 @@ namespace Orleans.Runtime
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        public void ResponseCallback(Message message, TaskCompletionSource<object> context)
+        public void ResponseCallback(Message message, object context)
         {
             Response response;
             if (message.Result != Message.ResponseTypes.Rejection)
@@ -89,11 +90,13 @@ namespace Orleans.Runtime
 
             if (!response.ExceptionFlag)
             {
-                context.TrySetResult(response.Data);
+                if (context is TaskCompletionSource<object> tcs) tcs.TrySetResult(response.Data);
+                else if (context is Invokable invokable) invokable.Complete(response.Data);
             }
             else
             {
-                context.TrySetException(response.Exception);
+                if (context is TaskCompletionSource<object> tcs) tcs.TrySetResult(response.Data);
+                else if (context is Invokable invokable) invokable.CompleteWithException(response.Exception);
             }
         }
     }

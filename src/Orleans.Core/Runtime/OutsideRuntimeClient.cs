@@ -348,7 +348,13 @@ namespace Orleans
 
             incomingMessagesThreadTimeTracking?.OnStopExecution();
         }
-        
+
+        public void SendRequest<TInvokable>(GrainReference target, TInvokable request, string genericArguments = null) where TInvokable : IInvokable
+        {
+            var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
+            SendRequestMessage(target, message, request, genericArguments);
+        }
+
         public void SendResponse(Message request, Response response)
         {
             var message = this.messageFactory.CreateResponseMessage(request);
@@ -382,6 +388,51 @@ namespace Orleans
         }
 
         private void SendRequestMessage(GrainReference target, Message message, TaskCompletionSource<object> context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
+        {
+            var targetGrainId = target.GrainId;
+            var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
+            message.SendingGrain = CurrentActivationAddress.Grain;
+            message.SendingActivation = CurrentActivationAddress.Activation;
+            message.TargetGrain = targetGrainId;
+            if (!String.IsNullOrEmpty(genericArguments))
+                message.GenericGrainType = genericArguments;
+
+            if (targetGrainId.IsSystemTarget)
+            {
+                // If the silo isn't be supplied, it will be filled in by the sender to be the gateway silo
+                message.TargetSilo = target.SystemTargetSilo;
+                if (target.SystemTargetSilo != null)
+                {
+                    message.TargetActivation = ActivationId.GetSystemActivation(targetGrainId, target.SystemTargetSilo);
+                }
+            }
+            // Client sending messages to another client (observer). Yes, we support that.
+            if (target.IsObserverReference)
+            {
+                message.TargetObserverId = target.ObserverId;
+            }
+
+            if (debugContext != null)
+            {
+                message.DebugContext = debugContext;
+            }
+            if (message.IsExpirableMessage(this.clientMessagingOptions.DropExpiredMessages))
+            {
+                // don't set expiration for system target messages.
+                message.TimeToLive = this.clientMessagingOptions.ResponseTimeout;
+            }
+
+            if (!oneWay)
+            {
+                var callbackData = new CallbackData(this.sharedCallbackData, context, message);
+                callbacks.TryAdd(message.Id, callbackData);
+            }
+
+            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Send {0}", message);
+            transport.SendMessage(message);
+        }
+
+        private void SendRequestMessage(GrainReference target, Message message, object context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
         {
             var targetGrainId = target.GrainId;
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;

@@ -63,6 +63,7 @@ namespace Orleans.CodeGenerator.Model
         {
             this.Type = type;
             this.Members = members.ToList();
+            this.TypeParameters = this.Type.GetHierarchyTypeParameters().ToImmutableArray();
         }
 
         private INamedTypeSymbol Type { get; }
@@ -82,7 +83,7 @@ namespace Orleans.CodeGenerator.Model
 
         public bool IsGenericType => this.Type.IsGenericType;
 
-        public ImmutableArray<ITypeParameterSymbol> TypeParameters => this.Type.TypeParameters;
+        public ImmutableArray<ITypeParameterSymbol> TypeParameters { get; }
 
         public List<IMemberDescription> Members { get; }
     }
@@ -102,48 +103,5 @@ namespace Orleans.CodeGenerator.Model
     {
         TypeSyntax TypeSyntax { get; }
         GrainInterfaceDescription InterfaceDescription { get; }
-    }
-
-    internal class InvokableInterfaceDescription : IInvokableInterfaceDescription
-    {
-        public InvokableInterfaceDescription(
-            WellKnownTypes WellKnownTypes,
-            INamedTypeSymbol interfaceType,
-            IEnumerable<GrainMethodDescription> methods,
-            INamedTypeSymbol proxyBaseType,
-            bool isExtension)
-        {
-            this.ValidateBaseClass(WellKnownTypes, proxyBaseType);
-            this.InterfaceType = interfaceType;
-            this.ProxyBaseType = proxyBaseType;
-            this.IsExtension = isExtension;
-            this.Methods = methods.ToList();
-        }
-
-        void ValidateBaseClass(WellKnownTypes l, INamedTypeSymbol baseClass)
-        {
-            var found = false;
-            foreach (var member in baseClass.GetMembers("Invoke"))
-            {
-                if (!(member is IMethodSymbol method)) continue;
-                if (method.TypeParameters.Length != 1) continue;
-                if (method.Parameters.Length != 1) continue;
-                if (!method.Parameters[0].Type.Equals(method.TypeParameters[0])) continue;
-                if (!method.TypeParameters[0].ConstraintTypes.Contains(l.IInvokable)) continue;
-                if (!method.ReturnType.Equals(l.ValueTask)) continue;
-                found = true;
-            }
-
-            if (!found)
-            {
-                throw new InvalidOperationException(
-                    $"Proxy base class {baseClass} does not contain a definition for ValueTask Invoke<T>(T) where T : IInvokable");
-            }
-        }
-
-        public INamedTypeSymbol InterfaceType { get; }
-        public List<GrainMethodDescription> Methods { get; }
-        public INamedTypeSymbol ProxyBaseType { get; }
-        public bool IsExtension { get; }
     }
 }

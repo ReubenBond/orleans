@@ -140,8 +140,23 @@ namespace Orleans.CodeGenerator
             foreach (var grainInterface in model.GrainInterfaces)
             {
                 var nsMembers = GetNamespace(namespaceGroupings, grainInterface.Type.ContainingNamespace);
+                if (grainInterface.HasGenerateMethodSerializersAttribute) // TODO: this isn't backwards compatible - we should always generate the invoker objects.
+                {
+                    foreach (var method in grainInterface.Methods)
+                    {
+                        var (invokable, generatedInvokerDescription) = InvokableGenerator.Generate(
+                            this.compilation,
+                            this.wellKnownTypes,
+                            grainInterface,
+                            method);
+                        grainInterface.Invokers[method] = generatedInvokerDescription;
+                        nsMembers.Add(invokable);
+                    }
+                }
+
                 nsMembers.Add(GrainMethodInvokerGenerator.GenerateClass(this.wellKnownTypes, grainInterface));
                 nsMembers.Add(GrainReferenceGenerator.GenerateClass(this.wellKnownTypes, grainInterface));
+                
             }
 
             var serializersToGenerate = model.Serializers.SerializerTypes
@@ -249,26 +264,6 @@ namespace Orleans.CodeGenerator
                     this.wellKnownTypes.GetVersion(type),
                     methods,
                     this.wellKnownTypes));
-
-                if (type.TypeKind == TypeKind.Interface)
-                {
-                    var attribute = this.HasAttribute(
-                        type,
-                        this.wellKnownTypes.GenerateMethodSerializersAttribute,
-                        inherited: true);
-                    if (attribute != null)
-                    {
-                        var baseClass = (INamedTypeSymbol)attribute.ConstructorArguments[0].Value;
-                        var isExtension = (bool)attribute.ConstructorArguments[1].Value;
-                        var description = new InvokableInterfaceDescription(
-                            this.wellKnownTypes,
-                            type,
-                            this.GetMethods(symbol),
-                            baseClass,
-                            isExtension);
-                        //model.GrainInterfaces.Add(description);
-                    }
-                }
             }
 
             // Returns a list of all methods in all interfaces on the provided type.
@@ -290,48 +285,6 @@ namespace Orleans.CodeGenerator
                     }
                 }
             }
-        }
-
-        // Returns descriptions of all methods 
-        private IEnumerable<GrainMethodDescription> GetMethods(INamedTypeSymbol symbol)
-        {
-            foreach (var member in symbol.GetMembers())
-            {
-                if (member is IMethodSymbol method)
-                {
-                    yield return new GrainMethodDescription(method);
-                }
-            }
-        }
-
-        // Returns true if the type declaration has the specified attribute.
-        private AttributeData HasAttribute(INamedTypeSymbol symbol, ISymbol attributeType, bool inherited = false)
-        {
-            foreach (var attribute in symbol.GetAttributes())
-            {
-                if (attribute.AttributeClass.Equals(attributeType)) return attribute;
-            }
-
-            if (inherited)
-            {
-                foreach (var iface in symbol.AllInterfaces)
-                {
-                    foreach (var attribute in iface.GetAttributes())
-                    {
-                        if (attribute.AttributeClass.Equals(attributeType)) return attribute;
-                    }
-                }
-
-                while ((symbol = symbol.BaseType) != null)
-                {
-                    foreach (var attribute in symbol.GetAttributes())
-                    {
-                        if (attribute.AttributeClass.Equals(attributeType)) return attribute;
-                    }
-                }
-            }
-
-            return null;
         }
 
         private void ProcessGrainClass(AggregatedModel model, INamedTypeSymbol type)

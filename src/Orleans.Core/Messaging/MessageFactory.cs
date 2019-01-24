@@ -18,7 +18,7 @@ namespace Orleans.Runtime
             this.logger = logger;
         }
 
-        public Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
+        public Message CreateMessage(object request, InvokeMethodOptions options)
         {
             var message = new Message
             {
@@ -29,7 +29,7 @@ namespace Orleans.Runtime
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
                 BodyObject = request,
-                IsUsingInterfaceVersions = request.InterfaceVersion > 0,
+                IsUsingInterfaceVersions = false,//request.InterfaceVersion > 0,
                 RequestContextData = RequestContextExtensions.Export(this.serializationManager)
             };
 

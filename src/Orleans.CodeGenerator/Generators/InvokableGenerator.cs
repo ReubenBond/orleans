@@ -19,7 +19,7 @@ namespace Orleans.CodeGenerator.Generators
         public static (ClassDeclarationSyntax, IGeneratedInvokerDescription) Generate(
             Compilation compilation,
             WellKnownTypes wellKnownTypes,
-            IInvokableInterfaceDescription interfaceDescription,
+            GrainInterfaceDescription interfaceDescription,
             GrainMethodDescription methodDescription)
         {
             var method = methodDescription.Method;
@@ -33,24 +33,34 @@ namespace Orleans.CodeGenerator.Generators
             var resultField = fieldDescriptions.OfType<ResultFieldDescription>().FirstOrDefault();
 
             var classDeclaration = ClassDeclaration(generatedClassName)
-                .AddBaseListTypes(SimpleBaseType(wellKnownTypes.Invokable.ToTypeSyntax()))
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
                 .AddMembers(fields)
                 .AddMembers(ctor)
                 .AddMembers(
                     GenerateGetArgumentCount(wellKnownTypes, methodDescription),
                     GenerateSetTargetMethod(wellKnownTypes, interfaceDescription, targetField),
-                    GenerateGetTargetMethod(wellKnownTypes, targetField),
+                    GenerateGetTargetMethod(targetField),
                     GenerateResetMethod(wellKnownTypes, fieldDescriptions),
                     GenerateGetArgumentMethod(wellKnownTypes, methodDescription, fieldDescriptions),
                     GenerateSetArgumentMethod(wellKnownTypes, methodDescription, fieldDescriptions),
                     GenerateInvokeMethod(wellKnownTypes, methodDescription, fieldDescriptions, targetField, resultField),
                     GenerateSetResultProperty(wellKnownTypes, resultField),
                     GenerateGetResultProperty(wellKnownTypes, resultField));
-
             var typeParameters = interfaceDescription.InterfaceType.TypeParameters.Select(tp => (tp, tp.Name))
                 .Concat(method.TypeParameters.Select(tp => (tp, tp.Name)))
                 .ToList();
+
+            if (resultField != null)
+            {
+                classDeclaration = classDeclaration.AddBaseListTypes(
+                    SimpleBaseType(wellKnownTypes.Invokable_1.Construct(resultField.FieldType).ToTypeSyntax()));
+            }
+            else
+            {
+                classDeclaration = classDeclaration.AddBaseListTypes(
+                    SimpleBaseType(wellKnownTypes.Invokable_1.Construct(wellKnownTypes.Object).ToTypeSyntax()));
+            }
+
             if (typeParameters.Count > 0)
             {
                 classDeclaration = AddGenericTypeConstraints(classDeclaration, typeParameters);
@@ -78,7 +88,7 @@ namespace Orleans.CodeGenerator.Generators
                     MemberAccessExpression(
                         SyntaxKind.SimpleMemberAccessExpression,
                         holder,
-                        GenericName(interfaceDescription.IsExtension ? "GetExtension" : "GetTarget")
+                        GenericName(interfaceDescription.IsExtension ? "GetExtension" : "GetGrain")
                             .WithTypeArgumentList(
                                 TypeArgumentList(
                                     SingletonSeparatedList(interfaceDescription.InterfaceType.ToTypeSyntax())))))
@@ -97,9 +107,7 @@ namespace Orleans.CodeGenerator.Generators
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
 
-        private static MemberDeclarationSyntax GenerateGetTargetMethod(
-            WellKnownTypes wellKnownTypes,
-            TargetFieldDescription targetField)
+        private static MemberDeclarationSyntax GenerateGetTargetMethod(TargetFieldDescription targetField)
         {
             var type = IdentifierName("TTarget");
             var typeToken = Identifier("TTarget");
@@ -142,10 +150,10 @@ namespace Orleans.CodeGenerator.Generators
                                         ThisExpression().Member(parameter.FieldName)))))));
             }
 
-            // C#: default: return HagarGeneratedCodeHelper.InvokableThrowArgumentOutOfRange<TArgument>(index, {maxArgs})
+            // C#: default: return OrleansGeneratedCodeHelper.InvokableThrowArgumentOutOfRange<TArgument>(index, {maxArgs})
             var throwHelperMethod = MemberAccessExpression(
                 SyntaxKind.SimpleMemberAccessExpression,
-                IdentifierName("HagarGeneratedCodeHelper"),
+                IdentifierName("Orleans").Member("CodeGeneration").Member("OrleansGeneratedCodeHelper"),
                 GenericName("InvokableThrowArgumentOutOfRange")
                     .WithTypeArgumentList(
                         TypeArgumentList(
@@ -217,11 +225,11 @@ namespace Orleans.CodeGenerator.Generators
                             })));
             }
 
-            // C#: default: return HagarGeneratedCodeHelper.InvokableThrowArgumentOutOfRange<TArgument>(index, {maxArgs})
+            // C#: default: return OrleansGeneratedCodeHelper.InvokableThrowArgumentOutOfRange<TArgument>(index, {maxArgs})
             var maxArgs = Math.Max(0, methodDescription.Method.Parameters.Length - 1);
             var throwHelperMethod = MemberAccessExpression(
                 SyntaxKind.SimpleMemberAccessExpression,
-                IdentifierName("HagarGeneratedCodeHelper"),
+                IdentifierName("Orleans").Member("CodeGeneration").Member("OrleansGeneratedCodeHelper"),
                 GenericName("InvokableThrowArgumentOutOfRange")
                     .WithTypeArgumentList(
                         TypeArgumentList(
@@ -669,21 +677,11 @@ namespace Orleans.CodeGenerator.Generators
                     AssignmentExpression(
                         SyntaxKind.SimpleAssignmentExpression,
                         ThisExpression().Member(f.FieldName.ToIdentifierName()),
-                        Unwrapped(f.FieldName.ToIdentifierName()))));
+                        f.FieldName.ToIdentifierName())));
             return ConstructorDeclaration(simpleClassName)
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters.ToArray())
                 .AddBodyStatements(body.ToArray());
-
-            ExpressionSyntax Unwrapped(ExpressionSyntax expr)
-            {
-                return InvocationExpression(
-                    MemberAccessExpression(
-                        SyntaxKind.SimpleMemberAccessExpression,
-                        IdentifierName("HagarGeneratedCodeHelper"),
-                        IdentifierName("UnwrapService")),
-                    ArgumentList(SeparatedList(new[] {Argument(ThisExpression()), Argument(expr)})));
-            }
         }
 
         private static List<FieldDescription> GetFieldDescriptions(
@@ -721,30 +719,6 @@ namespace Orleans.CodeGenerator.Generators
             public string FieldName { get; }
             public abstract bool IsInjected { get; }
             public abstract bool IsSerializable { get; }
-        }
-
-        internal class InjectedFieldDescription : FieldDescription
-        {
-            public InjectedFieldDescription(ITypeSymbol fieldType, string fieldName) : base(fieldType, fieldName)
-            {
-            }
-
-            public override bool IsInjected => true;
-            public override bool IsSerializable => false;
-        }
-
-        internal class TypeFieldDescription : FieldDescription
-        {
-            public TypeFieldDescription(ITypeSymbol fieldType, string fieldName, ITypeSymbol underlyingType) : base(
-                fieldType,
-                fieldName)
-            {
-                this.UnderlyingType = underlyingType;
-            }
-
-            public ITypeSymbol UnderlyingType { get; }
-            public override bool IsInjected => false;
-            public override bool IsSerializable => false;
         }
 
         internal class ResultFieldDescription : FieldDescription

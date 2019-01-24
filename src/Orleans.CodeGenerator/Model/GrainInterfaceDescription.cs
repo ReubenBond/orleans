@@ -16,8 +16,16 @@ namespace Orleans.CodeGenerator.Model
             this.InterfaceId = interfaceId;
             this.InterfaceVersion = interfaceVersion;
             this.Methods = members.ToList();
+            var attribute = type.GetAttributeOrDefault(
+                wellKnownTypes.GenerateMethodSerializersAttribute,
+                inherited: true);
+            //var baseClass = (INamedTypeSymbol)attribute.ConstructorArguments[0].Value;
+            //var isExtension = (bool)attribute.ConstructorArguments[1].Value;
+            this.HasGenerateMethodSerializersAttribute = attribute != null;
             this.IsExtension = type.HasInterface(wellKnownTypes.IGrainExtension);
         }
+
+        public bool HasGenerateMethodSerializersAttribute { get; }
 
         public ushort InterfaceVersion { get; }
 

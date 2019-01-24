@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
@@ -62,8 +63,17 @@ namespace Orleans.CodeGenerator.Generators
                         GenerateInterfaceNameProperty(wellKnownTypes, description),
                         GenerateIsCompatibleMethod(wellKnownTypes, description),
                         GenerateGetMethodNameMethod(wellKnownTypes, description))
-                    .AddMembers(GenerateInvokeMethods(wellKnownTypes, description))
                     .AddAttributeLists(attributes);
+
+            if (description.HasGenerateMethodSerializersAttribute)
+            {
+                classDeclaration = classDeclaration.AddMembers(CreateProxyMethods(wellKnownTypes, description));
+            }
+            else
+            {
+                classDeclaration = classDeclaration.AddMembers(GenerateInvokeMethods(wellKnownTypes, description));
+            }
+
             if (genericTypes.Length > 0)
             {
                 classDeclaration = classDeclaration.AddTypeParameterListParameters(genericTypes);
@@ -261,6 +271,154 @@ namespace Orleans.CodeGenerator.Generators
                     return argName;
                 }
             }
+        }
+
+        private static MemberDeclarationSyntax[] CreateProxyMethods(
+            WellKnownTypes wellKnownTypes,
+            GrainInterfaceDescription interfaceDescription)
+        {
+            return interfaceDescription.Methods.Select(CreateProxyMethod).ToArray();
+
+            MemberDeclarationSyntax CreateProxyMethod(GrainMethodDescription methodDescription)
+            {
+                var method = methodDescription.Method;
+                var declaration = MethodDeclaration(method.ReturnType.ToTypeSyntax(), method.Name)
+                    .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AsyncKeyword))
+                    .AddParameterListParameters(method.Parameters.Select(GetParameterSyntax).ToArray())
+                    .WithBody(
+                        CreateProxyMethodBody(wellKnownTypes, interfaceDescription, methodDescription));
+
+                var typeParameters = GetTypeParametersWithConstraints(method.TypeParameters);
+                foreach (var (name, constraints) in typeParameters)
+                {
+                    if (constraints.Count > 0)
+                    {
+                        declaration = declaration.AddConstraintClauses(
+                            TypeParameterConstraintClause(name).AddConstraints(constraints.ToArray()));
+                    }
+                }
+
+                if (typeParameters.Count > 0)
+                {
+                    declaration = declaration.WithTypeParameterList(
+                        TypeParameterList(SeparatedList(typeParameters.Select(tp => TypeParameter(tp.Item1)))));
+                }
+
+                return declaration;
+            }
+
+            List<(string, List<TypeParameterConstraintSyntax>)> GetTypeParametersWithConstraints(ImmutableArray<ITypeParameterSymbol> typeParameter)
+            {
+                var allConstraints = new List<(string, List<TypeParameterConstraintSyntax>)>();
+                foreach (var tp in typeParameter)
+                {
+                    var constraints = new List<TypeParameterConstraintSyntax>();
+                    if (tp.HasReferenceTypeConstraint)
+                    {
+                        constraints.Add(ClassOrStructConstraint(SyntaxKind.ClassConstraint));
+                    }
+
+                    if (tp.HasValueTypeConstraint)
+                    {
+                        constraints.Add(ClassOrStructConstraint(SyntaxKind.StructConstraint));
+                    }
+
+                    foreach (var c in tp.ConstraintTypes)
+                    {
+                        constraints.Add(TypeConstraint(c.ToTypeSyntax()));
+                    }
+
+                    if (tp.HasConstructorConstraint)
+                    {
+                        constraints.Add(ConstructorConstraint());
+                    }
+
+                    allConstraints.Add((tp.Name, constraints));
+                }
+
+                return allConstraints;
+            }
+        }
+
+        private static BlockSyntax CreateProxyMethodBody(
+            WellKnownTypes wellKnownTypes,
+            GrainInterfaceDescription interfaceDescription,
+            GrainMethodDescription methodDescription)
+        {
+            var statements = new List<StatementSyntax>();
+
+            // Create request object
+            var requestVar = IdentifierName("request");
+
+            var requestDescription = interfaceDescription.Invokers[methodDescription];
+            var createRequestExpr = ObjectCreationExpression(requestDescription.TypeSyntax)
+                .WithArgumentList(ArgumentList(SeparatedList<ArgumentSyntax>()));
+
+            statements.Add(
+                LocalDeclarationStatement(
+                    VariableDeclaration(
+                        ParseTypeName("var"),
+                        SingletonSeparatedList(
+                            VariableDeclarator(
+                                    Identifier("request"))
+                                .WithInitializer(
+                                    EqualsValueClause(createRequestExpr))))));
+
+            // Set request object fields from method parameters.
+            var parameterIndex = 0;
+            foreach (var parameter in methodDescription.Method.Parameters)
+            {
+                statements.Add(
+                    ExpressionStatement(
+                        AssignmentExpression(
+                            SyntaxKind.SimpleAssignmentExpression,
+                            requestVar.Member($"arg{parameterIndex}"),
+                            IdentifierName(parameter.Name))));
+
+                parameterIndex++;
+            }
+
+            // Issue request
+            statements.Add(
+                ExpressionStatement(
+                        InvocationExpression(
+                            BaseExpression().Member("Invoke"),
+                            ArgumentList(SingletonSeparatedList(Argument(requestVar))))));
+
+            // Return result
+            if (methodDescription.Method.ReturnType is INamedTypeSymbol named && named.TypeParameters.Length == 1)
+            {
+                statements.Add(ReturnStatement(AwaitExpression(requestVar)));
+            }
+            else
+            {
+                statements.Add(ExpressionStatement(AwaitExpression(requestVar)));
+            }
+
+            return Block(statements);
+        }
+
+        private static ParameterSyntax GetParameterSyntax(IParameterSymbol parameter)
+        {
+            var result = Parameter(Identifier(parameter.Name)).WithType(parameter.Type.ToTypeSyntax());
+            switch (parameter.RefKind)
+            {
+                case RefKind.None:
+                    break;
+                case RefKind.Ref:
+                    result = result.WithModifiers(TokenList(Token(SyntaxKind.RefKeyword)));
+                    break;
+                case RefKind.Out:
+                    result = result.WithModifiers(TokenList(Token(SyntaxKind.OutKeyword)));
+                    break;
+                case RefKind.In:
+                    result = result.WithModifiers(TokenList(Token(SyntaxKind.InKeyword)));
+                    break;
+                default:
+                    break;
+            }
+
+            return result;
         }
 
         /// <summary>

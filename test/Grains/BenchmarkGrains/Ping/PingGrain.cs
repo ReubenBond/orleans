@@ -1,4 +1,4 @@
-﻿using Orleans;
+using Orleans;
 using BenchmarkGrainInterfaces.Ping;
 using System.Threading.Tasks;
 
@@ -24,5 +24,15 @@ namespace BenchmarkGrains.Ping
             if (count == 0) return Task.CompletedTask;
             return other.PingPongInterleave(this.self, count - 1);
         }
+    }
+
+    public class EchoGrain : Grain, IEchoGrain
+    {
+        public ValueTask<int> Echo(int input) => new ValueTask<int>(input);
+    }
+
+    public class NewEchoGrain : Grain, INewEchoGrain
+    {
+        public ValueTask<int> Echo(int input) => new ValueTask<int>(input);
     }
 }
