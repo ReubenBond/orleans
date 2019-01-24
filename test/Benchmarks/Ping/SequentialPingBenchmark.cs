@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using BenchmarkGrainInterfaces.Ping;
-using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Serialization;
 
 namespace Benchmarks.Ping
 {
@@ -22,10 +23,18 @@ namespace Benchmarks.Ping
 
         public SequentialPingBenchmark()
         {
-            this.host = new SiloHostBuilder().UseLocalhostClustering()/*.ConfigureLogging(l => l.AddConsole())*/.Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev").Build();
+            this.host = new SiloHostBuilder().UseLocalhostClustering() /*.ConfigureLogging(l => l.AddConsole())*/
+                .Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev")
+                .Configure<SerializationProviderOptions>(
+                    options => { options.FallbackSerializationProvider = typeof(ILBasedSerializer).GetTypeInfo(); })
+                .Build();
             this.host.StartAsync().GetAwaiter().GetResult();
 
-            this.client = new ClientBuilder().UseLocalhostClustering()/*.ConfigureLogging(l => l.AddConsole())*/.Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev").Build();
+            this.client = new ClientBuilder().UseLocalhostClustering() /*.ConfigureLogging(l => l.AddConsole())*/
+                .Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev")
+                .Configure<SerializationProviderOptions>(
+                    options => { options.FallbackSerializationProvider = typeof(ILBasedSerializer).GetTypeInfo(); })
+                .Build();
             this.client.Connect().GetAwaiter().GetResult();
 
             this.grain = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
@@ -42,7 +51,7 @@ namespace Benchmarks.Ping
         //[Benchmark]
         // public Task Ping() => grain.Run();
 
-        [Benchmark]
+        //[Benchmark]
         public ValueTask<int> Echo() => this.echoGrain.Echo(7);
 
         [Benchmark]

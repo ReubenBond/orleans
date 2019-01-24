@@ -88,6 +88,7 @@ namespace Orleans.Runtime
 
         public void InvokeAsync<TInvokable>(GrainReference reference, TInvokable invokable) where TInvokable : IInvokable
         {
+            invokable = (TInvokable)this.serializationManager.DeepCopy(invokable);
             this.RuntimeClient.SendRequest(reference, invokable, reference.GenericArguments);
         }
 

@@ -10,5 +10,5 @@ Intel Xeon Silver 4108 CPU 1.80GHz, 1 CPU, 16 logical and 8 physical cores
 ```
 |  Method |     Mean |    Error |    StdDev | Gen 0/1k Op | Gen 1/1k Op | Gen 2/1k Op | Allocated Memory/Op |
 |-------- |---------:|---------:|----------:|------------:|------------:|------------:|--------------------:|
-|    Echo | 211.0 us | 4.365 us | 12.455 us |      2.4414 |           - |           - |              1328 B |
-| NewEcho | 169.3 us | 2.594 us |  2.426 us |      2.1973 |           - |           - |               856 B |
+|    Echo | 219.2 us | 5.461 us | 15.843 us |      2.4414 |           - |           - |              1328 B |
+| NewEcho | 174.3 us | 3.439 us |  4.590 us |      2.1973 |           - |           - |               856 B |

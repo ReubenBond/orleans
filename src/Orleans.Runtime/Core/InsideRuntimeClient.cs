@@ -116,8 +116,9 @@ namespace Orleans.Runtime
         public void SendRequest<TInvokable>(GrainReference target, TInvokable request, string genericArguments = null) where TInvokable : CodeGeneration.IInvokable
         {
             var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
-            SendRequestMessage(target, message, genericArguments);
+            SendRequestMessage(target, message, request, genericArguments);
         }
+
         public void SendRequest(
             GrainReference target,
             InvokeMethodRequest request,
