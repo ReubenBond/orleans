@@ -10,7 +10,8 @@ namespace Orleans.Runtime
         private readonly int minimumBufferSize;
         public static BufferPool GlobalPool;
 
-        private const int MaximumBufferSize = int.MaxValue;
+        private readonly ArrayPool<byte> pool;
+
         public int MinimumSize => this.minimumBufferSize;
 
         internal static void InitGlobalBufferPool(MessagingOptions messagingOptions)
@@ -25,11 +26,18 @@ namespace Orleans.Runtime
         private BufferPool(int minimumBufferSize)
         {
             this.minimumBufferSize = minimumBufferSize;
+            this.pool = ArrayPool<byte>.Create();
         }
         
         public byte[] GetBuffer()
         {
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(this.minimumBufferSize);
+            byte[] buffer = this.pool.Rent(this.minimumBufferSize);
+            return buffer;
+        }
+
+        public byte[] GetBuffer(int minimumSize)
+        {
+            byte[] buffer = this.pool.Rent(minimumSize);
             return buffer;
         }
 
@@ -38,14 +46,14 @@ namespace Orleans.Runtime
             var list = new List<ArraySegment<byte>>();
             while (totalSize > 0)
             {
-                var buff = this.GetBuffer();
-                list.Add(new ArraySegment<byte>(buff, 0, Math.Min(this.minimumBufferSize, totalSize)));
+                var buff = this.pool.Rent(totalSize);
+                list.Add(new ArraySegment<byte>(buff, 0, Math.Min(buff.Length, totalSize)));
                 totalSize -= this.minimumBufferSize;
             }
             return list;
         }
 
-        public void Release(byte[] buffer) => ArrayPool<byte>.Shared.Return(buffer);
+        public void Release(byte[] buffer) => this.pool.Return(buffer);
 
         public void Release(List<ArraySegment<byte>> list)
         {

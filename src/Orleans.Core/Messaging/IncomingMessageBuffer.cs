@@ -273,10 +273,11 @@ namespace Orleans.Runtime
         private List<ArraySegment<byte>> DuplicateBuffer(List<ArraySegment<byte>> body)
         {
             var dupBody = new List<ArraySegment<byte>>(body.Count);
-            foreach (ArraySegment<byte> seg in body)
+            foreach (var seg in body)
             {
-                var dupSeg = new ArraySegment<byte>(BufferPool.GlobalPool.GetBuffer(), seg.Offset, seg.Count);
-                Buffer.BlockCopy(seg.Array, seg.Offset, dupSeg.Array, dupSeg.Offset, seg.Count);
+                var dup = BufferPool.GlobalPool.GetBuffer(seg.Count);
+                var dupSeg = new ArraySegment<byte>(dup, 0, seg.Count);
+                Buffer.BlockCopy(seg.Array, seg.Offset, dup, 0, seg.Count);
                 dupBody.Add(dupSeg);
             }
             return dupBody;
