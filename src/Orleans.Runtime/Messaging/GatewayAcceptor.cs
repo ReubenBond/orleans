@@ -29,8 +29,10 @@ namespace Orleans.Runtime.Messaging
             ILocalSiloDetails siloDetails,
             IOptions<MultiClusterOptions> multiClusterOptions,
             ILoggerFactory loggerFactory,
-            OverloadDetector overloadDetector)
-            : base(msgCtr, gatewayAddress, SocketDirection.GatewayToClient, messageFactory, serializationManager, executorService, loggerFactory)
+            OverloadDetector overloadDetector,
+            ISerializer<Message.HeadersContainer> messageHeadersSerializer,
+            ISerializer<object> objectSerializer)
+            : base(msgCtr, gatewayAddress, SocketDirection.GatewayToClient, messageFactory, serializationManager, executorService, loggerFactory, messageHeadersSerializer, objectSerializer)
         {
             this.gateway = gateway;
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);

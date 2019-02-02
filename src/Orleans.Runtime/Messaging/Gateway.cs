@@ -11,6 +11,7 @@ using Orleans.Serialization;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using System.Runtime.InteropServices;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -39,7 +40,9 @@ namespace Orleans.Runtime.Messaging
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
-        
+        private readonly ISerializer<Message.HeadersContainer> messageHeadersSerializer;
+        private readonly ISerializer<object> objectSerializer;
+
         public Gateway(
             MessageCenter msgCtr, 
             ILocalSiloDetails siloDetails, 
@@ -50,10 +53,14 @@ namespace Orleans.Runtime.Messaging
             IOptions<EndpointOptions> endpointOptions,
             IOptions<SiloMessagingOptions> options, 
             IOptions<MultiClusterOptions> multiClusterOptions,
-            OverloadDetector overloadDetector)
+            OverloadDetector overloadDetector,
+            ISerializer<Message.HeadersContainer> messageHeadersSerializer,
+            ISerializer<object> objectSerializer)
         {
             this.messagingOptions = options.Value;
             this.loggerFactory = loggerFactory;
+            this.objectSerializer = objectSerializer;
+            this.messageHeadersSerializer = messageHeadersSerializer;
             messageCenter = msgCtr;
             this.messageFactory = messageFactory;
             this.logger = this.loggerFactory.CreateLogger<Gateway>();
@@ -69,7 +76,9 @@ namespace Orleans.Runtime.Messaging
                 siloDetails,
                 multiClusterOptions,
                 loggerFactory,
-                overloadDetector);
+                overloadDetector,
+                messageHeadersSerializer,
+                objectSerializer);
             senders = new Lazy<GatewaySender>[messagingOptions.GatewaySenderQueues];
             nextGatewaySenderToUseForRoundRobin = 0;
             dropper = new GatewayClientCleanupAgent(this, executorService, loggerFactory, messagingOptions.ClientDropTimeout);
@@ -90,7 +99,15 @@ namespace Orleans.Runtime.Messaging
                 int capture = i;
                 senders[capture] = new Lazy<GatewaySender>(() =>
                 {
-                    var sender = new GatewaySender("GatewaySiloSender_" + capture, this, this.messageFactory, this.serializationManager, this.executorService, this.loggerFactory);
+                    var sender = new GatewaySender(
+                        "GatewaySiloSender_" + capture,
+                        this,
+                        this.messageFactory,
+                        this.executorService,
+                        this.loggerFactory,
+                        this.messagingOptions,
+                        this.messageHeadersSerializer,
+                        this.objectSerializer);
                     sender.Start();
                     return sender;
                 }, LazyThreadSafetyMode.ExecutionAndPublication);
@@ -408,13 +425,26 @@ namespace Orleans.Runtime.Messaging
             private readonly Gateway gateway;
             private readonly MessageFactory messageFactory;
             private readonly CounterStatistic gatewaySends;
-            private readonly SerializationManager serializationManager;
-            internal GatewaySender(string name, Gateway gateway, MessageFactory messageFactory, SerializationManager serializationManager, ExecutorService executorService, ILoggerFactory loggerFactory)
+            private readonly ISerializer<Message.HeadersContainer> messageHeadersSerializer;
+            private readonly ISerializer<object> bodySerializer;
+            private readonly SiloMessagingOptions messagingOptions;
+
+            internal GatewaySender(
+                string name,
+                Gateway gateway,
+                MessageFactory messageFactory,
+                ExecutorService executorService,
+                ILoggerFactory loggerFactory,
+                SiloMessagingOptions messagingOptions,
+                ISerializer<Message.HeadersContainer> messageHeadersSerializer,
+                ISerializer<object> bodySerializer)
                 : base(name, executorService, loggerFactory)
             {
                 this.gateway = gateway;
                 this.messageFactory = messageFactory;
-                this.serializationManager = serializationManager;
+                this.messageHeadersSerializer = messageHeadersSerializer;
+                this.bodySerializer = bodySerializer;
+                this.messagingOptions = messagingOptions;
                 gatewaySends = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_SENT);
                 OnFault = FaultBehavior.RestartOnFault;
             }
@@ -518,69 +548,85 @@ namespace Orleans.Runtime.Messaging
                 if (Cts.IsCancellationRequested) return false;
                 
                 if (sock == null) return false;
-                
+
+                var data = new List<ArraySegment<byte>>(4);
+
+                // Reserve space the length fields.
+                var lengthFields = new byte[2 * sizeof(int)];
+                data.Add(new ArraySegment<byte>(lengthFields, 0, 2 * sizeof(int)));
+
                 // Send the message
-                List<ArraySegment<byte>> data;
-                int headerLength;
-                try
+                using (var buffer = new ArrayBufferWriter())
                 {
-                    int bodyLength;
-                    data = msg.Serialize(this.serializationManager, out headerLength, out bodyLength);
-                    if (headerLength + bodyLength > this.serializationManager.LargeObjectSizeThreshold)
+                    int headerLength;
+                    try
                     {
-                        Log.Info(ErrorCode.Messaging_LargeMsg_Outgoing, "Preparing to send large message Size={0} HeaderLength={1} BodyLength={2} #ArraySegments={3}. Msg={4}",
-                            headerLength + bodyLength + Message.LENGTH_HEADER_SIZE, headerLength, bodyLength, data.Count, this.ToString());
-                        if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Sending large message {0}", msg.ToLongString());
-                    }
-                }
-                catch (Exception exc)
-                {
-                    this.OnMessageSerializationFailure(msg, exc);
-                    return true;
-                }
+                        this.messageHeadersSerializer.Serialize(buffer, msg.Headers);
+                        headerLength = buffer.CommitedByteCount;
 
-                int length = data.Sum(x => x.Count);
+                        this.bodySerializer.Serialize(buffer, msg.BodyObject);
+                        var bodyLength = buffer.CommitedByteCount - headerLength;
+                        data.Add(new ArraySegment<byte>(buffer.ToArray()));
 
-                int bytesSent = 0;
-                bool exceptionSending = false;
-                bool countMismatchSending = false;
-                string sendErrorStr;
-                try
-                {
-                    bytesSent = sock.Send(data);
-                    if (bytesSent != length)
-                    {
-                        // The complete message wasn't sent, even though no error was reported; treat this as an error
-                        countMismatchSending = true;
-                        sendErrorStr = String.Format("Byte count mismatch on send: sent {0}, expected {1}", bytesSent, length);
-                        Log.Warn(ErrorCode.GatewayByteCountMismatch, sendErrorStr);
-                    }
-                }
-                catch (Exception exc)
-                {
-                    exceptionSending = true;
-                    string remoteEndpoint = "";
-                    if (!(exc is ObjectDisposedException))
-                    {
-                        try
+                        // Write length prefixes, first header length then body length.
+                        var lengthPrefixes = MemoryMarshal.Cast<byte, int>(lengthFields);
+                        lengthPrefixes[0] = headerLength;
+                        lengthPrefixes[1] = bodyLength;
+
+                        if (buffer.CommitedByteCount > this.messagingOptions.LargeMessageWarningThreshold)
                         {
-                            remoteEndpoint = sock.RemoteEndPoint.ToString();
+                            Log.Info(ErrorCode.Messaging_LargeMsg_Outgoing, "Preparing to send large message Size={0} HeaderLength={1} BodyLength={2} Msg={3}",
+                                buffer.CommitedByteCount, headerLength, bodyLength, msg.ToString());
+                            if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Sending large message {0}", msg.ToLongString());
                         }
-                        catch (Exception){}
                     }
-                    sendErrorStr = String.Format("Exception sending to client at {0}: {1}", remoteEndpoint, exc);
-                    Log.Warn(ErrorCode.GatewayExceptionSendingToClient, sendErrorStr, exc);
+                    catch (Exception exc)
+                    {
+                        this.OnMessageSerializationFailure(msg, exc);
+                        return true;
+                    }
+                    
+                    int bytesSent = 0;
+                    bool exceptionSending = false;
+                    bool countMismatchSending = false;
+                    string sendErrorStr;
+                    try
+                    {
+                        var messageLength = buffer.CommitedByteCount + lengthFields.Length;
+                        bytesSent = sock.Send(data);
+                        if (bytesSent != messageLength)
+                        {
+                            // The complete message wasn't sent, even though no error was reported; treat this as an error
+                            countMismatchSending = true;
+                            sendErrorStr = String.Format("Byte count mismatch on send: sent {0}, expected {1}", bytesSent, messageLength);
+                            Log.Warn(ErrorCode.GatewayByteCountMismatch, sendErrorStr);
+                        }
+                    }
+                    catch (Exception exc)
+                    {
+                        exceptionSending = true;
+                        string remoteEndpoint = "";
+                        if (!(exc is ObjectDisposedException))
+                        {
+                            try
+                            {
+                                remoteEndpoint = sock.RemoteEndPoint.ToString();
+                            }
+                            catch (Exception) { }
+                        }
+                        sendErrorStr = String.Format("Exception sending to client at {0}: {1}", remoteEndpoint, exc);
+                        Log.Warn(ErrorCode.GatewayExceptionSendingToClient, sendErrorStr, exc);
+                    }
+                    MessagingStatisticsGroup.OnMessageSend(msg.TargetSilo, msg.Direction, bytesSent, headerLength, SocketDirection.GatewayToClient);
+                    bool sendError = exceptionSending || countMismatchSending;
+                    if (sendError)
+                    {
+                        gateway.RecordClosedSocket(sock);
+                        SocketManager.CloseSocket(sock);
+                    }
+                    gatewaySends.Increment();
+                    return !sendError;
                 }
-                MessagingStatisticsGroup.OnMessageSend(msg.TargetSilo, msg.Direction, bytesSent, headerLength, SocketDirection.GatewayToClient);
-                bool sendError = exceptionSending || countMismatchSending;
-                if (sendError)
-                {
-                    gateway.RecordClosedSocket(sock);
-                    SocketManager.CloseSocket(sock);
-                }
-                gatewaySends.Increment();
-                msg.ReleaseBodyAndHeaderBuffers();
-                return !sendError;
             }
 
             private void OnMessageSerializationFailure(Message msg, Exception exc)
@@ -593,8 +639,7 @@ namespace Orleans.Runtime.Messaging
                     "Unexpected error serializing message {Message}: {Exception}",
                     msg,
                     exc);
-
-                msg.ReleaseBodyAndHeaderBuffers();
+                
                 MessagingStatisticsGroup.OnFailedSentMessage(msg);
 
                 var retryCount = msg.RetryCount ?? 0;

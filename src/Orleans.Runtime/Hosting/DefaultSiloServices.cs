@@ -227,6 +227,8 @@ namespace Orleans.Hosting
             // Serialization
             services.TryAddSingleton<SerializationManager>(sp=>ActivatorUtilities.CreateInstance<SerializationManager>(sp,
                 sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.LargeMessageWarningThreshold));
+            services.TryAddSingleton(typeof(ISerializer<>), typeof(OrleansSerializer<>));
+            services.TryAddSingleton(typeof(OrleansSerializer<>));
             services.TryAddSingleton<ITypeResolver, CachedTypeResolver>();
             services.TryAddSingleton<IFieldUtils, FieldUtils>();
             services.AddSingleton<BinaryFormatterSerializer>();

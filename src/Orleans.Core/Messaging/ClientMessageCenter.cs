@@ -91,6 +91,8 @@ namespace Orleans.Messaging
         private readonly ILoggerFactory loggerFactory;
         private readonly TimeSpan openConnectionTimeout;
         private readonly ExecutorService executorService;
+        private readonly ISerializer<Message.HeadersContainer> messageHeadersSerializer;
+        private readonly ISerializer<object> objectSerializer;
         private StatisticsLevel statisticsLevel;
 
         public ClientMessageCenter(
@@ -107,9 +109,13 @@ namespace Orleans.Messaging
             ExecutorService executorService,
             ILoggerFactory loggerFactory,
             IOptions<NetworkingOptions> networkingOptions,
-            IOptions<StatisticsOptions> statisticsOptions)
+            IOptions<StatisticsOptions> statisticsOptions,
+            ISerializer<Message.HeadersContainer> messageHeadersSerializer,
+            ISerializer<object> objectSerializer)
         {
             this.loggerFactory = loggerFactory;
+            this.messageHeadersSerializer = messageHeadersSerializer;
+            this.objectSerializer = objectSerializer;
             this.openConnectionTimeout = networkingOptions.Value.OpenConnectionTimeout;
             this.SerializationManager = serializationManager;
             this.executorService = executorService;
@@ -198,7 +204,7 @@ namespace Orleans.Messaging
                 {
                     if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
                     {
-                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, executorService, this.loggerFactory, this.openConnectionTimeout);
+                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, executorService, this.loggerFactory, this.openConnectionTimeout, this.messageHeadersSerializer, this.objectSerializer);
                         gatewayConnections[addr] = gatewayConnection;
                         if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Creating gateway to {0} for pre-addressed message", addr);
                         startRequired = true;
@@ -229,7 +235,7 @@ namespace Orleans.Messaging
                     Uri addr = gatewayNames[msgNumber % numGateways];
                     if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
                     {
-                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, this.executorService, this.loggerFactory, this.openConnectionTimeout);
+                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, this.executorService, this.loggerFactory, this.openConnectionTimeout, this.messageHeadersSerializer, this.objectSerializer);
                         gatewayConnections[addr] = gatewayConnection;
                         if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_CreatedGatewayUnordered, "Creating gateway to {0} for unordered message to grain {1}", addr, msg.TargetGrain);
                         startRequired = true;
@@ -265,7 +271,7 @@ namespace Orleans.Messaging
                         if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.ProxyClient_NewBucketIndex, "Starting new bucket index {0} for ordered messages to grain {1}", index, msg.TargetGrain);
                         if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
                         {
-                            gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, this.executorService, this.loggerFactory, this.openConnectionTimeout);
+                            gatewayConnection = new GatewayConnection(addr, this, this.messageFactory, this.executorService, this.loggerFactory, this.openConnectionTimeout, this.messageHeadersSerializer, this.objectSerializer);
                             gatewayConnections[addr] = gatewayConnection;
                             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_CreatedGatewayToGrain, "Creating gateway to {0} for message to grain {1}, bucket {2}, grain id hash code {3}X", addr, msg.TargetGrain, index,
                                                msg.TargetGrain.GetHashCode().ToString("x"));

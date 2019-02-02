@@ -51,8 +51,9 @@
     <SystemReflectionMetadataVersion>1.5.0</SystemReflectionMetadataVersion>
     <SystemReflectionTypeExtensionsVersion>4.4.0</SystemReflectionTypeExtensionsVersion>
     <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
-    <SystemThreadingTasksExtensionsVersion>4.4.0</SystemThreadingTasksExtensionsVersion>
+    <SystemThreadingTasksExtensionsVersion>4.5.1</SystemThreadingTasksExtensionsVersion>
     <SystemMemoryVersion>4.5.1</SystemMemoryVersion>
+    <SystemBuffersVersion>4.5.0</SystemBuffersVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>15.7.179</MicrosoftBuildVersion>

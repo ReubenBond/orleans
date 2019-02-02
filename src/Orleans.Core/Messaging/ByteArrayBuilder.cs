@@ -1,10 +1,11 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace Orleans.Runtime
 {
-    internal class ByteArrayBuilder
+    internal class ByteArrayBuilder : IBufferWriter<byte>
     {
         private const int MINIMUM_BUFFER_SIZE = 256;
         private readonly int bufferSize;
@@ -98,7 +99,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private void Grow()
+        private void Grow(int sizeHint = 0)
         {
             if (currentBuffer != null)
             {
@@ -115,6 +116,21 @@ namespace Orleans.Runtime
             {
                 Grow();
             }
+        }
+
+        public void Advance(int count)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Memory<byte> GetMemory(int sizeHint = 0)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Span<byte> GetSpan(int sizeHint = 0)
+        {
+            throw new NotImplementedException();
         }
 
         /// <summary>

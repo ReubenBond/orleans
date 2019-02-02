@@ -6,6 +6,10 @@ using Microsoft.Extensions.Logging;
 using Orleans.Messaging;
 using Orleans.Serialization;
 using System.Threading.Tasks;
+using Pipelines.Sockets.Unofficial;
+using System.Buffers.Binary;
+using System.IO.Pipelines;
+using System.Buffers;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -28,6 +32,8 @@ namespace Orleans.Runtime.Messaging
         private readonly CounterStatistic checkedOutSocketEventArgsCounter;
         private readonly CounterStatistic checkedInSocketEventArgsCounter;
         private readonly SerializationManager serializationManager;
+        private readonly ISerializer<Message.HeadersContainer> messageHeadersSerializer;
+        private readonly ISerializer<object> objectSerializer;
 
         public Action<Message> SniffIncomingMessage
         {
@@ -45,8 +51,16 @@ namespace Orleans.Runtime.Messaging
         protected SocketDirection SocketDirection { get; private set; }
 
         // Used for holding enough info to handle receive completion
-        internal IncomingMessageAcceptor(MessageCenter msgCtr, IPEndPoint here, SocketDirection socketDirection, MessageFactory messageFactory, SerializationManager serializationManager,
-            ExecutorService executorService, ILoggerFactory loggerFactory)
+        internal IncomingMessageAcceptor(
+            MessageCenter msgCtr,
+            IPEndPoint here,
+            SocketDirection socketDirection,
+            MessageFactory messageFactory,
+            SerializationManager serializationManager,
+            ExecutorService executorService,
+            ILoggerFactory loggerFactory,
+            ISerializer<Message.HeadersContainer> messageHeadersSerializer,
+            ISerializer<object> objectSerializer)
             :base(executorService, loggerFactory)
         {
             this.loggerFactory = loggerFactory;
@@ -56,6 +70,8 @@ namespace Orleans.Runtime.Messaging
             this.MessageFactory = messageFactory;
             this.receiveEventArgsPool = new ConcurrentObjectPool<SaeaPoolWrapper>(() => this.CreateSocketReceiveAsyncEventArgsPoolWrapper());
             this.serializationManager = serializationManager;
+            this.messageHeadersSerializer = messageHeadersSerializer;
+            this.objectSerializer = objectSerializer;
             if (here == null)
                 listenAddress = MessageCenter.MyAddress.Endpoint;
 
@@ -355,11 +371,13 @@ namespace Orleans.Runtime.Messaging
                         // Add the socket to the open socket collection
                         if (ima.RecordOpenedSocket(sock))
                         {
+                            Task.Run(() => this.SocketReadPump(sock));
+
                             // Get the socket for the accepted client connection and put it into the 
                             // ReadEventArg object user token.
-                            var readEventArgs = GetSocketReceiveAsyncEventArgs(sock);
+                            //var readEventArgs = GetSocketReceiveAsyncEventArgs(sock);
 
-                            StartReceiveAsync(sock, readEventArgs, ima);
+                            //StartReceiveAsync(sock, readEventArgs, ima);
                         }
                         else
                         {
@@ -382,6 +400,90 @@ namespace Orleans.Runtime.Messaging
                 var logger = ima?.Log ?? this.Log;
                 logger.Error(ErrorCode.Messaging_IMA_ExceptionAccepting, "Unexpected exception in IncomingMessageAccepter.AcceptCallback", ex);
                 RestartAcceptingSocket();
+            }
+        }
+
+        private async Task SocketReadPump(Socket sock)
+        {
+            SocketConnection.SetRecommendedServerOptions(sock);
+            var pipeOptions = new PipeOptions(pauseWriterThreshold: int.MaxValue, useSynchronizationContext: false);
+            var connection = SocketConnection.Create(sock, pipeOptions, socketConnectionOptions: SocketConnectionOptions.InlineReads);
+            var input = connection.Input;
+            var headerLength = 0;
+            var bodyLength = 0;
+            while (!this.Cts.IsCancellationRequested)
+            {
+                try
+                {
+                    if (!input.TryRead(out var readResult)) readResult = await input.ReadAsync(this.Cts.Token);
+                    if (readResult.IsCanceled || readResult.IsCompleted)
+                    {
+                        this.Log.LogInformation("Socket closed");
+                        break;
+                    }
+
+                    var buffer = readResult.Buffer;
+                    var bufferLength = buffer.Length;
+                    if (bufferLength < 2 * sizeof(int) + headerLength + bodyLength)
+                    {
+                        input.AdvanceTo(readResult.Buffer.Start, readResult.Buffer.End);
+                        continue;
+                    }
+
+                    if (headerLength == 0)
+                    {
+                        void ReadLengths(in ReadOnlySequence<byte> s, out int h, out int b)
+                        {
+                            Span<byte> span = stackalloc byte[8];
+                            buffer.Slice(0, 2 * sizeof(int)).CopyTo(span);
+                            h = BinaryPrimitives.ReadInt32LittleEndian(span);
+                            b = BinaryPrimitives.ReadInt32LittleEndian(span.Slice(sizeof(int)));
+                        }
+
+                        ReadLengths(buffer, out headerLength, out bodyLength);
+                        
+                        if (headerLength == 0 || bodyLength == 0)
+                        {
+                            // TODO: handle this better
+                            this.Log.LogError("Message size cannot be zero");
+                            break;
+                        }
+                        
+                        if (bufferLength < 2* sizeof(int) + headerLength + bodyLength)
+                        {
+                            input.AdvanceTo(buffer.Start, buffer.End);
+                            continue;
+                        }
+                    }
+
+                    // TODO: Use a single serializer for the whole message.
+                    buffer = buffer.Slice(2 * sizeof(int));
+                    this.messageHeadersSerializer.Deserialize(buffer, out var header);
+                    buffer = buffer.Slice(headerLength, bodyLength);
+                    this.objectSerializer.Deserialize(buffer, out var body);
+
+                    var message = new Message
+                    {
+                        Headers = header,
+                        BodyObject = body
+                    };
+                    this.HandleMessage(message, sock);
+
+                    input.AdvanceTo(buffer.End);
+
+                    headerLength = 0;
+                    bodyLength = 0;
+                }
+                catch (Exception exception)
+                {
+                    this.Log.LogWarning("Exception reading from socket: {Exception}", exception);
+                }
+            }
+
+            if (connection.ShutdownKind == PipeShutdownKind.None)
+            {
+                // TODO: I imagine this is the wrong way to close the read side.
+                connection.Input.Complete();
             }
         }
 
@@ -429,7 +531,7 @@ namespace Orleans.Runtime.Messaging
             var poolWrapper = new SaeaPoolWrapper(readEventArgs);
 
             // Creates with incomplete state: IMA should be set before using
-            readEventArgs.UserToken = new ReceiveCallbackContext(poolWrapper, this.MessageFactory, this.serializationManager, this.loggerFactory);
+            readEventArgs.UserToken = new ReceiveCallbackContext(poolWrapper, this.MessageFactory, this.serializationManager, this.loggerFactory, this.messageHeadersSerializer, this.objectSerializer);
             allocatedSocketEventArgsCounter.Increment();
             return poolWrapper;
         }
@@ -642,11 +744,17 @@ namespace Orleans.Runtime.Messaging
             public IncomingMessageAcceptor IMA { get; internal set; }
             public SaeaPoolWrapper SaeaPoolWrapper { get; }
 
-            public ReceiveCallbackContext(SaeaPoolWrapper poolWrapper, MessageFactory messageFactory, SerializationManager serializationManager, ILoggerFactory loggerFactory)
+            public ReceiveCallbackContext(
+                SaeaPoolWrapper poolWrapper,
+                MessageFactory messageFactory,
+                SerializationManager serializationManager,
+                ILoggerFactory loggerFactory,
+                ISerializer<Message.HeadersContainer> messageHeadersSerializer,
+                ISerializer<object> objectSerializer)
             {
                 this.messageFactory = messageFactory;
                 SaeaPoolWrapper = poolWrapper;
-                _buffer = new IncomingMessageBuffer(loggerFactory, serializationManager);
+                _buffer = new IncomingMessageBuffer(loggerFactory, serializationManager, messageHeadersSerializer, objectSerializer);
             }
 
             public void ProcessReceived(SocketAsyncEventArgs e)

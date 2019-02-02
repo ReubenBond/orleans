@@ -31,12 +31,14 @@
     <PackageReference Include="Microsoft.Extensions.Logging" Version="$(MicrosoftExtensionsLoggingVersion)" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="$(MicrosoftExtensionsHostingAbstractionsVersion)" />
     <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
+    <PackageReference Include="System.Buffers" Version="$(SystemBuffersVersion)" />
     <PackageReference Include="System.Collections.Immutable" Version="$(SystemCollectionsImmutableVersion)" />
     <PackageReference Include="System.ComponentModel.TypeConverter" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Diagnostics.FileVersionInfo" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Diagnostics.Process" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Diagnostics.TraceSource" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Linq.Expressions" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="System.Memory" Version="$(SystemMemoryVersion)" />
     <PackageReference Include="System.Net.NameResolution" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Net.NetworkInformation" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Reflection.Emit" Version="$(SystemRuntimeVersion)" />
@@ -52,6 +54,7 @@
     <PackageReference Include="System.ValueTuple" Version="$(SystemValueTupleVersion)" />
     <PackageReference Include="System.Xml.XmlDocument" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Xml.XPath.XmlDocument" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="Pipelines.Sockets.Unofficial" Version="1.0.9" />
   </ItemGroup>
 
 </Project>
