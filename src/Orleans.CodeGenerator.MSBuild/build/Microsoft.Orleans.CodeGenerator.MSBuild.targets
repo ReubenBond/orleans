@@ -8,19 +8,16 @@
          Orleans_MSBuildIsCore;
          Orleans_OutputFileName;
          Orleans_TargetIsCore;
-         Orleans_TaskAssembly;
          Orleans_CodeGeneratorTargetFramework;">
 
   <PropertyGroup>
-    <Orleans_CodeGeneratorTargetFramework>netcoreapp2.0</Orleans_CodeGeneratorTargetFramework>
+    <Orleans_CodeGeneratorTargetFramework>netcoreapp3.0</Orleans_CodeGeneratorTargetFramework>
     <Orleans_DotNetHost Condition="'$(DotNetFromPath)' == 'true'">dotnet</Orleans_DotNetHost>
     <Orleans_CoreAssembly Condition="'$(OrleansCodeGenCoreAssembly)' != ''">$(OrleansCodeGenCoreAssembly)</Orleans_CoreAssembly>
     <Orleans_CoreAssembly Condition="'$(Orleans_CoreAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\$(Orleans_CodeGeneratorTargetFramework)\Orleans.CodeGenerator.MSBuild.dll</Orleans_CoreAssembly>
 
     <!-- Specify the assembly containing the MSBuild tasks. -->
     <Orleans_MSBuildIsCore Condition="'$(MSBuildRuntimeType)' == 'Core' or '$(OS)' != 'Windows_NT'">true</Orleans_MSBuildIsCore>
-    <Orleans_TaskAssembly Condition="'$(OrleansCodeGenTasksAssembly)' != ''">$(OrleansCodeGenTasksAssembly)</Orleans_TaskAssembly>
-    <Orleans_TaskAssembly Condition="'$(Orleans_TaskAssembly)' == '' and '$(Orleans_MSBuildIsCore)' == 'true'">$(MSBuildThisFileDirectory)..\tasks\$(Orleans_CodeGeneratorTargetFramework)\Orleans.CodeGenerator.MSBuild.Tasks.dll</Orleans_TaskAssembly>
 
     <!-- When the MSBuild host is full-framework, we defer to PATH for dotnet -->
     <Orleans_DotNetHost Condition="'$(Orleans_MSBuildIsCore)' != 'true'">dotnet</Orleans_DotNetHost>
@@ -40,11 +37,6 @@
     <OrleansGenerateCodeDependsOn>$(OrleansGenerateCodeDependsOn);ResolveReferences;OrleansGenerateInputCache</OrleansGenerateCodeDependsOn>
   </PropertyGroup>
 
-  <UsingTask
-    TaskName="Orleans.CodeGenerator.MSBuild.Tasks.GetDotNetHost"
-    AssemblyFile="$(Orleans_TaskAssembly)"
-    Condition="'$(Orleans_CodeGeneratorEnabled)' == 'true' and '$(Orleans_DotNetHost)' == '' and '$(Orleans_MSBuildIsCore)' == 'true'" />
-  
   <!--
     Input to the code generator should not include its output.
   -->
@@ -69,7 +61,10 @@
   -->
   <Target Name="OrleansGenerateInputCache"
           DependsOnTargets="ResolveAssemblyReferences"
-          BeforeTargets="OrleansGenerateCode">
+          BeforeTargets="OrleansGenerateCode"
+          Condition="'$(Orleans_CodeGeneratorEnabled)' == 'true'"
+          Inputs="@(Orleans_CodeGenInputs)"
+          Outputs="$(Orleans_CodeGenInputCache)">
 
     <Hash ItemsToHash="@(Orleans_CodeGenInputs)">
       <Output TaskParameter="HashResult" PropertyName="Orleans_UpdatedInputCacheContents" />
@@ -81,10 +76,13 @@
       Lines="$(Orleans_UpdatedInputCacheContents)"
       WriteOnlyWhenDifferent="True" />
 
-    <ItemGroup>
-      <FileWrites Include="$(Orleans_CodeGenInputCache)" />
-    </ItemGroup>
-    
+    <CreateItem
+      Include="$(Orleans_CodeGenInputCache)">
+      <Output
+        TaskParameter="Include"
+        ItemName="FileWrites"/>
+    </CreateItem>
+
   </Target>
 
   <Target Name="OrleansGenerateCode"
@@ -114,25 +112,46 @@
     <Message Text="[Orleans.CodeGenerator] - CodeGen arguments file=$(Orleans_ArgsFile)" Importance="Low"/>
     <WriteLinesToFile Overwrite="true" File="$(Orleans_ArgsFile)" Lines="@(Orleans_CodeGenArgs)"/>
 
-    <Orleans.CodeGenerator.MSBuild.Tasks.GetDotNetHost Condition="'$(Orleans_DotNetHost)' == '' and '$(Orleans_MSBuildIsCore)' == 'true' ">
-      <Output TaskParameter="DotNetHost" PropertyName="Orleans_DotNetHost" />
-    </Orleans.CodeGenerator.MSBuild.Tasks.GetDotNetHost>
-
     <!-- Use dotnet to execute the process. -->
-    <Exec Command="&quot;$(Orleans_DotNetHost)&quot; &quot;$(Orleans_GeneratorAssembly)&quot; SourceToSource &quot;$(Orleans_ArgsFile)&quot;" Outputs="$(Orleans_OutputFileName)" />
+    <Exec Command="$(Orleans_DotNetHost) &quot;$(Orleans_GeneratorAssembly)&quot; SourceToSource &quot;$(Orleans_ArgsFile)&quot;" Outputs="$(Orleans_OutputFileName)" />
+    
+    <CreateItem
+      Include="$(Orleans_OutputFileName)"
+      Condition="Exists('$(Orleans_OutputFileName)')" >
+      <Output
+        TaskParameter="Include"
+        ItemName="Compile"/>
+    </CreateItem>
+    
+    <CreateItem
+      Include="$(Orleans_OutputFileName)"
+      Condition="Exists('$(Orleans_OutputFileName)')" >
+      <Output
+        TaskParameter="Include"
+        ItemName="FileWrites"/>
+    </CreateItem>
 
-    <ItemGroup>
-      <Compile Include="$(Orleans_OutputFileName)" Condition="Exists('$(Orleans_OutputFileName)')" />
-      <FileWrites Include="$(Orleans_OutputFileName)" Condition="Exists('$(Orleans_OutputFileName)')"/>
-    </ItemGroup>
   </Target>
 
-  <Target Name="OrleansIncludeCodegenOutputDuringDesignTimeBuild"
-          BeforeTargets="AssignTargetPaths"
-          Condition="'$(Orleans_CodeGeneratorEnabled)' != 'true' and Exists('$(Orleans_OutputFileName)')">
-    <ItemGroup>
-      <Compile Include="$(Orleans_OutputFileName)"/>
-      <FileWrites Include="$(Orleans_OutputFileName)"/>
-    </ItemGroup>
+  <Target
+    Name="OrleansIncludeCodegenOutputDuringDesignTimeBuild"
+    BeforeTargets="AssignTargetPaths"
+    Condition="'$(Orleans_CodeGeneratorEnabled)' != 'true' and Exists('$(Orleans_OutputFileName)')">    
+
+    <CreateItem
+      Include="$(Orleans_OutputFileName)"
+      Condition="Exists('$(Orleans_OutputFileName)')" >
+      <Output
+        TaskParameter="Include"
+        ItemName="Compile"/>
+    </CreateItem>
+    
+    <CreateItem
+      Include="$(Orleans_OutputFileName)"
+      Condition="Exists('$(Orleans_OutputFileName)')" >
+      <Output
+        TaskParameter="FileWrites"
+        ItemName="Compile"/>
+    </CreateItem>
   </Target>
 </Project>

@@ -9,7 +9,6 @@
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);FS2003;1591</NoWarn>
-    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
 
   <!-- For test project we still need to target various desktop .Net versions instead of .Net Standard -->

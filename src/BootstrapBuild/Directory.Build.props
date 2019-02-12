@@ -7,7 +7,9 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
-    <DefineConstants>$(DefineConstants);EXCLUDE_CODEGEN</DefineConstants>
-    <OrleansCodeGenPrecompile>true</OrleansCodeGenPrecompile>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <BootstrapPublishRoot>$(MSBuildThisFileDirectory)publish\</BootstrapPublishRoot>
   </PropertyGroup>
 </Project>

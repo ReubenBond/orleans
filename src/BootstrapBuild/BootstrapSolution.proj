@@ -1,0 +1,69 @@
+<Project DefaultTargets="Build">
+
+  <PropertyGroup>
+    <OrleansBootstrapBuildInput>$(MSBuildThisFileDirectory)obj/_$(MSBuildProjectName)_Input</OrleansBootstrapBuildInput>
+    <OrleansBootstrapBuildOutput>$(MSBuildThisFileDirectory)obj/_$(MSBuildProjectName)_Output</OrleansBootstrapBuildOutput>
+    <_OrleansBootstrapCodeGeneratorProject>$(MSBuildThisFileDirectory)Orleans.CodeGenerator.MSBuild.Bootstrap\Orleans.CodeGenerator.MSBuild.Bootstrap.csproj</_OrleansBootstrapCodeGeneratorProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <BootstrapInputs Include="../Orleans.CodeGenerator/**/*.cs"/>
+    <BootstrapInputs Include="../src/Orleans.CodeGenerator.MSBuild/**/*.cs" />
+    <BootstrapInputs Remove="**/bin/*" />
+  </ItemGroup>
+
+  <Target Name="Clean">
+    <MSBuild Projects="$(_OrleansBootstrapCodeGeneratorProject)" Targets="Clean"/>
+  </Target>
+
+  <Target Name="CoreBuild">
+  </Target>
+
+  <Target Name="Restore">
+  </Target>
+
+  <Target Name="Build">
+  </Target>
+
+  <Target Name="Publish">
+  </Target>
+
+  <Target Name="OrleansBootstrapGenerateInputCache"
+          BeforeTargets="_PublishOrleansBootstrap"
+          Inputs="@(BootstrapInputs)"
+          Outputs="$(OrleansBootstrapBuildInput)">
+
+    <Hash ItemsToHash="@(BootstrapInputs)">
+      <Output TaskParameter="HashResult" PropertyName="OrleansBootstrapBuildCacheContents" />
+    </Hash>
+
+    <WriteLinesToFile
+      Overwrite="true"
+      File="$(OrleansBootstrapBuildInput)"
+      Lines="$(OrleansBootstrapBuildCacheContents)"
+      WriteOnlyWhenDifferent="True" />
+
+    <CreateItem
+      Include="$(OrleansBootstrapBuildInput)">
+      <Output
+        TaskParameter="Include"
+        ItemName="FileWrites"/>
+    </CreateItem>
+
+  </Target>
+
+  <Target Name="_PublishOrleansBootstrap"
+          AfterTargets="Build"
+          Inputs="$(OrleansBootstrapBuildInput)"
+          Outputs="$(OrleansBootstrapBuildOutput)">
+
+    <MakeDir Directories="$(MSBuildThisFileDirectory)obj/"/>
+    <MSBuild Projects="$(_OrleansBootstrapCodeGeneratorProject)" Targets="Restore"/>
+    <MSBuild Projects="$(_OrleansBootstrapCodeGeneratorProject)" Targets="Build"/>
+    <MSBuild Projects="$(_OrleansBootstrapCodeGeneratorProject)" Targets="Publish"/>
+
+    <Touch Files="$(OrleansBootstrapBuildOutput)" AlwaysCreate="true">
+      <Output TaskParameter="TouchedFiles" ItemName="FileWrites"/>
+    </Touch>
+  </Target>
+</Project>

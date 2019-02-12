@@ -1,21 +1,32 @@
-<Project Sdk="Microsoft.NET.Sdk" DefaultTargets="Build;PostBuildPublish">
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <Choose>
+    <When Condition="'$(OS)' == 'Windows_NT'">
+      <PropertyGroup>
+        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+      </PropertyGroup>
+    </When>
+    <When Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">
+      <PropertyGroup>
+        <RuntimeIdentifier>osx-x64</RuntimeIdentifier>
+      </PropertyGroup>
+    </When>
+    <When Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' == 'true'">
+      <PropertyGroup>
+        <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+      </PropertyGroup>
+    </When>
+  </Choose>
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
+    <TargetLatestRuntimePatch>false</TargetLatestRuntimePatch>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
-    <NoPackageAnalysis>true</NoPackageAnalysis>
     <AssemblyName>Orleans.CodeGenerator.MSBuild.Bootstrap</AssemblyName>
     <RootNamespace>Orleans.CodeGenerator.MSBuild</RootNamespace>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <PreserveCompilationContext>true</PreserveCompilationContext>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
-    <DevelopmentDependency>true</DevelopmentDependency>
-    <PublishRoot>bin\$(Configuration)\publish\</PublishRoot>
-    <PublishDir>$(PublishRoot)$(TargetFramework)</PublishDir>
+    <PublishDir>$(BootstrapPublishRoot)</PublishDir>
     <SourceDir>$(MSBuildThisFileDirectory)..\..\Orleans.CodeGenerator.MSBuild\</SourceDir>
-    <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
   </PropertyGroup>
   
   <ItemGroup>
@@ -24,8 +35,7 @@
       <Link>_%(Filename)%(Extension)</Link>
       <Visible>false</Visible>
     </Compile>
-    <ProjectReference Include="..\..\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" PrivateAssets="all" />
-    <ProjectReference Include="..\..\Orleans.CodeGenerator.MSBuild.Tasks\Orleans.CodeGenerator.MSBuild.Tasks.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\..\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" />
   </ItemGroup>
   
   <ItemGroup>
@@ -51,11 +61,5 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="$(MicrosoftCodeAnalysisVersion)" />
     <PackageReference Include="Microsoft.CodeAnalysis.VisualBasic.Workspaces" Version="$(MicrosoftCodeAnalysisVersion)" />
   </ItemGroup>
-
-  <Target Name="PostBuildPublish" AfterTargets="Build">
-    <!-- So that we can create a nuget package which includes all dependencies, we publish the build. -->
-    <!-- However, we cannot publish during the cross-targeting build, so we skip that. -->
-    <CallTarget Targets="Publish" Condition="'$(TargetFramework)' != '' and '$(DesignTimeBuild)' == ''" />
-  </Target>
 
 </Project>
