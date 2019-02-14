@@ -19,6 +19,8 @@ namespace Orleans.Runtime
 
         void SendMessage(Message msg);
 
+        void OnReceivedMessage(Message message);
+
         void RegisterLocalMessageHandler(Message.Categories category, Action<Message> handler);
 
         int SendQueueLength { get; }

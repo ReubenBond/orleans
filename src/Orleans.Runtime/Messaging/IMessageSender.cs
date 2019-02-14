@@ -35,45 +35,51 @@ namespace Orleans.Runtime.Messaging
     {
         public static IConnectionBuilder UseOrleansSiloConnectionHandler(this IConnectionBuilder builder)
         {
-            return builder.UseConnectionMessageSender(registerMessageSender: false);
+            return builder.RunOrleansConnectionHandler(registerMessageSender: false);
         }
         public static IConnectionBuilder UseOrleansGatewayConnectionHandler(this IConnectionBuilder builder)
         {
-            return builder.UseConnectionMessageSender(registerMessageSender: false);
+            return builder.RunOrleansConnectionHandler(registerMessageSender: false);
         }
 
         public static IConnectionBuilder UseOrleansOutgoingConnectionHandler(this IConnectionBuilder builder)
         {
-            return builder.UseConnectionMessageSender(registerMessageSender: true);
+            return builder.RunOrleansConnectionHandler(registerMessageSender: true);
         }
 
-        private static IConnectionBuilder UseConnectionMessageSender(this IConnectionBuilder builder, bool registerMessageSender)
+        private static IConnectionBuilder RunOrleansConnectionHandler(this IConnectionBuilder builder, bool registerMessageSender)
         {
-            return builder.Use(next =>
+            return builder.Use(_ =>
             {
                 var connectionManager = builder.ApplicationServices.GetRequiredService<ConnectionMessageSenderManager>();
                 return async (ConnectionContext connection) =>
                 {
-                    var sender = ActivatorUtilities.CreateInstance<ConnectionMessageSender>(builder.ApplicationServices, connection);
-                    connection.Features.Set(sender);
-                    sender.Start();
+                    ConnectionMessageSender sender = default;
+                    ConnectionMessageReceiver receiver = default;
 
                     try
                     {
-                        var nextTask = next(connection);
-
+                        sender = ActivatorUtilities.CreateInstance<ConnectionMessageSender>(builder.ApplicationServices, connection);
+                        connection.Features.Set(sender);
                         if (registerMessageSender)
                         {
                             var endPoint = connection.GetEndPoint();
                             connectionManager.Add(endPoint, sender);
                         }
 
-                        await nextTask.ConfigureAwait(false);
+                        receiver = ActivatorUtilities.CreateInstance<ConnectionMessageReceiver>(builder.ApplicationServices, connection);
+                        connection.Features.Set(receiver);
+
+                        var senderTask = sender.Run();
+                        var receiverTask = receiver.Run();
+                        
+                        await Task.WhenAny(senderTask, receiverTask).ConfigureAwait(false);
                     }
                     finally
                     {
-                        if (registerMessageSender) connectionManager.Remove(connection.GetEndPoint());
-                        sender.Abort();
+                        if (registerMessageSender && sender != null) connectionManager.Remove(connection.GetEndPoint(), sender);
+                        sender?.Abort();
+                        receiver?.Abort();
                     }
                 };
             });
@@ -111,7 +117,7 @@ namespace Orleans.Runtime.Messaging
             this.serializer = connection.Features.Get<IMessageSerializer>();
         }
             
-        public void Start() => Task.Run(this.Process);
+        public Task Run() => Task.Run(this.Process);
 
         public void Dispose() => this.Abort();
 
@@ -174,17 +180,76 @@ namespace Orleans.Runtime.Messaging
         }
     }
 
-    /*
-    public interface IConnectionManager
+    internal sealed class ConnectionMessageReceiver
     {
-        void Add(ConnectionContext connection);
-        void Remove(ConnectionContext connection);
-        Task<ConnectionContext> GetConnection(IPEndPoint endPoint);
-    }*/
+        private readonly ConnectionContext connection;
+        private readonly IMessageCenter messageCenter;
+        private readonly IMessageSerializer serializer;
+        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
 
+        public ConnectionMessageReceiver(ConnectionContext connection, IMessageCenter messageCenter, IMessageSerializer serializer)
+        {
+            this.connection = connection;
+            this.messageCenter = messageCenter;
+            this.serializer = serializer;
+        }
+
+        public void Abort()
+        {
+            ThreadPool.UnsafeQueueUserWorkItem(cts => ((CancellationTokenSource)cts).Cancel(), this.cancellation);
+        }
+
+        public Task Run() => Task.Run(this.Process);
+
+        public async Task Process()
+        {
+            var input = this.connection.Transport.Input;
+            var error = default(Exception);
+            try
+            {
+                int requiredBytes = 0;
+                while (!this.cancellation.IsCancellationRequested)
+                {
+                    if (!input.TryRead(out var readResult)) readResult = await input.ReadAsync(this.cancellation.Token);
+                                       
+                    var buffer = readResult.Buffer;
+                    var start = buffer.Start;
+                    do
+                    {
+                        requiredBytes = this.serializer.TryRead(ref buffer, out var message);
+                        if (requiredBytes == 0)
+                        {
+                            this.messageCenter.OnReceivedMessage(message);
+                        }
+                    } while (requiredBytes == 0);
+
+                    if (readResult.IsCanceled || readResult.IsCompleted) break;
+                    input.AdvanceTo(start, buffer.End);
+                }
+            }
+            catch (Exception exception)
+            {
+                error = exception;
+            }
+            finally
+            {
+                this.Abort();
+
+                if (error != null)
+                {
+                    this.connection.Abort(new ConnectionAbortedException($"Exception in {nameof(ConnectionMessageReceiver)}, see {nameof(Exception.InnerException)}.", error));
+                }
+                else
+                {
+                    this.connection.Abort();
+                }
+            }
+        }
+    }
+    
     public interface IOutboundConnectionFactory
     {
-        Task Connect(IPEndPoint endPoint, IConnectionDispatcher dispatcher);
+        Task<ConnectionContext> Connect(IPEndPoint endPoint);
     }
 
     public interface IConnectionDispatcher
@@ -201,7 +266,7 @@ namespace Orleans.Runtime.Messaging
             this.loggerFactory = loggerFactory;
         }
 
-        public async Task Connect(IPEndPoint endPoint, IConnectionDispatcher dispatcher)
+        public async Task<ConnectionContext> Connect(IPEndPoint endPoint)
         {
             var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
             var completion = new SingleUseSocketAsyncEventArgs
@@ -222,9 +287,25 @@ namespace Orleans.Runtime.Messaging
             }
 
             var connection = new SocketConnection(socket, MemoryPool<byte>.Shared, PipeScheduler.Inline, this.loggerFactory.CreateLogger<SocketConnection>());
-            var middlewareTask = dispatcher.OnConnected(connection);
-            await connection.StartAsync();
-            await middlewareTask;
+            Task.Run(async () =>
+            {
+                try
+                {
+                    await connection.StartAsync();
+                }
+                finally
+                {
+                    connection.Abort();
+                }
+            }).Ignore();
+            return connection;
+        }
+    }
+
+    internal sealed class OutboundConnectionBuilder : ConnectionBuilder
+    {
+        public OutboundConnectionBuilder(IServiceProvider applicationServices) : base(applicationServices)
+        {
         }
     }
 
@@ -232,9 +313,21 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly ConcurrentDictionary<IPEndPoint, TaskCompletionSource<ConnectionMessageSender>> connections
             = new ConcurrentDictionary<IPEndPoint, TaskCompletionSource<ConnectionMessageSender>>();
-        
+        private readonly IOutboundConnectionFactory connectionFactory;
+        private readonly ConnectionDelegate connectionDelegate;
+
+        public ConnectionMessageSenderManager(IOutboundConnectionFactory connectionFactory, IServiceProvider serviceProvider, IOptions<EndpointOptions> endpointOptions)
+        {
+            this.connectionFactory = connectionFactory;
+
+            // Configure the connection builder using the user-defined options.
+            var connectionBuilder = ActivatorUtilities.CreateInstance<OutboundConnectionBuilder>(serviceProvider);
+            endpointOptions.Value.ConfigureOutboundConnectionBuilder(connectionBuilder);
+            this.connectionDelegate = connectionBuilder.Build();
+        }
+
         public void Add(IPEndPoint endPoint, ConnectionMessageSender sender)
-    {
+        {
             var updated = new TaskCompletionSource<ConnectionMessageSender>();
             updated.SetResult(sender);
 
@@ -258,8 +351,22 @@ namespace Orleans.Runtime.Messaging
         }
 
         public Task<ConnectionMessageSender> GetConnection(IPEndPoint endPoint)
-    {
-            if (!this.connections.TryGetValue(endPoint, out var result))
+        {
+            this.connections.TryGetValue(endPoint, out var result);
+
+            // Clean up defunct connections.
+            if (result != null && result.Task.IsCompleted)
+            {
+                var status = result.Task.Status;
+                if (status == TaskStatus.Canceled || status == TaskStatus.Faulted)
+                {
+                    var item = new KeyValuePair<IPEndPoint, TaskCompletionSource<ConnectionMessageSender>>(endPoint, result);
+                    ((IDictionary<IPEndPoint, TaskCompletionSource<ConnectionMessageSender>>)this.connections).Remove(item);
+                    result = default;
+                }
+            }
+
+            if (result == null)
             {
                 var tcs = new TaskCompletionSource<ConnectionMessageSender>();
                 result = this.connections.GetOrAdd(endPoint, tcs);
@@ -270,41 +377,60 @@ namespace Orleans.Runtime.Messaging
             }
 
             return result.Task;
-
-            async Task ConnectAsync(IPEndPoint ep, TaskCompletionSource<ConnectionMessageSender> completion)
-            {
-                try
-                {
-                    await Task.CompletedTask;
-                    completion.TrySetResult(null);
-                }
-                catch (Exception exception)
-                {
-                    completion.TrySetException(exception);
-                }
-                finally
-                {
-                    completion.TrySetCanceled();
-                }
-            }
         }
 
-        private bool TryReplace(IPEndPoint endPoint, TaskCompletionSource<ConnectionMessageSender> replacement)
+        public void Remove(IPEndPoint endPoint, ConnectionMessageSender connection = null)
         {
             if (this.connections.TryGetValue(endPoint, out var tcs))
             {
-                if (this.connections.TryUpdate(endPoint, replacement, tcs))
+                var status = tcs.Task.Status;
+
+                if (status == TaskStatus.RanToCompletion && ReferenceEquals(tcs.Task.GetAwaiter().GetResult(), connection)
+                    || (status == TaskStatus.Canceled || status == TaskStatus.Faulted))
                 {
-                    return true;
+                    var item = new KeyValuePair<IPEndPoint, TaskCompletionSource<ConnectionMessageSender>>(endPoint, tcs);
+                    ((IDictionary<IPEndPoint, TaskCompletionSource<ConnectionMessageSender>>)this.connections).Remove(item);
                 }
             }
-
-            return false;
         }
 
-        public void Remove(IPEndPoint endPoint)
+        private async Task ConnectAsync(IPEndPoint endPoint, TaskCompletionSource<ConnectionMessageSender> completion)
         {
-            this.TryReplace(endPoint, new TaskCompletionSource<ConnectionMessageSender>());
+            try
+            {
+                var context = await this.connectionFactory.Connect(endPoint);
+                var middlewareTask = this.connectionDelegate(context);
+                var sender = context.Features.Get<ConnectionMessageSender>();
+                if (sender == null)
+                {
+                    var exception = new ConnectionAbortedException($"Connection does not have the required {nameof(ConnectionMessageSender)} feature");
+                    context.Abort(exception);
+                    throw exception;
+                }
+
+                Task.Run(async () =>
+                {
+                    try
+                    {
+                        await middlewareTask.ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        // Remove the defunct connection.
+                        context.Abort();
+                        this.connections.TryUpdate(endPoint, new TaskCompletionSource<ConnectionMessageSender>(), completion);
+                    }
+                }).Ignore();
+            }
+            catch (Exception exception)
+            {
+                completion.TrySetException(exception);
+                this.Remove(endPoint, null);
+            }
+            finally
+            {
+                completion.TrySetCanceled();
+            }
         }
     }
 }

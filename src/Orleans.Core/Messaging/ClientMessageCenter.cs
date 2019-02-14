@@ -187,6 +187,11 @@ namespace Orleans.Messaging
         public ChannelReader<Message> GetReader(Message.Categories type)
             => PendingInboundMessages.Reader;
 
+        public void OnReceivedMessage(Message message)
+        {
+            this.QueueIncomingMessage(message);
+        }
+
         public void SendMessage(Message msg)
         {
             GatewayConnection gatewayConnection = null;

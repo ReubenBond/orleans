@@ -191,6 +191,11 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        public void OnReceivedMessage(Message message)
+        {
+            this.InboundQueue.PostMessage(message);
+        }
+
         public void RerouteMessage(Message message)
         {
             if (rerouteHandler != null)
