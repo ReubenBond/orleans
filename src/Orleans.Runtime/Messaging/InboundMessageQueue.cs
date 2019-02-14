@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Concurrent;
 using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -11,7 +13,7 @@ namespace Orleans.Runtime.Messaging
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1711:IdentifiersShouldNotHaveIncorrectSuffix")]
     internal class InboundMessageQueue : IInboundMessageQueue
     {
-        private readonly BlockingCollection<Message>[] messageQueues;
+        private readonly Channel<Message>[] messageQueues;
 
         private readonly ILogger log;
 
@@ -29,9 +31,9 @@ namespace Orleans.Runtime.Messaging
                 int n = 0;
                 foreach (var queue in this.messageQueues)
                 {
-                    n += queue.Count;
+                    n += 0;
                 }
-                
+
                 return n;
             }
         }
@@ -39,13 +41,17 @@ namespace Orleans.Runtime.Messaging
         internal InboundMessageQueue(ILoggerFactory loggerFactory, IOptions<StatisticsOptions> statisticsOptions)
         {
             int n = Enum.GetValues(typeof(Message.Categories)).Length;
-            this.messageQueues = new BlockingCollection<Message>[n];
+            this.messageQueues = new Channel<Message>[n];
             this.queueTracking = new QueueTrackingStatistic[n];
             int i = 0;
             this.statisticsLevel = statisticsOptions.Value.CollectionLevel;
             foreach (var category in Enum.GetValues(typeof(Message.Categories)))
             {
-                this.messageQueues[i] = new BlockingCollection<Message>();
+                this.messageQueues[i] = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
+                {
+                    SingleReader = true,
+                    SingleWriter = false
+                });
                 if (this.statisticsLevel.CollectQueueStats())
                 {
                     var queueName = "IncomingMessageAgent." + category;
@@ -64,7 +70,7 @@ namespace Orleans.Runtime.Messaging
         {
             foreach (var q in this.messageQueues)
             {
-                q.CompleteAdding();
+                q.Writer.Complete();
             }
 
             if (!this.statisticsLevel.CollectQueueStats())
@@ -81,30 +87,20 @@ namespace Orleans.Runtime.Messaging
         /// <inheritdoc />
         public void PostMessage(Message msg)
         {
-            this.messageQueues[(int)msg.Category].Add(msg);
+            var writer = this.messageQueues[(int)msg.Category].Writer;
 
-            if (this.log.IsEnabled(LogLevel.Trace))
+            // Should always return true
+            if (writer.TryWrite(msg))
             {
-                this.log.Trace("Queued incoming {0} message", msg.Category.ToString());
+                if (this.log.IsEnabled(LogLevel.Trace))
+                {
+                    this.log.Trace("Queued incoming {0} message", msg.Category.ToString());
+                }
             }
         }
 
-        /// <inheritdoc />
-        public Message WaitMessage(Message.Categories type, CancellationToken cancellationToken)
-        {
-            try
-            {
-                return this.messageQueues[(int)type].Take(cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                return null;
-            }
-            catch (InvalidOperationException)
-            {
-                return null;
-            }
-        }
+        public ChannelReader<Message> GetReader(Message.Categories type)
+            => this.messageQueues[(int)type].Reader;
 
         /// <inheritdoc />
         public void Dispose()
@@ -118,7 +114,7 @@ namespace Orleans.Runtime.Messaging
 
                 foreach (var q in this.messageQueues)
                 {
-                    q.Dispose();
+                    //q.Dispose();
                 }
 
                 this.disposed = true;

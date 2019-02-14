@@ -17,7 +17,7 @@ namespace Orleans.Messaging
         GatewayToClient
     }
 
-    internal abstract class OutgoingMessageSender : AsynchQueueAgent<Message>
+    internal abstract class OutgoingMessageSender : ChannelAgent<Message>
     {
         private readonly SerializationManager serializationManager;
 

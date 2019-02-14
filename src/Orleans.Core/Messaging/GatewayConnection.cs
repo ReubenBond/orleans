@@ -320,9 +320,7 @@ namespace Orleans.Messaging
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
         }
-
-        protected override bool DrainAfterCancel => true;
-
+        
         private void RerouteMessage(Message msg)
         {
             msg.TargetActivation = null;

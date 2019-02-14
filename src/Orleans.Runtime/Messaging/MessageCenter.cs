@@ -7,6 +7,7 @@ using Orleans.Serialization;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using System.Threading.Channels;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -255,10 +256,8 @@ namespace Orleans.Runtime.Messaging
             InboundQueue.PostMessage(error);
         }
 
-        public Message WaitMessage(Message.Categories type, CancellationToken ct)
-        {
-            return InboundQueue.WaitMessage(type, ct);
-        }
+        public ChannelReader<Message> GetReader(Message.Categories type) => InboundQueue.GetReader(type);
+
 
         public void RegisterLocalMessageHandler(Message.Categories category, Action<Message> handler)
         {

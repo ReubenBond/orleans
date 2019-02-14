@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -72,7 +73,7 @@ namespace Orleans.Messaging
         internal bool Running { get; private set; }
 
         internal readonly GatewayManager GatewayManager;
-        internal readonly BlockingCollection<Message> PendingInboundMessages;
+        internal readonly Channel<Message> PendingInboundMessages;
         private readonly Dictionary<Uri, GatewayConnection> gatewayConnections;
         private int numMessages;
         // The grainBuckets array is used to select the connection to use when sending an ordered message to a grain.
@@ -121,7 +122,11 @@ namespace Orleans.Messaging
             this.connectionStatusListener = connectionStatusListener;
             Running = false;
             GatewayManager = new GatewayManager(gatewayOptions.Value, gatewayListProvider, loggerFactory);
-            PendingInboundMessages = new BlockingCollection<Message>();
+            PendingInboundMessages = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = false
+            });
             gatewayConnections = new Dictionary<Uri, GatewayConnection>();
             numMessages = 0;
             grainBuckets = new WeakReference[clientMessagingOptions.Value.ClientSenderBuckets];
@@ -164,7 +169,7 @@ namespace Orleans.Messaging
 
             Utils.SafeExecute(() =>
             {
-                PendingInboundMessages.CompleteAdding();
+                PendingInboundMessages.Writer.Complete();
             });
 
             if (this.statisticsLevel.CollectQueueStats())
@@ -178,6 +183,9 @@ namespace Orleans.Messaging
                 gateway.Stop();
             }
         }
+
+        public ChannelReader<Message> GetReader(Message.Categories type)
+            => PendingInboundMessages.Reader;
 
         public void SendMessage(Message msg)
         {
@@ -325,49 +333,13 @@ namespace Orleans.Messaging
             return GetTypeManager(silo, grainFactory).GetImplicitStreamSubscriberTable(silo);
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        public Message WaitMessage(Message.Categories type, CancellationToken ct)
-        {
-            try
-            {
-                return PendingInboundMessages.Take(ct);
-            }
-            catch (ThreadAbortException exc)
-            {
-                // Silo may be shutting-down, so downgrade to verbose log
-                logger.Debug(ErrorCode.ProxyClient_ThreadAbort, "Received thread abort exception -- exiting. {0}", exc);
-                Thread.ResetAbort();
-                return null;
-            }
-            catch (OperationCanceledException exc)
-            {
-                logger.Debug(ErrorCode.ProxyClient_OperationCancelled, "Received operation cancelled exception -- exiting. {0}", exc);
-                return null;
-            }
-            catch (ObjectDisposedException exc)
-            {
-                logger.Debug(ErrorCode.ProxyClient_OperationCancelled, "Received Object Disposed exception -- exiting. {0}", exc);
-                return null;
-            }
-            catch (InvalidOperationException exc)
-            {
-                logger.Debug(ErrorCode.ProxyClient_OperationCancelled, "Received Invalid Operation exception -- exiting. {0}", exc);
-                return null;
-            }
-            catch (Exception ex)
-            {
-                logger.Error(ErrorCode.ProxyClient_ReceiveError, "Unexpected error getting an inbound message", ex);
-                return null;
-            }
-        }
-
         public void RegisterLocalMessageHandler(Message.Categories category, Action<Message> handler)
         {
         }
 
         internal void QueueIncomingMessage(Message msg)
         {
-            PendingInboundMessages.Add(msg);
+            PendingInboundMessages.Writer.TryWrite(msg);
         }
 
         public void RejectMessage(Message msg, string reason, Exception exc = null)
@@ -459,7 +431,7 @@ namespace Orleans.Messaging
 
         public void Dispose()
         {
-            PendingInboundMessages.Dispose();
+            PendingInboundMessages.Writer.TryComplete();
             if (gatewayConnections != null)
                 foreach (var item in gatewayConnections)
                 {
