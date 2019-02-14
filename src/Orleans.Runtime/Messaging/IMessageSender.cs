@@ -2,14 +2,19 @@ using System;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO.Pipelines;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.Internal;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -26,27 +31,27 @@ namespace Orleans.Runtime.Messaging
         int TryRead(ref ReadOnlySequence<byte> input, out Message message);
     }
 
-    internal interface IConnectionMessageSender
-    {
-        void Send(Message message);
-    }
-
     public static class ConnectionBuilderExtensions
     {
         public static IConnectionBuilder UseOrleansSiloConnectionHandler(this IConnectionBuilder builder)
         {
-            return builder.UseConnectionMessageSender();
+            return builder.UseConnectionMessageSender(registerMessageSender: false);
         }
         public static IConnectionBuilder UseOrleansGatewayConnectionHandler(this IConnectionBuilder builder)
         {
-            return builder.UseConnectionMessageSender();
+            return builder.UseConnectionMessageSender(registerMessageSender: false);
         }
 
-        private static IConnectionBuilder UseConnectionMessageSender(this IConnectionBuilder builder)
+        public static IConnectionBuilder UseOrleansOutgoingConnectionHandler(this IConnectionBuilder builder)
         {
-            builder.Use(next =>
+            return builder.UseConnectionMessageSender(registerMessageSender: true);
+        }
+
+        private static IConnectionBuilder UseConnectionMessageSender(this IConnectionBuilder builder, bool registerMessageSender)
+        {
+            return builder.Use(next =>
             {
-                var connectionManager = builder.ApplicationServices.GetRequiredService<IConnectionManager>();
+                var connectionManager = builder.ApplicationServices.GetRequiredService<ConnectionMessageSenderManager>();
                 return async (ConnectionContext connection) =>
                 {
                     var sender = ActivatorUtilities.CreateInstance<ConnectionMessageSender>(builder.ApplicationServices, connection);
@@ -56,72 +61,29 @@ namespace Orleans.Runtime.Messaging
                     try
                     {
                         var nextTask = next(connection);
-                        connectionManager.Add(connection);
+
+                        if (registerMessageSender)
+                        {
+                            var endPoint = connection.GetEndPoint();
+                            connectionManager.Add(endPoint, sender);
+                        }
+
                         await nextTask.ConfigureAwait(false);
                     }
                     finally
                     {
-                        connectionManager.Remove(connection);
+                        if (registerMessageSender) connectionManager.Remove(connection.GetEndPoint());
                         sender.Abort();
                     }
                 };
             });
-            return builder;
-        }
-    }
-
-    public interface IRemoteEndPointFeature
-    {
-        IPEndPoint RemoteEndPoint { get; }
-    }
-
-    public interface IConnectionDependency
-    {
-        ValueTask Ready { get; }
-    }
-
-    public interface ILocalEndPointFeature
-    {
-        IPEndPoint LocalEndPoint { get; }
-    }
-
-    /// <summary>
-    /// Options for inbound silo connections.
-    /// </summary>
-    public class SiloListenerOptions : ConnectionBuilder, ILocalEndPointFeature
-    {
-        private readonly EndpointOptions endPointOptions;
-
-        public SiloListenerOptions(IServiceProvider applicationServices, IOptions<EndpointOptions> endPointOptions) : base(applicationServices)
-        {
-            this.endPointOptions = endPointOptions.Value;
         }
 
-        public IPEndPoint LocalEndPoint => this.endPointOptions.GetListeningSiloEndpoint();
-    }
-
-    /// <summary>
-    /// Options for inbound client connections.
-    /// </summary>
-    public class GatewayListenerOptions : ConnectionBuilder, ILocalEndPointFeature
-    {
-        private readonly EndpointOptions endPointOptions;
-
-        public GatewayListenerOptions(IServiceProvider applicationServices, IOptions<EndpointOptions> endPointOptions) : base(applicationServices)
+        private static IPEndPoint GetEndPoint(this ConnectionContext connection)
         {
-            this.endPointOptions = endPointOptions.Value;
-        }
-
-        public IPEndPoint LocalEndPoint => this.endPointOptions.GetListeningProxyEndpoint();
-    }
-
-    /// <summary>
-    /// Options for outbound connections.
-    /// </summary>
-    public class OutboundConnectionOptions : ConnectionBuilder
-    {
-        public OutboundConnectionOptions(IServiceProvider applicationServices) : base(applicationServices)
-        {
+            var feature = connection.Features.Get<IHttpConnectionFeature>();
+            if (feature == null) throw new ArgumentException($"Connection must have {nameof(IHttpConnectionFeature)}");
+            return new IPEndPoint(feature.RemoteIpAddress, feature.RemotePort);
         }
     }
 
@@ -212,39 +174,72 @@ namespace Orleans.Runtime.Messaging
         }
     }
 
+    /*
     public interface IConnectionManager
     {
         void Add(ConnectionContext connection);
         void Remove(ConnectionContext connection);
         Task<ConnectionContext> GetConnection(IPEndPoint endPoint);
-    }
-
-    public interface IConnectionFactory
-    {
-        Task<ConnectionContext> Connect(IPEndPoint endPoint);
-    }
-
-    /*internal class KestrelSocketConnectionFactory : IConnectionFactory
-    {
-        public Task<ConnectionContext> Connect(IPEndPoint endPoint)
-        {
-            
-        }
     }*/
-    
-    internal sealed class ConnectionManager : IConnectionManager
-    {
-        private readonly ConcurrentDictionary<IPEndPoint, TaskCompletionSource<ConnectionContext>> connections
-            = new ConcurrentDictionary<IPEndPoint, TaskCompletionSource<ConnectionContext>>();
 
-        public void Add(ConnectionContext connection)
+    public interface IOutboundConnectionFactory
+    {
+        Task Connect(IPEndPoint endPoint, IConnectionDispatcher dispatcher);
+    }
+
+    public interface IConnectionDispatcher
+    {
+        Task OnConnected(ConnectionContext connection);
+    }
+
+    internal class SocketConnectionFactory : IOutboundConnectionFactory
+    {
+        private readonly ILoggerFactory loggerFactory;
+
+        public SocketConnectionFactory(ILoggerFactory loggerFactory)
         {
-            var endPoint = GetEndPoint(connection);
-            var updated = new TaskCompletionSource<ConnectionContext>();
-            updated.SetResult(connection);
+            this.loggerFactory = loggerFactory;
+        }
+
+        public async Task Connect(IPEndPoint endPoint, IConnectionDispatcher dispatcher)
+        {
+            var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+            var completion = new SingleUseSocketAsyncEventArgs
+            {
+                RemoteEndPoint = endPoint
+            };
+
+            if (!socket.ConnectAsync(completion))
+            {
+                completion.Complete();
+            }
+
+            await completion;
+
+            if (completion.SocketError != SocketError.Success)
+            {
+                throw new Exception($"Unable to connect to {endPoint}. Error: {completion.SocketError}");
+            }
+
+            var connection = new SocketConnection(socket, MemoryPool<byte>.Shared, PipeScheduler.Inline, this.loggerFactory.CreateLogger<SocketConnection>());
+            var middlewareTask = dispatcher.OnConnected(connection);
+            await connection.StartAsync();
+            await middlewareTask;
+        }
+    }
+
+    internal sealed class ConnectionMessageSenderManager
+    {
+        private readonly ConcurrentDictionary<IPEndPoint, TaskCompletionSource<ConnectionMessageSender>> connections
+            = new ConcurrentDictionary<IPEndPoint, TaskCompletionSource<ConnectionMessageSender>>();
+        
+        public void Add(IPEndPoint endPoint, ConnectionMessageSender sender)
+    {
+            var updated = new TaskCompletionSource<ConnectionMessageSender>();
+            updated.SetResult(sender);
 
             var c = this.connections;
-            TaskCompletionSource<ConnectionContext> existing = default;
+            TaskCompletionSource<ConnectionMessageSender> existing = default;
             while (!c.TryAdd(endPoint, updated)
                 && c.TryGetValue(endPoint, out existing)
                 && !c.TryUpdate(endPoint, updated, existing))
@@ -253,7 +248,7 @@ namespace Orleans.Runtime.Messaging
 
             if (existing != null && !ReferenceEquals(existing, updated))
             {
-                if (existing.TrySetResult(connection)) return;
+                if (existing.TrySetResult(sender)) return;
                 if (existing.Task.Status == TaskStatus.RanToCompletion)
                 {
                     var e = existing.Task.GetAwaiter().GetResult();
@@ -262,11 +257,11 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public Task<ConnectionContext> GetConnection(IPEndPoint endPoint)
-        {
+        public Task<ConnectionMessageSender> GetConnection(IPEndPoint endPoint)
+    {
             if (!this.connections.TryGetValue(endPoint, out var result))
             {
-                var tcs = new TaskCompletionSource<ConnectionContext>();
+                var tcs = new TaskCompletionSource<ConnectionMessageSender>();
                 result = this.connections.GetOrAdd(endPoint, tcs);
                 if (ReferenceEquals(result, tcs))
                 {
@@ -276,7 +271,7 @@ namespace Orleans.Runtime.Messaging
 
             return result.Task;
 
-            async Task ConnectAsync(IPEndPoint ep, TaskCompletionSource<ConnectionContext> completion)
+            async Task ConnectAsync(IPEndPoint ep, TaskCompletionSource<ConnectionMessageSender> completion)
             {
                 try
                 {
@@ -294,7 +289,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private bool TryReplace(IPEndPoint endPoint, TaskCompletionSource<ConnectionContext> replacement)
+        private bool TryReplace(IPEndPoint endPoint, TaskCompletionSource<ConnectionMessageSender> replacement)
         {
             if (this.connections.TryGetValue(endPoint, out var tcs))
             {
@@ -307,21 +302,9 @@ namespace Orleans.Runtime.Messaging
             return false;
         }
 
-        public void Remove(ConnectionContext connection)
+        public void Remove(IPEndPoint endPoint)
         {
-            this.TryReplace(this.GetEndPoint(connection), new TaskCompletionSource<ConnectionContext>());
+            this.TryReplace(endPoint, new TaskCompletionSource<ConnectionMessageSender>());
         }
-
-        private IPEndPoint GetEndPoint(ConnectionContext connection)
-        {
-            var endPoint = connection.Features.Get<IRemoteEndPointFeature>()?.RemoteEndPoint;
-            if (endPoint == null) throw new ArgumentException($"Connection must have {nameof(IRemoteEndPointFeature)}");
-            return endPoint;
-        }
-    }
-
-    internal interface IConnectionSenderManager
-    {
-        Task<IConnectionMessageSender> GetSender(IPEndPoint endPoint);
     }
 }

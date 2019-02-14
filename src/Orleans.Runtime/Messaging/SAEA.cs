@@ -532,4 +532,20 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.Internal
             }
         }
     }
+
+    public class SingleUseSocketAsyncEventArgs : SocketAsyncEventArgs, ICriticalNotifyCompletion
+    {
+        private readonly TaskCompletionSource<SingleUseSocketAsyncEventArgs> completion
+            = new TaskCompletionSource<SingleUseSocketAsyncEventArgs>();
+
+        public TaskAwaiter<SingleUseSocketAsyncEventArgs> GetAwaiter() => this.completion.Task.GetAwaiter();
+
+        public void Complete() => this.completion.TrySetResult(this);
+
+        public void OnCompleted(Action continuation) => this.GetAwaiter().OnCompleted(continuation);
+
+        public void UnsafeOnCompleted(Action continuation) => this.GetAwaiter().UnsafeOnCompleted(continuation);
+
+        protected override void OnCompleted(SocketAsyncEventArgs _) => this.completion.TrySetResult(this);
+    }
 }
