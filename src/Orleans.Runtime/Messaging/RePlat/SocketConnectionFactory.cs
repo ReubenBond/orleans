@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.IO.Pipelines;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.Internal;
@@ -71,6 +72,22 @@ namespace Orleans.Runtime.Messaging
 
             result = new IPEndPoint(ipAddress, uri.Port);
             return true;
+        }
+
+        public class SingleUseSocketAsyncEventArgs : SocketAsyncEventArgs, ICriticalNotifyCompletion
+        {
+            private readonly TaskCompletionSource<SingleUseSocketAsyncEventArgs> completion
+                = new TaskCompletionSource<SingleUseSocketAsyncEventArgs>();
+
+            public TaskAwaiter<SingleUseSocketAsyncEventArgs> GetAwaiter() => this.completion.Task.GetAwaiter();
+
+            public void Complete() => this.completion.TrySetResult(this);
+
+            public void OnCompleted(Action continuation) => this.GetAwaiter().OnCompleted(continuation);
+
+            public void UnsafeOnCompleted(Action continuation) => this.GetAwaiter().UnsafeOnCompleted(continuation);
+
+            protected override void OnCompleted(SocketAsyncEventArgs _) => this.completion.TrySetResult(this);
         }
     }
 }

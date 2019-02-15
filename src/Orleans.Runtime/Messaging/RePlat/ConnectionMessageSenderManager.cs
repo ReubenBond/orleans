@@ -29,7 +29,7 @@ namespace Orleans.Runtime.Messaging
             // Configure the connection builder using the user-defined options.
             var connectionBuilder = new ConnectionBuilder(serviceProvider);
             endpointOptions.ConfigureConnectionBuilder(connectionBuilder);
-            connectionBuilder.UseOrleansOutgoingConnectionHandler();
+            connectionBuilder.UseOrleansOutboundConnectionHandler();
             return connectionBuilder.Build();
         }
 
