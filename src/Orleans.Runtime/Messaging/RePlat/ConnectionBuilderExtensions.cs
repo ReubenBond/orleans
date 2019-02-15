@@ -1,7 +1,4 @@
 using System;
-using System.Buffers;
-using System.Buffers.Binary;
-using System.IO.Pipelines;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
@@ -14,23 +11,32 @@ namespace Orleans.Runtime.Messaging
     {
         public static IConnectionBuilder UseOrleansSiloConnectionHandler(this IConnectionBuilder builder)
         {
-            return builder.RunOrleansConnectionHandler(outbound: false);
+            return builder.RunOrleansConnectionHandler(outbound: false, siloToSilo: true);
         }
+
         public static IConnectionBuilder UseOrleansGatewayConnectionHandler(this IConnectionBuilder builder)
         {
-            return builder.RunOrleansConnectionHandler(outbound: false);
+            return builder.RunOrleansConnectionHandler(outbound: false, siloToSilo: false);
         }
 
-        public static IConnectionBuilder UseOrleansOutboundConnectionHandler(this IConnectionBuilder builder)
+        public static IConnectionBuilder UseOrleansOutboundSiloConnectionHandler(this IConnectionBuilder builder)
         {
-            return builder.RunOrleansConnectionHandler(outbound: true);
+            return builder.RunOrleansConnectionHandler(outbound: true, siloToSilo: true);
         }
 
-        private static IConnectionBuilder RunOrleansConnectionHandler(this IConnectionBuilder builder, bool outbound)
+        public static IConnectionBuilder UseOrleansOutboundClientConnectionHandler(this IConnectionBuilder builder)
+        {
+            return builder.RunOrleansConnectionHandler(outbound: true, siloToSilo: false);
+        }
+
+        private static IConnectionBuilder RunOrleansConnectionHandler(this IConnectionBuilder builder, bool outbound, bool siloToSilo)
         {
             return builder.Use(_ =>
             {
-                var connectionManager = builder.ApplicationServices.GetRequiredService<ConnectionMessageSenderManager>();
+                var serviceProvider = builder.ApplicationServices;
+                var connectionManager = serviceProvider.GetRequiredService<ConnectionMessageSenderManager>();
+                var preambleSender = GetPreambleSender(serviceProvider, outbound, siloToSilo);
+                var preambleReceiver = GetPreambleReceiver(serviceProvider, outbound, siloToSilo);
                 return async (ConnectionContext connection) =>
                 {
                     ConnectionMessageSender sender = default;
@@ -50,6 +56,8 @@ namespace Orleans.Runtime.Messaging
                         connection.Features.Set(receiver);
 
                         // Ok to yield execution after this point.
+                        if (preambleSender != null) await preambleSender.WritePreamble(connection);
+                        if (preambleReceiver != null) await preambleReceiver.ReadPreamble(connection);
 
                         // Start the sender/receiver after the handshake has completed.
                         var senderTask = sender.Run();
@@ -67,95 +75,33 @@ namespace Orleans.Runtime.Messaging
             });
         }
 
+        private static ConnectionPreambleReceiver GetPreambleReceiver(IServiceProvider serviceProvider, bool outbound, bool siloToSilo)
+        {
+            if (outbound)
+            {
+                return null;
+            }
+
+            if (siloToSilo) return ActivatorUtilities.GetServiceOrCreateInstance<SiloPreambleReceiver>(serviceProvider);
+            else return ActivatorUtilities.GetServiceOrCreateInstance<GatewayPreambleReceiver>(serviceProvider);
+        }
+
+        private static ConnectionPreambleSender GetPreambleSender(IServiceProvider serviceProvider, bool outbound, bool siloToSilo)
+        {
+            if (!outbound)
+            {
+                return null;
+            }
+
+            if (siloToSilo) return ActivatorUtilities.GetServiceOrCreateInstance<SiloPreambleSender>(serviceProvider);
+            else return ActivatorUtilities.GetServiceOrCreateInstance<ClientPreambleSender>(serviceProvider);
+        }
+
         private static string GetEndPoint(this ConnectionContext connection)
         {
             var feature = connection.Features.Get<IHttpConnectionFeature>();
             if (feature == null) throw new ArgumentException($"Connection must have {nameof(IHttpConnectionFeature)}");
             return new IPEndPoint(feature.RemoteIpAddress, feature.RemotePort).ToString();
-        }
-    }
-
-    internal class ConnectionPreambleSender
-    {
-        private readonly GrainId id;
-
-        public ConnectionPreambleSender(GrainId grainId)
-        {
-            this.id = grainId;
-        }
-
-        public Task SendPreamble(ConnectionContext connection)
-        {
-            var output = connection.Transport.Output;
-            var grainIdByteArray = this.id.ToByteArray();
-
-            Span<byte> bytes = stackalloc byte[sizeof(int)];
-            BinaryPrimitives.WriteInt32LittleEndian(bytes, grainIdByteArray.Length);
-            var buffer = output.GetSpan(bytes.Length + grainIdByteArray.Length);
-            bytes.CopyTo(buffer);
-            new ReadOnlySpan<byte>(grainIdByteArray).CopyTo(buffer.Slice(sizeof(int)));
-            output.Advance(buffer.Length);
-            var flushTask = output.FlushAsync();
-
-            if (flushTask.IsCompletedSuccessfully) return Task.CompletedTask;
-            return FlushAsync(flushTask);
-
-            async Task FlushAsync(ValueTask<FlushResult> task)
-            {
-                await task;
-            }
-        }
-    }
-
-    internal class ConnectionPreambleReceiver
-    {
-        private const int MaxPreambleLength = 1024;
-        private readonly bool isProxy;
-        public ConnectionPreambleReceiver(bool isProxy)
-        {
-            this.isProxy = isProxy;
-        }
-
-        public async Task ReceivePreamble(ConnectionContext context)
-        {
-            var input = context.Transport.Input;
-
-            var readResult = await input.ReadAsync();
-            var buffer = readResult.Buffer;
-            while (buffer.Length < 4)
-            {
-                input.AdvanceTo(buffer.Start, buffer.End);
-                readResult = await input.ReadAsync();
-                buffer = readResult.Buffer;
-            }
-
-            int ReadLength(ref ReadOnlySequence<byte> b)
-            {
-                Span<byte> lengthBytes = stackalloc byte[4];
-                b.Slice(0, 4).CopyTo(lengthBytes);
-                b = b.Slice(4);
-                return BinaryPrimitives.ReadInt32LittleEndian(lengthBytes);
-            }
-
-            var length = ReadLength(ref buffer);
-            if (buffer.Length > MaxPreambleLength)
-            {
-                throw new InvalidOperationException($"Remote connection sent preamble length of {length}, which is greater than maximum allowed size of {MaxPreambleLength}");
-            }
-
-            while (buffer.Length < length)
-            {
-                input.AdvanceTo(buffer.Start, buffer.End);
-                readResult = await input.ReadAsync();
-                buffer = readResult.Buffer;
-            }
-
-            var grainIdBytes = new byte[Math.Min(length, 1024)];
-
-            buffer.Slice(0, length).CopyTo(grainIdBytes);
-            var grainId = GrainIdExtensions.FromByteArray(grainIdBytes);
-
-#warning validate grainId
         }
     }
 }

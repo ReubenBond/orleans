@@ -19,6 +19,7 @@ namespace Orleans.Runtime.Messaging
         private Action<Message> rerouteHandler;
         internal Func<Message, bool> ShouldDrop;
         private IHostedClient hostedClient;
+        private Action<Message> sniffIncomingMessageHandler;
 
         // ReSharper disable NotAccessedField.Local
         private IntValueStatistic sendQueueLengthCounter;
@@ -208,8 +209,13 @@ namespace Orleans.Runtime.Messaging
         {
             set
             {
-                ima.SniffIncomingMessage = value;
+                if (this.sniffIncomingMessageHandler != null)
+                    throw new InvalidOperationException("IncomingMessageAcceptor SniffIncomingMessage already set");
+
+                this.sniffIncomingMessageHandler = value;
             }
+
+            get => this.sniffIncomingMessageHandler;
         }
 
         public Func<SiloAddress, bool> SiloDeadOracle { get; set; }

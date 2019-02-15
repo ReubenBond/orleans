@@ -28,7 +28,7 @@ namespace Orleans.Runtime.Messaging
         private readonly CounterStatistic checkedOutSocketEventArgsCounter;
         private readonly CounterStatistic checkedInSocketEventArgsCounter;
         private readonly SerializationManager serializationManager;
-
+        
         public Action<Message> SniffIncomingMessage
         {
             set

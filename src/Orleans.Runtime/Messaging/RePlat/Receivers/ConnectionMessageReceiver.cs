@@ -1,21 +1,19 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class ConnectionMessageReceiver
+    internal abstract class ConnectionMessageReceiver
     {
         private readonly ConnectionContext connection;
-        private readonly IMessageCenter messageCenter;
         private readonly IMessageSerializer serializer;
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
 
-        public ConnectionMessageReceiver(ConnectionContext connection, IMessageCenter messageCenter, IMessageSerializer serializer)
+        protected ConnectionMessageReceiver(ConnectionContext connection, IMessageSerializer serializer)
         {
             this.connection = connection;
-            this.messageCenter = messageCenter;
             this.serializer = serializer;
         }
 
@@ -26,7 +24,9 @@ namespace Orleans.Runtime.Messaging
 
         public Task Run() => Task.Run(this.Process);
 
-        public async Task Process()
+        protected abstract void OnReceivedMessage(Message message);
+
+        private async Task Process()
         {
             var input = this.connection.Transport.Input;
             var error = default(Exception);
@@ -47,7 +47,7 @@ namespace Orleans.Runtime.Messaging
                             requiredBytes = this.serializer.TryRead(ref buffer, out var message);
                             if (requiredBytes == 0)
                             {
-                                this.messageCenter.OnReceivedMessage(message);
+                                this.OnReceivedMessage(message);
                             }
                         } while (requiredBytes == 0);
                     }

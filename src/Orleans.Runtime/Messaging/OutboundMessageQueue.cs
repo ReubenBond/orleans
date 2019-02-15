@@ -30,7 +30,13 @@ namespace Orleans.Runtime.Messaging
 
         internal const string QUEUED_TIME_METADATA = "QueuedTime";
 
-        internal OutboundMessageQueue(MessageCenter mc, IOptions<SiloMessagingOptions> options, SerializationManager serializationManager, ExecutorService executorService, ILoggerFactory loggerFactory, ConnectionMessageSenderManager senderManager)
+        internal OutboundMessageQueue(
+            MessageCenter mc,
+            IOptions<SiloMessagingOptions> options,
+            SerializationManager serializationManager,
+            ExecutorService executorService,
+            ILoggerFactory loggerFactory,
+            ConnectionMessageSenderManager senderManager)
         {
             messageCenter = mc;
             this.senderManager = senderManager;
