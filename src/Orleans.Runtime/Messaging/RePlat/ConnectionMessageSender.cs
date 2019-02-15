@@ -1,0 +1,95 @@
+﻿using System;
+using System.Threading;
+using System.Threading.Channels;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Connections;
+
+namespace Orleans.Runtime.Messaging
+{
+    internal sealed class ConnectionMessageSender : IDisposable
+    {
+        private static readonly UnboundedChannelOptions ChannelOptions = new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = false
+        };
+
+        private readonly Channel<Message> messages;
+        private readonly ChannelWriter<Message> writer;
+        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
+        private readonly IMessageCenter messageCenter;
+        private readonly ConnectionContext connection;
+        private readonly IMessageSerializer serializer;
+
+        public ConnectionMessageSender(IMessageCenter messageCenter, ConnectionContext connection)
+        {
+            this.messages = Channel.CreateUnbounded<Message>(ChannelOptions);
+            this.writer = this.messages.Writer;
+            this.messageCenter = messageCenter;
+            this.connection = connection;
+            this.serializer = connection.Features.Get<IMessageSerializer>();
+        }
+            
+        public Task Run() => Task.Run(this.Process);
+
+        public void Dispose() => this.Abort();
+
+        public void Abort()
+        {
+            if (this.writer.TryComplete())
+            {
+                ThreadPool.UnsafeQueueUserWorkItem(cts => ((CancellationTokenSource)cts).Cancel(), this.cancellation);
+            }
+        }
+
+        public void Send(Message message)
+        {
+            if (!this.writer.TryWrite(message))
+            {
+                this.RerouteMessage(message);
+            }
+        }
+        private async Task Process()
+        {
+            var output = this.connection.Transport.Output;
+            var reader = this.messages.Reader;
+            try
+            {
+                while (!this.cancellation.IsCancellationRequested)
+                {
+                    var moreTask = reader.WaitToReadAsync();
+                    var more = moreTask.IsCompleted ? moreTask.GetAwaiter().GetResult() : await moreTask.ConfigureAwait(false);
+                    if (!more)
+                    {
+                        break;
+                    }
+
+                    while (reader.TryRead(out var message))
+                    {
+                        this.serializer.Write(ref output, message);
+                    }
+
+                    var flushTask = output.FlushAsync();
+                    var flushResult = flushTask.IsCompleted ? flushTask.GetAwaiter().GetResult() : await flushTask.ConfigureAwait(false);
+                    if (flushResult.IsCompleted || flushResult.IsCanceled) break;
+                }
+            }
+            finally
+            {
+                while (reader.TryRead(out var message))
+                {
+                    this.RerouteMessage(message);
+                }
+
+                this.Abort();
+                this.connection.Abort();
+            }
+        }
+
+        private void RerouteMessage(Message message)
+        {
+            //TODO: is this correct?
+            ThreadPool.UnsafeQueueUserWorkItem(msg => this.messageCenter.SendMessage((Message)msg), message);
+        }
+    }
+}
