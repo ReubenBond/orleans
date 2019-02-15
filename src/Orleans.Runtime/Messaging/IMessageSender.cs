@@ -207,21 +207,25 @@ namespace Orleans.Runtime.Messaging
             var error = default(Exception);
             try
             {
-                int requiredBytes = 0;
+                var requiredBytes = 0;
                 while (!this.cancellation.IsCancellationRequested)
                 {
                     if (!input.TryRead(out var readResult)) readResult = await input.ReadAsync(this.cancellation.Token);
-                                       
+                    
                     var buffer = readResult.Buffer;
+                    
                     var start = buffer.Start;
-                    do
+                    if (buffer.Length >= requiredBytes)
                     {
-                        requiredBytes = this.serializer.TryRead(ref buffer, out var message);
-                        if (requiredBytes == 0)
+                        do
                         {
-                            this.messageCenter.OnReceivedMessage(message);
-                        }
-                    } while (requiredBytes == 0);
+                            requiredBytes = this.serializer.TryRead(ref buffer, out var message);
+                            if (requiredBytes == 0)
+                            {
+                                this.messageCenter.OnReceivedMessage(message);
+                            }
+                        } while (requiredBytes == 0);
+                    }
 
                     if (readResult.IsCanceled || readResult.IsCompleted) break;
                     input.AdvanceTo(start, buffer.End);
@@ -322,6 +326,7 @@ namespace Orleans.Runtime.Messaging
 
             // Configure the connection builder using the user-defined options.
             var connectionBuilder = ActivatorUtilities.CreateInstance<OutboundConnectionBuilder>(serviceProvider);
+            connectionBuilder.UseOrleansOutgoingConnectionHandler();
             endpointOptions.Value.ConfigureOutboundConnectionBuilder(connectionBuilder);
             this.connectionDelegate = connectionBuilder.Build();
         }
