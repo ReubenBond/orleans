@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net;
@@ -11,23 +11,29 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class ConnectionMessageSenderManager
     {
-        private readonly ConcurrentDictionary<IPEndPoint, TaskCompletionSource<ConnectionMessageSender>> connections
-            = new ConcurrentDictionary<IPEndPoint, TaskCompletionSource<ConnectionMessageSender>>();
+        private readonly ConcurrentDictionary<string, TaskCompletionSource<ConnectionMessageSender>> connections
+            = new ConcurrentDictionary<string, TaskCompletionSource<ConnectionMessageSender>>();
         private readonly IConnectionFactory connectionFactory;
         private readonly ConnectionDelegate connectionDelegate;
 
-        public ConnectionMessageSenderManager(IConnectionFactory connectionFactory, IServiceProvider serviceProvider, IOptions<EndpointOptions> endpointOptions)
+        public ConnectionMessageSenderManager(IConnectionFactory connectionFactory, IServiceProvider serviceProvider, IOptions<ConnectionOptions> connectionOptions)
         {
             this.connectionFactory = connectionFactory;
-
-            // Configure the connection builder using the user-defined options.
-            var connectionBuilder = new ConnectionBuilder(serviceProvider);
-            connectionBuilder.UseOrleansOutgoingConnectionHandler();
-            endpointOptions.Value.ConfigureOutboundConnectionBuilder(connectionBuilder);
-            this.connectionDelegate = connectionBuilder.Build();
+            this.connectionDelegate = CreateOutboundConnectionDelegate(serviceProvider, connectionOptions.Value);
         }
 
-        public void Add(IPEndPoint endPoint, ConnectionMessageSender sender)
+        private ConnectionDelegate CreateOutboundConnectionDelegate(
+            IServiceProvider serviceProvider,
+            ConnectionOptions endpointOptions)
+        {
+            // Configure the connection builder using the user-defined options.
+            var connectionBuilder = new ConnectionBuilder(serviceProvider);
+            endpointOptions.ConfigureConnectionBuilder(connectionBuilder);
+            connectionBuilder.UseOrleansOutgoingConnectionHandler();
+            return connectionBuilder.Build();
+        }
+
+        public void Add(string endPoint, ConnectionMessageSender sender)
         {
             var updated = new TaskCompletionSource<ConnectionMessageSender>();
             updated.SetResult(sender);
@@ -51,7 +57,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public Task<ConnectionMessageSender> GetConnection(IPEndPoint endPoint)
+        public Task<ConnectionMessageSender> GetConnection(string endPoint)
         {
             this.connections.TryGetValue(endPoint, out var result);
 
@@ -61,8 +67,8 @@ namespace Orleans.Runtime.Messaging
                 var status = result.Task.Status;
                 if (status == TaskStatus.Canceled || status == TaskStatus.Faulted)
                 {
-                    var item = new KeyValuePair<IPEndPoint, TaskCompletionSource<ConnectionMessageSender>>(endPoint, result);
-                    ((IDictionary<IPEndPoint, TaskCompletionSource<ConnectionMessageSender>>)this.connections).Remove(item);
+                    var item = new KeyValuePair<string, TaskCompletionSource<ConnectionMessageSender>>(endPoint, result);
+                    ((IDictionary<string, TaskCompletionSource<ConnectionMessageSender>>)this.connections).Remove(item);
                     result = default;
                 }
             }
@@ -73,14 +79,14 @@ namespace Orleans.Runtime.Messaging
                 result = this.connections.GetOrAdd(endPoint, tcs);
                 if (ReferenceEquals(result, tcs))
                 {
-                    Task.Run(() => ConnectAsync(endPoint, tcs));
+                    Task.Run(() => this.ConnectAsync(endPoint, tcs));
                 }
             }
 
             return result.Task;
         }
 
-        public void Remove(IPEndPoint endPoint, ConnectionMessageSender connection = null)
+        public void Remove(string endPoint, ConnectionMessageSender connection = null)
         {
             if (this.connections.TryGetValue(endPoint, out var tcs))
             {
@@ -89,13 +95,13 @@ namespace Orleans.Runtime.Messaging
                 if (status == TaskStatus.RanToCompletion && ReferenceEquals(tcs.Task.GetAwaiter().GetResult(), connection)
                     || (status == TaskStatus.Canceled || status == TaskStatus.Faulted))
                 {
-                    var item = new KeyValuePair<IPEndPoint, TaskCompletionSource<ConnectionMessageSender>>(endPoint, tcs);
-                    ((IDictionary<IPEndPoint, TaskCompletionSource<ConnectionMessageSender>>)this.connections).Remove(item);
+                    var item = new KeyValuePair<string, TaskCompletionSource<ConnectionMessageSender>>(endPoint, tcs);
+                    ((IDictionary<string, TaskCompletionSource<ConnectionMessageSender>>)this.connections).Remove(item);
                 }
             }
         }
 
-        private async Task ConnectAsync(IPEndPoint endPoint, TaskCompletionSource<ConnectionMessageSender> completion)
+        private async Task ConnectAsync(string endPoint, TaskCompletionSource<ConnectionMessageSender> completion)
         {
             try
             {
@@ -122,6 +128,8 @@ namespace Orleans.Runtime.Messaging
                         this.connections.TryUpdate(endPoint, new TaskCompletionSource<ConnectionMessageSender>(), completion);
                     }
                 }).Ignore();
+
+                completion.TrySetResult(sender);
             }
             catch (Exception exception)
             {

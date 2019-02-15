@@ -16,12 +16,6 @@ namespace Orleans.Configuration
     /// </summary>
     public class EndpointOptions
     {
-        private readonly ConnectionBuilderDelegates inboundConnectionBuilder = new ConnectionBuilderDelegates();
-
-        private readonly ConnectionBuilderDelegates gatewayConnectionBuilder = new ConnectionBuilderDelegates();
-
-        private readonly ConnectionBuilderDelegates outboundConnectionBuilder = new ConnectionBuilderDelegates();
-
         /// <summary>
         /// The IP address used for clustering.
         /// </summary>
@@ -51,28 +45,5 @@ namespace Orleans.Configuration
         /// </summary>
         public IPEndPoint GatewayListeningEndpoint { get; set; }
 
-        public void ConfigureInboundConnections(Action<IConnectionBuilder> configure) => this.inboundConnectionBuilder.Add(configure);
-        public void ConfigureGatewayConnections(Action<IConnectionBuilder> configure) => this.gatewayConnectionBuilder.Add(configure);
-        public void ConfigureOutboundConnections(Action<IConnectionBuilder> configure) => this.outboundConnectionBuilder.Add(configure);
-
-        internal void ConfigureInboundConnectionBuilder(IConnectionBuilder builder) => this.inboundConnectionBuilder.Invoke(builder);
-        public void ConfigureGatewayConnectionBuilder(IConnectionBuilder builder) => this.gatewayConnectionBuilder.Invoke(builder);
-        public void ConfigureOutboundConnectionBuilder(IConnectionBuilder builder) => this.outboundConnectionBuilder.Invoke(builder);
-
-        internal class ConnectionBuilderDelegates
-        {
-            private readonly List<Action<IConnectionBuilder>> configurationDelegates = new List<Action<IConnectionBuilder>>();
-
-            public void Add(Action<IConnectionBuilder> configure)
-                => this.configurationDelegates.Add(configure ?? throw new ArgumentNullException(nameof(configure)));
-
-            public void Invoke(IConnectionBuilder builder)
-            {
-                foreach (var configureDelegate in this.configurationDelegates)
-                {
-                    configureDelegate(builder);
-                }
-            }
-        }
     }
 }
