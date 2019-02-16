@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 
 namespace Orleans.Runtime
 {
-    internal class ByteArrayBuilder
+    internal class ByteArrayBuilder : IBufferWriter<byte>
     {
         private const int MINIMUM_BUFFER_SIZE = 256;
         private readonly int bufferSize;
@@ -100,8 +100,6 @@ namespace Orleans.Runtime
             }
         }
 
-        public static object MemoryMarshall { get; private set; }
-
         private void Grow()
         {
             if (currentBuffer != null)
@@ -119,6 +117,21 @@ namespace Orleans.Runtime
             {
                 Grow();
             }
+        }
+
+        public void Advance(int count)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Memory<byte> GetMemory(int sizeHint = 0)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Span<byte> GetSpan(int sizeHint = 0)
+        {
+            throw new NotImplementedException();
         }
 
         /// <summary>

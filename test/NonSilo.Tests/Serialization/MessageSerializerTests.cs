@@ -1,7 +1,9 @@
-﻿using System;
+using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
@@ -19,12 +21,16 @@ namespace UnitTests.Serialization
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
         private readonly MessageFactory messageFactory;
+        private readonly ISerializer<Message.HeadersContainer> messageHeadersSerializer;
+        private readonly ISerializer<object> objectSerializer;
 
         public MessageSerializerTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
             this.fixture = fixture;
             this.messageFactory = this.fixture.Services.GetRequiredService<MessageFactory>();
+            this.messageHeadersSerializer = this.fixture.Services.GetRequiredService<ISerializer<Message.HeadersContainer>>();
+            this.objectSerializer = this.fixture.Services.GetRequiredService<ISerializer<object>>();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
@@ -52,23 +58,46 @@ namespace UnitTests.Serialization
 
             message.TimeToLive = TimeSpan.FromSeconds(1);
             await Task.Delay(TimeSpan.FromMilliseconds(500));
-
-            int dummy;
-            var serialized = message.Serialize(this.fixture.SerializationManager, out dummy, out dummy);
-            int length = serialized.Sum<ArraySegment<byte>>(x => x.Count);
-            byte[] data = new byte[length];
-            int n = 0;
-            foreach (var buffer in serialized)
-            {
-                Array.Copy(buffer.Array, buffer.Offset, data, n, buffer.Count);
-                n += buffer.Count;
-            }
-            message.ReleaseBodyAndHeaderBuffers();
-
-            Message deserializedMessage = DeserializeMessage(length, data);
+            var deserializedMessage = RoundTripMessage(message);
 
             Assert.NotNull(deserializedMessage.TimeToLive);
             Assert.InRange(deserializedMessage.TimeToLive.Value, TimeSpan.FromMilliseconds(300), TimeSpan.FromMilliseconds(500));
+        }
+
+        private Message RoundTripMessage(Message message)
+        {
+            Message deserializedMessage;
+            var segments = new List<ArraySegment<byte>>(4);
+            var lengthFields = new byte[2 * sizeof(int)];
+            segments.Add(new ArraySegment<byte>(lengthFields, 0, lengthFields.Length));
+            using (var buffer = new MultiSegmentBufferWriter(maxAllocationSize: 9192, bufferList: segments))
+            {
+                this.messageHeadersSerializer.Serialize(buffer, message.Headers);
+                var headerLength = buffer.CommitedByteCount;
+                this.objectSerializer.Serialize(buffer, message.BodyObject);
+                var bodyLength = buffer.CommitedByteCount - headerLength;
+
+                void WriteLengthPrefixes()
+                {
+                    var lengthPrefixes = MemoryMarshal.Cast<byte, int>(lengthFields);
+                    lengthPrefixes[0] = headerLength;
+                    lengthPrefixes[1] = bodyLength;
+                }
+
+                WriteLengthPrefixes();
+
+                byte[] data = new byte[buffer.CommitedByteCount];
+                int n = 0;
+                foreach (var b in buffer.Committed)
+                {
+                    Array.Copy(b.Array, b.Offset, data, n, b.Count);
+                    n += b.Count;
+                }
+
+                deserializedMessage = DeserializeMessage(buffer.CommitedByteCount, data);
+            }
+
+            return deserializedMessage;
         }
 
         private void RunTest(int numItems)
@@ -93,20 +122,8 @@ namespace UnitTests.Serialization
 
             string s = resp.ToString();
             output.WriteLine(s);
-
-            int dummy;
-            var serialized = resp.Serialize(this.fixture.SerializationManager, out dummy, out dummy);
-            int length = serialized.Sum<ArraySegment<byte>>(x => x.Count);
-            byte[] data = new byte[length];
-            int n = 0;
-            foreach (var buffer in serialized)
-            {
-                Array.Copy(buffer.Array, buffer.Offset, data, n, buffer.Count);
-                n += buffer.Count;
-            }
-            resp.ReleaseBodyAndHeaderBuffers();
-
-            var resp1 = DeserializeMessage(length, data);
+            
+            var resp1 = RoundTripMessage(resp);
 
             //byte[] serialized = resp.FormatForSending();
             //Message resp1 = new Message(serialized, serialized.Length);
@@ -138,20 +155,15 @@ namespace UnitTests.Serialization
             Array.Copy(data, 8, header, 0, headerLength);
             byte[] body = new byte[bodyLength];
             Array.Copy(data, 8 + headerLength, body, 0, bodyLength);
-            var headerList = new List<ArraySegment<byte>>();
-            headerList.Add(new ArraySegment<byte>(header));
-            var bodyList = new List<ArraySegment<byte>>();
-            bodyList.Add(new ArraySegment<byte>(body));
-            var context = new DeserializationContext(this.fixture.SerializationManager)
+
+            this.messageHeadersSerializer.Deserialize(new ReadOnlySequence<byte>(header), out var headersContainer);
+            this.objectSerializer.Deserialize(new ReadOnlySequence<byte>(body), out var bodyObject);
+            
+            return new Message
             {
-                StreamReader = new BinaryTokenStreamReader(headerList)
+                Headers = headersContainer,
+                BodyObject = bodyObject
             };
-            var deserializedMessage = new Message
-            {
-                Headers = SerializationManager.DeserializeMessageHeaders(context)
-            };
-            deserializedMessage.SetBodyBytes(bodyList);
-            return deserializedMessage;
         }
     }
 }

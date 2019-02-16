@@ -170,7 +170,6 @@ namespace Orleans.Runtime
             // build message
 
             this.deserializationContext.Reset();
-            this.deserializationContext.StreamReader.Reset(header);
 
             msg = new Message
             {
@@ -178,7 +177,7 @@ namespace Orleans.Runtime
             };
             try
             {
-                if (this.supportForwarding)
+               /* if (this.supportForwarding)
                 {
                     // If forwarding is supported, then deserialization will be deferred until the body value is needed.
                     // Need to maintain ownership of buffer, so we need to duplicate the body buffer.
@@ -189,6 +188,7 @@ namespace Orleans.Runtime
                     // Attempt to deserialize the body immediately.
                     msg.DeserializeBodyObject(this.serializationManager, body);
                 }
+                */
             }
             finally
             {
