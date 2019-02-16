@@ -24,24 +24,47 @@ namespace Benchmarks.Ping
     public class KestrelSequentialPingBenchmark : IDisposable 
     {
         private readonly IHost host;
+        private readonly IHost two;
         private readonly IPingGrain grain;
         private readonly IClusterClient client;
 
         public KestrelSequentialPingBenchmark()
         {
-            this.host = new HostBuilder()
+            var primary = new IPEndPoint(IPAddress.Loopback, 60666);
+            this.host = CreateSilo(primary, 0).GetAwaiter().GetResult();
+            this.two = CreateSilo(primary, 1).GetAwaiter().GetResult();
+
+            /*this.client = new ClientBuilder()
+                .UseLocalhostClustering(gatewayPort: 60777)
+                .Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev")
+                .Build();
+            this.client.Connect(ex => Task.FromResult(true)).GetAwaiter().GetResult();
+            */
+
+            this.client = two.Services.GetRequiredService<IClusterClient>();
+            int siloPort;
+            do
+            {
+                this.grain = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
+                siloPort = this.grain.GetSiloPort().GetAwaiter().GetResult();
+            } while (siloPort != 60667);
+        }
+
+        private static async Task<IHost> CreateSilo(IPEndPoint primary, int siloNum)
+        {
+            var host = new HostBuilder()
                 .ConfigureWebHost(builder =>
                 {
                     builder.UseKestrel(options =>
                     {
                         options.Listen(
-                            new IPEndPoint(IPAddress.Any, 60666),
+                            new IPEndPoint(IPAddress.Any, 60666 + siloNum),
                             listenOptions =>
                             {
                                 listenOptions.UseOrleansSiloConnectionHandler();
                             });
                         options.Listen(
-                            new IPEndPoint(IPAddress.Any, 60777),
+                            new IPEndPoint(IPAddress.Any, 60777 + siloNum),
                             listenOptions =>
                             {
                                 listenOptions.UseOrleansGatewayConnectionHandler();
@@ -53,28 +76,24 @@ namespace Benchmarks.Ping
                 {
                     builder
                     .Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev")
-                    .UseDevelopmentClustering((DevelopmentClusterMembershipOptions options) => { options.PrimarySiloEndpoint = new IPEndPoint(IPAddress.Loopback, 60666); })
+                    .UseDevelopmentClustering((DevelopmentClusterMembershipOptions options) => { options.PrimarySiloEndpoint = primary; })
                     .Configure<EndpointOptions>(options =>
                     {
                         options.AdvertisedIPAddress = IPAddress.Loopback;
-                        options.SiloPort = 60666;
-                        options.GatewayPort = 60777;
-                        options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Any, 20666);
-                        options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Any, 20777);
-                    });
-                }).Build();
-            this.host.StartAsync().GetAwaiter().GetResult();
+                        options.SiloPort = 60666 + siloNum;
+                        options.GatewayPort = 60777 + siloNum;
+                        options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Any, 20666 + siloNum);
+                        options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Any, 20777 + siloNum);
+                    })
+                    .EnableDirectClient();
+                })
+                //.ConfigureLogging(logging => logging.AddConsole())
+                .UseConsoleLifetime().Build();
 
-            this.client = new ClientBuilder()
-                .UseLocalhostClustering(gatewayPort: 60777)
-                .Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev")
-                .Build();
-            this.client.Connect(ex => Task.FromResult(true)).GetAwaiter().GetResult();
-            
-            this.grain = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
-            this.grain.Run().GetAwaiter().GetResult();
+            await host.StartAsync();
+            return host;
         }
-        
+
         [Benchmark]
         public Task Ping() => grain.Run();
 
@@ -132,8 +151,9 @@ namespace Benchmarks.Ping
         [GlobalCleanup]
         public void Dispose()
         {
-            this.client.Dispose(); 
+            //this.client.Dispose();
             this.host.Dispose();
+            this.two.Dispose();
         }
 
 

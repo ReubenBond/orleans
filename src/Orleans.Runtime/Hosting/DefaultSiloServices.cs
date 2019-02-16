@@ -39,6 +39,7 @@ using System.Reflection;
 using System.Linq;
 using Microsoft.Extensions.Options;
 using Orleans.Timers.Internal;
+using Orleans.Runtime.Messaging.RePlat;
 
 namespace Orleans.Hosting
 {
@@ -306,6 +307,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ConnectionMessageSenderManager>();
             services.TryAddSingleton<IConnectionFactory, SocketConnectionFactory>();
             services.TryAddSingleton<IMessageSerializer, MessageSerializer>();
+            services.TryAddSingleton<ConnectionComponentFactory, SiloConnectionComponentFactory>();
         }
     }
 }

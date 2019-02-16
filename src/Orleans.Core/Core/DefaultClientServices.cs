@@ -8,6 +8,7 @@ using Orleans.Hosting;
 using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Statistics;
 using Orleans.Streams;
@@ -84,6 +85,12 @@ namespace Orleans
 
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, ClientClusteringValidator>();
+
+            // Networking
+            services.TryAddSingleton<ConnectionMessageSenderManager>();
+            services.TryAddSingleton<IConnectionFactory, SocketConnectionFactory>();
+            services.TryAddSingleton<IMessageSerializer, MessageSerializer>();
+            services.TryAddSingleton<ConnectionComponentFactory, ClientConnectionComponentFactory>();
         }
     }
 }

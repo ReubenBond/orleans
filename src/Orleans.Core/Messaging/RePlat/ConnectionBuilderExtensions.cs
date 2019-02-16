@@ -39,8 +39,8 @@ namespace Orleans.Runtime.Messaging
             {
                 var serviceProvider = builder.ApplicationServices;
                 var connectionManager = serviceProvider.GetRequiredService<ConnectionMessageSenderManager>();
-                var preambleSender = GetPreambleSender(serviceProvider, outbound, siloToSilo);
-                var preambleReceiver = GetPreambleReceiver(serviceProvider, outbound, siloToSilo);
+                var components = serviceProvider.GetRequiredService<ConnectionComponentFactory>();
+                
                 return async (ConnectionContext connection) =>
                 {
                     ConnectionMessageSender sender = default;
@@ -52,11 +52,13 @@ namespace Orleans.Runtime.Messaging
                         connection.Features.Set(sender);
                         if (outbound)
                         {
-                            var endPoint = connection.GetEndPoint();
+                            var endPoint = connection.GetRemoteEndPoint();
                             connectionManager.Add(endPoint, sender);
                         }
 
-                        receiver = GetReceiver(serviceProvider, outbound, siloToSilo, connection);
+                        ConnectionPreambleSender preambleSender;
+                        ConnectionPreambleReceiver preambleReceiver;
+                        (preambleSender, preambleReceiver, receiver) = components.GetComponents(outbound, siloToSilo, connection);
                         connection.Features.Set(receiver);
 
                         // Ok to yield execution after this point.
@@ -71,7 +73,7 @@ namespace Orleans.Runtime.Messaging
                     }
                     finally
                     {
-                        if (outbound && sender != null) connectionManager.Remove(connection.GetEndPoint(), sender);
+                        if (outbound && sender != null) connectionManager.Remove(connection.GetRemoteEndPoint(), sender);
                         sender?.Abort();
                         receiver?.Abort();
                     }
@@ -79,40 +81,48 @@ namespace Orleans.Runtime.Messaging
             });
         }
 
-        private static ConnectionPreambleReceiver GetPreambleReceiver(IServiceProvider serviceProvider, bool outbound, bool siloToSilo)
-        {
-            if (outbound)
-            {
-                return null;
-            }
+    }
 
-            if (siloToSilo) return ActivatorUtilities.GetServiceOrCreateInstance<SiloPreambleReceiver>(serviceProvider);
-            else return ActivatorUtilities.GetServiceOrCreateInstance<GatewayPreambleReceiver>(serviceProvider);
+    internal abstract class ConnectionComponentFactory
+    {
+        public abstract (ConnectionPreambleSender, ConnectionPreambleReceiver, ConnectionMessageReceiver) GetComponents(bool outbound, bool siloToSilo, ConnectionContext connection);
+    }
+
+    internal sealed class ClientConnectionComponentFactory : ConnectionComponentFactory
+    {
+        private readonly IServiceProvider serviceProvider;
+
+        public ClientConnectionComponentFactory(IServiceProvider serviceProvider)
+        {
+            this.serviceProvider = serviceProvider;
         }
 
-        private static ConnectionPreambleSender GetPreambleSender(IServiceProvider serviceProvider, bool outbound, bool siloToSilo)
+        public override (ConnectionPreambleSender, ConnectionPreambleReceiver, ConnectionMessageReceiver) GetComponents(bool outbound, bool siloToSilo, ConnectionContext connection)
+        {
+            var preambleSender = GetPreambleSender(outbound, siloToSilo);
+            var preambleReceiver = GetPreambleReceiver(outbound, siloToSilo);
+            var receiver = GetReceiver(outbound, siloToSilo, connection);
+            return (preambleSender, preambleReceiver, receiver);
+        }
+
+        private ConnectionPreambleReceiver GetPreambleReceiver(bool outbound, bool siloToSilo)
+        {
+            return null;
+        }
+
+        private ConnectionPreambleSender GetPreambleSender(bool outbound, bool siloToSilo)
         {
             if (!outbound)
             {
                 return null;
             }
 
-            if (siloToSilo) return ActivatorUtilities.GetServiceOrCreateInstance<SiloPreambleSender>(serviceProvider);
-            else return ActivatorUtilities.GetServiceOrCreateInstance<ClientPreambleSender>(serviceProvider);
+            return ActivatorUtilities.GetServiceOrCreateInstance<ClientPreambleSender>(serviceProvider);
         }
 
-        private static ConnectionMessageReceiver GetReceiver(IServiceProvider serviceProvider, bool outbound, bool siloToSilo, ConnectionContext connection)
+        private ConnectionMessageReceiver GetReceiver(bool outbound, bool siloToSilo, ConnectionContext connection)
         {
-            if (siloToSilo) return ActivatorUtilities.CreateInstance<SiloMessageReceiver>(serviceProvider, connection);
-            else if (outbound) return ActivatorUtilities.CreateInstance<ClientMessageReceiver>(serviceProvider, connection);
-            else return ActivatorUtilities.CreateInstance<GatewayMessageReceiver>(serviceProvider, connection);
-        }
-
-        private static string GetEndPoint(this ConnectionContext connection)
-        {
-            var feature = connection.Features.Get<IHttpConnectionFeature>();
-            if (feature == null) throw new ArgumentException($"Connection must have {nameof(IHttpConnectionFeature)}");
-            return new IPEndPoint(feature.RemoteIpAddress, feature.RemotePort).ToString();
+            return ActivatorUtilities.CreateInstance<ClientMessageReceiver>(serviceProvider, connection);
         }
     }
 }

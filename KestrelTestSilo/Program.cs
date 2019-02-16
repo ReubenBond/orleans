@@ -19,19 +19,35 @@ namespace KestrelTestSilo
     {
         static async Task Main(string[] args)
         {
+            var primary = new IPEndPoint(IPAddress.Loopback, 60666);
+            var one = await CreateSilo(primary, 0);
+            var two = await CreateSilo(primary, 1);
+            var three = await CreateSilo(primary, 2);
+
+            var client = two.Services.GetRequiredService<IClusterClient>();
+            var grain = client.GetGrain<IMyHappyLittleKestrelGrain>("blah");
+            while (true)
+            {
+                await grain.SayHelloKestrel("tob");
+                await Task.Delay(30_000);
+            }
+        }
+
+        private static async Task<IHost> CreateSilo(IPEndPoint primary, int siloNum)
+        {
             var host = new HostBuilder()
                 .ConfigureWebHost(builder =>
                 {
                     builder.UseKestrel(options =>
                     {
                         options.Listen(
-                            new IPEndPoint(IPAddress.Any, 60666),
+                            new IPEndPoint(IPAddress.Any, 60666 + siloNum),
                             listenOptions =>
                             {
                                 listenOptions.UseOrleansSiloConnectionHandler();
                             });
                         options.Listen(
-                            new IPEndPoint(IPAddress.Any, 60777),
+                            new IPEndPoint(IPAddress.Any, 60777 + siloNum),
                             listenOptions =>
                             {
                                 listenOptions.UseOrleansGatewayConnectionHandler();
@@ -43,20 +59,22 @@ namespace KestrelTestSilo
                 {
                     builder
                     .Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev")
-                    .UseDevelopmentClustering((DevelopmentClusterMembershipOptions options) => { options.PrimarySiloEndpoint = new IPEndPoint(IPAddress.Loopback, 60666); })
+                    .UseDevelopmentClustering((DevelopmentClusterMembershipOptions options) => { options.PrimarySiloEndpoint = primary; })
                     .Configure<EndpointOptions>(options =>
                     {
                         options.AdvertisedIPAddress = IPAddress.Loopback;
-                        options.SiloPort = 60666;
-                        options.GatewayPort = 60777;
-                        options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Any, 20666);
-                        options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Any, 20777);
-                    });
+                        options.SiloPort = 60666 + siloNum;
+                        options.GatewayPort = 60777 + siloNum;
+                        options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Any, 20666 + siloNum);
+                        options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Any, 20777 + siloNum);
+                    })
+                    .EnableDirectClient();
                 })
                 .ConfigureLogging(logging => logging.AddConsole())
                 .UseConsoleLifetime().Build();
-            
-            await host.RunAsync();
+
+            await host.StartAsync();
+            return host;
         }
 
         public class Startup

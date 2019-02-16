@@ -89,7 +89,6 @@ namespace Orleans.Runtime.Messaging
 
         private void RerouteMessage(Message message)
         {
-            //TODO: is this correct?
             ThreadPool.UnsafeQueueUserWorkItem(msg => this.messageCenter.SendMessage((Message)msg), message);
         }
     }

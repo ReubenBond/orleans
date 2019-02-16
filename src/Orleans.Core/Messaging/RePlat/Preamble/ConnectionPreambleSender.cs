@@ -17,10 +17,11 @@ namespace Orleans.Runtime.Messaging
 
             Span<byte> bytes = stackalloc byte[sizeof(int)];
             BinaryPrimitives.WriteInt32LittleEndian(bytes, grainIdByteArray.Length);
-            var buffer = output.GetSpan(bytes.Length + grainIdByteArray.Length);
+            var length = bytes.Length + grainIdByteArray.Length;
+            var buffer = output.GetSpan(length);
             bytes.CopyTo(buffer);
             new ReadOnlySpan<byte>(grainIdByteArray).CopyTo(buffer.Slice(sizeof(int)));
-            output.Advance(buffer.Length);
+            output.Advance(length);
             var flushTask = output.FlushAsync();
 
             if (flushTask.IsCompletedSuccessfully) return Task.CompletedTask;
