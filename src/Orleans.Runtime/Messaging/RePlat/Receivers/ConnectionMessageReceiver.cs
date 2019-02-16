@@ -39,7 +39,6 @@ namespace Orleans.Runtime.Messaging
                     
                     var buffer = readResult.Buffer;
                     
-                    var start = buffer.Start;
                     if (buffer.Length >= requiredBytes)
                     {
                         do
@@ -53,7 +52,7 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     if (readResult.IsCanceled || readResult.IsCompleted) break;
-                    input.AdvanceTo(start, buffer.End);
+                    input.AdvanceTo(buffer.Start, buffer.End);
                 }
             }
             catch (Exception exception)

@@ -299,6 +299,11 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, GrainCollectionOptionsValidator>();
 
             services.TryAddSingleton<ITimerManager, TimerManagerImpl>();
+
+            // Networking
+            services.TryAddSingleton<ConnectionMessageSenderManager>();
+            services.TryAddSingleton<IConnectionFactory, SocketConnectionFactory>();
+            services.TryAddSingleton<IMessageSerializer, MessageSerializer>();
         }
     }
 }

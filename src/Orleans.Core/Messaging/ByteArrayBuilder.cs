@@ -1,6 +1,8 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 
 namespace Orleans.Runtime
 {
@@ -97,6 +99,8 @@ namespace Orleans.Runtime
                 return currentOffset + completedLength;
             }
         }
+
+        public static object MemoryMarshall { get; private set; }
 
         private void Grow()
         {
@@ -487,6 +491,43 @@ namespace Orleans.Runtime
                 }
             }
             return result;
+        }
+
+        public static List<ArraySegment<byte>> BuildSegmentListWithLengthLimit(ReadOnlySequence<byte> buffer, int offset, int length)
+        {
+            var result = new List<ArraySegment<byte>>();
+            var lengthSoFar = 0;
+            var countSoFar = 0;
+            foreach (var seg in buffer)
+            {
+                if (!MemoryMarshal.TryGetArray(seg, out var segment)) ThrowException();
+
+                var bytesStillToSkip = offset - lengthSoFar;
+                lengthSoFar += segment.Count;
+
+                if (segment.Count <= bytesStillToSkip) // Still skipping past this buffer
+                {
+                    continue;
+                }
+                if (bytesStillToSkip > 0) // This is the first buffer
+                {
+                    result.Add(new ArraySegment<byte>(segment.Array, bytesStillToSkip + segment.Offset, Math.Min(length - countSoFar, segment.Count - bytesStillToSkip)));
+                    countSoFar += Math.Min(length - countSoFar, segment.Count - bytesStillToSkip);
+                }
+                else
+                {
+                    result.Add(new ArraySegment<byte>(segment.Array, segment.Offset, Math.Min(length - countSoFar, segment.Count)));
+                    countSoFar += Math.Min(length - countSoFar, segment.Count);
+                }
+
+                if (countSoFar == length)
+                {
+                    break;
+                }
+            }
+            return result;
+
+            void ThrowException() => throw new Exception("MEMORY MARSHAL!");
         }
     }
 }

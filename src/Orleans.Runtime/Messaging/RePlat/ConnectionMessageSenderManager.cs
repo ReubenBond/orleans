@@ -14,12 +14,12 @@ namespace Orleans.Runtime.Messaging
         private readonly ConcurrentDictionary<string, TaskCompletionSource<ConnectionMessageSender>> connections
             = new ConcurrentDictionary<string, TaskCompletionSource<ConnectionMessageSender>>();
         private readonly IConnectionFactory connectionFactory;
-        private readonly ConnectionDelegate connectionDelegate;
+        private readonly Lazy<ConnectionDelegate> connectionDelegate;
 
         public ConnectionMessageSenderManager(IConnectionFactory connectionFactory, IServiceProvider serviceProvider, IOptions<ConnectionOptions> connectionOptions)
         {
             this.connectionFactory = connectionFactory;
-            this.connectionDelegate = CreateOutboundConnectionDelegate(serviceProvider, connectionOptions.Value);
+            this.connectionDelegate = new Lazy<ConnectionDelegate>(() => this.CreateOutboundConnectionDelegate(serviceProvider, connectionOptions.Value), isThreadSafe: false);
         }
 
         private ConnectionDelegate CreateOutboundConnectionDelegate(
@@ -29,7 +29,7 @@ namespace Orleans.Runtime.Messaging
             // Configure the connection builder using the user-defined options.
             var connectionBuilder = new ConnectionBuilder(serviceProvider);
             endpointOptions.ConfigureConnectionBuilder(connectionBuilder);
-            connectionBuilder.UseOrleansOutboundConnectionHandler();
+            connectionBuilder.UseOrleansOutboundSiloConnectionHandler();
             return connectionBuilder.Build();
         }
 
@@ -106,7 +106,7 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 var context = await this.connectionFactory.Connect(endPoint);
-                var middlewareTask = this.connectionDelegate(context);
+                var middlewareTask = this.connectionDelegate.Value(context);
                 var sender = context.Features.Get<ConnectionMessageSender>();
                 if (sender == null)
                 {

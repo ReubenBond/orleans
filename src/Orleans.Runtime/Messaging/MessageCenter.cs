@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Messaging
 {
     internal class MessageCenter : ISiloMessageCenter, IDisposable
     {
-        private Gateway Gateway { get; set; }
+        public Gateway Gateway { get; set; }
         private IncomingMessageAcceptor ima;
         private readonly ILogger log;
         private Action<Message> rerouteHandler;
@@ -26,12 +26,13 @@ namespace Orleans.Runtime.Messaging
         private IntValueStatistic receiveQueueLengthCounter;
         // ReSharper restore NotAccessedField.Local
 
-        internal IOutboundMessageQueue OutboundQueue { get; set; }
-        internal IInboundMessageQueue InboundQueue { get; set; }
+        internal OutboundMessageQueue OutboundQueue { get; set; }
+        internal InboundMessageQueue InboundQueue { get; set; }
         internal SocketManager SocketManager;
         private readonly SerializationManager serializationManager;
         private readonly MessageFactory messageFactory;
         private readonly ILoggerFactory loggerFactory;
+        private readonly ConnectionMessageSenderManager senderManager;
         private readonly ExecutorService executorService;
         private readonly Action<Message>[] localMessageHandlers;
         private SiloMessagingOptions messagingOptions;
@@ -61,16 +62,18 @@ namespace Orleans.Runtime.Messaging
             Factory<MessageCenter, Gateway> gatewayFactory,
             ExecutorService executorService,
             ILoggerFactory loggerFactory,
-            IOptions<StatisticsOptions> statisticsOptions)
+            IOptions<StatisticsOptions> statisticsOptions,
+            ConnectionMessageSenderManager senderManager)
         {
             this.messagingOptions = messagingOptions.Value;
             this.loggerFactory = loggerFactory;
+            this.senderManager = senderManager;
             this.log = loggerFactory.CreateLogger<MessageCenter>();
             this.serializationManager = serializationManager;
             this.messageFactory = messageFactory;
             this.executorService = executorService;
             this.MyAddress = siloDetails.SiloAddress;
-            this.Initialize(endpointOptions, messagingOptions, networkingOptions, statisticsOptions);
+            this.Initialize(endpointOptions, networkingOptions, statisticsOptions);
             if (siloDetails.GatewayAddress != null)
             {
                 Gateway = gatewayFactory(this);
@@ -80,7 +83,6 @@ namespace Orleans.Runtime.Messaging
         }
 
         private void Initialize(IOptions<EndpointOptions> endpointOptions,
-            IOptions<SiloMessagingOptions> messagingOptions,
             IOptions<NetworkingOptions> networkingOptions,
             IOptions<StatisticsOptions> statisticsOptions)
         {
@@ -95,8 +97,8 @@ namespace Orleans.Runtime.Messaging
                 this.serializationManager,
                 this.executorService,
                 this.loggerFactory);
-            InboundQueue = new InboundMessageQueue(this.loggerFactory, statisticsOptions);
-            OutboundQueue = new OutboundMessageQueue(this, messagingOptions, this.serializationManager, this.executorService, this.loggerFactory);
+            InboundQueue = new InboundMessageQueue(this.loggerFactory.CreateLogger<InboundMessageQueue>(), statisticsOptions);
+            OutboundQueue = new OutboundMessageQueue(this, this.loggerFactory.CreateLogger<OutboundMessageQueue>(), this.senderManager);
 
             sendQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_SEND_QUEUE_LENGTH, () => SendQueueLength);
             receiveQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_RECEIVE_QUEUE_LENGTH, () => ReceiveQueueLength);
@@ -238,7 +240,7 @@ namespace Orleans.Runtime.Messaging
 
         public bool TrySendLocal(Message message)
         {
-            if (!message.TargetSilo.Equals(MyAddress))
+            if (!message.TargetSilo.Matches(MyAddress))
             {
                 return false;
             }

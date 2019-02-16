@@ -11,6 +11,43 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Messaging
 {
+    internal class DuplexPipe : IDuplexPipe
+    {
+        public DuplexPipe(PipeReader reader, PipeWriter writer)
+        {
+            Input = reader;
+            Output = writer;
+        }
+
+        public PipeReader Input { get; }
+
+        public PipeWriter Output { get; }
+
+        public static DuplexPipePair CreateConnectionPair(PipeOptions inputOptions, PipeOptions outputOptions)
+        {
+            var input = new Pipe(inputOptions);
+            var output = new Pipe(outputOptions);
+
+            var transportToApplication = new DuplexPipe(output.Reader, input.Writer);
+            var applicationToTransport = new DuplexPipe(input.Reader, output.Writer);
+
+            return new DuplexPipePair(applicationToTransport, transportToApplication);
+        }
+
+        // This class exists to work around issues with value tuple on .NET Framework
+        public readonly struct DuplexPipePair
+        {
+            public IDuplexPipe Transport { get; }
+            public IDuplexPipe Application { get; }
+
+            public DuplexPipePair(IDuplexPipe transport, IDuplexPipe application)
+            {
+                Transport = transport;
+                Application = application;
+            }
+        }
+    }
+
     internal class SocketConnectionFactory : IConnectionFactory
     {
         private readonly ILoggerFactory loggerFactory;
@@ -46,6 +83,9 @@ namespace Orleans.Runtime.Messaging
             }
 
             var connection = new SocketConnection(socket, MemoryPool<byte>.Shared, PipeScheduler.Inline, this.loggerFactory.CreateLogger<SocketConnection>());
+            var pair = DuplexPipe.CreateConnectionPair(GetPipeOptions(), GetPipeOptions());
+            connection.Application = pair.Application;
+            connection.Transport = pair.Transport;
             Task.Run(async () =>
             {
                 try
@@ -59,6 +99,18 @@ namespace Orleans.Runtime.Messaging
             }).Ignore();
             return connection;
         }
+
+        internal static PipeOptions GetPipeOptions() => new PipeOptions
+(
+    pool: MemoryPool<byte>.Shared,
+    readerScheduler: PipeScheduler.Inline,
+    writerScheduler: PipeScheduler.Inline,
+    pauseWriterThreshold: 0,
+    resumeWriterThreshold: 0,
+    useSynchronizationContext: false,
+    minimumSegmentSize: 4000
+);
+        
 
         private static bool TryParseEndPoint(string value, out IPEndPoint result)
         {

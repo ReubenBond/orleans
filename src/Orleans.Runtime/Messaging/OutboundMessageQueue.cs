@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 namespace Orleans.Runtime.Messaging
 {
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1711:IdentifiersShouldNotHaveIncorrectSuffix")]
-    internal sealed class OutboundMessageQueue : IOutboundMessageQueue
+    internal sealed class OutboundMessageQueue : IDisposable
     {
         private readonly MessageCenter messageCenter;
         private readonly ConnectionMessageSenderManager senderManager;
@@ -32,15 +32,12 @@ namespace Orleans.Runtime.Messaging
 
         internal OutboundMessageQueue(
             MessageCenter mc,
-            IOptions<SiloMessagingOptions> options,
-            SerializationManager serializationManager,
-            ExecutorService executorService,
-            ILoggerFactory loggerFactory,
+            ILogger<OutboundMessageQueue> logger,
             ConnectionMessageSenderManager senderManager)
         {
             messageCenter = mc;
             this.senderManager = senderManager;
-            logger = loggerFactory.CreateLogger<OutboundMessageQueue>();
+            this.logger = logger;
             stopped = false;
         }
 

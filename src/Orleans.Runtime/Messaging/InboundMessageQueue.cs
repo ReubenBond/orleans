@@ -1,8 +1,5 @@
 using System;
-using System.Collections.Concurrent;
-using System.Threading;
 using System.Threading.Channels;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -11,7 +8,7 @@ using Orleans.Runtime.Configuration;
 namespace Orleans.Runtime.Messaging
 {
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1711:IdentifiersShouldNotHaveIncorrectSuffix")]
-    internal class InboundMessageQueue : IInboundMessageQueue
+    internal sealed class InboundMessageQueue : IDisposable
     {
         private readonly Channel<Message>[] messageQueues;
 
@@ -38,8 +35,9 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal InboundMessageQueue(ILoggerFactory loggerFactory, IOptions<StatisticsOptions> statisticsOptions)
+        internal InboundMessageQueue(ILogger<InboundMessageQueue> log, IOptions<StatisticsOptions> statisticsOptions)
         {
+            this.log = log;
             int n = Enum.GetValues(typeof(Message.Categories)).Length;
             this.messageQueues = new Channel<Message>[n];
             this.queueTracking = new QueueTrackingStatistic[n];
@@ -61,8 +59,6 @@ namespace Orleans.Runtime.Messaging
 
                 i++;
             }
-
-            this.log = loggerFactory.CreateLogger<InboundMessageQueue>();
         }
 
         /// <inheritdoc />

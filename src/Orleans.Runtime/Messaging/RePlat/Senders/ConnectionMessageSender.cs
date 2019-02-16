@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -21,13 +21,13 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionContext connection;
         private readonly IMessageSerializer serializer;
 
-        public ConnectionMessageSender(IMessageCenter messageCenter, ConnectionContext connection)
+        public ConnectionMessageSender(IMessageCenter messageCenter, IMessageSerializer messageSerializer, ConnectionContext connection)
         {
             this.messages = Channel.CreateUnbounded<Message>(ChannelOptions);
             this.writer = this.messages.Writer;
             this.messageCenter = messageCenter;
             this.connection = connection;
-            this.serializer = connection.Features.Get<IMessageSerializer>();
+            this.serializer = messageSerializer;
         }
             
         public Task Run() => Task.Run(this.Process);
@@ -64,7 +64,7 @@ namespace Orleans.Runtime.Messaging
                         break;
                     }
 
-                    while (reader.TryRead(out var message))
+                    if (reader.TryRead(out var message))
                     {
                         this.serializer.Write(ref output, message);
                     }

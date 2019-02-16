@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Connections;
+using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -15,7 +15,6 @@ namespace Orleans.Runtime.Messaging
         private readonly OverloadDetector overloadDetector;
         private readonly MessageFactory messageFactory;
         private readonly ILogger<GatewayMessageReceiver> log;
-        private readonly Gateway gateway;
 
         public GatewayMessageReceiver(
             ConnectionContext connection,
@@ -25,8 +24,7 @@ namespace Orleans.Runtime.Messaging
             OverloadDetector overloadDetector,
             IOptions<MultiClusterOptions> multiClusterOptions,
             MessageFactory messageFactory,
-            ILogger<GatewayMessageReceiver> log,
-            Gateway gateway)
+            ILogger<GatewayMessageReceiver> log)
             : base(connection, serializer)
         {
             this.messageCenter = messageCenter;
@@ -34,11 +32,12 @@ namespace Orleans.Runtime.Messaging
             this.overloadDetector = overloadDetector;
             this.messageFactory = messageFactory;
             this.log = log;
-            this.gateway = gateway;
             this.multiClusterOptions = multiClusterOptions.Value;
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
             this.gatewayTrafficCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
         }
+
+        private Gateway Gateway => this.messageCenter.Gateway;
 
         protected override void OnReceivedMessage(Message msg)
         {
@@ -68,7 +67,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            SiloAddress targetAddress = gateway.TryToReroute(msg);
+            SiloAddress targetAddress = Gateway.TryToReroute(msg);
             msg.SendingSilo = this.messageCenter.MyAddress;
 
             if (targetAddress == null)

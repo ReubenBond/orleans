@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
@@ -14,9 +14,9 @@ namespace Orleans.Runtime.Messaging
         private readonly MultiClusterOptions multiClusterOptions;
         private readonly ILogger<GatewayPreambleReceiver> log;
 
-        public GatewayPreambleReceiver(Gateway gateway, ILocalSiloDetails siloDetails, ILogger<GatewayPreambleReceiver> log, IOptions<MultiClusterOptions> multiClusterOptions)
+        public GatewayPreambleReceiver(MessageCenter messageCenter, ILocalSiloDetails siloDetails, ILogger<GatewayPreambleReceiver> log, IOptions<MultiClusterOptions> multiClusterOptions)
         {
-            this.gateway = gateway;
+            this.gateway = messageCenter.Gateway;
             this.siloDetails = siloDetails;
             this.log = log;
             this.multiClusterOptions = multiClusterOptions.Value;

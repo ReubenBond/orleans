@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -8,6 +8,9 @@ using Benchmarks.Serialization;
 using Benchmarks.Ping;
 using Benchmarks.Transactions;
 using Benchmarks.GrainStorage;
+using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Jobs;
+using BenchmarkDotNet.Toolchains.CsProj;
 
 namespace Benchmarks
 {
@@ -112,7 +115,7 @@ namespace Benchmarks
             },
             ["SequentialPing"] = () =>
             {
-                BenchmarkRunner.Run<SequentialPingBenchmark>();
+                BenchmarkRunner.Run<KestrelSequentialPingBenchmark>(DefaultConfig.Instance.With(Job.Default.With(CsProjCoreToolchain.NetCoreApp30)));
             },
             ["PingForever"] = () =>
             {
