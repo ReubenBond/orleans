@@ -33,6 +33,8 @@ namespace Orleans.Runtime.Messaging
         private readonly MessageFactory messageFactory;
         private readonly ILoggerFactory loggerFactory;
         private readonly ConnectionMessageSenderManager senderManager;
+        private readonly ISerializer<Message.HeadersContainer> messageHeadersSerializer;
+        private readonly ISerializer<object> objectSerializer;
         private readonly ExecutorService executorService;
         private readonly Action<Message>[] localMessageHandlers;
         private SiloMessagingOptions messagingOptions;
@@ -63,11 +65,15 @@ namespace Orleans.Runtime.Messaging
             ExecutorService executorService,
             ILoggerFactory loggerFactory,
             IOptions<StatisticsOptions> statisticsOptions,
-            ConnectionMessageSenderManager senderManager)
+            ConnectionMessageSenderManager senderManager,
+            ISerializer<Message.HeadersContainer> messageHeadersSerializer,
+            ISerializer<object> objectSerializer)
         {
             this.messagingOptions = messagingOptions.Value;
             this.loggerFactory = loggerFactory;
             this.senderManager = senderManager;
+            this.messageHeadersSerializer = messageHeadersSerializer;
+            this.objectSerializer = objectSerializer;
             this.log = loggerFactory.CreateLogger<MessageCenter>();
             this.serializationManager = serializationManager;
             this.messageFactory = messageFactory;
@@ -96,7 +102,9 @@ namespace Orleans.Runtime.Messaging
                 this.messageFactory,
                 this.serializationManager,
                 this.executorService,
-                this.loggerFactory);
+                this.loggerFactory,
+                this.messageHeadersSerializer,
+                this.objectSerializer);
             InboundQueue = new InboundMessageQueue(this.loggerFactory.CreateLogger<InboundMessageQueue>(), statisticsOptions);
             OutboundQueue = new OutboundMessageQueue(this, this.loggerFactory.CreateLogger<OutboundMessageQueue>(), this.senderManager);
 

@@ -475,8 +475,7 @@ namespace Orleans.Runtime.Messaging
                     "Unexpected error serializing message {Message}: {Exception}",
                     msg,
                     exc);
-
-                msg.ReleaseBodyAndHeaderBuffers();
+                
                 MessagingStatisticsGroup.OnFailedSentMessage(msg);
 
                 var retryCount = msg.RetryCount ?? 0;

@@ -48,7 +48,8 @@ namespace Orleans.Runtime.Messaging
                 this.messageQueues[i] = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
                 {
                     SingleReader = true,
-                    SingleWriter = false
+                    SingleWriter = false,
+                    AllowSynchronousContinuations = true
                 });
                 if (this.statisticsLevel.CollectQueueStats())
                 {

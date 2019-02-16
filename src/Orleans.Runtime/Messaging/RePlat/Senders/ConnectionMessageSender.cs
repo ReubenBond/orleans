@@ -11,7 +11,8 @@ namespace Orleans.Runtime.Messaging
         private static readonly UnboundedChannelOptions ChannelOptions = new UnboundedChannelOptions
         {
             SingleReader = true,
-            SingleWriter = false
+            SingleWriter = false,
+            AllowSynchronousContinuations = true
         };
 
         private readonly Channel<Message> messages;

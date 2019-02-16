@@ -14,15 +14,25 @@ namespace Orleans.Messaging
     internal class GatewayClientReceiver : DedicatedAsynchAgent
     {
         private readonly GatewayConnection gatewayConnection;
+        private readonly ISerializer<Message.HeadersContainer> messageHeadersSerializer;
+        private readonly ISerializer<object> objectSerializer;
         private readonly IncomingMessageBuffer buffer;
         private Socket socket;
 
-        internal GatewayClientReceiver(GatewayConnection gateway, SerializationManager serializationManager, ExecutorService executorService, ILoggerFactory loggerFactory)
+        internal GatewayClientReceiver(
+            GatewayConnection gateway,
+            SerializationManager serializationManager,
+            ExecutorService executorService,
+            ILoggerFactory loggerFactory,
+            ISerializer<Message.HeadersContainer> messageHeadersSerializer,
+            ISerializer<object> objectSerializer)
             : base(gateway.Address.ToString(), executorService, loggerFactory)
         {
             gatewayConnection = gateway;
+            this.messageHeadersSerializer = messageHeadersSerializer;
+            this.objectSerializer = objectSerializer;
             OnFault = FaultBehavior.RestartOnFault;
-            buffer = new IncomingMessageBuffer(loggerFactory, serializationManager, true); 
+            buffer = new IncomingMessageBuffer(loggerFactory, serializationManager, messageHeadersSerializer, objectSerializer); 
         }
 
         protected override void Run()

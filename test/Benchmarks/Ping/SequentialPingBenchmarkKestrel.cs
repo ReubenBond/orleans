@@ -20,7 +20,7 @@ using Orleans.Runtime.Messaging;
 namespace Benchmarks.Ping
 {
     [MemoryDiagnoser]
-    [EtwProfiler(performExtraBenchmarksRun: false)]
+    [EtwProfiler]
     public class KestrelSequentialPingBenchmark : IDisposable 
     {
         private readonly IHost host;
@@ -83,6 +83,22 @@ namespace Benchmarks.Ping
             while (true)
             {
                 await grain.Run();
+            }
+        }
+
+        public async Task PingForeverSaturate()
+        {
+            var num = Environment.ProcessorCount * Environment.ProcessorCount * 2;
+            var grains = Enumerable.Range(0, num).Select(n => this.client.GetGrain<IPingGrain>(n)).ToArray();
+            var tasks = new Task[num];
+            while (true)
+            {
+                for (var i = 0; i < num; i++)
+                {
+                    tasks[i] = grains[i].Run();
+                }
+
+                await Task.WhenAll(tasks);
             }
         }
 

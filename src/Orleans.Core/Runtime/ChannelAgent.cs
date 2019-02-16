@@ -1,21 +1,23 @@
 using System.Threading;
 using System.Threading.Channels;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
-    internal abstract class ChannelAgent<T> : AsynchAgent
+    internal abstract class ChannelAgent<T> : TaskSchedulerAgent
     {
         private readonly Channel<T> channel;
         private int count;
 
-        protected ChannelAgent(string nameSuffix, ExecutorService executorService, ILoggerFactory loggerFactory)
-            : base(nameSuffix, executorService, loggerFactory)
+        protected ChannelAgent(string nameSuffix, ILoggerFactory loggerFactory)
+            : base(nameSuffix, loggerFactory)
         {
             this.channel = Channel.CreateUnbounded<T>(new UnboundedChannelOptions
             {
                 SingleReader = true,
-                SingleWriter = false
+                SingleWriter = false,
+                AllowSynchronousContinuations = true
             });
         }
 
@@ -23,7 +25,7 @@ namespace Orleans.Runtime
 
         public void QueueRequest(T request)
         {
-            if (State != ThreadState.Running)
+            if (State != AgentState.Running)
             {
                 Log.LogWarning($"Invalid usage attempt of {Name} agent in {State.ToString()} state");
                 return;
@@ -32,29 +34,26 @@ namespace Orleans.Runtime
             if (this.channel.Writer.TryWrite(request)) Interlocked.Increment(ref this.count);
         }
 
-        public sealed override void OnStart()
+        protected override async Task Run()
         {
-            this.executor.QueueWorkItem(_ =>
-            { 
-                var reader = this.channel.Reader;
-                var ct = this.Cts.Token;
-                while (true)
+            var reader = this.channel.Reader;
+            var ct = this.Cts.Token;
+            while (true)
+            {
+                while (reader.TryRead(out var item))
                 {
-                    while (reader.TryRead(out var item))
-                    {
-                        Interlocked.Decrement(ref this.count);
-                        this.Process(item);
-                    }
-
-                    var waitTask = reader.WaitToReadAsync(ct);
-                    var more = waitTask.AsTask().GetAwaiter().GetResult();
-                    if (!more)
-                    {
-                        if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.LogDebug("Processed all items in queue.");
-                        return;
-                    }
+                    Interlocked.Decrement(ref this.count);
+                    this.Process(item);
                 }
-            });
+
+                var waitTask = reader.WaitToReadAsync(ct);
+                var more = waitTask.IsCompleted ? waitTask.GetAwaiter().GetResult() : await waitTask.ConfigureAwait(false);
+                if (!more)
+                {
+                    if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.LogDebug("Processed all items in queue.");
+                    return;
+                }
+            }
         }
 
         protected abstract void Process(T request);

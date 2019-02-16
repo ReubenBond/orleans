@@ -119,15 +119,19 @@ namespace Benchmarks
             },
             ["PingForever"] = () =>
             {
-                new SequentialPingBenchmark().PingForever().GetAwaiter().GetResult();
+                new KestrelSequentialPingBenchmark().PingForever().GetAwaiter().GetResult();
+            },
+            ["PingForeverSaturate"] = () =>
+            {
+                new KestrelSequentialPingBenchmark().PingForeverSaturate().GetAwaiter().GetResult();
             },
             ["PingPongForever"] = () =>
             {
-                new SequentialPingBenchmark().PingPongForever().GetAwaiter().GetResult();
+                new KestrelSequentialPingBenchmark().PingPongForever().GetAwaiter().GetResult();
             },
             ["PingPongForeverSaturate"] = () =>
             {
-                new SequentialPingBenchmark().PingPongForever().GetAwaiter().GetResult();
+                new KestrelSequentialPingBenchmark().PingPongForeverSaturate().GetAwaiter().GetResult();
             },
             ["GrainStorage.Memory"] = () =>
             {

@@ -28,7 +28,9 @@ namespace Orleans.Runtime.Messaging
         private readonly CounterStatistic checkedOutSocketEventArgsCounter;
         private readonly CounterStatistic checkedInSocketEventArgsCounter;
         private readonly SerializationManager serializationManager;
-        
+        private readonly ISerializer<Message.HeadersContainer> messageHeadersSerializer;
+        private readonly ISerializer<object> objectSerializer;
+
         public Action<Message> SniffIncomingMessage
         {
             set
@@ -45,8 +47,16 @@ namespace Orleans.Runtime.Messaging
         protected SocketDirection SocketDirection { get; private set; }
 
         // Used for holding enough info to handle receive completion
-        internal IncomingMessageAcceptor(MessageCenter msgCtr, IPEndPoint here, SocketDirection socketDirection, MessageFactory messageFactory, SerializationManager serializationManager,
-            ExecutorService executorService, ILoggerFactory loggerFactory)
+        internal IncomingMessageAcceptor(
+            MessageCenter msgCtr,
+            IPEndPoint here,
+            SocketDirection socketDirection,
+            MessageFactory messageFactory,
+            SerializationManager serializationManager,
+            ExecutorService executorService,
+            ILoggerFactory loggerFactory,
+            ISerializer<Message.HeadersContainer> messageHeadersSerializer,
+            ISerializer<object> objectSerializer)
             :base(executorService, loggerFactory)
         {
             this.loggerFactory = loggerFactory;
@@ -56,6 +66,8 @@ namespace Orleans.Runtime.Messaging
             this.MessageFactory = messageFactory;
             this.receiveEventArgsPool = new ConcurrentObjectPool<SaeaPoolWrapper>(() => this.CreateSocketReceiveAsyncEventArgsPoolWrapper());
             this.serializationManager = serializationManager;
+            this.messageHeadersSerializer = messageHeadersSerializer;
+            this.objectSerializer = objectSerializer;
             if (here == null)
                 listenAddress = MessageCenter.MyAddress.Endpoint;
 
@@ -429,7 +441,7 @@ namespace Orleans.Runtime.Messaging
             var poolWrapper = new SaeaPoolWrapper(readEventArgs);
 
             // Creates with incomplete state: IMA should be set before using
-            readEventArgs.UserToken = new ReceiveCallbackContext(poolWrapper, this.MessageFactory, this.serializationManager, this.loggerFactory);
+            readEventArgs.UserToken = new ReceiveCallbackContext(poolWrapper, this.MessageFactory, this.serializationManager, this.loggerFactory, this.messageHeadersSerializer, this.objectSerializer);
             allocatedSocketEventArgsCounter.Increment();
             return poolWrapper;
         }
@@ -642,11 +654,17 @@ namespace Orleans.Runtime.Messaging
             public IncomingMessageAcceptor IMA { get; internal set; }
             public SaeaPoolWrapper SaeaPoolWrapper { get; }
 
-            public ReceiveCallbackContext(SaeaPoolWrapper poolWrapper, MessageFactory messageFactory, SerializationManager serializationManager, ILoggerFactory loggerFactory)
+            public ReceiveCallbackContext(
+                SaeaPoolWrapper poolWrapper,
+                MessageFactory messageFactory,
+                SerializationManager serializationManager,
+                ILoggerFactory loggerFactory,
+                ISerializer<Message.HeadersContainer> messageHeadersSerializer,
+                ISerializer<object> objectSerializer)
             {
                 this.messageFactory = messageFactory;
                 SaeaPoolWrapper = poolWrapper;
-                _buffer = new IncomingMessageBuffer(loggerFactory, serializationManager);
+                _buffer = new IncomingMessageBuffer(loggerFactory, serializationManager, messageHeadersSerializer, objectSerializer);
             }
 
             public void ProcessReceived(SocketAsyncEventArgs e)

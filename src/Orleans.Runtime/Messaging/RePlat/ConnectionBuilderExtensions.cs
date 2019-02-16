@@ -123,11 +123,13 @@ namespace Orleans.Runtime.Messaging
 
     internal sealed class MessageSerializer : IMessageSerializer
     {
-        private readonly SerializationManager serializationManager;
+        private readonly OrleansSerializer<Message.HeadersContainer> messageHeadersSerializer;
+        private readonly OrleansSerializer<object> objectSerializer;
 
-        public MessageSerializer(SerializationManager serializationManager)
+        public MessageSerializer(OrleansSerializer<Message.HeadersContainer> headersSerializer, OrleansSerializer<object> objectSerializer)
         {
-            this.serializationManager = serializationManager;
+            this.messageHeadersSerializer = headersSerializer;
+            this.objectSerializer = objectSerializer;
         }
 
         public int TryRead(ref ReadOnlySequence<byte> input, out Message message)
@@ -155,24 +157,20 @@ namespace Orleans.Runtime.Messaging
             }
 
             // decode header
-            int headerOffset = Message.LENGTH_HEADER_SIZE;
-            var header = ByteArrayBuilder.BuildSegmentListWithLengthLimit(input, headerOffset, headerLength);
+            var header = input.Slice(Message.LENGTH_HEADER_SIZE, headerLength);
 
             // decode body
-            int bodyOffset = headerOffset + headerLength;
-            var body = ByteArrayBuilder.BuildSegmentListWithLengthLimit(input, bodyOffset, bodyLength);
+            int bodyOffset = Message.LENGTH_HEADER_SIZE + headerLength;
+            var body = input.Slice(bodyOffset, bodyLength);
 
             // build message
-            var deserializationContext = new DeserializationContext(this.serializationManager)
-            {
-                StreamReader = new BinaryTokenStreamReader(header)
-            };
-
+            this.messageHeadersSerializer.Deserialize(header, out var headersContainer);
             message = new Message
             {
-                Headers = SerializationManager.DeserializeMessageHeaders(deserializationContext)
+                Headers = headersContainer
             };
-            message.DeserializeBodyObject(this.serializationManager, body);
+            this.objectSerializer.Deserialize(body, out var bodyObject);
+            message.BodyObject = bodyObject;
 
             input = input.Slice(Message.LENGTH_HEADER_SIZE + requiredBytes);
             return 0;
@@ -180,10 +178,28 @@ namespace Orleans.Runtime.Messaging
 
         public void Write<TBufferWriter>(ref TBufferWriter writer, Message message) where TBufferWriter : IBufferWriter<byte>
         {
-            List<ArraySegment<byte>> data = message.Serialize(this.serializationManager, out var headerLength, out var bodyLength);
-            foreach (var seg in data)
+            var data = new List<ArraySegment<byte>>();
+            var lengthFields = new byte[2 * sizeof(int)];
+            data.Add(new ArraySegment<byte>(lengthFields, 0, 2 * sizeof(int)));
+            using (var buffer = new ArrayBufferWriter())
             {
-                writer.Write(seg);
+                this.messageHeadersSerializer.Serialize(buffer, message.Headers);
+                var headerLength = buffer.CommitedByteCount;
+
+                this.objectSerializer.Serialize(buffer, message.BodyObject);
+                var bodyLength = buffer.CommitedByteCount - headerLength;
+
+                data.Add(new ArraySegment<byte>(buffer.ToArray()));
+
+                // Write length prefixes, first header length then body length.
+                var lengthPrefixes = MemoryMarshal.Cast<byte, int>(lengthFields);
+                lengthPrefixes[0] = headerLength;
+                lengthPrefixes[1] = bodyLength;
+
+                foreach (var segment in data)
+                {
+                    writer.Write(segment);
+                }
             }
         }
     }

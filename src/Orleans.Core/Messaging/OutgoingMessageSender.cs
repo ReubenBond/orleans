@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -20,11 +21,20 @@ namespace Orleans.Messaging
     internal abstract class OutgoingMessageSender : ChannelAgent<Message>
     {
         private readonly SerializationManager serializationManager;
+        private readonly ISerializer<Message.HeadersContainer> messageHeadersSerializer;
+        private readonly ISerializer<object> objectSerializer;
 
-        internal OutgoingMessageSender(string nameSuffix, SerializationManager serializationManager, ExecutorService executorService, ILoggerFactory loggerFactory)
-            : base(nameSuffix, executorService, loggerFactory)
+        internal OutgoingMessageSender(
+            string nameSuffix,
+            SerializationManager serializationManager,
+            ILoggerFactory loggerFactory,
+            ISerializer<Message.HeadersContainer> messageHeadersSerializer,
+            ISerializer<object> objectSerializer)
+            : base(nameSuffix, loggerFactory)
         {
             this.serializationManager = serializationManager;
+            this.messageHeadersSerializer = messageHeadersSerializer;
+            this.objectSerializer = objectSerializer;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
@@ -44,56 +54,76 @@ namespace Orleans.Messaging
                 return;
             }
 
-            List<ArraySegment<byte>> data;
-            int headerLength = 0;
-            try
-            {
-                int bodyLength;
-                data = msg.Serialize(this.serializationManager, out headerLength, out bodyLength);
-                if (headerLength + bodyLength > this.serializationManager.LargeObjectSizeThreshold)
-                {
-                    this.Log.Info(ErrorCode.Messaging_LargeMsg_Outgoing, "Preparing to send large message Size={0} HeaderLength={1} BodyLength={2} #ArraySegments={3}. Msg={4}",
-                        headerLength + bodyLength + Message.LENGTH_HEADER_SIZE, headerLength, bodyLength, data.Count, this.ToString());
-                    if (this.Log.IsEnabled(LogLevel.Trace)) this.Log.Trace("Sending large message {0}", msg.ToLongString());
-                }
-            }
-            catch (Exception exc)
-            {
-                this.OnMessageSerializationFailure(msg, exc);
-                return;
-            }
+            var data = new List<ArraySegment<byte>>(4);
 
-            int length = data.Sum(x => x.Count);
-            int bytesSent = 0;
-            bool exceptionSending = false;
-            bool countMismatchSending = false;
-            string sendErrorStr = null;
-            try
-            {
-                bytesSent = sock.Send(data);
-                if (bytesSent != length)
-                {
-                    // The complete message wasn't sent, even though no error was reported; treat this as an error
-                    countMismatchSending = true;
-                    sendErrorStr = $"Byte count mismatch on sending to {targetSilo}: sent {bytesSent}, expected {length}";
-                    Log.Warn(ErrorCode.Messaging_CountMismatchSending, sendErrorStr);
-                }
-            }
-            catch (Exception exc)
-            {
-                exceptionSending = true;
-                if (!(exc is ObjectDisposedException))
-                {
-                    sendErrorStr = $"Exception sending message to {targetSilo}. Message: {msg}. {exc}";
-                    Log.Warn(ErrorCode.Messaging_ExceptionSending, sendErrorStr, exc);
-                }
-            }
-            MessagingStatisticsGroup.OnMessageSend(targetSilo, msg.Direction, bytesSent, headerLength, GetSocketDirection());
-            bool sendError = exceptionSending || countMismatchSending;
-            if (sendError)
-                OnSendFailure(sock, targetSilo);
+            // Reserve space the length fields.
+            var lengthFields = new byte[2 * sizeof(int)];
+            data.Add(new ArraySegment<byte>(lengthFields, 0, 2 * sizeof(int)));
 
-            ProcessMessageAfterSend(msg, sendError, sendErrorStr);
+            // Send the message
+            using (var buffer = new ArrayBufferWriter())
+            {
+                int headerLength = 0;
+                try
+                {
+                    this.messageHeadersSerializer.Serialize(buffer, msg.Headers);
+                    headerLength = buffer.CommitedByteCount;
+
+                    this.objectSerializer.Serialize(buffer, msg.BodyObject);
+                    var bodyLength = buffer.CommitedByteCount - headerLength;
+
+                    data.Add(new ArraySegment<byte>(buffer.ToArray()));
+
+                    // Write length prefixes, first header length then body length.
+                    var lengthPrefixes = MemoryMarshal.Cast<byte, int>(lengthFields);
+                    lengthPrefixes[0] = headerLength;
+                    lengthPrefixes[1] = bodyLength;
+
+                    if (buffer.CommitedByteCount > this.serializationManager.LargeObjectSizeThreshold)
+                    {
+                        this.Log.Info(ErrorCode.Messaging_LargeMsg_Outgoing, "Preparing to send large message Size={0} HeaderLength={1} BodyLength={2} #ArraySegments={3}. Msg={4}",
+                            headerLength + bodyLength + Message.LENGTH_HEADER_SIZE, headerLength, bodyLength, data.Count, this.ToString());
+                        if (this.Log.IsEnabled(LogLevel.Trace)) this.Log.Trace("Sending large message {0}", msg.ToLongString());
+                    }
+                }
+                catch (Exception exc)
+                {
+                    this.OnMessageSerializationFailure(msg, exc);
+                    return;
+                }
+
+                int length = data.Sum(x => x.Count);
+                int bytesSent = 0;
+                bool exceptionSending = false;
+                bool countMismatchSending = false;
+                string sendErrorStr = null;
+                try
+                {
+                    bytesSent = sock.Send(data);
+                    if (bytesSent != length)
+                    {
+                        // The complete message wasn't sent, even though no error was reported; treat this as an error
+                        countMismatchSending = true;
+                        sendErrorStr = $"Byte count mismatch on sending to {targetSilo}: sent {bytesSent}, expected {length}";
+                        Log.Warn(ErrorCode.Messaging_CountMismatchSending, sendErrorStr);
+                    }
+                }
+                catch (Exception exc)
+                {
+                    exceptionSending = true;
+                    if (!(exc is ObjectDisposedException))
+                    {
+                        sendErrorStr = $"Exception sending message to {targetSilo}. Message: {msg}. {exc}";
+                        Log.Warn(ErrorCode.Messaging_ExceptionSending, sendErrorStr, exc);
+                    }
+                }
+                MessagingStatisticsGroup.OnMessageSend(targetSilo, msg.Direction, bytesSent, headerLength, GetSocketDirection());
+                bool sendError = exceptionSending || countMismatchSending;
+                if (sendError)
+                    OnSendFailure(sock, targetSilo);
+
+                ProcessMessageAfterSend(msg, sendError, sendErrorStr);
+            }
         }
 
         protected abstract SocketDirection GetSocketDirection();
