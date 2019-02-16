@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace Orleans.Messaging
 {
@@ -37,14 +38,22 @@ namespace Orleans.Messaging
 
         private DateTime lastConnect;
 
-        internal GatewayConnection(Uri address, ClientMessageCenter mc, MessageFactory messageFactory, ExecutorService executorService, ILoggerFactory loggerFactory, TimeSpan openConnectionTimeout)
-            : base("GatewayClientSender_" + address, mc.SerializationManager, executorService, loggerFactory)
+        internal GatewayConnection(
+            Uri address,
+            ClientMessageCenter mc,
+            MessageFactory messageFactory,
+            ExecutorService executorService,
+            ILoggerFactory loggerFactory,
+            TimeSpan openConnectionTimeout,
+            ISerializer<Message.HeadersContainer> messageHeadersSerializer,
+            ISerializer<object> objectSerializer)
+            : base("GatewayClientSender_" + address, mc.SerializationManager, executorService, loggerFactory, messageHeadersSerializer, objectSerializer)
         {
             this.messageFactory = messageFactory;
             this.openConnectionTimeout = openConnectionTimeout;
             Address = address;
             MsgCenter = mc;
-            receiver = new GatewayClientReceiver(this, mc.SerializationManager, executorService, loggerFactory);
+            receiver = new GatewayClientReceiver(this, mc.SerializationManager, executorService, loggerFactory, messageHeadersSerializer, objectSerializer);
             lastConnect = new DateTime();
             IsLive = true;
         }
@@ -257,8 +266,7 @@ namespace Orleans.Messaging
                 "Unexpected error serializing message {Message}: {Exception}",
                 msg,
                 exc);
-
-            msg.ReleaseBodyAndHeaderBuffers();
+            
             MessagingStatisticsGroup.OnFailedSentMessage(msg);
 
             var retryCount = msg.RetryCount ?? 0;
@@ -295,7 +303,6 @@ namespace Orleans.Messaging
 
         protected override void ProcessMessageAfterSend(Message msg, bool sendError, string sendErrorStr)
         {
-            msg.ReleaseBodyAndHeaderBuffers();
             if (sendError)
             {
                 // We can't recycle the current message, because that might wind up with it getting delivered out of order, so we have to reject it
@@ -305,7 +312,6 @@ namespace Orleans.Messaging
 
         protected override void FailMessage(Message msg, string reason)
         {
-            msg.ReleaseBodyAndHeaderBuffers();
             MessagingStatisticsGroup.OnFailedSentMessage(msg);
             if (MsgCenter.Running && msg.Direction == Message.Directions.Request)
             {

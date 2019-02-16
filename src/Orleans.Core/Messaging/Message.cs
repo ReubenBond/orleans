@@ -50,16 +50,7 @@ namespace Orleans.Runtime
             get { return _maxRetries; }
             set { _maxRetries = value; }
         }
-
-        /// <summary>
-        /// NOTE: The contents of bodyBytes should never be modified
-        /// </summary>
-        private List<ArraySegment<byte>> bodyBytes;
-
-        private List<ArraySegment<byte>> headerBytes;
-
-        private object bodyObject;
-
+        
         // Cache values of TargetAddess and SendingAddress as they are used very frequently
         private ActivationAddress targetAddress;
         private ActivationAddress sendingAddress;
@@ -387,76 +378,9 @@ namespace Orleans.Runtime
             set { Headers.RequestContextData = value; }
         }
 
-        public object GetDeserializedBody(SerializationManager serializationManager)
-        {
-            if (this.bodyObject != null) return this.bodyObject;
-            
-            try
-            {
-                this.bodyObject = DeserializeBody(serializationManager, this.bodyBytes);
-            }
-            finally
-            {
-                if (this.bodyBytes != null)
-                {
-                    BufferPool.GlobalPool.Release(bodyBytes);
-                    this.bodyBytes = null;
-                }
-            }
+        public object GetDeserializedBody(SerializationManager serializationManager) => this.BodyObject;
 
-            return this.bodyObject;
-        }
-
-        public object BodyObject
-        {
-            set
-            {
-                bodyObject = value;
-                if (bodyBytes == null) return;
-
-                BufferPool.GlobalPool.Release(bodyBytes);
-                bodyBytes = null;
-            }
-        }
-
-        private static object DeserializeBody(SerializationManager serializationManager, List<ArraySegment<byte>> bytes)
-        {
-            if (bytes == null)
-            {
-                return null;
-            }
-
-            var stream = new BinaryTokenStreamReader(bytes);
-            return serializationManager.Deserialize(stream);
-        }
-
-        public Message()
-        {
-            bodyObject = null;
-            bodyBytes = null;
-            headerBytes = null;
-        }
-        
-        /// <summary>
-        /// Clears the current body and sets the serialized body contents to the provided value.
-        /// </summary>
-        /// <param name="body">The serialized body contents.</param>
-        public void SetBodyBytes(List<ArraySegment<byte>> body)
-        {
-            // Dispose of the current body.
-            this.BodyObject = null;
-            this.bodyBytes = body;
-        }
-
-        /// <summary>
-        /// Deserializes the provided value into this instance's <see cref="BodyObject"/>.
-        /// </summary>
-        /// <param name="serializationManager">The serialization manager.</param>
-        /// <param name="body">The serialized body contents.</param>
-        public void DeserializeBodyObject(SerializationManager serializationManager, List<ArraySegment<byte>> body)
-        {
-            this.BodyObject = DeserializeBody(serializationManager, body);
-        }
+        public object BodyObject { get; set; }
 
         public void ClearTargetAddress()
         {
@@ -477,69 +401,7 @@ namespace Orleans.Runtime
         {
             return Equals(SendingSilo, other.SendingSilo) && Equals(Id, other.Id);
         }
-
-        public List<ArraySegment<byte>> Serialize(SerializationManager serializationManager, out int headerLengthOut, out int bodyLengthOut)
-        {
-            var context = new SerializationContext(serializationManager)
-            {
-                StreamWriter = new BinaryTokenStreamWriter()
-            };
-            SerializationManager.SerializeMessageHeaders(Headers, context);
-
-            if (bodyBytes == null)
-            {
-                var bodyStream = new BinaryTokenStreamWriter();
-                serializationManager.Serialize(bodyObject, bodyStream);
-                // We don't bother to turn this into a byte array and save it in bodyBytes because Serialize only gets called on a message
-                // being sent off-box. In this case, the likelihood of needed to re-serialize is very low, and the cost of capturing the
-                // serialized bytes from the steam -- where they're a list of ArraySegment objects -- into an array of bytes is actually
-                // pretty high (an array allocation plus a bunch of copying).
-                bodyBytes = bodyStream.ToBytes();
-            }
-
-            if (headerBytes != null)
-            {
-                BufferPool.GlobalPool.Release(headerBytes);
-            }
-            headerBytes = context.StreamWriter.ToBytes();
-            int headerLength = context.StreamWriter.CurrentOffset;
-            int bodyLength = BufferLength(bodyBytes);
-
-            var bytes = new List<ArraySegment<byte>>();
-            bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(headerLength)));
-            bytes.Add(new ArraySegment<byte>(BitConverter.GetBytes(bodyLength)));
-           
-            bytes.AddRange(headerBytes);
-            bytes.AddRange(bodyBytes);
-
-            headerLengthOut = headerLength;
-            bodyLengthOut = bodyLength;
-            return bytes;
-        }
-
-
-        public void ReleaseBodyAndHeaderBuffers()
-        {
-            ReleaseHeadersOnly();
-            ReleaseBodyOnly();
-        }
-
-        public void ReleaseHeadersOnly()
-        {
-            if (headerBytes == null) return;
-
-            BufferPool.GlobalPool.Release(headerBytes);
-            headerBytes = null;
-        }
-
-        public void ReleaseBodyOnly()
-        {
-            if (bodyBytes == null) return;
-
-            BufferPool.GlobalPool.Release(bodyBytes);
-            bodyBytes = null;
-        }
-
+                
         // For testing and logging/tracing
         public string ToLongString()
         {
@@ -706,7 +568,6 @@ namespace Orleans.Runtime
         internal void DropExpiredMessage(MessagingStatisticsGroup.Phase phase)
         {
             MessagingStatisticsGroup.OnMessageExpired(phase);
-            ReleaseBodyAndHeaderBuffers();
         }
 
         private static int BufferLength(List<ArraySegment<byte>> buffer)

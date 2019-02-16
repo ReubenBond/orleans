@@ -14,7 +14,7 @@ namespace Orleans.Serialization
         public static ISerializationContext CreateNestedContext(
             this ISerializationContext context,
             int position,
-            BinaryTokenStreamWriter writer)
+            IBinaryTokenStreamWriter writer)
         {
             return new SerializationContext.NestedSerializationContext(context, position, writer);
         }
@@ -142,7 +142,7 @@ namespace Orleans.Serialization
             /// <param name="parent">The parent context.</param>
             /// <param name="offset">The absolute offset at which this stream begins.</param>
             /// <param name="writer">The writer.</param>
-            public NestedSerializationContext(ISerializationContext parent, int offset, BinaryTokenStreamWriter writer)
+            public NestedSerializationContext(ISerializationContext parent, int offset, IBinaryTokenStreamWriter writer)
             {
                 this.parentContext = parent;
                 this.initialOffset = offset;

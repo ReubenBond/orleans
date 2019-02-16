@@ -18,8 +18,15 @@ namespace Orleans.Runtime.Messaging
         internal static readonly TimeSpan CONNECTION_RETRY_DELAY = TimeSpan.FromMilliseconds(1000);
 
         
-        internal SiloMessageSender(string nameSuffix, MessageCenter msgCtr, SerializationManager serializationManager, ExecutorService executorService, ILoggerFactory loggerFactory)
-            : base(nameSuffix, serializationManager, executorService, loggerFactory)
+        internal SiloMessageSender(
+            string nameSuffix,
+            MessageCenter msgCtr,
+            SerializationManager serializationManager,
+            ExecutorService executorService,
+            ILoggerFactory loggerFactory,
+            ISerializer<Message.HeadersContainer> messageHeadersSerializer,
+            ISerializer<object> objectSerializer)
+            : base(nameSuffix, serializationManager, executorService, loggerFactory, messageHeadersSerializer, objectSerializer)
         {
             messageCenter = msgCtr;
             lastConnectionFailure = new Dictionary<SiloAddress, DateTime>();
@@ -114,8 +121,7 @@ namespace Orleans.Runtime.Messaging
                 "Unexpected error serializing message {Message}: {Exception}",
                 msg,
                 exc);
-
-            msg.ReleaseBodyAndHeaderBuffers();
+            
             MessagingStatisticsGroup.OnFailedSentMessage(msg);
 
             var retryCount = msg.RetryCount ?? 0;
@@ -155,19 +161,16 @@ namespace Orleans.Runtime.Messaging
         {
             if (sendError)
             {
-                msg.ReleaseHeadersOnly();
                 RetryMessage(msg);
             }
             else
-            {
-                msg.ReleaseBodyAndHeaderBuffers();
+            {;
                 if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Sending queue delay time for: {0} is {1}", msg, DateTime.UtcNow.Subtract(msg.QueuedTime ?? DateTime.UtcNow));
             }
         }
 
         protected override void FailMessage(Message msg, string reason)
         {
-            msg.ReleaseBodyAndHeaderBuffers();
             MessagingStatisticsGroup.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {

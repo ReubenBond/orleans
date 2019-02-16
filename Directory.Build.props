@@ -55,6 +55,7 @@
     <SystemThreadingChannelsVersion>4.5.0</SystemThreadingChannelsVersion>
     <SystemBuffersVersion>4.5.0</SystemBuffersVersion>
     <SystemMemoryVersion>4.5.1</SystemMemoryVersion>
+    <SystemBuffersVersion>4.5.0</SystemBuffersVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>15.7.179</MicrosoftBuildVersion>
@@ -91,7 +92,30 @@
     <ConsulVersion>0.7.2.3</ConsulVersion>
     <GoogleCloudPubSubV1Version>1.0.0-beta13</GoogleCloudPubSubV1Version>
     <GoogleProtobufVersion>3.4.0</GoogleProtobufVersion>
-    <ProtobufNetVersion>2.3.7</ProtobufNetVersion>
+    <ProtobufNetVersion>2.3.7</ProtobufNetVersion>namespace Orleans.Serialization
+{
+    public sealed class OrleansSerializer<T> : ISerializer<T>
+    {
+        private readonly SerializationManager serializationManager;
+
+        public OrleansSerializer(SerializationManager serializationManager)
+        {
+            this.serializationManager = serializationManager;
+        }
+
+        public void Deserialize(ReadOnlySequence<byte> input, out T value)
+        {
+            var reader = new BinaryTokenStreamReader2(input);
+            value = this.serializationManager.Deserialize<T>(reader);
+        }
+
+        public void Serialize<TBufferWriter>(TBufferWriter output, T value) where TBufferWriter : IBufferWriter<byte>
+        {
+            var writer = new BinaryTokenStreamWriter2<TBufferWriter>(output);
+            this.serializationManager.Serialize(value, writer);
+            writer.Commit();
+        }
+    }
     <MySqlDataVersion>6.9.9</MySqlDataVersion>
     <NewRelicAgentApiVersion>8.0.0.0</NewRelicAgentApiVersion>
     <NewtonsoftJsonVersion>10.0.3</NewtonsoftJsonVersion>
@@ -151,7 +175,30 @@
     <OrleansTestingHostVersion>2.3.0</OrleansTestingHostVersion>
     <OrleansTransactionsVersion>2.3.0</OrleansTransactionsVersion>
     <OrleansServiceFabricVersion>2.3.0</OrleansServiceFabricVersion>
-    <OrleansSerializersVersion>2.3.0</OrleansSerializersVersion>
+    <OrleansSerializersVersion>2.3.0</OrleansSerializersVersion>namespace Orleans.Serialization
+{
+    public sealed class OrleansSerializer<T> : ISerializer<T>
+    {
+        private readonly SerializationManager serializationManager;
+
+        public OrleansSerializer(SerializationManager serializationManager)
+        {
+            this.serializationManager = serializationManager;
+        }
+
+        public void Deserialize(ReadOnlySequence<byte> input, out T value)
+        {
+            var reader = new BinaryTokenStreamReader2(input);
+            value = this.serializationManager.Deserialize<T>(reader);
+        }
+
+        public void Serialize<TBufferWriter>(TBufferWriter output, T value) where TBufferWriter : IBufferWriter<byte>
+        {
+            var writer = new BinaryTokenStreamWriter2<TBufferWriter>(output);
+            this.serializationManager.Serialize(value, writer);
+            writer.Commit();
+        }
+    }
     <OrleansToolsVersion>2.3.0</OrleansToolsVersion>
     <OrleansClientVersion>2.3.0</OrleansClientVersion>
     <OrleansServerVersion>2.3.0</OrleansServerVersion>

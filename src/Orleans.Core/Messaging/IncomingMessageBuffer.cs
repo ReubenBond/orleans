@@ -22,23 +22,27 @@ namespace Orleans.Runtime
 
         private int receiveOffset;
         private int decodeOffset;
-
+        private readonly ISerializer<Message.HeadersContainer> messageHeadersSerializer;
+        private readonly ISerializer<object> objectSerializer;
         private readonly bool supportForwarding;
-        private ILogger Log;
         private readonly SerializationManager serializationManager;
-        private readonly DeserializationContext deserializationContext;
+        private ILogger Log;
 
         internal const int DEFAULT_RECEIVE_BUFFER_SIZE = 128 * Kb; // 128k
 
         public IncomingMessageBuffer(
             ILoggerFactory loggerFactory,
             SerializationManager serializationManager,
+            ISerializer<Message.HeadersContainer> messageHeadersSerializer,
+            ISerializer<object> objectSerializer,
             bool supportForwarding = false,
             int receiveBufferSize = DEFAULT_RECEIVE_BUFFER_SIZE,
             int maxSustainedReceiveBufferSize = DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE)
         {
             Log = loggerFactory.CreateLogger<IncomingMessageBuffer>();
             this.serializationManager = serializationManager;
+            this.messageHeadersSerializer = messageHeadersSerializer;
+            this.objectSerializer = objectSerializer;
             this.supportForwarding = supportForwarding;
             currentBufferSize = receiveBufferSize;
             maxSustainedBufferSize = maxSustainedReceiveBufferSize;
@@ -48,10 +52,6 @@ namespace Orleans.Runtime
             decodeOffset = 0;
             headerLength = 0;
             bodyLength = 0;
-            deserializationContext = new DeserializationContext(this.serializationManager)
-            {
-                StreamReader = new BinaryTokenStreamReader(EmptyBuffers)
-            };
         }
 
         public List<ArraySegment<byte>> BuildReceiveBuffer()
@@ -161,34 +161,23 @@ namespace Orleans.Runtime
 
             // decode header
             int headerOffset = decodeOffset + Message.LENGTH_HEADER_SIZE;
-            List<ArraySegment<byte>> header = ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, headerOffset, headerLength);
+            var header = ReadOnlySequenceHelper.CreateReadOnlySequence(ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, headerOffset, headerLength));
 
             // decode body
             int bodyOffset = headerOffset + headerLength;
-            List<ArraySegment<byte>> body = ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, bodyOffset, bodyLength);
-            
-            // build message
+            var body = ReadOnlySequenceHelper.CreateReadOnlySequence(ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, bodyOffset, bodyLength));
 
-            this.deserializationContext.Reset();
-            this.deserializationContext.StreamReader.Reset(header);
+            // build message
+            this.messageHeadersSerializer.Deserialize(header, out var headersContainer);
 
             msg = new Message
             {
-                Headers = SerializationManager.DeserializeMessageHeaders(this.deserializationContext)
+                Headers = headersContainer
             };
             try
             {
-                if (this.supportForwarding)
-                {
-                    // If forwarding is supported, then deserialization will be deferred until the body value is needed.
-                    // Need to maintain ownership of buffer, so we need to duplicate the body buffer.
-                    msg.SetBodyBytes(this.DuplicateBuffer(body));
-                }
-                else
-                {
-                    // Attempt to deserialize the body immediately.
-                    msg.DeserializeBodyObject(this.serializationManager, body);
-                }
+                this.objectSerializer.Deserialize(body, out var bodyObject);
+                msg.BodyObject = bodyObject;
             }
             finally
             {

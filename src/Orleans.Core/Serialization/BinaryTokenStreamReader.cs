@@ -76,16 +76,14 @@ namespace Orleans.Serialization
         /// <returns>Next token that will be read from the stream.</returns>
         internal static SerializationTokenType PeekToken(this IBinaryTokenStreamReader @this)
         {
-            // TODO try to avoid that
-            return ((BinaryTokenStreamReader) @this).PeekToken();
+            return (SerializationTokenType)@this.PeekByte();
         }
 
         /// <summary> Read a <c>SerializationTokenType</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         internal static SerializationTokenType ReadToken(this IBinaryTokenStreamReader @this)
         {
-            // TODO try to avoid that
-            return ((BinaryTokenStreamReader) @this).ReadToken();
+            return (SerializationTokenType)@this.ReadByte();
         }
 
         internal static bool TryReadSimpleType(this IBinaryTokenStreamReader @this, out object result, out SerializationTokenType token)
@@ -664,7 +662,7 @@ namespace Orleans.Serialization
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public bool ReadBoolean()
         {
-            return ReadToken() == SerializationTokenType.True;
+            return this.ReadToken() == SerializationTokenType.True;
         }
 
         /// <summary> Read an <c>Int32</c> value from the stream. </summary>
@@ -867,6 +865,14 @@ namespace Orleans.Serialization
             return buff[offset];
         }
 
+        public byte PeekByte()
+        {
+            if (currentOffset == currentSegment.Count + currentSegment.Offset)
+                StartNextSegment();
+
+            return currentBuffer[currentOffset];
+        }
+
         /// <summary> Read an <c>sbyte</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         public sbyte ReadSByte()
@@ -969,27 +975,6 @@ namespace Orleans.Serialization
             trace.Write(format, args);
             trace.WriteLine(" at offset {0}", CurrentPosition);
             trace.Flush();
-        }
-
-        /// <summary>
-        /// Peek at the next token in this input stream.
-        /// </summary>
-        /// <returns>Next token that will be read from the stream.</returns>
-        internal SerializationTokenType PeekToken()
-        {
-            if (currentOffset == currentSegment.Count + currentSegment.Offset)
-                StartNextSegment();
-
-            return (SerializationTokenType)currentBuffer[currentOffset];
-        }
-
-        /// <summary> Read a <c>SerializationTokenType</c> value from the stream. </summary>
-        /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        internal SerializationTokenType ReadToken()
-        {
-            int offset;
-            var buff = CheckLength(1, out offset);
-            return (SerializationTokenType)buff[offset];
         }
     }
 }

@@ -11,6 +11,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
+
     internal static class BinaryTokenStreamWriterExtensions
     {
         internal static void Write(this IBinaryTokenStreamWriter @this, SerializationTokenType t)
