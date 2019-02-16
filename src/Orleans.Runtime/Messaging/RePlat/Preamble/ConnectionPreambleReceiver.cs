@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Threading.Tasks;
@@ -16,12 +16,12 @@ namespace Orleans.Runtime.Messaging
         {
             var input = connection.Transport.Input;
 
-            var readResult = await input.ReadAsync();
+            var readResult = await input.ReadAsync().ConfigureAwait(false);
             var buffer = readResult.Buffer;
             while (buffer.Length < 4)
             {
                 input.AdvanceTo(buffer.Start, buffer.End);
-                readResult = await input.ReadAsync();
+                readResult = await input.ReadAsync().ConfigureAwait(false);
                 buffer = readResult.Buffer;
             }
 
@@ -42,7 +42,7 @@ namespace Orleans.Runtime.Messaging
             while (buffer.Length < length)
             {
                 input.AdvanceTo(buffer.Start, buffer.End);
-                readResult = await input.ReadAsync();
+                readResult = await input.ReadAsync().ConfigureAwait(false);
                 buffer = readResult.Buffer;
             }
 

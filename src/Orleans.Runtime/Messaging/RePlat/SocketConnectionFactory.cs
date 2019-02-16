@@ -90,7 +90,7 @@ namespace Orleans.Runtime.Messaging
             {
                 try
                 {
-                    await connection.StartAsync();
+                    await connection.StartAsync().ConfigureAwait(false);
                 }
                 finally
                 {
@@ -100,16 +100,14 @@ namespace Orleans.Runtime.Messaging
             return connection;
         }
 
-        internal static PipeOptions GetPipeOptions() => new PipeOptions
-(
-    pool: MemoryPool<byte>.Shared,
-    readerScheduler: PipeScheduler.Inline,
-    writerScheduler: PipeScheduler.Inline,
-    pauseWriterThreshold: 0,
-    resumeWriterThreshold: 0,
-    useSynchronizationContext: false,
-    minimumSegmentSize: 4000
-);
+        internal static PipeOptions GetPipeOptions() => new PipeOptions(
+            pool: MemoryPool<byte>.Shared,
+            readerScheduler: PipeScheduler.Inline,
+            writerScheduler: PipeScheduler.Inline,
+            pauseWriterThreshold: 0,
+            resumeWriterThreshold: 0,
+            useSynchronizationContext: false,
+            minimumSegmentSize: 4000);
         
 
         private static bool TryParseEndPoint(string value, out IPEndPoint result)

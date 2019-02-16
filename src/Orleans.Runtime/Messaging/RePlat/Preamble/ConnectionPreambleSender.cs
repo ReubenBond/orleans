@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers.Binary;
 using System.IO.Pipelines;
 using System.Threading.Tasks;
@@ -28,7 +28,7 @@ namespace Orleans.Runtime.Messaging
 
             async Task FlushAsync(ValueTask<FlushResult> task)
             {
-                await task;
+                await task.ConfigureAwait(false);
             }
         }
     }

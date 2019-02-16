@@ -26,7 +26,7 @@ namespace Orleans.Runtime.Messaging
         {
             connection.GetLifetime().ConnectionClosed.Register(() => this.gateway.RecordClosedConnection(connection));
 
-            var grainId = await base.ReadPreambleInternal(connection);
+            var grainId = await base.ReadPreambleInternal(connection).ConfigureAwait(false);
 
             if (grainId.Equals(Constants.SiloDirectConnectionId))
             {
