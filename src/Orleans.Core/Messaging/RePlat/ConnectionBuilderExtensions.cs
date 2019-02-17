@@ -98,18 +98,12 @@ namespace Orleans.Runtime.Messaging
 
         public override (ConnectionPreambleSender, ConnectionPreambleReceiver, ConnectionMessageReceiver) GetComponents(bool outbound, bool siloToSilo, ConnectionContext connection)
         {
-            var preambleSender = GetPreambleSender(outbound, siloToSilo);
-            var preambleReceiver = GetPreambleReceiver(outbound, siloToSilo);
-            var receiver = GetReceiver(outbound, siloToSilo, connection);
-            return (preambleSender, preambleReceiver, receiver);
+            var preambleSender = GetPreambleSender(outbound);
+            var receiver = ActivatorUtilities.CreateInstance<ClientMessageReceiver>(serviceProvider, connection);
+            return (preambleSender, null, receiver);
         }
 
-        private ConnectionPreambleReceiver GetPreambleReceiver(bool outbound, bool siloToSilo)
-        {
-            return null;
-        }
-
-        private ConnectionPreambleSender GetPreambleSender(bool outbound, bool siloToSilo)
+        private ConnectionPreambleSender GetPreambleSender(bool outbound)
         {
             if (!outbound)
             {
@@ -117,11 +111,6 @@ namespace Orleans.Runtime.Messaging
             }
 
             return ActivatorUtilities.GetServiceOrCreateInstance<ClientPreambleSender>(serviceProvider);
-        }
-
-        private ConnectionMessageReceiver GetReceiver(bool outbound, bool siloToSilo, ConnectionContext connection)
-        {
-            return ActivatorUtilities.CreateInstance<ClientMessageReceiver>(serviceProvider, connection);
         }
     }
 }

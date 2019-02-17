@@ -61,7 +61,7 @@ namespace Orleans.Runtime.Messaging
                         }
                         catch
                         {
-                            this.Remove(endPoint, null);
+                            this.Remove(endPoint, sender);
                         }
                     });
                 }

@@ -14,17 +14,11 @@ namespace Orleans.Runtime.Messaging
     internal class MessageCenter : ISiloMessageCenter, IDisposable
     {
         public Gateway Gateway { get; set; }
-        private IncomingMessageAcceptor ima;
         private readonly ILogger log;
         private Action<Message> rerouteHandler;
         internal Func<Message, bool> ShouldDrop;
         private IHostedClient hostedClient;
         private Action<Message> sniffIncomingMessageHandler;
-
-        // ReSharper disable NotAccessedField.Local
-        private IntValueStatistic sendQueueLengthCounter;
-        private IntValueStatistic receiveQueueLengthCounter;
-        // ReSharper restore NotAccessedField.Local
 
         internal OutboundMessageQueue OutboundQueue { get; set; }
         internal InboundMessageQueue InboundQueue { get; set; }
@@ -95,21 +89,8 @@ namespace Orleans.Runtime.Messaging
             if (log.IsEnabled(LogLevel.Trace)) log.Trace("Starting initialization.");
 
             SocketManager = new SocketManager(networkingOptions, this.loggerFactory);
-            var listeningEndpoint = endpointOptions.Value.GetListeningSiloEndpoint();
-            ima = new IncomingMessageAcceptor(this,
-                listeningEndpoint,
-                SocketDirection.SiloToSilo,
-                this.messageFactory,
-                this.serializationManager,
-                this.executorService,
-                this.loggerFactory,
-                this.messageHeadersSerializer,
-                this.objectSerializer);
             InboundQueue = new InboundMessageQueue(this.loggerFactory.CreateLogger<InboundMessageQueue>(), statisticsOptions);
             OutboundQueue = new OutboundMessageQueue(this, this.loggerFactory.CreateLogger<OutboundMessageQueue>(), this.senderManager);
-
-            sendQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_SEND_QUEUE_LENGTH, () => SendQueueLength);
-            receiveQueueLengthCounter = IntValueStatistic.FindOrCreate(StatisticNames.MESSAGE_CENTER_RECEIVE_QUEUE_LENGTH, () => ReceiveQueueLength);
 
             if (log.IsEnabled(LogLevel.Trace)) log.Trace("Completed initialization.");
         }
@@ -117,7 +98,6 @@ namespace Orleans.Runtime.Messaging
         public void Start()
         {
             IsBlockingApplicationMessages = false;
-            ima.Start();
             OutboundQueue.Start();
         }
 
@@ -147,16 +127,7 @@ namespace Orleans.Runtime.Messaging
         public void Stop()
         {
             IsBlockingApplicationMessages = true;
-
-            try
-            {
-                ima.Stop();
-            }
-            catch (Exception exc)
-            {
-                log.Error(ErrorCode.Runtime_Error_100108, "Stop failed.", exc);
-            }
-
+            
             StopAcceptingClientMessages();
 
             try
@@ -287,12 +258,6 @@ namespace Orleans.Runtime.Messaging
 
         public void Dispose()
         {
-            if (ima != null)
-            {
-                ima.Dispose();
-                ima = null;
-            }
-
             InboundQueue?.Dispose();
             OutboundQueue?.Dispose();
 

@@ -17,7 +17,7 @@
     },
     "Benchmarks": {
       "commandName": "Project",
-      "launchBrowser": true,
+      "commandLineArgs": "PingForever",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },

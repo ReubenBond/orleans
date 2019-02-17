@@ -24,9 +24,7 @@ namespace Orleans.Runtime.Messaging
             var context = await this.connectionFactory.Connect(endPoint);
             configureContext(context);
             var handlerTask = this.connectionDelegate.Value(context);
-
-            var connection = new ConnectionInfo(context);
-
+            
             _ = Task.Run(async () =>
             {
                 try

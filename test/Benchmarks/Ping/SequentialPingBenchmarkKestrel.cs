@@ -24,21 +24,24 @@ namespace Benchmarks.Ping
     public class KestrelSequentialPingBenchmark : IDisposable 
     {
         private readonly IHost host;
-        private readonly IHost two;
+       // private readonly IHost two;
         private readonly IPingGrain grain;
         private readonly IClusterClient client;
 
         public KestrelSequentialPingBenchmark()
         {
+            Console.WriteLine("starting");
             var primary = new IPEndPoint(IPAddress.Loopback, 60666);
             this.host = CreateSilo(primary, 0).GetAwaiter().GetResult();
-            this.two = CreateSilo(primary, 1).GetAwaiter().GetResult();
+            Console.WriteLine("silo started");
+            //this.two = CreateSilo(primary, 1).GetAwaiter().GetResult();
 
             this.client = new ClientBuilder()
                 .UseLocalhostClustering(gatewayPort: 60777)
                 .Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev")
                 .Build();
             this.client.Connect(ex => Task.FromResult(true)).GetAwaiter().GetResult();
+            Console.WriteLine("client started");
             this.grain = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
 
 
@@ -154,7 +157,7 @@ namespace Benchmarks.Ping
         {
             //this.client.Dispose();
             this.host.Dispose();
-            this.two.Dispose();
+            //this.two.Dispose();
         }
 
 
