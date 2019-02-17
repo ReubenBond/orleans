@@ -82,7 +82,7 @@ namespace Orleans.Messaging
         // Each bucket holds a (possibly null) weak reference to a GatewayConnection object. That connection instance is used
         // if the WeakReference is non-null, is alive, and points to a live gateway connection. If any of these conditions is
         // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
-        private readonly WeakReference<ConnectionInfo>[] grainBuckets;
+        private readonly WeakReference<ConnectionMessageSender>[] grainBuckets;
         private readonly ILogger logger;
         private readonly object lockable;
         public SiloAddress MyAddress { get; private set; }
@@ -125,7 +125,7 @@ namespace Orleans.Messaging
                 AllowSynchronousContinuations = true
             });
             numMessages = 0;
-            grainBuckets = new WeakReference<ConnectionInfo>[clientMessagingOptions.Value.ClientSenderBuckets];
+            grainBuckets = new WeakReference<ConnectionMessageSender>[clientMessagingOptions.Value.ClientSenderBuckets];
             logger = loggerFactory.CreateLogger<ClientMessageCenter>();
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Proxy grain client constructed");
             IntValueStatistic.FindOrCreate(
@@ -199,12 +199,12 @@ namespace Orleans.Messaging
                 return;
             }
 
-            var gatewayConnection = this.GetGatewayConnection(msg);
-
+            var gatewaySender = this.GetGatewayConnection(msg);
             try
             {
-                gatewayConnection.Sender.Send(msg);
-                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.ProxyClient_QueueRequest, "Sending message {0} via gateway {1}", msg, gatewayConnection.RemoteEndPoint);
+                gatewaySender.Send(msg);
+                // TODO: Fix log message
+                if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.ProxyClient_QueueRequest, "Sending message {0} via gateway {1}", msg, gatewaySender );
             }
             catch (InvalidOperationException)
             {
@@ -214,9 +214,9 @@ namespace Orleans.Messaging
             }
         }
 
-        private ConnectionInfo GetGatewayConnection(Message msg)
+        private ConnectionMessageSender GetGatewayConnection(Message msg)
         {
-            ConnectionInfo gatewayConnection;
+            ConnectionMessageSender gatewayConnection;
 
             // If there's a specific gateway specified, use it
             if (msg.TargetSilo != null && GatewayManager.GetLiveGateways().Contains(msg.TargetSilo.ToGatewayUri()))
@@ -271,7 +271,7 @@ namespace Orleans.Messaging
                         gatewayConnection = this.connectionManager.GetConnection(addr.ToIPEndPoint().ToString());
                         if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_CreatedGatewayToGrain, "Creating gateway to {0} for message to grain {1}, bucket {2}, grain id hash code {3}X", addr, msg.TargetGrain, index,
                                             msg.TargetGrain.GetHashCode().ToString("x"));
-                        grainBuckets[index] = new WeakReference<ConnectionInfo>(gatewayConnection);
+                        grainBuckets[index] = new WeakReference<ConnectionMessageSender>(gatewayConnection);
                     }
                 }
             }

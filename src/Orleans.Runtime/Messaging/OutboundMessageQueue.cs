@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Messaging
     internal sealed class OutboundMessageQueue : IDisposable
     {
         private readonly MessageCenter messageCenter;
-        private readonly ConnectionManager senderManager;
+        private readonly ConnectionManager connectionManager;
         private readonly ILogger logger;
         private bool stopped;
 
@@ -36,7 +36,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionManager senderManager)
         {
             messageCenter = mc;
-            this.senderManager = senderManager;
+            this.connectionManager = senderManager;
             this.logger = logger;
             stopped = false;
         }
@@ -92,29 +92,8 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                var senderTask = this.senderManager.GetConnection(msg.TargetSilo.Endpoint.ToString());
-                if (senderTask.Status == TaskStatus.RanToCompletion)
-                {
-                    var sender = senderTask.GetAwaiter().GetResult();
-                    sender.Send(msg);
-                }
-                else
-                {
-                    _ = SendAsync(senderTask, msg);
-
-                    async Task SendAsync(Task<ConnectionMessageSender> task, Message m)
-                    {
-                        try
-                        {
-                            var sender = await task;
-                            sender.Send(msg);
-                        }
-                        catch
-                        {
-                            this.messageCenter.RerouteMessage(m);
-                        }
-                    }
-                }
+                var sender = this.connectionManager.GetConnection(msg.TargetSilo.Endpoint.ToString());
+                sender.Send(msg);
             }
         }
 

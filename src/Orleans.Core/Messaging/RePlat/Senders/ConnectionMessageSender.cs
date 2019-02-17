@@ -8,6 +8,7 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class ConnectionMessageSender : IDisposable
     {
+        internal static readonly object ContextItemKey = new object();
         private static readonly UnboundedChannelOptions ChannelOptions = new UnboundedChannelOptions
         {
             SingleReader = true,
@@ -19,19 +20,23 @@ namespace Orleans.Runtime.Messaging
         private readonly ChannelWriter<Message> writer;
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly IMessageCenter messageCenter;
-        private readonly ConnectionContext connection;
         private readonly IMessageSerializer serializer;
+        private ConnectionContext connection;
 
-        public ConnectionMessageSender(IMessageCenter messageCenter, IMessageSerializer messageSerializer, ConnectionContext connection)
+        public ConnectionMessageSender(IMessageCenter messageCenter, IMessageSerializer messageSerializer)
         {
             this.messages = Channel.CreateUnbounded<Message>(ChannelOptions);
             this.writer = this.messages.Writer;
             this.messageCenter = messageCenter;
-            this.connection = connection;
             this.serializer = messageSerializer;
         }
-            
-        public Task Run() => Task.Run(this.Process);
+
+        public Task Run(ConnectionContext connection)
+        {
+            if (this.connection != null) throw new InvalidOperationException($"{nameof(ConnectionContext)} already set on this instance.");
+            this.connection = connection;
+            return Task.Run(this.Process);
+        }
 
         public void Dispose() => this.Abort();
 

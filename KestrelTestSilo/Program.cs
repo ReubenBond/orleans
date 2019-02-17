@@ -29,7 +29,7 @@ namespace KestrelTestSilo
             while (true)
             {
                 await grain.SayHelloKestrel("tob");
-                await Task.Delay(30_000);
+                await Task.Delay(1000);
             }
         }
 

@@ -24,7 +24,7 @@ namespace Orleans.Runtime.Messaging
             // Configure the connection builder using the user-defined options.
             var connectionBuilder = new ConnectionBuilder(serviceProvider);
             connectionOptions.ConfigureConnectionBuilder(connectionBuilder);
-            connectionBuilder.UseOrleansSiloConnectionHandler();
+            connectionBuilder.UseOrleansOutboundSiloConnectionHandler();
             return connectionBuilder.Build();
         }
     }

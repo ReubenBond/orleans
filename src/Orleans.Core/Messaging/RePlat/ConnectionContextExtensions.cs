@@ -13,8 +13,6 @@ namespace Orleans.Runtime.Messaging
             return $"{feature.RemoteIpAddress}:{feature.RemotePort}";
         }
 
-        public static ConnectionMessageSender GetMessageSender(this ConnectionContext connection) => connection.GetRequiredFeature<ConnectionMessageSender>();
-
         public static IConnectionLifetimeFeature GetLifetime(this ConnectionContext connection) => connection.GetRequiredFeature<IConnectionLifetimeFeature>();
 
         public static TFeature GetRequiredFeature<TFeature>(this ConnectionContext connection) where TFeature : class
@@ -22,6 +20,11 @@ namespace Orleans.Runtime.Messaging
             return connection.Features.Get<TFeature>() ?? ThrowMissingFeature();
 
             TFeature ThrowMissingFeature() => throw new InvalidOperationException($"Connection does not have required {typeof(TFeature)} feature.");
+        }
+
+        public static ConnectionMessageSender GetMessageSender(this ConnectionContext connection)
+        {
+            return (ConnectionMessageSender)connection.Items[ConnectionMessageSender.ContextItemKey];
         }
     }
 }

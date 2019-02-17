@@ -1,75 +1,63 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Net;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
-using Orleans.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.Messaging
 {
     internal sealed class ConnectionManager
     {
-        private readonly ConcurrentDictionary<string, TaskCompletionSource<ConnectionMessageSender>> connections
-            = new ConcurrentDictionary<string, TaskCompletionSource<ConnectionMessageSender>>();
+        private readonly ConcurrentDictionary<string, ConnectionMessageSender> connections
+            = new ConcurrentDictionary<string, ConnectionMessageSender>();
         private readonly OutboundConnectionFactory connectionBuilder;
+        private readonly IServiceProvider serviceProvider;
 
-        public ConnectionManager(OutboundConnectionFactory connectionBuilder)
+        public ConnectionManager(OutboundConnectionFactory connectionBuilder, IServiceProvider serviceProvider)
         {
             this.connectionBuilder = connectionBuilder;
+            this.serviceProvider = serviceProvider;
         }
 
         public void Add(string endPoint, ConnectionMessageSender sender)
         {
-            var updated = new TaskCompletionSource<ConnectionMessageSender>();
-            updated.SetResult(sender);
-
             var c = this.connections;
-            TaskCompletionSource<ConnectionMessageSender> existing = default;
-            while (!c.TryAdd(endPoint, updated)
+            ConnectionMessageSender existing = default;
+            while (!c.TryAdd(endPoint, sender)
                 && c.TryGetValue(endPoint, out existing)
-                && !c.TryUpdate(endPoint, updated, existing))
+                && !c.TryUpdate(endPoint, sender, existing))
             {
             }
 
-            if (existing != null && !ReferenceEquals(existing, updated))
+            if (existing != null && !ReferenceEquals(existing, sender))
             {
-                if (existing.TrySetResult(sender)) return;
-                if (existing.Task.Status == TaskStatus.RanToCompletion)
-                {
-                    var e = existing.Task.GetAwaiter().GetResult();
-                    e?.Abort();
-                }
+                existing.Abort();
             }
         }
 
-        public Task<ConnectionMessageSender> GetConnection(string endPoint)
+        public ConnectionMessageSender GetConnection(string endPoint)
         {
             this.connections.TryGetValue(endPoint, out var result);
 
-            // Clean up defunct connections.
-            if (result != null && result.Task.IsCompleted)
-            {
-                var status = result.Task.Status;
-                if (status == TaskStatus.Canceled || status == TaskStatus.Faulted)
-                {
-                    var item = new KeyValuePair<string, TaskCompletionSource<ConnectionMessageSender>>(endPoint, result);
-                    ((IDictionary<string, TaskCompletionSource<ConnectionMessageSender>>)this.connections).Remove(item);
-                    result = default;
-                }
-            }
-
             if (result == null)
             {
-                var tcs = new TaskCompletionSource<ConnectionMessageSender>();
-                result = this.connections.GetOrAdd(endPoint, tcs);
-                if (ReferenceEquals(result, tcs))
+                var sender = ActivatorUtilities.CreateInstance<ConnectionMessageSender>(this.serviceProvider);
+                result = this.connections.GetOrAdd(endPoint, sender);
+
+                if (ReferenceEquals(result, sender))
                 {
-                    Task.Run(async () =>
+                    var additionalItems = new Dictionary<object, object>
+                    {
+                        [ConnectionMessageSender.ContextItemKey] = sender
+                    };
+
+                    var connectionTask = this.connectionBuilder.Connect(endPoint, additionalItems);
+
+                    _ = Task.Run(async () =>
                     {
                         try
                         {
-                            await this.connectionBuilder.ConnectAsync(this, endPoint, tcs);
+                            await connectionTask.ConfigureAwait(false);
                         }
                         catch
                         {
@@ -79,20 +67,17 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-            return result.Task;
+            return result;
         }
 
         public void Remove(string endPoint, ConnectionMessageSender connection = null)
         {
-            if (this.connections.TryGetValue(endPoint, out var tcs))
+            if (this.connections.TryGetValue(endPoint, out var existing))
             {
-                var status = tcs.Task.Status;
-
-                if (status == TaskStatus.RanToCompletion && ReferenceEquals(tcs.Task.GetAwaiter().GetResult(), connection)
-                    || (status == TaskStatus.Canceled || status == TaskStatus.Faulted))
+                if (ReferenceEquals(existing, connection))
                 {
-                    var item = new KeyValuePair<string, TaskCompletionSource<ConnectionMessageSender>>(endPoint, tcs);
-                    ((IDictionary<string, TaskCompletionSource<ConnectionMessageSender>>)this.connections).Remove(item);
+                    var item = new KeyValuePair<string, ConnectionMessageSender>(endPoint, existing);
+                    ((IDictionary<string, ConnectionMessageSender>)this.connections).Remove(item);
                 }
             }
         }
