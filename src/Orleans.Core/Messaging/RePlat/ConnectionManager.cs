@@ -46,12 +46,12 @@ namespace Orleans.Runtime.Messaging
 
                 if (ReferenceEquals(result, sender))
                 {
-                    var additionalItems = new Dictionary<object, object>
-                    {
-                        [ConnectionMessageSender.ContextItemKey] = sender
-                    };
-
-                    var connectionTask = this.connectionBuilder.Connect(endPoint, additionalItems);
+                    var connectionTask = this.connectionBuilder.Connect(
+                        endPoint,
+                        context =>
+                        {
+                            context.Items[ConnectionMessageSender.ContextItemKey] = sender;
+                        });
 
                     _ = Task.Run(async () =>
                     {

@@ -15,9 +15,11 @@ namespace TestClient
 
             var grain = client.GetGrain<TestGrainContracts.IMyHappyLittleKestrelGrain>("rando");
 
-            var message = await grain.SayHelloKestrel("Reuben");
-            Console.WriteLine(message);
-            await Task.Delay(-1);
+            while (true)
+            {
+                var message = await grain.SayHelloKestrel("Reuben");
+                await Task.Delay(1000);
+            }
         }
     }
 }

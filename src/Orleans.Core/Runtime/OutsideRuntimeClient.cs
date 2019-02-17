@@ -82,6 +82,8 @@ namespace Orleans
 
         public IGrainReferenceRuntime GrainReferenceRuntime { get; private set; }
 
+        internal ClientMessageCenter MessageCenter => this.transport;
+
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
         public OutsideRuntimeClient(

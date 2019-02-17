@@ -5,6 +5,7 @@ using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Configuration.Validators;
 using Orleans.Hosting;
+using Orleans.Messaging;
 using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -92,6 +93,10 @@ namespace Orleans
             services.TryAddSingleton<IMessageSerializer, MessageSerializer>();
             services.TryAddSingleton<ConnectionComponentFactory, ClientConnectionComponentFactory>();
             services.TryAddSingleton<OutboundConnectionFactory, ClientOutboundConnectionFactory>();
+            services.TryAddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter);
+            services.TryAddFromExisting<IMessageCenter, ClientMessageCenter>();
+            services.TryAddSingleton(typeof(ISerializer<>), typeof(OrleansSerializer<>));
+            services.TryAddSingleton(typeof(OrleansSerializer<>));
         }
     }
 }

@@ -21,16 +21,17 @@ namespace KestrelTestSilo
         {
             var primary = new IPEndPoint(IPAddress.Loopback, 60666);
             var one = await CreateSilo(primary, 0);
-            var two = await CreateSilo(primary, 1);
-            var three = await CreateSilo(primary, 2);
+           // var two = await CreateSilo(primary, 1);
+           // var three = await CreateSilo(primary, 2);
 
-            var client = two.Services.GetRequiredService<IClusterClient>();
+            await RunClient();
+            /*var client = two.Services.GetRequiredService<IClusterClient>();
             var grain = client.GetGrain<IMyHappyLittleKestrelGrain>("blah");
             while (true)
             {
                 await grain.SayHelloKestrel("tob");
                 await Task.Delay(1000);
-            }
+            }*/
         }
 
         private static async Task<IHost> CreateSilo(IPEndPoint primary, int siloNum)
@@ -75,6 +76,22 @@ namespace KestrelTestSilo
 
             await host.StartAsync();
             return host;
+        }
+
+        static async Task RunClient()
+        {
+            var client = new ClientBuilder()
+                .UseLocalhostClustering(gatewayPort: 60777)
+                .Build();
+            await client.Connect(ex => Task.FromResult(true));
+
+            var grain = client.GetGrain<IMyHappyLittleKestrelGrain>("rando");
+
+            while (true)
+            {
+                var message = await grain.SayHelloKestrel("Reuben");
+                await Task.Delay(1000);
+            }
         }
 
         public class Startup

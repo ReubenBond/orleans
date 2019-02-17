@@ -34,20 +34,21 @@ namespace Benchmarks.Ping
             this.host = CreateSilo(primary, 0).GetAwaiter().GetResult();
             this.two = CreateSilo(primary, 1).GetAwaiter().GetResult();
 
-            /*this.client = new ClientBuilder()
+            this.client = new ClientBuilder()
                 .UseLocalhostClustering(gatewayPort: 60777)
                 .Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev")
                 .Build();
             this.client.Connect(ex => Task.FromResult(true)).GetAwaiter().GetResult();
-            */
+            this.grain = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
 
-            this.client = two.Services.GetRequiredService<IClusterClient>();
+
+            /*this.client = two.Services.GetRequiredService<IClusterClient>();
             int siloPort;
             do
             {
                 this.grain = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
                 siloPort = this.grain.GetSiloPort().GetAwaiter().GetResult();
-            } while (siloPort != 60666);
+            } while (siloPort != 60666);*/
         }
 
         private static async Task<IHost> CreateSilo(IPEndPoint primary, int siloNum)
