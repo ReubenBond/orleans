@@ -304,10 +304,11 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ITimerManager, TimerManagerImpl>();
 
             // Networking
-            services.TryAddSingleton<ConnectionMessageSenderManager>();
-            services.TryAddSingleton<IConnectionFactory, SocketConnectionFactory>();
+            services.TryAddSingleton<ConnectionManager>();
+            services.TryAddSingleton<IOutboundTransportFactory, SocketTransportFactory>();
             services.TryAddSingleton<IMessageSerializer, MessageSerializer>();
             services.TryAddSingleton<ConnectionComponentFactory, SiloConnectionComponentFactory>();
+            services.TryAddSingleton<OutboundConnectionFactory, SiloOutboundConnectionFactory>();
         }
     }
 }

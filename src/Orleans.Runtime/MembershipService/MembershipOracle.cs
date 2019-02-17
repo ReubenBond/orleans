@@ -27,7 +27,8 @@ namespace Orleans.Runtime.MembershipService
 
         private const int NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS = -1; // unlimited
         private const int NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS = -1;
-        private static readonly TimeSpan EXP_BACKOFF_ERROR_MIN = SiloMessageSender.CONNECTION_RETRY_DELAY;
+        private static readonly TimeSpan CONNECTION_RETRY_DELAY = TimeSpan.FromMilliseconds(1000);
+        private static readonly TimeSpan EXP_BACKOFF_ERROR_MIN = CONNECTION_RETRY_DELAY;
         private static readonly TimeSpan EXP_BACKOFF_CONTENTION_MIN = TimeSpan.FromMilliseconds(100);
         private readonly TimeSpan EXP_BACKOFF_ERROR_MAX;
         private readonly TimeSpan EXP_BACKOFF_CONTENTION_MAX; // set based on config
@@ -51,7 +52,7 @@ namespace Orleans.Runtime.MembershipService
             probedSilos = new Dictionary<SiloAddress, int>();
             this.clusterMembershipOptions = clusterMembershipOptions.Value;
             pingCounter = 0;
-            TimeSpan backOffMax = StandardExtensions.Max(EXP_BACKOFF_STEP.Multiply(this.clusterMembershipOptions.ExpectedClusterSize), SiloMessageSender.CONNECTION_RETRY_DELAY.Multiply(2));
+            TimeSpan backOffMax = StandardExtensions.Max(EXP_BACKOFF_STEP.Multiply(this.clusterMembershipOptions.ExpectedClusterSize), CONNECTION_RETRY_DELAY.Multiply(2));
             EXP_BACKOFF_CONTENTION_MAX = backOffMax;
             EXP_BACKOFF_ERROR_MAX = backOffMax;
             timerLogger = this.loggerFactory.CreateLogger<GrainTimer>();

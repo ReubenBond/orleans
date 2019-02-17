@@ -17,7 +17,7 @@ namespace Orleans.Runtime.Messaging
 
         public static IConnectionLifetimeFeature GetLifetime(this ConnectionContext connection) => connection.GetRequiredFeature<IConnectionLifetimeFeature>();
 
-        private static TFeature GetRequiredFeature<TFeature>(this ConnectionContext connection) where TFeature : class
+        public static TFeature GetRequiredFeature<TFeature>(this ConnectionContext connection) where TFeature : class
         {
             return connection.Features.Get<TFeature>() ?? ThrowMissingFeature();
 

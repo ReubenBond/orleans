@@ -48,11 +48,11 @@ namespace Orleans.Runtime.Messaging
         }
     }
 
-    internal class SocketConnectionFactory : IConnectionFactory
+    internal class SocketTransportFactory : IOutboundTransportFactory
     {
         private readonly ILoggerFactory loggerFactory;
 
-        public SocketConnectionFactory(ILoggerFactory loggerFactory)
+        public SocketTransportFactory(ILoggerFactory loggerFactory)
         {
             this.loggerFactory = loggerFactory;
         }

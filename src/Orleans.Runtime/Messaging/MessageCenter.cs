@@ -32,7 +32,7 @@ namespace Orleans.Runtime.Messaging
         private readonly SerializationManager serializationManager;
         private readonly MessageFactory messageFactory;
         private readonly ILoggerFactory loggerFactory;
-        private readonly ConnectionMessageSenderManager senderManager;
+        private readonly ConnectionManager senderManager;
         private readonly ISerializer<Message.HeadersContainer> messageHeadersSerializer;
         private readonly ISerializer<object> objectSerializer;
         private readonly ExecutorService executorService;
@@ -65,7 +65,7 @@ namespace Orleans.Runtime.Messaging
             ExecutorService executorService,
             ILoggerFactory loggerFactory,
             IOptions<StatisticsOptions> statisticsOptions,
-            ConnectionMessageSenderManager senderManager,
+            ConnectionManager senderManager,
             ISerializer<Message.HeadersContainer> messageHeadersSerializer,
             ISerializer<object> objectSerializer)
         {
@@ -315,6 +315,94 @@ namespace Orleans.Runtime.Messaging
         {
             if(log.IsEnabled(LogLevel.Debug)) log.Debug("BlockApplicationMessages");
             IsBlockingApplicationMessages = true;
+        }
+
+        public bool PrepareMessageForSend(Message msg)
+        {
+            // Don't send messages that have already timed out
+            if (msg.IsExpired)
+            {
+                msg.DropExpiredMessage(MessagingStatisticsGroup.Phase.Send);
+                return false;
+            }
+
+            // Fill in the outbound message with our silo address, if it's not already set
+            if (msg.SendingSilo == null)
+                msg.SendingSilo = this.MyAddress;
+
+
+            // If there's no target silo set, then we shouldn't see this message; send it back
+            if (msg.TargetSilo == null)
+            {
+                FailMessage(msg, "No target silo provided -- internal error");
+                return false;
+            }
+
+            // If we know this silo is dead, don't bother
+            if ((this.SiloDeadOracle != null) && this.SiloDeadOracle(msg.TargetSilo))
+            {
+                FailMessage(msg, String.Format("Target {0} silo is known to be dead", msg.TargetSilo.ToLongString()));
+                return false;
+            }
+            
+            return true;
+        }
+
+        public void FailMessage(Message msg, string reason)
+        {
+            MessagingStatisticsGroup.OnFailedSentMessage(msg);
+            if (msg.Direction == Message.Directions.Request)
+            {
+                if (this.log.IsEnabled(LogLevel.Debug)) this.log.Debug(ErrorCode.MessagingSendingRejection, "Silo {siloAddress} is rejecting message: {message}. Reason = {reason}", this.MyAddress, msg, reason);
+                // Done retrying, send back an error instead
+                this.SendRejection(msg, Message.RejectionTypes.Transient, String.Format("Silo {0} is rejecting message: {1}. Reason = {2}", this.MyAddress, msg, reason));
+            }
+            else
+            {
+                this.log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Silo {siloAddress} is dropping message: {message}. Reason = {reason}", this.MyAddress, msg, reason);
+                MessagingStatisticsGroup.OnDroppedSentMessage(msg);
+            }
+        }
+
+        public void OnMessageSerializationFailure(Message msg, Exception exc)
+        {
+            // we only get here if we failed to serialize the msg (or any other catastrophic failure).
+            // Request msg fails to serialize on the sending silo, so we just enqueue a rejection msg.
+            // Response msg fails to serialize on the responding silo, so we try to send an error response back.
+            this.log.LogWarning(
+                (int)ErrorCode.MessagingUnexpectedSendError,
+                "Unexpected error serializing message {Message}: {Exception}",
+                msg,
+                exc);
+
+            MessagingStatisticsGroup.OnFailedSentMessage(msg);
+
+            var retryCount = msg.RetryCount ?? 0;
+
+            if (msg.Direction == Message.Directions.Request)
+            {
+                this.SendRejection(msg, Message.RejectionTypes.Unrecoverable, exc.ToString());
+            }
+            else if (msg.Direction == Message.Directions.Response && retryCount < 1)
+            {
+                // if we failed sending an original response, turn the response body into an error and reply with it.
+                // unless we have already tried sending the response multiple times.
+                msg.Result = Message.ResponseTypes.Error;
+                msg.BodyObject = Response.ExceptionResponse(exc);
+                msg.RetryCount = retryCount + 1;
+                this.SendMessage(msg);
+            }
+            else
+            {
+                this.log.LogWarning(
+                    (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
+                    "Silo {SiloAddress} is dropping message which failed during serialization: {Message}. Exception = {Exception}",
+                    this.MyAddress,
+                    msg,
+                    exc);
+
+                MessagingStatisticsGroup.OnDroppedSentMessage(msg);
+            }
         }
     }
 }

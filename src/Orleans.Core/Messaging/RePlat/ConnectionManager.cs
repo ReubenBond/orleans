@@ -4,33 +4,19 @@ using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class ConnectionMessageSenderManager
+    internal sealed class ConnectionManager
     {
         private readonly ConcurrentDictionary<string, TaskCompletionSource<ConnectionMessageSender>> connections
             = new ConcurrentDictionary<string, TaskCompletionSource<ConnectionMessageSender>>();
-        private readonly IConnectionFactory connectionFactory;
-        private readonly Lazy<ConnectionDelegate> connectionDelegate;
+        private readonly OutboundConnectionFactory connectionBuilder;
 
-        public ConnectionMessageSenderManager(IConnectionFactory connectionFactory, IServiceProvider serviceProvider, IOptions<ConnectionOptions> connectionOptions)
+        public ConnectionManager(OutboundConnectionFactory connectionBuilder)
         {
-            this.connectionFactory = connectionFactory;
-            this.connectionDelegate = new Lazy<ConnectionDelegate>(() => this.CreateOutboundConnectionDelegate(serviceProvider, connectionOptions.Value), isThreadSafe: false);
-        }
-
-        private ConnectionDelegate CreateOutboundConnectionDelegate(
-            IServiceProvider serviceProvider,
-            ConnectionOptions endpointOptions)
-        {
-            // Configure the connection builder using the user-defined options.
-            var connectionBuilder = new ConnectionBuilder(serviceProvider);
-            endpointOptions.ConfigureConnectionBuilder(connectionBuilder);
-            connectionBuilder.UseOrleansOutboundSiloConnectionHandler();
-            return connectionBuilder.Build();
+            this.connectionBuilder = connectionBuilder;
         }
 
         public void Add(string endPoint, ConnectionMessageSender sender)
@@ -79,7 +65,17 @@ namespace Orleans.Runtime.Messaging
                 result = this.connections.GetOrAdd(endPoint, tcs);
                 if (ReferenceEquals(result, tcs))
                 {
-                    Task.Run(() => this.ConnectAsync(endPoint, tcs));
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await this.connectionBuilder.ConnectAsync(this, endPoint, tcs);
+                        }
+                        catch
+                        {
+                            this.Remove(endPoint, null);
+                        }
+                    });
                 }
             }
 
@@ -98,47 +94,6 @@ namespace Orleans.Runtime.Messaging
                     var item = new KeyValuePair<string, TaskCompletionSource<ConnectionMessageSender>>(endPoint, tcs);
                     ((IDictionary<string, TaskCompletionSource<ConnectionMessageSender>>)this.connections).Remove(item);
                 }
-            }
-        }
-
-        private async Task ConnectAsync(string endPoint, TaskCompletionSource<ConnectionMessageSender> completion)
-        {
-            try
-            {
-                var context = await this.connectionFactory.Connect(endPoint);
-                var middlewareTask = this.connectionDelegate.Value(context);
-                var sender = context.Features.Get<ConnectionMessageSender>();
-                if (sender == null)
-                {
-                    var exception = new ConnectionAbortedException($"Connection does not have the required {nameof(ConnectionMessageSender)} feature");
-                    context.Abort(exception);
-                    throw exception;
-                }
-
-                Task.Run(async () =>
-                {
-                    try
-                    {
-                        await middlewareTask.ConfigureAwait(false);
-                    }
-                    finally
-                    {
-                        // Remove the defunct connection.
-                        context.Abort();
-                        this.connections.TryUpdate(endPoint, new TaskCompletionSource<ConnectionMessageSender>(), completion);
-                    }
-                }).Ignore();
-
-                completion.TrySetResult(sender);
-            }
-            catch (Exception exception)
-            {
-                completion.TrySetException(exception);
-                this.Remove(endPoint, null);
-            }
-            finally
-            {
-                completion.TrySetCanceled();
             }
         }
     }

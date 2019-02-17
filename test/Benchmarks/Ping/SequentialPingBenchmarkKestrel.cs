@@ -47,7 +47,7 @@ namespace Benchmarks.Ping
             {
                 this.grain = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
                 siloPort = this.grain.GetSiloPort().GetAwaiter().GetResult();
-            } while (siloPort != 60667);
+            } while (siloPort != 60666);
         }
 
         private static async Task<IHost> CreateSilo(IPEndPoint primary, int siloNum)

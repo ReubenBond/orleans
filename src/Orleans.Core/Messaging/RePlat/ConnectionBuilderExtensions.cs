@@ -38,7 +38,7 @@ namespace Orleans.Runtime.Messaging
             return builder.Use(_ =>
             {
                 var serviceProvider = builder.ApplicationServices;
-                var connectionManager = serviceProvider.GetRequiredService<ConnectionMessageSenderManager>();
+                var connectionManager = serviceProvider.GetRequiredService<ConnectionManager>();
                 var components = serviceProvider.GetRequiredService<ConnectionComponentFactory>();
                 
                 return async (ConnectionContext connection) =>

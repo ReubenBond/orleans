@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Messaging
     internal sealed class OutboundMessageQueue : IDisposable
     {
         private readonly MessageCenter messageCenter;
-        private readonly ConnectionMessageSenderManager senderManager;
+        private readonly ConnectionManager senderManager;
         private readonly ILogger logger;
         private bool stopped;
 
@@ -33,7 +33,7 @@ namespace Orleans.Runtime.Messaging
         internal OutboundMessageQueue(
             MessageCenter mc,
             ILogger<OutboundMessageQueue> logger,
-            ConnectionMessageSenderManager senderManager)
+            ConnectionManager senderManager)
         {
             messageCenter = mc;
             this.senderManager = senderManager;

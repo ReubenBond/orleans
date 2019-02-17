@@ -87,10 +87,11 @@ namespace Orleans
             services.AddTransient<IConfigurationValidator, ClientClusteringValidator>();
 
             // Networking
-            services.TryAddSingleton<ConnectionMessageSenderManager>();
-            services.TryAddSingleton<IConnectionFactory, SocketConnectionFactory>();
+            services.TryAddSingleton<ConnectionManager>();
+            services.TryAddSingleton<IOutboundTransportFactory, SocketTransportFactory>();
             services.TryAddSingleton<IMessageSerializer, MessageSerializer>();
             services.TryAddSingleton<ConnectionComponentFactory, ClientConnectionComponentFactory>();
+            services.TryAddSingleton<OutboundConnectionFactory, ClientOutboundConnectionFactory>();
         }
     }
 }
