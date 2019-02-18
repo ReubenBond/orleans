@@ -454,7 +454,7 @@ namespace Orleans
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resend {0}", message);
 
             message.ResendCount = message.ResendCount + 1;
-            message.TargetHistory = message.GetTargetHistory();
+           // message.TargetHistory = message.GetTargetHistory();
 
             if (!message.TargetGrain.IsSystemTarget)
             {
