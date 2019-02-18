@@ -74,12 +74,12 @@ namespace Orleans.Serialization
         private readonly ConcurrentDictionary<Type, IExternalSerializer> typeToExternalSerializerDictionary;
         private readonly CachedReadConcurrentDictionary<string, Type> types;
         private readonly Dictionary<string, string> typeKeysToQualifiedNames = new Dictionary<string, string>();
-        private readonly Dictionary<RuntimeTypeHandle, DeepCopier> copiers;
-        private readonly Dictionary<RuntimeTypeHandle, Serializer> serializers;
+        private readonly Dictionary<Type, DeepCopier> copiers;
+        private readonly Dictionary<Type, Serializer> serializers;
 
         private readonly CachedReadConcurrentDictionary<Type, IKeyedSerializer> typeToKeyedSerializer =
             new CachedReadConcurrentDictionary<Type, IKeyedSerializer>();
-        private readonly Dictionary<RuntimeTypeHandle, Deserializer> deserializers;
+        private readonly Dictionary<Type, Deserializer> deserializers;
         private readonly ConcurrentDictionary<Type, Func<GrainReference, GrainReference>> grainRefConstructorDictionary;
 
         private readonly IExternalSerializer fallbackSerializer;
@@ -137,9 +137,9 @@ namespace Orleans.Serialization
             externalSerializers = new List<IExternalSerializer>();
             typeToExternalSerializerDictionary = new ConcurrentDictionary<Type, IExternalSerializer>();
             types = new CachedReadConcurrentDictionary<string, Type>();
-            copiers = new Dictionary<RuntimeTypeHandle, DeepCopier>();
-            serializers = new Dictionary<RuntimeTypeHandle, Serializer>();
-            deserializers = new Dictionary<RuntimeTypeHandle, Deserializer>();
+            copiers = new Dictionary<Type, DeepCopier>();
+            serializers = new Dictionary<Type, Serializer>();
+            deserializers = new Dictionary<Type, Deserializer>();
             grainRefConstructorDictionary = new ConcurrentDictionary<Type, Func<GrainReference, GrainReference>>();
 
             var options = serializationProviderOptions.Value;
@@ -254,9 +254,9 @@ namespace Orleans.Serialization
                         lock (copiers)
                         {
                             DeepCopier current;
-                            if (forceOverride || !copiers.TryGetValue(t.TypeHandle, out current) || (current == null))
+                            if (forceOverride || !copiers.TryGetValue(t, out current) || (current == null))
                             {
-                                copiers[t.TypeHandle] = cop;
+                                copiers[t] = cop;
                             }
                         }
                     }
@@ -265,17 +265,17 @@ namespace Orleans.Serialization
                         lock (serializers)
                         {
                             Serializer currentSer;
-                            if (forceOverride || !serializers.TryGetValue(t.TypeHandle, out currentSer) || (currentSer == null))
+                            if (forceOverride || !serializers.TryGetValue(t, out currentSer) || (currentSer == null))
                             {
-                                serializers[t.TypeHandle] = ser;
+                                serializers[t] = ser;
                             }
                         }
                         lock (deserializers)
                         {
                             Deserializer currentDeser;
-                            if (forceOverride || !deserializers.TryGetValue(t.TypeHandle, out currentDeser) || (currentDeser == null))
+                            if (forceOverride || !deserializers.TryGetValue(t, out currentDeser) || (currentDeser == null))
                             {
-                                deserializers[t.TypeHandle] = deser;
+                                deserializers[t] = deser;
                             }
                         }
                     }
@@ -289,21 +289,21 @@ namespace Orleans.Serialization
                     {
                         lock (copiers)
                         {
-                            copiers[t.TypeHandle] = cop;
+                            copiers[t] = cop;
                         }
                     }
                     if (ser != null)
                     {
                         lock (serializers)
                         {
-                            serializers[t.TypeHandle] = ser;
+                            serializers[t] = ser;
                         }
                     }
                     if (deser != null)
                     {
                         lock (deserializers)
                         {
-                            deserializers[t.TypeHandle] = deser;
+                            deserializers[t] = deser;
                         }
                     }
 
@@ -597,10 +597,10 @@ namespace Orleans.Serialization
             lock (copiers)
             {
                 DeepCopier copier;
-                if (copiers.TryGetValue(t.TypeHandle, out copier))
+                if (copiers.TryGetValue(t, out copier))
                     return copier;
 
-                if (t.IsGenericType && this.copiers.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out copier))
+                if (t.IsGenericType && this.copiers.TryGetValue(t.GetGenericTypeDefinition(), out copier))
                     return copier;
             }
 
@@ -816,11 +816,11 @@ namespace Orleans.Serialization
             lock (serializers)
             {
                 Serializer ser;
-                if (serializers.TryGetValue(t.TypeHandle, out ser)) return true;
+                if (serializers.TryGetValue(t, out ser)) return true;
                 if (t.IsOrleansPrimitive()) return true;
                 if (!t.IsGenericType) return false;
                 var genericTypeDefinition = t.GetGenericTypeDefinition();
-                return this.serializers.TryGetValue(genericTypeDefinition.TypeHandle, out ser) &&
+                return this.serializers.TryGetValue(genericTypeDefinition, out ser) &&
                        t.GetGenericArguments().All(type => this.HasSerializer(type));
             }
         }
@@ -830,11 +830,11 @@ namespace Orleans.Serialization
             lock (serializers)
             {
                 Serializer ser;
-                if (serializers.TryGetValue(t.TypeHandle, out ser))
+                if (serializers.TryGetValue(t, out ser))
                     return ser;
 
                 if (t.IsGenericType)
-                    if (this.serializers.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out ser))
+                    if (this.serializers.TryGetValue(t.GetGenericTypeDefinition(), out ser))
                         return ser;
             }
 
@@ -1506,7 +1506,7 @@ namespace Orleans.Serialization
 
             lock (deserializers)
             {
-                if (deserializers.TryGetValue(t.TypeHandle, out deser))
+                if (deserializers.TryGetValue(t, out deser))
                     return deser;
             }
 
@@ -1514,7 +1514,7 @@ namespace Orleans.Serialization
             {
                 lock (deserializers)
                 {
-                    if (deserializers.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out deser))
+                    if (deserializers.TryGetValue(t.GetGenericTypeDefinition(), out deser))
                         return deser;
                 }
             }
@@ -1788,23 +1788,23 @@ namespace Orleans.Serialization
             foreach (var name in types.Keys.OrderBy(k => k))
             {
                 var line = new StringBuilder();
-                RuntimeTypeHandle typeHandle = types[name].TypeHandle;
+                var type = types[name];
                 bool discardLine = true;
 
                 line.Append("    - ");
                 line.Append(name);
                 line.Append(" :");
-                if (copiers.ContainsKey(typeHandle))
+                if (copiers.ContainsKey(type))
                 {
                     line.Append(" copier");
                     discardLine = false;
                 }
-                if (deserializers.ContainsKey(typeHandle))
+                if (deserializers.ContainsKey(type))
                 {
                     line.Append(" deserializer");
                     discardLine = false;
                 }
-                if (serializers.ContainsKey(typeHandle))
+                if (serializers.ContainsKey(type))
                 {
                     line.Append(" serializer");
                     discardLine = false;

@@ -90,13 +90,13 @@ namespace Orleans
             // Networking
             services.TryAddSingleton<ConnectionManager>();
             services.TryAddSingleton<IOutboundTransportFactory, SocketTransportFactory>();
-            services.TryAddSingleton<IMessageSerializer, MessageSerializer>();
+            services.TryAddTransient<IMessageSerializer, MessageSerializer>();
             services.TryAddSingleton<ConnectionComponentFactory, ClientConnectionComponentFactory>();
             services.TryAddSingleton<OutboundConnectionFactory, ClientOutboundConnectionFactory>();
             services.TryAddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter);
             services.TryAddFromExisting<IMessageCenter, ClientMessageCenter>();
-            services.TryAddSingleton(typeof(ISerializer<>), typeof(OrleansSerializer<>));
-            services.TryAddSingleton(typeof(OrleansSerializer<>));
+            services.TryAddTransient(typeof(ISerializer<>), typeof(OrleansSerializer<>));
+            services.TryAddTransient(typeof(OrleansSerializer<>));
         }
     }
 }

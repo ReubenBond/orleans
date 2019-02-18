@@ -65,6 +65,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+            SetRecommendedClientOptions(socket);
             var completion = new SingleUseSocketAsyncEventArgs
             {
                 RemoteEndPoint = remoteEndPoint
@@ -83,7 +84,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             var connection = new SocketConnection(socket, MemoryPool<byte>.Shared, PipeScheduler.Inline, this.loggerFactory.CreateLogger<SocketConnection>());
-            var pair = DuplexPipe.CreateConnectionPair(GetPipeOptions(), GetPipeOptions());
+            var pair = DuplexPipe.CreateConnectionPair(GetPipeOptions(PipeScheduler.ThreadPool, connection.InputWriterScheduler), GetPipeOptions(connection.OutputReaderScheduler, PipeScheduler.ThreadPool));
             connection.Application = pair.Application;
             connection.Transport = pair.Transport;
             Task.Run(async () =>
@@ -100,10 +101,50 @@ namespace Orleans.Runtime.Messaging
             return connection;
         }
 
-        internal static PipeOptions GetPipeOptions() => new PipeOptions(
+        /// <param name="socket">The socket to set options against</param>
+        public static void SetRecommendedClientOptions(Socket socket)
+        {
+            if (socket.AddressFamily == AddressFamily.Unix) return;
+
+            try { socket.NoDelay = true; } catch { }
+
+            try { SetFastLoopbackOption(socket); } catch { }
+            void SetFastLoopbackOption(Socket s)
+            {
+                // SIO_LOOPBACK_FAST_PATH (https://msdn.microsoft.com/en-us/library/windows/desktop/jj841212%28v=vs.85%29.aspx)
+                // Speeds up localhost operations significantly. OK to apply to a socket that will not be hooked up to localhost,
+                // or will be subject to WFP filtering.
+                const int SIO_LOOPBACK_FAST_PATH = -1744830448;
+
+                // windows only
+                if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+                {
+                    // Win8/Server2012+ only
+                    var osVersion = Environment.OSVersion.Version;
+                    if (osVersion.Major > 6 || (osVersion.Major == 6 && osVersion.Minor >= 2))
+                    {
+                        byte[] optionInValue = BitConverter.GetBytes(1);
+                        s.IOControl(SIO_LOOPBACK_FAST_PATH, optionInValue, null);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Set recommended socket options for server sockets
+        /// </summary>
+        /// <param name="socket">The socket to set options against</param>
+        public static void SetRecommendedServerOptions(Socket socket)
+        {
+            if (socket.AddressFamily == AddressFamily.Unix) return;
+
+            try { socket.NoDelay = true; } catch { }
+        }
+
+        internal static PipeOptions GetPipeOptions(PipeScheduler readerScheduler, PipeScheduler writerScheduler) => new PipeOptions(
             pool: MemoryPool<byte>.Shared,
-            readerScheduler: PipeScheduler.Inline,
-            writerScheduler: PipeScheduler.Inline,
+            readerScheduler: readerScheduler,
+            writerScheduler: writerScheduler,
             pauseWriterThreshold: 0,
             resumeWriterThreshold: 0,
             useSynchronizationContext: false,

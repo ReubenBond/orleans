@@ -228,8 +228,6 @@ namespace Orleans.Hosting
             // Serialization
             services.TryAddSingleton<SerializationManager>(sp=>ActivatorUtilities.CreateInstance<SerializationManager>(sp,
                 sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.LargeMessageWarningThreshold));
-            services.TryAddSingleton(typeof(ISerializer<>), typeof(OrleansSerializer<>));
-            services.TryAddSingleton(typeof(OrleansSerializer<>));
             services.TryAddSingleton<ITypeResolver, CachedTypeResolver>();
             services.TryAddSingleton<IFieldUtils, FieldUtils>();
             services.AddSingleton<BinaryFormatterSerializer>();
@@ -306,9 +304,11 @@ namespace Orleans.Hosting
             // Networking
             services.TryAddSingleton<ConnectionManager>();
             services.TryAddSingleton<IOutboundTransportFactory, SocketTransportFactory>();
-            services.TryAddSingleton<IMessageSerializer, MessageSerializer>();
+            services.TryAddTransient<IMessageSerializer, MessageSerializer>();
             services.TryAddSingleton<ConnectionComponentFactory, SiloConnectionComponentFactory>();
             services.TryAddSingleton<OutboundConnectionFactory, SiloOutboundConnectionFactory>();
+            services.TryAddTransient(typeof(ISerializer<>), typeof(OrleansSerializer<>));
+            services.TryAddTransient(typeof(OrleansSerializer<>));
         }
     }
 }

@@ -70,7 +70,7 @@ namespace Orleans.Runtime.Messaging
         public void Write<TBufferWriter>(ref TBufferWriter writer, Message message) where TBufferWriter : IBufferWriter<byte>
         {
             var lengthFields = new byte[8];
-            var buffer = new PrefixingBufferWriter<byte, TBufferWriter>(writer, 8, 2048);
+            var buffer = new PrefixingBufferWriter<byte, TBufferWriter>(writer, 8, 10240);
             this.messageHeadersSerializer.Serialize(buffer, message.Headers);
             var headerLength = buffer.CommittedBytes;
 
@@ -145,13 +145,16 @@ namespace Orleans.Runtime.Messaging
         {
             if (prefixSize <= 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(prefixSize));
+                ThrowPrefixSize();
             }
 
             this.innerWriter = innerWriter;
-            if (innerWriter is null) throw new ArgumentNullException(nameof(innerWriter));
+            if (innerWriter is null) ThrowInnerWriter();
             this.expectedPrefixSize = prefixSize;
             this.payloadSizeHint = payloadSizeHint;
+
+            void ThrowPrefixSize() => throw new ArgumentOutOfRangeException(nameof(prefixSize));
+            void ThrowInnerWriter() => throw new ArgumentNullException(nameof(innerWriter));
         }
 
         public int CommittedBytes { get; private set; }
@@ -219,7 +222,8 @@ namespace Orleans.Runtime.Messaging
         {
             if (prefix.Length != this.expectedPrefixSize)
             {
-                throw new ArgumentOutOfRangeException(nameof(prefix), "Prefix was not expected length.");
+                ThrowPrefixLength();
+                void ThrowPrefixLength() => throw new ArgumentOutOfRangeException(nameof(prefix), "Prefix was not expected length.");
             }
 
             if (this.prefixMemory.Length == 0)
@@ -346,10 +350,12 @@ namespace Orleans.Runtime.Messaging
                 current = current.Next;
             }
 
-            Requires.Argument(current != null, nameof(position), "Position does not represent a valid position in this sequence.");
+            if (current == null) RequireCurrentNotNull();
+            void RequireCurrentNotNull() => Requires.Argument(current != null, nameof(position), "Position does not represent a valid position in this sequence.");
 
             // Also confirm that the position is not a prior position in the block.
-            Requires.Argument(firstIndex >= current.Start, nameof(position), "Position must not be earlier than current position.");
+            if (firstIndex > current.Start) RequireFirstGreaterThanStart();
+            void RequireFirstGreaterThanStart() => Requires.Argument(firstIndex >= current.Start, nameof(position), "Position must not be earlier than current position.");
 
             // Now repeat the loop, performing the mutations.
             current = this.first;
