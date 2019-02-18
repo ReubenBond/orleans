@@ -18,7 +18,7 @@ namespace Orleans.Serialization
     /// <summary>
     /// Reader for Orleans binary token streams
     /// </summary>
-    public class BinaryTokenStreamReader2 : IBinaryTokenStreamReader
+    public sealed class BinaryTokenStreamReader2 : IBinaryTokenStreamReader
     {
         // ReSharper disable FieldCanBeMadeReadOnly.Local
         private ReadOnlySequence<byte> input;
@@ -30,7 +30,11 @@ namespace Orleans.Serialization
         private int bufferSize;
         private long previousBuffersSize;
 
-        public BinaryTokenStreamReader2(ReadOnlySequence<byte> input)
+        public BinaryTokenStreamReader2()
+        {
+        }
+
+        public void Reset(ref ReadOnlySequence<byte> input)
         {
             this.input = input;
             this.nextSequencePosition = input.Start;
@@ -71,7 +75,13 @@ namespace Orleans.Serialization
         /// <summary>
         /// Creates a new reader beginning at the specified position.
         /// </summary>
-        public BinaryTokenStreamReader2 ForkFrom(long position) => new BinaryTokenStreamReader2(this.input.Slice(position));
+        public BinaryTokenStreamReader2 ForkFrom(long position)
+        {
+            var result = new BinaryTokenStreamReader2();
+            var sliced = this.input.Slice(position);
+            result.Reset(ref sliced);
+            return result;
+        }   
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void MoveNext()
@@ -409,7 +419,9 @@ namespace Orleans.Serialization
         
         public IBinaryTokenStreamReader Copy()
         {
-            return new BinaryTokenStreamReader2(this.input);
+            var result = new BinaryTokenStreamReader2();
+            result.Reset(ref this.input);
+            return result;
         }
 
         public int ReadInt() => this.ReadInt32();

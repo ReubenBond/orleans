@@ -107,9 +107,9 @@ namespace Orleans.Serialization
                 return null;
             }
 
-            using (var buffer = new MultiSegmentBufferWriter())
+            using (var buffer = new ArrayBufferWriter())
             {
-                var writer = new BinaryTokenStreamWriter2<MultiSegmentBufferWriter>(buffer);
+                var writer = new BinaryTokenStreamWriter2<ArrayBufferWriter>(buffer);
                 var serializationContext = new SerializationContext(context.GetSerializationManager())
                 {
                     StreamWriter = writer
@@ -120,7 +120,7 @@ namespace Orleans.Serialization
 
                 var deserializationContext = new DeserializationContext(context.GetSerializationManager())
                 {
-                    StreamReader = new BinaryTokenStreamReader(buffer.Committed)
+                    StreamReader = new BinaryTokenStreamReader(buffer.Formatted)
                 };
 
                 var retVal = Deserialize(source.GetType(), deserializationContext);

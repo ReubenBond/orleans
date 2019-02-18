@@ -95,9 +95,9 @@ namespace Orleans.Serialization
 
             // Create a nested context which will be written to the outer context at an int-length offset from the current position.
             // This is because the inner context will be copied with a length prefix to the outer context.
-            using (var buffer = new MultiSegmentBufferWriter())
+            using (var buffer = new ArrayBufferWriter())
             {
-                var innerWriter = new BinaryTokenStreamWriter2<MultiSegmentBufferWriter>(buffer);
+                var innerWriter = new BinaryTokenStreamWriter2<ArrayBufferWriter>(buffer);
                 var innerContext = outerContext.CreateNestedContext(position: outerContext.CurrentOffset + sizeof(int), writer: innerWriter);
 
                 // Serialize the exception itself.
@@ -107,7 +107,7 @@ namespace Orleans.Serialization
 
                 // Write the serialized exception to the output stream.
                 outerContext.StreamWriter.Write(innerContext.StreamWriter.CurrentOffset);
-                outerContext.StreamWriter.Write(buffer.Committed);
+                outerContext.StreamWriter.Write(buffer.ToArray());
             }
         }
 
@@ -190,9 +190,9 @@ namespace Orleans.Serialization
 
             // Create a nested context which will be written to the outer context at an int-length offset from the current position.
             // This is because the inner context will be copied with a length prefix to the outer context.
-            using (var buffer = new MultiSegmentBufferWriter())
+            using (var buffer = new ArrayBufferWriter())
             {
-                var innerWriter = new BinaryTokenStreamWriter2<MultiSegmentBufferWriter>(buffer);
+                var innerWriter = new BinaryTokenStreamWriter2<ArrayBufferWriter>(buffer);
                 var innerContext = outerContext.CreateNestedContext(sizeof(int), innerWriter);
 
                 // Serialize the only accepted fields from the base Exception class.
@@ -202,7 +202,7 @@ namespace Orleans.Serialization
                 // Write the length of the serialized exception, then write the serialized bytes.
                 var additionalDataLength = fallbackException.AdditionalData?.Length ?? 0;
                 outerWriter.Write(innerContext.StreamWriter.CurrentOffset + additionalDataLength);
-                outerWriter.Write(buffer.Committed);
+                outerWriter.Write(buffer.ToArray());
 
                 if (additionalDataLength > 0)
                 {

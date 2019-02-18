@@ -15,121 +15,6 @@ using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
-
-    // NOTE: This is broken - do not use it.
-    public sealed class MultiSegmentBufferWriter : IBufferWriter<byte>, IDisposable
-    {
-        private static readonly ArraySegment<byte> EmptySegment = new ArraySegment<byte>(Array.Empty<byte>(), 0, 0);
-        private readonly int maxAllocationSize;
-        private readonly int segmentStartIndex;
-        private ArraySegment<byte> current = EmptySegment;
-
-        public MultiSegmentBufferWriter(int maxAllocationSize, List<ArraySegment<byte>> bufferList)
-        {
-            this.segmentStartIndex = bufferList.Count;
-            this.Committed = bufferList;
-            this.maxAllocationSize = maxAllocationSize;
-        }
-
-        public MultiSegmentBufferWriter(int maxAllocationSize = int.MaxValue)
-        {
-            this.segmentStartIndex = 0;
-            this.Committed = new List<ArraySegment<byte>>();
-            this.maxAllocationSize = maxAllocationSize;
-        }
-
-        public List<ArraySegment<byte>> Committed { get; }
-        public int CommitedByteCount { get; private set; }
-
-        public List<ArraySegment<byte>> ExpensiveGetOwned => this.Committed.Skip(this.segmentStartIndex).ToList();
-
-        public void Advance(int bytes)
-        {
-            if (bytes == 0)
-            {
-                return;
-            }
-
-            if (bytes > this.current.Count)
-            {
-                ThrowAdvancedPastSegment();
-            }
-
-            var last = this.Committed.Count - 1;
-            ArraySegment<byte> lastSegment;
-            if (last >= 0 && ReferenceEquals((lastSegment = this.Committed[last]).Array, this.current.Array))
-            {
-                // Extend the existing committed segment.
-                this.Committed[last] = new ArraySegment<byte>(lastSegment.Array, lastSegment.Offset, lastSegment.Count + bytes);
-                this.current = new ArraySegment<byte>(lastSegment.Array, lastSegment.Offset + bytes, lastSegment.Count - bytes);
-            }
-            else
-            {
-                // Append a new segment.
-                this.Committed.Add(new ArraySegment<byte>(this.current.Array, this.current.Offset, bytes));
-                this.current = EmptySegment;
-            }
-
-            this.CommitedByteCount += bytes;
-        }
-
-        public Memory<byte> GetMemory(int sizeHint = 0)
-        {
-            if (sizeHint == 0)
-            {
-                sizeHint = this.current.Count + 1;
-            }
-            else if (sizeHint < this.current.Count) ThrowSufficientSpace();
-
-            var newBuffer = ArrayPool<byte>.Shared.Rent(Math.Min(sizeHint, this.maxAllocationSize));
-            this.current.AsSpan().CopyTo(newBuffer.AsSpan());
-            if (this.current != null && this.current.Count > 0) ArrayPool<byte>.Shared.Return(this.current.Array);
-            this.current = new ArraySegment<byte>(newBuffer, 0, newBuffer.Length);
-            return this.current;
-        }
-
-        public Span<byte> GetSpan(int sizeHint)
-        {
-            if (sizeHint == 0)
-            {
-                sizeHint = this.current.Count + 1;
-            }
-            else if (sizeHint < this.current.Count) ThrowSufficientSpace();
-
-            var newBuffer = ArrayPool<byte>.Shared.Rent(Math.Min(sizeHint, this.maxAllocationSize));
-            this.current.AsSpan().CopyTo(newBuffer.AsSpan());
-            if (this.current != null && this.current.Count > 0) ArrayPool<byte>.Shared.Return(this.current.Array);
-            this.current = new ArraySegment<byte>(newBuffer, 0, newBuffer.Length);
-            return this.current;
-        }
-
-        private static void ThrowSufficientSpace() => throw new InvalidOperationException("Attempted to allocate a new buffer when the existing buffer has sufficient free space.");
-
-        private static void ThrowAdvancedPastSegment() => throw new InvalidOperationException("Attempted to advance past the end of the current segment.");
-
-        public void Dispose()
-        {
-            var last = this.Committed.Count - 1;
-            ArraySegment<byte> lastSegment;
-            if (last == 0 || !ReferenceEquals((lastSegment = this.Committed[last]).Array, this.current.Array))
-            {
-                // The last segment was not committed, so it needs to be handled separately to the committed segments.
-                if (lastSegment.Count > 0)
-                {
-                    ArrayPool<byte>.Shared.Return(lastSegment.Array);
-                }
-            }
-
-            for (var i = this.segmentStartIndex; i < this.Committed.Count; i++)
-            {
-                ArrayPool<byte>.Shared.Return(this.Committed[i].Array);
-            }
-
-            this.current = EmptySegment;
-            this.Committed.Clear();
-        }
-    }
-
     internal sealed class MemoryBufferWriter : IDisposable, IBufferWriter<byte>
     {
         private readonly int _minimumSegmentSize;
@@ -704,6 +589,11 @@ namespace Orleans.Serialization
             this.currentBuffer = output.GetMemory();
             this.currentOffset = default;
             this.completedLength = default;
+        }
+
+        public void Reset(TBufferWriter output)
+        {
+
         }
 
         /// <summary> Current write position in the stream. </summary>
