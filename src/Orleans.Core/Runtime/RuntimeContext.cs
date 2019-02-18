@@ -37,7 +37,7 @@ namespace Orleans.Runtime
 
         internal static void SetExecutionContext(ISchedulingContext shedContext)
         {
-            if (context == null) throw new InvalidOperationException("SetExecutionContext called on unexpected non-WorkerPool thread");
+            if (context == null) InitializeThread();
             context.ActivationContext = shedContext;
         }
 

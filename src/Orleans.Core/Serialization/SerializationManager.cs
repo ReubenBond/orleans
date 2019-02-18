@@ -29,6 +29,7 @@ namespace Orleans.Serialization
     public sealed class OrleansSerializer<T> : ISerializer<T>
     {
         private readonly SerializationManager serializationManager;
+        private readonly BinaryTokenStreamReader2 reader = new BinaryTokenStreamReader2();
 
         public OrleansSerializer(SerializationManager serializationManager)
         {
@@ -37,7 +38,7 @@ namespace Orleans.Serialization
 
         public void Deserialize(ReadOnlySequence<byte> input, out T value)
         {
-            var reader = new BinaryTokenStreamReader2(input);
+            reader.Reset(ref input);
             value = this.serializationManager.Deserialize<T>(reader);
         }
 
@@ -46,19 +47,6 @@ namespace Orleans.Serialization
             var writer = new BinaryTokenStreamWriter2<TBufferWriter>(output);
             this.serializationManager.Serialize(value, writer);
             writer.Commit();
-
-            /*if (output is MultiSegmentBufferWriter multiSegment)
-            {
-                try
-                {
-                    var input = new BinaryTokenStreamReader2(ReadOnlySequenceHelper.CreateReadOnlySequence(multiSegment.ExpensiveGetOwned, 0, multiSegment.CommitedByteCount));
-                    var roundTripped = this.serializationManager.Deserialize<T>(input);
-                }
-                catch (Exception exception)
-                {
-                    Debug.WriteLine(exception);
-                }
-            }*/
         }
     }
 
