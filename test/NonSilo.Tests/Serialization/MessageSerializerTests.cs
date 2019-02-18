@@ -70,29 +70,18 @@ namespace UnitTests.Serialization
             var segments = new List<ArraySegment<byte>>(4);
             var lengthFields = new byte[2 * sizeof(int)];
             segments.Add(new ArraySegment<byte>(lengthFields, 0, lengthFields.Length));
-            using (var buffer = new MultiSegmentBufferWriter(maxAllocationSize: 9192, bufferList: segments))
+            using (var buffer = new ArrayBufferWriter())
             {
+                buffer.Advance(8);
                 this.messageHeadersSerializer.Serialize(buffer, message.Headers);
                 var headerLength = buffer.CommitedByteCount;
                 this.objectSerializer.Serialize(buffer, message.BodyObject);
                 var bodyLength = buffer.CommitedByteCount - headerLength;
 
-                void WriteLengthPrefixes()
-                {
-                    var lengthPrefixes = MemoryMarshal.Cast<byte, int>(lengthFields);
-                    lengthPrefixes[0] = headerLength;
-                    lengthPrefixes[1] = bodyLength;
-                }
-
-                WriteLengthPrefixes();
-
-                byte[] data = new byte[buffer.CommitedByteCount];
-                int n = 0;
-                foreach (var b in buffer.Committed)
-                {
-                    Array.Copy(b.Array, b.Offset, data, n, b.Count);
-                    n += b.Count;
-                }
+                var data = buffer.ToArray();
+                var lengthPrefixes = MemoryMarshal.Cast<byte, int>(data);
+                lengthPrefixes[0] = headerLength;
+                lengthPrefixes[1] = bodyLength;
 
                 deserializedMessage = DeserializeMessage(buffer.CommitedByteCount, data);
             }

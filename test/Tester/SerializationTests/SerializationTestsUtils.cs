@@ -8,9 +8,9 @@ namespace Tester.SerializationTests
     {
         public static void VerifyUsingFallbackSerializer(SerializationManager serializationManager, object ob)
         {
-            using (var buffer = new MultiSegmentBufferWriter())
+            using (var buffer = new ArrayBufferWriter())
             {
-                var writer = new BinaryTokenStreamWriter2<MultiSegmentBufferWriter>(buffer);
+                var writer = new BinaryTokenStreamWriter2<ArrayBufferWriter>(buffer);
                 var context = new SerializationContext(serializationManager)
                 {
                     StreamWriter = writer
@@ -18,7 +18,7 @@ namespace Tester.SerializationTests
                 serializationManager.FallbackSerializer(ob, context, ob.GetType());
                 writer.Commit();
 
-                var reader = new BinaryTokenStreamReader(buffer.Committed);
+                var reader = new BinaryTokenStreamReader(buffer.Formatted);
                 var serToken = reader.ReadToken();
                 Assert.Equal(SerializationTokenType.Fallback, serToken);
             }
