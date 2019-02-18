@@ -290,8 +290,7 @@ namespace Orleans.Runtime.Scheduler
             {
                 // Process multiple items -- drain the applicationMessageQueue (up to max items) for this physical activation
                 int count = 0;
-                var stopwatch = new Stopwatch();
-                stopwatch.Start();
+                var stopwatch = ValueStopwatch.StartNew();
                 do
                 {
                     lock (lockable)

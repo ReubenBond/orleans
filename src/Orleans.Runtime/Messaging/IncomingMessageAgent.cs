@@ -155,18 +155,22 @@ namespace Orleans.Runtime.Messaging
 
             if (targetActivation != null) targetActivation.IncrementEnqueuedOnDispatcherCount();
 
-            scheduler.QueueWorkItem(new ClosureWorkItem(() =>
-            {
-                try
+            scheduler.QueueWorkItem(
+                new ClosureWorkItem<(Dispatcher dispatcher, ActivationData activation, Message msg)>(
+                state =>
                 {
-                    dispatcher.ReceiveMessage(msg);
-                }
-                finally
-                {
-                    if (targetActivation != null) targetActivation.DecrementEnqueuedOnDispatcherCount();
-                }
-            },
-            "Dispatcher.ReceiveMessage"), context);
+                    try
+                    {
+                        state.dispatcher.ReceiveMessage(state.msg);
+                    }
+                    finally
+                    {
+                        if (state.activation != null) state.activation.DecrementEnqueuedOnDispatcherCount();
+                    }
+                },
+                "Dispatcher.ReceiveMessage",
+                (dispatcher, targetActivation, msg)),
+            context);
         }
     }
 }
