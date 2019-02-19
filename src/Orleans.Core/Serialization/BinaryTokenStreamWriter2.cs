@@ -15,223 +15,6 @@ using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
-    internal sealed class MemoryBufferWriter : IDisposable, IBufferWriter<byte>
-    {
-        private readonly int _minimumSegmentSize;
-        private int _bytesWritten;
-
-        private List<ArraySegment<byte>> _completedSegments;
-        private byte[] _currentSegment;
-        private int _position;
-
-        public MemoryBufferWriter(int minimumSegmentSize = 4096)
-        {
-            _minimumSegmentSize = minimumSegmentSize;
-        }
-
-        public void Reset()
-        {
-            if (_completedSegments != null)
-            {
-                for (var i = 0; i < _completedSegments.Count; i++)
-                {
-                    ArrayPool<byte>.Shared.Return(_completedSegments[i].Array);
-                }
-
-                _completedSegments.Clear();
-            }
-
-            if (_currentSegment != null)
-            {
-                ArrayPool<byte>.Shared.Return(_currentSegment);
-                _currentSegment = null;
-            }
-
-            _bytesWritten = 0;
-            _position = 0;
-        }
-
-        public void Advance(int count)
-        {
-            _bytesWritten += count;
-            _position += count;
-        }
-
-        public int BytesWritten => _bytesWritten;
-
-        public Memory<byte> GetMemory(int sizeHint = 0)
-        {
-            EnsureCapacity(sizeHint);
-
-            return _currentSegment.AsMemory(_position, _currentSegment.Length - _position);
-        }
-
-        public Span<byte> GetSpan(int sizeHint = 0)
-        {
-            EnsureCapacity(sizeHint);
-
-            return _currentSegment.AsSpan(_position, _currentSegment.Length - _position);
-        }
-        
-        private void EnsureCapacity(int sizeHint)
-        {
-            // This does the Right Thing. It only subtracts _position from the current segment length if it's non-null.
-            // If _currentSegment is null, it returns 0.
-            var remainingSize = _currentSegment?.Length - _position ?? 0;
-
-            // If the sizeHint is 0, any capacity will do
-            // Otherwise, the buffer must have enough space for the entire size hint, or we need to add a segment.
-            if (sizeHint == 0 && remainingSize > 0 || sizeHint > 0 && remainingSize >= sizeHint)
-            {
-                // We have capacity in the current segment
-                return;
-            }
-
-            AddSegment(sizeHint);
-        }
-
-        private void AddSegment(int sizeHint = 0)
-        {
-            if (_currentSegment != null)
-            {
-                // We're adding a segment to the list
-                if (_completedSegments == null)
-                {
-                    _completedSegments = new List<ArraySegment<byte>>();
-                }
-
-                // Position might be less than the segment length if there wasn't enough space to satisfy the sizeHint when
-                // GetMemory was called. In that case we'll take the current segment and call it "completed", but need to
-                // ignore any empty space in it.
-
-                IncludeCurrentSegment();
-            }
-
-            // Get a new buffer using the minimum segment size, unless the size hint is larger than a single segment.
-            _currentSegment = ArrayPool<byte>.Shared.Rent(Math.Max(_minimumSegmentSize, sizeHint));
-            _position = 0;
-        }
-
-        private void IncludeCurrentSegment()
-        {
-            var last = this._completedSegments.Count - 1;
-            if (last >= 0 && ReferenceEquals(this._completedSegments[last].Array, _currentSegment))
-            {
-                // Extend the existing committed segment.
-                _completedSegments[last] = new ArraySegment<byte>(_currentSegment, 0, _position);
-            }
-            else
-            {
-                _completedSegments.Add(new ArraySegment<byte>(_currentSegment, 0, _position));
-            }
-        }
-
-        public List<ArraySegment<byte>> GetSegments()
-        {
-            if (_completedSegments == null)
-            {
-                _completedSegments = new List<ArraySegment<byte>>(1);
-            }
-
-            IncludeCurrentSegment();
-
-            return _completedSegments;
-        }
-
-        public byte[] ToArray()
-        {
-            if (_currentSegment == null)
-            {
-                return Array.Empty<byte>();
-            }
-
-            var result = new byte[_bytesWritten];
-
-            var totalWritten = 0;
-
-            if (_completedSegments != null)
-            {
-                // Copy full segments
-                var count = _completedSegments.Count;
-                for (var i = 0; i < count; i++)
-                {
-                    var segment = _completedSegments[i];
-                    segment.Array.CopyTo(result.AsSpan(totalWritten));
-                    totalWritten += segment.Count;
-                }
-            }
-
-            // Copy current incomplete segment
-            _currentSegment.AsSpan(0, _position).CopyTo(result.AsSpan(totalWritten));
-
-            return result;
-        }
-
-        public void CopyTo(Span<byte> span)
-        {
-            Debug.Assert(span.Length >= _bytesWritten);
-
-            if (_currentSegment == null)
-            {
-                return;
-            }
-
-            var totalWritten = 0;
-
-            if (_completedSegments != null)
-            {
-                // Copy full segments
-                var count = _completedSegments.Count;
-                for (var i = 0; i < count; i++)
-                {
-                    var segment = _completedSegments[i];
-                    segment.Array.CopyTo(span.Slice(totalWritten));
-                    totalWritten += segment.Count;
-                }
-            }
-
-            // Copy current incomplete segment
-            _currentSegment.AsSpan(0, _position).CopyTo(span.Slice(totalWritten));
-
-            Debug.Assert(_bytesWritten == totalWritten + _position);
-        }
-
-        public void Dispose()
-        {
-            this.Dispose(true);
-        }
-        
-        public void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                Reset();
-            }
-        }
-
-        /// <summary>
-        /// Holds a byte[] from the pool and a size value. Basically a Memory but guaranteed to be backed by an ArrayPool byte[], so that we know we can return it.
-        /// </summary>
-        private readonly struct CompletedBuffer
-        {
-            public byte[] Buffer { get; }
-            public int Length { get; }
-
-            public ReadOnlySpan<byte> Span => Buffer.AsSpan(0, Length);
-
-            public CompletedBuffer(byte[] buffer, int length)
-            {
-                Buffer = buffer;
-                Length = length;
-            }
-
-            public void Return()
-            {
-                ArrayPool<byte>.Shared.Return(Buffer);
-            }
-        }
-    }
-
     public static class ReadOnlySequenceHelper
     {
         public static ReadOnlySequence<byte> ToReadOnlySequence(this IEnumerable<Memory<byte>> buffers)
@@ -500,8 +283,8 @@ namespace Orleans.Serialization
     /// </summary>
     public sealed class BinaryTokenStreamWriter2<TBufferWriter> : IBinaryTokenStreamWriter where TBufferWriter : IBufferWriter<byte>
     {
-        private static readonly Dictionary<RuntimeTypeHandle, SerializationTokenType> typeTokens;
-        private static readonly Dictionary<RuntimeTypeHandle, Action<BinaryTokenStreamWriter2<TBufferWriter>, object>> writers;
+        private static readonly Dictionary<Type, SerializationTokenType> typeTokens;
+        private static readonly Dictionary<Type, Action<BinaryTokenStreamWriter2<TBufferWriter>, object>> writers;
 
         private TBufferWriter output;
         private Memory<byte> currentBuffer;
@@ -510,77 +293,77 @@ namespace Orleans.Serialization
 
         static BinaryTokenStreamWriter2()
         {
-            typeTokens = new Dictionary<RuntimeTypeHandle, SerializationTokenType>(RuntimeTypeHandlerEqualityComparer.Instance);
-            typeTokens[typeof(bool).TypeHandle] = SerializationTokenType.Boolean;
-            typeTokens[typeof(int).TypeHandle] = SerializationTokenType.Int;
-            typeTokens[typeof(uint).TypeHandle] = SerializationTokenType.Uint;
-            typeTokens[typeof(short).TypeHandle] = SerializationTokenType.Short;
-            typeTokens[typeof(ushort).TypeHandle] = SerializationTokenType.Ushort;
-            typeTokens[typeof(long).TypeHandle] = SerializationTokenType.Long;
-            typeTokens[typeof(ulong).TypeHandle] = SerializationTokenType.Ulong;
-            typeTokens[typeof(byte).TypeHandle] = SerializationTokenType.Byte;
-            typeTokens[typeof(sbyte).TypeHandle] = SerializationTokenType.Sbyte;
-            typeTokens[typeof(float).TypeHandle] = SerializationTokenType.Float;
-            typeTokens[typeof(double).TypeHandle] = SerializationTokenType.Double;
-            typeTokens[typeof(decimal).TypeHandle] = SerializationTokenType.Decimal;
-            typeTokens[typeof(string).TypeHandle] = SerializationTokenType.String;
-            typeTokens[typeof(char).TypeHandle] = SerializationTokenType.Character;
-            typeTokens[typeof(Guid).TypeHandle] = SerializationTokenType.Guid;
-            typeTokens[typeof(DateTime).TypeHandle] = SerializationTokenType.Date;
-            typeTokens[typeof(TimeSpan).TypeHandle] = SerializationTokenType.TimeSpan;
-            typeTokens[typeof(GrainId).TypeHandle] = SerializationTokenType.GrainId;
-            typeTokens[typeof(ActivationId).TypeHandle] = SerializationTokenType.ActivationId;
-            typeTokens[typeof(SiloAddress).TypeHandle] = SerializationTokenType.SiloAddress;
-            typeTokens[typeof(ActivationAddress).TypeHandle] = SerializationTokenType.ActivationAddress;
-            typeTokens[typeof(IPAddress).TypeHandle] = SerializationTokenType.IpAddress;
-            typeTokens[typeof(IPEndPoint).TypeHandle] = SerializationTokenType.IpEndPoint;
-            typeTokens[typeof(CorrelationId).TypeHandle] = SerializationTokenType.CorrelationId;
-            typeTokens[typeof(InvokeMethodRequest).TypeHandle] = SerializationTokenType.Request;
-            typeTokens[typeof(Response).TypeHandle] = SerializationTokenType.Response;
-            typeTokens[typeof(Dictionary<string, object>).TypeHandle] = SerializationTokenType.StringObjDict;
-            typeTokens[typeof(Object).TypeHandle] = SerializationTokenType.Object;
-            typeTokens[typeof(List<>).TypeHandle] = SerializationTokenType.List;
-            typeTokens[typeof(SortedList<,>).TypeHandle] = SerializationTokenType.SortedList;
-            typeTokens[typeof(Dictionary<,>).TypeHandle] = SerializationTokenType.Dictionary;
-            typeTokens[typeof(HashSet<>).TypeHandle] = SerializationTokenType.Set;
-            typeTokens[typeof(SortedSet<>).TypeHandle] = SerializationTokenType.SortedSet;
-            typeTokens[typeof(KeyValuePair<,>).TypeHandle] = SerializationTokenType.KeyValuePair;
-            typeTokens[typeof(LinkedList<>).TypeHandle] = SerializationTokenType.LinkedList;
-            typeTokens[typeof(Stack<>).TypeHandle] = SerializationTokenType.Stack;
-            typeTokens[typeof(Queue<>).TypeHandle] = SerializationTokenType.Queue;
-            typeTokens[typeof(Tuple<>).TypeHandle] = SerializationTokenType.Tuple + 1;
-            typeTokens[typeof(Tuple<,>).TypeHandle] = SerializationTokenType.Tuple + 2;
-            typeTokens[typeof(Tuple<,,>).TypeHandle] = SerializationTokenType.Tuple + 3;
-            typeTokens[typeof(Tuple<,,,>).TypeHandle] = SerializationTokenType.Tuple + 4;
-            typeTokens[typeof(Tuple<,,,,>).TypeHandle] = SerializationTokenType.Tuple + 5;
-            typeTokens[typeof(Tuple<,,,,,>).TypeHandle] = SerializationTokenType.Tuple + 6;
-            typeTokens[typeof(Tuple<,,,,,,>).TypeHandle] = SerializationTokenType.Tuple + 7;
+            typeTokens = new Dictionary<Type, SerializationTokenType>();
+            typeTokens[typeof(bool)] = SerializationTokenType.Boolean;
+            typeTokens[typeof(int)] = SerializationTokenType.Int;
+            typeTokens[typeof(uint)] = SerializationTokenType.Uint;
+            typeTokens[typeof(short)] = SerializationTokenType.Short;
+            typeTokens[typeof(ushort)] = SerializationTokenType.Ushort;
+            typeTokens[typeof(long)] = SerializationTokenType.Long;
+            typeTokens[typeof(ulong)] = SerializationTokenType.Ulong;
+            typeTokens[typeof(byte)] = SerializationTokenType.Byte;
+            typeTokens[typeof(sbyte)] = SerializationTokenType.Sbyte;
+            typeTokens[typeof(float)] = SerializationTokenType.Float;
+            typeTokens[typeof(double)] = SerializationTokenType.Double;
+            typeTokens[typeof(decimal)] = SerializationTokenType.Decimal;
+            typeTokens[typeof(string)] = SerializationTokenType.String;
+            typeTokens[typeof(char)] = SerializationTokenType.Character;
+            typeTokens[typeof(Guid)] = SerializationTokenType.Guid;
+            typeTokens[typeof(DateTime)] = SerializationTokenType.Date;
+            typeTokens[typeof(TimeSpan)] = SerializationTokenType.TimeSpan;
+            typeTokens[typeof(GrainId)] = SerializationTokenType.GrainId;
+            typeTokens[typeof(ActivationId)] = SerializationTokenType.ActivationId;
+            typeTokens[typeof(SiloAddress)] = SerializationTokenType.SiloAddress;
+            typeTokens[typeof(ActivationAddress)] = SerializationTokenType.ActivationAddress;
+            typeTokens[typeof(IPAddress)] = SerializationTokenType.IpAddress;
+            typeTokens[typeof(IPEndPoint)] = SerializationTokenType.IpEndPoint;
+            typeTokens[typeof(CorrelationId)] = SerializationTokenType.CorrelationId;
+            typeTokens[typeof(InvokeMethodRequest)] = SerializationTokenType.Request;
+            typeTokens[typeof(Response)] = SerializationTokenType.Response;
+            typeTokens[typeof(Dictionary<string, object>)] = SerializationTokenType.StringObjDict;
+            typeTokens[typeof(Object)] = SerializationTokenType.Object;
+            typeTokens[typeof(List<>)] = SerializationTokenType.List;
+            typeTokens[typeof(SortedList<,>)] = SerializationTokenType.SortedList;
+            typeTokens[typeof(Dictionary<,>)] = SerializationTokenType.Dictionary;
+            typeTokens[typeof(HashSet<>)] = SerializationTokenType.Set;
+            typeTokens[typeof(SortedSet<>)] = SerializationTokenType.SortedSet;
+            typeTokens[typeof(KeyValuePair<,>)] = SerializationTokenType.KeyValuePair;
+            typeTokens[typeof(LinkedList<>)] = SerializationTokenType.LinkedList;
+            typeTokens[typeof(Stack<>)] = SerializationTokenType.Stack;
+            typeTokens[typeof(Queue<>)] = SerializationTokenType.Queue;
+            typeTokens[typeof(Tuple<>)] = SerializationTokenType.Tuple + 1;
+            typeTokens[typeof(Tuple<,>)] = SerializationTokenType.Tuple + 2;
+            typeTokens[typeof(Tuple<,,>)] = SerializationTokenType.Tuple + 3;
+            typeTokens[typeof(Tuple<,,,>)] = SerializationTokenType.Tuple + 4;
+            typeTokens[typeof(Tuple<,,,,>)] = SerializationTokenType.Tuple + 5;
+            typeTokens[typeof(Tuple<,,,,,>)] = SerializationTokenType.Tuple + 6;
+            typeTokens[typeof(Tuple<,,,,,,>)] = SerializationTokenType.Tuple + 7;
 
-            writers = new Dictionary<RuntimeTypeHandle, Action<BinaryTokenStreamWriter2<TBufferWriter>, object>>(RuntimeTypeHandlerEqualityComparer.Instance);
-            writers[typeof(bool).TypeHandle] = (stream, obj) => stream.Write((bool)obj);
-            writers[typeof(int).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Int); stream.Write((int)obj); };
-            writers[typeof(uint).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Uint); stream.Write((uint)obj); };
-            writers[typeof(short).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Short); stream.Write((short)obj); };
-            writers[typeof(ushort).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Ushort); stream.Write((ushort)obj); };
-            writers[typeof(long).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Long); stream.Write((long)obj); };
-            writers[typeof(ulong).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Ulong); stream.Write((ulong)obj); };
-            writers[typeof(byte).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Byte); stream.Write((byte)obj); };
-            writers[typeof(sbyte).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Sbyte); stream.Write((sbyte)obj); };
-            writers[typeof(float).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Float); stream.Write((float)obj); };
-            writers[typeof(double).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Double); stream.Write((double)obj); };
-            writers[typeof(decimal).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Decimal); stream.Write((decimal)obj); };
-            writers[typeof(string).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.String); stream.Write((string)obj); };
-            writers[typeof(char).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Character); stream.Write((char)obj); };
-            writers[typeof(Guid).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Guid); stream.Write((Guid)obj); };
-            writers[typeof(DateTime).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Date); stream.Write((DateTime)obj); };
-            writers[typeof(TimeSpan).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.TimeSpan); stream.Write((TimeSpan)obj); };
-            writers[typeof(GrainId).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.GrainId); stream.Write((GrainId)obj); };
-            writers[typeof(ActivationId).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.ActivationId); stream.Write((ActivationId)obj); };
-            writers[typeof(SiloAddress).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.SiloAddress); stream.Write((SiloAddress)obj); };
-            writers[typeof(ActivationAddress).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.ActivationAddress); stream.Write((ActivationAddress)obj); };
-            writers[typeof(IPAddress).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.IpAddress); stream.Write((IPAddress)obj); };
-            writers[typeof(IPEndPoint).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.IpEndPoint); stream.Write((IPEndPoint)obj); };
-            writers[typeof(CorrelationId).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.CorrelationId); stream.Write((CorrelationId)obj); };
+            writers = new Dictionary<Type, Action<BinaryTokenStreamWriter2<TBufferWriter>, object>>();
+            writers[typeof(bool)] = (stream, obj) => stream.Write((bool)obj);
+            writers[typeof(int)] = (stream, obj) => { stream.Write(SerializationTokenType.Int); stream.Write((int)obj); };
+            writers[typeof(uint)] = (stream, obj) => { stream.Write(SerializationTokenType.Uint); stream.Write((uint)obj); };
+            writers[typeof(short)] = (stream, obj) => { stream.Write(SerializationTokenType.Short); stream.Write((short)obj); };
+            writers[typeof(ushort)] = (stream, obj) => { stream.Write(SerializationTokenType.Ushort); stream.Write((ushort)obj); };
+            writers[typeof(long)] = (stream, obj) => { stream.Write(SerializationTokenType.Long); stream.Write((long)obj); };
+            writers[typeof(ulong)] = (stream, obj) => { stream.Write(SerializationTokenType.Ulong); stream.Write((ulong)obj); };
+            writers[typeof(byte)] = (stream, obj) => { stream.Write(SerializationTokenType.Byte); stream.Write((byte)obj); };
+            writers[typeof(sbyte)] = (stream, obj) => { stream.Write(SerializationTokenType.Sbyte); stream.Write((sbyte)obj); };
+            writers[typeof(float)] = (stream, obj) => { stream.Write(SerializationTokenType.Float); stream.Write((float)obj); };
+            writers[typeof(double)] = (stream, obj) => { stream.Write(SerializationTokenType.Double); stream.Write((double)obj); };
+            writers[typeof(decimal)] = (stream, obj) => { stream.Write(SerializationTokenType.Decimal); stream.Write((decimal)obj); };
+            writers[typeof(string)] = (stream, obj) => { stream.Write(SerializationTokenType.String); stream.Write((string)obj); };
+            writers[typeof(char)] = (stream, obj) => { stream.Write(SerializationTokenType.Character); stream.Write((char)obj); };
+            writers[typeof(Guid)] = (stream, obj) => { stream.Write(SerializationTokenType.Guid); stream.Write((Guid)obj); };
+            writers[typeof(DateTime)] = (stream, obj) => { stream.Write(SerializationTokenType.Date); stream.Write((DateTime)obj); };
+            writers[typeof(TimeSpan)] = (stream, obj) => { stream.Write(SerializationTokenType.TimeSpan); stream.Write((TimeSpan)obj); };
+            writers[typeof(GrainId)] = (stream, obj) => { stream.Write(SerializationTokenType.GrainId); stream.Write((GrainId)obj); };
+            writers[typeof(ActivationId)] = (stream, obj) => { stream.Write(SerializationTokenType.ActivationId); stream.Write((ActivationId)obj); };
+            writers[typeof(SiloAddress)] = (stream, obj) => { stream.Write(SerializationTokenType.SiloAddress); stream.Write((SiloAddress)obj); };
+            writers[typeof(ActivationAddress)] = (stream, obj) => { stream.Write(SerializationTokenType.ActivationAddress); stream.Write((ActivationAddress)obj); };
+            writers[typeof(IPAddress)] = (stream, obj) => { stream.Write(SerializationTokenType.IpAddress); stream.Write((IPAddress)obj); };
+            writers[typeof(IPEndPoint)] = (stream, obj) => { stream.Write(SerializationTokenType.IpEndPoint); stream.Write((IPEndPoint)obj); };
+            writers[typeof(CorrelationId)] = (stream, obj) => { stream.Write(SerializationTokenType.CorrelationId); stream.Write((CorrelationId)obj); };
         }
         
         public BinaryTokenStreamWriter2(TBufferWriter output)
@@ -663,7 +446,7 @@ namespace Orleans.Serialization
             }
 
             SerializationTokenType token;
-            if (typeTokens.TryGetValue(t.TypeHandle, out token))
+            if (typeTokens.TryGetValue(t, out token))
             {
                 this.Write((byte)token);
                 return;
@@ -671,7 +454,7 @@ namespace Orleans.Serialization
 
             if (t.GetTypeInfo().IsGenericType)
             {
-                if (typeTokens.TryGetValue(t.GetGenericTypeDefinition().TypeHandle, out token))
+                if (typeTokens.TryGetValue(t.GetGenericTypeDefinition(), out token))
                 {
                     this.Write((byte)token);
                     foreach (var tp in t.GetGenericArguments())
@@ -764,7 +547,7 @@ namespace Orleans.Serialization
                 return true;
             }
             Action<BinaryTokenStreamWriter2<TBufferWriter>, object> writer;
-            if (writers.TryGetValue(obj.GetType().TypeHandle, out writer))
+            if (writers.TryGetValue(obj.GetType(), out writer))
             {
                 writer(this, obj);
                 return true;

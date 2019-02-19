@@ -83,8 +83,8 @@ namespace Orleans.Runtime.Messaging
                 throw new Exception($"Unable to connect to {endPoint}. Error: {completion.SocketError}");
             }
 
-            var connection = new SocketConnection(socket, MemoryPool<byte>.Shared, PipeScheduler.Inline, this.loggerFactory.CreateLogger<SocketConnection>());
-            var pair = DuplexPipe.CreateConnectionPair(GetPipeOptions(PipeScheduler.ThreadPool, connection.InputWriterScheduler), GetPipeOptions(connection.OutputReaderScheduler, PipeScheduler.ThreadPool));
+            var connection = new SocketConnection(socket, MemoryPool<byte>.Shared, PipeScheduler.ThreadPool, this.loggerFactory.CreateLogger<SocketConnection>());
+            var pair = DuplexPipe.CreateConnectionPair(GetPipeOptions(PipeScheduler.Inline, connection.InputWriterScheduler), GetPipeOptions(connection.OutputReaderScheduler, PipeScheduler.Inline));
             connection.Application = pair.Application;
             connection.Transport = pair.Transport;
             Task.Run(async () =>
