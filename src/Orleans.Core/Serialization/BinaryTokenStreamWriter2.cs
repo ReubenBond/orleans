@@ -585,15 +585,15 @@ namespace Orleans.Serialization
         
         public BinaryTokenStreamWriter2(TBufferWriter output)
         {
-            this.output = output;
-            this.currentBuffer = output.GetMemory();
-            this.currentOffset = default;
-            this.completedLength = default;
+            this.Reset(output);
         }
 
         public void Reset(TBufferWriter output)
         {
-
+            this.output = output;
+            this.currentBuffer = output.GetMemory();
+            this.currentOffset = default;
+            this.completedLength = default;
         }
 
         /// <summary> Current write position in the stream. </summary>
@@ -721,6 +721,7 @@ namespace Orleans.Serialization
                 {
                     this.Write((byte)0);
                 }
+                
                 this.Write(ip.GetAddressBytes()); // IPv4 -- 4 bytes
             }
             else

@@ -30,6 +30,7 @@ namespace Orleans.Serialization
     {
         private readonly SerializationManager serializationManager;
         private readonly BinaryTokenStreamReader2 reader = new BinaryTokenStreamReader2();
+        private object writerCache;
 
         public OrleansSerializer(SerializationManager serializationManager)
         {
@@ -44,7 +45,15 @@ namespace Orleans.Serialization
 
         public void Serialize<TBufferWriter>(TBufferWriter output, T value) where TBufferWriter : IBufferWriter<byte>
         {
-            var writer = new BinaryTokenStreamWriter2<TBufferWriter>(output);
+            if (writerCache is BinaryTokenStreamWriter2<TBufferWriter> writer)
+            {
+                writer.Reset(output);
+            }
+            else
+            {
+                writerCache = writer = new BinaryTokenStreamWriter2<TBufferWriter>(output);
+            }
+
             this.serializationManager.Serialize(value, writer);
             writer.Commit();
         }

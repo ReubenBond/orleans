@@ -69,7 +69,6 @@ namespace Orleans.Runtime.Messaging
 
         public void Write<TBufferWriter>(ref TBufferWriter writer, Message message) where TBufferWriter : IBufferWriter<byte>
         {
-            var lengthFields = new byte[8];
             var buffer = new PrefixingBufferWriter<byte, TBufferWriter>(writer, 8, 10240);
             this.messageHeadersSerializer.Serialize(buffer, message.Headers);
             var headerLength = buffer.CommittedBytes;
@@ -78,6 +77,7 @@ namespace Orleans.Runtime.Messaging
             var bodyLength = buffer.CommittedBytes - headerLength;
 
             // Write length prefixes, first header length then body length.
+            Span<byte> lengthFields = stackalloc byte[8];
             var lengthPrefixes = MemoryMarshal.Cast<byte, int>(lengthFields);
             lengthPrefixes[0] = headerLength;
             lengthPrefixes[1] = bodyLength;
