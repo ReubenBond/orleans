@@ -368,7 +368,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.Internal
                 return SendAsync(buffers.First);
             }
 
-            if (!_awaitableEventArgs.Buffer.Equals(Array.Empty<byte>()))
+            if (!Array.Empty<byte>().Equals(_awaitableEventArgs.Buffer))
             {
                 _awaitableEventArgs.SetBuffer(null, 0, 0);
             }
