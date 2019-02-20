@@ -3,8 +3,10 @@
     <PackageId>Microsoft.Orleans.OrleansRuntime</PackageId>
     <Title>Microsoft Orleans Runtime</Title>
     <Description>Core runtime library of Microsoft Orleans that hosts and executes grains within a silo.</Description>
+    <!--
     <TargetFramework />
     <TargetFrameworks>netcoreapp3.0;netstandard2.0</TargetFrameworks>
+    -->
   </PropertyGroup>
 
   <PropertyGroup>

@@ -149,7 +149,9 @@ namespace Orleans.Runtime.Messaging
             }
 
             this.innerWriter = innerWriter;
-            if (innerWriter is null) ThrowInnerWriter();
+
+            // TODO: clean up this equals
+            if (innerWriter.Equals(default(TBufferWriter))) ThrowInnerWriter();
             this.expectedPrefixSize = prefixSize;
             this.payloadSizeHint = payloadSizeHint;
 

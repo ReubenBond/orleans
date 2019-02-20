@@ -3,8 +3,11 @@
     <PackageId>Microsoft.Orleans.Core</PackageId>
     <Title>Microsoft Orleans Core Library</Title>
     <Description>Core library of Microsoft Orleans used both on the client and server.</Description>
+
+    <!--
     <TargetFramework />
     <TargetFrameworks>netcoreapp3.0;netstandard2.0</TargetFrameworks>
+    -->
   </PropertyGroup>
 
   <PropertyGroup>
