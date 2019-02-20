@@ -7,23 +7,23 @@ namespace Orleans.Runtime.Messaging.RePlat
 {
     public sealed class SocketConnectionListenerFactory : IConnectionListenerFactory
     {
-        private readonly IApplicationLifetime applicationLifetime;
+      //  private readonly IApplicationLifetime applicationLifetime;
         private readonly SocketsTrace tracetrace;
 
         public SocketConnectionListenerFactory(
-            IApplicationLifetime applicationLifetime,
+          //  IApplicationLifetime applicationLifetime,
             ILoggerFactory loggerFactory)
         {
-            if (applicationLifetime == null)
+        //    if (applicationLifetime == null)
             {
-                throw new ArgumentNullException(nameof(applicationLifetime));
+          //      throw new ArgumentNullException(nameof(applicationLifetime));
             }
             if (loggerFactory == null)
             {
                 throw new ArgumentNullException(nameof(loggerFactory));
             }
 
-            this.applicationLifetime = applicationLifetime;
+          //  this.applicationLifetime = applicationLifetime;
             var logger = loggerFactory.CreateLogger("Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets");
             this.tracetrace = new SocketsTrace(logger);
         }
@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Messaging.RePlat
                 throw new ArgumentNullException(nameof(connectionDelegate));
             }
 
-            return new SocketConnectionListener(endPoint, connectionDelegate, this.applicationLifetime, this.tracetrace);
+            return new SocketConnectionListener(endPoint, connectionDelegate, /*this.applicationLifetime,*/ this.tracetrace);
         }
     }
 }

@@ -17,7 +17,7 @@ namespace Orleans.Runtime.Messaging.RePlat
     {
         private readonly MemoryPool<byte> memoryPool;
         private readonly ConnectionDelegate connectionDelegate;
-        private readonly IApplicationLifetime applicationLifetime;
+    //    private readonly IApplicationLifetime applicationLifetime;
         private readonly ISocketsTrace trace;
         private readonly PipeScheduler scheduler = PipeScheduler.ThreadPool;
         private Socket listenSocket;
@@ -29,12 +29,12 @@ namespace Orleans.Runtime.Messaging.RePlat
         internal SocketConnectionListener(
             string endPoint,
             ConnectionDelegate connectionDelegate,
-            IApplicationLifetime applicationLifetime,
+         //   IApplicationLifetime applicationLifetime,
             ISocketsTrace trace)
         {
             Debug.Assert(endPoint != null);
             Debug.Assert(connectionDelegate != null);
-            Debug.Assert(applicationLifetime != null);
+      //      Debug.Assert(applicationLifetime != null);
             Debug.Assert(trace != null);
 
             if (!IPEndPointUtility.TryParseEndPoint(endPoint, out this.endPoint))
@@ -43,7 +43,7 @@ namespace Orleans.Runtime.Messaging.RePlat
             }
 
             this.connectionDelegate = connectionDelegate;
-            this.applicationLifetime = applicationLifetime;
+         //   this.applicationLifetime = applicationLifetime;
             this.trace = trace;
             this.memoryPool = MemoryPool<byte>.Shared;
         }
@@ -152,7 +152,7 @@ namespace Orleans.Runtime.Messaging.RePlat
 
                     // Request shutdown so we can rethrow this exception
                     // in Stop which should be observable.
-                    this.applicationLifetime.StopApplication();
+                   // this.applicationLifetime.StopApplication();
                 }
             }
         }
