@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Server.Kestrel.Transport.Abstractions.Internal;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Messaging;
 
 namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.Internal
 {
@@ -26,7 +27,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.Internal
 
         private readonly Socket _socket;
         private readonly PipeScheduler _scheduler;
-        private readonly ILogger<SocketConnection> _trace;
+        private readonly ISocketsTrace _trace;
         private readonly SocketReceiver _receiver;
         private readonly SocketSender _sender;
         private readonly CancellationTokenSource _connectionClosedTokenSource = new CancellationTokenSource();
@@ -35,7 +36,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.Internal
         private volatile bool _socketDisposed;
         private volatile Exception _shutdownReason;
 
-        internal SocketConnection(Socket socket, MemoryPool<byte> memoryPool, PipeScheduler scheduler, ILogger<SocketConnection> trace)
+        internal SocketConnection(Socket socket, MemoryPool<byte> memoryPool, PipeScheduler scheduler, ISocketsTrace trace)
         {
             Debug.Assert(socket != null);
             Debug.Assert(memoryPool != null);
@@ -125,7 +126,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.Internal
                 // Both logs will have the same ConnectionId. I don't think it's worthwhile to lock just to avoid this.
                 if (!_socketDisposed)
                 {
-                    //_trace.ConnectionReset(ConnectionId);
+                    _trace.ConnectionReset(ConnectionId);
                 }
             }
             catch (Exception ex)
@@ -138,14 +139,14 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.Internal
                 if (!_socketDisposed)
                 {
                     // This is unexpected if the socket hasn't been disposed yet.
-                    //_trace.ConnectionError(ConnectionId, error);
+                    _trace.ConnectionError(ConnectionId, error);
                 }
             }
             catch (Exception ex)
             {
                 // This is unexpected.
                 error = ex;
-                //_trace.ConnectionError(ConnectionId, error);
+                _trace.ConnectionError(ConnectionId, error);
             }
             finally
             {
@@ -171,7 +172,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.Internal
                 if (bytesReceived == 0)
                 {
                     // FIN
-                    //_trace.ConnectionReadFin(ConnectionId);
+                    _trace.ConnectionReadFin(ConnectionId);
                     break;
                 }
 
@@ -183,14 +184,14 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.Internal
 
                 if (paused)
                 {
-                    //_trace.ConnectionPause(ConnectionId);
+                    _trace.ConnectionPause(ConnectionId);
                 }
 
                 var result = await flushTask;
 
                 if (paused)
                 {
-                    //_trace.ConnectionResume(ConnectionId);
+                    _trace.ConnectionResume(ConnectionId);
                 }
 
                 if (result.IsCompleted || result.IsCanceled)
@@ -213,7 +214,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.Internal
             catch (SocketException ex) when (IsConnectionResetError(ex.SocketErrorCode))
             {
                 shutdownReason = new ConnectionResetException(ex.Message, ex); ;
-                //_trace.ConnectionReset(ConnectionId);
+                _trace.ConnectionReset(ConnectionId);
             }
             catch (Exception ex)
                 when ((ex is SocketException socketEx && IsConnectionAbortError(socketEx.SocketErrorCode)) ||
@@ -226,7 +227,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.Internal
             {
                 shutdownReason = ex;
                 unexpectedError = ex;
-                //_trace.ConnectionError(ConnectionId, unexpectedError);
+                _trace.ConnectionError(ConnectionId, unexpectedError);
             }
             finally
             {
@@ -290,7 +291,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.Internal
                 // to half close the connection which is currently unsupported.
                 _shutdownReason = shutdownReason ?? new ConnectionAbortedException("The Socket transport's send loop completed gracefully.");
 
-                //_trace.ConnectionWriteFin(ConnectionId, _shutdownReason.Message);
+                _trace.ConnectionWriteFin(ConnectionId, _shutdownReason.Message);
 
                 try
                 {

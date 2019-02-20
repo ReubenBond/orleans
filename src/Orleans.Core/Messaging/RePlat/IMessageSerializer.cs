@@ -11,4 +11,14 @@ namespace Orleans.Runtime.Messaging
         /// </returns>
         int TryRead(ref ReadOnlySequence<byte> input, out Message message);
     }
+
+    internal interface IInboundMessageHandler
+    {
+        void OnMessageReceived(Message message);
+    }
+
+    internal interface IOutboundMessageHandler
+    {
+        void Send(Message message);
+    }
 }

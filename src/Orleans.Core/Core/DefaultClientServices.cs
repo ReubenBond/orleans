@@ -89,7 +89,7 @@ namespace Orleans
 
             // Networking
             services.TryAddSingleton<ConnectionManager>();
-            services.TryAddSingleton<IOutboundTransportFactory, SocketTransportFactory>();
+            services.TryAddSingleton<IConnectionFactory, SocketConnectionFactory>();
             services.TryAddTransient<IMessageSerializer, MessageSerializer>();
             services.TryAddSingleton<ConnectionComponentFactory, ClientConnectionComponentFactory>();
             services.TryAddSingleton<OutboundConnectionFactory, ClientOutboundConnectionFactory>();

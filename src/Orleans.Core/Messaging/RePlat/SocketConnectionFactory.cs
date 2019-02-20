@@ -11,55 +11,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class DuplexPipe : IDuplexPipe
+    internal class SocketConnectionFactory : IConnectionFactory
     {
-        public DuplexPipe(PipeReader reader, PipeWriter writer)
+        private readonly SocketsTrace trace;
+
+        public SocketConnectionFactory(ILoggerFactory loggerFactory)
         {
-            Input = reader;
-            Output = writer;
-        }
-
-        public PipeReader Input { get; }
-
-        public PipeWriter Output { get; }
-
-        public static DuplexPipePair CreateConnectionPair(PipeOptions inputOptions, PipeOptions outputOptions)
-        {
-            var input = new Pipe(inputOptions);
-            var output = new Pipe(outputOptions);
-
-            var transportToApplication = new DuplexPipe(output.Reader, input.Writer);
-            var applicationToTransport = new DuplexPipe(input.Reader, output.Writer);
-
-            return new DuplexPipePair(applicationToTransport, transportToApplication);
-        }
-
-        // This class exists to work around issues with value tuple on .NET Framework
-        public readonly struct DuplexPipePair
-        {
-            public IDuplexPipe Transport { get; }
-            public IDuplexPipe Application { get; }
-
-            public DuplexPipePair(IDuplexPipe transport, IDuplexPipe application)
-            {
-                Transport = transport;
-                Application = application;
-            }
-        }
-    }
-
-    internal class SocketTransportFactory : IOutboundTransportFactory
-    {
-        private readonly ILoggerFactory loggerFactory;
-
-        public SocketTransportFactory(ILoggerFactory loggerFactory)
-        {
-            this.loggerFactory = loggerFactory;
+            var logger = loggerFactory.CreateLogger("Orleans.Sockets");
+            this.trace = new SocketsTrace(logger);
         }
 
         public async Task<ConnectionContext> Connect(string endPoint)
         {
-            if (!TryParseEndPoint(endPoint, out var remoteEndPoint))
+            if (!IPEndPointUtility.TryParseEndPoint(endPoint, out var remoteEndPoint))
             {
                 throw new ArgumentException($"Unable to parse \"{endPoint}\" as {nameof(IPEndPoint)}");
             }
@@ -83,7 +47,7 @@ namespace Orleans.Runtime.Messaging
                 throw new Exception($"Unable to connect to {endPoint}. Error: {completion.SocketError}");
             }
 
-            var connection = new SocketConnection(socket, MemoryPool<byte>.Shared, PipeScheduler.ThreadPool, this.loggerFactory.CreateLogger<SocketConnection>());
+            var connection = new SocketConnection(socket, MemoryPool<byte>.Shared, PipeScheduler.ThreadPool, this.trace);
             var pair = DuplexPipe.CreateConnectionPair(GetPipeOptions(PipeScheduler.Inline, connection.InputWriterScheduler), GetPipeOptions(connection.OutputReaderScheduler, PipeScheduler.Inline));
             connection.Application = pair.Application;
             connection.Transport = pair.Transport;
@@ -149,21 +113,6 @@ namespace Orleans.Runtime.Messaging
             resumeWriterThreshold: 0,
             useSynchronizationContext: false,
             minimumSegmentSize: 4000);
-        
-
-        private static bool TryParseEndPoint(string value, out IPEndPoint result)
-        {
-            if (!Uri.TryCreate($"tcp://{value}", UriKind.Absolute, out var uri) ||
-                !IPAddress.TryParse(uri.Host, out var ipAddress) ||
-                uri.Port < IPEndPoint.MinPort || uri.Port > IPEndPoint.MaxPort)
-            {
-                result = default;
-                return false;
-            }
-
-            result = new IPEndPoint(ipAddress, uri.Port);
-            return true;
-        }
 
         public class SingleUseSocketAsyncEventArgs : SocketAsyncEventArgs, ICriticalNotifyCompletion
         {

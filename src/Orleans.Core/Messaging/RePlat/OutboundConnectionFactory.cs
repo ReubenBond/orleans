@@ -6,10 +6,10 @@ namespace Orleans.Runtime.Messaging
 {
     internal abstract class OutboundConnectionFactory
     {
-        private readonly IOutboundTransportFactory connectionFactory;
+        private readonly IConnectionFactory connectionFactory;
         private readonly Lazy<ConnectionDelegate> connectionDelegate;
 
-        protected OutboundConnectionFactory(IOutboundTransportFactory connectionFactory)
+        protected OutboundConnectionFactory(IConnectionFactory connectionFactory)
         {
             this.connectionFactory = connectionFactory;
             this.connectionDelegate = new Lazy<ConnectionDelegate>(() => this.GetOutboundConnectionDelegate(), isThreadSafe: false);

@@ -21,8 +21,8 @@ namespace KestrelTestSilo
         {
             var primary = new IPEndPoint(IPAddress.Loopback, 60666);
             var one = await CreateSilo(primary, 0);
-           // var two = await CreateSilo(primary, 1);
-           // var three = await CreateSilo(primary, 2);
+            var two = await CreateSilo(primary, 1);
+            var three = await CreateSilo(primary, 2);
 
             await RunClient();
             /*var client = two.Services.GetRequiredService<IClusterClient>();
@@ -37,7 +37,7 @@ namespace KestrelTestSilo
         private static async Task<IHost> CreateSilo(IPEndPoint primary, int siloNum)
         {
             var host = new HostBuilder()
-                .ConfigureWebHost(builder =>
+                /*.ConfigureWebHost(builder =>
                 {
                     builder.UseKestrel(options =>
                     {
@@ -55,7 +55,7 @@ namespace KestrelTestSilo
                             });
                     })
                     .UseStartup<Startup>();
-                })
+                })*/
                 .UseOrleans(builder =>
                 {
                     builder
@@ -66,13 +66,14 @@ namespace KestrelTestSilo
                         options.AdvertisedIPAddress = IPAddress.Loopback;
                         options.SiloPort = 60666 + siloNum;
                         options.GatewayPort = 60777 + siloNum;
-                        options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Any, 20666 + siloNum);
-                        options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Any, 20777 + siloNum);
+                        options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Any, 60666 + siloNum);
+                        options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Any, 60777 + siloNum);
                     })
                     .EnableDirectClient();
                 })
                 .ConfigureLogging(logging => logging.AddConsole())
-                .UseConsoleLifetime().Build();
+                .UseConsoleLifetime()
+                .Build();
 
             await host.StartAsync();
             return host;

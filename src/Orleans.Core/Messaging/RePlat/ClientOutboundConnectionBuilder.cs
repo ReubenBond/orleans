@@ -12,7 +12,7 @@ namespace Orleans.Runtime.Messaging
         public ClientOutboundConnectionFactory(
             IServiceProvider serviceProvider,
             IOptions<ConnectionOptions> connectionOptions,
-            IOutboundTransportFactory connectionFactory)
+            IConnectionFactory connectionFactory)
             : base(connectionFactory)
         {
             this.connectionOptions = connectionOptions.Value;

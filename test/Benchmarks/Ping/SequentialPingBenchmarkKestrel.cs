@@ -57,7 +57,7 @@ namespace Benchmarks.Ping
         private static async Task<IHost> CreateSilo(IPEndPoint primary, int siloNum)
         {
             var host = new HostBuilder()
-                .ConfigureWebHost(builder =>
+                /*.ConfigureWebHost(builder =>
                 {
                     builder.UseKestrel(options =>
                     {
@@ -75,7 +75,7 @@ namespace Benchmarks.Ping
                             });
                     })
                     .UseStartup<Startup>();
-                })
+                })*/
                 .UseOrleans(builder =>
                 {
                     builder
@@ -86,9 +86,9 @@ namespace Benchmarks.Ping
                         options.AdvertisedIPAddress = IPAddress.Loopback;
                         options.SiloPort = 60666 + siloNum;
                         options.GatewayPort = 60777 + siloNum;
-                        options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Any, 20666 + siloNum);
-                        options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Any, 20777 + siloNum);
-                    })
+                        options.SiloListeningEndpoint = new IPEndPoint(IPAddress.Any, 60666 + siloNum);
+                        options.GatewayListeningEndpoint = new IPEndPoint(IPAddress.Any, 60777 + siloNum);
+                    })///.Configure<SchedulingOptions>(options => options.MaxActiveThreads = 2)
                     .EnableDirectClient();
                 })
                 //.ConfigureLogging(logging => logging.AddConsole())
