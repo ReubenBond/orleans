@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Messaging
 
             var (headerLength, bodyLength) = ReadLengths(input);
 
-            var requiredBytes = headerLength + bodyLength;
+            var requiredBytes = 8 + headerLength + bodyLength;
             if (input.Length < requiredBytes)
             {
                 message = default;
@@ -63,7 +63,7 @@ namespace Orleans.Runtime.Messaging
             this.objectSerializer.Deserialize(body, out var bodyObject);
             message.BodyObject = bodyObject;
 
-            input = input.Slice(Message.LENGTH_HEADER_SIZE + requiredBytes);
+            input = input.Slice(requiredBytes);
             return 0;
         }
 
