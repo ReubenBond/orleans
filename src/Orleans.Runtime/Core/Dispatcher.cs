@@ -399,7 +399,7 @@ namespace Orleans.Runtime
             {
                 if (targetActivation.Grain.IsGrain && message.IsUsingInterfaceVersions)
                 {
-                    var request = ((InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager));
+                    var request = (InvokeMethodRequest)message.BodyObject;
                     var compatibilityDirector = compatibilityDirectorManager.GetDirector(request.InterfaceId);
                     var currentVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
                     if (!compatibilityDirector.IsCompatible(request.InterfaceVersion, currentVersion))
@@ -729,7 +729,7 @@ namespace Orleans.Runtime
             var strategy = targetAddress.Grain.IsGrain ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
 
             var request = message.IsUsingInterfaceVersions
-                ? message.GetDeserializedBody(this.serializationManager) as InvokeMethodRequest
+                ? message.BodyObject as InvokeMethodRequest
                 : null;
             var target = new PlacementTarget(
                 message.TargetGrain,

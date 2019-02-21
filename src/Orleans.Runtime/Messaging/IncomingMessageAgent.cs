@@ -44,10 +44,9 @@ namespace Orleans.Runtime.Messaging
         protected override async Task Run()
         {
             var ct = Cts.Token;
+            var reader = messageCenter.GetReader(category);
             while (true)
             {
-                var reader = messageCenter.GetReader(category);
-
                 var vt = reader.WaitToReadAsync(ct);
                 var res = vt.IsCompletedSuccessfully ? vt.GetAwaiter().GetResult() : await vt.ConfigureAwait(false);
                 if (!res && reader.Completion.IsCompleted) return;

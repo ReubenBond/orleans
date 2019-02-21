@@ -76,6 +76,7 @@ namespace Orleans.Messaging
 
         internal readonly GatewayManager GatewayManager;
         internal readonly Channel<Message> PendingInboundMessages;
+        private readonly Action<Message>[] messageHandlers;
         private int numMessages;
         // The grainBuckets array is used to select the connection to use when sending an ordered message to a grain.
         // Requests are bucketed by GrainID, so that all requests to a grain get routed through the same bucket.
@@ -108,6 +109,7 @@ namespace Orleans.Messaging
             IOptions<StatisticsOptions> statisticsOptions,
             ConnectionManager connectionManager)
         {
+            this.messageHandlers = new Action<Message>[Enum.GetValues(typeof(Message.Categories)).Length];
             this.connectionManager = connectionManager;
             this.SerializationManager = serializationManager;
             lockable = new object();
@@ -188,7 +190,15 @@ namespace Orleans.Messaging
 
         public void OnReceivedMessage(Message message)
         {
-            PendingInboundMessages.Writer.TryWrite(message);
+            var handler = this.messageHandlers[(int)message.Category];
+            if (handler != null)
+            {
+                handler(message);
+            }
+            else
+            {
+                PendingInboundMessages.Writer.TryWrite(message);
+            }
         }
 
         public void SendMessage(Message msg)

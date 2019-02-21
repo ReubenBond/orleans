@@ -179,7 +179,7 @@ namespace Orleans.Runtime.Messaging.RePlat
             }
 
             PipeOptions GetPipeOptions(PipeScheduler readerScheduler, PipeScheduler writerScheduler) => new PipeOptions(
-                pool: MemoryPool<byte>.Shared,
+                pool: this.memoryPool,
                 readerScheduler: readerScheduler,
                 writerScheduler: writerScheduler,
                 pauseWriterThreshold: 0,

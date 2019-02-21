@@ -230,6 +230,7 @@ namespace Orleans
 
             var generation = -SiloAddress.AllocateNewGeneration(); // Client generations are negative
             transport = ActivatorUtilities.CreateInstance<ClientMessageCenter>(this.ServiceProvider, localAddress, generation, handshakeClientId);
+            transport.RegisterLocalMessageHandler(Message.Categories.Application, this.HandleMessage);
             transport.Start();
             CurrentActivationAddress = ActivationAddress.NewActivationAddress(transport.MyAddress, handshakeClientId);
 
@@ -325,48 +326,50 @@ namespace Orleans
                         return;
                     }
 
-                    // when we receive the first message, we update the
-                    // clientId for this client because it may have been modified to
-                    // include the cluster name
-                    if (!firstMessageReceived)
-                    {
-                        firstMessageReceived = true;
-                        if (!handshakeClientId.Equals(message.TargetGrain))
-                        {
-                            clientId = message.TargetGrain;
-                            transport.UpdateClientId(clientId);
-                            CurrentActivationAddress = ActivationAddress.GetAddress(transport.MyAddress, clientId, CurrentActivationAddress.Activation);
-                        }
-                        else
-                        {
-                            clientId = handshakeClientId;
-                        }
-                    }
-
-                    switch (message.Direction)
-                    {
-                        case Message.Directions.Response:
-                            {
-                                ReceiveResponse(message);
-                                break;
-                            }
-                        case Message.Directions.OneWay:
-                        case Message.Directions.Request:
-                            {
-                                this.localObjects.Dispatch(message);
-                                break;
-                            }
-                        default:
-                            logger.Error(ErrorCode.Runtime_Error_100327, $"Message not supported: {message}.");
-                            break;
-                    }
-
+                    HandleMessage(message);
                 }
-                
+            }
+        }
+
+        private void HandleMessage(Message message)
+        {
+            // when we receive the first message, we update the
+            // clientId for this client because it may have been modified to
+            // include the cluster name
+            if (!firstMessageReceived)
+            {
+                firstMessageReceived = true;
+                if (!handshakeClientId.Equals(message.TargetGrain))
+                {
+                    clientId = message.TargetGrain;
+                    transport.UpdateClientId(clientId);
+                    CurrentActivationAddress = ActivationAddress.GetAddress(transport.MyAddress, clientId, CurrentActivationAddress.Activation);
+                }
+                else
+                {
+                    clientId = handshakeClientId;
+                }
             }
 
+            switch (message.Direction)
+            {
+                case Message.Directions.Response:
+                    {
+                        ReceiveResponse(message);
+                        break;
+                    }
+                case Message.Directions.OneWay:
+                case Message.Directions.Request:
+                    {
+                        this.localObjects.Dispatch(message);
+                        break;
+                    }
+                default:
+                    logger.Error(ErrorCode.Runtime_Error_100327, $"Message not supported: {message}.");
+                    break;
+            }
         }
-        
+
         public void SendResponse(Message request, Response response)
         {
             var message = this.messageFactory.CreateResponseMessage(request);

@@ -378,8 +378,6 @@ namespace Orleans.Runtime
             set { Headers.RequestContextData = value; }
         }
 
-        public object GetDeserializedBody(SerializationManager serializationManager) => this.BodyObject;
-
         public object BodyObject { get; set; }
 
         public void ClearTargetAddress()

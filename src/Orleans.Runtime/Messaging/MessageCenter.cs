@@ -23,14 +23,10 @@ namespace Orleans.Runtime.Messaging
         internal OutboundMessageQueue OutboundQueue { get; set; }
         internal InboundMessageQueue InboundQueue { get; set; }
         internal SocketManager SocketManager;
-        private readonly SerializationManager serializationManager;
         private readonly MessageFactory messageFactory;
         private readonly ILoggerFactory loggerFactory;
         private readonly ConnectionManager senderManager;
-        private readonly ISerializer<Message.HeadersContainer> messageHeadersSerializer;
-        private readonly ISerializer<object> objectSerializer;
-        private readonly ExecutorService executorService;
-        private readonly Action<Message>[] localMessageHandlers;
+        private readonly Action<Message>[] messageHandlers;
         private SiloMessagingOptions messagingOptions;
         internal bool IsBlockingApplicationMessages { get; private set; }
 
@@ -53,25 +49,17 @@ namespace Orleans.Runtime.Messaging
             IOptions<EndpointOptions> endpointOptions,
             IOptions<SiloMessagingOptions> messagingOptions,
             IOptions<NetworkingOptions> networkingOptions,
-            SerializationManager serializationManager,
             MessageFactory messageFactory,
             Factory<MessageCenter, Gateway> gatewayFactory,
-            ExecutorService executorService,
             ILoggerFactory loggerFactory,
             IOptions<StatisticsOptions> statisticsOptions,
-            ConnectionManager senderManager,
-            ISerializer<Message.HeadersContainer> messageHeadersSerializer,
-            ISerializer<object> objectSerializer)
+            ConnectionManager senderManager)
         {
             this.messagingOptions = messagingOptions.Value;
             this.loggerFactory = loggerFactory;
             this.senderManager = senderManager;
-            this.messageHeadersSerializer = messageHeadersSerializer;
-            this.objectSerializer = objectSerializer;
             this.log = loggerFactory.CreateLogger<MessageCenter>();
-            this.serializationManager = serializationManager;
             this.messageFactory = messageFactory;
-            this.executorService = executorService;
             this.MyAddress = siloDetails.SiloAddress;
             this.Initialize(endpointOptions, networkingOptions, statisticsOptions);
             if (siloDetails.GatewayAddress != null)
@@ -79,7 +67,7 @@ namespace Orleans.Runtime.Messaging
                 Gateway = gatewayFactory(this);
             }
 
-            localMessageHandlers = new Action<Message>[Enum.GetValues(typeof(Message.Categories)).Length];
+            messageHandlers = new Action<Message>[Enum.GetValues(typeof(Message.Categories)).Length];
         }
 
         private void Initialize(IOptions<EndpointOptions> endpointOptions,
@@ -175,7 +163,15 @@ namespace Orleans.Runtime.Messaging
 
         public void OnReceivedMessage(Message message)
         {
-            this.InboundQueue.PostMessage(message);
+            var handler = this.messageHandlers[(int)message.Category];
+            if (handler != null)
+            {
+                handler(message);
+            }
+            else
+            {
+                this.InboundQueue.PostMessage(message);
+            }
         }
 
         public void RerouteMessage(Message message)
@@ -226,15 +222,7 @@ namespace Orleans.Runtime.Messaging
 
             if (log.IsEnabled(LogLevel.Trace)) log.Trace("Message has been looped back to this silo: {0}", message);
             MessagingStatisticsGroup.LocalMessagesSent.Increment();
-            var localHandler = localMessageHandlers[(int) message.Category];
-            if (localHandler != null)
-            {
-                localHandler(message);
-            }
-            else
-            {
-                InboundQueue.PostMessage(message);
-            }
+            this.OnReceivedMessage(message);
 
             return true;
         }
@@ -245,7 +233,7 @@ namespace Orleans.Runtime.Messaging
             if (string.IsNullOrEmpty(reason)) reason = string.Format("Rejection from silo {0} - Unknown reason.", MyAddress);
             Message error = this.messageFactory.CreateRejectionResponse(msg, rejectionType, reason);
             // rejection msgs are always originated in the local silo, they are never remote.
-            InboundQueue.PostMessage(error);
+            this.OnReceivedMessage(error);
         }
 
         public ChannelReader<Message> GetReader(Message.Categories type) => InboundQueue.GetReader(type);
@@ -253,7 +241,7 @@ namespace Orleans.Runtime.Messaging
 
         public void RegisterLocalMessageHandler(Message.Categories category, Action<Message> handler)
         {
-            localMessageHandlers[(int) category] = handler;
+            messageHandlers[(int) category] = handler;
         }
 
         public void Dispose()

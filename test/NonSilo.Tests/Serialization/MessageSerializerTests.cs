@@ -126,7 +126,7 @@ namespace UnitTests.Serialization
             Assert.True(resp.SendingGrain.Equals(resp1.SendingGrain));
             Assert.True(resp.SendingSilo.Equals(resp1.SendingSilo)); //SendingSilo is incorrect
             Assert.True(resp1.IsUsingInterfaceVersions);
-            List<object> responseList = Assert.IsAssignableFrom<List<object>>(resp1.GetDeserializedBody(this.fixture.SerializationManager));
+            List<object> responseList = Assert.IsAssignableFrom<List<object>>(resp1.BodyObject);
             Assert.Equal<int>(numItems, responseList.Count); //Body list has wrong number of entries
             for (int k = 0; k < numItems; k++)
             {
