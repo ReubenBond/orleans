@@ -4,8 +4,9 @@ using Orleans;
 
 namespace TestGrainContracts
 {
-    public interface IMyHappyLittleKestrelGrain : IGrainWithStringKey
+    public interface IMyHappyLittleKestrelGrain : IGrainWithIntegerKey
     {
         Task<string> SayHelloKestrel(string name);
+        Task<string> HelloChain(int id);
     }
 }

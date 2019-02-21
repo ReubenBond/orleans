@@ -3,7 +3,7 @@ using System;
 namespace Orleans.Runtime
 {
     [Serializable]
-    internal struct CorrelationId : IEquatable<CorrelationId>, IComparable<CorrelationId>
+    internal class CorrelationId : IEquatable<CorrelationId>, IComparable<CorrelationId>
     {
         private readonly long id;
         private static long nextToUse = 1;
@@ -12,7 +12,11 @@ namespace Orleans.Runtime
         {
             id = value;
         }
-        
+
+        internal CorrelationId() : this(0)
+        {
+        }
+
         public CorrelationId(CorrelationId other)
         {
             id = other.id;

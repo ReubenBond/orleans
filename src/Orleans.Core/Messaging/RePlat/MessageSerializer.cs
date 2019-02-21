@@ -78,9 +78,8 @@ namespace Orleans.Runtime.Messaging
 
             // Write length prefixes, first header length then body length.
             Span<byte> lengthFields = stackalloc byte[8];
-            var lengthPrefixes = MemoryMarshal.Cast<byte, int>(lengthFields);
-            lengthPrefixes[0] = headerLength;
-            lengthPrefixes[1] = bodyLength;
+            BinaryPrimitives.WriteInt32LittleEndian(lengthFields, headerLength);
+            BinaryPrimitives.WriteInt32LittleEndian(lengthFields.Slice(4), bodyLength);
 
             buffer.Complete(lengthFields);
         }

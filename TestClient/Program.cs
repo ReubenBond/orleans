@@ -13,7 +13,7 @@ namespace TestClient
                 .Build();
             await client.Connect(ex => Task.FromResult(true));
 
-            var grain = client.GetGrain<TestGrainContracts.IMyHappyLittleKestrelGrain>("rando");
+            var grain = client.GetGrain<TestGrainContracts.IMyHappyLittleKestrelGrain>(50);
 
             while (true)
             {

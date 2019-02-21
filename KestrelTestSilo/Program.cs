@@ -19,9 +19,10 @@ namespace KestrelTestSilo
         {
             var primary = new IPEndPoint(IPAddress.Loopback, 60666);
             var one = await CreateSilo(primary, 0);
-            var two = await CreateSilo(primary, 1);
-            var three = await CreateSilo(primary, 2);
+           // var two = await CreateSilo(primary, 1);
+           // var three = await CreateSilo(primary, 2);
 
+            //await Task.Delay(TimeSpan.FromMinutes(2));
             await RunClient();
             /*var client = two.Services.GetRequiredService<IClusterClient>();
             var grain = client.GetGrain<IMyHappyLittleKestrelGrain>("blah");
@@ -84,12 +85,23 @@ namespace KestrelTestSilo
                 .Build();
             await client.Connect(ex => Task.FromResult(true));
 
-            var grain = client.GetGrain<IMyHappyLittleKestrelGrain>("rando");
+            var grain = client.GetGrain<IMyHappyLittleKestrelGrain>(11);
 
             while (true)
             {
-                var message = await grain.SayHelloKestrel("Reuben");
-                await Task.Delay(1000);
+                try
+                {
+                    var message = await grain.HelloChain(10);
+                    //Console.WriteLine("Message: " + message);
+                }
+                catch// (Exception exception)
+                {
+                    //Console.WriteLine("Exception: " + exception);
+                }
+                finally
+                {
+                    //await Task.Delay(10);
+                }
             }
         }
 
@@ -124,10 +136,18 @@ namespace KestrelTestSilo
 
         public MyKestrelGrain(ILogger<MyKestrelGrain> log) => this.log = log;
 
+        public Task<string> HelloChain(int id)
+        {
+            var grain = this.GrainFactory.GetGrain<IMyHappyLittleKestrelGrain>(id);
+            if (id <= 0) return grain.SayHelloKestrel("mememe");
+            return grain.HelloChain(id - 1);
+        }
+
         public Task<string> SayHelloKestrel(string name)
         {
-            this.log.LogInformation($"Received a happy little message from {name} just now :)");
-            return Task.FromResult($"Hello from Orleans on Kestrel, {name}!!!");
+            throw new InvalidOperationException("no no " + name);
+           // this.log.LogInformation($"Received a happy little message from {name} just now :)");
+           // return Task.FromResult($"Hello from Orleans on Kestrel, {name}!!!");
         }
     }
 }
