@@ -51,7 +51,7 @@ namespace Benchmarks.Ping
         //[Benchmark]
         // public Task Ping() => grain.Run();
 
-        //[Benchmark]
+        [Benchmark]
         public ValueTask<int> Echo() => this.echoGrain.Echo(7);
 
         [Benchmark]
