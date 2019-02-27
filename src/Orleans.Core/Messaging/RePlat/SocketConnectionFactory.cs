@@ -30,7 +30,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-            SetRecommendedClientOptions(socket);
+            SetRecommendedOptions(socket);
             var completion = new SingleUseSocketAsyncEventArgs
             {
                 RemoteEndPoint = remoteEndPoint
@@ -66,8 +66,7 @@ namespace Orleans.Runtime.Messaging
             return connection;
         }
 
-        /// <param name="socket">The socket to set options against</param>
-        public static void SetRecommendedClientOptions(Socket socket)
+        public static void SetRecommendedOptions(Socket socket)
         {
             if (socket.AddressFamily == AddressFamily.Unix) return;
 
@@ -93,17 +92,6 @@ namespace Orleans.Runtime.Messaging
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// Set recommended socket options for server sockets
-        /// </summary>
-        /// <param name="socket">The socket to set options against</param>
-        public static void SetRecommendedServerOptions(Socket socket)
-        {
-            if (socket.AddressFamily == AddressFamily.Unix) return;
-
-            try { socket.NoDelay = true; } catch { }
         }
 
         internal static PipeOptions GetPipeOptions(PipeScheduler readerScheduler, PipeScheduler writerScheduler) => new PipeOptions(

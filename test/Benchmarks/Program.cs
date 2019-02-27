@@ -115,7 +115,7 @@ namespace Benchmarks
             },
             ["SequentialPing"] = () =>
             {
-                BenchmarkRunner.Run<KestrelSequentialPingBenchmark>(DefaultConfig.Instance.With(Job.Default.With(CsProjCoreToolchain.NetCoreApp30)));
+                BenchmarkRunner.Run<KestrelSequentialPingBenchmark>(DefaultConfig.Instance.With(Job.MediumRun.With(CsProjCoreToolchain.NetCoreApp30)));
             },
             ["PingForever"] = () =>
             {

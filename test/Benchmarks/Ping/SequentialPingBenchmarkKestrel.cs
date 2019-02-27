@@ -15,7 +15,7 @@ using Microsoft.Extensions.Hosting;
 namespace Benchmarks.Ping
 {
     [MemoryDiagnoser]
-    [EtwProfiler]
+    //[EtwProfiler]
     public class KestrelSequentialPingBenchmark : IDisposable 
     {
         private readonly IHost host;

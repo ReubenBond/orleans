@@ -56,6 +56,7 @@ namespace Orleans.Runtime.Messaging.RePlat
             }
             
             var listenSocket = new Socket(this.endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            SocketConnectionFactory.SetRecommendedOptions(listenSocket);
 
             // Kestrel expects IPv6Any to bind to both IPv6 and IPv4
             if (this.endPoint.Address == IPAddress.IPv6Any)
@@ -126,7 +127,7 @@ namespace Orleans.Runtime.Messaging.RePlat
                     {
                         var acceptSocket = await this.listenSocket.AcceptAsync();
                         acceptSocket.NoDelay = true;
-                        SocketConnectionFactory.SetRecommendedClientOptions(acceptSocket);
+                        SocketConnectionFactory.SetRecommendedOptions(acceptSocket);
 
                         var connection = new SocketConnection(acceptSocket, this.memoryPool, this.scheduler, this.trace);
 
