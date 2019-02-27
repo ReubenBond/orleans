@@ -39,6 +39,38 @@ namespace Orleans.Runtime.Scheduler
         }
     }
 
+    internal class ClosureWorkItem<T> : WorkItemBase
+    {
+        private readonly Action<T> continuation;
+        private readonly string name;
+        private T state;
+
+        public override string Name => this.name ?? GetMethodName(this.continuation);
+
+        public ClosureWorkItem(Action<T> closure, string name, T state)
+        {
+            continuation = closure;
+            this.name = name;
+            this.state = state;
+        }
+
+        public override void Execute()
+        {
+            continuation(this.state);
+        }
+
+        public override WorkItemType ItemType => WorkItemType.Closure;
+
+        internal static string GetMethodName(Delegate action)
+        {
+            var continuationMethodInfo = action.GetMethodInfo();
+            return string.Format(
+                "{0}->{1}",
+                action.Target?.ToString() ?? string.Empty,
+                continuationMethodInfo == null ? string.Empty : continuationMethodInfo.ToString());
+        }
+    }
+
     internal class AsyncClosureWorkItem : WorkItemBase
     {
         private readonly TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>();

@@ -22,6 +22,11 @@ namespace Orleans
         public const int RuntimeServices = 4000;
 
         /// <summary>
+        /// Start listening for incoming silo connections.
+        /// </summary>
+        public const int AcceptSiloConnections = 4050;
+
+        /// <summary>
         /// Initialize runtime storage
         /// </summary>
         public const int RuntimeStorageServices = 6000;
@@ -42,12 +47,17 @@ namespace Orleans
         /// and the gateway, no other component should run
         /// at this stage
         /// </summary>
-        public const int BecomeActive = Active-1;
+        public const int BecomeActive = Active - 1;
 
         /// <summary>
         /// Service is active.
         /// </summary>
         public const int Active = 20000;
+
+        /// <summary>
+        /// Start listening for gateway connections.
+        /// </summary>
+        public const int AcceptGatewayConnections = 20050;
 
         /// <summary>
         /// Last valid stage in service's lifecycle

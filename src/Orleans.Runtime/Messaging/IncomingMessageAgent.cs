@@ -1,11 +1,12 @@
 using System;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class IncomingMessageAgent : DedicatedAsynchAgent
+    internal class IncomingMessageAgent : TaskSchedulerAgent
     {
         private readonly IMessageCenter messageCenter;
         private readonly ActivationDirectory directory;
@@ -21,9 +22,8 @@ namespace Orleans.Runtime.Messaging
             OrleansTaskScheduler sched, 
             Dispatcher dispatcher, 
             MessageFactory messageFactory,
-            ExecutorService executorService,
             ILoggerFactory loggerFactory) :
-            base(cat.ToString(), executorService, loggerFactory)
+            base(cat.ToString(), loggerFactory)
         {
             category = cat;
             messageCenter = mc;
@@ -41,22 +41,30 @@ namespace Orleans.Runtime.Messaging
             if (Log.IsEnabled(LogLevel.Trace)) Log.Trace("Started incoming message agent for silo at {0} for {1} messages", messageCenter.MyAddress, category);
         }
 
-        protected override void Run()
+        protected override async Task Run()
         {
-            CancellationToken ct = Cts.Token;
+            var ct = Cts.Token;
+            var reader = messageCenter.GetReader(category);
             while (true)
             {
+                var vt = reader.WaitToReadAsync(ct);
+                var res = vt.IsCompletedSuccessfully ? vt.GetAwaiter().GetResult() : await vt.ConfigureAwait(false);
+                if (!res && reader.Completion.IsCompleted) return;
+
                 // Get an application message
-                var msg = messageCenter.WaitMessage(category, ct);
-                if (msg == null)
+                while (reader.TryRead(out var msg))
                 {
-                    if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Dequeued a null message, exiting");
-                    // Null return means cancelled
-                    break;
+                    if (msg == null)
+                    {
+                        if (Log.IsEnabled(LogLevel.Debug)) Log.Debug("Dequeued a null message, exiting");
+                        // Null return means cancelled
+                        continue;
+                    }
+                    else
+                    {
+                        ReceiveMessage(msg);
+                    }
                 }
-
-
-                ReceiveMessage(msg);
             }
         }
 
@@ -146,18 +154,22 @@ namespace Orleans.Runtime.Messaging
 
             if (targetActivation != null) targetActivation.IncrementEnqueuedOnDispatcherCount();
 
-            scheduler.QueueWorkItem(new ClosureWorkItem(() =>
-            {
-                try
+            scheduler.QueueWorkItem(
+                new ClosureWorkItem<(Dispatcher dispatcher, ActivationData activation, Message msg)>(
+                state =>
                 {
-                    dispatcher.ReceiveMessage(msg);
-                }
-                finally
-                {
-                    if (targetActivation != null) targetActivation.DecrementEnqueuedOnDispatcherCount();
-                }
-            },
-            "Dispatcher.ReceiveMessage"), context);
+                    try
+                    {
+                        state.dispatcher.ReceiveMessage(state.msg);
+                    }
+                    finally
+                    {
+                        if (state.activation != null) state.activation.DecrementEnqueuedOnDispatcherCount();
+                    }
+                },
+                "Dispatcher.ReceiveMessage",
+                (dispatcher, targetActivation, msg)),
+            context);
         }
     }
 }

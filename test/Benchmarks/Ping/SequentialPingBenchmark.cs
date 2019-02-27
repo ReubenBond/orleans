@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Diagnostics.Windows.Configs;
 using BenchmarkGrainInterfaces.Ping;
 using Orleans;
 using Orleans.Configuration;
@@ -11,6 +12,7 @@ using Orleans.Hosting;
 namespace Benchmarks.Ping
 {
     [MemoryDiagnoser]
+    [EtwProfiler(performExtraBenchmarksRun: false)]
     public class SequentialPingBenchmark : IDisposable 
     {
         private readonly ISiloHost host;

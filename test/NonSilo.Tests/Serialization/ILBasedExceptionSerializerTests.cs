@@ -1,5 +1,7 @@
 using System;
+using System.Buffers;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -9,6 +11,118 @@ using Xunit;
 
 namespace UnitTests.Serialization
 {
+    internal class ArrayBufferWriter : IBufferWriter<byte>, IDisposable
+    {
+        private ResizableArray<byte> buffer;
+
+        public ArrayBufferWriter(int capacity = 1024)
+        {
+            this.buffer = new ResizableArray<byte>(ArrayPool<byte>.Shared.Rent(capacity));
+        }
+
+        public int CommitedByteCount => this.buffer.Count;
+
+        public void Clear()
+        {
+            this.buffer.Count = 0;
+        }
+
+        public ArraySegment<byte> Free => this.buffer.Free;
+
+        public ArraySegment<byte> Formatted => this.buffer.Full;
+
+        public byte[] ToArray() => this.Formatted.AsMemory().ToArray();
+
+        public Memory<byte> GetMemory(int minimumLength = 0)
+        {
+            if (minimumLength < 1)
+            {
+                minimumLength = 1;
+            }
+
+            if (minimumLength > this.buffer.FreeCount)
+            {
+                int doubleCount = this.buffer.FreeCount * 2;
+                int newSize = minimumLength > doubleCount ? minimumLength : doubleCount;
+                byte[] newArray = ArrayPool<byte>.Shared.Rent(newSize + this.buffer.Count);
+                byte[] oldArray = this.buffer.Resize(newArray);
+                ArrayPool<byte>.Shared.Return(oldArray);
+            }
+
+            return this.buffer.FreeMemory;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Span<byte> GetSpan(int minimumLength = 0)
+        {
+            if (minimumLength < 1)
+            {
+                minimumLength = 1;
+            }
+
+            if (minimumLength > this.buffer.FreeCount)
+            {
+                int doubleCount = this.buffer.FreeCount * 2;
+                int newSize = minimumLength > doubleCount ? minimumLength : doubleCount;
+                byte[] newArray = ArrayPool<byte>.Shared.Rent(newSize + this.buffer.Count);
+                byte[] oldArray = this.buffer.Resize(newArray);
+                ArrayPool<byte>.Shared.Return(oldArray);
+            }
+
+            return this.buffer.FreeSpan;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Advance(int bytes)
+        {
+            this.buffer.Count += bytes;
+            if (this.buffer.Count > this.buffer.Capacity)
+            {
+                throw new InvalidOperationException("More bytes commited than returned from FreeBuffer");
+            }
+        }
+
+        public void Dispose()
+        {
+            byte[] array = this.buffer.Array;
+            this.buffer.Array = null;
+            ArrayPool<byte>.Shared.Return(array);
+        }
+
+        private struct ResizableArray<T>
+        {
+            public ResizableArray(T[] array, int count = 0)
+            {
+                this.Array = array;
+                this.Count = count;
+            }
+
+            public T[] Array { get; set; }
+
+            public int Count { get; set; }
+
+            public int Capacity => this.Array.Length;
+
+            public T[] Resize(T[] newArray)
+            {
+                T[] oldArray = this.Array;
+                this.Array.AsSpan(0, this.Count).CopyTo(newArray);  // CopyTo will throw if newArray.Length < _count
+                this.Array = newArray;
+                return oldArray;
+            }
+
+            public ArraySegment<T> Full => new ArraySegment<T>(this.Array, 0, this.Count);
+
+            public ArraySegment<T> Free => new ArraySegment<T>(this.Array, this.Count, this.Array.Length - this.Count);
+
+            public Span<T> FreeSpan => new Span<T>(this.Array, this.Count, this.Array.Length - this.Count);
+
+            public Memory<T> FreeMemory => new Memory<T>(this.Array, this.Count, this.Array.Length - this.Count);
+
+            public int FreeCount => this.Array.Length - this.Count;
+        }
+    }
+
     [TestCategory("BVT"), TestCategory("Serialization")]
     public class ILBasedExceptionSerializerTests
     {
@@ -34,9 +148,11 @@ namespace UnitTests.Serialization
 
         private ILExceptionSerializerTestException TestExceptionSerialization(ILExceptionSerializerTestException expected)
         {
-            var writer = new SerializationContext(this.environment.SerializationManager)
+            var buffer = new ArrayBufferWriter();
+            var writer = new BinaryTokenStreamWriter2<ArrayBufferWriter>(buffer);
+            var context = new SerializationContext(this.environment.SerializationManager)
             {
-                StreamWriter = new BinaryTokenStreamWriter()
+                StreamWriter = writer
             };
 
             // Deep copies should be reference-equal.
@@ -45,10 +161,11 @@ namespace UnitTests.Serialization
                 SerializationManager.DeepCopyInner(expected, new SerializationContext(this.environment.SerializationManager)),
                 ReferenceEqualsComparer.Instance);
 
-            this.environment.SerializationManager.Serialize(expected, writer.StreamWriter);
+            this.environment.SerializationManager.Serialize(expected, writer);
+            writer.Commit();
             var reader = new DeserializationContext(this.environment.SerializationManager)
             {
-                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+                StreamReader = new BinaryTokenStreamReader(buffer.ToArray())
             };
 
             var actual = (ILExceptionSerializerTestException) this.environment.SerializationManager.Deserialize(null, reader.StreamReader);
@@ -95,15 +212,18 @@ namespace UnitTests.Serialization
             // Create a reference cycle.
             exception.SomeObject = expected;
 
-            var writer = new SerializationContext(this.environment.SerializationManager)
+            var buffer = new ArrayBufferWriter();
+            var writer = new BinaryTokenStreamWriter2<ArrayBufferWriter>(buffer);
+            var context = new SerializationContext(this.environment.SerializationManager)
             {
-                StreamWriter = new BinaryTokenStreamWriter()
+                StreamWriter = writer
             };
             
-            this.environment.SerializationManager.Serialize(expected, writer.StreamWriter);
+            this.environment.SerializationManager.Serialize(expected, context.StreamWriter);
+            writer.Commit();
             var reader = new DeserializationContext(this.environment.SerializationManager)
             {
-                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+                StreamReader = new BinaryTokenStreamReader(buffer.ToArray())
             };
 
             var actual = (Outer)this.environment.SerializationManager.Deserialize(null, reader.StreamReader);
@@ -151,12 +271,15 @@ namespace UnitTests.Serialization
             var expected = GetNewException();
 
             var knowsException = new ILBasedExceptionSerializer(this.serializerGenerator, new TypeSerializer(new CachedTypeResolver()));
-            
-            var writer = new SerializationContext(this.environment.SerializationManager)
+
+            var buffer = new ArrayBufferWriter();
+            var writer = new BinaryTokenStreamWriter2<ArrayBufferWriter>(buffer);
+            var context = new SerializationContext(this.environment.SerializationManager)
             {
-                StreamWriter = new BinaryTokenStreamWriter()
+                StreamWriter = writer
             };
-            knowsException.Serialize(expected, writer, null);
+            knowsException.Serialize(expected, context, null);
+            writer.Commit();
 
             // Deep copies should be reference-equal.
             var copyContext = new SerializationContext(this.environment.SerializationManager);
@@ -165,7 +288,7 @@ namespace UnitTests.Serialization
             // Create a deserializer which doesn't know about the expected exception type.
             var reader = new DeserializationContext(this.environment.SerializationManager)
             {
-                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+                StreamReader = new BinaryTokenStreamReader(buffer.ToArray())
             };
 
             // Ensure that the deserialized object has the fallback type.
@@ -178,15 +301,18 @@ namespace UnitTests.Serialization
             Assert.Equal(RuntimeTypeNameFormatter.Format(typeof(ILExceptionSerializerTestException)), actualDeserialized.OriginalTypeName);
 
             // Re-serialize the deserialized object using the serializer which does not have access to the original type.
-            writer = new SerializationContext(this.environment.SerializationManager)
+            var buffer2 = new ArrayBufferWriter();
+            var writer2 = new BinaryTokenStreamWriter2<ArrayBufferWriter>(buffer2);
+            context = new SerializationContext(this.environment.SerializationManager)
             {
-                StreamWriter = new BinaryTokenStreamWriter()
+                StreamWriter = writer2
             };
-            doesNotKnowException.Serialize(untypedActual, writer, null);
+            doesNotKnowException.Serialize(untypedActual, context, null);
+            writer2.Commit();
 
             reader = new DeserializationContext(this.environment.SerializationManager)
             {
-                StreamReader = new BinaryTokenStreamReader(writer.StreamWriter.ToByteArray())
+                StreamReader = new BinaryTokenStreamReader(buffer2.ToArray())
             };
 
             // Deserialize the round-tripped object and verify that it has the original type and all properties are

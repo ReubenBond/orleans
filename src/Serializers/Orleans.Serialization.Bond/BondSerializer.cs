@@ -19,9 +19,9 @@ namespace Orleans.Serialization
     /// </summary>
     public class BondSerializer : IExternalSerializer
     {
-        private static ConcurrentDictionary<RuntimeTypeHandle, ClonerInfo> ClonerInfoDictionary;
-        private static ConcurrentDictionary<RuntimeTypeHandle, BondTypeSerializer> SerializerDictionary;
-        private static ConcurrentDictionary<RuntimeTypeHandle, BondTypeDeserializer> DeserializerDictionary;
+        private static ConcurrentDictionary<Type, ClonerInfo> ClonerInfoDictionary;
+        private static ConcurrentDictionary<Type, BondTypeSerializer> SerializerDictionary;
+        private static ConcurrentDictionary<Type, BondTypeDeserializer> DeserializerDictionary;
 
         private ILogger logger;
 
@@ -31,9 +31,9 @@ namespace Orleans.Serialization
         /// <param name="logger"></param>
         public BondSerializer(ILogger<BondSerializer> logger)
         {
-            ClonerInfoDictionary = new ConcurrentDictionary<RuntimeTypeHandle, ClonerInfo>();
-            SerializerDictionary = new ConcurrentDictionary<RuntimeTypeHandle, BondTypeSerializer>();
-            DeserializerDictionary = new ConcurrentDictionary<RuntimeTypeHandle, BondTypeDeserializer>();
+            ClonerInfoDictionary = new ConcurrentDictionary<Type, ClonerInfo>();
+            SerializerDictionary = new ConcurrentDictionary<Type, BondTypeSerializer>();
+            DeserializerDictionary = new ConcurrentDictionary<Type, BondTypeDeserializer>();
             this.logger = logger;
         }
 
@@ -44,7 +44,7 @@ namespace Orleans.Serialization
         /// <returns>A value indicating whether the type can be serialized</returns>
         public bool IsSupportedType(Type itemType)
         {
-            if (ClonerInfoDictionary.ContainsKey(itemType.TypeHandle))
+            if (ClonerInfoDictionary.ContainsKey(itemType))
             {
                 return true;
             }
@@ -71,7 +71,7 @@ namespace Orleans.Serialization
                 return null;
             }
 
-            var clonerInfo = GetClonerInfo(source.GetType().TypeHandle);
+            var clonerInfo = GetClonerInfo(source.GetType());
             if (clonerInfo == null)
             {
                 LogWarning(1, "no copier found for type {0}", source.GetType());
@@ -94,8 +94,7 @@ namespace Orleans.Serialization
                 throw new ArgumentNullException(nameof(context));
             }
 
-            var typeHandle = expectedType.TypeHandle;
-            var deserializer = GetDeserializer(typeHandle);
+            var deserializer = GetDeserializer(expectedType);
             if (deserializer == null)
             {
                 LogWarning(3, "no deserializer found for type {0}", expectedType.FullName);
@@ -122,8 +121,8 @@ namespace Orleans.Serialization
                 return;
             }
 
-            var typeHandle = item.GetType().TypeHandle;
-            var serializer = GetSerializer(typeHandle);
+            var type = item.GetType();
+            var serializer = GetSerializer(type);
             if (serializer == null)
             {
                 LogWarning(2, "no serializer found for type {0}", item.GetType());
@@ -140,22 +139,22 @@ namespace Orleans.Serialization
             return ((Cloner<T>)cloner).Clone<T>(source);
         }
 
-        private static ClonerInfo GetClonerInfo(RuntimeTypeHandle handle)
+        private static ClonerInfo GetClonerInfo(Type handle)
         {
             return Get(ClonerInfoDictionary, handle);
         }
 
-        private static BondTypeSerializer GetSerializer(RuntimeTypeHandle handle)
+        private static BondTypeSerializer GetSerializer(Type handle)
         {
             return Get(SerializerDictionary, handle);
         }
 
-        private static BondTypeDeserializer GetDeserializer(RuntimeTypeHandle handle)
+        private static BondTypeDeserializer GetDeserializer(Type handle)
         {
             return Get(DeserializerDictionary, handle);
         }
 
-        private static TValue Get<TValue>(IDictionary<RuntimeTypeHandle, TValue> dictionary, RuntimeTypeHandle key)
+        private static TValue Get<TValue>(ConcurrentDictionary<Type, TValue> dictionary, Type key)
         {
             TValue value;
             dictionary.TryGetValue(key, out value);
@@ -187,9 +186,9 @@ namespace Orleans.Serialization
                    sourceParameter,
                    instanceParameter);
             var copierDelegate = (Func<object, object, object>)lambda.Compile();
-            ClonerInfoDictionary.TryAdd(type.TypeHandle, new ClonerInfo(clonerInstance, copierDelegate));
-            SerializerDictionary.TryAdd(type.TypeHandle, serializer);
-            DeserializerDictionary.TryAdd(type.TypeHandle, deserializer);
+            ClonerInfoDictionary.TryAdd(type, new ClonerInfo(clonerInstance, copierDelegate));
+            SerializerDictionary.TryAdd(type, serializer);
+            DeserializerDictionary.TryAdd(type, deserializer);
         }
 
         private class ClonerInfo

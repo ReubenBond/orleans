@@ -1,4 +1,4 @@
-﻿using System.Runtime.Serialization;
+using System.Runtime.Serialization;
 using Orleans.Utilities;
 
 namespace Orleans.Serialization
@@ -95,15 +95,20 @@ namespace Orleans.Serialization
 
             // Create a nested context which will be written to the outer context at an int-length offset from the current position.
             // This is because the inner context will be copied with a length prefix to the outer context.
-            var innerContext = outerContext.CreateNestedContext(position: outerContext.CurrentOffset + sizeof(int), writer: new BinaryTokenStreamWriter());
+            using (var buffer = new ArrayBufferWriter())
+            {
+                var innerWriter = new BinaryTokenStreamWriter2<ArrayBufferWriter>(buffer);
+                var innerContext = outerContext.CreateNestedContext(position: outerContext.CurrentOffset + sizeof(int), writer: innerWriter);
 
-            // Serialize the exception itself.
-            var methods = this.GetSerializerMethods(actualType);
-            methods.Serialize(item, innerContext, null);
+                // Serialize the exception itself.
+                var methods = this.GetSerializerMethods(actualType);
+                methods.Serialize(item, innerContext, null);
+                innerWriter.Commit();
 
-            // Write the serialized exception to the output stream.
-            outerContext.StreamWriter.Write(innerContext.StreamWriter.CurrentOffset);
-            outerContext.StreamWriter.Write(innerContext.StreamWriter.ToBytes());
+                // Write the serialized exception to the output stream.
+                outerContext.StreamWriter.Write(innerContext.StreamWriter.CurrentOffset);
+                outerContext.StreamWriter.Write(buffer.ToArray());
+            }
         }
 
         public object Deserialize(Type expectedType, IDeserializationContext outerContext)
@@ -185,19 +190,24 @@ namespace Orleans.Serialization
 
             // Create a nested context which will be written to the outer context at an int-length offset from the current position.
             // This is because the inner context will be copied with a length prefix to the outer context.
-            var innerContext = outerContext.CreateNestedContext(sizeof(int), new BinaryTokenStreamWriter());
-
-            // Serialize the only accepted fields from the base Exception class.
-            this.fallbackBaseExceptionSerializer.Serialize(fallbackException, innerContext, null);
-
-            // Write the length of the serialized exception, then write the serialized bytes.
-            var additionalDataLength = fallbackException.AdditionalData?.Length ?? 0;
-            outerWriter.Write(innerContext.StreamWriter.CurrentOffset + additionalDataLength);
-            outerWriter.Write(innerContext.StreamWriter.ToBytes());
-            
-            if (additionalDataLength > 0)
+            using (var buffer = new ArrayBufferWriter())
             {
-                outerWriter.Write(fallbackException.AdditionalData);
+                var innerWriter = new BinaryTokenStreamWriter2<ArrayBufferWriter>(buffer);
+                var innerContext = outerContext.CreateNestedContext(sizeof(int), innerWriter);
+
+                // Serialize the only accepted fields from the base Exception class.
+                this.fallbackBaseExceptionSerializer.Serialize(fallbackException, innerContext, null);
+                innerWriter.Commit();
+
+                // Write the length of the serialized exception, then write the serialized bytes.
+                var additionalDataLength = fallbackException.AdditionalData?.Length ?? 0;
+                outerWriter.Write(innerContext.StreamWriter.CurrentOffset + additionalDataLength);
+                outerWriter.Write(buffer.ToArray());
+
+                if (additionalDataLength > 0)
+                {
+                    outerWriter.Write(fallbackException.AdditionalData);
+                }
             }
         }
 
