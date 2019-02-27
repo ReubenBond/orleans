@@ -40,6 +40,8 @@ namespace TestExtensions
 
             var builder = new TestClusterBuilder();
             TestDefaultConfiguration.ConfigureTestCluster(builder);
+            builder.AddSiloBuilderConfigurator<TestClusterLoggingConfigurator>();
+            builder.AddClientBuilderConfigurator<TestClusterLoggingConfigurator>();
             builder.ConfigureLegacyConfiguration();
             this.ConfigureTestCluster(builder);
 

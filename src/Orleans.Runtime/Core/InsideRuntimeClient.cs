@@ -317,7 +317,7 @@ namespace Orleans.Runtime
                 object resultObject;
                 try
                 {
-                    var request = (InvokeMethodRequest) message.GetDeserializedBody(this.serializationManager);
+                    var request = (InvokeMethodRequest) message.BodyObject;
                     if (request.Arguments != null)
                     {
                         CancellationSourcesExtension.RegisterCancellationTokens(target, request, this.loggerFactory, logger, this, this.cancellationTokenRuntime);
@@ -355,12 +355,12 @@ namespace Orleans.Runtime
                     if (message.Direction == Message.Directions.OneWay)
                     {
                         invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
-                            "Exception during Grain method call of message: " + message, exc1);
+                            "Exception during Grain method call of message: " + message + ": " + LogFormatter.PrintException(exc1), exc1);
                     }
                     else if (invokeExceptionLogger.IsEnabled(LogLevel.Debug))
                     {
                         invokeExceptionLogger.Debug(ErrorCode.GrainInvokeException,
-                            "Exception during Grain method call of message: " + message, exc1);
+                            "Exception during Grain method call of message: " + message + ": " + LogFormatter.PrintException(exc1), exc1);
                     }
 
                     if (transactionInfo != null)
@@ -662,7 +662,6 @@ namespace Orleans.Runtime
 
         public void Reset(bool cleanup)
         {
-            throw new InvalidOperationException();
         }
 
         /// <inheritdoc />
@@ -727,7 +726,6 @@ namespace Orleans.Runtime
                 msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.messagingOptions,
-                this.serializationManager,
                 this.appRequestStatistics);
             var timerLogger = this.loggerFactory.CreateLogger<SafeTimer>();
             var minTicks = Math.Min(this.messagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);

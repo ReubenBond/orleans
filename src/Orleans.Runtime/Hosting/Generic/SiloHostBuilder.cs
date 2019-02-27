@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.ApplicationParts;
 
 namespace Orleans.Hosting
@@ -146,6 +147,7 @@ namespace Orleans.Hosting
                     services.AddSingleton(this.hostingEnvironment);
                     services.AddSingleton(this.hostBuilderContext);
                     services.AddSingleton(this.appConfiguration);
+                    services.AddSingleton<IApplicationLifetime, ApplicationLifetime>();
                     services.AddOptions();
                     services.AddLogging();
                 });

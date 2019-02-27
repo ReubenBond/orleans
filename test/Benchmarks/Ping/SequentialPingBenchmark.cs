@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Diagnostics.Windows.Configs;
 using BenchmarkGrainInterfaces.Ping;
 using Orleans;
 using Orleans.Configuration;
@@ -11,6 +12,7 @@ using Orleans.Hosting;
 namespace Benchmarks.Ping
 {
     [MemoryDiagnoser]
+    [EtwProfiler(performExtraBenchmarksRun: false)]
     public class SequentialPingBenchmark : IDisposable 
     {
         private readonly ISiloHost host;
@@ -19,7 +21,11 @@ namespace Benchmarks.Ping
 
         public SequentialPingBenchmark()
         {
-            this.host = new SiloHostBuilder().UseLocalhostClustering().Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev").Build();
+            this.host = new SiloHostBuilder()
+                .UseLocalhostClustering()
+                .Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev")
+                //.Configure<SchedulingOptions>(options => options.MaxActiveThreads = 4)
+                .Build();
             this.host.StartAsync().GetAwaiter().GetResult();
 
             this.client = new ClientBuilder().UseLocalhostClustering().Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev").Build();
@@ -38,6 +44,19 @@ namespace Benchmarks.Ping
             {
                 await grain.Run();
             }
+        }
+
+        public async Task PingConcurrent()
+        {
+            Console.WriteLine("Starting");
+            var loadGenerator = new ConcurrentLoadGenerator<IPingGrain>(
+                maxConcurrency: 250,
+                blocksPerWorker: 100,
+                requestsPerBlock: 500,
+                issueRequest: g => g.Run(),
+                getStateForWorker: workerId => this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode()));
+            await loadGenerator.Run();
+            Console.WriteLine("Completed");
         }
 
         public async Task PingPongForever()

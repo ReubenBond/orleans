@@ -97,7 +97,7 @@ namespace Orleans
 
             async Task<T> ConvertAsync(Task<object> asyncTask)
             {
-                return (T)await asyncTask;
+                return (T)await asyncTask.ConfigureAwait(false);
             }
         }
 
@@ -399,7 +399,7 @@ namespace Orleans
         {
             if (task == null) return Task.FromResult(default(T));
 
-            var resolver = new TaskCompletionSource<T>();
+            var resolver = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             if (task.Status == TaskStatus.RanToCompletion)
             {
@@ -429,9 +429,9 @@ namespace Orleans
                     }
                     else
                     {
-                        resolver.TrySetResult(t.GetResult());
+                        resolver.TrySetResult(t.GetAwaiter().GetResult());
                     }
-                });
+                }, TaskContinuationOptions.ExecuteSynchronously);
             }
             return resolver.Task;
         }
@@ -445,6 +445,18 @@ namespace Orleans
         internal static void GetResult(this Task task)
         {
             task.GetAwaiter().GetResult();
+        }
+
+        internal static async Task WhenCancelled(this CancellationToken token)
+        {
+            var waitForCancellation = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(obj =>
+            {
+                var tcs = (TaskCompletionSource<object>)obj;
+                tcs.TrySetResult(null);
+            }, waitForCancellation);
+
+            await waitForCancellation.Task;
         }
     }
 }

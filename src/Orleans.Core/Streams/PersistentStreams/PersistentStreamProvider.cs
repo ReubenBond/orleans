@@ -103,7 +103,7 @@ namespace Orleans.Providers.Streams.Common
             var siloRuntime = this.runtime as ISiloSideStreamProviderRuntime;
             if (siloRuntime != null)
             {
-                await pullingAgentManager.Stop();
+                await pullingAgentManager?.Stop();
             }
             stateManager.CommitState();
         }
