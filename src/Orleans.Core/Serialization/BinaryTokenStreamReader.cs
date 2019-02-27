@@ -89,7 +89,6 @@ namespace Orleans.Serialization
         internal static bool TryReadSimpleType<TReader>(this TReader @this, out object result, out SerializationTokenType token) where TReader : IBinaryTokenStreamReader
         {
             token = @this.ReadToken();
-            byte[] bytes;
             switch (token)
             {
                 case SerializationTokenType.True:
@@ -144,8 +143,22 @@ namespace Orleans.Serialization
                     result = @this.ReadChar();
                     break;
                 case SerializationTokenType.Guid:
-                    bytes = @this.ReadBytes(16);
+#if NETCOREAPP
+                    if (@this is BinaryTokenStreamReader2 reader)
+                    {
+                        Span<byte> bytes = stackalloc byte[16];
+                        reader.ReadBytes(in bytes);
+                        result = new Guid(bytes);
+                    }
+                    else
+                    {
+                        var bytes = @this.ReadBytes(16);
+                        result = new Guid(bytes);
+                    }
+#else
+                    var bytes = @this.ReadBytes(16);
                     result = new Guid(bytes);
+#endif
                     break;
                 case SerializationTokenType.Date:
                     result = DateTime.FromBinary(@this.ReadLong());
@@ -412,11 +425,34 @@ namespace Orleans.Serialization
                     return typeof(bool[]);
                 case SerializationTokenType.SByteArray:
                     return typeof(sbyte[]);
+#if SERIALIZER_SESSIONAWARE
+                case SerializationTokenType.ReferencedType:
+                    {
+                        if (@this is BinaryTokenStreamReader2 knownReader)
+                        {
+                            var id = knownReader.ReadUInt();
+                            return knownReader.GetReferencedType(id);
+                        }
+                        else
+                        {
+                            ThrowInvalid();
+                            void ThrowInvalid() => throw new InvalidOperationException($"Context does not support referenced types, but a type reference was encountered.");
+                        }
+                        break;
+                    }
+#endif
                 case SerializationTokenType.NamedType:
                     var typeName = @this.ReadString();
                     try
                     {
-                        return serializationManager.ResolveTypeName(typeName);
+                        var type = serializationManager.ResolveTypeName(typeName);
+#if SERIALIZER_SESSIONAWARE
+                        if (@this is BinaryTokenStreamReader2 knownReader)
+                        {
+                            knownReader.RecordType(type);
+                        }
+#endif
+                        return type;
                     }
                     catch (TypeAccessException ex)
                     {
@@ -975,27 +1011,6 @@ namespace Orleans.Serialization
             trace.Write(format, args);
             trace.WriteLine(" at offset {0}", CurrentPosition);
             trace.Flush();
-        }
-
-        /// <summary>
-        /// Peek at the next token in this input stream.
-        /// </summary>
-        /// <returns>Next token that will be read from the stream.</returns>
-        internal SerializationTokenType PeekToken()
-        {
-            if (currentOffset == currentSegment.Count + currentSegment.Offset)
-                StartNextSegment();
-
-            return (SerializationTokenType)currentBuffer[currentOffset];
-        }
-
-        /// <summary> Read a <c>SerializationTokenType</c> value from the stream. </summary>
-        /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        internal SerializationTokenType ReadToken()
-        {
-            int offset;
-            var buff = CheckLength(1, out offset);
-            return (SerializationTokenType)buff[offset];
         }
     }
 }

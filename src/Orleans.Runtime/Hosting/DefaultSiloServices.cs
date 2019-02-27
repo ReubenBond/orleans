@@ -311,6 +311,18 @@ namespace Orleans.Hosting
             // persistent state facet support
             services.TryAddSingleton<IPersistentStateFactory, PersistentStateFactory>();
             services.TryAddSingleton(typeof(IAttributeToFactoryMapper<PersistentStateAttribute>), typeof(PersistentStateAttributeMapper));
+            
+            // Networking
+            services.TryAddSingleton<ConnectionManager>();
+            services.TryAddSingleton<IConnectionFactory, SocketConnectionFactory>();
+            services.TryAddSingleton<IConnectionListenerFactory, SocketConnectionListenerFactory>();
+            services.TryAddTransient<IMessageSerializer, MessageSerializer>();
+            services.TryAddSingleton<ConnectionComponentFactory, SiloConnectionComponentFactory>();
+            services.TryAddSingleton<OutboundConnectionFactory, SiloOutboundConnectionFactory>();
+
+            // Use Orleans socket server.
+            services.AddSingleton<OrleansServer>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, OrleansServer>();
         }
     }
 }

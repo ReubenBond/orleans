@@ -18,6 +18,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using Orleans.Statistics;
 using Orleans.TestingHost.Utils;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.TestingHost
 {
@@ -59,6 +60,11 @@ namespace Orleans.TestingHost
                     }
                 });
 
+            if (Debugger.IsAttached)
+            {
+                hostBuilder.ConfigureLogging(logging => logging.AddDebug());
+            }
+
             hostBuilder.Properties["Configuration"] = configuration;
             ConfigureAppServices(configuration, hostBuilder);
 
@@ -98,6 +104,12 @@ namespace Orleans.TestingHost
             var builder = new ClientBuilder();
             builder.Properties["Configuration"] = configuration;
             builder.Configure<ClusterOptions>(configuration);
+
+            if (Debugger.IsAttached)
+            {
+                builder.ConfigureLogging(logging => logging.AddDebug());
+            }
+
             ConfigureAppServices(configuration, builder);
 
             builder.ConfigureServices(services =>

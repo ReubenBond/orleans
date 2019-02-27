@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace UnitTests.Streaming
 {
@@ -26,6 +27,7 @@ namespace UnitTests.Streaming
             {
                 this.ServiceId = builder.Options.ServiceId;
                 builder.Options.InitialSilosCount = 4;
+
                 builder.ConfigureLegacyConfiguration(legacy =>
                 {
                     legacy.ClusterConfiguration.Globals.RegisterStorageProvider<UnitTests.StorageTests.MockStorageProvider>("test1");
@@ -40,6 +42,7 @@ namespace UnitTests.Streaming
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
+                    hostBuilder.ConfigureLogging(logging => logging.AddDebug());
                     hostBuilder.AddMemoryGrainStorage("MemoryStore");
                 }
             }
@@ -87,7 +90,7 @@ namespace UnitTests.Streaming
             output.WriteLine("About to reset Silos .....");
             output.WriteLine("Restarting Silos ...");
 
-            foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
+            foreach (var silo in this.HostedCluster.SecondarySilos.ToList())
             {
                 await this.HostedCluster.RestartSiloAsync(silo);
             }

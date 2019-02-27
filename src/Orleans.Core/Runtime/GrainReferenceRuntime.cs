@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 using System;
@@ -81,8 +81,9 @@ namespace Orleans.Runtime
 
                 return Task.FromResult(default(T));
             }
-
+#if !NETCOREAPP
             resultTask = OrleansTaskExtentions.ConvertTaskViaTcs(resultTask);
+#endif
             return resultTask.ToTypedTask<T>();
         }
 

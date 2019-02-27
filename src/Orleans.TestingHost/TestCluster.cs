@@ -350,7 +350,8 @@ namespace Orleans.TestingHost
         {
             try
             {
-                await this.InternalClient?.Close();
+                var client = this.InternalClient;
+                if (client != null) await client.Close();
             }
             catch (Exception exc)
             {

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -8,6 +8,9 @@ using Benchmarks.Serialization;
 using Benchmarks.Ping;
 using Benchmarks.Transactions;
 using Benchmarks.GrainStorage;
+using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Jobs;
+using BenchmarkDotNet.Toolchains.CsProj;
 
 namespace Benchmarks
 {
@@ -112,19 +115,23 @@ namespace Benchmarks
             },
             ["SequentialPing"] = () =>
             {
-                BenchmarkRunner.Run<SequentialPingBenchmark>();
+                BenchmarkRunner.Run<KestrelSequentialPingBenchmark>(DefaultConfig.Instance.With(Job.Default.With(CsProjCoreToolchain.NetCoreApp22)));
             },
             ["PingForever"] = () =>
             {
-                new SequentialPingBenchmark().PingForever().GetAwaiter().GetResult();
+                new KestrelSequentialPingBenchmark().PingForever().GetAwaiter().GetResult();
+            },
+            ["PingForeverSaturate"] = () =>
+            {
+                new KestrelSequentialPingBenchmark().PingForeverSaturate().GetAwaiter().GetResult();
             },
             ["PingPongForever"] = () =>
             {
-                new SequentialPingBenchmark().PingPongForever().GetAwaiter().GetResult();
+                new KestrelSequentialPingBenchmark().PingPongForever().GetAwaiter().GetResult();
             },
             ["PingPongForeverSaturate"] = () =>
             {
-                new SequentialPingBenchmark().PingPongForever().GetAwaiter().GetResult();
+                new KestrelSequentialPingBenchmark().PingPongForeverSaturate().GetAwaiter().GetResult();
             },
             ["GrainStorage.Memory"] = () =>
             {
