@@ -5,9 +5,11 @@ using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Configuration.Validators;
 using Orleans.Hosting;
+using Orleans.Messaging;
 using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Statistics;
 using Orleans.Streams;
@@ -85,6 +87,19 @@ namespace Orleans
 
             services.AddTransient<IConfigurationValidator, ClusterOptionsValidator>();
             services.AddTransient<IConfigurationValidator, ClientClusteringValidator>();
+
+            // TODO: abstract or move into some options.
+            services.AddSingleton<SocketSchedulers>();
+            services.AddSingleton<SharedMemoryPool>();
+
+            // Networking
+            services.TryAddSingleton<ConnectionManager>();
+            services.TryAddSingleton<IConnectionFactory, SocketConnectionFactory>();
+            services.TryAddTransient<IMessageSerializer, MessageSerializer>();
+            services.TryAddSingleton<ConnectionComponentFactory, ClientConnectionComponentFactory>();
+            services.TryAddSingleton<OutboundConnectionFactory, ClientOutboundConnectionFactory>();
+            services.TryAddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter);
+            services.TryAddFromExisting<IMessageCenter, ClientMessageCenter>();
         }
     }
 }

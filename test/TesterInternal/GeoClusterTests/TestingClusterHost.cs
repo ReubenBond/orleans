@@ -313,8 +313,6 @@ namespace Tests.GeoClusterTests
             {
                 this.Name = name;
 
-                Console.WriteLine("Initializing client {0}");
-
                 ClientConfiguration config = null;
                 try
                 {

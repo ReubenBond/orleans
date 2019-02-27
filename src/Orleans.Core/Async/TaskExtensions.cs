@@ -466,6 +466,18 @@ namespace Orleans
         {
             task.GetAwaiter().GetResult();
         }
+
+        internal static async Task WhenCancelled(this CancellationToken token)
+        {
+            var waitForCancellation = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(obj =>
+            {
+                var tcs = (TaskCompletionSource<object>)obj;
+                tcs.TrySetResult(null);
+            }, waitForCancellation);
+
+            await waitForCancellation.Task;
+        }
     }
 }
 

@@ -90,7 +90,7 @@ namespace UnitTests.MessageCenterTests
                 GatewayListRefreshPeriod = cfg.GatewayListRefreshPeriod,
                 PreferedGatewayIndex = cfg.PreferedGatewayIndex
             };
-            var gatewayManager = new GatewayManager(null, gatewayOptions, listProvider, NullLoggerFactory.Instance);
+            var gatewayManager = new GatewayManager(gatewayOptions, listProvider, NullLoggerFactory.Instance, null);
 
             var counts = new int[4];
 

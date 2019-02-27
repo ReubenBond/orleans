@@ -33,6 +33,8 @@ namespace TestExtensions
             var builder = new TestClusterBuilder();
             TestDefaultConfiguration.ConfigureTestCluster(builder);
             builder.ConfigureLegacyConfiguration();
+            builder.AddSiloBuilderConfigurator<TestClusterLoggingConfigurator>();
+            builder.AddClientBuilderConfigurator<TestClusterLoggingConfigurator>();
             ConfigureTestCluster(builder);
 
             var testCluster = builder.Build();
