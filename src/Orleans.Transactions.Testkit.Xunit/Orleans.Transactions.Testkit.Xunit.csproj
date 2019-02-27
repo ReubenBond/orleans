@@ -10,7 +10,7 @@
     <AssemblyName>Orleans.Transactions.TestKit.xUnit</AssemblyName>
     <RootNamespace>Orleans.Transactions.TestKit.xUnit</RootNamespace>
   </PropertyGroup>
-  
+
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
