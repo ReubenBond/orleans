@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Runtime.Messaging
 {

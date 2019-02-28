@@ -1,8 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Connections;
 
-namespace Orleans.Runtime.Messaging
+namespace Orleans.Configuration
 {
     public class ConnectionOptions
     {

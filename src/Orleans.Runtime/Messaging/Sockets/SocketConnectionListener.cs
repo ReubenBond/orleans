@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 
-namespace Orleans.Runtime.Messaging.RePlat
+namespace Orleans.Runtime.Messaging
 {
     internal sealed class SocketConnectionListener : IConnectionListener
     {

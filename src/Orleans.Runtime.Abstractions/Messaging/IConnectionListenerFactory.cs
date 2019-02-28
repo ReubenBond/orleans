@@ -1,6 +1,6 @@
-﻿using Microsoft.AspNetCore.Connections;
+using Microsoft.AspNetCore.Connections;
 
-namespace Orleans.Runtime.Messaging.RePlat
+namespace Orleans.Runtime.Messaging
 {
     public interface IConnectionListenerFactory
     {

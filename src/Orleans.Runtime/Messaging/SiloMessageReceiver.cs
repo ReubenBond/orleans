@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 
@@ -17,14 +17,12 @@ namespace Orleans.Runtime.Messaging
             this.log = log;
         }
 
-
         protected override void OnReceivedMessage(Message msg)
         {
             // See it's a Ping message, and if so, short-circuit it
-            object pingObj;
             var requestContext = msg.RequestContextData;
             if (requestContext != null &&
-                requestContext.TryGetValue(RequestContext.PING_APPLICATION_HEADER, out pingObj) &&
+                requestContext.TryGetValue(RequestContext.PING_APPLICATION_HEADER, out var pingObj) &&
                 pingObj is bool &&
                 (bool)pingObj)
             {

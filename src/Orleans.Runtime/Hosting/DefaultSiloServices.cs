@@ -39,8 +39,6 @@ using System.Reflection;
 using System.Linq;
 using Microsoft.Extensions.Options;
 using Orleans.Timers.Internal;
-using Orleans.Runtime.Messaging.RePlat;
-using Orleans.Messaging.RePlat;
 
 namespace Orleans.Hosting
 {

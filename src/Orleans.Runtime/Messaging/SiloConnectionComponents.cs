@@ -1,9 +1,8 @@
 using System;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
-using static Orleans.Runtime.Messaging.ConnectionBuilderExtensions;
 
-namespace Orleans.Runtime.Messaging.RePlat
+namespace Orleans.Runtime.Messaging
 {
     internal sealed class SiloConnectionComponentFactory : ConnectionComponentFactory
     {

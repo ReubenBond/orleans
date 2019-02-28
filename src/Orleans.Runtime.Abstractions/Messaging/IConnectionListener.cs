@@ -1,6 +1,6 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 
-namespace Orleans.Runtime.Messaging.RePlat
+namespace Orleans.Runtime.Messaging
 {
     public interface IConnectionListener
     {

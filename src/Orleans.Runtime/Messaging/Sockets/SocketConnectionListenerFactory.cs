@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Orleans.Runtime.Messaging.RePlat
+namespace Orleans.Runtime.Messaging
 {
     public sealed class SocketConnectionListenerFactory : IConnectionListenerFactory
     {

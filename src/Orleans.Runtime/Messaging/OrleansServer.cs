@@ -5,11 +5,8 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Runtime;
-using Orleans.Runtime.Messaging;
-using Orleans.Runtime.Messaging.RePlat;
 
-namespace Orleans.Messaging.RePlat
+namespace Orleans.Runtime.Messaging
 {
     internal class OrleansServer : ILifecycleParticipant<ISiloLifecycle>
 #if NETCOREAPP
