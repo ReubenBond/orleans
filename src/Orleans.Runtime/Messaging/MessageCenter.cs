@@ -22,7 +22,6 @@ namespace Orleans.Runtime.Messaging
 
         internal OutboundMessageQueue OutboundQueue { get; set; }
         internal InboundMessageQueue InboundQueue { get; set; }
-        internal SocketManager SocketManager;
         private readonly MessageFactory messageFactory;
         private readonly ILoggerFactory loggerFactory;
         private readonly ConnectionManager senderManager;
@@ -73,7 +72,6 @@ namespace Orleans.Runtime.Messaging
         {
             if (log.IsEnabled(LogLevel.Trace)) log.Trace("Starting initialization.");
 
-            SocketManager = new SocketManager(networkingOptions, this.loggerFactory);
             InboundQueue = new InboundMessageQueue(this.loggerFactory.CreateLogger<InboundMessageQueue>(), statisticsOptions);
             OutboundQueue = new OutboundMessageQueue(this, this.loggerFactory.CreateLogger<OutboundMessageQueue>(), this.senderManager);
 
@@ -123,15 +121,6 @@ namespace Orleans.Runtime.Messaging
             catch (Exception exc)
             {
                 log.Error(ErrorCode.Runtime_Error_100110, "Stop failed.", exc);
-            }
-
-            try
-            {
-                SocketManager.Stop();
-            }
-            catch (Exception exc)
-            {
-                log.Error(ErrorCode.Runtime_Error_100111, "Stop failed.", exc);
             }
         }
 
