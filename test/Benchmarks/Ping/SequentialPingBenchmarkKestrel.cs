@@ -15,7 +15,6 @@ using Microsoft.Extensions.Hosting;
 namespace Benchmarks.Ping
 {
     [MemoryDiagnoser]
-    [EtwProfiler]
     public class KestrelSequentialPingBenchmark : IDisposable 
     {
         private readonly IHost host;
@@ -38,39 +37,11 @@ namespace Benchmarks.Ping
             this.client.Connect(ex => Task.FromResult(true)).GetAwaiter().GetResult();
             Console.WriteLine("client started");
             this.grain = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
-
-
-            /*this.client = two.Services.GetRequiredService<IClusterClient>();
-            int siloPort;
-            do
-            {
-                this.grain = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
-                siloPort = this.grain.GetSiloPort().GetAwaiter().GetResult();
-            } while (siloPort != 60666);*/
         }
 
         private static async Task<IHost> CreateSilo(IPEndPoint primary, int siloNum)
         {
             var host = new HostBuilder()
-                /*.ConfigureWebHost(builder =>
-                {
-                    builder.UseKestrel(options =>
-                    {
-                        options.Listen(
-                            new IPEndPoint(IPAddress.Any, 60666 + siloNum),
-                            listenOptions =>
-                            {
-                                listenOptions.UseOrleansSiloConnectionHandler();
-                            });
-                        options.Listen(
-                            new IPEndPoint(IPAddress.Any, 60777 + siloNum),
-                            listenOptions =>
-                            {
-                                listenOptions.UseOrleansGatewayConnectionHandler();
-                            });
-                    })
-                    .UseStartup<Startup>();
-                })*/
                 .UseOrleans(builder =>
                 {
                     builder
