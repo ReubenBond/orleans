@@ -54,6 +54,7 @@ namespace Orleans.Runtime.Messaging
             }
             
             var listenSocket = new Socket(this.endPoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            listenSocket.EnableRecommendedOptions();
 
             // Kestrel expects IPv6Any to bind to both IPv6 and IPv4
             if (this.endPoint.Address == IPAddress.IPv6Any)
@@ -120,21 +121,21 @@ namespace Orleans.Runtime.Messaging
             {
                 while (true)
                 {
-                        try
-                        {
-                            var acceptSocket = await this.listenSocket.AcceptAsync();
-                            acceptSocket.NoDelay = true;
+                    try
+                    {
+                        var acceptSocket = await this.listenSocket.AcceptAsync();
+                        acceptSocket.EnableRecommendedOptions();
 
-                            var connection = new SocketConnection(acceptSocket, this.memoryPool, this.scheduler, this.trace);
+                        var connection = new SocketConnection(acceptSocket, this.memoryPool, this.scheduler, this.trace);
 
-                            // REVIEW: This task should be tracked by the server for graceful shutdown
-                            // Today it's handled specifically for http but not for arbitrary middleware
-                            _ = this.HandleConnectionAsync(connection);
-                        }
-                        catch (SocketException) when (!this.unbinding)
-                        {
-                            this.trace.ConnectionReset(connectionId: "(null)");
-                        }
+                        // REVIEW: This task should be tracked by the server for graceful shutdown
+                        // Today it's handled specifically for http but not for arbitrary middleware
+                        _ = this.HandleConnectionAsync(connection);
+                    }
+                    catch (SocketException) when (!this.unbinding)
+                    {
+                        this.trace.ConnectionReset(connectionId: "(null)");
+                    }
                 }
             }
             catch (Exception ex)

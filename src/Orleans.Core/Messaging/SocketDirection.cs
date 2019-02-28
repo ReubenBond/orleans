@@ -1,6 +1,6 @@
 namespace Orleans.Messaging
 {
-    internal enum SocketDirection
+    internal enum ConnectionDirection
     {
         SiloToSilo,
         ClientToGateway,
