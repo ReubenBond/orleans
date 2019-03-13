@@ -17,7 +17,7 @@ namespace Orleans.Runtime.Messaging
         {
             SingleReader = true,
             SingleWriter = false,
-            AllowSynchronousContinuations = true
+            AllowSynchronousContinuations = false
         };
 
         private readonly Channel<Message> messages;

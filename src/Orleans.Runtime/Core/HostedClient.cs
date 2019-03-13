@@ -44,7 +44,7 @@ namespace Orleans.Runtime
             {
                 SingleReader = true,
                 SingleWriter = false,
-                AllowSynchronousContinuations = true,
+                AllowSynchronousContinuations = false,
             });
 
             this.runtimeClient = runtimeClient;

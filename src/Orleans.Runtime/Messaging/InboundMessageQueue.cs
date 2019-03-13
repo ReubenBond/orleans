@@ -49,7 +49,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     SingleReader = true,
                     SingleWriter = false,
-                    AllowSynchronousContinuations = true
+                    AllowSynchronousContinuations = false
                 });
                 if (this.statisticsLevel.CollectQueueStats())
                 {
