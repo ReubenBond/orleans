@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
+using System.IO.Pipelines;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 
@@ -18,11 +19,13 @@ namespace Orleans.Runtime.Messaging
 
             var readResult = await input.ReadAsync().ConfigureAwait(false);
             var buffer = readResult.Buffer;
+            CheckForCompletion(ref readResult);
             while (buffer.Length < 4)
             {
                 input.AdvanceTo(buffer.Start, buffer.End);
                 readResult = await input.ReadAsync().ConfigureAwait(false);
                 buffer = readResult.Buffer;
+                CheckForCompletion(ref readResult);
             }
 
             int ReadLength(ref ReadOnlySequence<byte> b)
@@ -44,6 +47,7 @@ namespace Orleans.Runtime.Messaging
                 input.AdvanceTo(buffer.Start, buffer.End);
                 readResult = await input.ReadAsync().ConfigureAwait(false);
                 buffer = readResult.Buffer;
+                CheckForCompletion(ref readResult);
             }
 
             var grainIdBytes = new byte[Math.Min(length, 1024)];
@@ -51,6 +55,11 @@ namespace Orleans.Runtime.Messaging
             buffer.Slice(0, length).CopyTo(grainIdBytes);
             input.AdvanceTo(buffer.GetPosition(length));
             return GrainIdExtensions.FromByteArray(grainIdBytes);
+        }
+
+        private static void CheckForCompletion(ref ReadResult readResult)
+        {
+            if (readResult.IsCanceled || readResult.IsCompleted) throw new InvalidOperationException("Connection terminated prematurely");
         }
     }
 }
