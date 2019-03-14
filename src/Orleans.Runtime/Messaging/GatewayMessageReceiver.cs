@@ -27,7 +27,7 @@ namespace Orleans.Runtime.Messaging
             IOptions<MultiClusterOptions> multiClusterOptions,
             MessageFactory messageFactory,
             ILogger<GatewayMessageReceiver> log)
-            : base(connection, serializer)
+            : base(connection, serializer, log)
         {
             this.messageCenter = messageCenter;
             this.siloDetails = siloDetails;

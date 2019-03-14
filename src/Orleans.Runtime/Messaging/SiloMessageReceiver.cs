@@ -11,7 +11,12 @@ namespace Orleans.Runtime.Messaging
         private readonly ILogger<SiloMessageReceiver> log;
         private readonly MessageFactory messageFactory;
 
-        public SiloMessageReceiver(ConnectionContext connection, IMessageSerializer serializer, MessageCenter messageCenter, MessageFactory messageFactory, ILogger<SiloMessageReceiver> log) : base(connection, serializer)
+        public SiloMessageReceiver(
+            ConnectionContext connection,
+            IMessageSerializer serializer,
+            MessageCenter messageCenter,
+            MessageFactory messageFactory,
+            ILogger<SiloMessageReceiver> log) : base(connection, serializer, log)
         {
             this.messageCenter = messageCenter;
             this.messageFactory = messageFactory;

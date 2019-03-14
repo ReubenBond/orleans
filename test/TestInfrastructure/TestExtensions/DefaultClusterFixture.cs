@@ -18,7 +18,9 @@ namespace TestExtensions
         {
             var builder = new TestClusterBuilder();
             TestDefaultConfiguration.ConfigureTestCluster(builder);
-            
+
+            builder.AddSiloBuilderConfigurator<TestClusterLoggingConfigurator>();
+            builder.AddClientBuilderConfigurator<TestClusterLoggingConfigurator>();
             builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
 
             var testCluster = builder.Build();

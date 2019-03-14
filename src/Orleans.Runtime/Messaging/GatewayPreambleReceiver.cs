@@ -14,7 +14,11 @@ namespace Orleans.Runtime.Messaging
         private readonly MultiClusterOptions multiClusterOptions;
         private readonly ILogger<GatewayPreambleReceiver> log;
 
-        public GatewayPreambleReceiver(MessageCenter messageCenter, ILocalSiloDetails siloDetails, ILogger<GatewayPreambleReceiver> log, IOptions<MultiClusterOptions> multiClusterOptions)
+        public GatewayPreambleReceiver(
+            MessageCenter messageCenter,
+            ILocalSiloDetails siloDetails,
+            ILogger<GatewayPreambleReceiver> log,
+            IOptions<MultiClusterOptions> multiClusterOptions)
         {
             this.gateway = messageCenter.Gateway;
             this.siloDetails = siloDetails;

@@ -17,7 +17,8 @@ namespace Orleans.Runtime.Messaging
             IMessageSerializer serializer,
             ClientMessageCenter messageCenter,
             ILogger<ClientMessageReceiver> log,
-            MessageFactory messageFactory) : base(connection, serializer)
+            MessageFactory messageFactory)
+            : base(connection, serializer, log)
         {
             this.messageCenter = messageCenter;
             this.log = log;

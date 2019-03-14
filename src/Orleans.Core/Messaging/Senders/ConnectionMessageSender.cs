@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -24,16 +25,19 @@ namespace Orleans.Runtime.Messaging
         private readonly ChannelWriter<Message> writer;
         private readonly IMessageCenter messageCenter;
         private readonly IMessageSerializer serializer;
+        private readonly ILogger<ConnectionMessageSender> log;
         private ConnectionContext connection;
 
         public ConnectionMessageSender(
             IMessageCenter messageCenter,
-            IMessageSerializer messageSerializer)
+            IMessageSerializer messageSerializer,
+             ILogger<ConnectionMessageSender> log)
         {
             this.messages = Channel.CreateUnbounded<Message>(ChannelOptions);
             this.writer = this.messages.Writer;
             this.messageCenter = messageCenter;
             this.serializer = messageSerializer;
+            this.log = log;
         }
 
         public Task Run(ConnectionContext connection)
@@ -45,6 +49,14 @@ namespace Orleans.Runtime.Messaging
 
         public void Abort()
         {
+            if (this.log.IsEnabled(LogLevel.Information))
+            {
+                this.log.LogInformation(
+                    "Aborting connection with remote endpoint {EndPoint} and id {ConnectionId}.",
+                    this.connection?.GetRemoteEndPoint(),
+                    this.connection.ConnectionId);
+            }
+
             if (this.writer.TryComplete())
             {
                 if (this.connection == null) this.RerouteMessages();
@@ -71,10 +83,18 @@ namespace Orleans.Runtime.Messaging
             {
                 output = this.connection.Transport.Output;
                 var reader = this.messages.Reader;
+                if (this.log.IsEnabled(LogLevel.Information))
+                {
+                    this.log.LogInformation(
+                        "Starting to process messages to remote endpoint {EndPoint} on connection {ConnectionId}.",
+                        this.connection?.GetRemoteEndPoint(),
+                        this.connection.ConnectionId);
+                }
+
                 while (true)
                 {
                     var moreTask = reader.WaitToReadAsync();
-                    var more = moreTask.IsCompleted ? moreTask.GetAwaiter().GetResult() : await moreTask;
+                    var more = moreTask.IsCompleted ? moreTask.GetAwaiter().GetResult() : await moreTask.ConfigureAwait(false);
                     if (!more)
                     {
                         break;
@@ -90,16 +110,28 @@ namespace Orleans.Runtime.Messaging
                     }
                     catch (Exception exception) when (message != default)
                     {
+                        this.log.LogWarning(
+                            "Exception writing message {Message} to remote endpoint {EndPoint} on connection {ConnectionId}: {Exception}",
+                            message,
+                            this.connection?.GetRemoteEndPoint(),
+                            this.connection.ConnectionId,
+                            exception);
                         this.messageCenter.OnMessageSerializationFailure(message, exception);
                     }
 
                     var flushTask = output.FlushAsync();
-                    var flushResult = flushTask.IsCompleted ? flushTask.GetAwaiter().GetResult() : await flushTask;
+                    var flushResult = flushTask.IsCompleted ? flushTask.GetAwaiter().GetResult() : await flushTask.ConfigureAwait(false);
                     if (flushResult.IsCompleted || flushResult.IsCanceled) break;
                 }
             }
             catch (Exception exception)
             {
+                this.log.LogWarning(
+                    "Exception processing messages to remote endpoint {EndPoint} on connection {ConnectionId}: {Exception}",
+                    this.connection.GetRemoteEndPoint(),
+                    this.connection.ConnectionId,
+                    exception);
+
                 if (!(exception is ThreadAbortException) && !(exception is OperationCanceledException)) error = exception;
             }
             finally
@@ -116,6 +148,14 @@ namespace Orleans.Runtime.Messaging
                     output.Complete();
                 }
 
+                if (this.log.IsEnabled(LogLevel.Information))
+                {
+                    this.log.LogInformation(
+                        "Completed processing messages to remote endpoint {EndPoint} on connection {ConnectionId}",
+                        this.connection.GetRemoteEndPoint(),
+                        this.connection.ConnectionId);
+                }
+
                 this.Abort();
                 this.RerouteMessages();
             }
@@ -126,10 +166,29 @@ namespace Orleans.Runtime.Messaging
             ThreadPool.UnsafeQueueUserWorkItem(
                 _ =>
                 {
+                    if (this.log.IsEnabled(LogLevel.Information))
+                    {
+                        this.log.LogInformation(
+                            "Rerouting messages from remote endpoint {EndPoint} on connection {ConnectionId}",
+                            this.connection?.GetRemoteEndPoint()?.ToString() ?? "(never connected)",
+                            this.connection?.ConnectionId ?? "none");
+                    }
+
                     var reader = this.messages.Reader;
+                    var count = 0;
                     while (reader.TryRead(out var message))
                     {
+                        ++count;
                         this.messageCenter.RetryMessage(message);
+                    }
+
+                    if (this.log.IsEnabled(LogLevel.Information))
+                    {
+                        this.log.LogInformation(
+                            "Rerouted {Count} messages from remote endpoint {EndPoint} on connection {ConnectionId}",
+                            count,
+                            this.connection?.GetRemoteEndPoint()?.ToString() ?? "(never connected)",
+                            this.connection?.ConnectionId ?? "none");
                     }
                 },
                 null);
@@ -137,6 +196,18 @@ namespace Orleans.Runtime.Messaging
 
         private void RerouteMessage(Message message)
         {
+            // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            // !!!!!!!! CHANGE TO DEBUG LEVEL !!!!!!!!!
+            // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            if (this.log.IsEnabled(LogLevel.Information))
+            {
+                this.log.LogInformation(
+                    "Rerouting message {Message} from remote endpoint {EndPoint} on connection {ConnectionId}",
+                    message,
+                    this.connection?.GetRemoteEndPoint()?.ToString() ?? "(never connected)",
+                    this.connection?.ConnectionId ?? "none");
+            }
+
             ThreadPool.UnsafeQueueUserWorkItem(
                 msg => this.messageCenter.RetryMessage((Message)msg),
                 message);

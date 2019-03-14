@@ -3,17 +3,23 @@ using System.IO.Pipelines;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Messaging
 {
     internal abstract class ConnectionMessageReceiver
     {
         private readonly IMessageSerializer serializer;
+        private readonly ILogger<ConnectionMessageReceiver> log;
 
-        protected ConnectionMessageReceiver(ConnectionContext connection, IMessageSerializer serializer)
+        protected ConnectionMessageReceiver(
+            ConnectionContext connection,
+            IMessageSerializer serializer,
+            ILogger<ConnectionMessageReceiver> log)
         {
             this.Connection = connection;
             this.serializer = serializer;
+            this.log = log;
         }
 
         protected ConnectionContext Connection { get; }
@@ -30,13 +36,21 @@ namespace Orleans.Runtime.Messaging
             PipeReader input = default;
             try
             {
+                if (this.log.IsEnabled(LogLevel.Information))
+                {
+                    this.log.LogInformation(
+                        "Starting to process messages from remote endpoint {EndPoint} on connection {ConnectionId}.",
+                        this.Connection.GetRemoteEndPoint(),
+                        this.Connection.ConnectionId);
+                }
+
                 input = this.Connection.Transport.Input;
                 var requiredBytes = 0;
                 Message message = default;
                 while (true)
                 {
                     var readResultTask = input.ReadAsync();
-                    var readResult = readResultTask.IsCompletedSuccessfully ? readResultTask.GetAwaiter().GetResult() : await readResultTask;
+                    var readResult = readResultTask.IsCompletedSuccessfully ? readResultTask.GetAwaiter().GetResult() : await readResultTask.ConfigureAwait(false);
                     
                     var buffer = readResult.Buffer;
                     
@@ -52,9 +66,16 @@ namespace Orleans.Runtime.Messaging
                                     this.OnReceivedMessage(message);
                                 }
                             }
-                            catch (Exception readException)
+                            catch (Exception exception)
                             {
-                                this.OnReceiveMessageFail(message, readException);
+                                this.log.LogWarning(
+                                    "Exception reading message {Message} from remote endpoint {EndPoint} on connection {ConnectionId}: {Exception}",
+                                    message,
+                                    this.Connection.GetRemoteEndPoint(),
+                                    this.Connection.ConnectionId,
+                                    exception);
+
+                                this.OnReceiveMessageFail(message, exception);
                                 break;
                             }
                         } while (requiredBytes == 0);
@@ -66,6 +87,12 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exception)
             {
+                this.log.LogWarning(
+                    "Exception processing messages from remote endpoint {EndPoint} on connection {ConnectionId}: {Exception}",
+                    this.Connection.GetRemoteEndPoint(),
+                    this.Connection.ConnectionId,
+                    exception);
+
                 if (!(exception is ThreadAbortException) && !(exception is OperationCanceledException)) error = exception;
             }
             finally
@@ -81,6 +108,14 @@ namespace Orleans.Runtime.Messaging
                 {
                     input.Complete();
                     this.Connection.Abort();
+                }
+
+                if (this.log.IsEnabled(LogLevel.Information))
+                {
+                    this.log.LogInformation(
+                        "Completed processing messages from remote endpoint {EndPoint} on connection {ConnectionId}",
+                        this.Connection?.GetRemoteEndPoint(),
+                        this.Connection.ConnectionId);
                 }
             }
         }

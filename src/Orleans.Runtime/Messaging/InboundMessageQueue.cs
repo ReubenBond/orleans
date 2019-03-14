@@ -94,11 +94,12 @@ namespace Orleans.Runtime.Messaging
                     this.log.Trace("Queued incoming {0} message", msg.Category.ToString());
                 }
             }
-            else throw new Exception("sadads");
+            else ThrowPostMessage(msg);
+
+            void ThrowPostMessage(Message m) => throw new InvalidOperationException("Attempted to post message " + m + " to closed message queue.");
         }
 
-        public ChannelReader<Message> GetReader(Message.Categories type)
-            => this.messageQueues[(int)type].Reader;
+        public ChannelReader<Message> GetReader(Message.Categories type) => this.messageQueues[(int)type].Reader;
 
         /// <inheritdoc />
         public void Dispose()
@@ -109,12 +110,7 @@ namespace Orleans.Runtime.Messaging
                 if (this.disposed) return;
 
                 this.Stop();
-
-                foreach (var q in this.messageQueues)
-                {
-                    //q.Dispose();
-                }
-
+                
                 this.disposed = true;
             }
         }

@@ -65,6 +65,13 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
+                if (this.log.IsEnabled(LogLevel.Information))
+                {
+                    this.log.LogInformation(
+                        "Establishing connection to endpoint {EndPoint}",
+                        endPoint);
+                }
+
                 var connectionTask = this.connectionBuilder.Connect(
                     endPoint,
                     context =>
@@ -82,7 +89,7 @@ namespace Orleans.Runtime.Messaging
                     {
                         var delay = TimeSpan.FromSeconds(2);
                         this.log.LogWarning(
-                            "Failed to connect to endpoint {EndPoint}: {Exception}. Waiting {Delay}ms before retry.",
+                            "Connection to endpoint {EndPoint} terminated with exception {Exception}. Waiting {Delay}ms before retry.",
                             endPoint,
                             exception,
                             delay.TotalMilliseconds);
@@ -90,6 +97,9 @@ namespace Orleans.Runtime.Messaging
                     }
                     finally
                     {
+                        this.log.LogInformation(
+                           "Connection to endpoint {EndPoint} closed.",
+                           endPoint);
                         this.Remove(endPoint, sender);
                         sender.Abort();
                     }
@@ -101,7 +111,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     var delay = TimeSpan.FromSeconds(2);
                     this.log.LogWarning(
-                        "Failed to connect to endpoint {EndPoint}: {Exception}. Waiting {Delay}ms before retry.",
+                        "Connection to endpoint {EndPoint} terminated with exception {Exception}. Waiting {Delay}ms before retry.",
                         endPoint,
                         exception,
                         delay.TotalMilliseconds);

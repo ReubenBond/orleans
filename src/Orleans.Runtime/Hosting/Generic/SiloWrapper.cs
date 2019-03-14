@@ -39,10 +39,16 @@ namespace Orleans.Hosting
         /// <inheritdoc />
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            this.applicationLifetime?.StopApplication();
-            await silo.StopAsync(cancellationToken);
-            await this.Stopped;
-            this.applicationLifetime?.NotifyStopped();
+            try
+            {
+                this.applicationLifetime?.StopApplication();
+                await silo.StopAsync(cancellationToken);
+                await this.Stopped;
+            }
+            finally
+            {
+                this.applicationLifetime?.NotifyStopped();
+            }
         }
 
         /// <inheritdoc />
