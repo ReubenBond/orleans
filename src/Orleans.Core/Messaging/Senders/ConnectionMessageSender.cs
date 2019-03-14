@@ -54,7 +54,7 @@ namespace Orleans.Runtime.Messaging
                 this.log.LogInformation(
                     "Aborting connection with remote endpoint {EndPoint} and id {ConnectionId}.",
                     this.connection?.GetRemoteEndPoint(),
-                    this.connection.ConnectionId);
+                    this.connection?.ConnectionId);
             }
 
             if (this.writer.TryComplete())
@@ -87,7 +87,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     this.log.LogInformation(
                         "Starting to process messages to remote endpoint {EndPoint} on connection {ConnectionId}.",
-                        this.connection?.GetRemoteEndPoint(),
+                        this.connection.GetRemoteEndPoint(),
                         this.connection.ConnectionId);
                 }
 
