@@ -23,7 +23,65 @@ namespace Orleans.Runtime.Messaging
 
     internal sealed class SharedMemoryPool
     {
-        public MemoryPool<byte> Pool { get; } = new SlabMemoryPool();
+        public MemoryPool<byte> Pool { get; } = new ArrayMemoryPool<byte>();// new SlabMemoryPool();
+    }
+
+    internal sealed class ArrayMemoryPool<T> : MemoryPool<T>
+    {
+        private readonly ArrayPool<T> internalPool = ArrayPool<T>.Create();
+        private const int MaximumBufferSize = int.MaxValue;
+
+        public sealed override int MaxBufferSize => MaximumBufferSize;
+
+        public sealed override IMemoryOwner<T> Rent(int minimumBufferSize = -1)
+        {
+            if (minimumBufferSize == -1)
+                minimumBufferSize = 1 + (4095 / Unsafe.SizeOf<T>());
+            else if (((uint)minimumBufferSize) > MaximumBufferSize)
+                ThrowArgumentOutOfRange();
+
+            return new ArrayMemoryPoolBuffer(this.internalPool, minimumBufferSize);
+
+            void ThrowArgumentOutOfRange() => throw new ArgumentOutOfRangeException(nameof(minimumBufferSize));
+        }
+
+        protected sealed override void Dispose(bool disposing) { }  // ArrayMemoryPool is a shared pool so Dispose() would be a nop even if there were native resources to dispose.
+        private sealed class ArrayMemoryPoolBuffer : IMemoryOwner<T>
+        {
+            private readonly ArrayPool<T> owner;
+            private T[] _array;
+
+            public ArrayMemoryPoolBuffer(ArrayPool<T> owner, int size)
+            {
+                _array = owner.Rent(size);
+                this.owner = owner;
+            }
+
+            public Memory<T> Memory
+            {
+                get
+                {
+                    T[] array = _array;
+                    if (array == null)
+                    {
+                        ThrowDisposed();
+                        void ThrowDisposed() => throw new ObjectDisposedException(nameof(ArrayMemoryPoolBuffer));
+                    }
+
+                    return new Memory<T>(array);
+                }
+            }
+
+            public void Dispose()
+            {
+                T[] array = _array;
+                if (array != null)
+                {
+                    _array = null;
+                    owner.Return(array);
+                }
+            }
+        }
     }
 
     internal class SocketSchedulers
