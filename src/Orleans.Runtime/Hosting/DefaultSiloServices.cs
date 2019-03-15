@@ -311,7 +311,10 @@ namespace Orleans.Hosting
             // persistent state facet support
             services.TryAddSingleton<IPersistentStateFactory, PersistentStateFactory>();
             services.TryAddSingleton(typeof(IAttributeToFactoryMapper<PersistentStateAttribute>), typeof(PersistentStateAttributeMapper));
-            
+
+            // TODO: abstract or move into some options.
+            services.AddSingleton<SharedMemoryPool>();
+
             // Networking
             services.TryAddSingleton<ConnectionManager>();
             services.TryAddSingleton<IConnectionFactory, SocketConnectionFactory>();

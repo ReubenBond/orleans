@@ -29,7 +29,8 @@ namespace Orleans.Runtime.Messaging
             string endPoint,
             ConnectionDelegate connectionDelegate,
             IApplicationLifetime applicationLifetime,
-            ISocketsTrace trace)
+            ISocketsTrace trace,
+            MemoryPool<byte> memoryPool)
         {
             Debug.Assert(endPoint != null);
             Debug.Assert(connectionDelegate != null);
@@ -44,7 +45,7 @@ namespace Orleans.Runtime.Messaging
             this.connectionDelegate = connectionDelegate;
             this.applicationLifetime = applicationLifetime;
             this.trace = trace;
-            this.memoryPool = MemoryPool<byte>.Shared;
+            this.memoryPool = memoryPool;
         }
 
         public Task Bind()
@@ -117,7 +118,6 @@ namespace Orleans.Runtime.Messaging
 
         public Task Stop()
         {
-            this.memoryPool.Dispose();
             return Task.CompletedTask;
         }
 

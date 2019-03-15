@@ -5,14 +5,16 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Messaging
 {
-    public sealed class SocketConnectionListenerFactory : IConnectionListenerFactory
+    internal sealed class SocketConnectionListenerFactory : IConnectionListenerFactory
     {
         private readonly IApplicationLifetime applicationLifetime;
+        private readonly SharedMemoryPool memoryPool;
         private readonly SocketsTrace trace;
 
         public SocketConnectionListenerFactory(
             IApplicationLifetime applicationLifetime,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            SharedMemoryPool memoryPool)
         {
             if (applicationLifetime == null)
             {
@@ -24,6 +26,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             this.applicationLifetime = applicationLifetime;
+            this.memoryPool = memoryPool;
             var logger = loggerFactory.CreateLogger("Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets");
             this.trace = new SocketsTrace(logger);
         }
@@ -40,7 +43,7 @@ namespace Orleans.Runtime.Messaging
                 throw new ArgumentNullException(nameof(connectionDelegate));
             }
 
-            return new SocketConnectionListener(endPoint, connectionDelegate, this.applicationLifetime, this.trace);
+            return new SocketConnectionListener(endPoint, connectionDelegate, this.applicationLifetime, this.trace, memoryPool.Pool);
         }
     }
 }

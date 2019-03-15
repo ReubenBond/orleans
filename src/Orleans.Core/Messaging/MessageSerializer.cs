@@ -13,11 +13,13 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly OrleansSerializer<Message.HeadersContainer> messageHeadersSerializer;
         private readonly OrleansSerializer<object> objectSerializer;
+        private readonly MemoryPool<byte> memoryPool;
 
-        public MessageSerializer(SerializationManager serializationManager)
+        public MessageSerializer(SerializationManager serializationManager, SharedMemoryPool memoryPool)
         {
             this.messageHeadersSerializer = new OrleansSerializer<Message.HeadersContainer>(serializationManager);
             this.objectSerializer = new OrleansSerializer<object>(serializationManager);
+            this.memoryPool = memoryPool.Pool;
         }
 
         public int TryRead(ref ReadOnlySequence<byte> input, out Message message)
@@ -82,7 +84,7 @@ namespace Orleans.Runtime.Messaging
 
         public void Write<TBufferWriter>(ref TBufferWriter writer, Message message) where TBufferWriter : IBufferWriter<byte>
         {
-            var buffer = new PrefixingBufferWriter<byte, TBufferWriter>(writer, 8, 10240);
+            var buffer = new PrefixingBufferWriter<byte, TBufferWriter>(writer, 8, 10240, this.memoryPool);
             Span<byte> lengthFields = stackalloc byte[8];
 
             this.messageHeadersSerializer.Serialize(ref buffer, message.Headers);
@@ -164,6 +166,8 @@ namespace Orleans.Runtime.Messaging
     /// </remarks>
     public class PrefixingBufferWriter<T, TBufferWriter> : IBufferWriter<T> where TBufferWriter : IBufferWriter<T>
     {
+        private readonly MemoryPool<T> memoryPool;
+
         /// <summary>
         /// The underlying buffer writer.
         /// </summary>
@@ -208,7 +212,8 @@ namespace Orleans.Runtime.Messaging
         /// <param name="innerWriter">The underlying writer that should ultimately receive the prefix and payload.</param>
         /// <param name="prefixSize">The length of the header to reserve space for. Must be a positive number.</param>
         /// <param name="payloadSizeHint">A hint at the expected max size of the payload. The real size may be more or less than this, but additional copying is avoided if it does not exceed this amount. If 0, a reasonable guess is made.</param>
-        public PrefixingBufferWriter(TBufferWriter innerWriter, int prefixSize, int payloadSizeHint)
+        /// <param name="memoryPool"></param>
+        public PrefixingBufferWriter(TBufferWriter innerWriter, int prefixSize, int payloadSizeHint, MemoryPool<T> memoryPool)
         {
             if (prefixSize <= 0)
             {
@@ -221,7 +226,7 @@ namespace Orleans.Runtime.Messaging
             if (innerWriter.Equals(default(TBufferWriter))) ThrowInnerWriter();
             this.expectedPrefixSize = prefixSize;
             this.payloadSizeHint = payloadSizeHint;
-
+            this.memoryPool = memoryPool;
             void ThrowPrefixSize() => throw new ArgumentOutOfRangeException(nameof(prefixSize));
             void ThrowInnerWriter() => throw new ArgumentNullException(nameof(innerWriter));
         }
@@ -252,7 +257,7 @@ namespace Orleans.Runtime.Messaging
             {
                 if (this.privateWriter == null)
                 {
-                    this.privateWriter = new Sequence<T>();
+                    this.privateWriter = new Sequence<T>(this.memoryPool);
                 }
 
                 return this.privateWriter.GetMemory(sizeHint);
@@ -272,7 +277,7 @@ namespace Orleans.Runtime.Messaging
             {
                 if (this.privateWriter == null)
                 {
-                    this.privateWriter = new Sequence<T>();
+                    this.privateWriter = new Sequence<T>(this.memoryPool);
                 }
 
                 return this.privateWriter.GetSpan(sizeHint);
@@ -360,16 +365,7 @@ namespace Orleans.Runtime.Messaging
         private SequenceSegment first;
 
         private SequenceSegment last;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="Sequence{T}"/> class
-        /// that uses the <see cref="MemoryPool{T}.Shared"/> memory pool for recycling arrays.
-        /// </summary>
-        public Sequence()
-            : this(MemoryPool<T>.Shared)
-        {
-        }
-
+        
         /// <summary>
         /// Initializes a new instance of the <see cref="Sequence{T}"/> class.
         /// </summary>
