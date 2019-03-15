@@ -175,8 +175,7 @@ namespace Orleans.Messaging
             GatewayManager.Stop();
         }
 
-        public ChannelReader<Message> GetReader(Message.Categories type)
-            => PendingInboundMessages.Reader;
+        public ChannelReader<Message> GetReader(Message.Categories type) => PendingInboundMessages.Reader;
 
         public void OnReceivedMessage(Message message)
         {
@@ -206,7 +205,6 @@ namespace Orleans.Messaging
             try
             {
                 gatewaySender.Send(msg);
-                // TODO: Fix log message
                 if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.ProxyClient_QueueRequest, "Sending message {0} via gateway {1}", msg, gatewaySender );
             }
             catch (InvalidOperationException)
@@ -308,6 +306,7 @@ namespace Orleans.Messaging
 
         public void RegisterLocalMessageHandler(Message.Categories category, Action<Message> handler)
         {
+            this.messageHandlers[(int)category] = handler;
         }
 
         public void RejectMessage(Message msg, string reason, Exception exc = null)
