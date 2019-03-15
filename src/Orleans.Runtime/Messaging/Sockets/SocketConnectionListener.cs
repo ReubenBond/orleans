@@ -167,11 +167,11 @@ namespace Orleans.Runtime.Messaging
             {
                 var pair = DuplexPipe.CreateConnectionPair(
                     GetPipeOptions(
-                        PipeScheduler.Inline,
+                        PipeScheduler.ThreadPool,
                         connection.InputWriterScheduler),
                     GetPipeOptions(
                         connection.OutputReaderScheduler,
-                        PipeScheduler.Inline));
+                        PipeScheduler.ThreadPool));
 
                 connection.Application = pair.Application;
                 connection.Transport = pair.Transport;
