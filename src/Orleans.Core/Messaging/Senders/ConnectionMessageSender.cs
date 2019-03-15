@@ -94,34 +94,41 @@ namespace Orleans.Runtime.Messaging
                 while (true)
                 {
                     var moreTask = reader.WaitToReadAsync();
-                    var more = moreTask.IsCompleted ? moreTask.GetAwaiter().GetResult() : await moreTask.ConfigureAwait(false);
+                    var more = moreTask.IsCompleted ? moreTask.GetAwaiter().GetResult() : await moreTask;
                     if (!more)
                     {
                         break;
                     }
 
-                    Message message = default;
-                    try
+                    while (true)
                     {
-                        if (reader.TryRead(out message) && this.messageCenter.PrepareMessageForSend(message))
+                        Message message = default;
+                        try
                         {
-                            this.serializer.Write(ref output, message);
+                            if (reader.TryRead(out message) && this.messageCenter.PrepareMessageForSend(message))
+                            {
+                                this.serializer.Write(ref output, message);
+                            }
+                            else break;
                         }
-                    }
-                    catch (Exception exception) when (message != default)
-                    {
-                        this.log.LogWarning(
-                            "Exception writing message {Message} to remote endpoint {EndPoint} on connection {ConnectionId}: {Exception}",
-                            message,
-                            this.connection?.GetRemoteEndPoint(),
-                            this.connection.ConnectionId,
-                            exception);
-                        this.messageCenter.OnMessageSerializationFailure(message, exception);
+                        catch (Exception exception) when (message != default)
+                        {
+                            this.log.LogWarning(
+                                "Exception writing message {Message} to remote endpoint {EndPoint} on connection {ConnectionId}: {Exception}",
+                                message,
+                                this.connection?.GetRemoteEndPoint(),
+                                this.connection.ConnectionId,
+                                exception);
+                            this.messageCenter.OnMessageSerializationFailure(message, exception);
+                        }
                     }
 
                     var flushTask = output.FlushAsync();
-                    var flushResult = flushTask.IsCompleted ? flushTask.GetAwaiter().GetResult() : await flushTask.ConfigureAwait(false);
-                    if (flushResult.IsCompleted || flushResult.IsCanceled) break;
+                    var flushResult = flushTask.IsCompleted ? flushTask.GetAwaiter().GetResult() : await flushTask;
+                    if (flushResult.IsCompleted || flushResult.IsCanceled)
+                    {
+                        break;
+                    }
                 }
             }
             catch (Exception exception)
