@@ -89,6 +89,7 @@ namespace Orleans
             services.AddTransient<IConfigurationValidator, ClientClusteringValidator>();
 
             // TODO: abstract or move into some options.
+            services.AddSingleton<SocketSchedulers>();
             services.AddSingleton<SharedMemoryPool>();
 
             // Networking

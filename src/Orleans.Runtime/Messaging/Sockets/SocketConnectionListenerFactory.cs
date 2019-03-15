@@ -8,12 +8,14 @@ namespace Orleans.Runtime.Messaging
     internal sealed class SocketConnectionListenerFactory : IConnectionListenerFactory
     {
         private readonly IApplicationLifetime applicationLifetime;
+        private readonly SocketSchedulers schedulers;
         private readonly SharedMemoryPool memoryPool;
         private readonly SocketsTrace trace;
 
         public SocketConnectionListenerFactory(
             IApplicationLifetime applicationLifetime,
             ILoggerFactory loggerFactory,
+            SocketSchedulers schedulers,
             SharedMemoryPool memoryPool)
         {
             if (applicationLifetime == null)
@@ -26,6 +28,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             this.applicationLifetime = applicationLifetime;
+            this.schedulers = schedulers;
             this.memoryPool = memoryPool;
             var logger = loggerFactory.CreateLogger("Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets");
             this.trace = new SocketsTrace(logger);
@@ -43,7 +46,7 @@ namespace Orleans.Runtime.Messaging
                 throw new ArgumentNullException(nameof(connectionDelegate));
             }
 
-            return new SocketConnectionListener(endPoint, connectionDelegate, this.applicationLifetime, this.trace, memoryPool.Pool);
+            return new SocketConnectionListener(endPoint, connectionDelegate, this.applicationLifetime, this.trace, this.schedulers, this.memoryPool);
         }
     }
 }

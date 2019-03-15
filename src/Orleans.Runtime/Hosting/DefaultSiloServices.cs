@@ -313,7 +313,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton(typeof(IAttributeToFactoryMapper<PersistentStateAttribute>), typeof(PersistentStateAttributeMapper));
 
             // TODO: abstract or move into some options.
-            services.AddSingleton<SharedMemoryPool>();
 
             // Networking
             services.TryAddSingleton<ConnectionManager>();
@@ -326,6 +325,8 @@ namespace Orleans.Hosting
             // Use Orleans socket server.
             services.AddSingleton<OrleansServer>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, OrleansServer>();
+            services.AddSingleton<SocketSchedulers>();
+            services.AddSingleton<SharedMemoryPool>();
         }
     }
 }

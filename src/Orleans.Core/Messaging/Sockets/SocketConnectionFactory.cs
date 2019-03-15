@@ -12,23 +12,61 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Runtime.Messaging
 {
+    public class SocketConnectionOptions
+    {
+        public int IOQueueCount { get; set; } = Math.Min(Environment.ProcessorCount, 16);
+    }
+
     internal sealed class SharedMemoryPool
     {
         public MemoryPool<byte> Pool { get; } = new SlabMemoryPool();
     }
 
+    internal class SocketSchedulers
+    {
+        private static readonly PipeScheduler[] ThreadPoolSchedulerArray = new PipeScheduler[] { PipeScheduler.ThreadPool };
+        private readonly int _numSchedulers;
+        private readonly PipeScheduler[] _schedulers;
+        private int nextScheduler;
+
+        public SocketSchedulers(IOptions<SocketConnectionOptions> options)
+        {
+            var o = options.Value;
+            if (o.IOQueueCount > 0)
+            {
+                _numSchedulers = o.IOQueueCount;
+                _schedulers = new IOQueue[_numSchedulers];
+
+                for (var i = 0; i < _numSchedulers; i++)
+                {
+                    _schedulers[i] = new IOQueue();
+                }
+            }
+            else
+            {
+                _numSchedulers = ThreadPoolSchedulerArray.Length;
+                _schedulers = ThreadPoolSchedulerArray;
+            }
+        }
+
+        public PipeScheduler GetScheduler() => _schedulers[++nextScheduler % _numSchedulers];
+    }
+
     internal class SocketConnectionFactory : IConnectionFactory
     {
         private readonly SocketsTrace trace;
+        private readonly SocketSchedulers schedulers;
         private readonly MemoryPool<byte> memoryPool;
 
-        public SocketConnectionFactory(ILoggerFactory loggerFactory, SharedMemoryPool memoryPool)
+        public SocketConnectionFactory(ILoggerFactory loggerFactory, SocketSchedulers schedulers, SharedMemoryPool memoryPool)
         {
             var logger = loggerFactory.CreateLogger("Orleans.Sockets");
             this.trace = new SocketsTrace(logger);
+            this.schedulers = schedulers;
             this.memoryPool = memoryPool.Pool;
         }
 
@@ -60,7 +98,8 @@ namespace Orleans.Runtime.Messaging
                 throw new SocketConnectionException($"Unable to connect to {endPoint}. Error: {completion.SocketError}");
             }
 
-            var connection = new SocketConnection(socket, this.memoryPool, PipeScheduler.ThreadPool, this.trace);
+            var scheduler = schedulers.GetScheduler();
+            var connection = new SocketConnection(socket, this.memoryPool, scheduler, this.trace);
             var pair = DuplexPipe.CreateConnectionPair(
                 GetPipeOptions(PipeScheduler.Inline, connection.InputWriterScheduler, this.memoryPool),
                 GetPipeOptions(connection.OutputReaderScheduler, PipeScheduler.Inline, this.memoryPool));

@@ -14,11 +14,11 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class SocketConnectionListener : IConnectionListener
     {
-        private readonly MemoryPool<byte> memoryPool;
         private readonly ConnectionDelegate connectionDelegate;
         private readonly IApplicationLifetime applicationLifetime;
         private readonly ISocketsTrace trace;
-        private readonly PipeScheduler scheduler = PipeScheduler.ThreadPool;
+        private readonly SocketSchedulers schedulers;
+        private readonly MemoryPool<byte> memoryPool;
         private Socket listenSocket;
         private Task listenTask;
         private Exception listenException;
@@ -30,7 +30,8 @@ namespace Orleans.Runtime.Messaging
             ConnectionDelegate connectionDelegate,
             IApplicationLifetime applicationLifetime,
             ISocketsTrace trace,
-            MemoryPool<byte> memoryPool)
+            SocketSchedulers schedulers,
+            SharedMemoryPool memoryPool)
         {
             Debug.Assert(endPoint != null);
             Debug.Assert(connectionDelegate != null);
@@ -45,7 +46,8 @@ namespace Orleans.Runtime.Messaging
             this.connectionDelegate = connectionDelegate;
             this.applicationLifetime = applicationLifetime;
             this.trace = trace;
-            this.memoryPool = memoryPool;
+            this.schedulers = schedulers;
+            this.memoryPool = memoryPool.Pool;
         }
 
         public Task Bind()
@@ -131,7 +133,20 @@ namespace Orleans.Runtime.Messaging
                     {
                         var acceptSocket = await this.listenSocket.AcceptAsync();
 
-                        var connection = new SocketConnection(acceptSocket, this.memoryPool, this.scheduler, this.trace);
+                        var scheduler = schedulers.GetScheduler();
+                        var connection = new SocketConnection(acceptSocket, this.memoryPool, scheduler, this.trace);
+                        var pair = DuplexPipe.CreateConnectionPair(
+                            GetPipeOptions(
+                                PipeScheduler.Inline,
+                                connection.InputWriterScheduler,
+                                this.memoryPool),
+                            GetPipeOptions(
+                                connection.OutputReaderScheduler,
+                                PipeScheduler.Inline,
+                                this.memoryPool));
+
+                        connection.Application = pair.Application;
+                        connection.Transport = pair.Transport;
 
                         // REVIEW: This task should be tracked by the server for graceful shutdown
                         // Today it's handled specifically for http but not for arbitrary middleware
@@ -165,17 +180,6 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                var pair = DuplexPipe.CreateConnectionPair(
-                    GetPipeOptions(
-                        PipeScheduler.Inline,
-                        connection.InputWriterScheduler),
-                    GetPipeOptions(
-                        connection.OutputReaderScheduler,
-                        PipeScheduler.Inline));
-
-                connection.Application = pair.Application;
-                connection.Transport = pair.Transport;
-
                 var middlewareTask = this.connectionDelegate(connection);
                 var transportTask = connection.StartAsync();
 
@@ -190,15 +194,16 @@ namespace Orleans.Runtime.Messaging
             {
                 this.trace.LogCritical(ex, $"Unexpected exception in {nameof(SocketConnectionListener)}.{nameof(HandleConnectionAsync)}.");
             }
+        }
 
-            PipeOptions GetPipeOptions(PipeScheduler readerScheduler, PipeScheduler writerScheduler) => new PipeOptions(
-                pool: this.memoryPool,
+        private static PipeOptions GetPipeOptions(PipeScheduler readerScheduler, PipeScheduler writerScheduler, MemoryPool<byte> memoryPool) =>
+            new PipeOptions(
+                pool: memoryPool,
                 readerScheduler: readerScheduler,
                 writerScheduler: writerScheduler,
                 pauseWriterThreshold: 0,
                 resumeWriterThreshold: 0,
                 useSynchronizationContext: false,
                 minimumSegmentSize: 4096);
-        }
     }
 }
