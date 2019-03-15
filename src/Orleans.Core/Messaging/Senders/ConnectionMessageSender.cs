@@ -100,27 +100,23 @@ namespace Orleans.Runtime.Messaging
                         break;
                     }
 
-                    while (true)
+                    Message message = default;
+                    try
                     {
-                        Message message = default;
-                        try
+                        while (reader.TryRead(out message) && this.messageCenter.PrepareMessageForSend(message))
                         {
-                            if (reader.TryRead(out message) && this.messageCenter.PrepareMessageForSend(message))
-                            {
-                                this.serializer.Write(ref output, message);
-                            }
-                            else break;
+                            this.serializer.Write(ref output, message);
                         }
-                        catch (Exception exception) when (message != default)
-                        {
-                            this.log.LogWarning(
-                                "Exception writing message {Message} to remote endpoint {EndPoint} on connection {ConnectionId}: {Exception}",
-                                message,
-                                this.connection?.GetRemoteEndPoint(),
-                                this.connection.ConnectionId,
-                                exception);
-                            this.messageCenter.OnMessageSerializationFailure(message, exception);
-                        }
+                    }
+                    catch (Exception exception) when (message != default)
+                    {
+                        this.log.LogWarning(
+                            "Exception writing message {Message} to remote endpoint {EndPoint} on connection {ConnectionId}: {Exception}",
+                            message,
+                            this.connection?.GetRemoteEndPoint(),
+                            this.connection.ConnectionId,
+                            exception);
+                        this.messageCenter.OnMessageSerializationFailure(message, exception);
                     }
 
                     var flushTask = output.FlushAsync();
