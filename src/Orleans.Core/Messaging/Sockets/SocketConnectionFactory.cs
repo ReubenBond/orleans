@@ -52,8 +52,8 @@ namespace Orleans.Runtime.Messaging
 
             var connection = new SocketConnection(socket, MemoryPool<byte>.Shared, PipeScheduler.ThreadPool, this.trace);
             var pair = DuplexPipe.CreateConnectionPair(
-                GetPipeOptions(PipeScheduler.ThreadPool, connection.InputWriterScheduler),
-                GetPipeOptions(connection.OutputReaderScheduler, PipeScheduler.ThreadPool));
+                GetPipeOptions(PipeScheduler.Inline, connection.InputWriterScheduler),
+                GetPipeOptions(connection.OutputReaderScheduler, PipeScheduler.Inline));
             connection.Application = pair.Application;
             connection.Transport = pair.Transport;
             _ = Task.Run(async () =>
