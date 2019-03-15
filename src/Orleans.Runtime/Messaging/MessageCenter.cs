@@ -22,7 +22,7 @@ namespace Orleans.Runtime.Messaging
         private Action<Message> sniffIncomingMessageHandler;
 
         internal OutboundMessageQueue OutboundQueue { get; set; }
-        internal InboundMessageQueue InboundQueue { get; set; }
+        private InboundMessageQueue inboundQueue;
         private readonly MessageFactory messageFactory;
         private readonly ILoggerFactory loggerFactory;
         private readonly ConnectionManager senderManager;
@@ -73,7 +73,7 @@ namespace Orleans.Runtime.Messaging
         {
             if (log.IsEnabled(LogLevel.Trace)) log.Trace("Starting initialization.");
 
-            InboundQueue = new InboundMessageQueue(this.loggerFactory.CreateLogger<InboundMessageQueue>(), statisticsOptions);
+            inboundQueue = new InboundMessageQueue(this.loggerFactory.CreateLogger<InboundMessageQueue>(), statisticsOptions);
             OutboundQueue = new OutboundMessageQueue(this, this.loggerFactory.CreateLogger<OutboundMessageQueue>(), this.senderManager);
 
             if (log.IsEnabled(LogLevel.Trace)) log.Trace("Completed initialization.");
@@ -157,7 +157,7 @@ namespace Orleans.Runtime.Messaging
             }
             else
             {
-                this.InboundQueue.PostMessage(message);
+                this.inboundQueue.PostMessage(message);
             }
         }
 
@@ -223,8 +223,7 @@ namespace Orleans.Runtime.Messaging
             this.OnReceivedMessage(error);
         }
 
-        public ChannelReader<Message> GetReader(Message.Categories type) => InboundQueue.GetReader(type);
-
+        public ChannelReader<Message> GetReader(Message.Categories type) => inboundQueue.GetReader(type);
 
         public void RegisterLocalMessageHandler(Message.Categories category, Action<Message> handler)
         {
@@ -233,7 +232,7 @@ namespace Orleans.Runtime.Messaging
 
         public void Dispose()
         {
-            InboundQueue?.Dispose();
+            inboundQueue?.Dispose();
             OutboundQueue?.Dispose();
 
             GC.SuppressFinalize(this);
@@ -241,7 +240,7 @@ namespace Orleans.Runtime.Messaging
 
         public int SendQueueLength { get { return OutboundQueue.GetCount(); } }
 
-        public int ReceiveQueueLength { get { return InboundQueue.Count; } }
+        public int ReceiveQueueLength { get { return inboundQueue.Count; } }
 
         /// <summary>
         /// Indicates that application messages should be blocked from being sent or received.

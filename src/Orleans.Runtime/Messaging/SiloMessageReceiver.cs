@@ -84,7 +84,7 @@ namespace Orleans.Runtime.Messaging
                 if (messageCenter.IsProxying && messageCenter.TryDeliverToProxy(msg)) return;
 
                 // Nope, it's for us
-                messageCenter.InboundQueue.PostMessage(msg);
+                messageCenter.OnReceivedMessage(msg);
                 return;
             }
 
