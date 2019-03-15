@@ -1,19 +1,17 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.IO.Pipelines;
-using System.Threading;
 
 namespace Orleans.Runtime.Messaging
 {
     public sealed class IOQueue : PipeScheduler
-#if NETCORE
-        , IThreadPoolWorkItem
-#endif
     {
         private readonly object _workSync = new object();
         private readonly ConcurrentQueue<Work> _workItems = new ConcurrentQueue<Work>();
-#if !NETCORE
-        private static readonly WaitCallback WaitCallback = ctx => ((IOQueue)ctx).Execute();
+#if NETCOREAPP
+        private static readonly Action<IOQueue> Callback = ctx => ctx.Execute();
+#else
+        private static readonly System.Threading.WaitCallback WaitCallback = ctx => ((IOQueue)ctx).Execute();
 #endif
 
         private bool _doingWork;
@@ -28,8 +26,8 @@ namespace Orleans.Runtime.Messaging
             {
                 if (!_doingWork)
                 {
-#if NETCORE
-                    System.Threading.ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: false);
+#if NETCOREAPP
+                    System.Threading.ThreadPool.QueueUserWorkItem(Callback, this, preferLocal: false);
 #else
                     System.Threading.ThreadPool.UnsafeQueueUserWorkItem(WaitCallback, this);
 #endif
@@ -38,11 +36,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-#if NETCORE
-        void IThreadPoolWorkItem.Execute()
-#else
         private void Execute()
-#endif
         {
             while (true)
             {

@@ -9,7 +9,7 @@ using Orleans.Hosting;
 namespace Orleans.Runtime.Messaging
 {
     internal class OrleansServer : ILifecycleParticipant<ISiloLifecycle>
-#if NETCOREAPP
+#if NETCOREAPP30
         , IAsyncDisposable
 #endif
     {
