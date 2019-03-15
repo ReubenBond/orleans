@@ -232,16 +232,6 @@ namespace System.Buffers
 
         public override IMemoryOwner<byte> Rent(int size = AnySize)
         {
-            if (size > _blockSize)
-            {
-                ThrowBufferRequestTooLarge(_blockSize);
-
-                void ThrowBufferRequestTooLarge(int maxSize)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(size), $"Cannot allocate more than {maxSize} bytes in a single buffer");
-                }
-            }
-
             var block = Lease();
             return block;
         }
