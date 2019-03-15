@@ -493,7 +493,7 @@ namespace Orleans.Runtime.Messaging
 
             if (this.last == null || this.last.WritableBytes < sizeHint)
             {
-                this.Append(this.memoryPool.Rent(sizeHint));
+                this.Append(this.memoryPool.Rent(Math.Min(sizeHint, this.memoryPool.MaxBufferSize)));
             }
 
             return this.last.TrailingSlack;
