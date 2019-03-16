@@ -89,7 +89,7 @@ namespace Orleans.Runtime.Messaging
         private static readonly PipeScheduler[] ThreadPoolSchedulerArray = new PipeScheduler[] { PipeScheduler.ThreadPool };
         private readonly int _numSchedulers;
         private readonly PipeScheduler[] _schedulers;
-        //private int nextScheduler;
+        private int nextScheduler;
 
         public SocketSchedulers(IOptions<SocketConnectionOptions> options)
         {
@@ -111,7 +111,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public PipeScheduler GetScheduler() => PipeScheduler.Inline;// _schedulers[++nextScheduler % _numSchedulers];
+        public PipeScheduler GetScheduler() => _schedulers[++nextScheduler % _numSchedulers];
     }
 
     internal class SocketConnectionFactory : IConnectionFactory
