@@ -1,11 +1,11 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
+using System;
+using Orleans;
 
 namespace UnitTests.GrainInterfaces
 {
-    using Orleans;
-
     [TypeCodeOverride(6548972)]
     public interface IMethodInterceptionGrain : IGrainWithIntegerKey, IMethodFromAnotherInterface
     {
@@ -16,6 +16,9 @@ namespace UnitTests.GrainInterfaces
         Task<string> Throw();
         Task<string> IncorrectResultType();
         Task FilterThrows();
+
+        Task Create(HashSet<Guid> data);
+        Task CreateIEnumerable(IEnumerable<Guid> data);
     }
     
     public interface IOutgoingMethodInterceptionGrain : IGrainWithIntegerKey

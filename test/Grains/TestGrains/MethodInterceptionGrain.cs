@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -88,6 +88,20 @@ namespace UnitTests.Grains
             {
                 context.Result = string.Concat(resultString.Reverse());
             }
+        }
+
+        public Task Create(HashSet<Guid> data)
+        {
+            if (data == null)
+                throw new ArgumentNullException(nameof(data));
+            return Task.CompletedTask;
+        }
+
+        public Task CreateIEnumerable(IEnumerable<Guid> data)
+        {
+            if (data == null)
+                throw new ArgumentNullException(nameof(data));
+            return Task.CompletedTask;
         }
 
         [Serializable]

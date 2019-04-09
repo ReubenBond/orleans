@@ -1,6 +1,8 @@
-﻿using Orleans;
+using Orleans;
 using BenchmarkGrainInterfaces.Ping;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using System;
 
 namespace BenchmarkGrains.Ping
 {
@@ -23,6 +25,37 @@ namespace BenchmarkGrains.Ping
         {
             if (count == 0) return Task.CompletedTask;
             return other.PingPongInterleave(this.self, count - 1);
+        }
+    }
+
+    public interface IHashGrain : IGrainWithIntegerKey
+    {
+        Task Create(HashSet<Guid> data);
+        Task CreateIEnumerable(IEnumerable<Guid> data);
+    }
+
+    public class HashGrain : Grain, IHashGrain, IIncomingGrainCallFilter
+    {
+        public Task Create(HashSet<Guid> data)
+        {
+            if (data == null)
+                throw new ArgumentNullException(nameof(data));
+            return Task.CompletedTask;
+        }
+
+        public Task CreateIEnumerable(IEnumerable<Guid> data)
+        {
+            if (data == null)
+                throw new ArgumentNullException(nameof(data));
+            return Task.CompletedTask;
+        }
+
+        public Task Invoke(IIncomingGrainCallContext context)
+        {
+            if (context.InterfaceMethod == null)
+                throw new ArgumentNullException("InterfaceMethod");
+
+            return context.Invoke();
         }
     }
 }

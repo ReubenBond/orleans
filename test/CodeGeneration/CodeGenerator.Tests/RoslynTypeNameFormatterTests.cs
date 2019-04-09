@@ -40,11 +40,14 @@ namespace CodeGenerator.Tests
             typeof(List<int*[]>.Enumerator),
             typeof(List<>.Enumerator),
             typeof(Generic<>),
-            typeof(Generic<>.Nested<>)
+            typeof(Generic<>.Nested<>),
+            typeof(HashSet<int>),
         };
 
         private static readonly Type[] Grains =
         {
+            typeof(IMethodInterceptionGrain),
+            typeof(MethodInterceptionGrain),
             typeof(IMyGenericGrainInterface2<>),
             typeof(IMyGenericGrainInterface2<int>),
             typeof(IMyGrainInterface),
@@ -76,6 +79,7 @@ namespace CodeGenerator.Tests
                 typeof(IGrain).Assembly,
                 typeof(Attribute).Assembly,
                 typeof(System.Net.IPAddress).Assembly,
+                typeof(HashSet<>).Assembly,
                 typeof(ExcludeFromCodeCoverageAttribute).Assembly,
             }.Select(a => MetadataReference.CreateFromFile(a.Location, MetadataReferenceProperties.Assembly));
             var metadataReferences = metas.Concat(GetGlobalReferences()).ToArray();
@@ -234,6 +238,21 @@ namespace CodeGenerator.Tests
         public class Generic<T>
         {
             public class Nested<TU> { }
+        }
+
+
+
+        public interface IMethodInterceptionGrain : IGrainWithGuidKey
+        {
+            Task Create(HashSet<Guid> data);
+            Task CreateIEnumerable(IEnumerable<Guid> data);
+        }
+
+
+        public class MethodInterceptionGrain : Grain, IMethodInterceptionGrain
+        {
+            public Task Create(HashSet<Guid> data) => throw new NotImplementedException();
+            public Task CreateIEnumerable(IEnumerable<Guid> data) => throw new NotImplementedException();
         }
 
         public interface IMyGrainInterface : IGrainWithGuidKey

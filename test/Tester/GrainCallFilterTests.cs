@@ -15,6 +15,7 @@ using UnitTests.Grains;
 using Xunit;
 using Orleans.Hosting;
 using Orleans.Serialization;
+using Orleans.CodeGeneration;
 
 namespace UnitTests.General
 {
@@ -37,6 +38,9 @@ namespace UnitTests.General
                     hostBuilder
                         .AddIncomingGrainCallFilter(context =>
                         {
+                            if (((IGrainMethodInvoker)context).InterfaceId == 6548972 && context.InterfaceMethod is null) throw new ArgumentException("InterfaceMethod is null");
+                            if (((IGrainMethodInvoker)context).InterfaceId == 6548972 && context.ImplementationMethod is null) throw new ArgumentException("InterfaceMethod is null");
+
                             if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))
                             {
                                 if (RequestContext.Get(GrainCallFilterTestConstants.Key) != null) throw new InvalidOperationException();
@@ -290,6 +294,21 @@ namespace UnitTests.General
             // This grain method throws, but the exception should be handled by one of the filters and converted
             // into a specific message.
             await Assert.ThrowsAsync<InvalidCastException>(() => grain.IncorrectResultType());
+        }
+
+        /// <summary>
+        /// Tests that <see cref="IIncomingGrainCallContext.ImplementationMethod"/> and <see cref="IIncomingGrainCallContext.InterfaceMethod"/>
+        /// are correctly set within a grain call filter.
+        /// </summary>
+        [Fact]
+        public async Task GrainCallFilter_Incoming_Context_Test()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<IMethodInterceptionGrain>(random.Next());
+
+            // This grain method throws, but the exception should be handled by one of the filters and converted
+            // into a specific message.
+            await grain.Create(new HashSet<Guid> { Guid.NewGuid(), Guid.NewGuid() });
+            await grain.CreateIEnumerable(new HashSet<Guid> { Guid.NewGuid(), Guid.NewGuid() });
         }
     }
 }
