@@ -50,8 +50,8 @@
     <SystemNetHttpVersion>4.3.3</SystemNetHttpVersion>
     <SystemReflectionMetadataVersion>1.5.0</SystemReflectionMetadataVersion>
     <SystemReflectionTypeExtensionsVersion>4.4.0</SystemReflectionTypeExtensionsVersion>
-    <SystemValueTupleVersion>4.4.0</SystemValueTupleVersion>
-    <SystemThreadingTasksExtensionsVersion>4.4.0</SystemThreadingTasksExtensionsVersion>
+    <SystemValueTupleVersion>4.5.0</SystemValueTupleVersion>
+    <SystemThreadingTasksExtensionsVersion>4.5.2</SystemThreadingTasksExtensionsVersion>
     <SystemMemoryVersion>4.5.1</SystemMemoryVersion>
 
     <!-- Microsoft packages -->

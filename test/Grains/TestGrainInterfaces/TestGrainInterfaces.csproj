@@ -18,4 +18,12 @@
     <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonVersion)" />
     <PackageReference Include="protobuf-net" Version="$(ProtobufNetVersion)" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="Hagar" Version="0.2.2-dev-20190409095801" />
+    <PackageReference Update="Hagar.CodeGenerator.MSBuild" Version="0.2.2-dev-20190409095801">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
 </Project>

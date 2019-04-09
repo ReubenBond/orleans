@@ -15,5 +15,13 @@
     <PackageReference Include="Microsoft.Extensions.Options" Version="$(MicrosoftExtensionsOptionsVersion)" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="$(MicrosoftExtensionsHostingAbstractionsVersion)" />
   </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Hagar" Version="0.2.2-dev-20190409095801" />
+    <PackageReference Include="Hagar.CodeGenerator.MSBuild" Version="0.2.2-dev-20190409095801">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
 
 </Project>

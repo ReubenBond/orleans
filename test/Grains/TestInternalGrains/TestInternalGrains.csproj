@@ -17,5 +17,13 @@
     <ProjectReference Include="$(SourceRoot)test\Misc\TestInterfaces\TestInterfaces.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="Hagar" Version="0.2.2-dev-20190409095801" />
+    <PackageReference Update="Hagar.CodeGenerator.MSBuild" Version="0.2.2-dev-20190409095801">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
   
 </Project>

@@ -13,6 +13,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Hagar" Version="0.2.2-dev-20190409095801" />
+    <PackageReference Include="Hagar.CodeGenerator.MSBuild" Version="0.2.2-dev-20190409095801">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="System.Memory" Version="$(SystemMemoryVersion)" />
     <PackageReference Include="System.Runtime.Serialization.Formatters" Version="$(SystemRuntimeVersion)" />
   </ItemGroup>
