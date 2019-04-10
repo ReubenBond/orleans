@@ -17,8 +17,9 @@ namespace Orleans.Runtime.GrainDirectory
         private const int HANDOFF_CHUNK_SIZE = 500;
         private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(250);
         private const int MAX_OPERATION_DEQUEUE = 2;
+        private readonly ILocalSiloDetails localSiloDetails;
         private readonly LocalGrainDirectory localDirectory;
-        private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly IClusterMembershipService clusterMembershipService;
         private readonly IInternalGrainFactory grainFactory;
         private readonly Dictionary<SiloAddress, GrainDirectoryPartition> directoryPartitionsMap;
         private readonly List<SiloAddress> silosHoldingMyPartition;
@@ -29,15 +30,17 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly AsyncLock executorLock = new AsyncLock();
 
         internal GrainDirectoryHandoffManager(
-            LocalGrainDirectory localDirectory,
-            ISiloStatusOracle siloStatusOracle,
+            ILocalSiloDetails localSiloDetails,
+            LocalGrainDirectory localGrainDirectory,
+            IClusterMembershipService clusterMembershipService,
             IInternalGrainFactory grainFactory,
             Factory<GrainDirectoryPartition> createPartion,
             ILoggerFactory loggerFactory)
         {
             logger = loggerFactory.CreateLogger<GrainDirectoryHandoffManager>();
-            this.localDirectory = localDirectory;
-            this.siloStatusOracle = siloStatusOracle;
+            this.localSiloDetails = localSiloDetails;
+            this.localDirectory = localGrainDirectory;
+            this.clusterMembershipService = clusterMembershipService;
             this.grainFactory = grainFactory;
             this.createPartion = createPartion;
             directoryPartitionsMap = new Dictionary<SiloAddress, GrainDirectoryPartition>();
@@ -106,7 +109,7 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                     Task task = localDirectory.Scheduler.RunOrQueueTask(
                                 () => localDirectory.GetDirectoryReference(captureSilo).AcceptHandoffPartition(
-                                        localDirectory.MyAddress,
+                                        this.localSiloDetails.SiloAddress,
                                         captureChunk,
                                         captureIsFullCopy),
                                 localDirectory.RemoteGrainDirectory.SchedulingContext);
@@ -126,7 +129,7 @@ namespace Orleans.Runtime.GrainDirectory
             await Task.WhenAll(tasks);
         }
 
-        internal void ProcessSiloRemoveEvent(SiloAddress removedSilo)
+        internal void ProcessSiloRemoveEvent(DirectoryMembershipSnapshot membershipSnapshot, SiloAddress removedSilo)
         {
             lock (this)
             {
@@ -140,9 +143,9 @@ namespace Orleans.Runtime.GrainDirectory
                 if (!directoryPartitionsMap.ContainsKey(removedSilo)) return;
 
                 // at least one predcessor should exist, which is me
-                SiloAddress predecessor = localDirectory.FindPredecessors(removedSilo, 1)[0];
+                SiloAddress predecessor = membershipSnapshot.FindPredecessors(removedSilo, 1)[0];
                 Dictionary<SiloAddress, List<ActivationAddress>> duplicates;
-                if (localDirectory.MyAddress.Equals(predecessor))
+                if (membershipSnapshot.MyAddress.Equals(predecessor))
                 {
                     if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Merging my partition with the copy of silo " + removedSilo);
                     // now I am responsible for this directory part
@@ -164,12 +167,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        internal Task ProcessSiloStoppingEvent()
-        {
-            return ProcessSiloStoppingEvent_Impl();
-        }
-
-        private async Task ProcessSiloStoppingEvent_Impl()
+        internal async Task ProcessSiloStoppingEvent(DirectoryMembershipSnapshot membershipSnapshot)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Processing silo stopping event");
 
@@ -182,7 +180,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // that it doesn't also fail and that no other silo joins during the transition period).
                 if (silosHoldingMyPartition.Count == 0)
                 {
-                    silosHoldingMyPartition.AddRange(localDirectory.FindPredecessors(localDirectory.MyAddress, 1));
+                    silosHoldingMyPartition.AddRange(membershipSnapshot.FindPredecessors(membershipSnapshot.MyAddress, 1));
                 }
 
                 silosHoldingMyPartitionCopy = silosHoldingMyPartition.ToList();
@@ -194,7 +192,7 @@ namespace Orleans.Runtime.GrainDirectory
             await HandoffMyPartitionUponStop(batchUpdate, silosHoldingMyPartitionCopy, true);
         }
 
-        internal void ProcessSiloAddEvent(SiloAddress addedSilo)
+        internal void ProcessSiloAddEvent(DirectoryMembershipSnapshot membershipSnapshot, SiloAddress addedSilo)
         {
             lock (this)
             {
@@ -206,7 +204,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // check if this is one of our successors (i.e., if I should hold this silo's copy)
                 // (if yes, adjust local and/or copied directory partitions by splitting them between old successors and the new one)
                 // NOTE: We need to move part of our local directory to the new silo if it is an immediate successor.
-                List<SiloAddress> successors = localDirectory.FindSuccessors(localDirectory.MyAddress, 1);
+                List<SiloAddress> successors = membershipSnapshot.FindSuccessors(membershipSnapshot.MyAddress, 1);
                 if (!successors.Contains(addedSilo))
                 {
                     if (logger.IsEnabled(LogLevel.Debug)) logger.Debug($"{addedSilo} is not one of my successors.");
@@ -221,20 +219,20 @@ namespace Orleans.Runtime.GrainDirectory
                     GrainDirectoryPartition splitPart = localDirectory.DirectoryPartition.Split(
                         grain =>
                         {
-                            var s = localDirectory.CalculateGrainDirectoryPartition(grain);
-                            return (s != null) && !localDirectory.MyAddress.Equals(s);
+                            var s = membershipSnapshot.CalculateGrainDirectoryPartition(grain);
+                            return (s != null) && !this.localSiloDetails.SiloAddress.Equals(s);
                         }, false);
                     List<ActivationAddress> splitPartListSingle = splitPart.ToListOfActivations(true);
                     List<ActivationAddress> splitPartListMulti = splitPart.ToListOfActivations(false);
 
                     EnqueueOperation(
                         $"{nameof(ProcessSiloAddEvent)}({addedSilo})",
-                        () => ProcessAddedSiloAsync(addedSilo, splitPartListSingle, splitPartListMulti));
+                        () => ProcessAddedSiloAsync(membershipSnapshot, addedSilo, splitPartListSingle, splitPartListMulti));
                 }
                 else
                 {
                     // adjust partitions by splitting them accordingly between new and old silos
-                    SiloAddress predecessorOfNewSilo = localDirectory.FindPredecessors(addedSilo, 1)[0];
+                    SiloAddress predecessorOfNewSilo = membershipSnapshot.FindPredecessors(addedSilo, 1)[0];
                     if (!directoryPartitionsMap.ContainsKey(predecessorOfNewSilo))
                     {
                         // we should have the partition of the predcessor of our new successor
@@ -247,7 +245,7 @@ namespace Orleans.Runtime.GrainDirectory
                             grain =>
                             {
                                 // Need to review the 2nd line condition.
-                                var s = localDirectory.CalculateGrainDirectoryPartition(grain);
+                                var s = membershipSnapshot.CalculateGrainDirectoryPartition(grain);
                                 return (s != null) && !predecessorOfNewSilo.Equals(s);
                             }, true);
                         directoryPartitionsMap[addedSilo] = splitPart;
@@ -263,11 +261,11 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private async Task ProcessAddedSiloAsync(SiloAddress addedSilo, List<ActivationAddress> splitPartListSingle, List<ActivationAddress> splitPartListMulti)
+        private async Task ProcessAddedSiloAsync(DirectoryMembershipSnapshot membershipSnapshot, SiloAddress addedSilo, List<ActivationAddress> splitPartListSingle, List<ActivationAddress> splitPartListMulti)
         {
-            if (!this.localDirectory.Running) return;
+            if (!membershipSnapshot.IsLocalDirectoryRunning) return;
 
-            if (this.siloStatusOracle.GetApproximateSiloStatus(addedSilo) == SiloStatus.Active)
+            if (membershipSnapshot.ClusterMembership.GetSiloStatus(addedSilo) == SiloStatus.Active)
             {
                 if (splitPartListSingle.Count > 0)
                 {
@@ -315,7 +313,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         private async Task AcceptExistingRegistrationsAsync(List<ActivationAddress> singleActivations, List<ActivationAddress> multiActivations)
         {
-            if (!this.localDirectory.Running) return;
+            if (!this.localDirectory.DirectoryMembershipSnapshot.IsLocalDirectoryRunning) return;
 
             if (this.logger.IsEnabled(LogLevel.Debug))
             {
@@ -405,10 +403,11 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     if (!isFullCopy)
                     {
+                        var membershipSnapshot = this.clusterMembershipService.CurrentSnapshot;
                         logger.Warn(ErrorCode.DirectoryUnexpectedDelta,
-                            String.Format("Got delta of the directory partition from silo {0} (Membership status {1}) while not holding a full copy. Membership active cluster size is {2}",
-                                source, this.siloStatusOracle.GetApproximateSiloStatus(source),
-                                this.siloStatusOracle.GetApproximateSiloStatuses(true).Count));
+                            string.Format("Got delta of the directory partition from silo {0} (Membership status {1}) while not holding a full copy. Membership active cluster size is {2}",
+                                source, membershipSnapshot.GetSiloStatus(source),
+                                membershipSnapshot.Members.Values.Count(m => m.Status == SiloStatus.Active)));
                     }
 
                     directoryPartitionsMap[source] = this.createPartion();
@@ -451,7 +450,7 @@ namespace Orleans.Runtime.GrainDirectory
             // release this old copy, as we have got a new one
             silosHoldingMyPartition.Remove(silo);
             localDirectory.Scheduler.QueueTask(() =>
-                localDirectory.GetDirectoryReference(silo).RemoveHandoffPartition(localDirectory.MyAddress),
+                localDirectory.GetDirectoryReference(silo).RemoveHandoffPartition(this.localSiloDetails.SiloAddress),
                 localDirectory.RemoteGrainDirectory.SchedulingContext).Ignore();
         }
 
@@ -468,7 +467,7 @@ namespace Orleans.Runtime.GrainDirectory
             while (duplicates.Count > 0)
             {
                 var pair = duplicates.FirstOrDefault();
-                if (this.siloStatusOracle.GetApproximateSiloStatus(pair.Key) == SiloStatus.Active)
+                if (this.clusterMembershipService.CurrentSnapshot.GetSiloStatus(pair.Key) == SiloStatus.Active)
                 {
                     if (this.logger.IsEnabled(LogLevel.Debug))
                     {

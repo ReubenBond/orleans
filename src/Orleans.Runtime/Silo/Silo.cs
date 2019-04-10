@@ -285,13 +285,6 @@ namespace Orleans.Runtime
             logger.Debug("Creating {0} System Target", "DeploymentLoadPublisher");
             RegisterSystemTarget(Services.GetRequiredService<DeploymentLoadPublisher>());
             
-            logger.Debug("Creating {0} System Target", "RemoteGrainDirectory + CacheValidator");
-            RegisterSystemTarget(LocalGrainDirectory.RemoteGrainDirectory);
-            RegisterSystemTarget(LocalGrainDirectory.CacheValidator);
-
-            logger.Debug("Creating {0} System Target", "RemoteClusterGrainDirectory");
-            RegisterSystemTarget(LocalGrainDirectory.RemoteClusterGrainDirectory);
-
             logger.Debug("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
 
             this.RegisterSystemTarget(this.Services.GetRequiredService<ClientObserverRegistrar>());
@@ -326,7 +319,6 @@ namespace Orleans.Runtime
             }
 
             catalog.SiloStatusOracle = this.siloStatusOracle;
-            this.siloStatusOracle.SubscribeToSiloStatusEvents(localGrainDirectory);
             messageCenter.SiloDeadOracle = this.siloStatusOracle.IsDeadSilo;
 
             // consistentRingProvider is not a system target per say, but it behaves like the localGrainDirectory, so it is here
@@ -407,9 +399,7 @@ namespace Orleans.Runtime
                 incomingPingAgent.Start();
                 incomingSystemAgent.Start();
                 incomingAgent.Start();
-            } 
-
-            StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start, stopWatch);
+            }
 
             StartTaskWithPerfAnalysis("Init implicit stream subscribe table", InitImplicitStreamSubscribeTable, stopWatch);
             void InitImplicitStreamSubscribeTable()
@@ -736,9 +726,6 @@ namespace Orleans.Runtime
                 {
                     logger.Info(ErrorCode.SiloShuttingDown, "Silo starting to Shutdown()");
 
-                    //Stop LocalGrainDirectory
-                    await scheduler.QueueTask(()=>localGrainDirectory.Stop(true), localGrainDirectory.CacheValidator.SchedulingContext)
-                        .WithCancellation(ct, "localGrainDirectory Stop failed because the task was cancelled");
                     SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
                     //wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop. 
                     await Task.Delay(WaitForMessageToBeQueuedForOutbound);
