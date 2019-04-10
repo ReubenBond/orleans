@@ -57,7 +57,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 TimeSpan? onceOffDelay = default;
-                while (!this.tableManager.CurrentStatus.IsTerminating() && await this.iAmAliveTimer.NextTick(onceOffDelay))
+                while (await this.iAmAliveTimer.NextTick(onceOffDelay) && !this.tableManager.CurrentStatus.IsTerminating())
                 {
                     onceOffDelay = default;
 
@@ -254,18 +254,18 @@ namespace Orleans.Runtime.MembershipService
             }
 
             {
-                async Task AfterRuntimeGrainServicesStart(CancellationToken ct)
+                async Task OnBecomeJoiningStart(CancellationToken ct)
                 {
                     await Task.Run(() => this.StartJoining());
                 }
 
-                Task AfterRuntimeGrainServicesStop(CancellationToken ct) => Task.CompletedTask;
+                Task OnBecomeJoiningStop(CancellationToken ct) => Task.CompletedTask;
 
                 lifecycle.Subscribe(
                     nameof(MembershipAgent),
-                    ServiceLifecycleStage.AfterRuntimeGrainServices,
-                    AfterRuntimeGrainServicesStart,
-                    AfterRuntimeGrainServicesStop);
+                    ServiceLifecycleStage.BecomeJoining,
+                    OnBecomeJoiningStart,
+                    OnBecomeJoiningStop);
             }
 
             {
