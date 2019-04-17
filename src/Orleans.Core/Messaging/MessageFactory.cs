@@ -11,16 +11,18 @@ namespace Orleans.Runtime
     {
         private readonly SerializationManager serializationManager;
         private readonly ILogger logger;
+        private readonly SharedMessage sharedMessage;
 
-        public MessageFactory(SerializationManager serializationManager, ILogger<MessageFactory> logger)
+        public MessageFactory(SerializationManager serializationManager, ILogger<MessageFactory> logger, SharedMessage sharedMessage)
         {
             this.serializationManager = serializationManager;
             this.logger = logger;
+            this.sharedMessage = sharedMessage;
         }
 
         public Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
         {
-            var message = new Message
+            var message = new Message(this.sharedMessage)
             {
                 Category = Message.Categories.Application,
                 Direction = (options & InvokeMethodOptions.OneWay) != 0 ? Message.Directions.OneWay : Message.Directions.Request,
@@ -86,7 +88,7 @@ namespace Orleans.Runtime
 
         public Message CreateResponseMessage(Message request)
         {
-            var response = new Message
+            var response = new Message(this.sharedMessage)
             {
                 Category = request.Category,
                 Direction = Message.Directions.Response,

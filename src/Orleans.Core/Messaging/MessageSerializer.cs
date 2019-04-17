@@ -4,6 +4,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO.Pipelines;
 using System.Runtime.CompilerServices;
 using Orleans.Serialization;
 
@@ -14,12 +15,23 @@ namespace Orleans.Runtime.Messaging
         private readonly OrleansSerializer<Message.HeadersContainer> messageHeadersSerializer;
         private readonly OrleansSerializer<object> objectSerializer;
         private readonly MemoryPool<byte> memoryPool;
+        private readonly PipeOptions bodyPipeOptions;
+        private readonly SharedMessage sharedMessage;
 
-        public MessageSerializer(SerializationManager serializationManager, SharedMemoryPool memoryPool)
+        public MessageSerializer(SerializationManager serializationManager, SharedMemoryPool memoryPool, SharedMessage sharedMessage)
         {
             this.messageHeadersSerializer = new OrleansSerializer<Message.HeadersContainer>(serializationManager);
             this.objectSerializer = new OrleansSerializer<object>(serializationManager);
             this.memoryPool = memoryPool.Pool;
+            this.bodyPipeOptions = new PipeOptions(
+                pool: MemoryPool<byte>.Shared,
+                readerScheduler: PipeScheduler.Inline,
+                writerScheduler: PipeScheduler.Inline,
+                pauseWriterThreshold: 0,
+                resumeWriterThreshold: 0,
+                useSynchronizationContext: false,
+                minimumSegmentSize: 4096);
+            this.sharedMessage = sharedMessage;
         }
 
         public int TryRead(ref ReadOnlySequence<byte> input, out Message message)
@@ -58,21 +70,31 @@ namespace Orleans.Runtime.Messaging
 
             // decode body
             int bodyOffset = Message.LENGTH_HEADER_SIZE + headerLength;
-            var body = input.Slice(bodyOffset, bodyLength);
-
+            
             // build message
             try
             {
                 this.messageHeadersSerializer.Deserialize(ref header, out var headersContainer);
-                message = new Message
+                message = new Message(this.sharedMessage)
                 {
                     Headers = headersContainer
                 };
 
                 // Body deserialization is more likely to fail than header deserialization.
                 // Separating the two allows for these kinds of errors to be propagated back to the caller.
-                this.objectSerializer.Deserialize(ref body, out var bodyObject);
-                message.BodyObject = bodyObject;
+                //this.objectSerializer.Deserialize(ref body, out var bodyObject);
+                //message.BodyObject = bodyObject;
+
+                // Copy the body object data into the reader
+                if (bodyLength > 0)
+                {
+                    var pipe = new Pipe(this.bodyPipeOptions);
+                    var writer = pipe.Writer;
+                    var body = input.Slice(bodyOffset, bodyLength);
+                    foreach (var seg in body) writer.Write(seg.Span);
+                    writer.Complete();
+                    message.BodyReader = pipe.Reader;
+                }
             }
             finally
             {
@@ -90,7 +112,26 @@ namespace Orleans.Runtime.Messaging
             this.messageHeadersSerializer.Serialize(ref buffer, message.Headers);
             var headerLength = buffer.CommittedBytes;
 
-            this.objectSerializer.Serialize(ref buffer, message.BodyObject);
+            if (message.BodyReader != null)
+            {
+                var reader = message.BodyReader;
+                while (reader.TryRead(out var readerBuffer))
+                {
+                    foreach (var seg in readerBuffer.Buffer)
+                    {
+                        buffer.Write(seg.Span);
+                    }
+
+                    reader.AdvanceTo(readerBuffer.Buffer.End);
+                    if (readerBuffer.IsCompleted || readerBuffer.IsCanceled) break;
+                }
+
+                message.FreeBodyBuffers();
+            }
+            else
+            {
+                this.objectSerializer.Serialize(ref buffer, message.BodyObject);
+            }
 
             // Write length prefixes, first header length then body length.
             BinaryPrimitives.WriteInt32LittleEndian(lengthFields, headerLength);
@@ -100,7 +141,36 @@ namespace Orleans.Runtime.Messaging
             buffer.Complete(lengthFields);
         }
 
-        private sealed class OrleansSerializer<T>
+        internal sealed class SharedOrleansSerializer
+        {
+            private readonly SerializationManager serializationManager;
+            public SharedOrleansSerializer(SerializationManager serializationManager)
+            {
+                this.serializationManager = serializationManager;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public object Deserialize(PipeReader input)
+            {
+                var reader = new BinaryTokenStreamReader2();
+                var deserializationContext = new DeserializationContext(this.serializationManager)
+                {
+                    StreamReader = reader
+                };
+
+                if (!input.TryRead(out var readResult)) ThrowReadFailed();
+                if (!readResult.IsCompleted) ThrowNotCompleted();
+
+                var buffer = readResult.Buffer;
+                reader.PartialReset(ref buffer);
+                return SerializationManager.DeserializeInner(this.serializationManager, typeof(object), deserializationContext, reader);
+
+                void ThrowReadFailed() => throw new InvalidOperationException("Attempt to read from pipe failed");
+                void ThrowNotCompleted() => throw new InvalidOperationException("Attempt to read from non-completed pipe");
+            }
+        }
+
+        internal sealed class OrleansSerializer<T>
         {
             private readonly SerializationManager serializationManager;
             private readonly BinaryTokenStreamReader2 reader = new BinaryTokenStreamReader2();
