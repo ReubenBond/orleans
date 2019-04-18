@@ -24,14 +24,14 @@ namespace Benchmarks.Ping
             this.host = new SiloHostBuilder()
                 .UseLocalhostClustering()
                 .Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev")
-                //.Configure<SchedulingOptions>(options => options.MaxActiveThreads = 4)
                 .Build();
             this.host.StartAsync().GetAwaiter().GetResult();
 
             this.client = new ClientBuilder().UseLocalhostClustering().Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev").Build();
             this.client.Connect().GetAwaiter().GetResult();
-            
-            this.grain = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
+            var grainFactory = this.client;
+
+            this.grain = grainFactory.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
             this.grain.Run().GetAwaiter().GetResult();
         }
         
@@ -46,17 +46,26 @@ namespace Benchmarks.Ping
             }
         }
 
-        public async Task PingConcurrent()
+        public Task PingConcurrent() => this.Run(
+            runs: 3,
+            grainFactory: this.client,
+            blocksPerWorker: 10);
+
+        public Task PingConcurrentHostedClient() => this.Run(
+            runs: 3,
+            grainFactory: (IGrainFactory)this.host.Services.GetService(typeof(IGrainFactory)),
+            blocksPerWorker: 30);
+
+        private async Task Run(int runs, IGrainFactory grainFactory, int blocksPerWorker)
         {
-            Console.WriteLine("Starting");
             var loadGenerator = new ConcurrentLoadGenerator<IPingGrain>(
                 maxConcurrency: 250,
-                blocksPerWorker: 100,
+                blocksPerWorker: blocksPerWorker,
                 requestsPerBlock: 500,
                 issueRequest: g => g.Run(),
-                getStateForWorker: workerId => this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode()));
-            await loadGenerator.Run();
-            Console.WriteLine("Completed");
+                getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode()));
+            await loadGenerator.Warmup();
+            while (runs-- > 0) await loadGenerator.Run();
         }
 
         public async Task PingPongForever()
@@ -89,7 +98,7 @@ namespace Benchmarks.Ping
         [GlobalCleanup]
         public void Dispose()
         {
-            this.client.Dispose(); 
+            (this.client as IDisposable)?.Dispose(); 
             this.host.Dispose();
         }
     }
