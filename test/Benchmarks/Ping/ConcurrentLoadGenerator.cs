@@ -3,66 +3,22 @@ using System.Threading.Tasks;
 using System.Threading.Channels;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 
 namespace Benchmarks.Ping
 {
     public sealed class ConcurrentLoadGenerator<TState>
     {
-        private static readonly double TimestampToTicks = TimeSpan.TicksPerSecond / (double)Stopwatch.Frequency;
-
-        private class WorkBlock
+        private static readonly double StopwatchTickPerSecond = Stopwatch.Frequency;
+        private struct WorkBlock
         {
             public long StartTimestamp { get; set; }
             public long EndTimestamp { get; set; }
-            public TimeSpan Elapsed => TimeSpan.FromTicks((long)((this.EndTimestamp - this.StartTimestamp) * TimestampToTicks));
-            public int Remaining { get; set; }
             public int Successes { get; set; }
             public int Failures { get; set; }
             public int Completed => this.Successes + this.Failures;
-            public double RequestsPerSecond => this.Completed / this.Elapsed.TotalSeconds;
-
-            public void RecordStart() => this.StartTimestamp = Stopwatch.GetTimestamp();
-
-            public void RecordSuccess()
-            {
-                ++this.Successes;
-                if (--this.Remaining == 0) this.EndTimestamp = Stopwatch.GetTimestamp();
-            }
-
-            public void RecordFailure()
-            {
-                ++this.Failures;
-                if (--this.Remaining == 0) this.EndTimestamp = Stopwatch.GetTimestamp();
-            }
+            public double ElapsedSeconds => (this.EndTimestamp - this.StartTimestamp) / StopwatchTickPerSecond;
+            public double RequestsPerSecond => this.Completed / this.ElapsedSeconds;
         }
-
-        /*
-        private class Superblock
-        {
-            public List<WorkBlock> Blocks { get; } = new List<WorkBlock>();
-
-            public double AverageRequestsPerSecond
-            {
-                get
-                {
-                    var commonStartTimestamp = this.Blocks.Max(b => b.StartTimestamp);
-                    var commonEndTimestamp = this.Blocks.Min(b => b.EndTimestamp);
-                    long commonTimestampDelta = commonEndTimestamp - commonStartTimestamp;
-                    double requestsInCommonTime = 0;
-
-                    foreach (var block in this.Blocks)
-                    {
-                        var delta = block.EndTimestamp - block.StartTimestamp;
-                        var deltaFraction = commonTimestampDelta / (double)delta;
-                        requestsInCommonTime += deltaFraction * block.Completed;
-                    }
-
-                    return requestsInCommonTime / TimeSpan.FromTicks((long)(commonTimestampDelta * TimestampToTicks)).TotalSeconds;
-                }
-            }
-        }
-        */
 
         private Channel<WorkBlock> completedBlocks;
         private readonly Func<TState, Task> issueRequest;
@@ -99,7 +55,10 @@ namespace Benchmarks.Ping
             await Task.WhenAll(this.tasks);
 
             // Ignore warmup blocks.
-            while (completedBlockReader.TryRead(out _)) ;
+            while (completedBlockReader.TryRead(out _));
+            GC.Collect();
+            GC.Collect();
+            GC.Collect();
         }
 
         private void ResetBetweenRuns()
@@ -119,7 +78,6 @@ namespace Benchmarks.Ping
             var completedBlockReader = this.completedBlocks.Reader;
 
             // Start the run.
-            var stopwatch = ValueStopwatch.StartNew();
             for (var i = 0; i < this.numWorkers; i++)
             {
                 this.tasks[i] = this.RunWorker(this.states[i], this.requestsPerBlock, this.blocksPerWorker);
@@ -128,10 +86,7 @@ namespace Benchmarks.Ping
             var completion = Task.WhenAll(this.tasks);
             _ = Task.Run(async () => { try { await completion; } catch { } finally { this.completedBlocks.Writer.Complete(); } });
             var blocks = new List<WorkBlock>(this.numWorkers * this.blocksPerWorker);
-            var reportInterval = TimeSpan.FromSeconds(5);
-            var lastReportTime = DateTime.UtcNow;
-            var lastReportBlockCount = 0;
-            var blocksPerReport = this.numWorkers * this.blocksPerWorker / 10;
+            var blocksPerReport = this.numWorkers * this.blocksPerWorker / 5;
             var nextReportBlockCount = blocksPerReport;
             while (!completion.IsCompleted)
             {
@@ -142,21 +97,14 @@ namespace Benchmarks.Ping
                     blocks.Add(block);
                 }
 
-                var now = DateTime.UtcNow;
                 if (blocks.Count >= nextReportBlockCount)
                 {
                     nextReportBlockCount += blocksPerReport;
-                    var latestReport = PrintReport(lastReportBlockCount);
-                    var totalReport = PrintReport(0);
-                    Console.Write($"{latestReport}".PadRight(40));
-                    Console.WriteLine($"Total: {totalReport}");
-                    lastReportBlockCount = blocks.Count;
-                    lastReportTime = now;
+                    Console.WriteLine("    " + PrintReport(0));
                 }
             }
 
-            stopwatch.Stop();
-            Console.WriteLine("Total: " + PrintReport(0));
+            Console.WriteLine("  Total: " + PrintReport(0));
 
             string PrintReport(int statingBlockIndex)
             {
@@ -178,10 +126,10 @@ namespace Benchmarks.Ping
                     if (b.EndTimestamp > maxEndTime) maxEndTime = b.EndTimestamp;
                 }
 
-                var totalTime = TimeSpan.FromTicks((long)((maxEndTime - minStartTime) * TimestampToTicks));
-                var ratePerSecond = (long)(completed / totalTime.TotalSeconds);
-                var failureString = failures == 0 ? string.Empty : $" Failed: {failures}";
-                return $"{ratePerSecond,6}/s ({successes,8} reqs in {totalTime.TotalSeconds,6:0.000}s){failureString}";
+                var totalSeconds = (maxEndTime - minStartTime) / StopwatchTickPerSecond;
+                var ratePerSecond = (long)(completed / totalSeconds);
+                var failureString = failures == 0 ? string.Empty : $" with {failures} failures";
+                return $"{ratePerSecond,6}/s {successes,7} reqs in {totalSeconds,6:0.000}s{failureString}";
             }
         }
 
@@ -190,33 +138,22 @@ namespace Benchmarks.Ping
             var completedBlockWriter = this.completedBlocks.Writer;
             while (numBlocks > 0)
             {
-                var workBlock = new WorkBlock() { Remaining = requestsPerBlock };
-                workBlock.RecordStart();
-                while (workBlock.Remaining > 0)
+                var workBlock = new WorkBlock();
+                workBlock.StartTimestamp = Stopwatch.GetTimestamp();
+                while (workBlock.Completed < requestsPerBlock)
                 {
-                    Exception error = default;
                     try
                     {
                         await this.issueRequest(state).ConfigureAwait(false);
-
+                        ++workBlock.Successes;
                     }
-                    catch (Exception exception)
+                    catch
                     {
-                        error = exception;
-                    }
-                    finally
-                    {
-                        if (error != null)
-                        {
-                            workBlock.RecordFailure();
-                        }
-                        else
-                        {
-                            workBlock.RecordSuccess();
-                        }
+                        ++workBlock.Failures;
                     }
                 }
 
+                workBlock.EndTimestamp = Stopwatch.GetTimestamp();
                 await completedBlockWriter.WriteAsync(workBlock);
                 --numBlocks;
             }
