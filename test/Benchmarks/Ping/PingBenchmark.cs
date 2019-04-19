@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Diagnostics.Windows.Configs;
 using BenchmarkGrainInterfaces.Ping;
+using BenchmarkGrains.Ping;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -22,24 +24,45 @@ namespace Benchmarks.Ping
 
         public PingBenchmark() : this(1, true) { }
 
-        public PingBenchmark(int numSilos, bool startClient)
+        public PingBenchmark(int numSilos, bool startClient, bool grainsOnSecondariesOnly = false)
         {
             for (var i = 0; i < numSilos; ++i)
             {
                 var primary = i == 0 ? null : new IPEndPoint(IPAddress.Loopback, 11111);
                 var siloBuilder = new SiloHostBuilder()
+                    .ConfigureDefaults()
                    .UseLocalhostClustering(
                     siloPort: 11111 + i,
                     gatewayPort: 30000 + i,
                     primarySiloEndpoint: primary);
+
+                if (i == 0 && grainsOnSecondariesOnly)
+                {
+                    siloBuilder.ConfigureApplicationParts(parts =>
+                        parts.AddApplicationPart(typeof(IPingGrain).Assembly));
+                    siloBuilder.ConfigureServices(services =>
+                    {
+                        services.Remove(services.First(s => s.ImplementationType?.Name == "ApplicationPartValidator"));
+                    });
+                }
+                else
+                {
+                    siloBuilder.ConfigureApplicationParts(parts =>
+                        parts.AddApplicationPart(typeof(IPingGrain).Assembly)
+                             .AddApplicationPart(typeof(PingGrain).Assembly));
+                }
+
                 var silo = siloBuilder.Build();
                 silo.StartAsync().GetAwaiter().GetResult();
                 this.hosts.Add(silo);
             }
 
+            if (grainsOnSecondariesOnly) Thread.Sleep(4000);
+
             if (startClient)
             {
                 var clientBuilder = new ClientBuilder()
+                    .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IPingGrain).Assembly))
                     .Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev");
 
                 if (numSilos == 1)

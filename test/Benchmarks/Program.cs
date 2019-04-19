@@ -128,8 +128,9 @@ namespace Benchmarks
                 }
                 GC.Collect();
                 {
-                    Console.WriteLine("## 2 Silos (Hosted Client) ##");
-                    var test = new PingBenchmark(numSilos: 2, startClient: false);
+                    // All calls are cross-silo because the calling silo doesn't have any grain classes.
+                    Console.WriteLine("## 2 Silos, 100% cross-silo communication ##");
+                    var test = new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true);
                     test.PingConcurrentHostedClient().GetAwaiter().GetResult();
                     test.Shutdown().GetAwaiter().GetResult();
                 }
