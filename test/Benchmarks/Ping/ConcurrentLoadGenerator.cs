@@ -23,19 +23,27 @@ namespace Benchmarks.Ping
         private Channel<WorkBlock> completedBlocks;
         private readonly Func<TState, Task> issueRequest;
         private readonly Func<int, TState> getStateForWorker;
+        private readonly bool logIntermediateResults;
         private readonly Task[] tasks;
         private readonly TState[] states;
         private readonly int numWorkers;
         private readonly int blocksPerWorker;
         private readonly int requestsPerBlock;
 
-        public ConcurrentLoadGenerator(int maxConcurrency, int blocksPerWorker, int requestsPerBlock, Func<TState, Task> issueRequest, Func<int, TState> getStateForWorker)
+        public ConcurrentLoadGenerator(
+            int maxConcurrency,
+            int blocksPerWorker,
+            int requestsPerBlock,
+            Func<TState, Task> issueRequest,
+            Func<int, TState> getStateForWorker,
+            bool logIntermediateResults = false)
         {
             this.numWorkers = maxConcurrency;
             this.blocksPerWorker = blocksPerWorker;
             this.requestsPerBlock = requestsPerBlock;
             this.issueRequest = issueRequest;
             this.getStateForWorker = getStateForWorker;
+            this.logIntermediateResults = logIntermediateResults;
             this.tasks = new Task[maxConcurrency];
             this.states = new TState[maxConcurrency];
         }
@@ -45,10 +53,10 @@ namespace Benchmarks.Ping
             this.ResetBetweenRuns();
             var completedBlockReader = this.completedBlocks.Reader;
 
-            for (var i = 0; i < this.numWorkers; i++)
+            for (var ree = 0; ree < this.numWorkers; ree++)
             {
-                this.states[i] = getStateForWorker(i);
-                this.tasks[i] = this.RunWorker(this.states[i], this.requestsPerBlock, 3);
+                this.states[ree] = getStateForWorker(ree);
+                this.tasks[ree] = this.RunWorker(this.states[ree], this.requestsPerBlock, 3);
             }
 
             // Wait for warmup to complete.
@@ -97,7 +105,7 @@ namespace Benchmarks.Ping
                     blocks.Add(block);
                 }
 
-                if (blocks.Count >= nextReportBlockCount)
+                if (logIntermediateResults && blocks.Count >= nextReportBlockCount)
                 {
                     nextReportBlockCount += blocksPerReport;
                     Console.WriteLine("    " + PrintReport(0));
