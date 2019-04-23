@@ -82,19 +82,9 @@ namespace Orleans.Runtime.Messaging
 
                 // Body deserialization is more likely to fail than header deserialization.
                 // Separating the two allows for these kinds of errors to be propagated back to the caller.
-                //this.objectSerializer.Deserialize(ref body, out var bodyObject);
-                //message.BodyObject = bodyObject;
-
-                // Copy the body object data into the reader
-                if (bodyLength > 0)
-                {
-                    var pipe = new Pipe(this.bodyPipeOptions);
-                    var writer = pipe.Writer;
-                    var body = input.Slice(bodyOffset, bodyLength);
-                    foreach (var seg in body) writer.Write(seg.Span);
-                    writer.Complete();
-                    message.BodyReader = pipe.Reader;
-                }
+                var body = input.Slice(bodyOffset, bodyLength);
+                this.objectSerializer.Deserialize(ref body, out var bodyObject);
+                message.BodyObject = bodyObject;
             }
             finally
             {
@@ -112,26 +102,7 @@ namespace Orleans.Runtime.Messaging
             this.messageHeadersSerializer.Serialize(ref buffer, message.Headers);
             var headerLength = buffer.CommittedBytes;
 
-            if (message.BodyReader != null)
-            {
-                var reader = message.BodyReader;
-                while (reader.TryRead(out var readerBuffer))
-                {
-                    foreach (var seg in readerBuffer.Buffer)
-                    {
-                        buffer.Write(seg.Span);
-                    }
-
-                    reader.AdvanceTo(readerBuffer.Buffer.End);
-                    if (readerBuffer.IsCompleted || readerBuffer.IsCanceled) break;
-                }
-
-                message.FreeBodyBuffers();
-            }
-            else
-            {
-                this.objectSerializer.Serialize(ref buffer, message.BodyObject);
-            }
+            this.objectSerializer.Serialize(ref buffer, message.BodyObject);
 
             // Write length prefixes, first header length then body length.
             BinaryPrimitives.WriteInt32LittleEndian(lengthFields, headerLength);
