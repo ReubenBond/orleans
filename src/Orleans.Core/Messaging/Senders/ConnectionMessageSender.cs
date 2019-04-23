@@ -18,7 +18,7 @@ namespace Orleans.Runtime.Messaging
         {
             SingleReader = true,
             SingleWriter = false,
-            AllowSynchronousContinuations = false
+            AllowSynchronousContinuations = true
         };
 
         private readonly Channel<Message> messages;
@@ -94,7 +94,7 @@ namespace Orleans.Runtime.Messaging
                 while (true)
                 {
                     var moreTask = reader.WaitToReadAsync();
-                    var more = moreTask.IsCompleted ? moreTask.GetAwaiter().GetResult() : await moreTask;
+                    var more = moreTask.IsCompleted ? moreTask.GetAwaiter().GetResult() : await moreTask.ConfigureAwait(false);
                     if (!more)
                     {
                         break;
@@ -120,7 +120,7 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     var flushTask = output.FlushAsync();
-                    var flushResult = flushTask.IsCompleted ? flushTask.GetAwaiter().GetResult() : await flushTask;
+                    var flushResult = flushTask.IsCompleted ? flushTask.GetAwaiter().GetResult() : await flushTask.ConfigureAwait(false);
                     if (flushResult.IsCompleted || flushResult.IsCanceled)
                     {
                         break;
