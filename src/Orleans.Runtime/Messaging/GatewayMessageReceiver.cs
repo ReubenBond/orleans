@@ -20,14 +20,14 @@ namespace Orleans.Runtime.Messaging
 
         public GatewayMessageReceiver(
             ConnectionContext connection,
-            IMessageSerializer serializer,
+            IMessageSerializerFactory serializerFactory,
             MessageCenter messageCenter,
             ILocalSiloDetails siloDetails,
             OverloadDetector overloadDetector,
             IOptions<MultiClusterOptions> multiClusterOptions,
             MessageFactory messageFactory,
             ILogger<GatewayMessageReceiver> log)
-            : base(connection, serializer, log)
+            : base(connection, serializerFactory.GetSerializer(true), log)
         {
             this.messageCenter = messageCenter;
             this.siloDetails = siloDetails;

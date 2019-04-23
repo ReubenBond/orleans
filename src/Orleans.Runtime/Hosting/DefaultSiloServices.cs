@@ -319,7 +319,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<ConnectionManager>();
             services.TryAddSingleton<IConnectionFactory, SocketConnectionFactory>();
             services.TryAddSingleton<IConnectionListenerFactory, SocketConnectionListenerFactory>();
-            services.TryAddTransient<IMessageSerializer, MessageSerializer>();
+            services.TryAddTransient<IMessageSerializerFactory, MessageSerializerFactory>();
             services.TryAddSingleton<ConnectionComponentFactory, SiloConnectionComponentFactory>();
             services.TryAddSingleton<OutboundConnectionFactory, SiloOutboundConnectionFactory>();
 

@@ -30,13 +30,13 @@ namespace Orleans.Runtime.Messaging
 
         public ConnectionMessageSender(
             IMessageCenter messageCenter,
-            IMessageSerializer messageSerializer,
+            IMessageSerializerFactory messageSerializerFactory,
              ILogger<ConnectionMessageSender> log)
         {
             this.messages = Channel.CreateUnbounded<Message>(ChannelOptions);
             this.writer = this.messages.Writer;
             this.messageCenter = messageCenter;
-            this.serializer = messageSerializer;
+            this.serializer = messageSerializerFactory.GetSerializer(false);
             this.log = log;
         }
 
