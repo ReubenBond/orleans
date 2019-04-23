@@ -225,4 +225,12 @@
       </PropertyGroup>
     </Otherwise>
   </Choose>
+  
+  <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.csproj'">
+    <PackageReference Include="Hagar" Version="0.2.2-dev-*" />
+    <PackageReference Include="Hagar.CodeGenerator.MSBuild" Version="0.2.2-dev-*">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
 </Project>
