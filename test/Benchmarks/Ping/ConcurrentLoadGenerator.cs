@@ -105,14 +105,15 @@ namespace Benchmarks.Ping
                     blocks.Add(block);
                 }
 
-                if (logIntermediateResults && blocks.Count >= nextReportBlockCount)
+                if (this.logIntermediateResults && blocks.Count >= nextReportBlockCount)
                 {
                     nextReportBlockCount += blocksPerReport;
                     Console.WriteLine("    " + PrintReport(0));
                 }
             }
 
-            Console.WriteLine("  Total: " + PrintReport(0));
+            if (this.logIntermediateResults) Console.WriteLine("  Total: " + PrintReport(0));
+            else Console.WriteLine(PrintReport(0));
 
             string PrintReport(int statingBlockIndex)
             {
