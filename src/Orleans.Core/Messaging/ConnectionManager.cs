@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -9,8 +10,12 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class ConnectionManager
     {
-        private readonly ConcurrentDictionary<string, ConnectionMessageSender> connections
-            = new ConcurrentDictionary<string, ConnectionMessageSender>();
+        [ThreadStatic]
+        private static int nextConnection;
+
+        private const int MaxConnectionsPerEndpoint = 4;
+        private readonly ConcurrentDictionary<string, ImmutableArray<ConnectionMessageSender>> connections
+            = new ConcurrentDictionary<string, ImmutableArray<ConnectionMessageSender>>();
         private readonly OutboundConnectionFactory connectionBuilder;
         private readonly ILogger<ConnectionManager> log;
         private readonly IServiceProvider serviceProvider;
@@ -27,38 +32,33 @@ namespace Orleans.Runtime.Messaging
 
         public int ConnectionCount => this.connections.Count;
 
-        public void Add(string endPoint, ConnectionMessageSender sender)
-        {
-            var c = this.connections;
-            ConnectionMessageSender existing = default;
-            while (!c.TryAdd(endPoint, sender)
-                && c.TryGetValue(endPoint, out existing)
-                && !c.TryUpdate(endPoint, sender, existing))
-            {
-            }
-
-            if (existing != null && !ReferenceEquals(existing, sender))
-            {
-                existing.Abort();
-            }
-        }
-
         public ConnectionMessageSender GetConnection(string endPoint)
         {
-            this.connections.TryGetValue(endPoint, out var result);
+            ImmutableArray<ConnectionMessageSender> result;
+            ImmutableArray<ConnectionMessageSender> original;
 
-            if (result == null)
+            ConnectionMessageSender sender = default;
+            while (true)
             {
-                var sender = ActivatorUtilities.CreateInstance<ConnectionMessageSender>(this.serviceProvider);
-                result = this.connections.GetOrAdd(endPoint, sender);
+                if (this.connections.TryGetValue(endPoint, out original) && original.Length >= MaxConnectionsPerEndpoint)
+                {
+                    result = original;
+                    break;
+                }
 
-                if (ReferenceEquals(result, sender))
+                if (original.IsDefault) original = ImmutableArray<ConnectionMessageSender>.Empty;
+                if (sender is null) sender = ActivatorUtilities.CreateInstance<ConnectionMessageSender>(this.serviceProvider);
+                result = original.Add(sender);
+
+                if (this.connections.TryUpdate(endPoint, result, original) || this.connections.TryAdd(endPoint, result))
                 {
                     this.StartConnection(endPoint, sender);
+                    break;
                 }
-            }
+            };
 
-            return result;
+            nextConnection = (nextConnection + 1) % result.Length;
+            return result[nextConnection];
         }
 
         private void StartConnection(string endPoint, ConnectionMessageSender sender)
@@ -124,13 +124,20 @@ namespace Orleans.Runtime.Messaging
 
         public void Remove(string endPoint, ConnectionMessageSender connection = null)
         {
-            if (this.connections.TryGetValue(endPoint, out var existing))
+            if (connection is object)
             {
-                if (ReferenceEquals(existing, connection))
+                while (this.connections.TryGetValue(endPoint, out var existing) && existing.Contains(connection))
                 {
-                    var item = new KeyValuePair<string, ConnectionMessageSender>(endPoint, existing);
-                    ((IDictionary<string, ConnectionMessageSender>)this.connections).Remove(item);
+                    var updated = existing.Remove(connection);
+                    if (this.connections.TryUpdate(endPoint, updated, existing))
+                    {
+                        return;
+                    }
                 }
+            }
+            else
+            {
+                this.connections.TryRemove(endPoint, out _);
             }
         }
     }
