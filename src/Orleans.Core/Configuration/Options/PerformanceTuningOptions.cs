@@ -10,7 +10,7 @@ namespace Orleans.Configuration
         /// ServicePointManager related settings
         /// </summary>
         public int DefaultConnectionLimit { get; set; } = DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT;
-        public static readonly int DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT = DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
+        public static readonly int DEFAULT_MIN_DOT_NET_CONNECTION_LIMIT = 200;
 
         public bool Expect100Continue { get; set; }
 
@@ -19,7 +19,6 @@ namespace Orleans.Configuration
         /// <summary>
         /// Minimum number of DotNet threads.
         /// </summary>
-        public int MinDotNetThreadPoolSize { get; set; } = DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE;
-        public const int DEFAULT_MIN_DOT_NET_THREAD_POOL_SIZE = 200;
+        public int MinDotNetThreadPoolSize { get; set; }
     }
 }
