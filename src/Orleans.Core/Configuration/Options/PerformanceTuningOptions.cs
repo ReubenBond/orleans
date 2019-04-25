@@ -17,8 +17,13 @@ namespace Orleans.Configuration
         public bool UseNagleAlgorithm { get; set; }
 
         /// <summary>
-        /// Minimum number of DotNet threads.
+        /// Minimum number of .NET worker threads.
         /// </summary>
-        public int MinDotNetThreadPoolSize { get; set; }
+        public int MinDotNetThreadPoolSize { get; set; } = 0;
+
+        /// <summary>
+        /// Minimum number of I/O completion port threads.
+        /// </summary>
+        public int MinIOThreadPoolSize { get; set; } = 200;
     }
 }
