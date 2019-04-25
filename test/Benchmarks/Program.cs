@@ -135,17 +135,21 @@ namespace Benchmarks
                     test.Shutdown().GetAwaiter().GetResult();
                 }
             },
-            ["ConcurrentPingOneSilo"] = () =>
+            ["ConcurrentPing_OneSilo"] = () =>
             {
                 new PingBenchmark(numSilos: 1, startClient: true).PingConcurrent().GetAwaiter().GetResult();
             },
-            ["ConcurrentPingTwoSilos"] = () =>
+            ["ConcurrentPing_TwoSilos"] = () =>
             {
                 new PingBenchmark(numSilos: 2, startClient: true).PingConcurrent().GetAwaiter().GetResult();
             },
-            ["ConcurrentPingHostedClient"] = () =>
+            ["ConcurrentPing_HostedClient"] = () =>
             {
                 new PingBenchmark(numSilos: 1, startClient: false).PingConcurrentHostedClient().GetAwaiter().GetResult();
+            },
+            ["ConcurrentPing_SiloToSilo"] = () =>
+            {
+                new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true).PingConcurrentHostedClient().GetAwaiter().GetResult();                
             },
             ["PingForever"] = () =>
             {

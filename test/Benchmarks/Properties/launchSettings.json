@@ -17,7 +17,7 @@
     },
     "Benchmarks": {
       "commandName": "Project",
-      "commandLineArgs": "PingForever",
+      "commandLineArgs": "ConcurrentPing_SiloToSilo",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },

@@ -31,10 +31,10 @@ namespace Benchmarks.Ping
                 var primary = i == 0 ? null : new IPEndPoint(IPAddress.Loopback, 11111);
                 var siloBuilder = new SiloHostBuilder()
                     .ConfigureDefaults()
-                   .UseLocalhostClustering(
-                    siloPort: 11111 + i,
-                    gatewayPort: 30000 + i,
-                    primarySiloEndpoint: primary);
+                    .UseLocalhostClustering(
+                        siloPort: 11111 + i,
+                        gatewayPort: 30000 + i,
+                        primarySiloEndpoint: primary);
 
                 if (i == 0 && grainsOnSecondariesOnly)
                 {
