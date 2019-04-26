@@ -13,10 +13,10 @@ namespace Orleans.Runtime.Messaging
 
         public SiloMessageReceiver(
             ConnectionContext connection,
-            IMessageSerializerFactory serializerFactory,
+            IMessageSerializer serializer,
             MessageCenter messageCenter,
             MessageFactory messageFactory,
-            ILogger<SiloMessageReceiver> log) : base(connection, serializerFactory.GetSerializer(false), log)
+            ILogger<SiloMessageReceiver> log) : base(connection, serializer, log)
         {
             this.messageCenter = messageCenter;
             this.messageFactory = messageFactory;

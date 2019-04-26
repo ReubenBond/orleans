@@ -14,11 +14,11 @@ namespace Orleans.Runtime.Messaging
 
         public ClientMessageReceiver(
             ConnectionContext connection,
-            IMessageSerializerFactory serializerFactory,
+            IMessageSerializer serializer,
             ClientMessageCenter messageCenter,
             ILogger<ClientMessageReceiver> log,
             MessageFactory messageFactory)
-            : base(connection, serializerFactory.GetSerializer(false), log)
+            : base(connection, serializer, log)
         {
             this.messageCenter = messageCenter;
             this.log = log;

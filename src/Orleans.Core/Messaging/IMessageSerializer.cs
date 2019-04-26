@@ -11,9 +11,4 @@ namespace Orleans.Runtime.Messaging
         /// </returns>
         int TryRead(ref ReadOnlySequence<byte> input, out Message message);
     }
-
-    internal interface IMessageSerializerFactory
-    {
-        IMessageSerializer GetSerializer(bool deferBodyDeserialization);
-    }
 }

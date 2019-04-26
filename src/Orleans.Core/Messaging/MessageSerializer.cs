@@ -10,25 +10,6 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class MessageSerializerFactory : IMessageSerializerFactory
-    {
-        private readonly SerializationManager serializationManager;
-        private readonly SharedMemoryPool memoryPool;
-        private readonly SharedMessage sharedMessage;
-
-        public MessageSerializerFactory(
-            SerializationManager serializationManager,
-            SharedMemoryPool memoryPool,
-            SharedMessage sharedMessage)
-        {
-            this.serializationManager = serializationManager;
-            this.memoryPool = memoryPool;
-            this.sharedMessage = sharedMessage;
-        }
-
-        public IMessageSerializer GetSerializer(bool deferBodyDeserialization) => new MessageSerializer(this.serializationManager, this.memoryPool, this.sharedMessage, deferBodyDeserialization);
-    }
-
     internal sealed class MessageSerializer : IMessageSerializer
     {
         private readonly OrleansSerializer<Message.HeadersContainer> messageHeadersSerializer;
@@ -36,13 +17,8 @@ namespace Orleans.Runtime.Messaging
         private readonly MemoryPool<byte> memoryPool;
         private readonly PipeOptions bodyPipeOptions;
         private readonly SharedMessage sharedMessage;
-        private readonly bool deferBodyDeserialization;
 
-        public MessageSerializer(
-            SerializationManager serializationManager,
-            SharedMemoryPool memoryPool,
-            SharedMessage sharedMessage,
-            bool deferBodyDeserialization)
+        public MessageSerializer(SerializationManager serializationManager, SharedMemoryPool memoryPool, SharedMessage sharedMessage)
         {
             this.messageHeadersSerializer = new OrleansSerializer<Message.HeadersContainer>(serializationManager);
             this.objectSerializer = new OrleansSerializer<object>(serializationManager);
@@ -56,7 +32,6 @@ namespace Orleans.Runtime.Messaging
                 useSynchronizationContext: false,
                 minimumSegmentSize: 4096);
             this.sharedMessage = sharedMessage;
-            this.deferBodyDeserialization = deferBodyDeserialization;
         }
 
         public int TryRead(ref ReadOnlySequence<byte> input, out Message message)
@@ -105,25 +80,11 @@ namespace Orleans.Runtime.Messaging
                     Headers = headersContainer
                 };
 
-                // Copy the body object data into the reader
-                if (bodyLength > 0)
-                {
-                    if (this.deferBodyDeserialization)
-                    {
-                        var pipe = new Pipe(this.bodyPipeOptions);
-                        var writer = pipe.Writer;
-                        var body = input.Slice(bodyOffset, bodyLength);
-                        foreach (var seg in body) writer.Write(seg.Span);
-                        writer.Complete();
-                        message.BodyReader = pipe.Reader;
-                    }
-                    else
-                    {
-                        var body = input.Slice(bodyOffset, bodyLength);
-                        this.objectSerializer.Deserialize(ref body, out var bodyObject);
-                        message.BodyObject = bodyObject;
-                    }
-                }
+                // Body deserialization is more likely to fail than header deserialization.
+                // Separating the two allows for these kinds of errors to be propagated back to the caller.
+                var body = input.Slice(bodyOffset, bodyLength);
+                this.objectSerializer.Deserialize(ref body, out var bodyObject);
+                message.BodyObject = bodyObject;
             }
             finally
             {
@@ -141,26 +102,7 @@ namespace Orleans.Runtime.Messaging
             this.messageHeadersSerializer.Serialize(ref buffer, message.Headers);
             var headerLength = buffer.CommittedBytes;
 
-            if (message.BodyReader != null)
-            {
-                var reader = message.BodyReader;
-                while (reader.TryRead(out var readerBuffer))
-                {
-                    foreach (var seg in readerBuffer.Buffer)
-                    {
-                        buffer.Write(seg.Span);
-                    }
-
-                    reader.AdvanceTo(readerBuffer.Buffer.End);
-                    if (readerBuffer.IsCompleted || readerBuffer.IsCanceled) break;
-                }
-
-                message.FreeBodyBuffers();
-            }
-            else
-            {
-                this.objectSerializer.Serialize(ref buffer, message.BodyObject);
-            }
+            this.objectSerializer.Serialize(ref buffer, message.BodyObject);
 
             // Write length prefixes, first header length then body length.
             BinaryPrimitives.WriteInt32LittleEndian(lengthFields, headerLength);
