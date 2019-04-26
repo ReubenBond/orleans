@@ -141,7 +141,6 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IProviderRuntime, SiloProviderRuntime>();
             services.TryAddSingleton<ImplicitStreamSubscriberTable>();
             services.TryAddSingleton<MessageFactory>();
-            services.TryAddSingleton<SharedMessage>();
 
             services.TryAddSingleton<IGrainRegistrar<GlobalSingleInstanceRegistration>, GlobalSingleInstanceRegistrar>();
             services.TryAddSingleton<IGrainRegistrar<ClusterLocalRegistration>, ClusterLocalRegistrar>();

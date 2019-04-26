@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -49,19 +49,13 @@ namespace UnitTests.General
             this.fixture.RuntimeClient.ClientInvokeCallback = null;
         }
 
-        private Message CreateMessage()
-        {
-            var shared = this.fixture.Services.GetRequiredService<SharedMessage>();
-            return new Message(shared);
-        }
-
         [Fact, TestCategory("Functional"), TestCategory("RequestContext")]
         public async Task RequestContext_MultiThreads_ExportToMessage()
         {
             const int NumLoops = 50;
             string id = "key" + random.Next();
 
-            Message msg = this.CreateMessage();
+            Message msg = new Message();
             Task[] promises = new Task[NumLoops];
             ManualResetEventSlim flag = new ManualResetEventSlim(false);
             for (int i = 0; i < NumLoops; i++)
@@ -87,7 +81,7 @@ namespace UnitTests.General
             Guid activityId2 = Guid.NewGuid();
             Guid nullActivityId = Guid.Empty;
 
-            Message msg = this.CreateMessage();
+            Message msg = new Message();
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
@@ -97,7 +91,7 @@ namespace UnitTests.General
             TestCleanup();
 
             RequestContextTestUtils.SetActivityId(activityId);
-            msg = this.CreateMessage();
+            msg = new Message();
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
@@ -111,7 +105,7 @@ namespace UnitTests.General
             TestCleanup();
 
             RequestContextTestUtils.SetActivityId(nullActivityId);
-            msg = this.CreateMessage();
+            msg = new Message();
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
             if (msg.RequestContextData != null) foreach (var kvp in msg.RequestContextData)
                 {
@@ -121,7 +115,7 @@ namespace UnitTests.General
             TestCleanup();
 
             RequestContextTestUtils.SetActivityId(activityId2);
-            msg = this.CreateMessage();
+            msg = new Message();
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
             foreach (var kvp in msg.RequestContextData)
             {
@@ -143,7 +137,7 @@ namespace UnitTests.General
             Guid activityId2 = Guid.NewGuid();
             Guid nullActivityId = Guid.Empty;
 
-            Message msg = this.CreateMessage();
+            Message msg = new Message();
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);
@@ -152,7 +146,7 @@ namespace UnitTests.General
             TestCleanup();
 
             RequestContextTestUtils.SetActivityId(activityId);
-            msg = this.CreateMessage();
+            msg = new Message();
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);
@@ -169,7 +163,7 @@ namespace UnitTests.General
             TestCleanup();
 
             RequestContextTestUtils.SetActivityId(nullActivityId);
-            msg = this.CreateMessage();
+            msg = new Message();
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);
@@ -178,7 +172,7 @@ namespace UnitTests.General
             TestCleanup();
 
             RequestContextTestUtils.SetActivityId(activityId2);
-            msg = this.CreateMessage();
+            msg = new Message();
             msg.RequestContextData = RequestContextExtensions.Export(this.fixture.SerializationManager);
             RequestContext.Clear();
             RequestContextExtensions.Import(msg.RequestContextData);

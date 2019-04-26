@@ -49,7 +49,6 @@ namespace Orleans
             services.TryAddFromExisting<IGrainReferenceConverter, GrainFactory>();
             services.TryAddSingleton<ClientProviderRuntime>();
             services.TryAddSingleton<MessageFactory>();
-            services.TryAddSingleton<SharedMessage>();
             services.TryAddFromExisting<IStreamProviderRuntime, ClientProviderRuntime>();
             services.TryAddFromExisting<IProviderRuntime, ClientProviderRuntime>();
             services.TryAddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();

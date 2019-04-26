@@ -1,28 +1,14 @@
 using System;
 using System.Collections.Generic;
-using System.IO.Pipelines;
 using System.Text;
 using Orleans.CodeGeneration;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Transactions;
 
 namespace Orleans.Runtime
 {
-    internal sealed class SharedMessage
-    {
-        public SharedMessage(SerializationManager serializationManager)
-        {
-            this.BodyDeserializer = new MessageSerializer.SharedOrleansSerializer(serializationManager);
-        }
-
-        public MessageSerializer.SharedOrleansSerializer BodyDeserializer { get; }
-
-        public int? MaxRetries { get; } = 0;
-    }
-
     internal class Message : IOutgoingMessage
     {
         public const int LENGTH_HEADER_SIZE = 8;
@@ -38,7 +24,7 @@ namespace Orleans.Runtime
         private int? _retryCount;
 
         [NonSerialized]
-        private SharedMessage _shared;
+        private int? _maxRetries;
 
         public string TargetHistory
         {
@@ -59,19 +45,18 @@ namespace Orleans.Runtime
             set { _retryCount = value; }
         }
 
-        public int? MaxRetries => _shared.MaxRetries;
-
+        public int? MaxRetries
+        {
+            get { return _maxRetries; }
+            set { _maxRetries = value; }
+        }
+        
         // Cache values of TargetAddess and SendingAddress as they are used very frequently
         private ActivationAddress targetAddress;
         private ActivationAddress sendingAddress;
         
         static Message()
         {
-        }
-
-        public Message(SharedMessage shared)
-        {
-            this._shared = shared;
         }
 
         public enum Categories
@@ -397,36 +382,8 @@ namespace Orleans.Runtime
             set { Headers.RequestContextData = value; }
         }
 
-        private object bodyObject;
-        public object BodyObject
-        {
-            get
-            {
-                if (this.bodyObject is null && this.BodyReader is object)
-                {
-                    this.bodyObject = this._shared.BodyDeserializer.Deserialize(this.BodyReader);
-                    FreeBodyBuffers();
-                }
+        public object BodyObject { get; set; }
 
-                return this.bodyObject;
-            }
-
-            set
-            {
-                FreeBodyBuffers();
-                this.bodyObject = value;
-            }
-        }
-
-        public PipeReader BodyReader { get; set; }
-
-        internal void FreeBodyBuffers()
-        {
-            if (this.BodyReader is null) return;
-            this.BodyReader.Complete();
-            this.BodyReader = null;
-        }
-        
         public void ClearTargetAddress()
         {
             targetAddress = null;
@@ -601,7 +558,7 @@ namespace Orleans.Runtime
 
         public static Message CreatePromptExceptionResponse(Message request, Exception exception)
         {
-            return new Message(request._shared)
+            return new Message
             {
                 Category = request.Category,
                 Direction = Message.Directions.Response,
@@ -613,6 +570,17 @@ namespace Orleans.Runtime
         internal void DropExpiredMessage(MessagingStatisticsGroup.Phase phase)
         {
             MessagingStatisticsGroup.OnMessageExpired(phase);
+        }
+
+        private static int BufferLength(List<ArraySegment<byte>> buffer)
+        {
+            var result = 0;
+            for (var i = 0; i < buffer.Count; i++)
+            {
+                result += buffer[i].Count;
+            }
+
+            return result;
         }
 
         [Serializable]
