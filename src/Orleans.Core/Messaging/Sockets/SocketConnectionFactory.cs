@@ -156,7 +156,7 @@ namespace Orleans.Runtime.Messaging
                 throw new SocketConnectionException($"Unable to connect to {endPoint}. Error: {completion.SocketError}");
             }
 
-            var scheduler = schedulers.GetScheduler();
+            var scheduler = PipeScheduler.ThreadPool;
             var connection = new SocketConnection(socket, this.memoryPool, scheduler, this.trace);
             var pair = DuplexPipe.CreateConnectionPair(
                 GetPipeOptions(PipeScheduler.Inline, connection.InputWriterScheduler, this.memoryPool),
