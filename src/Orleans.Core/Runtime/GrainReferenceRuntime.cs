@@ -129,7 +129,7 @@ namespace Orleans.Runtime
         {
             bool isOneWayCall = (options & InvokeMethodOptions.OneWay) != 0;
 
-            var resolver = isOneWayCall ? null : new TaskCompletionSource<object>();
+            var resolver = isOneWayCall ? null : new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.RuntimeClient.SendRequest(reference, request, resolver, debugContext, options, reference.GenericArguments);
             return isOneWayCall ? null : resolver.Task;
         }
