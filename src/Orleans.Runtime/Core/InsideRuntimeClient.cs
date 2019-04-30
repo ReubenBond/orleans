@@ -861,11 +861,12 @@ namespace Orleans.Runtime
         private void OnCallbackExpiryTick(object state)
         {
             var currentStopwatchTicks = Stopwatch.GetTimestamp();
+            var responseTimeout = this.messagingOptions.ResponseTimeout;
             foreach (var pair in callbacks)
             {
                 var callback = pair.Value;
                 if (callback.IsCompleted) continue;
-                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(this.messagingOptions.ResponseTimeout);
+                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(responseTimeout);
             }
         }
     }
