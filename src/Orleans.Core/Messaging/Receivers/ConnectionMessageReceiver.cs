@@ -39,8 +39,9 @@ namespace Orleans.Runtime.Messaging
                 if (this.log.IsEnabled(LogLevel.Information))
                 {
                     this.log.LogInformation(
-                        "Starting to process messages from remote endpoint {EndPoint} on connection {ConnectionId}.",
+                        "Starting to process messages from remote endpoint {RemoteEndPoint} to local endpoint {LocalEndPoint} on connection {ConnectionId}.",
                         this.Connection.GetRemoteEndPoint(),
+                        this.Connection.GetLocalEndPoint(),
                         this.Connection.ConnectionId);
                 }
 
@@ -69,9 +70,10 @@ namespace Orleans.Runtime.Messaging
                             catch (Exception exception)
                             {
                                 this.log.LogWarning(
-                                    "Exception reading message {Message} from remote endpoint {EndPoint} on connection {ConnectionId}: {Exception}",
+                                    "Exception reading message {Message} from remote endpoint {RemoteEndPoint} to local endpoint {LocalEndPoint} on connection {ConnectionId}: {Exception}",
                                     message,
                                     this.Connection.GetRemoteEndPoint(),
+                                    this.Connection.GetLocalEndPoint(),
                                     this.Connection.ConnectionId,
                                     exception);
 

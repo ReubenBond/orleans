@@ -50,10 +50,11 @@ namespace Orleans.Runtime.Messaging
                 CheckForCompletion(ref readResult);
             }
 
-            var grainIdBytes = new byte[Math.Min(length, 1024)];
 
-            buffer.Slice(0, length).CopyTo(grainIdBytes);
-            input.AdvanceTo(buffer.GetPosition(length));
+            var grainIdBuffer = buffer.Slice(0, length);
+            input.AdvanceTo(grainIdBuffer.End);
+            var grainIdBytes = new byte[Math.Min(length, 1024)];
+            grainIdBuffer.CopyTo(grainIdBytes);
             return GrainIdExtensions.FromByteArray(grainIdBytes);
         }
 

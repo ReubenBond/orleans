@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -20,6 +21,8 @@ namespace Orleans.Runtime.Messaging
             {
                 var serviceProvider = builder.ApplicationServices;
                 var lifetime = serviceProvider.GetRequiredService<IApplicationLifetime>();
+                var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+                var log = loggerFactory.CreateLogger("ConnectionHandler");
                 var components = serviceProvider.GetRequiredService<ConnectionComponentFactory>();
                 var shutDown = lifetime.ApplicationStopped.WhenCancelled();
 
@@ -30,6 +33,14 @@ namespace Orleans.Runtime.Messaging
                     Exception error = default;
                     try
                     {
+                        log.LogInformation(
+                           "Starting to process messages from remote endpoint {RemoteEndPoint} to local endpoint {LocalEndPoint} on connection {ConnectionId}. Outbound {Outbound}, SiloToSilo {SiloToSilo}",
+                           connection.GetRemoteEndPoint(),
+                           connection.GetLocalEndPoint(),
+                           connection.ConnectionId,
+                           outbound,
+                           siloToSilo);
+
                         sender = GetMessageSender(connection, serviceProvider);
 
                         ConnectionPreambleSender preambleSender;

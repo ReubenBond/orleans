@@ -14,6 +14,13 @@ namespace Orleans.Runtime.Messaging
             return $"{feature.RemoteIpAddress}:{feature.RemotePort}";
         }
 
+        public static string GetLocalEndPoint(this ConnectionContext connection)
+        {
+            var feature = connection.Features.Get<IHttpConnectionFeature>();
+            if (feature == null) return null;
+            return $"{feature.LocalIpAddress}:{feature.LocalPort}";
+        }
+
         public static IConnectionLifetimeFeature GetLifetime(this ConnectionContext connection) => connection.GetRequiredFeature<IConnectionLifetimeFeature>();
 
         public static TFeature GetRequiredFeature<TFeature>(this ConnectionContext connection) where TFeature : class

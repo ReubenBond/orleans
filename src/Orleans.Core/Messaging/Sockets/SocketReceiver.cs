@@ -12,7 +12,11 @@ namespace Orleans.Runtime.Messaging
 
         public SocketAwaitableEventArgs WaitForDataAsync()
         {
+#if NETCOREAPP2_1
+            this.awaitableEventArgs.SetBuffer(Memory<byte>.Empty);
+#else
             this.awaitableEventArgs.SetBuffer(Array.Empty<byte>(), 0, 0);
+#endif
 
             if (!this.socket.ReceiveAsync(this.awaitableEventArgs))
             {
@@ -24,8 +28,12 @@ namespace Orleans.Runtime.Messaging
 
         public SocketAwaitableEventArgs ReceiveAsync(Memory<byte> buffer)
         {
+#if NETCOREAPP2_1
+            this.awaitableEventArgs.SetBuffer(buffer);
+#else
             var array = buffer.GetArray();
             this.awaitableEventArgs.SetBuffer(array.Array, array.Offset, array.Count);
+#endif
 
             if (!this.socket.ReceiveAsync(this.awaitableEventArgs))
             {

@@ -181,7 +181,7 @@ namespace Orleans.Runtime.Messaging
                     this.trace.ConnectionPause(this.ConnectionId);
                 }
 
-                var result = await flushTask;
+                var result = await flushTask.ConfigureAwait(false);
 
                 if (paused)
                 {
