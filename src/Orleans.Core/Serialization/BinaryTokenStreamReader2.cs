@@ -46,7 +46,8 @@ namespace Orleans.Serialization
         }
 #endif
 
-        public void PartialReset(ref ReadOnlySequence<byte> input)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void PartialReset(ReadOnlySequence<byte> input)
         {
             this.input = input;
             this.nextSequencePosition = input.Start;
@@ -91,7 +92,7 @@ namespace Orleans.Serialization
         {
             var result = new BinaryTokenStreamReader2();
             var sliced = this.input.Slice(position);
-            result.PartialReset(ref sliced);
+            result.PartialReset(sliced);
             return result;
         }   
 
@@ -466,7 +467,7 @@ namespace Orleans.Serialization
         public IBinaryTokenStreamReader Copy()
         {
             var result = new BinaryTokenStreamReader2();
-            result.PartialReset(ref this.input);
+            result.PartialReset(this.input);
             return result;
         }
 

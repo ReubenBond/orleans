@@ -109,6 +109,7 @@ namespace Orleans.Serialization
             this.PartialReset(output);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void PartialReset(TBufferWriter output)
         {
             this.output = output;
