@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Messaging
         [ThreadStatic]
         private static int nextConnection;
 
-        private const int MaxConnectionsPerEndpoint = 4;
+        private const int MaxConnectionsPerEndpoint = 1;
         private readonly ConcurrentDictionary<string, ImmutableArray<ConnectionMessageSender>> connections
             = new ConcurrentDictionary<string, ImmutableArray<ConnectionMessageSender>>();
         private readonly OutboundConnectionFactory connectionBuilder;
