@@ -1,6 +1,7 @@
 using System;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Messaging;
@@ -15,8 +16,9 @@ namespace Orleans.Runtime.Messaging
         public ClientOutboundConnectionFactory(
             IServiceProvider serviceProvider,
             IOptions<ConnectionOptions> connectionOptions,
-            IConnectionFactory connectionFactory)
-            : base(connectionFactory, serviceProvider)
+            IConnectionFactory connectionFactory,
+            ILogger<ClientOutboundConnectionFactory> log)
+            : base(connectionFactory, log, serviceProvider)
         {
             this.connectionOptions = connectionOptions.Value;
             this.serviceProvider = serviceProvider;

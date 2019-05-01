@@ -67,12 +67,22 @@ namespace Orleans.Runtime.Messaging
 
                         if (error != null)
                         {
+                            log.LogWarning(
+                                "Connection {LocalEndPoint}<->{RemoteEndPoint} terminated with exception: {Exception}",
+                                connection.GetLocalEndPoint(),
+                                connection.GetRemoteEndPoint(),
+                                error);
                             connection.Abort(
                                 new ConnectionAbortedException("Exception in connection handler. See InnerException for details.",
-                                error));
+                                    error));
                         }
                         else
                         {
+                            log.LogInformation(
+                                "Connection {LocalEndPoint}<->{RemoteEndPoint} terminated",
+                                connection.GetLocalEndPoint(),
+                                connection.GetRemoteEndPoint(),
+                                error);
                             connection.Abort();
                         }
                     }

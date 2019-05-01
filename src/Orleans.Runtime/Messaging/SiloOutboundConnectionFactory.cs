@@ -1,5 +1,6 @@
 using System;
 using Microsoft.AspNetCore.Connections;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
@@ -13,8 +14,9 @@ namespace Orleans.Runtime.Messaging
         public SiloOutboundConnectionFactory(
             IServiceProvider serviceProvider,
             IOptions<ConnectionOptions> connectionOptions,
-            IConnectionFactory connectionFactory)
-            : base(connectionFactory, serviceProvider)
+            IConnectionFactory connectionFactory,
+            ILogger<SiloOutboundConnectionFactory> log)
+            : base(connectionFactory, log, serviceProvider)
         {
             this.connectionOptions = connectionOptions.Value;
             this.serviceProvider = serviceProvider;
