@@ -137,12 +137,12 @@ namespace Orleans.Runtime.Messaging
                         var connection = new SocketConnection(acceptSocket, this.memoryPool, scheduler, this.trace);
                         var pair = DuplexPipe.CreateConnectionPair(
                             GetPipeOptions(
-                                PipeScheduler.Inline,
+                                PipeScheduler.ThreadPool,
                                 connection.InputWriterScheduler,
                                 this.memoryPool),
                             GetPipeOptions(
                                 connection.OutputReaderScheduler,
-                                PipeScheduler.Inline,
+                                PipeScheduler.ThreadPool,
                                 this.memoryPool));
 
                         connection.Application = pair.Application;
