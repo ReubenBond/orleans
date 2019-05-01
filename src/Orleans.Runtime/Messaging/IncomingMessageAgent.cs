@@ -109,35 +109,40 @@ namespace Orleans.Runtime.Messaging
                 ActivationData targetActivation = directory.FindTarget(msg.TargetActivation);
                 if (targetActivation != null)
                 {
-                    lock (targetActivation)
+                    //
+                    //
+
+                    //
+                    // WARNING!!! THIS IS NOT SHIPPABLE CODE! UNSAFE LACK OF A LOCK
+                    //
+
+                    //
+                    var target = targetActivation; // to avoid a warning about nulling targetActivation under a lock on it
+                    if (target.State == ActivationState.Valid)
                     {
-                        var target = targetActivation; // to avoid a warning about nulling targetActivation under a lock on it
-                        if (target.State == ActivationState.Valid)
+                        // Response messages are not subject to overload checks.
+                        if (msg.Direction != Message.Directions.Response)
                         {
-                            // Response messages are not subject to overload checks.
-                            if (msg.Direction != Message.Directions.Response)
+                            var overloadException = target.CheckOverloaded(Log);
+                            if (overloadException != null)
                             {
-                                var overloadException = target.CheckOverloaded(Log);
-                                if (overloadException != null)
-                                {
-                                    // Send rejection as soon as we can, to avoid creating additional work for runtime
-                                    dispatcher.RejectMessage(msg, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + target);
-                                    return;
-                                }
+                                // Send rejection as soon as we can, to avoid creating additional work for runtime
+                                dispatcher.RejectMessage(msg, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + target);
+                                return;
                             }
-
-                            // Run ReceiveMessage in context of target activation
-                            context = target.SchedulingContext;
-                        }
-                        else
-                        {
-                            // Can't use this activation - will queue for another activation
-                            target = null;
-                            context = null;
                         }
 
-                        EnqueueReceiveMessage(msg, target, context);
+                        // Run ReceiveMessage in context of target activation
+                        context = target.SchedulingContext;
                     }
+                    else
+                    {
+                        // Can't use this activation - will queue for another activation
+                        target = null;
+                        context = null;
+                    }
+
+                    EnqueueReceiveMessage(msg, target, context);
                 }
                 else
                 {

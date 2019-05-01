@@ -493,13 +493,14 @@ namespace Orleans.Runtime
 
         internal int GetRequestCount()
         {
+            long numInDispatcher = EnqueuedOnDispatcherCount;
+            long numActive = InFlightCount;
+            long numWaiting;
             lock (this)
             {
-                long numInDispatcher = EnqueuedOnDispatcherCount;
-                long numActive = InFlightCount;
-                long numWaiting = WaitingCount;
-                return (int)(numInDispatcher + numActive + numWaiting);
+                numWaiting = WaitingCount;
             }
+            return (int)(numInDispatcher + numActive + numWaiting);
         }
 
         public Message PeekNextWaitingMessage()
