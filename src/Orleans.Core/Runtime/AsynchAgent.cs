@@ -17,7 +17,7 @@ namespace Orleans.Runtime
         private readonly ExecutorFaultHandler executorFaultHandler;
 
         protected readonly ExecutorService executorService;
-        protected ThreadPoolExecutor executor;
+        protected IExecutor executor;
         protected CancellationTokenSource Cts;
         protected object Lockable;
         protected ILogger Log;
@@ -161,7 +161,7 @@ namespace Orleans.Runtime
 
         public bool CheckHealth(DateTime lastCheckTime)
         {
-            return executor.CheckHealth(lastCheckTime);
+            return (executor as IHealthCheckable)?.CheckHealth(lastCheckTime) ?? true;
         }
 
         internal static bool IsStarting { get; set; }

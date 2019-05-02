@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Threading;
 
@@ -13,9 +14,19 @@ namespace Orleans.Runtime
             this.serviceProvider = serviceProvider;
         }
 
-        public ThreadPoolExecutor GetExecutor(ThreadPoolExecutorOptions options)
+        public IExecutor GetExecutor(ThreadPoolExecutorOptions options)
         {
-            return ActivatorUtilities.CreateInstance<ThreadPoolExecutor>(this.serviceProvider, options);
+            return SharedThreadPoolExecutor.Instance;
+        }
+    }
+
+    internal sealed class SharedThreadPoolExecutor : IExecutor
+    {
+        public static SharedThreadPoolExecutor Instance { get; } = new SharedThreadPoolExecutor();
+
+        public void QueueWorkItem(WaitCallback callback, object state = null)
+        {
+            ThreadPool.UnsafeQueueUserWorkItem(callback, state);
         }
     }
 }
