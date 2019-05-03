@@ -1,11 +1,32 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Tracing;
 using System.Linq;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
+    [EventSource(Name = "Microsoft-Orleans-Runtime")]
+    internal class OrleansRuntimeEvents : EventSource
+    {
+        public static readonly OrleansRuntimeEvents Log = new OrleansRuntimeEvents();
+
+        private OrleansRuntimeEvents() { }
+
+        [Event(1, Level = EventLevel.Informational)]
+        public void InvokeRequestStart(Guid relatedActivityId) => this.WriteEventWithRelatedActivityId(1, relatedActivityId);
+
+        [Event(2, Level = EventLevel.Informational)]
+        public void InvokeRequestStop() => this.WriteEvent(2);
+
+        [Event(3, Level = EventLevel.Informational)]
+        public void IssueRequestStart() => this.WriteEvent(3);
+
+        [Event(4, Level = EventLevel.Informational)]
+        public void IssueRequestStop() => this.WriteEvent(4);
+    }
+
     public static class RequestContextExtensions
     {
         public static void Import(Dictionary<string, object> contextData)
@@ -15,7 +36,8 @@ namespace Orleans.Runtime
                 object activityIdObj = Guid.Empty;
                 if (contextData?.TryGetValue(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER, out activityIdObj) == true)
                 {
-                    Trace.CorrelationManager.ActivityId = (Guid)activityIdObj;
+                    var activityId = (Guid)activityIdObj;
+                    Trace.CorrelationManager.ActivityId = activityId;
                 }
                 else
                 {

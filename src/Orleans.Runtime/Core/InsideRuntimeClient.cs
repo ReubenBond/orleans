@@ -19,6 +19,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Threading;
 using Orleans.Configuration;
+using System.Diagnostics.Tracing;
 
 namespace Orleans.Runtime
 {
@@ -279,16 +280,23 @@ namespace Orleans.Runtime
 
         public async Task Invoke(IAddressable target, IInvokable invokable, Message message)
         {
+            Guid previousActivityId = EventSource.CurrentThreadActivityId;
             try
             {
+                RequestContextExtensions.Import(message.RequestContextData);
+                if (OrleansRuntimeEvents.Log.IsEnabled())
+                {
+                    var activityId = RequestContext.ActivityId;
+                    OrleansRuntimeEvents.Log.InvokeRequestStart(activityId);
+                }
+
                 // Don't process messages that have already timed out
                 if (message.IsExpired)
                 {
                     message.DropExpiredMessage(MessagingStatisticsGroup.Phase.Invoke);
                     return;
-                }
+                }        
 
-                RequestContextExtensions.Import(message.RequestContextData);
                 if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
                 {
                     UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
@@ -469,6 +477,11 @@ namespace Orleans.Runtime
             finally
             {
                 TransactionContext.Clear();
+
+                if (OrleansRuntimeEvents.Log.IsEnabled())
+                {
+                    OrleansRuntimeEvents.Log.InvokeRequestStop();
+                }
             }
         }
 
