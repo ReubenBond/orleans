@@ -32,7 +32,9 @@ namespace Orleans.Runtime.Messaging
 
         public int ConnectionCount => this.connections.Count;
 
-        public ConnectionMessageSender GetConnection(string endPoint)
+        public ImmutableArray<string> GetConnectedEndpoints() => this.connections.Keys.ToImmutableArray();
+        
+        public ConnectionMessageSender GetConnection(string endpoint)
         {
             ImmutableArray<ConnectionMessageSender> result;
             ImmutableArray<ConnectionMessageSender> original;
@@ -40,7 +42,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionMessageSender sender = default;
             while (true)
             {
-                if (this.connections.TryGetValue(endPoint, out original) && original.Length >= MaxConnectionsPerEndpoint)
+                if (this.connections.TryGetValue(endpoint, out original) && original.Length >= MaxConnectionsPerEndpoint)
                 {
                     result = original;
                     break;
@@ -50,9 +52,9 @@ namespace Orleans.Runtime.Messaging
                 if (sender is null) sender = ActivatorUtilities.CreateInstance<ConnectionMessageSender>(this.serviceProvider);
                 result = original.Add(sender);
 
-                if (this.connections.TryUpdate(endPoint, result, original) || this.connections.TryAdd(endPoint, result))
+                if (this.connections.TryUpdate(endpoint, result, original) || this.connections.TryAdd(endpoint, result))
                 {
-                    this.StartConnection(endPoint, sender);
+                    this.StartConnection(endpoint, sender);
                     break;
                 }
             };
@@ -61,7 +63,7 @@ namespace Orleans.Runtime.Messaging
             return result[nextConnection];
         }
 
-        private void StartConnection(string endPoint, ConnectionMessageSender sender)
+        private void StartConnection(string endpoint, ConnectionMessageSender sender)
         {
             try
             {
@@ -69,11 +71,11 @@ namespace Orleans.Runtime.Messaging
                 {
                     this.log.LogInformation(
                         "Establishing connection to endpoint {EndPoint}",
-                        endPoint);
+                        endpoint);
                 }
 
                 var connectionTask = this.connectionBuilder.Connect(
-                    endPoint,
+                    endpoint,
                     context =>
                     {
                         context.Items[ConnectionMessageSender.ContextItemKey] = sender;
@@ -90,7 +92,7 @@ namespace Orleans.Runtime.Messaging
                         var delay = TimeSpan.FromSeconds(2);
                         this.log.LogWarning(
                             "Connection to endpoint {EndPoint} terminated with exception {Exception}. Waiting {Delay}ms before retry.",
-                            endPoint,
+                            endpoint,
                             exception,
                             delay.TotalMilliseconds);
                         await Task.Delay(delay);
@@ -99,8 +101,8 @@ namespace Orleans.Runtime.Messaging
                     {
                         this.log.LogInformation(
                            "Connection to endpoint {EndPoint} closed.",
-                           endPoint);
-                        this.Remove(endPoint, sender);
+                           endpoint);
+                        this.Remove(endpoint, sender);
                         sender.Abort();
                     }
                 });
@@ -112,32 +114,54 @@ namespace Orleans.Runtime.Messaging
                     var delay = TimeSpan.FromSeconds(2);
                     this.log.LogWarning(
                         "Connection to endpoint {EndPoint} terminated with exception {Exception}. Waiting {Delay}ms before retry.",
-                        endPoint,
+                        endpoint,
                         exception,
                         delay.TotalMilliseconds);
                     await Task.Delay(delay);
-                    this.Remove(endPoint, sender);
+                    this.Remove(endpoint, sender);
                     sender.Abort();
                 });
             }
         }
 
-        public void Remove(string endPoint, ConnectionMessageSender connection = null)
+        internal void Remove(string endpoint, ConnectionMessageSender connection)
         {
             if (connection is object)
             {
-                while (this.connections.TryGetValue(endPoint, out var existing) && existing.Contains(connection))
+                while (this.connections.TryGetValue(endpoint, out var existing) && existing.Contains(connection))
                 {
                     var updated = existing.Remove(connection);
-                    if (this.connections.TryUpdate(endPoint, updated, existing))
+                    if (this.connections.TryUpdate(endpoint, updated, existing))
                     {
+                        if (updated.Length == 0)
+                        {
+                            var dict = ((IDictionary<string, ImmutableArray<ConnectionMessageSender>>)this.connections);
+                            var entry = new KeyValuePair<string, ImmutableArray<ConnectionMessageSender>>(endpoint, updated);
+                            dict.Remove(entry);
+                        }
+
                         return;
                     }
                 }
             }
-            else
+        }
+
+        public void Abort(string endpoint)
+        {
+            this.connections.TryRemove(endpoint, out var existing);
+
+            if (existing != null)
             {
-                this.connections.TryRemove(endPoint, out _);
+                foreach (var connection in existing)
+                {
+                    try
+                    {
+                        connection.Abort();
+                    }
+                    catch
+                    {
+                    }
+                }
             }
         }
     }

@@ -120,7 +120,7 @@ namespace Orleans.Messaging
             this.messageFactory = messageFactory;
             this.connectionStatusListener = connectionStatusListener;
             Running = false;
-            GatewayManager = new GatewayManager(this, gatewayOptions.Value, gatewayListProvider, loggerFactory);
+            GatewayManager = new GatewayManager(gatewayOptions.Value, gatewayListProvider, loggerFactory);
             PendingInboundMessages = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
             {
                 SingleReader = true,
@@ -312,7 +312,7 @@ namespace Orleans.Messaging
         public void RejectMessage(Message msg, string reason, Exception exc = null)
         {
             if (!Running) return;
-
+            
             if (msg.Direction != Message.Directions.Request)
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_DroppingMsg, "Dropping message: {0}. Reason = {1}", msg, reason);
@@ -370,30 +370,6 @@ namespace Orleans.Messaging
                 throw new ArgumentException("Handshake client ID can only be updated  with a geo client.", nameof(clientId));
 
             ClientId = clientId;
-        }
-
-        internal void CleanupGatewayConnections(IList<Uri> liveGateways)
-        {
-            lock (lockable)
-            {
-                foreach (var weakRef in this.grainBuckets)
-                {
-                    if (weakRef != null && weakRef.IsAlive)
-                    {
-                        var connection = weakRef.Target as GatewayConnection;
-                        if (!liveGateways.Contains(connection.Address))
-                        {
-                            if (connection.IsLive)
-                            {
-                                this.logger.Warn(
-                                    ErrorCode.ProxyClient_GatewayUnknownStatus,
-                                    "Stopping connection to {gateway} because it is not known by the gateway manager", connection.Address);
-                                connection.Stop();
-                            }
-                        }
-                    }
-                }
-            }
         }
 
         internal void OnGatewayConnectionOpen()
