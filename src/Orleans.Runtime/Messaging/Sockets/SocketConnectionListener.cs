@@ -50,7 +50,7 @@ namespace Orleans.Runtime.Messaging
             this.memoryPool = memoryPool.Pool;
         }
 
-        public Task Bind()
+        public Task BindAsync()
         {
             if (this.listenSocket != null)
             {
@@ -95,7 +95,7 @@ namespace Orleans.Runtime.Messaging
             return Task.CompletedTask;
         }
 
-        public async Task Unbind()
+        public async Task UnbindAsync()
         {
             if (this.listenSocket != null)
             {
@@ -118,7 +118,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public Task Stop()
+        public Task StopAsync()
         {
             return Task.CompletedTask;
         }

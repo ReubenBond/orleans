@@ -14,7 +14,7 @@ namespace Orleans.Runtime.Messaging
 #endif
     {
         private readonly IConnectionListenerFactory listenerfactory;
-        private readonly EndpointOptions endPointOptions;
+        private readonly EndpointOptions endpointOptions;
         private readonly ConnectionDelegate siloConnectionDelegate;
         private readonly ConnectionDelegate gatewayConnectionDelegate;
         private IConnectionListener siloListener;
@@ -22,12 +22,12 @@ namespace Orleans.Runtime.Messaging
 
         public OrleansServer(
             IConnectionListenerFactory listenerFactory,
-            IOptions<EndpointOptions> endPointOptions,
+            IOptions<EndpointOptions> endpointOptions,
             IOptions<ConnectionOptions> connectionOptions,
             IServiceProvider serviceProvider)
         {
             this.listenerfactory = listenerFactory;
-            this.endPointOptions = endPointOptions.Value;
+            this.endpointOptions = endpointOptions.Value;
             var connectionBuilderOptions = connectionOptions.Value;
 
             this.siloConnectionDelegate = GetSiloConnectionDelegate();
@@ -63,41 +63,41 @@ namespace Orleans.Runtime.Messaging
         private Task StartSiloListener(CancellationToken cancellation)
         {
             var listener = this.siloListener
-                ?? (this.siloListener = this.listenerfactory.Create(endPointOptions.GetListeningSiloEndpoint().ToString(), this.siloConnectionDelegate));
-            return listener.Bind();
+                ?? (this.siloListener = this.listenerfactory.Create(endpointOptions.GetListeningSiloEndpoint().ToString(), this.siloConnectionDelegate));
+            return listener.BindAsync();
         }
 
         private Task StopSiloListener(CancellationToken cancellation)
         {
             var listener = Interlocked.Exchange(ref this.siloListener, null);
-            return listener?.Unbind() ?? Task.CompletedTask;
+            return listener?.UnbindAsync() ?? Task.CompletedTask;
         }
 
         private Task StartGatewayListener(CancellationToken cancellation)
         {
             var listener = this.gatewayListener
-                ?? (this.gatewayListener = this.listenerfactory.Create(endPointOptions.GetListeningProxyEndpoint().ToString(), this.gatewayConnectionDelegate));
-            return listener.Bind();
+                ?? (this.gatewayListener = this.listenerfactory.Create(endpointOptions.GetListeningProxyEndpoint().ToString(), this.gatewayConnectionDelegate));
+            return listener.BindAsync();
         }
 
         private Task StopGatewayListener(CancellationToken cancellation)
         {
             var listener = Interlocked.Exchange(ref this.gatewayListener, null);
-            return listener?.Unbind() ?? Task.CompletedTask;
+            return listener?.UnbindAsync() ?? Task.CompletedTask;
         }
 
         public async ValueTask DisposeAsync()
         {
             if (this.siloListener is IConnectionListener silo)
             {
-                await silo.Unbind();
-                await silo.Stop();
+                await silo.UnbindAsync();
+                await silo.StopAsync();
             }
 
             if (this.gatewayListener is IConnectionListener gateway)
             {
-                await gateway.Unbind();
-                await gateway.Stop();
+                await gateway.UnbindAsync();
+                await gateway.StopAsync();
             }
         }
     }

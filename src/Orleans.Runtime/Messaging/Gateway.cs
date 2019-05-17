@@ -109,13 +109,13 @@ namespace Orleans.Runtime.Messaging
                 ClientState cs = null;
                 if (!clientConnections.TryGetValue(connection, out cs)) return;
 
-                string endPoint = null;
+                string endpoint = null;
                 try
                 {
-                    endPoint = connection.GetRemoteEndPoint();
+                    endpoint = connection.GetRemoteEndPoint();
                 }
                 catch (Exception) { } // guard against ObjectDisposedExceptions
-                logger.Info(ErrorCode.GatewayClientClosedSocket, "Recorded closed socket from endpoint {0}, client ID {1}.", endPoint != null ? endPoint : "null", cs.Id);
+                logger.Info(ErrorCode.GatewayClientClosedSocket, "Recorded closed socket from endpoint {0}, client ID {1}.", endpoint != null ? endpoint : "null", cs.Id);
                 
                 clientConnections.TryRemove(connection, out _);
                 cs.RecordDisconnection();

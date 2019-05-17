@@ -26,7 +26,7 @@ namespace Orleans.Runtime.Messaging
         protected abstract ConnectionDelegate GetOutboundConnectionDelegate();
 
         public async Task Connect(
-            string endPoint,
+            string endpoint,
             Action<ConnectionContext> configureContext)
         {
             ConnectionContext connectionContext = default;
@@ -34,10 +34,10 @@ namespace Orleans.Runtime.Messaging
 
             try
             {
-                this.log.LogInformation("Connecting to endpoint {EndPoint}", endPoint);
+                this.log.LogInformation("Connecting to endpoint {EndPoint}", endpoint);
 
                 // Initiate the connection
-                connectionContext = await this.connectionFactory.Connect(endPoint).ConfigureAwait(false);
+                connectionContext = await this.connectionFactory.ConnectAsync(endpoint).ConfigureAwait(false);
                 appLifetimeRegistration = this.applicationLifetime.ApplicationStopped.Register(
                     () => connectionContext.Abort(),
                     useSynchronizationContext: false);
@@ -54,7 +54,7 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                this.log.LogInformation("Connection to endpoint {EndPoint} terminated", endPoint);
+                this.log.LogInformation("Connection to endpoint {EndPoint} terminated", endpoint);
 
                 // Clean up the defunct connection
                 connectionContext?.Abort();

@@ -18,27 +18,23 @@ namespace Orleans.Runtime.Messaging
             SocketSchedulers schedulers,
             SharedMemoryPool memoryPool)
         {
-            if (applicationLifetime == null)
-            {
-                throw new ArgumentNullException(nameof(applicationLifetime));
-            }
             if (loggerFactory == null)
             {
                 throw new ArgumentNullException(nameof(loggerFactory));
             }
 
-            this.applicationLifetime = applicationLifetime;
+            this.applicationLifetime = applicationLifetime ?? throw new ArgumentNullException(nameof(applicationLifetime));
             this.schedulers = schedulers;
             this.memoryPool = memoryPool;
             var logger = loggerFactory.CreateLogger("Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets");
             this.trace = new SocketsTrace(logger);
         }
 
-        public IConnectionListener Create(string endPoint, ConnectionDelegate connectionDelegate)
+        public IConnectionListener Create(string endpoint, ConnectionDelegate connectionDelegate)
         {
-            if (string.IsNullOrWhiteSpace(endPoint))
+            if (string.IsNullOrWhiteSpace(endpoint))
             {
-                throw new ArgumentNullException(nameof(endPoint));
+                throw new ArgumentNullException(nameof(endpoint));
             }
 
             if (connectionDelegate == null)
@@ -46,7 +42,7 @@ namespace Orleans.Runtime.Messaging
                 throw new ArgumentNullException(nameof(connectionDelegate));
             }
 
-            return new SocketConnectionListener(endPoint, connectionDelegate, this.applicationLifetime, this.trace, this.schedulers, this.memoryPool);
+            return new SocketConnectionListener(endpoint, connectionDelegate, this.applicationLifetime, this.trace, this.schedulers, this.memoryPool);
         }
     }
 }

@@ -4,6 +4,6 @@ namespace Orleans.Runtime.Messaging
 {
     public interface IConnectionListenerFactory
     {
-        IConnectionListener Create(string endPoint, ConnectionDelegate connectionDelegate);
+        IConnectionListener Create(string endpoint, ConnectionDelegate connectionDelegate);
     }
 }

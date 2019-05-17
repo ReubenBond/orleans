@@ -5,6 +5,6 @@ namespace Orleans.Runtime.Messaging
 {
     public interface IConnectionFactory
     {
-        Task<ConnectionContext> Connect(string endPoint);
+        Task<ConnectionContext> ConnectAsync(string endpoint);
     }
 }

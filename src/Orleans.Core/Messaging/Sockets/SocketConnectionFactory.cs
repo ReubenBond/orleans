@@ -128,11 +128,11 @@ namespace Orleans.Runtime.Messaging
             this.memoryPool = memoryPool.Pool;
         }
 
-        public async Task<ConnectionContext> Connect(string endPoint)
+        public async Task<ConnectionContext> ConnectAsync(string endpoint)
         {
-            if (!IPEndPointUtility.TryParseEndPoint(endPoint, out var remoteEndPoint))
+            if (!IPEndPointUtility.TryParseEndPoint(endpoint, out var remoteEndPoint))
             {
-                throw new ArgumentException($"Unable to parse \"{endPoint}\" as {nameof(IPEndPoint)}");
+                throw new ArgumentException($"Unable to parse \"{endpoint}\" as {nameof(IPEndPoint)}");
             }
 
             var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
@@ -153,7 +153,7 @@ namespace Orleans.Runtime.Messaging
 
             if (completion.SocketError != SocketError.Success)
             {
-                throw new SocketConnectionException($"Unable to connect to {endPoint}. Error: {completion.SocketError}");
+                throw new SocketConnectionException($"Unable to connect to {endpoint}. Error: {completion.SocketError}");
             }
 
             var scheduler = PipeScheduler.ThreadPool;
@@ -186,7 +186,7 @@ namespace Orleans.Runtime.Messaging
                     {
                         connection.Abort(
                             new ConnectionAbortedException(
-                                $"Exception connecting to endpoint {endPoint}, see {nameof(Exception.InnerException)}.",
+                                $"Exception connecting to endpoint {endpoint}, see {nameof(Exception.InnerException)}.",
                                 error));
                     }
                     else
