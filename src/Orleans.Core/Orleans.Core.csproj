@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Core</PackageId>
     <Title>Microsoft Orleans Core Library</Title>
@@ -57,7 +57,6 @@
     <PackageReference Include="System.ValueTuple" Version="$(SystemValueTupleVersion)" />
     <PackageReference Include="System.Xml.XmlDocument" Version="$(SystemRuntimeVersion)" />
     <PackageReference Include="System.Xml.XPath.XmlDocument" Version="$(SystemRuntimeVersion)" />
-    <PackageReference Include="Microsoft.AspNetCore.Server.Kestrel.Transport.Abstractions" Version="$(MicrosoftAspNetCoreConnectionsAbstractionsVersion)" />
     <PackageReference Include="System.Threading.Channels" Version="$(SystemThreadingChannelsVersion)" />
     <PackageReference Include="Microsoft.AspNetCore.Connections.Abstractions" Version="$(MicrosoftAspNetCoreConnectionsAbstractionsVersion)" />
   </ItemGroup>
