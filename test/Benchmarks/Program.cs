@@ -115,7 +115,7 @@ namespace Benchmarks
             },
             ["SequentialPing"] = () =>
             {
-                BenchmarkRunner.Run<SequentialPingBenchmark>(DefaultConfig.Instance.With(Job.MediumRun.With(CsProjCoreToolchain.NetCoreApp30)));
+                BenchmarkRunner.Run<SequentialPingBenchmark>();
             },
             ["PingForever"] = () =>
             {
