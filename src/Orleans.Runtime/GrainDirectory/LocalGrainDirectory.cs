@@ -906,6 +906,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // we are the owner
                 LocalDirectoryLookups.Increment();
                 var localResult = DirectoryPartition.LookUpActivations(grainId);
+
                 if (localResult.Addresses == null)
                 {
                     // it can happen that we cannot find the grain in our partition if there were 
@@ -914,6 +915,21 @@ namespace Orleans.Runtime.GrainDirectory
                     localResult.Addresses = new List<ActivationAddress>();
                     localResult.VersionTag = GrainInfo.NO_ETAG;
                     return localResult;
+                }
+                else
+                {
+                    // Filter any addresses for known-dead silos.
+                    var tmp = default(List<ActivationAddress>);
+                    foreach (var address in localResult.Addresses)
+                    {
+                        if (this.siloStatusOracle.IsDeadSilo(address.Silo))
+                        {
+                            if (tmp == null) tmp = new List<ActivationAddress>(localResult.Addresses);
+                            tmp.Remove(address);
+                        }
+                    }
+
+                    if (tmp != null) localResult.Addresses = tmp;
                 }
 
                 if (log.IsEnabled(LogLevel.Trace)) log.Trace("FullLookup mine {0}={1}", grainId, localResult.Addresses.ToStrings());
