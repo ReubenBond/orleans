@@ -591,6 +591,11 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (forwardAddress == null)
             {
+                if (this.siloStatusOracle.IsDeadSilo(address.Silo))
+                {
+                    throw new SiloUnavailableException($"Silo {address.Silo} is known to be dead. Activations cannot be registered to known-dead silos");
+                }
+
                 (singleActivation ? RegistrationsSingleActLocal : RegistrationsLocal).Increment();
 
                 // we are the owner     

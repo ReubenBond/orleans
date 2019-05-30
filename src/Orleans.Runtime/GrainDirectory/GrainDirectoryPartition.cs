@@ -318,7 +318,30 @@ namespace Orleans.Runtime.GrainDirectory
                     partitionData[grain] = grainInfo = new GrainInfo();
                 }
 
-                result.Address = grainInfo.AddSingleActivation(grain, activation, silo, registrationStatus);
+                if (grainInfo.Instances != null)
+                {
+                    foreach (var info in grainInfo.Instances)
+                    {
+                        if (this.siloStatusOracle.IsDeadSilo(info.Value.SiloAddress))
+                        {
+                            grainInfo.RemoveActivation(info.Key, UnregistrationCause.Force, TimeSpan.Zero, out _, out _);
+                        }
+                    }
+                }
+
+                if (this.siloStatusOracle.IsDeadSilo(silo))
+                {
+                    var first = grainInfo.Instances.FirstOrDefault();
+                    if (first.Value != null)
+                    {
+                        result.Address = ActivationAddress.GetAddress(first.Value.SiloAddress, grain, first.Key);
+                    }
+                }
+                else
+                {
+                    result.Address = grainInfo.AddSingleActivation(grain, activation, silo, registrationStatus);
+                }
+
                 result.VersionTag = grainInfo.VersionTag;
             }
 
