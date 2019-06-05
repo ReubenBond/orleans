@@ -5,9 +5,72 @@ using System.Reflection;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using Orleans.Configuration;
+using System.Collections.Immutable;
 
 namespace Orleans.Runtime.MembershipService
 {
+    internal sealed class MembershipTableSnapshot
+    {
+        public MembershipTableSnapshot(
+            MembershipVersion version,
+            ImmutableDictionary<SiloAddress, MembershipEntry> entries)
+        {
+            this.Version = version;
+            this.Entries = entries;
+
+            var statuses = ImmutableDictionary.CreateBuilder<SiloAddress, SiloStatus>();
+            var activeStatuses = ImmutableDictionary.CreateBuilder<SiloAddress, SiloStatus>();
+            var names = ImmutableDictionary.CreateBuilder<SiloAddress, string>();
+            foreach (var item in entries)
+            {
+                var entry = item.Value;
+                statuses.Add(item.Key, entry.Status);
+                if (entry.Status == SiloStatus.Active)
+                {
+                    activeStatuses.Add(item.Key, entry.Status);
+                }
+
+                names.Add(item.Key, entry.SiloName);
+            }
+
+            this.localTableCopy = statuses.ToImmutable();
+            this.localTableCopyOnlyActive = activeStatuses.ToImmutable();
+            this.localNamesTableCopy = names.ToImmutable();
+        }
+
+        public static MembershipTableSnapshot Create(MembershipTableData table)
+        {
+            var entries = ImmutableDictionary.CreateBuilder<SiloAddress, MembershipEntry>();
+            foreach (var item in table.Members)
+            {
+                var entry = item.Item1;
+                entries.Add(entry.SiloAddress, entry);
+            }
+
+            var version = new MembershipVersion(table.Version.Version);
+            return new MembershipTableSnapshot(version, entries.ToImmutable());
+        }
+
+        public MembershipVersion Version { get; }
+
+        public ImmutableDictionary<SiloAddress, MembershipEntry> Entries { get; }
+
+        /// <summary>
+        /// A cached copy of a local table, including current silo, for fast access.
+        /// </summary>
+        public ImmutableDictionary<SiloAddress, SiloStatus> localTableCopy { get; }
+
+        /// <summary>
+        /// A cached copy of a local table, for fast access, including only active nodes and current silo (if active).
+        /// </summary>
+        public ImmutableDictionary<SiloAddress, SiloStatus> localTableCopyOnlyActive { get; }
+
+        /// <summary>
+        /// A copy of a map from SiloAddress to Silo Name for fast access.
+        /// </summary>
+        public ImmutableDictionary<SiloAddress, string> localNamesTableCopy { get; }
+    }
+
     internal class MembershipOracleData
     {
         private readonly Dictionary<SiloAddress, MembershipEntry> localTable;  // all silos not including current silo
@@ -314,7 +377,7 @@ namespace Orleans.Runtime.MembershipService
             }
             else
             {
-                result = DeterministicBalancedChoice<SiloAddress, UpdateFaultCombo>(
+                result = MembershipHelper.DeterministicBalancedChoice<SiloAddress, UpdateFaultCombo>(
                     localTableCopyOnlyActive.Keys,
                     this.maxMultiClusterGateways,
                    (SiloAddress a) => a.Equals(MyAddress) ? this.myFaultAndUpdateZones : new UpdateFaultCombo(localTable[a]),
@@ -327,66 +390,6 @@ namespace Orleans.Runtime.MembershipService
                 logger.Debug($"-DetermineMultiClusterGateways {gateways}");
             }
 
-            return result;
-        }
-
-        // pick a specified number of elements from a set of candidates
-        // - in a balanced way (try to pick evenly from groups)
-        // - in a deterministic way (using sorting order on candidates and keys)
-        internal static List<T> DeterministicBalancedChoice<T, K>(IEnumerable<T> candidates, int count, Func<T, K> group, ILogger logger = null)
-            where T:IComparable where K:IComparable
-        {
-            // organize candidates by groups
-            var groups = new Dictionary<K, List<T>>();
-            var keys = new List<K>();
-            int numcandidates = 0;
-            foreach (var c in candidates)
-            {
-                var key = group(c);
-                List<T> list;
-                if (!groups.TryGetValue(key, out list))
-                {
-                    groups[key] = list = new List<T>();
-                    keys.Add(key);
-                }
-                list.Add(c);
-                numcandidates++;
-            }
-
-            if (numcandidates < count)
-                throw new ArgumentException("not enough candidates");
-
-            // sort the keys and the groups to guarantee deterministic result
-            keys.Sort();
-            foreach(var kvp in groups)
-                kvp.Value.Sort();
-
-            // for debugging, trace all the gateway candidates
-            if (logger != null && logger.IsEnabled(LogLevel.Trace))
-            {
-                var b = new StringBuilder();
-                foreach (var k in keys)
-                {
-                    b.Append(k);
-                    b.Append(':');
-                    foreach (var s in groups[k])
-                    {
-                        b.Append(' ');
-                        b.Append(s);
-                    }
-                }
-                logger.Trace($"-DeterministicBalancedChoice candidates {b}");
-            }
-              
-            // pick round-robin from groups
-            var  result = new List<T>();
-            for (int i = 0; result.Count < count; i++)
-            {
-                var list = groups[keys[i % keys.Count]];
-                var col = i / keys.Count;
-                if (col < list.Count)
-                    result.Add(list[col]); 
-            }
             return result;
         }
 
@@ -428,6 +431,69 @@ namespace Orleans.Runtime.MembershipService
                 localTableCopy.Count,
                 Utils.EnumerableToString(localTableCopy, pair => 
                     String.Format("SiloAddress={0} Status={1}", pair.Key.ToLongString(), pair.Value)));
+        }
+    }
+
+    internal static class MembershipHelper
+    {
+        // pick a specified number of elements from a set of candidates
+        // - in a balanced way (try to pick evenly from groups)
+        // - in a deterministic way (using sorting order on candidates and keys)
+        internal static List<T> DeterministicBalancedChoice<T, K>(IEnumerable<T> candidates, int count, Func<T, K> group, ILogger logger = null)
+            where T : IComparable where K : IComparable
+        {
+            // organize candidates by groups
+            var groups = new Dictionary<K, List<T>>();
+            var keys = new List<K>();
+            int numcandidates = 0;
+            foreach (var c in candidates)
+            {
+                var key = group(c);
+                List<T> list;
+                if (!groups.TryGetValue(key, out list))
+                {
+                    groups[key] = list = new List<T>();
+                    keys.Add(key);
+                }
+                list.Add(c);
+                numcandidates++;
+            }
+
+            if (numcandidates < count)
+                throw new ArgumentException("not enough candidates");
+
+            // sort the keys and the groups to guarantee deterministic result
+            keys.Sort();
+            foreach (var kvp in groups)
+                kvp.Value.Sort();
+
+            // for debugging, trace all the gateway candidates
+            if (logger != null && logger.IsEnabled(LogLevel.Trace))
+            {
+                var b = new StringBuilder();
+                foreach (var k in keys)
+                {
+                    b.Append(k);
+                    b.Append(':');
+                    foreach (var s in groups[k])
+                    {
+                        b.Append(' ');
+                        b.Append(s);
+                    }
+                }
+                logger.Trace($"-DeterministicBalancedChoice candidates {b}");
+            }
+
+            // pick round-robin from groups
+            var result = new List<T>();
+            for (int i = 0; result.Count < count; i++)
+            {
+                var list = groups[keys[i % keys.Count]];
+                var col = i / keys.Count;
+                if (col < list.Count)
+                    result.Add(list[col]);
+            }
+            return result;
         }
     }
 }

@@ -11,7 +11,21 @@ using Orleans.Runtime.Messaging;
 
 namespace Orleans.Runtime.MembershipService
 {
-    internal class MembershipOracle : SystemTarget, IMembershipOracle, IMembershipService
+    internal partial class MembershipOracle
+    {
+        internal class ClusterHealthMonitor
+        {
+            private readonly MembershipOracle membershipOracle;
+
+            public ClusterHealthMonitor(MembershipOracle membershipOracle)
+            {
+                this.membershipOracle = membershipOracle;
+                this.membershipOracle.timerCleanupEntries.CheckTimerDelay();
+            }
+        }
+    }
+
+    internal partial class MembershipOracle : SystemTarget, IMembershipOracle, IMembershipService
     {
         private readonly static TimeSpan shutdownGossipTimeout = TimeSpan.FromMilliseconds(30);
         private readonly IInternalGrainFactory grainFactory;
