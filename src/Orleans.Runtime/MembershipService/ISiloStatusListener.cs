@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Runtime
 {
@@ -12,6 +14,11 @@ namespace Orleans.Runtime
         public ChangeFeedSource()
         {
             this.current = ChangeFeedNode.CreateInitial();
+        }
+
+        public ChangeFeedSource(T initial)
+        {
+            this.current = new ChangeFeedNode(initial);
         }
 
         public ChangeFeedEntry<T> Current => this.current;
@@ -27,6 +34,14 @@ namespace Orleans.Runtime
 
             return false;
         }
+
+        public void Publish(T value)
+        {
+            if (!this.TryPublish(value)) ThrowInvalidOperationException();
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowInvalidOperationException() => throw new InvalidOperationException("An update was concurrently published by another thread");
 
         private sealed class ChangeFeedNode : ChangeFeedEntry<T>
         {
@@ -175,7 +190,8 @@ namespace Orleans.Runtime
             this.Version = version;
         }
 
-        public static ClusterMembershipSnapshot FromTableData(SiloAddress siloAddress, MembershipTableData data)
+        // TODO: probably remove this.
+        internal static ClusterMembershipSnapshot Create(SiloAddress siloAddress, MembershipTableData data)
         {
             var memberBuilder = ImmutableDictionary.CreateBuilder<SiloAddress, ClusterMember>();
             foreach (var member in data.Members)
@@ -185,6 +201,18 @@ namespace Orleans.Runtime
             }
 
             return new ClusterMembershipSnapshot(siloAddress, memberBuilder.ToImmutable(), new MembershipVersion(data.Version.Version));
+        }
+
+        internal static ClusterMembershipSnapshot Create(SiloAddress siloAddress, MembershipTableSnapshot membership)
+        {
+            var memberBuilder = ImmutableDictionary.CreateBuilder<SiloAddress, ClusterMember>();
+            foreach (var member in membership.Entries)
+            {
+                var entry = member.Value;
+                memberBuilder[entry.SiloAddress] = new ClusterMember(entry.SiloAddress, entry.Status, entry.SiloName);
+            }
+
+            return new ClusterMembershipSnapshot(siloAddress, memberBuilder.ToImmutable(), membership.Version);
         }
 
         public ClusterMember LocalSilo => this.Members[this.localSiloAddress];
