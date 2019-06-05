@@ -613,7 +613,7 @@ namespace Orleans.Runtime.MembershipService
 
             // Update the current membership snapshot.
             ClusterMembershipSnapshot previous;
-            var updated = ClusterMembershipSnapshot.FromTableData(this.MyAddress, table);
+            var updated = ClusterMembershipSnapshot.Create(this.MyAddress, table);
 
             do
             {

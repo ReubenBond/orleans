@@ -6,6 +6,11 @@ using Microsoft.Extensions.Logging;
 using System.Text;
 using Orleans.Configuration;
 using System.Collections.Immutable;
+using Microsoft.Extensions.Hosting;
+using System.Threading.Tasks;
+using System.Threading;
+using System.Runtime.Serialization;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Runtime.MembershipService
 {
@@ -69,6 +74,414 @@ namespace Orleans.Runtime.MembershipService
         /// A copy of a map from SiloAddress to Silo Name for fast access.
         /// </summary>
         public ImmutableDictionary<SiloAddress, string> localNamesTableCopy { get; }
+    }
+
+    internal class MembershipTableManager
+    {
+        private readonly IMembershipTable membershipTable;
+        private readonly ILocalSiloDetails localSiloDetails;
+
+        public MembershipTableManager(IMembershipTable membershipTable, ILocalSiloDetails localSiloDetails)
+        {
+            this.membershipTable = membershipTable;
+            this.localSiloDetails = localSiloDetails;
+        }
+
+        public MembershipTableSnapshot CurrentTable { get; }
+        public ChangeFeedEntry<MembershipTableSnapshot> TableUpdates { get; }
+
+        public Task UpdateIAmAlive(MembershipEntry entry) => throw new NotImplementedException();
+    }
+
+    internal interface IFatalErrorHandler
+    {
+        void OnFatalException(object sender, string context, Exception exception);
+    }
+
+    internal class FatalErrorHandler : IFatalErrorHandler
+    {
+        private readonly ILogger<FatalErrorHandler> log;
+
+        public FatalErrorHandler(ILogger<FatalErrorHandler> log)
+        {
+            this.log = log;
+        }
+
+        public void OnFatalException(object sender, string context, Exception exception)
+        {
+            var msg = $"FATAL EXCEPTION from {sender?.ToString() ?? "null"}. Context: {context}. Exception: {LogFormatter.PrintException(exception)}.\nCurrent stack: {Environment.StackTrace}";
+            this.log.LogError((int)ErrorCode.Logger_ProcessCrashing, msg);
+
+
+            // TODO: Should we initiate shutdown instead? might be worth having two methods, one for failfast and one for shutdown? Hard to reason about shutdown in these cases...
+            // Can also signal shutdown using IApplicationLifetime, perhaps.
+
+
+            Environment.FailFast(msg);
+        }
+    }
+
+    internal interface IMembershipService
+    {
+        /// <summary>
+        /// A snapshot of the current cluster membership.
+        /// </summary>
+        ClusterMembershipSnapshot CurrentMembership { get; }
+
+        /// <summary>
+        /// Updates to the current cluster membership.
+        /// </summary>
+        ChangeFeedEntry<ClusterMembershipSnapshot> MembershipUpdates { get; }
+    }
+
+    internal class MembershipService : IMembershipService, ILifecycleParticipant<ISiloLifecycle>, ILifecycleObserver
+    {
+        private readonly MembershipTableManager tableManager;
+        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
+        private readonly ILocalSiloDetails localSilo;
+        private readonly IFatalErrorHandler fatalErrorHandler;
+        private readonly ILogger<MembershipService> log;
+        private readonly ChangeFeedSource<ClusterMembershipSnapshot> updates;
+        private Task processUpdatesTask;
+
+        public MembershipService(
+            MembershipTableManager tableManager,
+            ILocalSiloDetails localSilo,
+            IFatalErrorHandler fatalErrorHandler,
+            ILogger<MembershipService> log)
+        {
+            this.tableManager = tableManager;
+            this.localSilo = localSilo;
+            this.fatalErrorHandler = fatalErrorHandler;
+            this.log = log;
+            this.CurrentMembership = this.Create(tableManager.CurrentTable);
+            this.updates = new ChangeFeedSource<ClusterMembershipSnapshot>(this.CurrentMembership);
+        }
+
+        public ClusterMembershipSnapshot CurrentMembership { get; private set; }
+
+        public ChangeFeedEntry<ClusterMembershipSnapshot> MembershipUpdates => this.updates.Current;
+
+        private async Task ProcessUpdates()
+        {
+            var cancellationTask = this.cancellation.Token.WhenCancelled();
+            var current = this.tableManager.TableUpdates;
+
+            this.log.LogInformation($"Starting {nameof(MembershipService)}");
+            try
+            {
+                while (!this.cancellation.IsCancellationRequested)
+                {
+                    var next = current.NextAsync();
+
+                    // Handle graceful termination.
+                    var task = await Task.WhenAny(next, cancellationTask);
+                    if (ReferenceEquals(task, cancellationTask)) break;
+
+                    current = next.GetAwaiter().GetResult();
+
+                    if (!current.HasValue)
+                    {
+                        this.log.LogWarning("Received a membership update with no data");
+                        continue;
+                    }
+
+                    var snapshot = this.Create(current.Value);
+                    this.CurrentMembership = snapshot;
+                    this.updates.Publish(snapshot);
+                }
+            }
+            catch (Exception exception)
+            {
+                // Any exception here is fatal
+                this.log.LogError("Error processing membership updates: {Exception}", exception);
+                this.fatalErrorHandler.OnFatalException(this, nameof(ProcessUpdates), exception);
+            }
+            finally
+            {
+                this.log.LogInformation($"Shutting down {nameof(MembershipService)}");
+            }
+        }
+
+        private ClusterMembershipSnapshot Create(MembershipTableSnapshot table) => ClusterMembershipSnapshot.Create(this.localSilo.SiloAddress, table);
+
+        public void Participate(ISiloLifecycle lifecycle) => lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, this);
+
+        public Task OnStart(CancellationToken ct)
+        {
+            this.processUpdatesTask = this.ProcessUpdates();
+            return Task.CompletedTask;
+        }
+
+        public Task OnStop(CancellationToken ct)
+        {
+            this.cancellation.Cancel(throwOnFirstException: false);
+            return this.processUpdatesTask ?? Task.CompletedTask;
+        }
+    }
+
+    /// <summary>
+    /// Responsible for updating membership table with details about the local silo.
+    /// </summary>
+    internal class MembershipAgent : ILifecycleParticipant<ISiloLifecycle>
+    {
+        // Subscribe to membership table updates, listen for death declarations about this silo, kill local silo when declared dead (if not shutting down).
+        // Subscribe to silo lifecycle, reflect changes in membership table.
+        // Periodically update IAmAlive row in table.
+
+        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
+        private readonly MembershipTableManager tableManager;
+        private readonly ILocalSiloDetails localSilo;
+        private readonly IFatalErrorHandler fatalErrorHandler;
+        private readonly ClusterMembershipOptions clusterMembershipOptions;
+        private readonly ILogger<MembershipAgent> log;
+        private readonly int updateLivenessPeriodMilliseconds;
+        private SiloStatus expectedStatus;
+
+        public MembershipAgent(
+            MembershipTableManager tableManager,
+            ILocalSiloDetails localSilo,
+            IFatalErrorHandler fatalErrorHandler,
+            IOptions<ClusterMembershipOptions> options,
+            ILogger<MembershipAgent> log)
+        {
+            this.tableManager = tableManager;
+            this.localSilo = localSilo;
+            this.fatalErrorHandler = fatalErrorHandler;
+            this.clusterMembershipOptions = options.Value;
+            this.updateLivenessPeriodMilliseconds = (int)this.clusterMembershipOptions.IAmAliveTablePublishTimeout.TotalMilliseconds;
+            this.log = log;
+        }
+        
+        private async Task ProcessUpdates()
+        {
+            var cancellationTask = this.cancellation.Token.WhenCancelled();
+            var current = this.tableManager.TableUpdates;
+
+            if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting to process membership updates");
+            try
+            {
+                while (!this.cancellation.IsCancellationRequested)
+                {
+                    var next = current.NextAsync();
+
+                    // Handle graceful termination.
+                    var task = await Task.WhenAny(next, cancellationTask);
+                    if (this.expectedStatus.IsTerminating() || ReferenceEquals(task, cancellationTask)) break;
+
+                    current = next.GetAwaiter().GetResult();
+
+                    if (!current.HasValue)
+                    {
+                        this.log.LogWarning("Received a membership update with no data");
+                        continue;
+                    }
+
+                    var snapshot = current.Value;
+                    if (!snapshot.Entries.TryGetValue(this.localSilo.SiloAddress, out var entry))
+                    {
+                        throw new OrleansMissingMembershipEntryException();
+                    }
+
+                    // Check to see if this silo has been declared dead.
+                    if (entry.Status == SiloStatus.Dead && !this.expectedStatus.IsTerminating())
+                    {
+                        var message = $"{OrleansSiloDeclaredDeadException.BaseMessage} Membership record: {entry.ToFullString()}";
+                        this.log.LogError((int)ErrorCode.MembershipKillMyselfLocally, message);
+                        throw new OrleansSiloDeclaredDeadException(message);
+                    }
+                }
+            }
+            catch (OrleansSiloDeclaredDeadException exception)
+            {
+                this.fatalErrorHandler.OnFatalException(this, nameof(ProcessUpdates), exception);
+            }
+            catch (Exception exception)
+            {
+                this.log.LogError("Error processing membership updates: {Exception}", exception);
+                this.fatalErrorHandler.OnFatalException(this, nameof(ProcessUpdates), exception);
+            }
+            finally
+            {
+                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopping membership update processor");
+            }
+        }
+
+        private async Task UpdateLiveness()
+        {
+            var cancellationTask = this.cancellation.Token.WhenCancelled();
+
+            if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting periodic membership liveness timestamp updates");
+            try
+            {
+                var delayMilliseconds = this.updateLivenessPeriodMilliseconds;
+                while (!this.cancellation.IsCancellationRequested)
+                {
+                    var next = Task.Delay(delayMilliseconds);
+
+                    // Handle graceful termination.
+                    var task = await Task.WhenAny(next, cancellationTask);
+                    if (this.expectedStatus.IsTerminating() || ReferenceEquals(task, cancellationTask)) break;
+
+                    var snapshot = this.tableManager.CurrentTable;
+
+                    if (!snapshot.Entries.TryGetValue(this.localSilo.SiloAddress, out var entry))
+                    {
+                        throw new OrleansMissingMembershipEntryException();
+                    }
+
+                    try
+                    {
+                        var stopwatch = ValueStopwatch.StartNew();
+                        await this.tableManager.UpdateIAmAlive(entry);
+                        stopwatch.Stop();
+                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace("Updating liveness for entry {Entry} took {Elapsed}", entry, stopwatch.Elapsed);
+                        delayMilliseconds = Math.Max(this.updateLivenessPeriodMilliseconds - (int)stopwatch.Elapsed.TotalMilliseconds, 0);
+                    }
+                    catch (Exception exception)
+                    {
+                        this.log.LogError(
+                            (int)ErrorCode.MembershipUpdateIAmAliveFailure,
+                            "Failed to update table entry for this silo, will retry shortly: {Exception}",
+                            exception);
+
+                        // Retry quickly
+                        delayMilliseconds = 1_000;
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                this.log.LogError("Error updating liveness timestamp: {Exception}", exception);
+                this.fatalErrorHandler.OnFatalException(this, nameof(UpdateLiveness), exception);
+            }
+            finally
+            {
+                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopping periodic membership liveness timestamp updates");
+            }
+        }
+
+        private async Task CleanupDefunctEntries()
+        {
+            var cancellationTask = this.cancellation.Token.WhenCancelled();
+
+            if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting periodic membership liveness timestamp updates");
+            try
+            {
+                var delayMilliseconds = this.updateLivenessPeriodMilliseconds;
+                while (!this.cancellation.IsCancellationRequested)
+                {
+                    var next = Task.Delay(delayMilliseconds);
+
+                    // Handle graceful termination.
+                    var task = await Task.WhenAny(next, cancellationTask);
+                    if (this.expectedStatus.IsTerminating() || ReferenceEquals(task, cancellationTask)) break;
+
+                    var snapshot = this.tableManager.CurrentTable;
+
+                    if (!snapshot.Entries.TryGetValue(this.localSilo.SiloAddress, out var entry))
+                    {
+                        throw new OrleansMissingMembershipEntryException();
+                    }
+
+                    try
+                    {
+                        var stopwatch = ValueStopwatch.StartNew();
+                        await this.tableManager.UpdateIAmAlive(entry);
+                        stopwatch.Stop();
+                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace("Updating liveness for entry {Entry} took {Elapsed}", entry, stopwatch.Elapsed);
+                        delayMilliseconds = Math.Max(this.updateLivenessPeriodMilliseconds - (int)stopwatch.Elapsed.TotalMilliseconds, 0);
+                    }
+                    catch (Exception exception)
+                    {
+                        this.log.LogError(
+                            (int)ErrorCode.MembershipUpdateIAmAliveFailure,
+                            "Failed to update table entry for this silo, will retry shortly: {Exception}",
+                            exception);
+
+                        // Retry quickly
+                        delayMilliseconds = 1_000;
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                this.log.LogError("Error updating liveness timestamp: {Exception}", exception);
+                this.fatalErrorHandler.OnFatalException(this, nameof(UpdateLiveness), exception);
+            }
+            finally
+            {
+                if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopping periodic membership liveness timestamp updates");
+            }
+        }
+
+        public void Participate(ISiloLifecycle lifecycle)
+        {
+            var becomeActiveTasks = new List<Task>();
+
+            lifecycle.Subscribe(nameof(MembershipAgent), ServiceLifecycleStage.BecomeActive, OnBecomeActiveStart, OnBecomeActiveStop);
+
+            Task OnBecomeActiveStart(CancellationToken ct)
+            {
+                becomeActiveTasks.Add(this.ProcessUpdates());
+                becomeActiveTasks.Add(this.UpdateLiveness());
+                return Task.CompletedTask;
+            }
+
+            Task OnBecomeActiveStop(CancellationToken ct)
+            {
+                this.cancellation.Cancel(throwOnFirstException: false);
+                return Task.WhenAll(becomeActiveTasks);
+            }
+        }
+    }
+
+    public class OrleansMissingMembershipEntryException : OrleansException
+    {
+        public OrleansMissingMembershipEntryException() : base("Membership table does not contain information an entry for this silo.") { }
+
+        public OrleansMissingMembershipEntryException(string message) : base(message) { }
+
+        public OrleansMissingMembershipEntryException(string message, Exception innerException) : base(message, innerException) { }
+
+        public OrleansMissingMembershipEntryException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+    }
+
+    public class OrleansSiloDeclaredDeadException : OrleansException
+    {
+        public const string BaseMessage = "This silo has been declared dead.";
+
+        public OrleansSiloDeclaredDeadException() : base(BaseMessage) { }
+
+        public OrleansSiloDeclaredDeadException(string message) : base(message) { }
+
+        public OrleansSiloDeclaredDeadException(string message, Exception innerException) : base(message, innerException) { }
+
+        public OrleansSiloDeclaredDeadException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Responsible for ensuring that this silo monitors other silos in the cluster.
+    /// </summary>
+    public class ClusterHealthMonitor
+    {
+        // Subscribe to membership table, listen for new silos, manage collection of SiloHealthMonitor for each silo which should be monitored.
+        // Monitor local SiloHealthMonitors & reflect actions in membership table.
+    }
+
+    /// <summary>
+    /// Responsible for monitoring an individual remote silo.
+    /// </summary>
+    public class SiloHealthMonitor
+    {
+        // Periodically ping an individual silo to track silo health.
+        // Expose decisions: add/remove self as suspector (i.e, vote), declare dead.
     }
 
     internal class MembershipOracleData
