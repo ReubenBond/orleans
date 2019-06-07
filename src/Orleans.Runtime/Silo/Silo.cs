@@ -78,6 +78,7 @@ namespace Orleans.Runtime
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
+        private readonly IMembershipService membershipService;
         private List<GrainService> grainServices = new List<GrainService>();
 
         private readonly ILoggerFactory loggerFactory;
@@ -210,6 +211,7 @@ namespace Orleans.Runtime
             incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, executorService, this.loggerFactory);
 
             membershipOracle = Services.GetRequiredService<IMembershipOracle>();
+            this.membershipService = Services.GetRequiredService<IMembershipService>();
             this.clusterOptions = Services.GetRequiredService<IOptions<ClusterOptions>>().Value;
             var multiClusterOptions = Services.GetRequiredService<IOptions<MultiClusterOptions>>().Value;
 
@@ -303,9 +305,9 @@ namespace Orleans.Runtime
             this.RegisterSystemTarget(typeManager);
 
             logger.Debug("Creating {0} System Target", "MembershipOracle");
-            if (this.membershipOracle is SystemTarget)
+            if (this.membershipService is SystemTarget)
             {
-                RegisterSystemTarget((SystemTarget)membershipOracle);
+                RegisterSystemTarget((SystemTarget)membershipService);
             }
 
             if (multiClusterOracle != null && multiClusterOracle is SystemTarget)
@@ -437,7 +439,7 @@ namespace Orleans.Runtime
             await StartAsyncTaskWithPerfAnalysis("Init grain services",
                 () => CreateGrainServices(), stopWatch);
 
-            StartTaskWithPerfAnalysis("Start local grain directory maintenance", LocalGrainDirectory.OnRuntimeServicesStart, stopWatch);
+            await StartAsyncTaskWithPerfAnalysis("Start local grain directory maintenance", () => LocalGrainDirectory.OnRuntimeServicesStart(), stopWatch);
 
             var versionStore = Services.GetService<IVersionStore>();
             await StartAsyncTaskWithPerfAnalysis("Init type manager", () => scheduler
@@ -515,6 +517,9 @@ namespace Orleans.Runtime
                 await StartAsyncTaskWithPerfAnalysis("Start reminder service", StartReminderService, stopWatch);
                 async Task StartReminderService()
                 {
+// DELETE THIS
+                    await Task.Delay(TimeSpan.FromSeconds(2));
+
                     // so, we have the view of the membership in the consistentRingProvider. We can start the reminder service
                     this.reminderServiceContext = (this.reminderService as SystemTarget)?.SchedulingContext ??
                                                   this.fallbackScheduler.SchedulingContext;

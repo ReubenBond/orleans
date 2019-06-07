@@ -215,8 +215,6 @@ namespace Orleans.Runtime
             return new ClusterMembershipSnapshot(siloAddress, memberBuilder.ToImmutable(), membership.Version);
         }
 
-        public ClusterMember LocalSilo => this.Members[this.localSiloAddress];
-
         public ImmutableDictionary<SiloAddress, ClusterMember> Members { get; }
 
         public MembershipVersion Version { get; }

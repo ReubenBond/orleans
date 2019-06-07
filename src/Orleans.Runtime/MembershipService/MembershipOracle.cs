@@ -349,15 +349,7 @@ namespace Orleans.Runtime.MembershipService
         //      if failed (on ping or on write exception or on etag) - retry the whole AttemptToJoinActiveNodes
         private async Task<bool> TryUpdateMyStatusGlobalOnce(SiloStatus newStatus)
         {
-            MembershipTableData table;
-            if (newStatus == SiloStatus.Active)
-            {
-                table = await membershipTableProvider.ReadAll();
-            }
-            else
-            {
-                table = await membershipTableProvider.ReadRow(MyAddress);
-            }
+            var table = await membershipTableProvider.ReadAll();
 
             if (log.IsEnabled(LogLevel.Debug)) log.Debug("-TryUpdateMyStatusGlobalOnce: Read{0} Membership table {1}", (newStatus.Equals(SiloStatus.Active) ? "All" : " my entry from"), table.ToString());
             LogMissedIAmAlives(table);
@@ -390,11 +382,26 @@ namespace Orleans.Runtime.MembershipService
             myEntry.Status = newStatus;
             myEntry.IAmAliveTime = now;
 
+            bool ok;
             TableVersion next = table.Version.Next();
             if (myEtag != null) // no previous etag for my entry -> its the first write to this entry, so insert instead of update.
-                return await membershipTableProvider.UpdateRow(myEntry, myEtag, next);
-            
-            return await membershipTableProvider.InsertRow(myEntry, next);
+            {
+                ok = await membershipTableProvider.UpdateRow(myEntry, myEtag, next);
+            }
+            else
+            {
+                ok = await membershipTableProvider.InsertRow(myEntry, next);
+            }
+
+            if (ok)
+            {
+                var entries = table.Members.ToDictionary(e => e.Item1.SiloAddress, e => e);
+                entries[myEntry.SiloAddress] = Tuple.Create(myEntry, myEtag);
+                var updatedTable = new MembershipTableData(entries.Values.ToList(), next);
+                await this.ProcessTableUpdate(updatedTable, nameof(TryUpdateMyStatusGlobalOnce));
+            }
+
+            return ok;
         }
 
         private async Task ProcessTableUpdate(MembershipTableData table, string caller, bool logAtInfoLevel = false)

@@ -10,6 +10,7 @@ namespace Orleans.Runtime.MembershipService
     {
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly MembershipService membershipService;
+        private readonly MembershipAgent membershipAgent;
         private readonly SiloStatusListenerManager listenerManager;
         private readonly ILogger log;
         private readonly object cacheUpdateLock = new object();
@@ -20,16 +21,18 @@ namespace Orleans.Runtime.MembershipService
         public SiloStatusOracleCompatibilityShim(
             ILocalSiloDetails localSiloDetails,
             MembershipService membershipService,
+            MembershipAgent membershipAgent,
             ILoggerFactory loggerFactory,
             SiloStatusListenerManager listenerManager)
         {
             this.localSiloDetails = localSiloDetails;
             this.membershipService = membershipService;
+            this.membershipAgent = membershipAgent;
             this.listenerManager = listenerManager;
             this.log = loggerFactory.CreateLogger("MembershipOracle");
         }
 
-        public SiloStatus CurrentStatus => this.membershipService.CurrentMembership.LocalSilo.Status;
+        public SiloStatus CurrentStatus => this.membershipAgent.ExpectedStatus;
         public string SiloName => this.localSiloDetails.Name;
         public SiloAddress SiloAddress => this.localSiloDetails.SiloAddress;
         

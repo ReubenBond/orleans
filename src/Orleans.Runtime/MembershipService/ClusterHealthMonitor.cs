@@ -211,7 +211,7 @@ namespace Orleans.Runtime.MembershipService
             var localSiloAddress = membership.LocalSilo.SiloAddress;
             if (!membership.Entries.TryGetValue(localSiloAddress, out var self))
             {
-                throw new OrleansMissingMembershipEntryException();
+                return ImmutableDictionary<SiloAddress, SiloHealthMonitor>.Empty;
             }
 
             // if I am still not fully functional, I should not be probing others.

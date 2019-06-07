@@ -232,15 +232,18 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public void OnRuntimeServicesStart()
+        public Task OnRuntimeServicesStart()
         {
-            this.Scheduler.QueueTask(this.ProcessMembershipChanges, this.CacheValidator.SchedulingContext);
+            _ = this.Scheduler.QueueTask(this.ProcessMembershipChanges, this.CacheValidator.SchedulingContext);
+            return Task.CompletedTask;
         }
 
+        private readonly TaskCompletionSource<int> receivedFirstUpdate = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private async Task ProcessMembershipChanges()
         {
             var notification = this.membershipService.MembershipUpdates;
             ClusterMembershipSnapshot previous = default;
+            bool becameActive = false;
             while (this.Running)
             {
                 try
@@ -253,10 +256,24 @@ namespace Orleans.Runtime.GrainDirectory
 
                     // Update the membership snapshot
                     var update = notification.Value;
+
+                    if (!becameActive)
+                    {
+                        if (update.Members.TryGetValue(this.MyAddress, out var entry) && entry.Status == SiloStatus.Active)
+                        {
+                            becameActive = true;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                    }
+
                     DirectoryMembershipSnapshot existing;
                     DirectoryMembershipSnapshot updated;
                     Dictionary<GrainId, IGrainInfo> directoryPartitionCopy;
                     IReadOnlyList<Tuple<GrainId, IReadOnlyList<Tuple<SiloAddress, ActivationId>>, int>> directoryCache;
+                    var skip = false;
                     do
                     {
                         existing = this.membershipSnapshot;
@@ -264,13 +281,19 @@ namespace Orleans.Runtime.GrainDirectory
                         if (existing.ClusterMembership.Version >= update.Version)
                         {
                             // we have already removed this silo
-                            return;
+                            skip = true;
+                            updated = default;
+                            directoryPartitionCopy = default;
+                            directoryCache = default;
+                            break;
                         }
 
                         updated = existing.WithUpdate(existing.IsLocalDirectoryRunning, update);
                         directoryPartitionCopy = this.DirectoryPartition.GetItems();
                         directoryCache = this.DirectoryCache.KeyValues;
                     } while (Interlocked.CompareExchange(ref this.membershipSnapshot, updated, existing) != existing);
+
+                    if (skip) continue;
 
                     ClusterMembershipUpdate updateNotification;
                     if (ReferenceEquals(previous, default))
@@ -299,8 +322,9 @@ namespace Orleans.Runtime.GrainDirectory
                         {
                             AddSilo(updated, change, directoryPartitionCopy, directoryCache);
                         }
-
                     }
+
+                    this.receivedFirstUpdate.TrySetResult(0);
                 }
                 catch (Exception exception)
                 {

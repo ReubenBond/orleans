@@ -125,6 +125,8 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<ISiloRuntimeClient, InsideRuntimeClient>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InsideRuntimeClient>();
 
+            services.TryAddSingleton<IFatalErrorHandler, FatalErrorHandler>();
+
             services.TryAddSingleton<MultiClusterGossipChannelFactory>();
             services.TryAddSingleton<MultiClusterOracle>();
             services.TryAddSingleton<MultiClusterRegistrationStrategyManager>();
@@ -133,6 +135,8 @@ namespace Orleans.Hosting
 
             services.TryAddSingleton<MembershipTableManager>();
             services.AddFromExisting<IHealthCheckParticipant, MembershipTableManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableManager>();
+            services.AddFromExisting<IMembershipService, MembershipTableManager>();
 
             services.TryAddSingleton<SiloStatusOracleCompatibilityShim>();
             services.TryAddFromExisting<IMembershipOracle, SiloStatusOracleCompatibilityShim>();

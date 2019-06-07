@@ -44,6 +44,8 @@ namespace Orleans.Runtime.MembershipService
             this.updateLivenessPeriodMilliseconds = (int)this.clusterMembershipOptions.IAmAliveTablePublishTimeout.TotalMilliseconds;
             this.log = log;
         }
+
+        public SiloStatus ExpectedStatus => this.expectedStatus;
                 
         private async Task ProcessMembershipUpdates()
         {
@@ -72,7 +74,8 @@ namespace Orleans.Runtime.MembershipService
                     var snapshot = current.Value;
                     if (!snapshot.Entries.TryGetValue(this.localSilo.SiloAddress, out var entry))
                     {
-                        throw new OrleansMissingMembershipEntryException();
+                        //throw new OrleansMissingMembershipEntryException();
+                        continue;
                     }
 
                     // Check to see if this silo has been declared dead.
@@ -279,11 +282,13 @@ namespace Orleans.Runtime.MembershipService
 
                 Task OnRuntimeInitializeStart(CancellationToken ct)
                 {
+                    tasks.Add(this.ProcessMembershipUpdates());
                     return Task.CompletedTask;
                 }
 
                 async Task OnRuntimeInitializeStop(CancellationToken ct)
                 {
+                    this.cancellation.Cancel();
                     await Task.WhenAny(this.KillMyself(), Task.Delay(TimeSpan.FromMinutes(1)));
                 }
 
@@ -291,14 +296,14 @@ namespace Orleans.Runtime.MembershipService
             }
 
             {
-                async Task OnRuntimeGrainServicesStart(CancellationToken ct)
+                async Task AfterRuntimeGrainServicesStart(CancellationToken ct)
                 {
                     await this.StartJoining();
                 }
 
-                Task OnRuntimeGrainServicesStop(CancellationToken ct) => Task.CompletedTask;
+                Task AfterRuntimeGrainServicesStop(CancellationToken ct) => Task.CompletedTask;
 
-                lifecycle.Subscribe(nameof(MembershipAgent), ServiceLifecycleStage.RuntimeGrainServices, OnRuntimeGrainServicesStart, OnRuntimeGrainServicesStop);
+                lifecycle.Subscribe(nameof(MembershipAgent), ServiceLifecycleStage.RuntimeGrainServices + 1, AfterRuntimeGrainServicesStart, AfterRuntimeGrainServicesStop);
             }
 
             {
@@ -307,7 +312,6 @@ namespace Orleans.Runtime.MembershipService
                 async Task OnBecomeActiveStart(CancellationToken ct)
                 {
                     await this.BecomeActive();
-                    tasks.Add(this.ProcessMembershipUpdates());
                     tasks.Add(this.UpdateIAmAlive());
                 }
 
