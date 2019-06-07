@@ -9,39 +9,73 @@ namespace Orleans.Runtime
 {
     internal sealed class ChangeFeedSource<T>
     {
+        private enum PublishResult
+        {
+            Success,
+            InvalidUpdate,
+            Failure
+        }
+
+        private readonly object updateLock = new object();
+        private readonly Func<T, T, bool> updateValidator;
         private ChangeFeedNode current;
 
-        public ChangeFeedSource()
+        public ChangeFeedSource(Func<T, T, bool> updateValidator)
         {
+            this.updateValidator = updateValidator;
             this.current = ChangeFeedNode.CreateInitial();
         }
 
-        public ChangeFeedSource(T initial)
+        public ChangeFeedSource(Func<T, T, bool> updateValidator, T initial)
         {
+            this.updateValidator = updateValidator;
             this.current = new ChangeFeedNode(initial);
         }
 
         public ChangeFeedEntry<T> Current => this.current;
 
-        public bool TryPublish(T value)
-        {
-            var newItem = new ChangeFeedNode(value);
-            if (this.current.TrySetNext(newItem))
-            {
-                Interlocked.Exchange(ref this.current, newItem);
-                return true;
-            }
+        public bool TryPublish(T value) => this.TryPublishInternal(value) == PublishResult.Success;
 
-            return false;
+        private PublishResult TryPublishInternal(T value)
+        {
+            lock (this.updateLock)
+            {
+                if (this.current.HasValue && !this.updateValidator(this.current.Value, value))
+                {
+                    return PublishResult.InvalidUpdate;
+                }
+
+                var newItem = new ChangeFeedNode(value);
+                if (this.current.TrySetNext(newItem))
+                {
+                    Interlocked.Exchange(ref this.current, newItem);
+                    return PublishResult.Success;
+                }
+
+                return PublishResult.Failure;
+            }
         }
 
         public void Publish(T value)
         {
-            if (!this.TryPublish(value)) ThrowInvalidOperationException();
+            switch (this.TryPublishInternal(value))
+            {
+                case PublishResult.Success:
+                    return;
+                case PublishResult.Failure:
+                    ThrowConcurrency();
+                    break;
+                case PublishResult.InvalidUpdate:
+                    ThrowInvalidUpdate();
+                    break;
+            }
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ThrowInvalidOperationException() => throw new InvalidOperationException("An update was concurrently published by another thread");
+        private static void ThrowInvalidUpdate() => throw new ArgumentException("The value was not valid");
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowConcurrency() => throw new InvalidOperationException("An update was concurrently published by another thread");
 
         private sealed class ChangeFeedNode : ChangeFeedEntry<T>
         {
@@ -124,6 +158,8 @@ namespace Orleans.Runtime
         {
             this.version = version;
         }
+
+        public static MembershipVersion MinValue => new MembershipVersion(long.MinValue);
 
         public int CompareTo(MembershipVersion other) => this.version.CompareTo(other.version);
 

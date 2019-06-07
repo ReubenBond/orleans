@@ -65,8 +65,10 @@ namespace Orleans.Runtime.MembershipService
             EXP_BACKOFF_ERROR_MAX = backOffMax;
             timerLogger = this.loggerFactory.CreateLogger<GrainTimer>();
 
-            this.membershipTableSnapshot = new MembershipTableSnapshot(localSiloDetails, default, ImmutableDictionary<SiloAddress, MembershipEntry>.Empty);
-            this.membershipTableUpdates = new ChangeFeedSource<MembershipTableSnapshot>(this.membershipTableSnapshot);
+            this.membershipTableSnapshot = new MembershipTableSnapshot(localSiloDetails, MembershipVersion.MinValue, ImmutableDictionary<SiloAddress, MembershipEntry>.Empty);
+            this.membershipTableUpdates = new ChangeFeedSource<MembershipTableSnapshot>(
+                (previous, proposed) => proposed.Version > previous.Version,
+                this.membershipTableSnapshot);
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)

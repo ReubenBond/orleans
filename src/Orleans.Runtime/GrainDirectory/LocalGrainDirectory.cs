@@ -238,7 +238,6 @@ namespace Orleans.Runtime.GrainDirectory
             return Task.CompletedTask;
         }
 
-        private readonly TaskCompletionSource<int> receivedFirstUpdate = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private async Task ProcessMembershipChanges()
         {
             var notification = this.membershipService.MembershipUpdates;
@@ -323,8 +322,6 @@ namespace Orleans.Runtime.GrainDirectory
                             AddSilo(updated, change, directoryPartitionCopy, directoryCache);
                         }
                     }
-
-                    this.receivedFirstUpdate.TrySetResult(0);
                 }
                 catch (Exception exception)
                 {

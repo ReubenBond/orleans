@@ -26,7 +26,9 @@ namespace Orleans.Runtime.MembershipService
             this.fatalErrorHandler = fatalErrorHandler;
             this.log = log;
             this.CurrentMembership = this.Create(tableManager.MembershipTableSnapshot);
-            this.updates = new ChangeFeedSource<ClusterMembershipSnapshot>(this.CurrentMembership);
+            this.updates = new ChangeFeedSource<ClusterMembershipSnapshot>(
+                (previous, proposed) => proposed.Version > previous.Version,
+                this.CurrentMembership);
         }
 
         public ClusterMembershipSnapshot CurrentMembership { get; private set; }
