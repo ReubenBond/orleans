@@ -311,11 +311,10 @@ namespace Orleans
             IAmAliveTime = updatedSiloEntry.IAmAliveTime;
         }
 
-        internal List<Tuple<SiloAddress, DateTime>> GetFreshVotes(TimeSpan expiration)
+        internal List<Tuple<SiloAddress, DateTime>> GetFreshVotes(DateTime now, TimeSpan expiration)
         {
             if (SuspectTimes == null)
                 return EmptyList;
-            DateTime now = DateTime.UtcNow;
             return SuspectTimes.FindAll(voter =>
                 {
                     DateTime otherVoterTime = voter.Item2;

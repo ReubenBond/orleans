@@ -221,6 +221,24 @@ namespace Orleans.Runtime
 
         public MembershipVersion Version { get; }
 
+        public SiloStatus GetSiloStatus(SiloAddress silo)
+        {
+            var status = this.Members.TryGetValue(silo, out var entry) ? entry.Status : SiloStatus.None;
+            if (status == SiloStatus.None)
+            {
+                foreach (var member in this.Members)
+                {
+                    if (member.Key.IsSuccessorOf(silo))
+                    {
+                        status = SiloStatus.Dead;
+                        break;
+                    }
+                }
+            }
+
+            return status;
+        }
+
         public ClusterMembershipUpdate CreateInitialUpdateNotification() => new ClusterMembershipUpdate(this, this.Members.Values.ToImmutableArray());
 
         public ClusterMembershipUpdate CreateUpdateNotification(ClusterMembershipSnapshot previous)

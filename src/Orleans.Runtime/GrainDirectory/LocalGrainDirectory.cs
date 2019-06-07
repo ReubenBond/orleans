@@ -24,6 +24,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly SiloAddress seed;
         private readonly RegistrarManager registrarManager;
         private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly MembershipService.MembershipService membershipService;
         private readonly IMultiClusterOracle multiClusterOracle;
         private readonly IInternalGrainFactory grainFactory;
         private CatalogOnSiloRemoved catalogOnSiloRemoved;
@@ -100,6 +101,7 @@ namespace Orleans.Runtime.GrainDirectory
             ILocalSiloDetails siloDetails,
             OrleansTaskScheduler scheduler,
             ISiloStatusOracle siloStatusOracle,
+            Orleans.Runtime.MembershipService.MembershipService membershipService,
             IMultiClusterOracle multiClusterOracle,
             IInternalGrainFactory grainFactory,
             Factory<GrainDirectoryPartition> grainDirectoryPartitionFactory,
@@ -116,6 +118,7 @@ namespace Orleans.Runtime.GrainDirectory
             MyAddress = siloDetails.SiloAddress;
             Scheduler = scheduler;
             this.siloStatusOracle = siloStatusOracle;
+            this.membershipService = membershipService;
             this.multiClusterOracle = multiClusterOracle;
             this.grainFactory = grainFactory;
             ClusterId = clusterId;
@@ -146,7 +149,7 @@ namespace Orleans.Runtime.GrainDirectory
                 this.seed = this.MyAddress.Endpoint.Equals(primarySiloEndPoint) ? this.MyAddress : SiloAddress.New(primarySiloEndPoint, 0);
             }
 
-            this.membershipSnapshot = new DirectoryMembershipSnapshot(this.log, this.MyAddress, this.seed, false, siloStatusOracle.CurrentSnapshot);
+            this.membershipSnapshot = new DirectoryMembershipSnapshot(this.log, this.MyAddress, this.seed, false, this.membershipService.CurrentMembership);
 
             DirectoryPartition = grainDirectoryPartitionFactory();
             HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, grainDirectoryPartitionFactory, loggerFactory);
@@ -236,7 +239,8 @@ namespace Orleans.Runtime.GrainDirectory
 
         private async Task ProcessMembershipChanges()
         {
-            var notification = this.siloStatusOracle.MembershipUpdates;
+            var notification = this.membershipService.MembershipUpdates;
+            ClusterMembershipSnapshot previous = default;
             while (this.Running)
             {
                 try
@@ -257,19 +261,31 @@ namespace Orleans.Runtime.GrainDirectory
                     {
                         existing = this.membershipSnapshot;
 
-                        if (existing.ClusterMembership.Version >= update.Snapshot.Version)
+                        if (existing.ClusterMembership.Version >= update.Version)
                         {
                             // we have already removed this silo
                             return;
                         }
 
-                        updated = existing.WithUpdate(existing.IsLocalDirectoryRunning, update.Snapshot);
+                        updated = existing.WithUpdate(existing.IsLocalDirectoryRunning, update);
                         directoryPartitionCopy = this.DirectoryPartition.GetItems();
                         directoryCache = this.DirectoryCache.KeyValues;
                     } while (Interlocked.CompareExchange(ref this.membershipSnapshot, updated, existing) != existing);
 
+                    ClusterMembershipUpdate updateNotification;
+                    if (ReferenceEquals(previous, default))
+                    {
+                        updateNotification = update.CreateInitialUpdateNotification();
+                    }
+                    else
+                    {
+                        updateNotification = update.CreateUpdateNotification(previous);
+                    }
+
+                    previous = update;
+
                     // Process the individual changes
-                    foreach (var change in update.Changes)
+                    foreach (var change in updateNotification.Changes)
                     {
                         // Ignore changes for the local silo
                         if (change.SiloAddress.Equals(this.MyAddress)) continue;
