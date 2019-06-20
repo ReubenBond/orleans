@@ -323,6 +323,7 @@ namespace Orleans.Runtime
 
         public DetailedGrainReport GetDetailedGrainReport(GrainId grain)
         {
+            this.TryGetGrainDirectoryPartitionForDiagnostics(grain, out var primary);
             var report = new DetailedGrainReport
             {
                 Grain = grain,
@@ -330,7 +331,7 @@ namespace Orleans.Runtime
                 SiloName = localSiloName,
                 LocalCacheActivationAddresses = directory.GetLocalCacheData(grain),
                 LocalDirectoryActivationAddresses = directory.GetLocalDirectoryData(grain).Addresses,
-                PrimaryForGrain = this.TryGetGrainDirectoryPartitionForDiagnostics(grain)
+                PrimaryForGrain = primary
             };
             try
             {
@@ -606,7 +607,7 @@ namespace Orleans.Runtime
                             
                             if (logger.IsEnabled(LogLevel.Information))
                             {
-                                var primary = this.TryGetGrainDirectoryPartitionForDiagnostics(activation.ForwardingAddress.Grain);
+                                this.TryGetGrainDirectoryPartitionForDiagnostics(activation.ForwardingAddress.Grain, out var primary);
                                 
                                 // If this was a duplicate, it's not an error, just a race.
                                 // Forward on all of the pending messages, and then forget about this activation.
@@ -1445,14 +1446,16 @@ namespace Orleans.Runtime
             }
         }
 
-        private SiloAddress TryGetGrainDirectoryPartitionForDiagnostics(GrainId grainId)
+        private bool TryGetGrainDirectoryPartitionForDiagnostics(GrainId grainId, out SiloAddress siloAddress)
         {
             if (this.directory is LocalGrainDirectory localGrainDirectory)
             {
-                return localGrainDirectory.DirectoryMembershipSnapshot.CalculateGrainDirectoryPartition(grainId);
+                siloAddress = localGrainDirectory.DirectoryMembershipSnapshot.CalculateGrainDirectoryPartition(grainId);
+                return true;
             }
 
-            return null;
+            siloAddress = null;
+            return false;
         }
     }
 }
