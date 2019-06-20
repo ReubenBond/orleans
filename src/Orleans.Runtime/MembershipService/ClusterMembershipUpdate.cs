@@ -3,7 +3,6 @@ using System.Collections.Immutable;
 
 namespace Orleans.Runtime
 {
-    [Serializable]
     public sealed class ClusterMembershipUpdate
     {
         public ClusterMembershipUpdate(ClusterMembershipSnapshot snapshot, ImmutableArray<ClusterMember> changes)

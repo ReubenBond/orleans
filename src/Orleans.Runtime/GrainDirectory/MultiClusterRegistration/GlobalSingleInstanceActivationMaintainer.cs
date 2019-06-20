@@ -105,14 +105,14 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 try
                 {
-                    if (!router.DirectoryMembershipSnapshot.IsLocalDirectoryRunning || Cts.IsCancellationRequested) break;
+                    if (Cts.IsCancellationRequested) break;
 
                     // wait until it is time, or someone prodded us to continue
                     runNow.WaitOne(period);
                     runNow.Reset();
 
                     var directoryMembershipSnapshot = router.DirectoryMembershipSnapshot;
-                    if (!directoryMembershipSnapshot.IsLocalDirectoryRunning || Cts.IsCancellationRequested) break;
+                    if (Cts.IsCancellationRequested) break;
 
                     logger.Debug("GSIP:M running check");
 

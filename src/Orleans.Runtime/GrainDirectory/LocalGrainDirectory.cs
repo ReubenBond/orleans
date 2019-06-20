@@ -137,7 +137,7 @@ namespace Orleans.Runtime.GrainDirectory
                 this.seed = this.MyAddress.Endpoint.Equals(primarySiloEndPoint) ? this.MyAddress : SiloAddress.New(primarySiloEndPoint, 0);
             }
 
-            this.membershipSnapshot = new DirectoryMembershipSnapshot(this.log, this.MyAddress, this.seed, false, this.clusterMembership.CurrentSnapshot);
+            this.membershipSnapshot = new DirectoryMembershipSnapshot(this.log, this.MyAddress, this.clusterMembership.CurrentSnapshot);
             this.directoryMembershipUpdates = new AsyncEnumerable<DirectoryMembershipSnapshot>(
                 (previous, proposed) => proposed.ClusterMembership.Version > previous.ClusterMembership.Version,
                 this.membershipSnapshot)
@@ -173,8 +173,7 @@ namespace Orleans.Runtime.GrainDirectory
                 loggerFactory);
             siloProviderRuntime.RegisterSystemTarget(RemoteClusterGrainDirectory);
 
-            Func<SiloAddress, string> siloAddressPrint = (SiloAddress addr) => 
-                String.Format("{0}/{1:X}", addr.ToLongString(), addr.GetConsistentHashCode());
+            
             
             localLookups = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_LOCAL_ISSUED);
             localSuccesses = CounterStatistic.FindOrCreate(StatisticNames.DIRECTORY_LOOKUPS_LOCAL_SUCCESSES);
@@ -220,14 +219,15 @@ namespace Orleans.Runtime.GrainDirectory
             directoryPartitionCount = IntValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_PARTITION_SIZE, () => DirectoryPartition.Count);
             IntValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_MYPORTION_RINGDISTANCE, () => RingDistanceToSuccessor());
             FloatValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_MYPORTION_RINGPERCENTAGE, () => (((float)this.RingDistanceToSuccessor()) / ((float)(int.MaxValue * 2L))) * 100);
-            FloatValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_MYPORTION_AVERAGERINGPERCENTAGE, () => this.membershipSnapshot.Ring.Length == 0 ? 0 : ((float)100 / (float)this.membershipSnapshot.Ring.Length));
-            IntValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_RINGSIZE, () => this.membershipSnapshot.Ring.Length);
-            StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING, () =>
-                {
-                    return Utils.EnumerableToString(this.membershipSnapshot.Ring, siloAddressPrint);
-                });
-            StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_PREDECESSORS, () => Utils.EnumerableToString(this.membershipSnapshot.FindPredecessors(this.MyAddress, 1), siloAddressPrint));
-            StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_SUCCESSORS, () => Utils.EnumerableToString(this.membershipSnapshot.FindSuccessors(this.MyAddress, 1), siloAddressPrint));
+            FloatValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_MYPORTION_AVERAGERINGPERCENTAGE, () =>
+            {
+                var size = DirectoryMembershipSnapshot.RingSizeStatistic(this.membershipSnapshot);
+                return size == 0 ? 0 : (100 / (float)size);
+            });
+            IntValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_RINGSIZE, () => DirectoryMembershipSnapshot.RingSizeStatistic(this.membershipSnapshot));
+            StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING, () => DirectoryMembershipSnapshot.RingDetailsStatistic(this.membershipSnapshot));
+            StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_PREDECESSORS, () => DirectoryMembershipSnapshot.RingPredecessorStatistic(this.membershipSnapshot));
+            StringValueStatistic.FindOrCreate(StatisticNames.DIRECTORY_RING_SUCCESSORS, () => DirectoryMembershipSnapshot.RingSuccessorStatistic(this.membershipSnapshot));
 
             this.registrarManager = registrarManager;
             this.fatalErrorHandler = fatalErrorHandler;
@@ -247,9 +247,7 @@ namespace Orleans.Runtime.GrainDirectory
                     {
                         // Update the membership snapshot
                         var previous = this.membershipSnapshot;
-                        var updated = this.membershipSnapshot.WithUpdate(
-                            isLocalDirectoryRunning: true,
-                            clusterMembership: enumerator.Current);
+                        var updated = new DirectoryMembershipSnapshot(this.log, this.MyAddress, enumerator.Current);
 
                         var directoryPartitionCopy = this.DirectoryPartition.GetItems();
                         var directoryCache = this.DirectoryCache.KeyValues;
@@ -302,11 +300,6 @@ namespace Orleans.Runtime.GrainDirectory
             finally
             {
                 if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopping membership update processor");
-                Interlocked.Exchange(
-                    ref this.membershipSnapshot,
-                    this.membershipSnapshot.WithUpdate(
-                        isLocalDirectoryRunning: false,
-                        this.clusterMembership.CurrentSnapshot));
                 if (enumerator is object) await enumerator.DisposeAsync();
             }
 
@@ -434,8 +427,8 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (owner == null)
             {
-                // We don't know about any other silos, and we're stopping, so throw
-                throw new InvalidOperationException("Grain directory is stopping");
+                // There are no available silos for placement, so throw.
+                throw new InvalidOperationException("Grain directory is not operational");
             }
 
             if (owner.Equals(MyAddress))
@@ -542,7 +535,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             log.Trace("UnregisterAfterNonexistingActivation addr={0} origin={1}", addr, origin);
 
-            if (origin == null || this.membershipSnapshot.Members.Contains(origin))
+            if (origin == null || this.membershipSnapshot.ClusterMembership.Members.ContainsKey(origin))
             {
                 // the request originated in this cluster, call unregister here
                 return UnregisterAsync(addr, UnregistrationCause.NonexistentActivation, 0);
@@ -944,21 +937,6 @@ namespace Orleans.Runtime.GrainDirectory
             return 0;
         }
 
-        public string RingStatusToString()
-        {
-            var snapshot = this.membershipSnapshot;
-            var sb = new StringBuilder();
-
-            sb.AppendFormat("Silo address is {0}, silo consistent hash is {1:X}.", MyAddress, MyAddress.GetConsistentHashCode()).AppendLine();
-            sb.AppendLine("Ring is:");
-            foreach (var silo in snapshot.Ring)
-                sb.AppendFormat("    Silo {0}, consistent hash is {1:X}", silo, silo.GetConsistentHashCode()).AppendLine();
-
-            sb.AppendFormat("My predecessors: {0}", snapshot.FindPredecessors(MyAddress, 1).ToStrings(addr => String.Format("{0}/{1:X}---", addr, addr.GetConsistentHashCode()), " -- ")).AppendLine();
-            sb.AppendFormat("My successors: {0}", snapshot.FindSuccessors(MyAddress, 1).ToStrings(addr => String.Format("{0}/{1:X}---", addr, addr.GetConsistentHashCode()), " -- "));
-            return sb.ToString();
-        }
-
         internal IRemoteGrainDirectory GetDirectoryReference(SiloAddress silo)
         {
             return this.grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceId, silo);
@@ -1005,11 +983,6 @@ namespace Orleans.Runtime.GrainDirectory
             Task OnRuntimeServicesStart(CancellationToken ct)
             {
                 log.Info("Start");
-
-                this.membershipSnapshot = this.membershipSnapshot.WithUpdate(isLocalDirectoryRunning: true, this.clusterMembership.CurrentSnapshot);
-                this.HandoffManager.ProcessSiloAddEvent(this.membershipSnapshot, this.MyAddress);
-                this.AdjustLocalDirectory(this.DirectoryPartition.GetItems(), this.MyAddress, dead: false);
-                this.AdjustLocalCache(this.membershipSnapshot, this.DirectoryCache.KeyValues, this.MyAddress, dead: false);
 
                 if (maintainer != null)
                 {

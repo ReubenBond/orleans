@@ -2,9 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.Contracts;
+using System.Text;
 using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
-using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime.GrainDirectory
 {
@@ -13,24 +12,22 @@ namespace Orleans.Runtime.GrainDirectory
     /// </summary>
     internal class DirectoryMembershipSnapshot
     {
-        private readonly ILogger log;
-        private readonly SiloAddress seed;
+        private static readonly Func<SiloAddress, string> PrintSiloAddressForStatistics = (SiloAddress addr) => $"{addr.ToLongString()}/{addr.GetConsistentHashCode():X}";
         private static readonly Comparison<SiloAddress> RingComparer = CompareSiloAddressesForRing;
+        private readonly ILogger log;
+        private readonly ImmutableList<SiloAddress> ring;
+        private readonly SiloAddress siloAddress;
 
         public DirectoryMembershipSnapshot(
             ILogger log,
-            SiloAddress myAddress,
-            SiloAddress seed,
-            bool isLocalDirectoryRunning,
+            SiloAddress siloAddress,
             ClusterMembershipSnapshot clusterMembership)
         {
             this.log = log ?? throw new ArgumentNullException(nameof(log));
-            this.MyAddress = myAddress ?? throw new ArgumentNullException(nameof(myAddress));
+            this.siloAddress = siloAddress ?? throw new ArgumentNullException(nameof(siloAddress));
             this.ClusterMembership = clusterMembership ?? throw new ArgumentNullException(nameof(clusterMembership));
-            this.seed = seed;
-            this.IsLocalDirectoryRunning = isLocalDirectoryRunning;
 
-            var activeMembers = ImmutableArray.CreateBuilder<SiloAddress>();
+            var activeMembers = ImmutableList.CreateBuilder<SiloAddress>();
             
             foreach (var member in clusterMembership.Members)
             {
@@ -42,9 +39,16 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             activeMembers.Sort(RingComparer);
-            this.Members = ImmutableHashSet.CreateRange(activeMembers);
-            this.Ring = activeMembers.ToImmutable();
+            this.ring = activeMembers.ToImmutable();
         }
+
+        internal static int RingSizeStatistic(DirectoryMembershipSnapshot snapshot) => snapshot.ring.Count;
+
+        internal static string RingDetailsStatistic(DirectoryMembershipSnapshot snapshot) => Utils.EnumerableToString(snapshot.ring, PrintSiloAddressForStatistics);
+
+        internal static string RingPredecessorStatistic(DirectoryMembershipSnapshot snapshot) => Utils.EnumerableToString(snapshot.FindPredecessors(snapshot.siloAddress, 1), PrintSiloAddressForStatistics);
+
+        internal static string RingSuccessorStatistic(DirectoryMembershipSnapshot snapshot) => Utils.EnumerableToString(snapshot.FindSuccessors(snapshot.siloAddress, 1), PrintSiloAddressForStatistics);
 
         private static int CompareSiloAddressesForRing(SiloAddress left, SiloAddress right)
         {
@@ -54,39 +58,9 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         /// <summary>
-        /// Cluster members sorted by the hash value of their address
-        /// </summary>
-        [Pure]
-        public ImmutableArray<SiloAddress> Ring { get; }
-
-        /// <summary>
-        /// Cluster members.
-        /// </summary>
-        [Pure]
-        public ImmutableHashSet<SiloAddress> Members { get; }
-
-        /// <summary>
-        /// Indicates whether or not the grain directory was running.
-        /// </summary>
-        [Pure]
-        public bool IsLocalDirectoryRunning { get; }
-
-        /// <summary>
-        /// The address of the local silo.
-        /// </summary>
-        public SiloAddress MyAddress { get; }
-
-        /// <summary>
         /// The monotonically increasing membership version associated with this snapshot.
         /// </summary>
         public ClusterMembershipSnapshot ClusterMembership { get; }
-
-        /// <summary>
-        /// Returns an updated copy of this instance.
-        /// </summary>
-        [Pure]
-        public DirectoryMembershipSnapshot WithUpdate(bool isLocalDirectoryRunning, ClusterMembershipSnapshot clusterMembership)
-            => new DirectoryMembershipSnapshot(this.log, this.MyAddress, this.seed, isLocalDirectoryRunning, clusterMembership);
 
         /// <summary>
         /// Returns the <see cref="SiloAddress"/> which owns the directory partition of the provided grain.
@@ -97,42 +71,29 @@ namespace Orleans.Runtime.GrainDirectory
             // give a special treatment for special grains
             if (grainId.IsSystemTarget)
             {
-                if (Constants.SystemMembershipTableId.Equals(grainId))
+                if (log.IsEnabled(LogLevel.Trace))
                 {
-                    if (this.seed == null)
-                    {
-                        var errorMsg =
-                            $"MembershipTable cannot run without Seed node. Please check your silo configuration make sure it specifies a SeedNode element. " +
-                            $"This is in either the configuration file or the {nameof(NetworkingOptions)} configuration. " +
-                            " Alternatively, you may want to use reliable membership, such as Azure Table.";
-                        throw new ArgumentException(errorMsg, "grainId = " + grainId);
-                    }
+                    log.LogTrace(
+                        "Silo {LocalSilo} looked for a system target {SystemTarget}, returned {ResultSilo}",
+                        this.siloAddress,
+                        grainId,
+                        this.siloAddress);
                 }
 
-                if (log.IsEnabled(LogLevel.Trace)) log.Trace("Silo {0} looked for a system target {1}, returned {2}", this.MyAddress, grainId, this.MyAddress);
                 // every silo owns its system targets
-                return this.MyAddress;
+                return this.siloAddress;
             }
+
+            if (this.ring.Count == 0) return null;
 
             SiloAddress siloAddress = null;
             int hash = unchecked((int)grainId.GetUniformHashCode());
 
-            // excludeMySelf from being a TargetSilo if we're not running and the excludeThisSIloIfStopping flag is true. see the comment in the Stop method.
-            // excludeThisSIloIfStopping flag was removed because we believe that flag complicates things unnecessarily. We can add it back if it turns out that flag 
-            // is doing something valuable. 
-            bool excludeMySelf = !this.IsLocalDirectoryRunning;
-
-            if (Ring.Length == 0)
-            {
-                // If the membership ring is empty, then we're the owner by default unless we're stopping.
-                return !this.IsLocalDirectoryRunning ? null : this.MyAddress;
-            }
-
             // need to implement a binary search, but for now simply traverse the list of silos sorted by their hashes
-            for (var index = this.Ring.Length - 1; index >= 0; --index)
+            for (var index = this.ring.Count - 1; index >= 0; --index)
             {
-                var item = this.Ring[index];
-                if (IsSiloNextInTheRing(item, hash, excludeMySelf))
+                var item = this.ring[index];
+                if (item.GetConsistentHashCode() <= hash)
                 {
                     siloAddress = item;
                     break;
@@ -143,37 +104,38 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 // If not found in the traversal, last silo will do (we are on a ring).
                 // We checked above to make sure that the list isn't empty, so this should always be safe.
-                siloAddress = this.Ring[this.Ring.Length - 1];
-                // Make sure it's not us...
-                if (siloAddress.Equals(this.MyAddress) && excludeMySelf)
-                {
-                    siloAddress = this.Ring.Length > 1 ? this.Ring[this.Ring.Length - 2] : null;
-                }
+                siloAddress = this.ring[this.ring.Count - 1];
             }
-            if (log.IsEnabled(LogLevel.Trace)) log.Trace("Silo {0} calculated directory partition owner silo {1} for grain {2}: {3} --> {4}", this.MyAddress, siloAddress, grainId, hash, siloAddress?.GetConsistentHashCode());
-            return siloAddress;
-        }
 
-        private bool IsSiloNextInTheRing(SiloAddress siloAddr, int hash, bool excludeMySelf)
-        {
-            return siloAddr.GetConsistentHashCode() <= hash && (!excludeMySelf || !siloAddr.Equals(this.MyAddress));
+            if (log.IsEnabled(LogLevel.Trace))
+            {
+                log.LogTrace(
+                    "Silo {LocalSilo} calculated directory partition owner silo {Silo} for grain {Grain}: {GrainHash} --> {SiloHash}",
+                    this.siloAddress,
+                    siloAddress,
+                    grainId,
+                    hash,
+                    siloAddress?.GetConsistentHashCode());
+            }
+
+            return siloAddress;
         }
 
         [Pure]
         public List<SiloAddress> FindPredecessors(SiloAddress silo, int count)
         {
-            int index = this.Ring.FindIndex(elem => elem.Equals(silo));
+            int index = this.ring.FindIndex(elem => elem.Equals(silo));
+            var result = new List<SiloAddress>();
             if (index == -1)
             {
                 log.Warn(ErrorCode.Runtime_Error_100201, "Got request to find predecessors of silo " + silo + ", which is not in the list of members");
-                return null;
+                return result;
             }
 
-            var result = new List<SiloAddress>();
-            int numMembers = this.Ring.Length;
+            int numMembers = this.ring.Count;
             for (int i = index - 1; ((i + numMembers) % numMembers) != index && result.Count < count; i--)
             {
-                result.Add(this.Ring[(i + numMembers) % numMembers]);
+                result.Add(this.ring[(i + numMembers) % numMembers]);
             }
 
             return result;
@@ -183,20 +145,39 @@ namespace Orleans.Runtime.GrainDirectory
         public List<SiloAddress> FindSuccessors(SiloAddress silo, int count)
         {
             var result = new List<SiloAddress>();
-            int index = this.Ring.FindIndex(elem => elem.Equals(silo));
+            int index = this.ring.FindIndex(elem => elem.Equals(silo));
             if (index == -1)
             {
                 log.Warn(ErrorCode.Runtime_Error_100203, "Got request to find successors of silo " + silo + ", which is not in the list of members");
                 return result;
             }
 
-            int numMembers = this.Ring.Length;
+            int numMembers = this.ring.Count;
             for (int i = index + 1; i % numMembers != index && result.Count < count; i++)
             {
-                result.Add(this.Ring[i % numMembers]);
+                result.Add(this.ring[i % numMembers]);
             }
 
             return result;
+        }
+
+        public string ToDetailedString()
+        {
+            var sb = new StringBuilder();
+            sb.AppendFormat(
+                "Silo address is {0}, silo consistent hash is {1:X}.",
+                this.siloAddress,
+                this.siloAddress.GetConsistentHashCode()).AppendLine();
+            sb.AppendLine("Ring is:");
+            foreach (var silo in (this).ring)
+            {
+                sb.AppendFormat("    Silo {0}, consistent hash is {1:X}", silo, silo.GetConsistentHashCode()).AppendLine();
+            }
+
+            sb.Append("My predecessors: " + this.FindPredecessors(this.siloAddress, 1).ToStrings(addr => $"{addr}/{addr.GetConsistentHashCode():X}---", " -- "));
+            sb.AppendLine();
+            sb.Append("My successors: " + this.FindSuccessors(this.siloAddress, 1).ToStrings(addr => $"{addr}/{addr.GetConsistentHashCode():X}---", " -- "));
+            return sb.ToString();
         }
     }
 }

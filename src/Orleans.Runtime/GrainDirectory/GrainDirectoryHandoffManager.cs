@@ -71,7 +71,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Sending {0} items to my {1}: (ring status is {2})", 
-                batchUpdate.Count, silosHoldingMyPartitionCopy.ToStrings(), localDirectory.RingStatusToString());
+                batchUpdate.Count, silosHoldingMyPartitionCopy.ToStrings(), localDirectory.DirectoryMembershipSnapshot.ToDetailedString());
 
             var tasks = new List<Task>();
 
@@ -145,7 +145,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // at least one predcessor should exist, which is me
                 SiloAddress predecessor = membershipSnapshot.FindPredecessors(removedSilo, 1)[0];
                 Dictionary<SiloAddress, List<ActivationAddress>> duplicates;
-                if (membershipSnapshot.MyAddress.Equals(predecessor))
+                if (this.localSiloDetails.SiloAddress.Equals(predecessor))
                 {
                     if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Merging my partition with the copy of silo " + removedSilo);
                     // now I am responsible for this directory part
@@ -180,7 +180,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // that it doesn't also fail and that no other silo joins during the transition period).
                 if (silosHoldingMyPartition.Count == 0)
                 {
-                    silosHoldingMyPartition.AddRange(membershipSnapshot.FindPredecessors(membershipSnapshot.MyAddress, 1));
+                    silosHoldingMyPartition.AddRange(membershipSnapshot.FindPredecessors(this.localSiloDetails.SiloAddress, 1));
                 }
 
                 silosHoldingMyPartitionCopy = silosHoldingMyPartition.ToList();
@@ -204,7 +204,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // check if this is one of our successors (i.e., if I should hold this silo's copy)
                 // (if yes, adjust local and/or copied directory partitions by splitting them between old successors and the new one)
                 // NOTE: We need to move part of our local directory to the new silo if it is an immediate successor.
-                List<SiloAddress> successors = membershipSnapshot.FindSuccessors(membershipSnapshot.MyAddress, 1);
+                List<SiloAddress> successors = membershipSnapshot.FindSuccessors(this.localSiloDetails.SiloAddress, 1);
                 if (!successors.Contains(addedSilo))
                 {
                     if (logger.IsEnabled(LogLevel.Debug)) logger.Debug($"{addedSilo} is not one of my successors.");
@@ -263,8 +263,6 @@ namespace Orleans.Runtime.GrainDirectory
 
         private async Task ProcessAddedSiloAsync(DirectoryMembershipSnapshot membershipSnapshot, SiloAddress addedSilo, List<ActivationAddress> splitPartListSingle, List<ActivationAddress> splitPartListMulti)
         {
-            if (!membershipSnapshot.IsLocalDirectoryRunning) return;
-
             if (membershipSnapshot.ClusterMembership.GetSiloStatus(addedSilo) == SiloStatus.Active)
             {
                 if (splitPartListSingle.Count > 0)
@@ -313,8 +311,6 @@ namespace Orleans.Runtime.GrainDirectory
 
         private async Task AcceptExistingRegistrationsAsync(List<ActivationAddress> singleActivations, List<ActivationAddress> multiActivations)
         {
-            if (!this.localDirectory.DirectoryMembershipSnapshot.IsLocalDirectoryRunning) return;
-
             if (this.logger.IsEnabled(LogLevel.Debug))
             {
                 this.logger.LogDebug(

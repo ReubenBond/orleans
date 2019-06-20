@@ -44,10 +44,9 @@ namespace Orleans.Runtime.GrainDirectory
 
         protected override void Run()
         {
-            while (true)
+            while (!Cts.IsCancellationRequested)
             {
                 var membershipSnapshot = router.DirectoryMembershipSnapshot;
-                if (!membershipSnapshot.IsLocalDirectoryRunning) break;
 
                 // Run through all cache entries and do the following:
                 // 1. If the entry is not expired, skip it
