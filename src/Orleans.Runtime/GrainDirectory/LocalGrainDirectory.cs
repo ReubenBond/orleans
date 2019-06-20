@@ -23,7 +23,7 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly SiloAddress seed;
         private readonly RegistrarManager registrarManager;
         private readonly IFatalErrorHandler fatalErrorHandler;
-        private readonly IClusterMembershipService clusterMembershipService;
+        private readonly IClusterMembership clusterMembership;
         private readonly IMultiClusterOracle multiClusterOracle;
         private readonly IInternalGrainFactory grainFactory;
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
@@ -85,7 +85,7 @@ namespace Orleans.Runtime.GrainDirectory
         public LocalGrainDirectory(
             ILocalSiloDetails siloDetails,
             OrleansTaskScheduler scheduler,
-            IClusterMembershipService clusterMembershipService,
+            IClusterMembership clusterMembership,
             IMultiClusterOracle multiClusterOracle,
             IInternalGrainFactory grainFactory,
             Factory<GrainDirectoryPartition> grainDirectoryPartitionFactory,
@@ -105,7 +105,7 @@ namespace Orleans.Runtime.GrainDirectory
             var clusterId = multiClusterOptions.Value.HasMultiClusterNetwork ? siloDetails.ClusterId : null;
             this.MyAddress = siloDetails.SiloAddress;
             this.Scheduler = scheduler;
-            this.clusterMembershipService = clusterMembershipService;
+            this.clusterMembership = clusterMembership;
             this.multiClusterOracle = multiClusterOracle;
             this.grainFactory = grainFactory;
             this.clusterId = clusterId;
@@ -137,7 +137,7 @@ namespace Orleans.Runtime.GrainDirectory
                 this.seed = this.MyAddress.Endpoint.Equals(primarySiloEndPoint) ? this.MyAddress : SiloAddress.New(primarySiloEndPoint, 0);
             }
 
-            this.membershipSnapshot = new DirectoryMembershipSnapshot(this.log, this.MyAddress, this.seed, false, this.clusterMembershipService.CurrentSnapshot);
+            this.membershipSnapshot = new DirectoryMembershipSnapshot(this.log, this.MyAddress, this.seed, false, this.clusterMembership.CurrentSnapshot);
             this.directoryMembershipUpdates = new AsyncEnumerable<DirectoryMembershipSnapshot>(
                 (previous, proposed) => proposed.ClusterMembership.Version > previous.ClusterMembership.Version,
                 this.membershipSnapshot)
@@ -149,7 +149,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.HandoffManager = new GrainDirectoryHandoffManager(
                 siloDetails,
                 this,
-                this.clusterMembershipService,
+                this.clusterMembership,
                 grainFactory,
                 grainDirectoryPartitionFactory,
                 loggerFactory);
@@ -239,7 +239,7 @@ namespace Orleans.Runtime.GrainDirectory
             try
             {
                 if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting to process membership updates");
-                enumerator = this.clusterMembershipService.MembershipUpdates.GetAsyncEnumerator(this.cancellation.Token);
+                enumerator = this.clusterMembership.MembershipUpdates.GetAsyncEnumerator(this.cancellation.Token);
                 ClusterMembershipSnapshot previousClusterMembership = default;
                 while (await enumerator.MoveNextAsync())
                 {
@@ -306,7 +306,7 @@ namespace Orleans.Runtime.GrainDirectory
                     ref this.membershipSnapshot,
                     this.membershipSnapshot.WithUpdate(
                         isLocalDirectoryRunning: false,
-                        this.clusterMembershipService.CurrentSnapshot));
+                        this.clusterMembership.CurrentSnapshot));
                 if (enumerator is object) await enumerator.DisposeAsync();
             }
 
@@ -1006,7 +1006,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 log.Info("Start");
 
-                this.membershipSnapshot = this.membershipSnapshot.WithUpdate(isLocalDirectoryRunning: true, this.clusterMembershipService.CurrentSnapshot);
+                this.membershipSnapshot = this.membershipSnapshot.WithUpdate(isLocalDirectoryRunning: true, this.clusterMembership.CurrentSnapshot);
                 this.HandoffManager.ProcessSiloAddEvent(this.membershipSnapshot, this.MyAddress);
                 this.AdjustLocalDirectory(this.DirectoryPartition.GetItems(), this.MyAddress, dead: false);
                 this.AdjustLocalCache(this.membershipSnapshot, this.DirectoryCache.KeyValues, this.MyAddress, dead: false);

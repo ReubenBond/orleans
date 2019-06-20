@@ -8,17 +8,17 @@ using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime
 {
-    internal class ClusterMembershipService : IClusterMembershipService, ILifecycleParticipant<ISiloLifecycle>, IDisposable
+    internal class ClusterMembership : IClusterMembership, ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
         private readonly AsyncEnumerable<ClusterMembershipSnapshot> updates;
         private readonly MembershipTableManager membershipTableManager;
-        private readonly ILogger<ClusterMembershipService> log;
+        private readonly ILogger<ClusterMembership> log;
         private readonly IFatalErrorHandler fatalErrorHandler;
         private ClusterMembershipSnapshot snapshot;
 
-        public ClusterMembershipService(
+        public ClusterMembership(
             MembershipTableManager membershipTableManager,
-            ILogger<ClusterMembershipService> log,
+            ILogger<ClusterMembership> log,
             IFatalErrorHandler fatalErrorHandler)
         {
             this.snapshot = membershipTableManager.MembershipTableSnapshot.CreateClusterMembershipSnapshot();
@@ -78,7 +78,7 @@ namespace Orleans.Runtime
             }
 
             lifecycle.Subscribe(
-                nameof(ClusterMembershipService),
+                nameof(ClusterMembership),
                 ServiceLifecycleStage.RuntimeInitialize,
                 OnRuntimeInitializeStart,
                 OnRuntimeInitializeStop);

@@ -152,9 +152,9 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableCleanupAgent>();
             services.AddSingleton<SiloStatusListenerManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloStatusListenerManager>();
-            services.AddSingleton<ClusterMembershipService>();
-            services.TryAddFromExisting<IClusterMembershipService, ClusterMembershipService>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterMembershipService>();
+            services.AddSingleton<ClusterMembership>();
+            services.TryAddFromExisting<IClusterMembership, ClusterMembership>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterMembership>();
 
             services.TryAddSingleton<ClientObserverRegistrar>();
             services.TryAddSingleton<SiloProviderRuntime>();

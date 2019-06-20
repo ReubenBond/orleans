@@ -19,7 +19,7 @@ namespace Orleans.Runtime.GrainDirectory
         private const int MAX_OPERATION_DEQUEUE = 2;
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly LocalGrainDirectory localDirectory;
-        private readonly IClusterMembershipService clusterMembershipService;
+        private readonly IClusterMembership clusterMembership;
         private readonly IInternalGrainFactory grainFactory;
         private readonly Dictionary<SiloAddress, GrainDirectoryPartition> directoryPartitionsMap;
         private readonly List<SiloAddress> silosHoldingMyPartition;
@@ -32,7 +32,7 @@ namespace Orleans.Runtime.GrainDirectory
         internal GrainDirectoryHandoffManager(
             ILocalSiloDetails localSiloDetails,
             LocalGrainDirectory localGrainDirectory,
-            IClusterMembershipService clusterMembershipService,
+            IClusterMembership clusterMembership,
             IInternalGrainFactory grainFactory,
             Factory<GrainDirectoryPartition> createPartion,
             ILoggerFactory loggerFactory)
@@ -40,7 +40,7 @@ namespace Orleans.Runtime.GrainDirectory
             logger = loggerFactory.CreateLogger<GrainDirectoryHandoffManager>();
             this.localSiloDetails = localSiloDetails;
             this.localDirectory = localGrainDirectory;
-            this.clusterMembershipService = clusterMembershipService;
+            this.clusterMembership = clusterMembership;
             this.grainFactory = grainFactory;
             this.createPartion = createPartion;
             directoryPartitionsMap = new Dictionary<SiloAddress, GrainDirectoryPartition>();
@@ -403,7 +403,7 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     if (!isFullCopy)
                     {
-                        var membershipSnapshot = this.clusterMembershipService.CurrentSnapshot;
+                        var membershipSnapshot = this.clusterMembership.CurrentSnapshot;
                         logger.Warn(ErrorCode.DirectoryUnexpectedDelta,
                             string.Format("Got delta of the directory partition from silo {0} (Membership status {1}) while not holding a full copy. Membership active cluster size is {2}",
                                 source, membershipSnapshot.GetSiloStatus(source),
@@ -467,7 +467,7 @@ namespace Orleans.Runtime.GrainDirectory
             while (duplicates.Count > 0)
             {
                 var pair = duplicates.FirstOrDefault();
-                if (this.clusterMembershipService.CurrentSnapshot.GetSiloStatus(pair.Key) == SiloStatus.Active)
+                if (this.clusterMembership.CurrentSnapshot.GetSiloStatus(pair.Key) == SiloStatus.Active)
                 {
                     if (this.logger.IsEnabled(LogLevel.Debug))
                     {
