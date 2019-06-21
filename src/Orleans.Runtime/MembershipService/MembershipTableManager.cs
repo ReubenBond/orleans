@@ -80,14 +80,13 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task<MembershipTableData> RefreshInternal()
         {
-            // first, cleanup all outdated entries of myself from the table
             async Task<MembershipTableData> AttemptRefresh(int counter)
             {
                 var table = await this.membershipTableProvider.ReadAll();
                 this.ProcessTableUpdate(table, "Refresh");
                 try
                 {
-                    await CleanupMyTableEntries(table);
+                    await this.CleanupMyTableEntries(table);
                 }
                 catch (Exception exception)
                 {
@@ -100,15 +99,14 @@ namespace Orleans.Runtime.MembershipService
             }
 
             return await AsyncExecutorWithRetries.ExecuteWithRetries(
-                    AttemptRefresh,
-                    NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS,
-                    NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS,
-                    (value, i) => value == null,  
-                    (exc, i) => true,            // Retry on errors.          
-                    this.clusterMembershipOptions.MaxJoinAttemptTime,
-                    new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, this.EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP), // how long to wait between successful retries
-                    new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, this.EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)  // how long to wait between error retries
-            );
+                    function: AttemptRefresh,
+                    maxNumSuccessTries: NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS,
+                    maxNumErrorTries: NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS,
+                    retryValueFilter: (value, i) => value == null,
+                    retryExceptionFilter: (exc, i) => true,         
+                    maxExecutionTime: this.clusterMembershipOptions.MaxJoinAttemptTime,
+                    onSuccessBackOff: new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP),
+                    onErrorBackOff: new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP));
 
         }
 
