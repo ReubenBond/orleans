@@ -142,8 +142,8 @@ namespace Orleans.Runtime.GrainDirectory
                 // (if yes, adjust local and/or handoffed directory partitions)
                 if (!directoryPartitionsMap.ContainsKey(removedSilo)) return;
 
-                // at least one predcessor should exist, which is me
-                SiloAddress predecessor = membershipSnapshot.FindPredecessors(removedSilo, 1)[0];
+                SiloAddress predecessor = membershipSnapshot.FindPredecessors(removedSilo, 1).FirstOrDefault();
+                if (predecessor is null) return;
                 Dictionary<SiloAddress, List<ActivationAddress>> duplicates;
                 if (this.localSiloDetails.SiloAddress.Equals(predecessor))
                 {
@@ -205,7 +205,8 @@ namespace Orleans.Runtime.GrainDirectory
                 // (if yes, adjust local and/or copied directory partitions by splitting them between old successors and the new one)
                 // NOTE: We need to move part of our local directory to the new silo if it is an immediate successor.
                 List<SiloAddress> successors = membershipSnapshot.FindSuccessors(this.localSiloDetails.SiloAddress, 1);
-                if (!successors.Contains(addedSilo))
+
+                if (successors.Count == 0 || !successors.Contains(addedSilo))
                 {
                     if (logger.IsEnabled(LogLevel.Debug)) logger.Debug($"{addedSilo} is not one of my successors.");
                     return;
@@ -232,8 +233,8 @@ namespace Orleans.Runtime.GrainDirectory
                 else
                 {
                     // adjust partitions by splitting them accordingly between new and old silos
-                    SiloAddress predecessorOfNewSilo = membershipSnapshot.FindPredecessors(addedSilo, 1)[0];
-                    if (!directoryPartitionsMap.ContainsKey(predecessorOfNewSilo))
+                    SiloAddress predecessorOfNewSilo = membershipSnapshot.FindPredecessors(addedSilo, 1).FirstOrDefault();
+                    if (predecessorOfNewSilo is null || !directoryPartitionsMap.ContainsKey(predecessorOfNewSilo))
                     {
                         // we should have the partition of the predcessor of our new successor
                         logger.Warn(ErrorCode.DirectoryPartitionPredecessorExpected, "This silo is expected to hold directory partition of " + predecessorOfNewSilo);
