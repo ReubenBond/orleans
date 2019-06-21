@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
 using Orleans.Runtime;
-using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Hosting
 {
@@ -31,7 +30,7 @@ namespace Orleans.Hosting
         /// </returns>
         public static ISiloHostBuilder AddStartupTask<TStartup>(
             this ISiloHostBuilder builder,
-            int stage = ServiceLifecycleStage.Active)
+            int stage = ServiceLifecycleStage.UserStartupTasks)
             where TStartup : class, IStartupTask
         {
             return builder.AddStartupTask((sp, ct) => ActivatorUtilities.GetServiceOrCreateInstance<TStartup>(sp).Execute(ct), stage);
@@ -55,7 +54,7 @@ namespace Orleans.Hosting
         public static ISiloHostBuilder AddStartupTask(
             this ISiloHostBuilder builder,
             IStartupTask startupTask,
-            int stage = ServiceLifecycleStage.Active)
+            int stage = ServiceLifecycleStage.UserStartupTasks)
         {
             return builder.AddStartupTask((sp, ct) => startupTask.Execute(ct), stage);
         }
@@ -78,7 +77,7 @@ namespace Orleans.Hosting
         public static ISiloHostBuilder AddStartupTask(
             this ISiloHostBuilder builder,
             Func<IServiceProvider, CancellationToken, Task> startupTask,
-            int stage = ServiceLifecycleStage.Active)
+            int stage = ServiceLifecycleStage.UserStartupTasks)
         {
             builder.ConfigureServices(services =>
                 services.AddTransient<ILifecycleParticipant<ISiloLifecycle>>(sp =>
@@ -106,7 +105,7 @@ namespace Orleans.Hosting
         /// </returns>
         public static ISiloBuilder AddStartupTask<TStartup>(
             this ISiloBuilder builder,
-            int stage = ServiceLifecycleStage.Active)
+            int stage = ServiceLifecycleStage.UserStartupTasks)
             where TStartup : class, IStartupTask
         {
             return builder.AddStartupTask((sp, ct) => ActivatorUtilities.GetServiceOrCreateInstance<TStartup>(sp).Execute(ct), stage);
@@ -130,7 +129,7 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddStartupTask(
             this ISiloBuilder builder,
             IStartupTask startupTask,
-            int stage = ServiceLifecycleStage.Active)
+            int stage = ServiceLifecycleStage.UserStartupTasks)
         {
             return builder.AddStartupTask((sp, ct) => startupTask.Execute(ct), stage);
         }
@@ -153,7 +152,7 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddStartupTask(
             this ISiloBuilder builder,
             Func<IServiceProvider, CancellationToken, Task> startupTask,
-            int stage = ServiceLifecycleStage.Active)
+            int stage = ServiceLifecycleStage.UserStartupTasks)
         {
             builder.ConfigureServices(services =>
                 services.AddTransient<ILifecycleParticipant<ISiloLifecycle>>(sp =>
