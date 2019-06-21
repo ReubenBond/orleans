@@ -336,7 +336,7 @@ namespace Orleans.Runtime
                 logger.Info($"Creating reminder grain service for type={reminderTable.GetType()}");
                 
                 // Start the reminder service system target
-                reminderService = new LocalReminderService(this, reminderTable, this.initTimeout, this.loggerFactory); ;
+                reminderService = new LocalReminderService(this, reminderTable, this.initTimeout, this.loggerFactory);
                 RegisterSystemTarget((SystemTarget)reminderService);
             }
 

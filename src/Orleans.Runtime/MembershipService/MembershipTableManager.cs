@@ -84,6 +84,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 var table = await this.membershipTableProvider.ReadAll();
                 this.ProcessTableUpdate(table, "Refresh");
+
                 try
                 {
                     await this.CleanupMyTableEntries(table);
@@ -107,7 +108,6 @@ namespace Orleans.Runtime.MembershipService
                     maxExecutionTime: this.clusterMembershipOptions.MaxJoinAttemptTime,
                     onSuccessBackOff: new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP),
                     onErrorBackOff: new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP));
-
         }
 
         private async Task Start()
