@@ -80,20 +80,36 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task<MembershipTableData> RefreshInternal()
         {
-            var table = await this.membershipTableProvider.ReadAll();
-            this.ProcessTableUpdate(table, "Refresh");
-            try
+            // first, cleanup all outdated entries of myself from the table
+            async Task<MembershipTableData> AttemptRefresh(int counter)
             {
-                await CleanupMyTableEntries(table);
-            }
-            catch (Exception exception)
-            {
-                this.log.LogWarning(
-                    "Exception while trying to clean up my table entries: {Exception}",
-                    exception);
+                var table = await this.membershipTableProvider.ReadAll();
+                this.ProcessTableUpdate(table, "Refresh");
+                try
+                {
+                    await CleanupMyTableEntries(table);
+                }
+                catch (Exception exception)
+                {
+                    this.log.LogWarning(
+                        "Exception while trying to clean up my table entries: {Exception}",
+                        exception);
+                }
+
+                return table;
             }
 
-            return table;
+            return await AsyncExecutorWithRetries.ExecuteWithRetries(
+                    AttemptRefresh,
+                    NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS,
+                    NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS,
+                    (value, i) => value == null,  
+                    (exc, i) => true,            // Retry on errors.          
+                    this.clusterMembershipOptions.MaxJoinAttemptTime,
+                    new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, this.EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP), // how long to wait between successful retries
+                    new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, this.EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)  // how long to wait between error retries
+            );
+
         }
 
         private async Task Start()
@@ -209,14 +225,22 @@ namespace Orleans.Runtime.MembershipService
         }
 
         private Task<bool> MembershipExecuteWithRetries(
-            Func<int, Task<bool>> taskFunction, 
+            Func<int, Task<bool>> taskFunction,
             TimeSpan timeout)
+        {
+            return MembershipExecuteWithRetries(taskFunction, timeout, (result, i) => result == false);
+        }
+
+        private Task<T> MembershipExecuteWithRetries<T>(
+            Func<int, Task<T>> taskFunction,
+            TimeSpan timeout,
+            Func<T, int, bool> retryValueFilter)
         {
             return AsyncExecutorWithRetries.ExecuteWithRetries(
                     taskFunction,
                     NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS,
                     NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS,
-                    (result, i) => result == false,   // if failed to Update on contention - retry   
+                    retryValueFilter,   // if failed to Update on contention - retry   
                     (exc, i) => true,            // Retry on errors.          
                     timeout,
                     new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP), // how long to wait between successful retries
