@@ -263,7 +263,7 @@ namespace Orleans.Runtime.MembershipService
 
                 lifecycle.Subscribe(
                     nameof(MembershipAgent),
-                    ServiceLifecycleStage.AfterRuntimeGrainServices,
+                    ServiceLifecycleStage.BecomeJoining,
                     AfterRuntimeGrainServicesStart,
                     AfterRuntimeGrainServicesStop);
             }
