@@ -707,16 +707,16 @@ namespace Orleans.Runtime.MembershipService
             {
                 lifecycle.Subscribe(
                     nameof(MembershipTableManager),
-                    ServiceLifecycleStage.RuntimeGrainServices,
-                    OnRuntimeGrainServicesStart,
-                    OnRuntimeGrainServicesStop);
+                    ServiceLifecycleStage.RuntimeServices,
+                    OnRuntimeServicesStart,
+                    OnRuntimeServicesStop);
 
-                async Task OnRuntimeGrainServicesStart(CancellationToken ct)
+                async Task OnRuntimeServicesStart(CancellationToken ct)
                 {
                     await Task.Run(() => this.Start());
                 }
 
-                Task OnRuntimeGrainServicesStop(CancellationToken ct)
+                Task OnRuntimeServicesStop(CancellationToken ct)
                 {
                     return Task.CompletedTask;
                 }

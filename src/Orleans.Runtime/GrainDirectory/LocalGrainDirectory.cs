@@ -1007,15 +1007,6 @@ namespace Orleans.Runtime.GrainDirectory
 
             lifecycle.Subscribe(nameof(LocalGrainDirectory), ServiceLifecycleStage.RuntimeServices, OnRuntimeServicesStart, OnRuntimeServicesStop);
 
-            Task OnRuntimeGrainServicesStart(CancellationToken ct)
-            {
-                return Task.CompletedTask;
-            }
-
-            Task OnRuntimeGrainServicesStop(CancellationToken ct) => Task.CompletedTask;
-
-            lifecycle.Subscribe(nameof(LocalGrainDirectory), ServiceLifecycleStage.RuntimeGrainServices, OnRuntimeGrainServicesStart, OnRuntimeGrainServicesStop);
-
             async Task OnBecomeActiveStart(CancellationToken ct)
             {
                 // Wait until the directory has processed that the local silo is active before completing.
