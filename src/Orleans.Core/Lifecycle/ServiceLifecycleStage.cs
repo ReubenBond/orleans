@@ -42,7 +42,7 @@ namespace Orleans
 
         // ::START::
         // Silo creates & registers GrainServices & calls Init() for each ########################################################################################## Is this too early? #############################################
-        // Silo initializes type management with IVersionStore ########################################################################################## Is this too early? #############################################
+        // Silo initializes type management with IVersionStore
         // Silo calls IMultiClusterOracle.Start
         // Silo calls SiloStatisticsManager.Start
         // Silo calls DeploymentLoadPublisher.Start ########################################################################################## Is this too early? #############################################
@@ -72,8 +72,7 @@ namespace Orleans
 
         // ::START::
         // *Legacy* storage providers start
-
-        // NOTE: refresh type manager here?
+        // TODO: ensure type manager is refreshed here
         // 
 
         /// <summary>

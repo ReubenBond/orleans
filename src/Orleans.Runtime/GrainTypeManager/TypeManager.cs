@@ -9,10 +9,12 @@ using Orleans.Runtime.Versions;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
+using Orleans.Runtime.Utilities;
+using System.Threading;
 
 namespace Orleans.Runtime
 {
-    internal class TypeManager : SystemTarget, IClusterTypeManager, ISiloTypeManager, ISiloStatusListener, IDisposable
+    internal class TypeManager : SystemTarget, IClusterTypeManager, ISiloTypeManager, ISiloStatusListener, IDisposable, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly ILogger logger;
         private readonly GrainTypeManager grainTypeManager;
@@ -20,11 +22,15 @@ namespace Orleans.Runtime
         private readonly ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
         private readonly IInternalGrainFactory grainFactory;
         private readonly CachedVersionSelectorManager versionSelectorManager;
+        private readonly IClusterMembership clusterMembership;
+        private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly OrleansTaskScheduler scheduler;
         private readonly TimeSpan refreshClusterMapInterval;
+        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private bool hasToRefreshClusterGrainInterfaceMap;
         private IDisposable refreshClusterGrainInterfaceMapTimer;
         private IVersionStore versionStore;
+        private MembershipVersion lastUpdatedVersion;
 
         internal TypeManager(
             SiloAddress myAddr,
@@ -35,30 +41,30 @@ namespace Orleans.Runtime
             ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
             IInternalGrainFactory grainFactory,
             CachedVersionSelectorManager versionSelectorManager,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            IClusterMembership clusterMembership,
+            IFatalErrorHandler fatalErrorHandler,
+            IAsyncTimerFactory timerFactory)
             : base(Constants.TypeManagerId, myAddr, loggerFactory)
         {
-            if (grainTypeManager == null)
-                throw new ArgumentNullException(nameof(grainTypeManager));
-            if (oracle == null)
-                throw new ArgumentNullException(nameof(oracle));
-            if (scheduler == null)
-                throw new ArgumentNullException(nameof(scheduler));
-            if (implicitStreamSubscriberTable == null)
-                throw new ArgumentNullException(nameof(implicitStreamSubscriberTable));
             this.logger = loggerFactory.CreateLogger<TypeManager>();
-            this.grainTypeManager = grainTypeManager;
-            this.statusOracle = oracle;
-            this.implicitStreamSubscriberTable = implicitStreamSubscriberTable;
+            this.grainTypeManager = grainTypeManager ?? throw new ArgumentNullException(nameof(grainTypeManager));
+            this.statusOracle = oracle ?? throw new ArgumentNullException(nameof(oracle));
+            this.implicitStreamSubscriberTable = implicitStreamSubscriberTable ?? throw new ArgumentNullException(nameof(implicitStreamSubscriberTable));
             this.grainFactory = grainFactory;
             this.versionSelectorManager = versionSelectorManager;
-            this.scheduler = scheduler;
+            this.clusterMembership = clusterMembership;
+            this.fatalErrorHandler = fatalErrorHandler;
+            this.scheduler = scheduler ?? throw new ArgumentNullException(nameof(scheduler));
             this.refreshClusterMapInterval = refreshClusterMapInterval;
+
             // We need this so we can place needed local activations
             this.grainTypeManager.SetInterfaceMapsBySilo(new Dictionary<SiloAddress, GrainInterfaceMap>
             {
                 {this.Silo, grainTypeManager.GetTypeCodeMap()}
             });
+
+            this.refreshTimer = timerFactory.Create(refreshClusterMapInterval, nameof(TypeManager) + ".RefreshTypeMap");
         }
 
         internal async Task Initialize(IVersionStore store)
@@ -77,7 +83,7 @@ namespace Orleans.Runtime
 
         public Task<IGrainTypeResolver> GetClusterGrainTypeResolver()
         {
-            return Task.FromResult<IGrainTypeResolver>(grainTypeManager.GrainTypeResolver);
+            return Task.FromResult(grainTypeManager.GrainTypeResolver);
         }
 
         public Task<GrainInterfaceMap> GetSiloTypeCodeMap()
@@ -104,21 +110,42 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task OnRefreshClusterMapTimer(object _)
+        private async Task ProcessMembershipUpdates()
         {
-            // Check if we have to refresh
-            if (!hasToRefreshClusterGrainInterfaceMap)
+            IAsyncEnumerator<ClusterMembershipSnapshot> enumerator = default;
+            try
             {
-                if (this.logger.IsEnabled(LogLevel.Trace)) logger.Trace("OnRefreshClusterMapTimer: no refresh required");
-                return;
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Starting to process membership updates");
+                enumerator = this.clusterMembership.MembershipUpdates.GetAsyncEnumerator(this.cancellation.Token);
+                while (await enumerator.MoveNextAsync())
+                {
+                    // Ignore the actual snapshot and just always take the latest.
+                    this.hasToRefreshClusterGrainInterfaceMap |= this.lastUpdatedVersion >= enumerator.Current.Version;
+                    await this.UpdateClusterTypeMap();
+                }
             }
+            catch (Exception exception)
+            {
+                this.logger.LogError("Error processing membership updates: {Exception}", exception);
+                this.fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
+            }
+            finally
+            {
+                if (enumerator is object) await enumerator.DisposeAsync();
+                if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Stopping membership update processor");
+            }
+        }
 
+        private async Task UpdateClusterTypeMap()
+        {
             while (hasToRefreshClusterGrainInterfaceMap)
             {
                 hasToRefreshClusterGrainInterfaceMap = false;
 
-                if (this.logger.IsEnabled(LogLevel.Debug)) logger.Debug("OnRefreshClusterMapTimer: refresh start");
-                var activeSilos = statusOracle.GetApproximateSiloStatuses(onlyActive: true);
+                var members = this.clusterMembership.CurrentSnapshot;
+                if (this.lastUpdatedVersion >= members.Version) return;
+
+                if (this.logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpdateClusterTypeMap: refresh start");
                 var knownSilosClusterGrainInterfaceMap = grainTypeManager.GrainInterfaceMapsBySilo;
 
                 // Build the new map. Always start by himself
@@ -126,12 +153,16 @@ namespace Orleans.Runtime
                 {
                     {this.Silo, grainTypeManager.GetTypeCodeMap()}
                 };
+
                 var getGrainInterfaceMapTasks = new List<Task<KeyValuePair<SiloAddress, GrainInterfaceMap>>>();
 
-
-                foreach (var siloAddress in activeSilos.Keys)
+                foreach (var member in members.Members)
                 {
+                    var siloAddress = member.Key;
+
+                    // Skip this silo and any non-active silos.
                     if (siloAddress.Equals(this.Silo)) continue;
+                    if (member.Value.Status != SiloStatus.Active) continue;
 
                     GrainInterfaceMap value;
                     if (knownSilosClusterGrainInterfaceMap.TryGetValue(siloAddress, out value))
@@ -152,7 +183,9 @@ namespace Orleans.Runtime
                     foreach (var keyValuePair in await Task.WhenAll(getGrainInterfaceMapTasks))
                     {
                         if (keyValuePair.Value != null)
-                            newSilosClusterGrainInterfaceMap.Add(keyValuePair.Key, keyValuePair.Value);
+                        {
+                            newSilosClusterGrainInterfaceMap[keyValuePair.Key] = keyValuePair.Value;
+                        }
                     }
                 }
 
@@ -185,7 +218,23 @@ namespace Orleans.Runtime
 
                     await Task.Delay(TimeSpan.FromSeconds(1));
                 }
+                else
+                {
+                    this.lastUpdatedVersion = members.Version;
+                }
             }
+        }
+
+        private async Task OnRefreshClusterMapTimer(object _)
+        {
+            // Check if we have to refresh
+            if (!hasToRefreshClusterGrainInterfaceMap)
+            {
+                if (this.logger.IsEnabled(LogLevel.Trace)) logger.Trace("OnRefreshClusterMapTimer: no refresh required");
+                return;
+            }
+
+            await this.UpdateClusterTypeMap();
         }
 
         private async Task GetAndSetDefaultSelectorStrategy()
@@ -259,10 +308,17 @@ namespace Orleans.Runtime
 
         public void Dispose()
         {
+            this.cancellation.Cancel(throwOnFirstException: false);
             if (this.refreshClusterGrainInterfaceMapTimer != null)
             {
                 this.refreshClusterGrainInterfaceMapTimer.Dispose();
             }
+        }
+
+        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+        {
+            async Task On
+
         }
     }
 }
