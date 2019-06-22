@@ -199,7 +199,7 @@ namespace Orleans.Runtime
 
                 versionSelectorManager.ResetCache();
 
-                // Either a new silo joined or a refresh failed, so continue until no refresh is required.
+                // Continue until no refresh is required.
                 if (needsRefresh)
                 {
                     if (this.logger.IsEnabled(LogLevel.Debug))

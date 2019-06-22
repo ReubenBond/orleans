@@ -48,7 +48,6 @@ namespace Orleans
         // Silo calls DeploymentLoadPublisher.Start ########################################################################################## Is this too early? #############################################
         // Silo starts Watchdog
 
-
         /// <summary>
         /// Start runtime services
         /// </summary>
@@ -87,6 +86,8 @@ namespace Orleans
         // ClusterHealthManager begins monitoring other silos  ########################################################################################## Is this too early? #############################################
         // Silo starts the gateway ########################################################################################## Is this too early? #############################################
 
+        // NOTE: Gateway should open ports but not accept connections
+
         /// <summary>
         /// Transition into the Active state in membership.
         ///
@@ -115,6 +116,9 @@ namespace Orleans
         // HostedClient starts
         // Grain-based Reminders are enabled
         // Grain-based Versioning is enabled
+
+        // NOTE:
+        // Gateway starts accepting connections
 
         /// <summary>
         /// Start application layer services.
