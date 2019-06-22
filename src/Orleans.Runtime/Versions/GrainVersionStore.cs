@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans;
 using Orleans.Storage;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
@@ -12,101 +13,84 @@ namespace Orleans.Runtime.Versions
 {
     internal class GrainVersionStore : IVersionStore, ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly TaskCompletionSource<bool> ready = new TaskCompletionSource<bool>();
         private readonly IInternalGrainFactory grainFactory;
         private readonly IServiceProvider services;
         private readonly string clusterId;
-
         private IVersionStoreGrain StoreGrain => this.grainFactory.GetGrain<IVersionStoreGrain>(this.clusterId);
 
-        public GrainVersionStore(
-            ILocalSiloDetails siloDetails,
-            IInternalGrainFactory grainFactory,
-            IServiceProvider services)
+        public bool IsEnabled { get; private set; }
+
+        public GrainVersionStore(IInternalGrainFactory grainFactory, ILocalSiloDetails siloDetails, IServiceProvider services)
         {
             this.grainFactory = grainFactory;
             this.services = services;
             this.clusterId = siloDetails.ClusterId;
-            this.IsEnabled = this.services.GetService<IGrainStorage>() != null;
+            this.IsEnabled = false;
         }
-
-        public bool IsEnabled { get; }
 
         public async Task SetCompatibilityStrategy(CompatibilityStrategy strategy)
         {
-            await this.WaitUntilReady();
+            ThrowIfNotEnabled();
             await StoreGrain.SetCompatibilityStrategy(strategy);
         }
 
         public async Task SetSelectorStrategy(VersionSelectorStrategy strategy)
         {
-            await this.WaitUntilReady();
+            ThrowIfNotEnabled();
             await StoreGrain.SetSelectorStrategy(strategy);
         }
 
         public async Task SetCompatibilityStrategy(int interfaceId, CompatibilityStrategy strategy)
         {
-            await this.WaitUntilReady();
+            ThrowIfNotEnabled();
             await StoreGrain.SetCompatibilityStrategy(interfaceId, strategy);
         }
 
         public async Task SetSelectorStrategy(int interfaceId, VersionSelectorStrategy strategy)
         {
-            await this.WaitUntilReady();
+            ThrowIfNotEnabled();
             await StoreGrain.SetSelectorStrategy(interfaceId, strategy);
         }
 
         public async Task<Dictionary<int, CompatibilityStrategy>> GetCompatibilityStrategies()
         {
-            await this.WaitUntilReady();
+            ThrowIfNotEnabled();
             return await StoreGrain.GetCompatibilityStrategies();
         }
 
         public async Task<Dictionary<int, VersionSelectorStrategy>> GetSelectorStrategies()
         {
-            await this.WaitUntilReady();
+            ThrowIfNotEnabled();
             return await StoreGrain.GetSelectorStrategies();
         }
 
         public async Task<CompatibilityStrategy> GetCompatibilityStrategy()
         {
-            await this.WaitUntilReady();
+            ThrowIfNotEnabled();
             return await StoreGrain.GetCompatibilityStrategy();
         }
 
         public async Task<VersionSelectorStrategy> GetSelectorStrategy()
         {
-            await this.WaitUntilReady();
+            ThrowIfNotEnabled();
             return await StoreGrain.GetSelectorStrategy();
         }
 
-        private async Task WaitUntilReady()
+        private void ThrowIfNotEnabled()
         {
-            if (!this.IsEnabled) ThrowNotEnabled();
-            await this.ready.Task;
-
-            void ThrowNotEnabled() => throw new OrleansException("Version store not enabled, make sure the store is configured");
+            if (!IsEnabled)
+                throw new OrleansException("Version store not enabled, make sure the store is configured");
         }
 
-        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+        public void Participate(ISiloLifecycle lifecycle)
         {
-            Task OnApplicationServicesStart(CancellationToken ct)
-            {
-                this.ready.TrySetResult(true);
-                return Task.CompletedTask;
-            }
+            lifecycle.Subscribe<GrainVersionStore>(ServiceLifecycleStage.ApplicationServices, this.OnStart);
+        }
 
-            Task OnApplicationServicesStop(CancellationToken ct)
-            {
-                this.ready.TrySetResult(true);
-                return Task.CompletedTask;
-            }
-
-            lifecycle.Subscribe(
-                nameof(GrainVersionStore),
-                ServiceLifecycleStage.ApplicationServices,
-                OnApplicationServicesStart,
-                OnApplicationServicesStop);
+        private Task OnStart(CancellationToken token)
+        {
+            this.IsEnabled = this.services.GetService<IGrainStorage>() != null;
+            return Task.CompletedTask;
         }
     }
 }
