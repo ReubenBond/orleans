@@ -22,8 +22,6 @@ using Orleans.Runtime.ReminderService;
 using Orleans.Runtime.Scheduler;
 using Orleans.Services;
 using Orleans.Streams;
-using Orleans.Runtime.Versions;
-using Orleans.Versions;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Serialization;
@@ -59,7 +57,6 @@ namespace Orleans.Runtime
         private readonly IncomingMessageAgent incomingSystemAgent;
         private readonly IncomingMessageAgent incomingPingAgent;
         private readonly ILogger logger;
-        private TypeManager typeManager;
         private readonly TaskCompletionSource<int> siloTerminatedTask =
             new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly SiloStatisticsManager siloStatistics;
@@ -288,13 +285,6 @@ namespace Orleans.Runtime
             logger.Debug("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
 
             this.RegisterSystemTarget(this.Services.GetRequiredService<ClientObserverRegistrar>());
-            var implicitStreamSubscriberTable = Services.GetRequiredService<ImplicitStreamSubscriberTable>();
-            var versionDirectorManager = this.Services.GetRequiredService<CachedVersionSelectorManager>();
-            var grainTypeManager = this.Services.GetRequiredService<GrainTypeManager>();
-            IOptions<TypeManagementOptions> typeManagementOptions = this.Services.GetRequiredService<IOptions<TypeManagementOptions>>();
-            typeManager = new TypeManager(SiloAddress, grainTypeManager, siloStatusOracle, LocalScheduler, typeManagementOptions.Value.TypeMapRefreshInterval, implicitStreamSubscriberTable, this.grainFactory, versionDirectorManager,
-                this.loggerFactory);
-            this.RegisterSystemTarget(typeManager);
 
             logger.Debug("Creating {0} System Target", "MembershipOracle");
             if (this.membershipService is SystemTarget)
@@ -323,9 +313,7 @@ namespace Orleans.Runtime
 
             // consistentRingProvider is not a system target per say, but it behaves like the localGrainDirectory, so it is here
             this.siloStatusOracle.SubscribeToSiloStatusEvents((ISiloStatusListener)RingProvider);
-
-            this.siloStatusOracle.SubscribeToSiloStatusEvents(typeManager);
-
+            
             this.siloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<DeploymentLoadPublisher>());
 
             this.siloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<ClientObserverRegistrar>());
@@ -432,11 +420,6 @@ namespace Orleans.Runtime
             await StartAsyncTaskWithPerfAnalysis("Init grain services",
                 () => CreateGrainServices(), stopWatch);
             
-            var versionStore = Services.GetService<IVersionStore>();
-            await StartAsyncTaskWithPerfAnalysis("Init type manager", () => scheduler
-                .QueueTask(() => this.typeManager.Initialize(versionStore), this.typeManager.SchedulingContext)
-                .WithTimeout(this.initTimeout, $"TypeManager Initializing failed due to timeout {initTimeout}"), stopWatch);
-
             //if running in multi cluster scenario, start the MultiClusterNetwork Oracle
             if (this.multiClusterOracle != null)
             {
