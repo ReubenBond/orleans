@@ -24,7 +24,7 @@ namespace Orleans
         public const int RuntimeInitialize = 2_000;
 
         // ::START::
-        // MembershipTableManager initializes table & performs first read
+        // MembershipTableManager initializes table, performs first read, & begins periodic table refreshes
         // LocalGrainDirectory starts processing membership updates
         // LocalGrainDirectory starts GlobalSingleInstance maintainer
         // LocalGrainDirectory starts Directory cache maintainer
@@ -47,6 +47,7 @@ namespace Orleans
         // Silo calls SiloStatisticsManager.Start
         // Silo calls DeploymentLoadPublisher.Start ########################################################################################## Is this too early? #############################################
         // Silo starts Watchdog
+
 
         /// <summary>
         /// Start runtime services
@@ -84,7 +85,6 @@ namespace Orleans
         // MembershipAgent transitions the silo status to Active in the membership table, causing a table refresh
         // LocalGrainDirectory waits for the table refresh to propagate to it
         // ClusterHealthManager begins monitoring other silos  ########################################################################################## Is this too early? #############################################
-        // MembershipTableManager begins periodic table refreshes ########################################################################################## Is this too LATE?? #############################################
         // Silo starts the gateway ########################################################################################## Is this too early? #############################################
 
         /// <summary>

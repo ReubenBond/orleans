@@ -33,7 +33,7 @@ namespace Orleans.Runtime
         private bool needsRefresh;
         private MembershipVersion lastUpdatedVersion;
 
-        internal TypeManager(
+        public TypeManager(
             ILocalSiloDetails localSiloDetails,
             GrainTypeManager grainTypeManager,
             OrleansTaskScheduler scheduler,
