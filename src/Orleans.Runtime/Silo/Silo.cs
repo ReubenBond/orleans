@@ -644,7 +644,7 @@ namespace Orleans.Runtime
                     await Task.Delay(pause);
                 }
 
-                await this.siloTerminatedTask.Task;
+                await this.SiloTerminated;
                 return;
             }
 
