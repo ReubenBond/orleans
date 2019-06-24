@@ -158,6 +158,7 @@ namespace Orleans.Runtime
             Utils.SafeExecute(() => this.clientObserverRegistrar.SetHostedClient(null));
             Utils.SafeExecute(() => this.siloMessageCenter.SetHostedClient(null));
             Utils.SafeExecute(() => this.listeningCts.Cancel(false));
+            Utils.SafeExecute(() => this.incomingMessages.Add(null));
             Utils.SafeExecute(() => this.listeningCts.Dispose());
             Utils.SafeExecute(() => this.messagePump?.Join());
         }
@@ -178,7 +179,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    var message = this.incomingMessages.Take(this.listeningCts.Token);
+                    var message = this.incomingMessages.Take();
                     if (message == null) continue;
                     switch (message.Direction)
                     {

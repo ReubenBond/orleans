@@ -278,10 +278,7 @@ namespace Orleans.Runtime
 
             logger.Debug("Creating {0} System Target", "ProtocolGateway");
             RegisterSystemTarget(new ProtocolGateway(this.SiloAddress, this.loggerFactory));
-
-            logger.Debug("Creating {0} System Target", "DeploymentLoadPublisher");
-            RegisterSystemTarget(Services.GetRequiredService<DeploymentLoadPublisher>());
-            
+                        
             logger.Debug("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
 
             this.RegisterSystemTarget(this.Services.GetRequiredService<ClientObserverRegistrar>());
@@ -314,8 +311,6 @@ namespace Orleans.Runtime
             // consistentRingProvider is not a system target per say, but it behaves like the localGrainDirectory, so it is here
             this.siloStatusOracle.SubscribeToSiloStatusEvents((ISiloStatusListener)RingProvider);
             
-            this.siloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<DeploymentLoadPublisher>());
-
             this.siloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<ClientObserverRegistrar>());
 
             var reminderTable = Services.GetService<IReminderTable>();
@@ -449,17 +444,6 @@ namespace Orleans.Runtime
                 StatisticsOptions statisticsOptions = Services.GetRequiredService<IOptions<StatisticsOptions>>().Value;
                 StartTaskWithPerfAnalysis("Start silo statistics", () => this.siloStatistics.Start(statisticsOptions), stopWatch);
                 logger.Debug("Silo statistics manager started successfully.");
-
-                // Finally, initialize the deployment load collector, for grains with load-based placement
-                await StartAsyncTaskWithPerfAnalysis("Start deployment load collector", StartDeploymentLoadCollector, stopWatch);
-                async Task StartDeploymentLoadCollector()
-                {
-                    var deploymentLoadPublisher = Services.GetRequiredService<DeploymentLoadPublisher>();
-                    await this.scheduler.QueueTask(deploymentLoadPublisher.Start, deploymentLoadPublisher.SchedulingContext)
-                        .WithTimeout(this.initTimeout, $"Starting DeploymentLoadPublisher failed due to timeout {initTimeout}");
-                    logger.Debug("Silo deployment load publisher started successfully.");
-                }
-
 
                 // Start background timer tick to watch for platform execution stalls, such as when GC kicks in
                 this.platformWatchdog = new Watchdog(statisticsOptions.LogWriteInterval, this.healthCheckParticipants, this.executorService, this.loggerFactory);

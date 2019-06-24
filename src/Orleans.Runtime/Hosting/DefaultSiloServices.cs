@@ -39,6 +39,7 @@ using System.Reflection;
 using System.Linq;
 using Microsoft.Extensions.Options;
 using Orleans.Timers.Internal;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Hosting
 {
@@ -135,6 +136,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<MultiClusterRegistrationStrategyManager>();
             services.TryAddFromExisting<IMultiClusterOracle, MultiClusterOracle>();
             services.TryAddSingleton<DeploymentLoadPublisher>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DeploymentLoadPublisher>();
 
             services.TryAddSingleton<IAsyncTimerFactory, AsyncTimerFactory>();
             services.TryAddSingleton<MembershipTableManager>();
