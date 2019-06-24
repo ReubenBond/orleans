@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,9 +26,10 @@ namespace UnitTests
             originalTimeout = this.runtimeClient.GetResponseTimeout();
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
             this.runtimeClient.SetResponseTimeout(originalTimeout);
+            base.Dispose();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Timeout")]

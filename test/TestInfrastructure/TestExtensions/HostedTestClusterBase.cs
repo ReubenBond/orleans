@@ -26,7 +26,7 @@ namespace TestExtensions
             this.Fixture = fixture;
         }
 
-        public void Dispose()
+        public virtual void Dispose()
         {
             this.Fixture?.Dispose();
         }

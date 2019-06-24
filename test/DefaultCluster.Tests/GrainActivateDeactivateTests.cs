@@ -19,9 +19,10 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             watcher.Clear().Wait();
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
             watcher.Clear().Wait();
+            base.Dispose();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
