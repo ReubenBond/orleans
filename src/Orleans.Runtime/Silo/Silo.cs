@@ -350,8 +350,15 @@ namespace Orleans.Runtime
             logger.Info(ErrorCode.SiloStarting, "Silo Start()");
 
             var processExitHandlingOptions = this.Services.GetRequiredService<IOptions<ProcessExitHandlingOptions>>().Value;
-            if(processExitHandlingOptions.FastKillOnProcessExit)
-                AppDomain.CurrentDomain.ProcessExit += HandleProcessExit;
+            if (processExitHandlingOptions.FastKillOnProcessExit)
+            {
+                var weakCapture = new WeakReference<Silo>(this);
+                EventHandler weakEventHandler = (sender, args) =>
+                {
+                    if (weakCapture.TryGetTarget(out var silo)) silo.HandleProcessExit(sender, args);
+                };
+                AppDomain.CurrentDomain.ProcessExit += weakEventHandler;
+            }
             
             //TODO: setup thead pool directly to lifecycle
             StartTaskWithPerfAnalysis("ConfigureThreadPoolAndServicePointSettings",
