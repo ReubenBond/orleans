@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -7,7 +8,7 @@ using Orleans.TestingHost;
 
 namespace TestExtensions
 {
-    public class DefaultClusterFixture
+    public class DefaultClusterFixture : IDisposable
     {
         static DefaultClusterFixture()
         {

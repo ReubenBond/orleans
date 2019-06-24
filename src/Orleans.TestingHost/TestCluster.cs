@@ -27,7 +27,7 @@ namespace Orleans.TestingHost
     /// Make sure that your test project references your test grains and test grain interfaces 
     /// projects, and has CopyLocal=True set on those references [which should be the default].
     /// </remarks>
-    public class TestCluster
+    public class TestCluster : IDisposable
     {
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
         private readonly TestClusterOptions options;
@@ -587,6 +587,16 @@ namespace Orleans.TestingHost
         private void FlushLogToConsole()
         {
             Console.WriteLine(GetLog());
+        }
+
+        public void Dispose()
+        {
+            foreach (var handle in this.Silos)
+            {
+                handle.Dispose();
+            }
+
+            this.Client.Dispose();
         }
     }
 }
