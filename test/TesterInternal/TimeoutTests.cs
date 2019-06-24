@@ -26,10 +26,9 @@ namespace UnitTests
             originalTimeout = this.runtimeClient.GetResponseTimeout();
         }
 
-        public override void Dispose()
+        public virtual void Dispose()
         {
             this.runtimeClient.SetResponseTimeout(originalTimeout);
-            base.Dispose();
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Timeout")]
