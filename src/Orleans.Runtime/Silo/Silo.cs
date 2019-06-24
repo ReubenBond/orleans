@@ -634,7 +634,7 @@ namespace Orleans.Runtime
                 while (!this.SystemStatus.Equals(SystemStatus.Terminated))
                 {
                     logger.Info(ErrorCode.WaitingForSiloStop, "Waiting {0} for termination to complete", pause);
-                    Thread.Sleep(pause);
+                    await Task.Delay(pause);
                 }
 
                 await this.siloTerminatedTask.Task;
@@ -688,7 +688,6 @@ namespace Orleans.Runtime
             SafeExecute(siloStatistics.Stop);
 
             SafeExecute(() => this.SystemStatus = SystemStatus.Terminated);
-            SafeExecute(() => (this.Services as IDisposable)?.Dispose());
 
             // Setting the event should be the last thing we do.
             // Do nothing after that!
@@ -707,11 +706,18 @@ namespace Orleans.Runtime
             {
                 if (gracefully)
                 {
-                    logger.Info(ErrorCode.SiloShuttingDown, "Silo starting to Shutdown()");
+                    try
+                    {
+                        logger.LogInformation((int)ErrorCode.SiloShuttingDown, "Silo is shutting down");
+                        await Task.WhenAny(ct.WhenCancelled(), this.catalog.DeactivateAllActivations());
+                    }
+                    catch (Exception exception)
+                    {
+                        this.logger.LogWarning("Exception while deactivating all activations: {Exception}", exception);
+                    }
 
-                    SafeExecute(() => catalog.DeactivateAllActivations().Wait(ct));
-                    //wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop. 
-                    await Task.Delay(WaitForMessageToBeQueuedForOutbound);
+                    // wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop. 
+                    if (!ct.IsCancellationRequested) await Task.Delay(WaitForMessageToBeQueuedForOutbound);
                 }
             }
             catch (Exception exc)

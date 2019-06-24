@@ -8,15 +8,37 @@ namespace Orleans
     /// </summary>
     public static class ServiceLifecycleStage
     {
+        // ::FIRST::
+        // Before lifecycle starts, OrleansTaskScheduler is started
+
+        // ::LAST::
+        // After lifecycle stops, OrleansTaskScheduler is stopped
+
         /// <summary>
         /// First valid stage in service's lifecycle
         /// </summary>
         public const int First = int.MinValue;
 
         // ::START::
-        // Set Silo.SystemStatus = Starting
+        // Silo sets SystemStatus = Starting
         // Add AppDomain.CurrentDomain.ProcessExit hook (depending on ProcessExitHandlingOptions)
         // Configure .NET ThreadPool & .NET ServicePointManager (depending on PerformanceTuningOptions)
+        // HostedClient starts message pump
+        // InsiderRuntimeClient initializes internal data structures & starts callback expiry timer
+        // InsideRuntimeClient calls GrainTypeManager.Start, which just logs registered types & returns
+        // ClusterMembership begins processing membership updates
+        // SiloStatusListenerManager begins processing membership updates
+
+        // ::STOP::
+        // MembershipAgent stops updating IAmAlive & stops processing membership updates
+        // SiloStatusListenerManager stops processing membership updates
+        // Silo stops IncomingMessageAgents
+        // Silo stops Watchdog
+        // Silo stops MessageCenter
+        // Silo stops SiloStatisticsManager
+        // Silo sets SystemStatus = Terminated
+        // Silo disposes DI container  ########################################################################################## THIS IS BAD! DO THIS IN HOST ONLY #############################################
+        // Silo signals termination
 
         /// <summary>
         /// Initialize runtime
@@ -35,6 +57,12 @@ namespace Orleans
         // Silo subscribes various ISiloStatusListeners to the ISiloStatusOracle
         // Silo starts Catalog's activation collector timer (Catalog.Start)
 
+        // ::STOP::
+        // LocalGrainDirectory stops processing membership updates
+        // MembershipTableManager stops periodically refreshing the membership table
+        // Silo blocks application messages in MessageCenter
+        // Silo stops application turns in Scheduler
+
         /// <summary>
         /// Start runtime services
         /// </summary>
@@ -47,6 +75,10 @@ namespace Orleans
         // Silo calls SiloStatisticsManager.Start
         // Silo calls DeploymentLoadPublisher.Start
         // Silo starts Watchdog
+
+        // ::STOP::
+        // HostedClient calls IClusterClient.Close which should just set some internal state to disposed
+        // TypeManager stops processing membership updates
 
         /// <summary>
         /// Start runtime services
@@ -83,10 +115,18 @@ namespace Orleans
         // ::START::
         // MembershipAgent transitions the silo status to Active in the membership table, causing a table refresh
         // LocalGrainDirectory waits for the table refresh to propagate to it
-        // ClusterHealthManager begins monitoring other silos  ########################################################################################## Is this too early? #############################################
         // Silo starts the gateway ########################################################################################## Is this too early? #############################################
 
         // NOTE: Gateway should open ports but not accept connections
+
+        // ::STOP::
+        // LocalGrainDirectory stops ActivationCacheMaintainer, GsiActivationMaintainer
+        // LocalGrainDirectory performs handoff (only if graceful cancellation)
+        // LocalGrainDirectory clears local directory & cache data structures
+        // MembershipAgent transitions silo status to Stopping / ShuttingDown (depending on cancellation token)
+        // Silo deactivates all activations (if graceful)
+        // Silo waits 2 seconds in hopes taht all messages will have been forwarded by then
+        // Silo makes MessageCenter stop accepting client messages
 
         /// <summary>
         /// Transition into the Active state in membership.
@@ -120,6 +160,9 @@ namespace Orleans
         // NOTE:
         // Gateway starts accepting connections
 
+        // ::STOP::
+        // Grain-based reminders are disabled
+
         /// <summary>
         /// Start application layer services.
         /// </summary>
@@ -138,7 +181,14 @@ namespace Orleans
         // Membership table cleanup agent starts
         // Persistent stream provider starts (by default) ########################################################################################## Is this too LATE?? #############################################
         // Silo starts IReminderService  ########################################################################################## Is this too LATE?? (should be one stage earlier?) #############################################
-        // Silo starts GrainServices (GrainSerice.Start)
+        // Silo starts GrainServices (GrainService.Start)
+        // ClusterHealthMonitor begins monitoring other silos
+
+        // ::STOP::
+        // ClusterHealthMonitor stops monitoring other silos
+        // Membership table cleanup agent stops
+        // Silo stops IReminderService ########################################################################################## Is this too early? Grains are still running #############################################
+        // Silo stops GrainServices (GrainService.Stop)
 
         /// <summary>
         /// Service is active.

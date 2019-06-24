@@ -200,10 +200,10 @@ namespace Orleans.Runtime
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
+            lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.RuntimeGrainServices, OnRuntimeGrainServicesStart, OnRuntimeGrainServicesStop);
             lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.ApplicationServices, OnApplicationServicesStart, _ => Task.CompletedTask);
 
-            Task OnRuntimeInitializeStart(CancellationToken cancellation)
+            Task OnRuntimeGrainServicesStart(CancellationToken cancellation)
             {
                 // Start pumping messages.
                 this.Start();
@@ -211,7 +211,7 @@ namespace Orleans.Runtime
                 return Task.CompletedTask;
             }
 
-            Task OnRuntimeInitializeStop(CancellationToken cancellation)
+            Task OnRuntimeGrainServicesStop(CancellationToken cancellation)
             {
                 if (cancellation.IsCancellationRequested) return Task.CompletedTask;
 

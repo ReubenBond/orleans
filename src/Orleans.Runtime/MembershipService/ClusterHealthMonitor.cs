@@ -312,16 +312,16 @@ namespace Orleans.Runtime.MembershipService
         {
             var becomeActiveTasks = new List<Task>();
 
-            lifecycle.Subscribe(nameof(ClusterHealthMonitor), ServiceLifecycleStage.BecomeActive, OnBecomeActiveStart, OnBecomeActiveStop);
+            lifecycle.Subscribe(nameof(ClusterHealthMonitor), ServiceLifecycleStage.Active, OnActiveStart, OnActiveStop);
 
-            Task OnBecomeActiveStart(CancellationToken ct)
+            Task OnActiveStart(CancellationToken ct)
             {
                 becomeActiveTasks.Add(Task.Run(() => this.ProcessMembershipUpdates()));
                 becomeActiveTasks.Add(Task.Run(() => this.MonitorClusterHealth()));
                 return Task.CompletedTask;
             }
 
-            Task OnBecomeActiveStop(CancellationToken ct)
+            Task OnActiveStop(CancellationToken ct)
             {
                 this.monitorClusterHealthTimer.Dispose();
                 this.cancellation.Cancel(throwOnFirstException: false);

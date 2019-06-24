@@ -57,7 +57,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 TimeSpan? onceOffDelay = default;
-                while (!this.tableManager.CurrentStatus.IsTerminating() && await this.iAmAliveTimer.NextTick(onceOffDelay))
+                while (await this.iAmAliveTimer.NextTick(onceOffDelay) && !this.tableManager.CurrentStatus.IsTerminating())
                 {
                     onceOffDelay = default;
 

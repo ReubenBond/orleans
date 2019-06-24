@@ -1031,10 +1031,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             async Task OnBecomeActiveStop(CancellationToken ct)
             {
-                this.cancellation.Cancel(throwOnFirstException: false);
-
-                if (!ct.IsCancellationRequested) tasks.Add(this.Stop(true));
-
+                tasks.Add(Task.Run(() => this.Stop(ct)));
                 await Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
             }
 
@@ -1047,7 +1044,7 @@ namespace Orleans.Runtime.GrainDirectory
         // The alternative would be to allow the silo to process requests after it has handed off its partition, in which case those changes 
         // would receive successful responses but would not be reflected in the eventual state of the directory. 
         // It's easy to change this, if we think the trade-off is better the other way.
-        private async Task Stop(bool doOnStopHandoff)
+        private async Task Stop(CancellationToken cancellationToken)
         {
             // This will cause remote write requests to be forwarded to the silo that will become the new owner.
             // Requests might bounce back and forth for a while as membership stabilizes, but they will either be served by the
@@ -1063,7 +1060,7 @@ namespace Orleans.Runtime.GrainDirectory
                 GsiActivationMaintainer.Stop();
             }
 
-            if (doOnStopHandoff)
+            if (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
@@ -1074,6 +1071,7 @@ namespace Orleans.Runtime.GrainDirectory
                     this.log.LogWarning($"GrainDirectoryHandOffManager failed ProcessSiloStoppingEvent due to exception {exc}");
                 }
             }
+
             DirectoryPartition.Clear();
             DirectoryCache.Clear();
         }
