@@ -41,11 +41,11 @@ namespace Orleans
         public const int RuntimeServices = 4_000;
 
         // ::START::
-        // Silo creates & registers GrainServices & calls Init() for each ########################################################################################## Is this too early? #############################################
+        // Silo creates & registers GrainServices & calls Init() for each
         // Silo initializes type management with IVersionStore
         // Silo calls IMultiClusterOracle.Start
         // Silo calls SiloStatisticsManager.Start
-        // Silo calls DeploymentLoadPublisher.Start ########################################################################################## Is this too early? #############################################
+        // Silo calls DeploymentLoadPublisher.Start
         // Silo starts Watchdog
 
         /// <summary>
@@ -72,7 +72,7 @@ namespace Orleans
 
         // ::START::
         // *Legacy* storage providers start
-        // TODO: ensure type manager is refreshed here
+        // TODO: ensure type manager is refreshed here?
         // 
 
         /// <summary>

@@ -316,8 +316,8 @@ namespace Orleans.Runtime.MembershipService
 
             Task OnBecomeActiveStart(CancellationToken ct)
             {
-                becomeActiveTasks.Add(this.ProcessMembershipUpdates());
-                becomeActiveTasks.Add(this.MonitorClusterHealth());
+                becomeActiveTasks.Add(Task.Run(() => this.ProcessMembershipUpdates()));
+                becomeActiveTasks.Add(Task.Run(() => this.MonitorClusterHealth()));
                 return Task.CompletedTask;
             }
 

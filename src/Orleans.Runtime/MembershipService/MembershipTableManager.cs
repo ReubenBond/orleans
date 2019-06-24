@@ -76,38 +76,25 @@ namespace Orleans.Runtime.MembershipService
 
         public SiloStatus CurrentStatus { get; private set; } = SiloStatus.Created;
 
-        public Task Refresh() => this.RefreshInternal();
+        public Task Refresh() => this.RefreshInternal(requireCleanup: false);
 
-        private async Task<MembershipTableData> RefreshInternal()
+        private async Task<MembershipTableData> RefreshInternal(bool requireCleanup)
         {
-            async Task<MembershipTableData> AttemptRefresh(int counter)
+            var table = await this.membershipTableProvider.ReadAll();
+            this.ProcessTableUpdate(table, "Refresh");
+
+            try
             {
-                var table = await this.membershipTableProvider.ReadAll();
-                this.ProcessTableUpdate(table, "Refresh");
-
-                try
-                {
-                    await this.CleanupMyTableEntries(table);
-                }
-                catch (Exception exception)
-                {
-                    this.log.LogWarning(
-                        "Exception while trying to clean up my table entries: {Exception}",
-                        exception);
-                }
-
-                return table;
+                await this.CleanupMyTableEntries(table);
+            }
+            catch (Exception exception) when (!requireCleanup)
+            {
+                this.log.LogWarning(
+                    "Exception while trying to clean up my table entries: {Exception}",
+                    exception);
             }
 
-            return await AsyncExecutorWithRetries.ExecuteWithRetries(
-                    function: AttemptRefresh,
-                    maxNumSuccessTries: NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS,
-                    maxNumErrorTries: NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS,
-                    retryValueFilter: (value, i) => value == null,
-                    retryExceptionFilter: (exc, i) => true,         
-                    maxExecutionTime: this.clusterMembershipOptions.MaxJoinAttemptTime,
-                    onSuccessBackOff: new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP),
-                    onErrorBackOff: new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP));
+            return table;
         }
 
         private async Task Start()
@@ -123,8 +110,17 @@ namespace Orleans.Runtime.MembershipService
 
                 // Init the membership table.
                 await this.membershipTableProvider.InitializeMembershipTable(true);
-                
-                var table = await this.RefreshInternal();
+
+                // Perform an initial table read
+                var table = await AsyncExecutorWithRetries.ExecuteWithRetries(
+                    function: _ => this.RefreshInternal(requireCleanup: true),
+                    maxNumSuccessTries: NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS,
+                    maxNumErrorTries: NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS,
+                    retryValueFilter: (value, i) => value == null,
+                    retryExceptionFilter: (exc, i) => true,
+                    maxExecutionTime: this.clusterMembershipOptions.MaxJoinAttemptTime,
+                    onSuccessBackOff: new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP),
+                    onErrorBackOff: new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP));
 
                 LogMissedIAmAlives(table);
 
@@ -248,26 +244,11 @@ namespace Orleans.Runtime.MembershipService
 
         public async Task UpdateStatus(SiloStatus status)
         {
-            if (status == SiloStatus.Joining)
-            {
-                // first, cleanup all outdated entries of myself from the table
-                Func<int, Task<bool>> cleanupTableEntriesTask = async counter =>
-                {
-                    if (log.IsEnabled(LogLevel.Debug)) log.Debug("-Attempting CleanupTableEntries #{0}", counter);
-                    var table = await this.membershipTableProvider.ReadAll();
-                    log.Info(ErrorCode.MembershipReadAll_Cleanup, "-CleanupTable called on silo startup. Membership table {0}",
-                        table.ToString());
-
-                    return await CleanupMyTableEntries(table);
-                };
-
-                await MembershipExecuteWithRetries(cleanupTableEntriesTask, this.clusterMembershipOptions.MaxJoinAttemptTime);
-            }
-
             if (status == SiloStatus.Dead && this.membershipTableProvider is SystemTargetBasedMembershipTable)
             {
+                var table = await this.RefreshInternal(requireCleanup: false);
                 this.CurrentStatus = status;
-
+                this.ProcessTableUpdate(table, nameof(UpdateStatus));
 
                 // SystemTarget-based clustering does not support transitioning to Dead locally since at this point app scheduler turns have been stopped.
                 return;
