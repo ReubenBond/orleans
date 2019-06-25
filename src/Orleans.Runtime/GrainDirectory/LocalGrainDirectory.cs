@@ -1029,9 +1029,10 @@ namespace Orleans.Runtime.GrainDirectory
                 }
             }
 
-            async Task OnBecomeActiveStop(CancellationToken ct)
+            Task OnBecomeActiveStop(CancellationToken ct)
             {
-                await Task.WhenAny(ct.WhenCancelled(), Task.Run(() => this.Stop(ct)));
+                //await Task.WhenAny(ct.WhenCancelled(), Task.Run(() => this.Stop(ct)));
+                return Task.CompletedTask;
             }
 
             lifecycle.Subscribe(nameof(LocalGrainDirectory), ServiceLifecycleStage.BecomeActive, OnBecomeActiveStart, OnBecomeActiveStop);
@@ -1043,7 +1044,7 @@ namespace Orleans.Runtime.GrainDirectory
         // The alternative would be to allow the silo to process requests after it has handed off its partition, in which case those changes 
         // would receive successful responses but would not be reflected in the eventual state of the directory. 
         // It's easy to change this, if we think the trade-off is better the other way.
-        private async Task Stop(CancellationToken cancellationToken)
+        internal async Task Stop(CancellationToken cancellationToken)
         {
             // This will cause remote write requests to be forwarded to the silo that will become the new owner.
             // Requests might bounce back and forth for a while as membership stabilizes, but they will either be served by the
@@ -1063,7 +1064,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 try
                 {
-                    await HandoffManager.ProcessSiloStoppingEvent(this.membershipSnapshot);
+                    await Task.WhenAny(cancellationToken.WhenCancelled(), this.HandoffManager.ProcessSiloStoppingEvent(this.membershipSnapshot));
                 }
                 catch (Exception exc)
                 {

@@ -634,7 +634,6 @@ namespace Orleans.Runtime
             try
             {
                 await this.scheduler.QueueTask(() => this.siloLifecycle.OnStop(cancellationToken), this.lifecycleSchedulingSystemTarget.SchedulingContext);
-                await this.SiloTerminated;
             }
             finally
             {
@@ -698,6 +697,8 @@ namespace Orleans.Runtime
                 {
                     try
                     {
+                        await Task.WhenAny(ct.WhenCancelled(), this.localGrainDirectory.Stop(ct));
+
                         logger.LogInformation((int)ErrorCode.SiloShuttingDown, "Silo is shutting down");
                         await Task.WhenAny(ct.WhenCancelled(), this.catalog.DeactivateAllActivations());
                     }

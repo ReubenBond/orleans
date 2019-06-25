@@ -216,6 +216,9 @@ namespace Orleans.Runtime
             {
                 if (cancellation.IsCancellationRequested) return Task.CompletedTask;
 
+                this.listeningCts.Cancel(throwOnFirstException: false);
+                this.incomingMessages.Add(null);
+
                 var clusterClient = this.runtimeClient.ServiceProvider.GetRequiredService<IClusterClient>();
                 return clusterClient.Close();
             }

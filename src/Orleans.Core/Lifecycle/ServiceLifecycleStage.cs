@@ -125,7 +125,7 @@ namespace Orleans
         // LocalGrainDirectory clears local directory & cache data structures
         // MembershipAgent transitions silo status to Stopping / ShuttingDown (depending on cancellation token)
         // Silo deactivates all activations (if graceful)
-        // Silo waits 2 seconds in hopes taht all messages will have been forwarded by then
+        // Silo waits 2 seconds in hopes that all messages will have been forwarded by then
         // Silo makes MessageCenter stop accepting client messages
 
         /// <summary>
@@ -150,6 +150,8 @@ namespace Orleans
         /// </summary>
         public const int BecomeActive = 10_000;
 
+        // ::START::
+        // IncomingMessageAcceptor starts processing application messages
         public const int AcceptGrains = 12_000;
 
         // ::START::
@@ -158,9 +160,6 @@ namespace Orleans
         // HostedClient starts
         // Grain-based Reminders are enabled
         // Grain-based Versioning is enabled
-
-        // NOTE:
-        // Gateway starts accepting connections
 
         // ::STOP::
         // Grain-based reminders are disabled
