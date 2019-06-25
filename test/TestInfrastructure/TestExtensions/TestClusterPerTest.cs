@@ -69,12 +69,12 @@ namespace TestExtensions
             this.HostedCluster?.StopAllSilos();
         }
 
-        public Task InitializeAsync()
+        public virtual Task InitializeAsync()
         {
             return Task.CompletedTask;
         }
 
-        public async Task DisposeAsync()
+        public virtual async Task DisposeAsync()
         {
             var cluster = this.HostedCluster;
             if (cluster != null)
