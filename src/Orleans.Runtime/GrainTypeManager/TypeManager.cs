@@ -30,8 +30,6 @@ namespace Orleans.Runtime
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
         private readonly IAsyncTimer refreshTimer;
         private readonly IVersionStore versionStore;
-        private bool needsRefresh;
-        private MembershipVersion lastUpdatedVersion;
 
         public TypeManager(
             ILocalSiloDetails localSiloDetails,
@@ -130,12 +128,13 @@ namespace Orleans.Runtime
 
         private async Task UpdateClusterTypeMap()
         {
-            this.needsRefresh |= this.lastUpdatedVersion >= this.clusterMembership.CurrentSnapshot.Version;
+            ClusterMembershipSnapshot members = default;
+            var needsRefresh = true;
             while (needsRefresh)
             {
                 needsRefresh = false;
 
-                var members = this.clusterMembership.CurrentSnapshot;
+                members = this.clusterMembership.CurrentSnapshot;
 
                 if (this.logger.IsEnabled(LogLevel.Debug)) logger.Debug("UpdateClusterTypeMap: refresh start");
                 var knownSilosClusterGrainInterfaceMap = grainTypeManager.GrainInterfaceMapsBySilo;
@@ -177,6 +176,10 @@ namespace Orleans.Runtime
                         {
                             newSilosClusterGrainInterfaceMap[keyValuePair.Key] = keyValuePair.Value;
                         }
+                        else
+                        {
+                            needsRefresh = true;
+                        }
                     }
                 }
 
@@ -184,17 +187,17 @@ namespace Orleans.Runtime
 
                 if (this.versionStore.IsEnabled)
                 {
-                    await this.GetAndSetDefaultCompatibilityStrategy();
-                    foreach (var kvp in await GetStoredCompatibilityStrategies())
-                    {
-                        this.versionSelectorManager.CompatibilityDirectorManager.SetStrategy(kvp.Key, kvp.Value);
-                    }
+                    var success = await this.GetAndSetDefaultCompatibilityStrategy();
+                    needsRefresh |= !success;
 
-                    await this.GetAndSetDefaultSelectorStrategy();
-                    foreach (var kvp in await GetSelectorStrategies())
-                    {
-                        this.versionSelectorManager.VersionSelectorManager.SetSelector(kvp.Key, kvp.Value);
-                    }
+                    success = await this.RefreshCompatibilityStrategies();
+                    needsRefresh |= !success;
+
+                    success = await this.GetAndSetDefaultSelectorStrategy();
+                    needsRefresh |= !success;
+
+                    success = await this.RefreshSelectorStrategies();
+                    needsRefresh |= !success;
                 }
 
                 versionSelectorManager.ResetCache();
@@ -209,62 +212,75 @@ namespace Orleans.Runtime
 
                     if (!await this.refreshTimer.NextTick(TimeSpan.FromSeconds(1))) return;
                 }
-                else
-                {
-                    this.lastUpdatedVersion = members.Version;
-                }
+            }
+
+            if (this.logger.IsEnabled(LogLevel.Debug))
+            {
+                this.logger.LogDebug("Successfully refreshed type manager at membership version {Version}", members?.Version);
             }
         }
 
-        private async Task GetAndSetDefaultSelectorStrategy()
+        private async Task<bool> GetAndSetDefaultSelectorStrategy()
         {
             try
             {
                 var strategy = await this.versionStore.GetSelectorStrategy();
                 this.versionSelectorManager.VersionSelectorManager.SetSelector(strategy);
+                return true;
             }
             catch (Exception)
             {
-                needsRefresh = true;
+                return false;
             }
         }
 
-        private async Task GetAndSetDefaultCompatibilityStrategy()
+        private async Task<bool> GetAndSetDefaultCompatibilityStrategy()
         {
             try
             {
                 var strategy = await this.versionStore.GetCompatibilityStrategy();
                 this.versionSelectorManager.CompatibilityDirectorManager.SetStrategy(strategy);
+                return true;
             }
             catch (Exception)
             {
-                needsRefresh = true;
+                return false;
             }
         }
 
-        private async Task<Dictionary<int, CompatibilityStrategy>> GetStoredCompatibilityStrategies()
+        private async Task<bool> RefreshCompatibilityStrategies()
         {
             try
             {
-                return await this.versionStore.GetCompatibilityStrategies();
+                var strategies = await this.versionStore.GetCompatibilityStrategies();
+                foreach (var strategy in strategies)
+                {
+                    this.versionSelectorManager.CompatibilityDirectorManager.SetStrategy(strategy.Key, strategy.Value);
+                }
+
+                return true;
             }
             catch (Exception)
             {
-                needsRefresh = true;
-                return new Dictionary<int, CompatibilityStrategy>();
+                return false;
             }
         }
 
-        private async Task<Dictionary<int, VersionSelectorStrategy>> GetSelectorStrategies()
+        private async Task<bool> RefreshSelectorStrategies()
         {
             try
             {
-                return await this.versionStore.GetSelectorStrategies();
+                var result = await this.versionStore.GetSelectorStrategies();
+                foreach (var strategy in result)
+                {
+                    this.versionSelectorManager.VersionSelectorManager.SetSelector(strategy.Key, strategy.Value);
+                }
+
+                return true;
             }
             catch (Exception)
             {
-                needsRefresh = true;
-                return new Dictionary<int, VersionSelectorStrategy>();
+                return false;
             }
         }
 
@@ -280,7 +296,6 @@ namespace Orleans.Runtime
             {
 				// Will be retried on the next timer hit
                 logger.Error(ErrorCode.TypeManager_GetSiloGrainInterfaceMapError, $"Exception when trying to get GrainInterfaceMap for silos {siloAddress}", ex);
-				needsRefresh = true;
                 return new KeyValuePair<SiloAddress, GrainInterfaceMap>(siloAddress, null);
             }
         }
