@@ -150,6 +150,8 @@ namespace Orleans
         /// </summary>
         public const int BecomeActive = 10_000;
 
+        public const int AcceptGrains = 12_000;
+
         // ::START::
         // Non-legacy storage providers start (by default)
         // Grain-based grain storage starts
@@ -167,6 +169,7 @@ namespace Orleans
         /// Start application layer services.
         /// </summary>
         public const int ApplicationServices = 14_000;
+
 
         // ::START::
         // (User-defined) IStartupTasks start (by default)
