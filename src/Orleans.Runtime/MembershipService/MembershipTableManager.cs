@@ -246,9 +246,7 @@ namespace Orleans.Runtime.MembershipService
         {
             if (status == SiloStatus.Dead && this.membershipTableProvider is SystemTargetBasedMembershipTable)
             {
-                var table = await this.RefreshInternal(requireCleanup: false);
                 this.CurrentStatus = status;
-                this.ProcessTableUpdate(table, nameof(UpdateStatus));
 
                 // SystemTarget-based clustering does not support transitioning to Dead locally since at this point app scheduler turns have been stopped.
                 return;
