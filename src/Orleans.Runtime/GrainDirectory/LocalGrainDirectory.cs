@@ -1031,8 +1031,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             async Task OnBecomeActiveStop(CancellationToken ct)
             {
-                tasks.Add(Task.Run(() => this.Stop(ct)));
-                await Task.WhenAny(ct.WhenCancelled(), Task.WhenAll(tasks));
+                await Task.WhenAny(ct.WhenCancelled(), Task.Run(() => this.Stop(ct)));
             }
 
             lifecycle.Subscribe(nameof(LocalGrainDirectory), ServiceLifecycleStage.BecomeActive, OnBecomeActiveStart, OnBecomeActiveStop);
