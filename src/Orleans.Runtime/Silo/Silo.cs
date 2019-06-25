@@ -697,10 +697,10 @@ namespace Orleans.Runtime
                 {
                     try
                     {
-                        await Task.WhenAny(ct.WhenCancelled(), this.localGrainDirectory.Stop(ct));
-
                         logger.LogInformation((int)ErrorCode.SiloShuttingDown, "Silo is shutting down");
                         await Task.WhenAny(ct.WhenCancelled(), this.catalog.DeactivateAllActivations());
+
+                        await Task.WhenAny(ct.WhenCancelled(), this.localGrainDirectory.Stop(ct));
                     }
                     catch (Exception exception)
                     {

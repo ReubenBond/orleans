@@ -103,16 +103,6 @@ namespace Orleans
         public const int BecomeJoining = 9_000;
 
         // ::START::
-        // *Legacy* storage providers start
-        // TODO: ensure type manager is refreshed here?
-        // 
-
-        /// <summary>
-        /// Initialize runtime storage
-        /// </summary>
-        public const int RuntimeStorageServices = 12_000;
-
-        // ::START::
         // MembershipAgent transitions the silo status to Active in the membership table, causing a table refresh
         // LocalGrainDirectory waits for the table refresh to propagate to it
         // Silo starts the gateway ########################################################################################## Is this too early? #############################################
@@ -127,7 +117,7 @@ namespace Orleans
         // Silo deactivates all activations (if graceful)
         // Silo waits 2 seconds in hopes that all messages will have been forwarded by then
         // Silo makes MessageCenter stop accepting client messages
-
+        
         /// <summary>
         /// Transition into the Active state in membership.
         ///
@@ -153,6 +143,16 @@ namespace Orleans
         // ::START::
         // IncomingMessageAcceptor starts processing application messages
         public const int AcceptGrains = 12_000;
+
+        // ::START::
+        // *Legacy* storage providers start
+        // TODO: ensure type manager is refreshed here?
+        // 
+
+        /// <summary>
+        /// Initialize runtime storage
+        /// </summary>
+        public const int RuntimeStorageServices = 12_000;
 
         // ::START::
         // Non-legacy storage providers start (by default)

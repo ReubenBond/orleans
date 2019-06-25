@@ -603,13 +603,20 @@ namespace Orleans.Runtime.GrainDirectory
         {
             Dictionary<IGrainRegistrar, List<ActivationAddress>> unregisterBatches = new Dictionary<IGrainRegistrar, List<ActivationAddress>>();
 
+            var snapshot = this.membershipSnapshot;
             foreach (var address in addresses)
             {
-                // see if the owner is somewhere else (returns null if we are owner)
-                var forwardAddress = this.CheckIfShouldForward(address.Grain, hopCount, context);
+                // see if the owner is somewhere else
+                var forwardAddress = snapshot.CalculateGrainDirectoryPartition(address.Grain);
 
-                if (forwardAddress != null)
+                if (forwardAddress != null && !forwardAddress.Equals(this.MyAddress))
                 {
+                    if (hopCount >= HOP_LIMIT)
+                    {
+                        // we are not forwarding because there were too many hops already
+                        throw new OrleansException($"Silo {MyAddress} is not owner of {address.Grain}, cannot forward {context} to owner {forwardAddress} because hop limit is reached");
+                    }
+
                     AddToDictionary(ref forward, forwardAddress, address);
                 }
                 else
