@@ -266,11 +266,17 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
 
         public async Task DisposeAsync()
         {
-            if (Client != null) await Client.Close();
-            foreach (var silo in this.deployedSilos)
+            var primarySilo = this.deployedSilos[0];
+            foreach (var silo in this.deployedSilos.Skip(1))
             {
                 await silo.StopSiloAsync(true);
+                silo.Dispose();
             }
+
+            await primarySilo.StopSiloAsync(true);
+            primarySilo.Dispose();
+            if (this.Client != null) await this.Client.Close();
+            this.Client?.Dispose();
         }
     }
 }

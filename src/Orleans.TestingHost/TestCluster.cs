@@ -590,12 +590,13 @@ namespace Orleans.TestingHost
 
         public void Dispose()
         {
-            foreach (var handle in this.Silos)
+            foreach (var handle in this.SecondarySilos)
             {
                 handle.Dispose();
             }
 
-            this.Client.Dispose();
+            this.Primary?.Dispose();
+            this.Client?.Dispose();
         }
     }
 }
