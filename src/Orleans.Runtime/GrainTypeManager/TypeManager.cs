@@ -111,7 +111,7 @@ namespace Orleans.Runtime
                         timerTick = this.refreshTimer.NextTick();
                     }
 
-                    await this.scheduler.QueueTask(() => this.UpdateClusterTypeMap(), this.SchedulingContext);
+                    await this.UpdateClusterTypeMap();
                 }
             }
             catch (Exception exception)
@@ -311,7 +311,7 @@ namespace Orleans.Runtime
             var tasks = new List<Task>(1);
             Task OnRuntimeGrainServicesStart(CancellationToken ct)
             {
-                tasks.Add(Task.Run(() => this.ProcessMembershipUpdates()));
+                tasks.Add(Task.Run(() => this.ScheduleTask(() => this.ProcessMembershipUpdates())));
                 return Task.CompletedTask;
             }
 
