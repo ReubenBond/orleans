@@ -3,7 +3,6 @@ using System.Collections.Immutable;
 
 namespace Orleans.Runtime
 {
-    [Serializable]
     public sealed class ClusterMembershipSnapshot
     {
         public ClusterMembershipSnapshot(ImmutableDictionary<SiloAddress, ClusterMember> members, MembershipVersion version)

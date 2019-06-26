@@ -2,7 +2,6 @@ using System;
 
 namespace Orleans.Runtime
 {
-    [Serializable]
     public sealed class ClusterMember : IEquatable<ClusterMember>
     {
         public ClusterMember(SiloAddress siloAddress, SiloStatus status)
