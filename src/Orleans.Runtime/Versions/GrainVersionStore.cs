@@ -19,7 +19,7 @@ namespace Orleans.Runtime.Versions
         private readonly bool hasGrainStorage;
         private IVersionStoreGrain StoreGrain => this.grainFactory.GetGrain<IVersionStoreGrain>(this.clusterId);
 
-        public bool IsEnabled => this.hasGrainStorage && this.siloLifecycle.HighestCompletedStage >= ServiceLifecycleStage.EnableGrainCalls;
+        public bool IsEnabled => this.hasGrainStorage && this.siloLifecycle.HighestCompletedStage >= ServiceLifecycleStage.BecomeActive;
 
         public GrainVersionStore(
             IInternalGrainFactory grainFactory,
