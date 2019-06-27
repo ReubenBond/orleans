@@ -60,8 +60,10 @@ namespace Orleans.Runtime.MembershipService
                     this.log.LogTrace("Going to send Ping #{ProbeNumber} to probe silo {Silo}", probeNumber, this.SiloAddress);
                 }
 
-                await Task.WhenAny(this.cancelled, this.prober.Probe(this.SiloAddress, probeNumber));
+                var task = await Task.WhenAny(this.cancelled, this.prober.Probe(this.SiloAddress, probeNumber));
                 if (cancellation.IsCancellationRequested) return this.missedProbes;
+
+                await task;
 
                 return this.RecordSuccess(probeNumber);
             }

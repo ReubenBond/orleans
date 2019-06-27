@@ -1079,7 +1079,7 @@ namespace Orleans.Runtime.GrainDirectory
                 while (await enumerator.MoveNextAsync())
                 {
                     var status = enumerator.Current.ClusterMembership.GetSiloStatus(this.MyAddress);
-                    this.log.LogInformation("Received membership update: {Update}/{Members}", enumerator.Current.ToDetailedString(), enumerator.Current.ClusterMembership.ToString());
+                    this.log.LogInformation("Received membership update: {Update}\n{Members}", enumerator.Current.ToDetailedString(), enumerator.Current.ClusterMembership.ToString());
                     this.log.LogInformation("Status: {Status}. Condition: {Condition}", status, condition(status));
 
                     if (condition(status))
