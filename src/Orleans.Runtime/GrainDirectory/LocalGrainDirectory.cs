@@ -301,6 +301,7 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Stopping membership update processor");
                 if (enumerator is object) await enumerator.DisposeAsync();
+                this.directoryMembershipUpdates.Dispose();
             }
 
             void AddSilo(
