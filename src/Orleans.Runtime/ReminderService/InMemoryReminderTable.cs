@@ -1,17 +1,17 @@
 using System;
 using System.Threading.Tasks;
-using System.Threading;
 
 namespace Orleans.Runtime.ReminderService
 {
-    internal class InMemoryReminderTable : IReminderTable, ILifecycleParticipant<ISiloLifecycle>
+    internal class InMemoryReminderTable : IReminderTable
     {
         private readonly IReminderTableGrain reminderTableGrain;
-        private bool isAvailable;
+        private readonly ISiloLifecycle siloLifecycle;
 
-        public InMemoryReminderTable(IGrainFactory grainFactory)
+        public InMemoryReminderTable(IGrainFactory grainFactory, ISiloLifecycle siloLifecycle)
         {
             this.reminderTableGrain = grainFactory.GetGrain<IReminderTableGrain>(Constants.ReminderTableGrainId);
+            this.siloLifecycle = siloLifecycle;
         }
 
         public Task Init() => Task.CompletedTask;
@@ -55,28 +55,11 @@ namespace Orleans.Runtime.ReminderService
 
         private void ThrowIfNotAvailable()
         {
-            if (!this.isAvailable) throw new InvalidOperationException("The reminder service is not currently available.");
-        }
-
-        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
-        {
-            Task OnApplicationServicesStart(CancellationToken ct)
+            if (this.siloLifecycle.HighestCompletedStage < ServiceLifecycleStage.BecomeActive
+                || this.siloLifecycle.LowestStoppedStage <= ServiceLifecycleStage.EnableGrainCalls)
             {
-                this.isAvailable = true;
-                return Task.CompletedTask;
+                throw new InvalidOperationException("The reminder service is not currently available.");
             }
-
-            Task OnApplicationServicesStop(CancellationToken ct)
-            {
-                this.isAvailable = false;
-                return Task.CompletedTask;
-            }
-
-            lifecycle.Subscribe(
-                nameof(GrainBasedReminderTable),
-                ServiceLifecycleStage.ApplicationServices,
-                OnApplicationServicesStart,
-                OnApplicationServicesStop);
         }
     }
 }
