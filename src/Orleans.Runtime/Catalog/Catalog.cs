@@ -848,7 +848,7 @@ namespace Orleans.Runtime
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("DeactivateActivations: {0} activations.", list.Count);
             List<ActivationData> destroyNow = null;
-            List<MultiTaskCompletionSource> destroyLater = null;
+            List<Task> destroyLater = null;
             int alreadyBeingDestroyed = 0;
             foreach (var d in list)
             {
@@ -872,10 +872,10 @@ namespace Orleans.Runtime
                         {
                             if (destroyLater == null)
                             {
-                                destroyLater = new List<MultiTaskCompletionSource>();
+                                destroyLater = new List<Task>();
                             }
                             var tcs = new MultiTaskCompletionSource(1);
-                            destroyLater.Add(tcs);
+                            destroyLater.Add(tcs.Task);
                             activationData.AddOnInactive(() => DestroyActivationAsync(activationData, tcs));
                         }
                     }
@@ -899,7 +899,7 @@ namespace Orleans.Runtime
             }
             if (destroyLater != null && destroyLater.Count > 0)
             {
-                await Task.WhenAll(destroyLater.Select(t => t.Task).ToArray());
+                await Task.WhenAll(destroyLater);
             }
         }
 

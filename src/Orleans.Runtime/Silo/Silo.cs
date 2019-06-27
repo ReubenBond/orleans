@@ -712,41 +712,22 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        private async Task OnBecomeActiveStop(CancellationToken ct)
+        private Task OnBecomeActiveStop(CancellationToken ct)
         {
-            if (this.isFastKilledNeeded)
-                return;
+            if (this.isFastKilledNeeded) return Task.CompletedTask;
 
-            bool gracefully = !ct.IsCancellationRequested;
-            string operation = gracefully ? "Shutdown()" : "Stop()";
-            try
+            if (!ct.IsCancellationRequested)
             {
-                if (gracefully)
-                {
-                    try
-                    {
-                        logger.LogInformation((int)ErrorCode.SiloShuttingDown, "Silo is shutting down");
-                        await Task.WhenAny(ct.WhenCancelled(), this.catalog.DeactivateAllActivations());
-
-                        await Task.WhenAny(ct.WhenCancelled(), this.localGrainDirectory.Stop(ct));
-                    }
-                    catch (Exception exception)
-                    {
-                        this.logger.LogWarning("Exception while deactivating all activations: {Exception}", exception);
-                    }
-
-                    // wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop. 
-                    if (!ct.IsCancellationRequested) await Task.Delay(WaitForMessageToBeQueuedForOutbound);
-                }
+                logger.LogInformation((int)ErrorCode.SiloShuttingDown, "Silo is shutting down");
             }
-            catch (Exception exc)
+            else
             {
-                logger.Error(ErrorCode.SiloFailedToStopMembership,
-                    $"Failed to {operation}. About to FastKill this silo.", exc);
-                this.isFastKilledNeeded = true;
+                logger.LogInformation((int)ErrorCode.SiloStopping, "Silo is stopping");
             }
+
             // Stop the gateway
             SafeExecute(messageCenter.StopAcceptingClientMessages);
+            return Task.CompletedTask;
         }
 
         private async Task OnActiveStop(CancellationToken ct)
@@ -849,7 +830,8 @@ namespace Orleans.Runtime
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeInitialize, (ct) => Task.Run(() => OnRuntimeInitializeStart(ct)), (ct) => Task.Run(() => OnRuntimeInitializeStop(ct)));
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => OnRuntimeServicesStart(ct)), (ct) => Task.Run(() => OnRuntimeServicesStop(ct)));
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeGrainServices, (ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct)));
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, (ct) => Task.Run(() => OnBecomeActiveStart(ct)), (ct) => Task.Run(() => OnBecomeActiveStop(ct)));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, (ct) => Task.Run(() => OnBecomeActiveStart(ct)), (ct) => Task.CompletedTask);
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive - 1, (ct) => Task.CompletedTask, (ct) => Task.Run(() => OnBecomeActiveStop(ct)));
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.EnableGrainCalls, (ct) => Task.Run(() => OnEnableGrainCallsStart(ct)), (ct) => Task.CompletedTask);
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.Active, (ct) => Task.Run(() => OnActiveStart(ct)), (ct) => Task.Run(() => OnActiveStop(ct)));
         }

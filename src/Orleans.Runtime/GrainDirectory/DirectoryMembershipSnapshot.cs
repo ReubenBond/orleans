@@ -12,7 +12,7 @@ namespace Orleans.Runtime.GrainDirectory
     /// </summary>
     internal class DirectoryMembershipSnapshot
     {
-        private static readonly Func<SiloAddress, string> PrintSiloAddressForStatistics = (SiloAddress addr) => $"{addr.ToLongString()}/{addr.GetConsistentHashCode():X}";
+        private static readonly Func<SiloAddress, string> PrintSiloAddressForStatistics = (SiloAddress addr) => addr is null ? string.Empty : $"{addr.ToLongString()}/{addr.GetConsistentHashCode():X}";
         private static readonly Comparison<SiloAddress> RingComparer = CompareSiloAddressesForRing;
         private readonly ILogger log;
         private readonly ImmutableList<SiloAddress> ring;
@@ -46,9 +46,9 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal static string RingDetailsStatistic(DirectoryMembershipSnapshot snapshot) => Utils.EnumerableToString(snapshot.ring, PrintSiloAddressForStatistics);
 
-        internal static string RingPredecessorStatistic(DirectoryMembershipSnapshot snapshot) => Utils.EnumerableToString(snapshot.FindPredecessors(snapshot.siloAddress, 1), PrintSiloAddressForStatistics);
+        internal static string RingPredecessorStatistic(DirectoryMembershipSnapshot snapshot) => PrintSiloAddressForStatistics(snapshot.FindPredecessor(snapshot.siloAddress));
 
-        internal static string RingSuccessorStatistic(DirectoryMembershipSnapshot snapshot) => Utils.EnumerableToString(snapshot.FindSuccessors(snapshot.siloAddress, 1), PrintSiloAddressForStatistics);
+        internal static string RingSuccessorStatistic(DirectoryMembershipSnapshot snapshot) => PrintSiloAddressForStatistics(snapshot.FindSuccessor(snapshot.siloAddress));
 
         private static int CompareSiloAddressesForRing(SiloAddress left, SiloAddress right)
         {
@@ -122,43 +122,57 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         [Pure]
-        public List<SiloAddress> FindPredecessors(SiloAddress silo, int count)
+        public SiloAddress FindSuccessor(SiloAddress silo)
         {
-            int index = this.ring.FindIndex(elem => elem.Equals(silo));
-            var result = new List<SiloAddress>();
-            if (index == -1)
-            {
-                log.Warn(ErrorCode.Runtime_Error_100201, "Got request to find predecessors of silo " + silo + ", which is not in the list of members");
-                return result;
-            }
+            // There can be no successor if the ring is empty.
+            if (this.ring.Count == 0) return null;
 
-            int numMembers = this.ring.Count;
-            for (int i = index - 1; ((i + numMembers) % numMembers) != index && result.Count < count; i--)
-            {
-                result.Add(this.ring[(i + numMembers) % numMembers]);
-            }
+            var index = this.FindIndexOrFirstSuccessor(silo);
+
+            // If the silo was found in the ring, the successor is the subsequent silo.
+            if (this.ring[index].Equals(silo)) ++index;
+
+            var result = this.ring[index % this.ring.Count];
+
+            // If the silo is the only silo then it has no successor.
+            if (result.Equals(silo)) return null;
 
             return result;
         }
 
         [Pure]
-        public List<SiloAddress> FindSuccessors(SiloAddress silo, int count)
+        public SiloAddress FindPredecessor(SiloAddress silo)
         {
-            var result = new List<SiloAddress>();
-            int index = this.ring.FindIndex(elem => elem.Equals(silo));
-            if (index == -1)
-            {
-                log.Warn(ErrorCode.Runtime_Error_100203, "Got request to find successors of silo " + silo + ", which is not in the list of members");
-                return result;
-            }
+            // There can be no predecessor if the ring is empty.
+            if (this.ring.Count == 0) return null;
 
-            int numMembers = this.ring.Count;
-            for (int i = index + 1; i % numMembers != index && result.Count < count; i++)
-            {
-                result.Add(this.ring[i % numMembers]);
-            }
+            var index = this.FindIndexOrFirstSuccessor(silo) - 1;
+
+            // Wrap around to the end.
+            if (index < 0) index = this.ring.Count - 1;
+
+            var result = this.ring[index % this.ring.Count];
+
+            // If the silo is the only silo then it has no predecessor.
+            if (result.Equals(silo)) return null;
 
             return result;
+        }
+
+        /// <summary>
+        /// Returns the position of the given silo in the ring if it exists.
+        /// Otherwise returns its first successor if it exists.
+        /// Otherwise returns zero.
+        /// </summary>
+        private int FindIndexOrFirstSuccessor(SiloAddress silo)
+        {
+            var r = this.ring;
+            for (var i = 0; i < r.Count; i++)
+            {
+                if (r[i].CompareTo(silo) >= 0) return i;
+            }
+
+            return 0;
         }
 
         public string ToDetailedString()
@@ -174,9 +188,19 @@ namespace Orleans.Runtime.GrainDirectory
                 sb.AppendFormat("    Silo {0}, consistent hash is {1:X}", silo, silo.GetConsistentHashCode()).AppendLine();
             }
 
-            sb.Append("My predecessors: " + this.FindPredecessors(this.siloAddress, 1).ToStrings(addr => $"{addr}/{addr.GetConsistentHashCode():X}---", " -- "));
-            sb.AppendLine();
-            sb.Append("My successors: " + this.FindSuccessors(this.siloAddress, 1).ToStrings(addr => $"{addr}/{addr.GetConsistentHashCode():X}---", " -- "));
+            var predecessor = this.FindPredecessor(this.siloAddress);
+            if (predecessor is object)
+            {
+                sb.Append($"My predecessor: {predecessor}/{predecessor.GetConsistentHashCode():X}---");
+                sb.AppendLine();
+            }
+
+            var successor = this.FindSuccessor(this.siloAddress);
+            if (successor is object)
+            {
+                sb.Append($"My successor: {successor}/{successor.GetConsistentHashCode():X}---");
+            }
+
             return sb.ToString();
         }
     }
