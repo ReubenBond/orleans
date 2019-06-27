@@ -1033,7 +1033,7 @@ namespace Orleans.Runtime.GrainDirectory
             async Task OnBecomeActiveStart(CancellationToken ct)
             {
                 // Wait until the directory has processed that the local silo is active before completing.
-                await this.WaitForMembershipCondition(m => m.Status == SiloStatus.Active, ct);
+                await this.WaitForStatus(status => status == SiloStatus.Active, ct);
             }
 
             async Task OnBecomeActiveStop(CancellationToken ct)
@@ -1041,7 +1041,7 @@ namespace Orleans.Runtime.GrainDirectory
                 this.log.LogInformation("Waiting to receive termination update");
 
                 // Wait until the local grain directory observes that the silo is stopping.
-                await this.WaitForMembershipCondition(m => m.Status.IsTerminating(), ct);
+                if (!await this.WaitForStatus(status => status.IsTerminating(), ct)) return;
 
                 this.log.LogInformation("Performing handoff and stopping workers");
 
@@ -1070,7 +1070,7 @@ namespace Orleans.Runtime.GrainDirectory
             lifecycle.Subscribe(nameof(LocalGrainDirectory), ServiceLifecycleStage.BecomeActive, OnBecomeActiveStart, OnBecomeActiveStop);
         }
 
-        private async Task WaitForMembershipCondition(Func<ClusterMember, bool> condition, CancellationToken ct)
+        private async Task<bool> WaitForStatus(Func<SiloStatus, bool> condition, CancellationToken ct)
         {
             IAsyncEnumerator<DirectoryMembershipSnapshot> enumerator = default;
             try
@@ -1078,9 +1078,13 @@ namespace Orleans.Runtime.GrainDirectory
                 enumerator = this.directoryMembershipUpdates.GetAsyncEnumerator(ct);
                 while (await enumerator.MoveNextAsync())
                 {
-                    if (enumerator.Current.ClusterMembership.Members.TryGetValue(this.MyAddress, out var member) && condition(member))
+                    var status = enumerator.Current.ClusterMembership.GetSiloStatus(this.MyAddress);
+                    this.log.LogInformation("Received membership update: {Update}/{Members}", enumerator.Current.ToDetailedString(), enumerator.Current.ClusterMembership.ToString());
+                    this.log.LogInformation("Status: {Status}. Condition: {Condition}", status, condition(status));
+
+                    if (condition(status))
                     {
-                        break;
+                        return true;
                     }
                 }
             }
@@ -1088,6 +1092,9 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 if (enumerator is object) await enumerator.DisposeAsync();
             }
+
+            this.log.LogInformation("Terminating with false condition");
+            return false;
         }
 
         // Note that this implementation stops processing directory change requests (Register, Unregister, etc.) when the Stop event is raised. 

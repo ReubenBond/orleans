@@ -246,7 +246,6 @@ namespace Orleans.Runtime.MembershipService
             {
                 this.CurrentStatus = status;
 
-
                 // SystemTarget-based clustering does not support transitioning to Dead locally since at this point app scheduler turns have been stopped.
                 return;
             }
