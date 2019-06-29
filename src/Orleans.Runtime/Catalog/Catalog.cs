@@ -1389,7 +1389,7 @@ namespace Orleans.Runtime
             return datas;
         }
 
-        internal void OnSiloStatusChange(DirectoryMembershipSnapshot previousMembership, SiloAddress updatedSilo, SiloStatus status)
+        internal async Task OnSiloStatusChange(DirectoryMembershipSnapshot previousMembership, SiloAddress updatedSilo, SiloStatus status)
         { 
             // ignore joining events and also events on myself.
             if (updatedSilo.Equals(LocalSilo)) return;
@@ -1432,6 +1432,7 @@ namespace Orleans.Runtime
                         }
                     }
                 }
+
                 logger.Info(ErrorCode.Catalog_SiloStatusChangeNotification,
                     String.Format("Catalog is deactivating {0} activations due to a failure of silo {1}, since it is a primary directory partition to these grain ids.",
                         activationsToShutdown.Count, updatedSilo.ToStringWithHashCode()));
@@ -1441,7 +1442,7 @@ namespace Orleans.Runtime
                 // outside the lock.
                 if (activationsToShutdown.Count > 0)
                 {
-                    DeactivateActivations(activationsToShutdown).Ignore();
+                    await DeactivateActivations(activationsToShutdown);
                 }
             }
         }

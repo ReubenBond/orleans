@@ -20,7 +20,6 @@ namespace Orleans.Runtime.GrainDirectory
     {
         private readonly DedicatedAsynchAgent maintainer;
         private readonly ILogger log;
-        private readonly SiloAddress seed;
         private readonly RegistrarManager registrarManager;
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly IClusterMembershipService clusterMembership;
@@ -91,7 +90,6 @@ namespace Orleans.Runtime.GrainDirectory
             Factory<GrainDirectoryPartition> grainDirectoryPartitionFactory,
             RegistrarManager registrarManager,
             ExecutorService executorService,
-            IOptions<DevelopmentClusterMembershipOptions> developmentClusterMembershipOptions,
             IOptions<MultiClusterOptions> multiClusterOptions,
             IOptions<GrainDirectoryOptions> grainDirectoryOptions,
             ILoggerFactory loggerFactory,
@@ -130,13 +128,7 @@ namespace Orleans.Runtime.GrainDirectory
                 multiClusterOptions,
                 loggerFactory,
                 registrarManager);
-
-            var primarySiloEndPoint = developmentClusterMembershipOptions.Value.PrimarySiloEndpoint;
-            if (primarySiloEndPoint != null)
-            {
-                this.seed = this.MyAddress.Endpoint.Equals(primarySiloEndPoint) ? this.MyAddress : SiloAddress.New(primarySiloEndPoint, 0);
-            }
-
+            
             this.membershipSnapshot = new DirectoryMembershipSnapshot(this.log, this.MyAddress, this.clusterMembership.CurrentSnapshot);
             this.directoryMembershipUpdates = new AsyncEnumerable<DirectoryMembershipSnapshot>(
                 (previous, proposed) => proposed.ClusterMembership.Version > previous.ClusterMembership.Version,
@@ -270,7 +262,7 @@ namespace Orleans.Runtime.GrainDirectory
                             var previousStatus = previousClusterMembership?.GetSiloStatus(change.SiloAddress) ?? SiloStatus.None;
                             if (status.IsTerminating() && !previousStatus.IsTerminating())
                             {
-                                await this.Scheduler.QueueAction(
+                                await this.Scheduler.QueueTask(
                                     () => RemoveSilo(previous, updated, change, directoryPartitionCopy, directoryCache),
                                     this.CacheValidator.SchedulingContext);
                             }
@@ -317,7 +309,7 @@ namespace Orleans.Runtime.GrainDirectory
                 if (log.IsEnabled(LogLevel.Information)) log.LogInformation("Silo {LocalSilo} added silo {RemoteSilo}", MyAddress, added.SiloAddress);
             }
 
-            void RemoveSilo(
+            async Task RemoveSilo(
                 DirectoryMembershipSnapshot existing,
                 DirectoryMembershipSnapshot updated,
                 ClusterMember removed,
@@ -336,7 +328,7 @@ namespace Orleans.Runtime.GrainDirectory
                     // Only notify the catalog once.
                     // The catalog is intentionally called using the previous membership snapshot so that calculations about directory partitions
                     // are consistent.
-                    this.catalog.OnSiloStatusChange(existing, removed.SiloAddress, removed.Status);
+                    await this.catalog.OnSiloStatusChange(existing, removed.SiloAddress, removed.Status);
                 }
                 catch (Exception exc)
                 {
@@ -345,7 +337,7 @@ namespace Orleans.Runtime.GrainDirectory
                         string.Format("CatalogSiloStatusListener.RemoveServer has thrown an exception when notified about removed silo {0}.", removed.SiloAddress.ToStringWithHashCode()), exc);
                 }
 
-                this.HandoffManager.ProcessSiloRemoveEvent(existing, removed.SiloAddress);
+                this.HandoffManager.ProcessSiloRemoveEvent(updated, removed.SiloAddress);
                 this.AdjustLocalDirectory(directoryPartitionCopy, removed.SiloAddress, dead: true);
                 this.AdjustLocalCache(updated, directoryCache, removed.SiloAddress, dead: true);
 
@@ -463,7 +455,7 @@ namespace Orleans.Runtime.GrainDirectory
             // on all silos other than first, we insert a retry delay and recheck owner before forwarding
             if (hopCount > 0 && forwardAddress != null)
             {
-                await Task.Delay(RETRY_DELAY);
+                await this.RefreshMembership();
                 forwardAddress = this.CheckIfShouldForward(address.Grain, hopCount, "RegisterAsync");
                 if (forwardAddress != null)
                 {
@@ -564,7 +556,7 @@ namespace Orleans.Runtime.GrainDirectory
             // on all silos other than first, we insert a retry delay and recheck owner before forwarding
             if (hopCount > 0 && forwardAddress != null)
             {
-                await Task.Delay(RETRY_DELAY);
+                await this.RefreshMembership();
                 forwardAddress = this.CheckIfShouldForward(address.Grain, hopCount, "UnregisterAsync");
                 if (forwardAddress != null)
                 {
@@ -665,7 +657,7 @@ namespace Orleans.Runtime.GrainDirectory
             // before forwarding to other silos, we insert a retry delay and re-check destination
             if (hopCount > 0 && forwardlist != null)
             {
-                await Task.Delay(RETRY_DELAY);
+                await this.RefreshMembership();
                 Dictionary<SiloAddress, List<ActivationAddress>> forwardlist2 = null;
                 UnregisterOrPutInForwardList(addresses, cause, hopCount, ref forwardlist2, tasks, "UnregisterManyAsync");
                 forwardlist = forwardlist2;
@@ -789,7 +781,7 @@ namespace Orleans.Runtime.GrainDirectory
             // on all silos other than first, we insert a retry delay and recheck owner before forwarding
             if (hopCount > 0 && forwardAddress != null)
             {
-                await Task.Delay(RETRY_DELAY);
+                await this.RefreshMembership();
                 forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "LookUpAsync");
                 if (forwardAddress != null)
                 {
@@ -848,7 +840,7 @@ namespace Orleans.Runtime.GrainDirectory
             // on all silos other than first, we insert a retry delay and recheck owner before forwarding
             if (hopCount > 0 && forwardAddress != null)
             {
-                await Task.Delay(RETRY_DELAY);
+                await this.RefreshMembership();
                 forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "DeleteGrainAsync");
                 if (forwardAddress != null)
                 {
@@ -989,14 +981,7 @@ namespace Orleans.Runtime.GrainDirectory
             if (silo.Equals(this.MyAddress)) return true;
 
             var status = this.membershipSnapshot.ClusterMembership.GetSiloStatus(silo);
-            switch (status)
-            {
-                case SiloStatus.Active:
-                case SiloStatus.Joining:
-                    return true;
-                default:
-                    return false;
-            }
+            return status != SiloStatus.None;
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
@@ -1044,13 +1029,17 @@ namespace Orleans.Runtime.GrainDirectory
                     Task.Delay(TimeSpan.FromSeconds(10)),
                     isTerminatingTask);
 
-                if (!ReferenceEquals(task, isTerminatingTask) || !await isTerminatingTask) return;
+                if (!ReferenceEquals(task, isTerminatingTask) || !await isTerminatingTask)
+                {
+                    this.log.LogWarning(
+                        "Did not observe status change during shutdown. Skipping graceful shutdown behavior");
+                    return;
+                }
 
                 // Perform handoff
                 await this.Stop(ct);
 
                 if (this.catalog is null) this.catalog = this.serviceProvider.GetRequiredService<Catalog>();
-                
                 await await Task.WhenAny(ct.WhenCancelled(), this.catalog.DeactivateAllActivations());
 
                 // Wait for messages to be forwarded. Obviously this is a bad hack.
@@ -1058,6 +1047,32 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             lifecycle.Subscribe(nameof(LocalGrainDirectory), ServiceLifecycleStage.BecomeActive, OnBecomeActiveStart, OnBecomeActiveStop);
+        }
+
+        private async Task RefreshMembership(MembershipVersion targetVersion = default, CancellationToken cancellationToken = default)
+        {
+            this.log.LogInformation("Refreshing membership due to apparent inconsistency with received call.");
+
+            await this.clusterMembership.Refresh(targetVersion);
+
+            IAsyncEnumerator<DirectoryMembershipSnapshot> enumerator = default;
+            try
+            {
+                enumerator = this.directoryMembershipUpdates.GetAsyncEnumerator(cancellationToken);
+                while (await enumerator.MoveNextAsync())
+                {
+                    var version = enumerator.Current.ClusterMembership.Version;
+
+                    if (version >= this.membershipSnapshot.ClusterMembership.Version)
+                    {
+                        return;
+                    }
+                }
+            }
+            finally
+            {
+                if (enumerator is object) await enumerator.DisposeAsync();
+            }
         }
 
         private async Task<bool> WaitForStatus(Func<SiloStatus, bool> condition, CancellationToken ct)
