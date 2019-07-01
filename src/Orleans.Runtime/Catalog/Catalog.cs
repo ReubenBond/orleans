@@ -21,6 +21,7 @@ using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using System.Collections.Concurrent;
 
 namespace Orleans.Runtime
 {
@@ -97,6 +98,8 @@ namespace Orleans.Runtime
         private readonly ILoggerFactory loggerFactory;
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
         private readonly IOptions<SiloMessagingOptions> messagingOptions;
+        private readonly ConcurrentQueue<ActivationData> activationsToRegister = new ConcurrentQueue<ActivationData>();
+
         public Catalog(
             ILocalSiloDetails localSiloDetails,
             ILocalGrainDirectory grainDirectory,
@@ -1389,22 +1392,21 @@ namespace Orleans.Runtime
             return datas;
         }
 
-        internal async Task OnSiloStatusChange(DirectoryMembershipSnapshot previousMembership, SiloAddress updatedSilo, SiloStatus status)
+        internal void OnMembershipChange(DirectoryMembershipSnapshot previousMembership, DirectoryMembershipSnapshot updatedMembership, ClusterMember updatedSilo)
         { 
             // ignore joining events and also events on myself.
-            if (updatedSilo.Equals(LocalSilo)) return;
+            if (updatedSilo.SiloAddress.Equals(LocalSilo)) return;
 
             // We deactivate those activations when silo goes either of ShuttingDown/Stopping/Dead states,
             // since this is what Directory is doing as well. Directory removes a silo based on all those 3 statuses,
             // thus it will only deliver a "remove" notification for a given silo once to us. Therefore, we need to react the fist time we are notified.
             // We may review the directory behavior in the future and treat ShuttingDown differently ("drain only") and then this code will have to change a well.
-            if (!status.IsTerminating()) return;
-            if (status == SiloStatus.Dead)
+            if (!updatedSilo.Status.IsTerminating()) return;
+            if (updatedSilo.Status == SiloStatus.Dead)
             {
-                this.RuntimeClient.BreakOutstandingMessagesToDeadSilo(updatedSilo);
+                this.RuntimeClient.BreakOutstandingMessagesToDeadSilo(updatedSilo.SiloAddress);
             }
 
-            var activationsToShutdown = new List<ActivationData>();
             try
             {
                 // scan all activations in activation directory and deactivate the ones that the removed silo is their primary partition owner.
@@ -1412,38 +1414,37 @@ namespace Orleans.Runtime
                 {
                     foreach (var activation in activations)
                     {
-                        try
-                        {
-                            var activationData = activation.Value;
-                            if (!activationData.IsUsingGrainDirectory) continue;
-                            if (!updatedSilo.Equals(previousMembership.CalculateGrainDirectoryPartition(activationData.Grain))) continue;
+                        var activationData = activation.Value;
+                        if (!activationData.IsUsingGrainDirectory) continue;
+                        var previousOwner = previousMembership.CalculateGrainDirectoryPartition(activationData.Grain);
+                        var updatedOwner = updatedMembership.CalculateGrainDirectoryPartition(activationData.Grain);
 
-                            lock (activationData)
-                            {
-                                // adapted from InsideGrainClient.DeactivateOnIdle().
-                                activationData.ResetKeepAliveRequest();
-                                activationsToShutdown.Add(activationData);
-                            }
-                        }
-                        catch (Exception exc)
-                        {
-                            logger.Error(ErrorCode.Catalog_SiloStatusChangeNotification_Exception,
-                                String.Format("Catalog has thrown an exception while executing OnSiloStatusChange of silo {0}.", updatedSilo.ToStringWithHashCode()), exc);
-                        }
+                        if (!previousOwner.Equals(updatedOwner))
+                            activationsToRegister.Enqueue(activationData);
                     }
                 }
-
-                logger.Info(ErrorCode.Catalog_SiloStatusChangeNotification,
-                    String.Format("Catalog is deactivating {0} activations due to a failure of silo {1}, since it is a primary directory partition to these grain ids.",
-                        activationsToShutdown.Count, updatedSilo.ToStringWithHashCode()));
             }
             finally
             {
-                // outside the lock.
-                if (activationsToShutdown.Count > 0)
+                if (activationsToRegister.Count > 0)
                 {
-                    await DeactivateActivations(activationsToShutdown);
+                    logger.Info(
+                    ErrorCode.Catalog_SiloStatusChangeNotification,
+                    "Catalog is will try to register again {numberOfActivations} activations due to a failure of silo {siloAddress}, since it is a primary directory partition to these grain ids.",
+                    activationsToRegister.Count, updatedSilo.SiloAddress.ToStringWithHashCode());
+
+                    this.scheduler.RunOrQueueTask(this.RegisterOrphanActivations, this.SchedulingContext);
                 }
+            }
+        }
+
+        private async Task RegisterOrphanActivations()
+        {
+            while (this.activationsToRegister.TryDequeue(out ActivationData activation))
+            {
+                var result = await directory.RegisterAsync(activation.Address, singleActivation: true);
+                if (!activation.Address.Equals(result.Address))
+                    await DeactivateActivations(new List<ActivationData> { activation });
             }
         }
 

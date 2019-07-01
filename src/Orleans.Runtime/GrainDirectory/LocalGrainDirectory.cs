@@ -262,7 +262,7 @@ namespace Orleans.Runtime.GrainDirectory
                             var previousStatus = previousClusterMembership?.GetSiloStatus(change.SiloAddress) ?? SiloStatus.None;
                             if (status.IsTerminating() && !previousStatus.IsTerminating())
                             {
-                                await this.Scheduler.QueueTask(
+                                await this.Scheduler.QueueAction(
                                     () => RemoveSilo(previous, updated, change, directoryPartitionCopy, directoryCache),
                                     this.CacheValidator.SchedulingContext);
                             }
@@ -309,7 +309,7 @@ namespace Orleans.Runtime.GrainDirectory
                 if (log.IsEnabled(LogLevel.Information)) log.LogInformation("Silo {LocalSilo} added silo {RemoteSilo}", MyAddress, added.SiloAddress);
             }
 
-            async Task RemoveSilo(
+            void RemoveSilo(
                 DirectoryMembershipSnapshot existing,
                 DirectoryMembershipSnapshot updated,
                 ClusterMember removed,
@@ -328,7 +328,7 @@ namespace Orleans.Runtime.GrainDirectory
                     // Only notify the catalog once.
                     // The catalog is intentionally called using the previous membership snapshot so that calculations about directory partitions
                     // are consistent.
-                    await this.catalog.OnSiloStatusChange(existing, removed.SiloAddress, removed.Status);
+                    this.catalog.OnMembershipChange(existing, updated, removed);
                 }
                 catch (Exception exc)
                 {
