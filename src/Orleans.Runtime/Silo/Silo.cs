@@ -414,7 +414,6 @@ namespace Orleans.Runtime
             {
                 incomingPingAgent.Start();
                 incomingSystemAgent.Start();
-                incomingAgent.Start();
             } 
 
             StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start, stopWatch);
@@ -855,12 +854,20 @@ namespace Orleans.Runtime
             return localGrainDirectory.ToString();
         }
 
+        private Task OnEnableGrainCallsStart(CancellationToken ct)
+        {
+            this.incomingAgent.Start();
+            return Task.CompletedTask;
+        }
+
         private void Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeInitialize, (ct) => Task.Run(() => OnRuntimeInitializeStart(ct)), (ct) => Task.Run(() => OnRuntimeInitializeStop(ct)));
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => OnRuntimeServicesStart(ct)), (ct) => Task.Run(() => OnRuntimeServicesStop(ct)));
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.RuntimeGrainServices, (ct) => Task.Run(() => OnRuntimeGrainServicesStart(ct)));
-            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, (ct) => Task.Run(() => OnBecomeActiveStart(ct)), (ct) => Task.Run(() => OnBecomeActiveStop(ct)));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive, (ct) => Task.Run(() => OnBecomeActiveStart(ct)), (ct) => Task.CompletedTask);
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.BecomeActive - 1, (ct) => Task.CompletedTask, (ct) => Task.Run(() => OnBecomeActiveStop(ct)));
+            lifecycle.Subscribe<Silo>(ServiceLifecycleStage.EnableGrainCalls, (ct) => Task.Run(() => OnEnableGrainCallsStart(ct)), (ct) => Task.CompletedTask);
             lifecycle.Subscribe<Silo>(ServiceLifecycleStage.Active, (ct) => Task.Run(() => OnActiveStart(ct)), (ct) => Task.Run(() => OnActiveStop(ct)));
         }
     }

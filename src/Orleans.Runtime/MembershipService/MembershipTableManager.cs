@@ -662,7 +662,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 // kick this silo off
                 log.Info(ErrorCode.MembershipMarkingAsDead, 
-                    "-Going to mark silo {0} as DEAD in the table #1. I am the last voter: #freshVotes={1}, myVoteIndex = {2}, NumVotesForDeathDeclaration={3} , #activeSilos={4}, suspect list={5}",
+                    "-Going to mark silo {0} as DEAD in the table. I am the last voter: #freshVotes={1}, myVoteIndex = {2}, NumVotesForDeathDeclaration={3} , #activeSilos={4}, suspect list={5}",
                             entry.SiloAddress, 
                             freshVotes.Count, 
                             myVoteIndex,
