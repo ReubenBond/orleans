@@ -1,10 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
-using Orleans.ApplicationParts;
 
 namespace Orleans.Hosting
 {
@@ -162,6 +161,28 @@ namespace Orleans.Hosting
             {
                 validator.ValidateConfiguration();
             }
+        }
+
+        ISiloBuilder ISiloBuilder.ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureDelegate) => this.ConfigureServices(configureDelegate);
+
+        IHostBuilder IHostBuilder.ConfigureHostConfiguration(Action<IConfigurationBuilder> configureDelegate) => this.ConfigureHostConfiguration(configureDelegate);
+
+        IHostBuilder IHostBuilder.ConfigureAppConfiguration(Action<HostBuilderContext, IConfigurationBuilder> configureDelegate) => this.ConfigureAppConfiguration(configureDelegate);
+
+        IHostBuilder IHostBuilder.ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureDelegate) => this.ConfigureServices(configureDelegate);
+
+        IHostBuilder IHostBuilder.UseServiceProviderFactory<TContainerBuilder>(IServiceProviderFactory<TContainerBuilder> factory) => this.UseServiceProviderFactory<TContainerBuilder>(factory);
+
+        IHostBuilder IHostBuilder.ConfigureContainer<TContainerBuilder>(Action<HostBuilderContext, TContainerBuilder> configureDelegate) => this.ConfigureContainer<TContainerBuilder>(configureDelegate);
+
+        IHost IHostBuilder.Build() => this.Build();
+
+        private class HostingEnvironment : IHostingEnvironment
+        {
+            public string EnvironmentName { get; set; }
+            public string ApplicationName { get; set; }
+            public string ContentRootPath { get; set; }
+            public IFileProvider ContentRootFileProvider { get; set; }
         }
     }
 }

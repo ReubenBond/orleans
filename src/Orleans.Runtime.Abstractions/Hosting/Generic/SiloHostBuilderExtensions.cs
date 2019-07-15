@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
@@ -39,7 +40,7 @@ namespace Orleans.Hosting
         /// <returns>The same instance of the <see cref="ISiloHostBuilder"/> for chaining.</returns>
         public static ISiloHostBuilder ConfigureServices(this ISiloHostBuilder hostBuilder, Action<IServiceCollection> configureDelegate)
         {
-            return hostBuilder.ConfigureServices((context, collection) => configureDelegate(collection));
+            return (ISiloHostBuilder)hostBuilder.ConfigureServices((context, collection) => configureDelegate(collection));
         }
 
         /// <summary>
@@ -110,7 +111,7 @@ namespace Orleans.Hosting
         /// <returns>The same instance of the <see cref="ISiloHostBuilder"/> for chaining.</returns>
         public static ISiloHostBuilder ConfigureLogging(this ISiloHostBuilder builder, Action<HostBuilderContext, ILoggingBuilder> configureLogging)
         {
-            return builder.ConfigureServices((context, collection) => collection.AddLogging(loggingBuilder => configureLogging(context, loggingBuilder)));
+            return (ISiloHostBuilder)builder.ConfigureServices((context, collection) => collection.AddLogging(loggingBuilder => configureLogging(context, loggingBuilder)));
         }
 
         /// <summary>
@@ -129,7 +130,7 @@ namespace Orleans.Hosting
         /// </summary>
         /// <param name="builder">The builder.</param>
         /// <returns>The <see cref="ApplicationPartManager"/> for this instance.</returns>
-        public static IApplicationPartManager GetApplicationPartManager(this ISiloHostBuilder builder) => ApplicationPartManagerExtensions.GetApplicationPartManager(builder.Properties);
+        public static IApplicationPartManager GetApplicationPartManager(this ISiloHostBuilder builder) => ApplicationPartManagerExtensions.GetApplicationPartManager(((ISiloBuilder)builder).Properties);
         
         /// <summary>
         /// Configures the <see cref="ApplicationPartManager"/> using the given <see cref="Action{IApplicationPartBuilder}"/>.

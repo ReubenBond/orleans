@@ -6,10 +6,7 @@ using Orleans.Hosting;
 using Orleans.ApplicationParts;
 using Orleans.Serialization;
 using Microsoft.Extensions.Hosting;
-using IHostingEnvironment = Orleans.Hosting.IHostingEnvironment;
-using HostBuilderContext = Orleans.Hosting.HostBuilderContext;
-using HostDefaults = Orleans.Hosting.HostDefaults;
-using EnvironmentName = Orleans.Hosting.EnvironmentName;
+using Microsoft.Extensions.FileProviders;
 
 namespace Orleans
 {
@@ -156,6 +153,14 @@ namespace Orleans
             }
             this.appConfiguration = configBuilder.Build();
             this.hostBuilderContext.Configuration = this.appConfiguration;
+        }
+
+        private class HostingEnvironment : IHostingEnvironment
+        {
+            public string EnvironmentName { get; set; }
+            public string ApplicationName { get; set; }
+            public string ContentRootPath { get; set; }
+            public IFileProvider ContentRootFileProvider { get; set; }
         }
     }
 }

@@ -11,7 +11,7 @@ namespace Orleans.Hosting
         /// </summary>
         public static ISiloHostBuilder AddPerfCountersTelemetryConsumer(this ISiloHostBuilder hostBuilder)
         {
-            return hostBuilder.ConfigureServices(ConfigureServices);
+            return (ISiloHostBuilder)hostBuilder.ConfigureServices(ConfigureServices);
         }
 
         /// <summary>
@@ -31,11 +31,6 @@ namespace Orleans.Hosting
         }
 
         private static void ConfigureServices(Microsoft.Extensions.Hosting.HostBuilderContext context, IServiceCollection services)
-        {
-            services.Configure<TelemetryOptions>(options => options.AddConsumer<OrleansPerfCounterTelemetryConsumer>());
-        }
-
-        private static void ConfigureServices(HostBuilderContext context, IServiceCollection services)
         {
             services.Configure<TelemetryOptions>(options => options.AddConsumer<OrleansPerfCounterTelemetryConsumer>());
         }

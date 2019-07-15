@@ -18,6 +18,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using Orleans.Statistics;
 using Orleans.TestingHost.Utils;
+using Microsoft.Extensions.Hosting;
 
 namespace Orleans.TestingHost
 {

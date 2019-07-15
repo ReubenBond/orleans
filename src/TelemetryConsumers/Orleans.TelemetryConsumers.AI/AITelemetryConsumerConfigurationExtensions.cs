@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.TelemetryConsumers.AI;
 
@@ -13,7 +14,7 @@ namespace Orleans.Hosting
         /// <param name="instrumentationKey">The Application Insights instrumentation key.</param>
         public static ISiloHostBuilder AddApplicationInsightsTelemetryConsumer(this ISiloHostBuilder hostBuilder, string instrumentationKey = null)
         {
-            return hostBuilder.ConfigureServices((context, services) => ConfigureServices(context, services, instrumentationKey));
+            return (ISiloHostBuilder)hostBuilder.ConfigureServices((context, services) => ConfigureServices(services, instrumentationKey));
         }
 
         /// <summary>
@@ -23,7 +24,7 @@ namespace Orleans.Hosting
         /// <param name="instrumentationKey">The Application Insights instrumentation key.</param>
         public static ISiloBuilder AddApplicationInsightsTelemetryConsumer(this ISiloBuilder hostBuilder, string instrumentationKey = null)
         {
-            return hostBuilder.ConfigureServices((context, services) => ConfigureServices(context, services, instrumentationKey));
+            return hostBuilder.ConfigureServices((context, services) => ConfigureServices(services, instrumentationKey));
         }
 
         /// <summary>
@@ -33,18 +34,10 @@ namespace Orleans.Hosting
         /// <param name="instrumentationKey">The Application Insights instrumentation key.</param>
         public static IClientBuilder AddApplicationInsightsTelemetryConsumer(this IClientBuilder clientBuilder, string instrumentationKey = null)
         {
-            return clientBuilder.ConfigureServices((context, services) => ConfigureServices(context, services, instrumentationKey));
+            return clientBuilder.ConfigureServices((context, services) => ConfigureServices( services, instrumentationKey));
         }
 
-        private static void ConfigureServices(Microsoft.Extensions.Hosting.HostBuilderContext context, IServiceCollection services, string instrumentationKey)
-        {
-            services.ConfigureFormatter<ApplicationInsightsTelemetryConsumerOptions>();
-            services.Configure<TelemetryOptions>(options => options.AddConsumer<AITelemetryConsumer>());
-            if (!string.IsNullOrWhiteSpace(instrumentationKey))
-                services.Configure<ApplicationInsightsTelemetryConsumerOptions>(options => options.InstrumentationKey = instrumentationKey);
-        }
-
-        private static void ConfigureServices(HostBuilderContext context, IServiceCollection services, string instrumentationKey)
+        private static void ConfigureServices(IServiceCollection services, string instrumentationKey)
         {
             services.ConfigureFormatter<ApplicationInsightsTelemetryConsumerOptions>();
             services.Configure<TelemetryOptions>(options => options.AddConsumer<AITelemetryConsumer>());

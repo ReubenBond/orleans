@@ -12,6 +12,7 @@ using Orleans.ApplicationParts;
 using Orleans.CodeGeneration;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Microsoft.Extensions.Hosting;
 
 namespace Orleans
 {

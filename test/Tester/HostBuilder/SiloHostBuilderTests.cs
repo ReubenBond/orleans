@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
@@ -11,7 +12,7 @@ using Xunit;
 namespace Tester.HostBuilder
 {
     [TestCategory("BVT")]
-    public class HostBuilderTests
+    public class SiloHostBuilderTests
     {
         [Fact]
         public void ConfigureHostConfigurationPropagated()

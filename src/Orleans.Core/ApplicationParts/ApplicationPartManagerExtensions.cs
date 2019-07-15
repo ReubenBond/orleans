@@ -4,9 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.DependencyModel;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.ApplicationParts;
-using Orleans.Hosting;
 using Orleans.Runtime;
 
 namespace Orleans
@@ -20,13 +20,6 @@ namespace Orleans
         private static readonly string AbstractionsAssemblyName = typeof(IGrain).Assembly.GetName().Name;
         private static readonly IEnumerable<string> NoReferenceComplaint = new[] { $"Assembly does not reference {CoreAssemblyName} or {AbstractionsAssemblyName}" };
         private static readonly object ApplicationPartsKey = new object();
-
-        /// <summary>
-        /// Returns the <see cref="ApplicationPartManager"/> for the provided context.
-        /// </summary>
-        /// <param name="context">The context.</param>
-        /// <returns>The <see cref="ApplicationPartManager"/> belonging to the provided context.</returns>
-        public static ApplicationPartManager GetApplicationPartManager(this Microsoft.Extensions.Hosting.HostBuilderContext context) => GetApplicationPartManager(context.Properties);
 
         /// <summary>
         /// Returns the <see cref="ApplicationPartManager"/> for the provided context.
