@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
 using BenchmarkGrainInterfaces.GrainStorage;
+using Microsoft.Extensions.Hosting;
 
 namespace Benchmarks.GrainStorage
 {
@@ -38,17 +39,17 @@ namespace Benchmarks.GrainStorage
 
         public class SiloMemoryStorageConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddMemoryGrainStorageAsDefault();
+                siloBuilder.AddMemoryGrainStorageAsDefault();
             }
         }
 
         public class SiloAzureTableStorageConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddAzureTableGrainStorageAsDefault(options =>
+                siloBuilder.AddAzureTableGrainStorageAsDefault(options =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 });
@@ -57,9 +58,9 @@ namespace Benchmarks.GrainStorage
 
         public class SiloAzureBlobStorageConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddAzureBlobGrainStorageAsDefault(options =>
+                siloBuilder.AddAzureBlobGrainStorageAsDefault(options =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 });

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using Orleans.Tests.SqlUtils;
@@ -38,10 +39,10 @@ namespace Tester.AdoNet.Persistence
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
                     var connectionString = hostBuilder.GetConfiguration()[ConnectionStringKey];
-                    hostBuilder
+                    siloBuilder
                         .AddAdoNetGrainStorage("GrainStorageForTest", options =>
                         {
                             options.ConnectionString = (string)connectionString;

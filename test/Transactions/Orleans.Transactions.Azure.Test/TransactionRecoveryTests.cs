@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using Orleans.Transactions.TestKit;
@@ -54,9 +55,9 @@ namespace Orleans.Transactions.AzureStorage.Tests
 
         private class SiloBuilderConfiguratorUsingAzureClustering : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseAzureStorageClustering(options =>
+                siloBuilder.UseAzureStorageClustering(options =>
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
             }
         }

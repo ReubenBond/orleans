@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -28,9 +29,9 @@ namespace UnitTests.General
 
         internal class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddMemoryGrainStorage("MemoryStore")
+                siloBuilder.AddMemoryGrainStorage("MemoryStore")
                     .AddMemoryGrainStorageAsDefault()
                     .Configure<LoadSheddingOptions>(options => options.LoadSheddingEnabled = true);
             }

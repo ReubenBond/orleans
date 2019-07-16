@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -39,7 +40,7 @@ namespace Tester.StreamingTests
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)=> hostBuilder.AddMemoryGrainStorage("PubSubStore")
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder) => siloBuilder.AddMemoryGrainStorage("PubSubStore")
                         .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>b
                     .ConfigurePartitioning(partitionCount))
                     .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));

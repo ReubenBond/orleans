@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Streams;
 using Orleans.TestingHost;
@@ -24,9 +25,9 @@ namespace ServiceBus.Tests.Streaming
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .AddEventHubStreams(StreamProviderName, b=>
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
@@ -42,7 +43,7 @@ namespace ServiceBus.Tests.Streaming
                             }));
                         });
 
-                    hostBuilder
+                    siloBuilder
                         .AddEventHubStreams(StreamProviderName2, b=>
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
@@ -59,7 +60,7 @@ namespace ServiceBus.Tests.Streaming
                             }));
                         });
 
-                    hostBuilder
+                    siloBuilder
                           .AddMemoryGrainStorage("PubSubStore");
                 }
             }

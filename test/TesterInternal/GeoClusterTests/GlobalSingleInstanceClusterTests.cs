@@ -15,6 +15,7 @@ using Xunit.Abstractions;
 using Tester;
 using Orleans.Hosting;
 using Orleans.Configuration;
+using Microsoft.Extensions.Hosting;
 
 // ReSharper disable InconsistentNaming
 
@@ -93,9 +94,9 @@ namespace Tests.GeoClusterTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.Configure<MultiClusterOptions>(options => options.GlobalSingleInstanceRetryInterval = TimeSpan.FromSeconds(5));
+                siloBuilder.Configure<MultiClusterOptions>(options => options.GlobalSingleInstanceRetryInterval = TimeSpan.FromSeconds(5));
             }
         }
 

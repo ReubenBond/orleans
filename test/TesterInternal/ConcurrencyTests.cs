@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -27,9 +28,9 @@ namespace UnitTests.ConcurrencyTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.Configure<SchedulingOptions>(options => options.MaxActiveThreads = 2);
+                siloBuilder.Configure<SchedulingOptions>(options => options.MaxActiveThreads = 2);
             }
         }
 

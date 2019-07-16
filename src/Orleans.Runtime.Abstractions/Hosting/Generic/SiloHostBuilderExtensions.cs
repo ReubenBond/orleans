@@ -46,7 +46,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Sets up the configuration for the remainder of the build process and application. This can be called multiple times and
         /// the results will be additive. The results will be available at <see cref="HostBuilderContext.Configuration"/> for
-        /// subsequent operations, as well as in <see cref="ISiloHost.Services"/>.
+        /// subsequent operations, as well as in <see cref="IHost.Services"/>.
         /// </summary>
         /// <param name="hostBuilder">The host builder to configure.</param>
         /// <param name="configureDelegate"></param>
@@ -111,7 +111,7 @@ namespace Orleans.Hosting
         /// <returns>The same instance of the <see cref="ISiloHostBuilder"/> for chaining.</returns>
         public static ISiloHostBuilder ConfigureLogging(this ISiloHostBuilder builder, Action<HostBuilderContext, ILoggingBuilder> configureLogging)
         {
-            return (ISiloHostBuilder)builder.ConfigureServices((context, collection) => collection.AddLogging(loggingBuilder => configureLogging(context, loggingBuilder)));
+            return builder.ConfigureServices((context, collection) => collection.AddLogging(loggingBuilder => configureLogging(context, loggingBuilder)));
         }
 
         /// <summary>

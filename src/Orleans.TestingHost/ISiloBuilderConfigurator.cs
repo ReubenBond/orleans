@@ -1,4 +1,5 @@
-﻿using Orleans.Hosting;
+using Microsoft.Extensions.Hosting;
+using Orleans.Hosting;
 
 namespace Orleans.TestingHost
 {
@@ -10,6 +11,6 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Configures the host builder.
         /// </summary>
-        void Configure(ISiloHostBuilder hostBuilder);
+        void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder);
     }
 }

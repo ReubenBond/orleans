@@ -9,6 +9,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
+using Microsoft.Extensions.Hosting;
 
 namespace Tester.AzureUtils.Persistence
 {
@@ -31,9 +32,9 @@ namespace Tester.AzureUtils.Persistence
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .AddAzureTableGrainStorage("GrainStorageForTest", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;

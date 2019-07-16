@@ -15,6 +15,7 @@ using Xunit;
 using Xunit.Abstractions;
 using static Orleans.Storage.DynamoDBGrainStorage;
 using Orleans.Hosting;
+using Microsoft.Extensions.Hosting;
 
 namespace AWSUtils.Tests.StorageTests
 {
@@ -35,9 +36,9 @@ namespace AWSUtils.Tests.StorageTests
 
             public class SiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.AddMemoryGrainStorage("MemoryStore");
+                    siloBuilder.AddMemoryGrainStorage("MemoryStore");
                 }
             }
         }

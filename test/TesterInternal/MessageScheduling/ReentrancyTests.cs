@@ -12,14 +12,15 @@ using UnitTests.Grains;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace UnitTests
 {
     internal class ReentrancyTestsSiloBuilderConfigurator : ISiloBuilderConfigurator
     {
-        public void Configure(ISiloHostBuilder hostBuilder)
+        public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
         {
-            hostBuilder.AddSimpleMessageStreamProvider("sms")
+            siloBuilder.AddSimpleMessageStreamProvider("sms")
                 .AddMemoryGrainStorage("MemoryStore")
                     .AddMemoryGrainStorage("PubSubStore")
                     .AddMemoryGrainStorageAsDefault();
@@ -38,9 +39,9 @@ namespace UnitTests
 
         public class SiloConfigurator :ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.Configure<SchedulingOptions>(options => options.AllowCallChainReentrancy = true);
+                siloBuilder.Configure<SchedulingOptions>(options => options.AllowCallChainReentrancy = true);
             }
         }
 

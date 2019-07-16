@@ -8,6 +8,7 @@ using TestExtensions;
 using Orleans.Streams;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace ServiceBus.Tests
 {
@@ -30,9 +31,9 @@ namespace ServiceBus.Tests
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .AddMemoryGrainStorage("PubSubStore")
                         .AddPersistentStreams(
                             StreamProviderName,

@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
@@ -28,9 +29,9 @@ namespace Tester.AzureUtils
 
         public class Configurator : ISiloBuilderConfigurator, IClientBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseAzureStorageClustering(options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
+                siloBuilder.UseAzureStorageClustering(options => options.ConnectionString = TestDefaultConfiguration.DataConnectionString);
             }
 
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)

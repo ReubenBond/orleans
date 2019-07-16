@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using FluentAssertions.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans;
@@ -59,9 +60,9 @@ namespace Tester.AzureUtils.Streaming
 
         private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder
+                siloBuilder
                     .AddAzureQueueStreams(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>
                         {

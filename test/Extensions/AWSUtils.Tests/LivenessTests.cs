@@ -2,6 +2,7 @@ using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
 using Orleans.Clustering.DynamoDB;
@@ -66,9 +67,9 @@ namespace AWSUtils.Tests.Liveness
 
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseDynamoDBClustering(options => { options.Service = Service; });
+                siloBuilder.UseDynamoDBClustering(options => { options.Service = Service; });
             }
         }
 

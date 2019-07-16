@@ -23,6 +23,7 @@ using Tester;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Tester.AzureUtils.Streaming;
+using Microsoft.Extensions.Hosting;
 
 // ReSharper disable ConvertToConstant.Local
 // ReSharper disable CheckNamespace
@@ -77,9 +78,9 @@ namespace UnitTests.Streaming.Reliability
 
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseAzureStorageClustering(options =>
+                siloBuilder.UseAzureStorageClustering(options =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     options.MaxStorageBusyRetries = 3;

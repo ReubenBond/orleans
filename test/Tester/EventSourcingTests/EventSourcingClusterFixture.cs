@@ -1,4 +1,5 @@
 using System;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans.EventSourcing.CustomStorage;
 using Orleans.Hosting;
@@ -22,10 +23,10 @@ namespace Tester.EventSourcingTests
 
         private class TestSiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
                 // we use a slowed-down memory storage provider
-                hostBuilder
+                siloBuilder
                     .AddLogStorageBasedLogConsistencyProvider("LogStorage")
                     .AddStateStorageBasedLogConsistencyProvider("StateStorage")
                     .ConfigureLogging(builder =>

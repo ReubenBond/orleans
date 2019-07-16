@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Autofac;
 using Autofac.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -26,14 +22,9 @@ namespace DependencyInjection.Tests.Autofac
             //configure to use Autofac as DI container
             private class SiloBuilderConfiguratorConfiguringAutofac : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.UseServiceProviderFactory(services =>
-                    {
-                        var containerBuilder = new ContainerBuilder();
-                        containerBuilder.Populate(services);
-                        return new AutofacServiceProvider(containerBuilder.Build());
-                    });
+                    hostBuilder.UseServiceProviderFactory(new AutofacServiceProviderFactory());
                 }
             }
 

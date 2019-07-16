@@ -12,6 +12,7 @@ using TestExtensions;
 using UnitTests.Grains.ProgrammaticSubscribe;
 using Xunit.Abstractions;
 using Orleans.Hosting;
+using Microsoft.Extensions.Hosting;
 
 namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 {
@@ -29,9 +30,9 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddAzureBlobGrainStorageAsDefault()
+                siloBuilder.AddAzureBlobGrainStorageAsDefault()
                     .AddMemoryGrainStorage("PubSubStore");
             }
         }

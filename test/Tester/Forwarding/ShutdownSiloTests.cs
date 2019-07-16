@@ -12,6 +12,7 @@ using Orleans.Configuration;
 using System.Diagnostics;
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Tester.Forwarding
 {
@@ -22,9 +23,9 @@ namespace Tester.Forwarding
         public static readonly TimeSpan DeactivationTimeout = TimeSpan.FromSeconds(10);
         internal class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder
+                siloBuilder
                     .Configure<GrainCollectionOptions>(options =>
                     {
                         options.DeactivationTimeout = DeactivationTimeout;

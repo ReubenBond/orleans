@@ -10,6 +10,7 @@ using TestExtensions;
 using Tester;
 
 using Orleans.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace Tests.GeoClusterTests
 {
@@ -29,9 +30,9 @@ namespace Tests.GeoClusterTests
 
             private class SiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .AddStateStorageBasedLogConsistencyProvider()
                         .AddLogStorageBasedLogConsistencyProvider()
                         .AddCustomStorageBasedLogConsistencyProvider("CustomStorage")

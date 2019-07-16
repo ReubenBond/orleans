@@ -17,6 +17,7 @@ using UnitTests.StorageTests;
 using Orleans.Storage;
 using Orleans.Providers;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace UnitTests.Streaming
 {
@@ -35,9 +36,9 @@ namespace UnitTests.Streaming
 
             public class SiloHostConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .AddMemoryGrainStorage("MemoryStore")
                         .ConfigureServices(services =>
                         {
@@ -128,9 +129,9 @@ namespace UnitTests.Streaming
 
             public class SiloConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
+                    siloBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
                         .AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", options => options.OptimizeForImmutableData = false)
                         .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1);
                 }

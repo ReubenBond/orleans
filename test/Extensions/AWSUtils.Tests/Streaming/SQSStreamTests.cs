@@ -14,6 +14,7 @@ using TestExtensions;
 using UnitTests.Streaming;
 using OrleansAWSUtils.Streams;
 using Orleans;
+using Microsoft.Extensions.Hosting;
 
 namespace AWSUtils.Tests.Streaming
 {
@@ -36,9 +37,9 @@ namespace AWSUtils.Tests.Streaming
 
         private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder
+                siloBuilder
                     .AddSimpleMessageStreamProvider("SMSProvider")
                     .AddSqsStreams("SQSProvider", options =>
                     {

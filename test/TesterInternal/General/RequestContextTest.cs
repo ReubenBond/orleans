@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
@@ -39,9 +40,9 @@ namespace UnitTests.General
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.Configure<SiloMessagingOptions>(options => options.PropagateActivityId = true);
+                siloBuilder.Configure<SiloMessagingOptions>(options => options.PropagateActivityId = true);
             }
         }
 

@@ -7,6 +7,7 @@ using Orleans.TestingHost;
 using TestExtensions;
 using Orleans.Hosting;
 using Orleans.Configuration;
+using Microsoft.Extensions.Hosting;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -33,9 +34,9 @@ namespace Tester.AzureUtils.Persistence
 
             private class StorageSiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.AddAzureBlobGrainStorage("GrainStorageForTest", (AzureBlobStorageOptions options) =>
+                    siloBuilder.AddAzureBlobGrainStorage("GrainStorageForTest", (AzureBlobStorageOptions options) =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     });

@@ -13,6 +13,7 @@ using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using System.Text;
+using Microsoft.Extensions.Hosting;
 
 namespace Benchmarks.Transactions
 {
@@ -70,17 +71,17 @@ namespace Benchmarks.Transactions
 
         public class SiloMemoryStorageConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddMemoryGrainStorageAsDefault();
+                siloBuilder.AddMemoryGrainStorageAsDefault();
             }
         }
 
         public class SiloAzureStorageConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddAzureTableTransactionalStateStorageAsDefault(options =>
+                siloBuilder.AddAzureTableTransactionalStateStorageAsDefault(options =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 });
@@ -89,9 +90,9 @@ namespace Benchmarks.Transactions
 
         public class SiloTransactionThrottlingConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.Configure<TransactionRateLoadSheddingOptions>(options =>
+                siloBuilder.Configure<TransactionRateLoadSheddingOptions>(options =>
                 {
                     options.Enabled = true;
                     options.Limit = 50;
@@ -149,9 +150,9 @@ namespace Benchmarks.Transactions
 
         public sealed class SiloTransactionConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder
+                siloBuilder
                     .UseTransactions()
                     .ConfigureServices(services => services.AddSingleton<TelemetryConsumer>())
                     .Configure<TelemetryOptions>(options => options.AddConsumer<TelemetryConsumer>())

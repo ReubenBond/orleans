@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -53,9 +54,9 @@ namespace Tester.AzureUtils.Streaming
 
         private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder
+                siloBuilder
                     .AddAzureQueueStreams(adapterName, b =>
                     {
                         b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
@@ -69,7 +70,7 @@ namespace Tester.AzureUtils.Streaming
                     {
                         op.SiloNames = new List<string>() {"Primary", "Secondary_1", "Secondary_2", "Secondary_3"};
                     });
-                hostBuilder.AddMemoryGrainStorage("PubSubStore");
+                siloBuilder.AddMemoryGrainStorage("PubSubStore");
             }
         }
 

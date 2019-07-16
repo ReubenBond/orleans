@@ -3,6 +3,7 @@ using Orleans.TestingHost;
 using Orleans.Hosting;
 using Orleans.Transactions.TestKit;
 using TestExtensions;
+using Microsoft.Extensions.Hosting;
 
 namespace Orleans.Transactions.Tests
 {
@@ -15,11 +16,11 @@ namespace Orleans.Transactions.Tests
 
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder
+                hostBuilder.ConfigureTracingForTransactionTests();
+                siloBuilder
                     .ConfigureServices(services => services.AddSingletonNamedService<IRemoteCommitService, RemoteCommitService>(TransactionTestConstants.RemoteCommitService))
-                    .ConfigureTracingForTransactionTests()
                     .AddMemoryGrainStorage(TransactionTestConstants.TransactionStore)
                     .UseTransactions();
             }

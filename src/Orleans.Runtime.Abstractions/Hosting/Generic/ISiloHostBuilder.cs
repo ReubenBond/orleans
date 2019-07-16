@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -10,6 +11,11 @@ namespace Orleans.Hosting
     /// </summary>
     public interface ISiloHostBuilder : ISiloBuilder, IHostBuilder
     {
+        /// <summary>
+        /// A central location for sharing state between components during the host building process.
+        /// </summary>
+        new IDictionary<object, object> Properties { get; }
+
         /// <summary>
         /// Run the given actions to initialize the host. This can only be called once.
         /// </summary>

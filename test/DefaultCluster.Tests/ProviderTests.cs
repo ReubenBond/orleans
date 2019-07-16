@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Xunit;
 using Orleans;
@@ -8,6 +8,7 @@ using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
+using Microsoft.Extensions.Hosting;
 
 namespace DefaultCluster.Tests
 {
@@ -29,9 +30,9 @@ namespace DefaultCluster.Tests
 
             private class Configurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.AddGrainExtension<IAutoExtension, AutoExtension>();
+                    siloBuilder.AddGrainExtension<IAutoExtension, AutoExtension>();
                 }
             }
         }

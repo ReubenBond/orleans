@@ -6,6 +6,7 @@ using Orleans.Transactions.TestKit;
 using Orleans.Transactions.Tests;
 using TestExtensions;
 using Tester;
+using Microsoft.Extensions.Hosting;
 
 namespace Orleans.Transactions.AzureStorage.Tests
 {
@@ -24,11 +25,11 @@ namespace Orleans.Transactions.AzureStorage.Tests
 
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder
+                hostBuilder.ConfigureTracingForTransactionTests();
+                siloBuilder
                     .ConfigureServices(services => services.AddSingletonNamedService<IRemoteCommitService, RemoteCommitService>(TransactionTestConstants.RemoteCommitService))
-                    .ConfigureTracingForTransactionTests()
                     .AddAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
@@ -53,10 +54,10 @@ namespace Orleans.Transactions.AzureStorage.Tests
 
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder
-                    .ConfigureTracingForTransactionTests()
+                hostBuilder.ConfigureTracingForTransactionTests();
+                siloBuilder
                     .AddFaultInjectionAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
@@ -93,10 +94,10 @@ namespace Orleans.Transactions.AzureStorage.Tests
         public class TxSiloBuilderConfigurator : ISiloBuilderConfigurator
         {
             private static readonly double probability = 0.05;
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder
-                    .ConfigureTracingForTransactionTests()
+                hostBuilder.ConfigureTracingForTransactionTests();
+                siloBuilder
                     .AddFaultInjectionAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
                     {
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;

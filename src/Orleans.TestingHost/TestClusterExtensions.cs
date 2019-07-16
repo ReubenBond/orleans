@@ -1,12 +1,13 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 
 namespace Orleans.TestingHost
 {
     public static class TestClusterExtensions
     {
-        public static IConfiguration GetConfiguration(this ISiloHostBuilder hostBuilder)
+        public static IConfiguration GetConfiguration(this IHostBuilder hostBuilder)
         {
             if (hostBuilder.Properties.TryGetValue("Configuration", out var configObject) && configObject is IConfiguration config)
             {
@@ -14,15 +15,15 @@ namespace Orleans.TestingHost
             }
 
             throw new InvalidOperationException(
-                $"Expected configuration object in \"Configuration\" property of type {nameof(IConfiguration)} on {nameof(ISiloHostBuilder)}.");
+                $"Expected configuration object in \"Configuration\" property of type {nameof(IConfiguration)} on {nameof(IHostBuilder)}.");
         }
 
-        public static string GetConfigurationValue(this ISiloHostBuilder hostBuilder, string key)
+        public static string GetConfigurationValue(this IHostBuilder hostBuilder, string key)
         {
             return hostBuilder.GetConfiguration()[key];
         }
 
-        public static TestClusterOptions GetTestClusterOptions(this ISiloHostBuilder hostBuilder)
+        public static TestClusterOptions GetTestClusterOptions(this IHostBuilder hostBuilder)
         {
             return hostBuilder.GetConfiguration().GetTestClusterOptions();
         }

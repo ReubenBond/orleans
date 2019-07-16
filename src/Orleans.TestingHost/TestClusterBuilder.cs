@@ -8,6 +8,7 @@ using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.TestHooks;
@@ -176,17 +177,17 @@ namespace Orleans.TestingHost
                 clientBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(ITestHooksSystemTarget).Assembly));
             }
 
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(ITestHooksSystemTarget).Assembly));
+                siloBuilder.ConfigureApplicationParts(parts => parts.AddFrameworkPart(typeof(ITestHooksSystemTarget).Assembly));
             }
         }
 
         internal class ConfigureStaticClusterDeploymentOptions : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.ConfigureServices((context, services) =>
+                siloBuilder.ConfigureServices((context, services) =>
                 {
                     var initialSilos = int.Parse(context.Configuration[nameof(TestClusterOptions.InitialSilosCount)]);
                     var siloNames = Enumerable.Range(0, initialSilos).Select(GetSiloName).ToList();

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -33,9 +34,9 @@ namespace UnitTests.General
 
         private class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddMemoryGrainStorage("MemoryStore")
+                siloBuilder.AddMemoryGrainStorage("MemoryStore")
                     .AddMemoryGrainStorageAsDefault();
             }
         }

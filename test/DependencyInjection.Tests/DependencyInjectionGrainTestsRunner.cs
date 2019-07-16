@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Orleans.Hosting;
 using Orleans.TestingHost.Utils;
+using Microsoft.Extensions.Hosting;
 
 namespace DependencyInjection.Tests
 {
@@ -23,9 +24,9 @@ namespace DependencyInjection.Tests
         //while different ServiceProviderFactory set up should be in the more concrete test files
         protected class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.ConfigureServices(services =>
+                siloBuilder.ConfigureServices(services =>
                 {
                     services.AddSingleton<IReducer<string, Reducer1Action>>(x => new Reducer1());
                     services.AddSingleton<IReducer<int, Reducer2Action>>(x => new Reducer2());

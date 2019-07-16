@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -31,9 +32,9 @@ namespace UnitTests.StreamingTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
+                siloBuilder.AddSimpleMessageStreamProvider(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
                     .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1)
                     .ConfigureServices(services =>
                     {

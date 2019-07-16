@@ -8,6 +8,7 @@ using Xunit;
 using TestExtensions;
 using Orleans.Hosting;
 using Orleans.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace UnitTests.General
 {
@@ -24,9 +25,9 @@ namespace UnitTests.General
 
             private class SiloConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.Configure<SchedulingOptions>(options =>
+                    siloBuilder.Configure<SchedulingOptions>(options =>
                     {
                         options.PerformDeadlockDetection = true;
                         options.AllowCallChainReentrancy = true;

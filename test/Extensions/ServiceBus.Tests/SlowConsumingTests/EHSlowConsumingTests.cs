@@ -18,6 +18,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains.ProgrammaticSubscribe;
 using Xunit;
+using Microsoft.Extensions.Hosting;
 
 namespace ServiceBus.Tests.SlowConsumingTests
 {
@@ -42,9 +43,9 @@ namespace ServiceBus.Tests.SlowConsumingTests
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.AddPersistentStreams(
+                    siloBuilder.AddPersistentStreams(
                         StreamProviderName,
                         EHStreamProviderWithCreatedCacheListAdapterFactory.Create,
                         b=>
@@ -58,7 +59,7 @@ namespace ServiceBus.Tests.SlowConsumingTests
                             b.ConfigureComponent<IStreamQueueCheckpointerFactory>((s, n) => NoOpCheckpointerFactory.Instance);
                             b.UseDynamicClusterConfigDeploymentBalancer();
                         });
-                    hostBuilder.AddMemoryGrainStorage("PubSubStore");
+                    siloBuilder.AddMemoryGrainStorage("PubSubStore");
                 }
             }
         }

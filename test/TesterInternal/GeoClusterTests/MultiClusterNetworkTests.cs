@@ -13,6 +13,7 @@ using Tester;
 using Orleans.TestingHost;
 using Orleans.Hosting;
 using Orleans.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace Tests.GeoClusterTests
 {
@@ -152,9 +153,9 @@ namespace Tests.GeoClusterTests
 
         public class TwoClusterSiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.Configure<MultiClusterOptions>(options =>
+                siloBuilder.Configure<MultiClusterOptions>(options =>
                 {
                     options.DefaultMultiCluster.Add("A");
                     options.DefaultMultiCluster.Add("B");

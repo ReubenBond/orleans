@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 
@@ -10,9 +11,9 @@ namespace Orleans.Transactions.TestKit
         private static readonly TimeSpan MinSkew = TimeSpan.FromSeconds(3);
         private static readonly TimeSpan MaxSkew = TimeSpan.FromSeconds(5);
 
-        public void Configure(ISiloHostBuilder hostBuilder)
+        public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
         {
-            hostBuilder
+            siloBuilder
                 .ConfigureServices(services => services.AddSingleton<IClock>(sp => new SkewedClock(MinSkew, MaxSkew)));
         }
     }

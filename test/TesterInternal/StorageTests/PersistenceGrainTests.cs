@@ -18,6 +18,7 @@ using TesterInternal;
 using TestExtensions;
 using Orleans.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -41,13 +42,13 @@ namespace UnitTests.StorageTests
 
             private class SiloConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.AddMemoryGrainStorage("MemoryStore");
-                    hostBuilder.AddTestStorageProvider(MockStorageProviderName1, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
-                    hostBuilder.AddTestStorageProvider(MockStorageProviderName2, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
-                    hostBuilder.AddTestStorageProvider(MockStorageProviderNameLowerCase, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
-                    hostBuilder.AddTestStorageProvider(ErrorInjectorProviderName, (sp, name) => ActivatorUtilities.CreateInstance<ErrorInjectionStorageProvider>(sp));
+                    siloBuilder.AddMemoryGrainStorage("MemoryStore");
+                    siloBuilder.AddTestStorageProvider(MockStorageProviderName1, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
+                    siloBuilder.AddTestStorageProvider(MockStorageProviderName2, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
+                    siloBuilder.AddTestStorageProvider(MockStorageProviderNameLowerCase, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
+                    siloBuilder.AddTestStorageProvider(ErrorInjectorProviderName, (sp, name) => ActivatorUtilities.CreateInstance<ErrorInjectionStorageProvider>(sp));
                 }
             }
         }

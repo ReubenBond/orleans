@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -42,11 +43,11 @@ namespace Tester.HeterogeneousSilosTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
-                hostBuilder.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = RefreshInterval);
-                hostBuilder.Configure<GrainClassOptions>(options =>
+                siloBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
+                siloBuilder.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = RefreshInterval);
+                siloBuilder.Configure<GrainClassOptions>(options =>
                 {
                     var cfg = hostBuilder.GetConfiguration();
                     var siloOptions = new TestSiloSpecificOptions();
@@ -59,7 +60,7 @@ namespace Tester.HeterogeneousSilosTests
                         options.ExcludedGrainTypes.AddRange(blacklistedTypesList);
                     }
                 });
-                hostBuilder.ConfigureServices(services =>
+                siloBuilder.ConfigureServices(services =>
                 {
                     var defaultPlacementStrategy = Type.GetType(hostBuilder.GetConfiguration()["DefaultPlacementStrategy"]);
                     services.AddSingleton(typeof(PlacementStrategy), defaultPlacementStrategy);

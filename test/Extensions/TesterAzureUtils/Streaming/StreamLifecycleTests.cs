@@ -19,6 +19,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.AzureQueue;
 using Tester.AzureUtils.Streaming;
+using Microsoft.Extensions.Hosting;
 
 namespace UnitTests.StreamingTests
 {
@@ -60,9 +61,9 @@ namespace UnitTests.StreamingTests
 
         private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder
+                siloBuilder
                     .AddSimpleMessageStreamProvider(SmsStreamProviderName)
                     .AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData", options => options.OptimizeForImmutableData = false)
                     .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>

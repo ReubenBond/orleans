@@ -7,6 +7,7 @@ using TestExtensions;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
+using Microsoft.Extensions.Hosting;
 
 namespace Tester.ZooKeeperUtils
 {
@@ -25,9 +26,9 @@ namespace Tester.ZooKeeperUtils
 
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseZooKeeperClustering(options => { options.ConnectionString = TestDefaultConfiguration.DataConnectionString; });
+                siloBuilder.UseZooKeeperClustering(options => { options.ConnectionString = TestDefaultConfiguration.DataConnectionString; });
             }
         }
 

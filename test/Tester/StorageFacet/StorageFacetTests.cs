@@ -5,6 +5,7 @@ using Orleans.TestingHost;
 using Tester.StorageFacet.Infrastructure;
 using Tester.StorageFacet.Implementations;
 using Orleans.Hosting;
+using Microsoft.Extensions.Hosting;
 
 namespace Tester
 {
@@ -21,24 +22,24 @@ namespace Tester
 
             private class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
                     // Setup storage feature infrastructure.
                     // - Setup infrastructure.
                     // - Set default feature implementation - optional
 
                     // Setup infrastructure
-                    hostBuilder.UseExampleStorage();
+                    siloBuilder.UseExampleStorage();
                     // Default storage feature factory - optional
-                    hostBuilder.UseAsDefaultExampleStorage<TableExampleStorageFactory>();
+                    siloBuilder.UseAsDefaultExampleStorage<TableExampleStorageFactory>();
 
                     // Service will need to add types they want to use to collection
                     // - Call extension functions from each implementation assembly to register it's classes.
 
                     // Blob - from blob extension assembly
-                    hostBuilder.UseBlobExampleStorage("Blob");
+                    siloBuilder.UseBlobExampleStorage("Blob");
                     // Table - from table extension assembly
-                    hostBuilder.UseTableExampleStorage("Table");
+                    siloBuilder.UseTableExampleStorage("Table");
                     // Blarg - from blarg extension assembly
                     //builder.UseBlargExampleStorage("Blarg");
                 }

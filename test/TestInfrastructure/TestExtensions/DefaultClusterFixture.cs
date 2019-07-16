@@ -6,6 +6,7 @@ using Orleans.Hosting;
 using Orleans.TestingHost;
 
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 
 namespace TestExtensions
 {
@@ -62,9 +63,9 @@ namespace TestExtensions
 
         public class SiloHostConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder
+                siloBuilder
                     .UseInMemoryReminderService()
                     .AddMemoryGrainStorageAsDefault()
                     .AddMemoryGrainStorage("MemoryStore");

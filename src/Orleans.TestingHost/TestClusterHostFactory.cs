@@ -57,7 +57,7 @@ namespace Orleans.TestingHost
                 });
 
             hostBuilder.Properties["Configuration"] = configuration;
-            ConfigureAppServices(configuration, hostBuilder);
+            ConfigureAppServices(configuration, hostBuilder, hostBuilder);
 
             hostBuilder.ConfigureServices((context, services) =>
             {
@@ -147,7 +147,7 @@ namespace Orleans.TestingHost
             });
         }
 
-        private static void ConfigureAppServices(IConfiguration configuration, ISiloHostBuilder hostBuilder)
+        private static void ConfigureAppServices(IConfiguration configuration, IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
         {
             var builderConfiguratorTypes = configuration.GetSection(nameof(TestClusterOptions.SiloBuilderConfiguratorTypes))?.Get<string[]>();
             if (builderConfiguratorTypes == null) return;
@@ -157,7 +157,7 @@ namespace Orleans.TestingHost
                 if (!string.IsNullOrWhiteSpace(builderConfiguratorType))
                 {
                     var builderConfigurator = (ISiloBuilderConfigurator)Activator.CreateInstance(Type.GetType(builderConfiguratorType, true));
-                    builderConfigurator.Configure(hostBuilder);
+                    builderConfigurator.Configure(hostBuilder, siloBuilder);
                 }
             }
         }

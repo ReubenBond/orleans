@@ -16,6 +16,7 @@ using Orleans;
 using Orleans.Hosting;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace Tester.AzureUtils.Streaming
 {
@@ -49,9 +50,9 @@ namespace Tester.AzureUtils.Streaming
 
         private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder
+                siloBuilder
                      .AddMemoryGrainStorage("PubSubStore")
                     .AddAzureQueueStreams(AQStreamProviderName, ob=>ob.Configure<IOptions<ClusterOptions>>(
                         (options, dep) =>

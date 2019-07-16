@@ -13,6 +13,7 @@ using UnitTests.GrainInterfaces;
 using UnitTests.TimerTests;
 using Orleans.Tests.SqlUtils;
 using Xunit;
+using Microsoft.Extensions.Hosting;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -42,9 +43,9 @@ namespace Tester.AdoNet.Reminders
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseAdoNetReminderService(options =>
+                siloBuilder.UseAdoNetReminderService(options =>
                 {
                     options.ConnectionString = hostBuilder.GetConfigurationValue(ConnectionStringKey);
                     options.Invariant = AdoInvariant;

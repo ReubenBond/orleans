@@ -11,6 +11,7 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Orleans.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace UnitTests
 {
@@ -33,9 +34,9 @@ namespace UnitTests
 
             private class Configurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.ConfigureServices(services =>
+                    siloBuilder.ConfigureServices(services =>
                     {
                         services.TryAddSingleton<TestDedicatedAsynchAgent>();
                         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, TestDedicatedAsynchAgent>();

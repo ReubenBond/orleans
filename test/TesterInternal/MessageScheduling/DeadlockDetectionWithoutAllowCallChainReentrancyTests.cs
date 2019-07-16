@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
@@ -9,6 +9,7 @@ using TestExtensions;
 using Orleans.Hosting;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using Microsoft.Extensions.Hosting;
 
 namespace UnitTests.General
 {
@@ -25,9 +26,9 @@ namespace UnitTests.General
 
             private class SiloConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.Configure<SchedulingOptions>(options =>
+                    siloBuilder.Configure<SchedulingOptions>(options =>
                     {
                         options.PerformDeadlockDetection = true;
                         options.AllowCallChainReentrancy = false;

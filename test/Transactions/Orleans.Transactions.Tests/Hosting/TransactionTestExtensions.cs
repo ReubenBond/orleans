@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 
@@ -6,9 +7,9 @@ namespace Orleans.Transactions.Tests
     public static class TransactionTestExtensions
     {
         // control the tracing of the various components of the transaction mechanism
-        public static ISiloHostBuilder ConfigureTracingForTransactionTests(this ISiloHostBuilder hostBuilder)
+        public static void ConfigureTracingForTransactionTests(this IHostBuilder hostBuilder)
         {
-            return hostBuilder
+            hostBuilder
                  .ConfigureLogging(builder => builder.AddFilter("SingleStateTransactionalGrain.data", LogLevel.Trace))
                  .ConfigureLogging(builder => builder.AddFilter("DoubleStateTransactionalGrain.data", LogLevel.Trace))
                  .ConfigureLogging(builder => builder.AddFilter("MaxStateTransactionalGrain.data", LogLevel.Trace))

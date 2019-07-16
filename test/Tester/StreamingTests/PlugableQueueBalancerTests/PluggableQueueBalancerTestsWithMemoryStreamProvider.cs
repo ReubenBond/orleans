@@ -10,6 +10,7 @@ using TestExtensions;
 using Xunit;
 using Orleans.Streams;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Tester.StreamingTests.PlugableQueueBalancerTests
 {
@@ -33,9 +34,9 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .AddMemoryGrainStorage("PubSubStore")
                         .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(
                             StreamProviderName,

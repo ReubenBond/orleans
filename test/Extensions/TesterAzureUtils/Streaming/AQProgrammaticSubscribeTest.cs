@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -28,9 +29,9 @@ namespace Tester.AzureUtils.Streaming
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .AddAzureQueueStreams(StreamProviderName2, ob=>ob.Configure<IOptions<ClusterOptions>>(
                             (options, dep) =>
                             {
@@ -43,7 +44,7 @@ namespace Tester.AzureUtils.Streaming
                                 options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                                 options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                         }));
-                    hostBuilder
+                    siloBuilder
                         .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("PubSubStore");
                 }

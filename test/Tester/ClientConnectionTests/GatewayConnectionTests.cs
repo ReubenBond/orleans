@@ -16,6 +16,7 @@ using Xunit;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Microsoft.Extensions.Hosting;
 
 namespace Tester
 {
@@ -57,9 +58,9 @@ namespace Tester
 
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseLocalhostClustering();
+                siloBuilder.UseLocalhostClustering();
                 hostBuilder.ConfigureServices((context, services) =>
                 {
                     var cfg = context.Configuration;

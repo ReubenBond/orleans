@@ -13,6 +13,7 @@ using Tests.GeoClusterTests;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Hosting;
+using Microsoft.Extensions.Hosting;
 
 namespace UnitTests.GeoClusterTests
 {
@@ -100,9 +101,9 @@ namespace UnitTests.GeoClusterTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddSimpleMessageStreamProvider("SMSProvider");
+                siloBuilder.AddSimpleMessageStreamProvider("SMSProvider");
             }
         }
 

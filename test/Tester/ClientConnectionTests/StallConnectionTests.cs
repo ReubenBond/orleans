@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -26,9 +27,9 @@ namespace Tester.ClientConnectionTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.Configure<NetworkingOptions>(options => options.OpenConnectionTimeout = Timeout);
+                siloBuilder.Configure<NetworkingOptions>(options => options.OpenConnectionTimeout = Timeout);
             }
         }
 

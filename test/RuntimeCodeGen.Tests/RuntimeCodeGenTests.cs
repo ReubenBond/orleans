@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.ApplicationParts;
@@ -43,12 +44,12 @@ namespace UnitTests
 
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
                 ILoggerFactory codeGenLoggerFactory = new LoggerFactory();
                 var siloName = hostBuilder.GetConfigurationValue("SiloName") ?? nameof(RuntimeCodeGenTests);
                 codeGenLoggerFactory.AddProvider(new FileLoggerProvider($"{siloName}-CodeGeneration.log"));
-                hostBuilder
+                siloBuilder
                     .ConfigureApplicationParts(parts =>
                         parts.AddApplicationPart(typeof(IRuntimeCodeGenGrain).Assembly).WithCodeGeneration(codeGenLoggerFactory));
             }

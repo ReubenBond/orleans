@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -31,15 +32,15 @@ namespace UnitTests.StuckGrainTests
 
             private class SiloHostConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.Configure<GrainCollectionOptions>(options =>
+                    siloBuilder.Configure<GrainCollectionOptions>(options =>
                     {
                         options.CollectionAge = TimeSpan.FromSeconds(3);
                         options.CollectionQuantum = TimeSpan.FromSeconds(1);
                     });
 
-                    hostBuilder.Configure<SiloMessagingOptions>(options => options.MaxRequestProcessingTime = TimeSpan.FromSeconds(3));
+                    siloBuilder.Configure<SiloMessagingOptions>(options => options.MaxRequestProcessingTime = TimeSpan.FromSeconds(3));
                 }
             }
         }

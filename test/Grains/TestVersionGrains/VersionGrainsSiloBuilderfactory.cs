@@ -9,25 +9,26 @@ using Orleans.TestingHost;
 using UnitTests.Grains;
 using Orleans.Configuration;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace TestVersionGrains
 {
     public class VersionGrainsSiloBuilderConfigurator : ISiloBuilderConfigurator
     {
-        public void Configure(ISiloHostBuilder hostBuilder)
+        public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
         {
             var cfg = hostBuilder.GetConfiguration();
             var siloCount = int.Parse(cfg["SiloCount"]);
             var refreshInterval = TimeSpan.Parse(cfg["RefreshInterval"]);
-            hostBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
-            hostBuilder.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = refreshInterval);
-            hostBuilder.Configure<GrainVersioningOptions>(options =>
+            siloBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
+            siloBuilder.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = refreshInterval);
+            siloBuilder.Configure<GrainVersioningOptions>(options =>
             {
                 options.DefaultCompatibilityStrategy = cfg["CompatibilityStrategy"];
                 options.DefaultVersionSelectorStrategy = cfg["VersionSelectorStrategy"];
             });
 
-            hostBuilder.ConfigureServices(this.ConfigureServices)
+            siloBuilder.ConfigureServices(this.ConfigureServices)
                  .AddMemoryGrainStorageAsDefault();
         }
 

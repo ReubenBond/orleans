@@ -13,6 +13,7 @@ using TestExtensions;
 using Orleans.EventSourcing.Common;
 using Tester;
 using Orleans.Hosting;
+using Microsoft.Extensions.Hosting;
 
 namespace Tests.GeoClusterTests
 {
@@ -513,12 +514,12 @@ namespace Tests.GeoClusterTests
 
     internal class LogConsistencyProviderSiloConfigurator : ISiloBuilderConfigurator
     {
-        public void Configure(ISiloHostBuilder hostBuilder)
+        public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
         {
-            hostBuilder.AddCustomStorageBasedLogConsistencyProvider("StateStorage");
-            hostBuilder.AddCustomStorageBasedLogConsistencyProvider("LogStorage");
-            hostBuilder.AddCustomStorageBasedLogConsistencyProvider("CustomStorage");
-            hostBuilder.AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A");
+            siloBuilder.AddCustomStorageBasedLogConsistencyProvider("StateStorage");
+            siloBuilder.AddCustomStorageBasedLogConsistencyProvider("LogStorage");
+            siloBuilder.AddCustomStorageBasedLogConsistencyProvider("CustomStorage");
+            siloBuilder.AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster", "A");
         }
     }
 }

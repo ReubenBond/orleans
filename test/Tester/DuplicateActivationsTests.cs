@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.TestingHost;
@@ -24,10 +25,10 @@ namespace UnitTests.CatalogTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.Configure<SiloMessagingOptions>(options => options.ResponseTimeout = TimeSpan.FromMinutes(1));
-                hostBuilder.Configure<SchedulingOptions>(options => options.MaxActiveThreads = 1);
+                siloBuilder.Configure<SiloMessagingOptions>(options => options.ResponseTimeout = TimeSpan.FromMinutes(1));
+                siloBuilder.Configure<SchedulingOptions>(options => options.MaxActiveThreads = 1);
             }
         }
 

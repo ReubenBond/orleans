@@ -1,5 +1,6 @@
 
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Streams;
@@ -29,9 +30,9 @@ namespace UnitTests.StreamingTests
             }
             public class SiloConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.AddSimpleMessageStreamProvider(StreamBatchingTestConst.ProviderName,
+                    siloBuilder.AddSimpleMessageStreamProvider(StreamBatchingTestConst.ProviderName,
                         options => options.PubSubType = StreamPubSubType.ImplicitOnly);
                 }
             }

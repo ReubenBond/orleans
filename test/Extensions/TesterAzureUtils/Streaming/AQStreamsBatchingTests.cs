@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans;
@@ -29,9 +30,9 @@ namespace Tester.AzureUtils.Streaming
 
             private class SiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .AddAzureQueueStreams(StreamBatchingTestConst.ProviderName, b =>
                         {
                             b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(

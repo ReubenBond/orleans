@@ -8,6 +8,7 @@ using Orleans.Hosting;
 using Xunit;
 using TestExtensions;
 using UnitTests.StreamingTests;
+using Microsoft.Extensions.Hosting;
 
 namespace Tester.StreamingTests
 {
@@ -24,9 +25,9 @@ namespace Tester.StreamingTests
 
             public class SiloConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.AddSimpleMessageStreamProvider(StreamProvider)
+                    siloBuilder.AddSimpleMessageStreamProvider(StreamProvider)
                         .AddMemoryGrainStorage("MemoryStore")
                         .AddMemoryGrainStorage("PubSubStore");
                 }

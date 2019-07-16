@@ -16,6 +16,7 @@ using Orleans.MultiCluster;
 using Orleans.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Tests.GeoClusterTests
 {
@@ -150,9 +151,9 @@ namespace Tests.GeoClusterTests
 
         private class StandardGeoClusterConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.Configure<MultiClusterOptions>(
+                siloBuilder.Configure<MultiClusterOptions>(
                     options =>
                     {
                         options.HasMultiClusterNetwork = true;
@@ -168,16 +169,16 @@ namespace Tests.GeoClusterTests
 
         private class NoOpSiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
             }
         }
 
         private class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.ConfigureLogging(builder =>
+                siloBuilder.ConfigureLogging(builder =>
                 {
                     builder.AddFilter("Orleans.Runtime.Catalog", LogLevel.Debug);
                     builder.AddFilter("Orleans.Runtime.Dispatcher", LogLevel.Trace);
@@ -186,11 +187,11 @@ namespace Tests.GeoClusterTests
                     builder.AddFilter("Orleans.Runtime.LogConsistency.ProtocolServices", LogLevel.Trace);
                     builder.AddFilter("Orleans.Storage.MemoryStorageGrain", LogLevel.Debug);
                 });
-                hostBuilder.AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
+                siloBuilder.AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 }));
-                hostBuilder.AddAzureBlobGrainStorage("PubSubStore", (AzureBlobStorageOptions options) =>
+                siloBuilder.AddAzureBlobGrainStorage("PubSubStore", (AzureBlobStorageOptions options) =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 });
@@ -250,9 +251,9 @@ namespace Tests.GeoClusterTests
 
         public class SiloHostConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddMemoryGrainStorage("MemoryStore")
+                siloBuilder.AddMemoryGrainStorage("MemoryStore")
                     .AddMemoryGrainStorageAsDefault();
             }
         }

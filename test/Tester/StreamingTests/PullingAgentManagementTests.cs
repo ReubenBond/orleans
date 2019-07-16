@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -25,9 +26,9 @@ namespace UnitTests.StreamingTests
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                     .AddAzureQueueStreams(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, b=>
                         b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>((options, dep) =>
                            {
@@ -35,7 +36,7 @@ namespace UnitTests.StreamingTests
                                options.QueueNames = Enumerable.Range(0, 8).Select(num => $"{dep.Value.ClusterId}-{num}").ToList();
                            })));
 
-                    hostBuilder.AddMemoryGrainStorage("PubSubStore");
+                    siloBuilder.AddMemoryGrainStorage("PubSubStore");
                 }
             }
 

@@ -7,6 +7,7 @@ using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
 using Orleans.Hosting;
+using Microsoft.Extensions.Hosting;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -30,9 +31,9 @@ namespace ServiceBus.Tests.StreamingTests
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .AddMemoryGrainStorage("PubSubStore")
                         .AddEventHubStreams(StreamProviderName, b=>
                         {

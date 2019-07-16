@@ -5,6 +5,7 @@ using UnitTests.General;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Hosting;
+using Microsoft.Extensions.Hosting;
 
 namespace UnitTests.MembershipTests
 {
@@ -24,11 +25,11 @@ namespace UnitTests.MembershipTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
                 var cfg = hostBuilder.GetConfiguration();
                 var connectionString = cfg["RelationalStorageConnectionString"];
-                hostBuilder.UseAdoNetClustering(options =>
+                siloBuilder.UseAdoNetClustering(options =>
                 {
                     options.ConnectionString = connectionString;
                     options.Invariant = AdoNetInvariants.InvariantNameSqlServer;
@@ -82,11 +83,11 @@ namespace UnitTests.MembershipTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
                 var cfg = hostBuilder.GetConfiguration();
                 var connectionString = cfg["RelationalStorageConnectionString"];
-                hostBuilder.UseAdoNetClustering(options =>
+                siloBuilder.UseAdoNetClustering(options =>
                 {
                     options.ConnectionString = connectionString;
                     options.Invariant = AdoNetInvariants.InvariantNamePostgreSql;
@@ -141,11 +142,11 @@ namespace UnitTests.MembershipTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
                 var cfg = hostBuilder.GetConfiguration();
                 var connectionString = cfg["RelationalStorageConnectionString"];
-                hostBuilder.UseAdoNetClustering(options =>
+                siloBuilder.UseAdoNetClustering(options =>
                 {
                     options.ConnectionString = connectionString;
                     options.Invariant = AdoNetInvariants.InvariantNameMySql;

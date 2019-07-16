@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -8,6 +8,7 @@ using Orleans.TestingHost.Utils;
 using TestExtensions;
 using System.Linq;
 using System.Collections.Generic;
+using Microsoft.Extensions.Hosting;
 
 namespace Tester.StreamingTests
 {
@@ -25,9 +26,9 @@ namespace Tester.StreamingTests
 
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.ConfigureServices(services => services.AddTransient<LeaseBasedQueueBalancerForTest>());
+                siloBuilder.ConfigureServices(services => services.AddTransient<LeaseBasedQueueBalancerForTest>());
             }
         }
 

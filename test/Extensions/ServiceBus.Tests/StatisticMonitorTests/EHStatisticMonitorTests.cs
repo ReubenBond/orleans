@@ -15,6 +15,7 @@ using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
 using Orleans.ServiceBus.Providers.Testing;
 using Orleans.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace ServiceBus.Tests.MonitorTests
 {
@@ -40,9 +41,9 @@ namespace ServiceBus.Tests.MonitorTests
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .AddPersistentStreams(
                             StreamProviderName,
                             EHStreamProviderForMonitorTestsAdapterFactory.Create,
@@ -52,7 +53,7 @@ namespace ServiceBus.Tests.MonitorTests
                                 b.Configure<StreamStatisticOptions>(ob => ob.Configure(options => options.StatisticMonitorWriteInterval = monitorWriteInterval));
                                 b.UseDynamicClusterConfigDeploymentBalancer();
                             });
-                    hostBuilder
+                    siloBuilder
                         .ConfigureServices(services =>
                         {
                             services.AddTransientNamedService<Func<IStreamIdentity, IStreamDataGenerator<EventData>>>(StreamProviderName, (s, n) => SimpleStreamEventDataGenerator.CreateFactory(s));

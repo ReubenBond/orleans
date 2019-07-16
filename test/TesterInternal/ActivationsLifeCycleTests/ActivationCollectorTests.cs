@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
@@ -41,15 +42,15 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
                 var config = hostBuilder.GetConfiguration();
                 var collectionAgeLimit = TimeSpan.Parse(config["DefaultCollectionAgeLimit"]);
                 var quantum = TimeSpan.Parse(config["CollectionQuantum"]);
-                hostBuilder
+                siloBuilder
                     .ConfigureDefaults()
                     .ConfigureServices(services => services.Where(s => s.ServiceType == typeof(IConfigurationValidator)).ToList().ForEach(s => services.Remove(s)));
-                hostBuilder.Configure<GrainCollectionOptions>(options =>
+                siloBuilder.Configure<GrainCollectionOptions>(options =>
                 {
                     options.CollectionAge = collectionAgeLimit;
                     options.CollectionQuantum = quantum;

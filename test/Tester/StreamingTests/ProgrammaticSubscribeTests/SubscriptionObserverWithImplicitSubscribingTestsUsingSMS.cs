@@ -11,6 +11,7 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using UnitTests.Grains.ProgrammaticSubscribe;
 using Xunit.Abstractions;
+using Microsoft.Extensions.Hosting;
 
 namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 {
@@ -27,9 +28,9 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 
         private class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddSimpleMessageStreamProvider(StreamProviderName,
+                siloBuilder.AddSimpleMessageStreamProvider(StreamProviderName,
                         options => options.PubSubType = StreamPubSubType.ImplicitOnly)
                         .AddSimpleMessageStreamProvider(StreamProviderName2,
                         options => options.PubSubType = StreamPubSubType.ImplicitOnly)

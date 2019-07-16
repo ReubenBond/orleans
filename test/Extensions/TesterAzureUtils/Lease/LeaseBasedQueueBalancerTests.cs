@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.LeaseProviders;
@@ -57,16 +58,16 @@ namespace Tester.AzureUtils.Lease
                 
             }
 
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder
+                siloBuilder
                     .ConfigureServices(ConfigureServices)
                     .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProviderName, b=>
                     {
                         b.ConfigurePartitioning(totalQueueCount);
                         b.UseClusterConfigDeploymentLeaseBasedBalancer();
                     });
-                hostBuilder
+                siloBuilder
                     .AddMemoryGrainStorage("PubSubStore");
             }
         }

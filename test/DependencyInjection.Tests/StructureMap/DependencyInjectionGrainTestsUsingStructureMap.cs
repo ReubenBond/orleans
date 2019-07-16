@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.TestingHost;
 using StructureMap;
@@ -25,17 +26,11 @@ namespace DependencyInjection.Tests.StructureMap
             //configure to use StructureMap as DI container
             private class SiloBuilderConfiguratorConfiguringStructureMap : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.UseServiceProviderFactory(services =>
-                    {
-                        var ctr = new Container();
-                        ctr.Populate(services);
-                        return ctr.GetInstance<IServiceProvider>();
-                    });
+                    hostBuilder.UseServiceProviderFactory(new StructureMapServiceProviderFactory(new Registry()));
                 }
             }
-
         }
 
         public DependencyInjectionGrainTestsUsingStructureMap(Fixture fixture)

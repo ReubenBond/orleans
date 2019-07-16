@@ -13,6 +13,7 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using Orleans.Hosting;
 using Orleans.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace Tester.CustomPlacementTests
 {
@@ -34,11 +35,11 @@ namespace Tester.CustomPlacementTests
 
             private class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = true);
-                    hostBuilder.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(100));
-                    hostBuilder.ConfigureServices(ConfigureServices);
+                    siloBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = true);
+                    siloBuilder.Configure<TypeManagementOptions>(options => options.TypeMapRefreshInterval = TimeSpan.FromMilliseconds(100));
+                    siloBuilder.ConfigureServices(ConfigureServices);
                 }
             }
 

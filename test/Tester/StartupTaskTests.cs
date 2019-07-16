@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 using Orleans;
 using Orleans.Hosting;
@@ -30,10 +31,10 @@ namespace DefaultCluster.Tests
 
             private class StartupTaskSiloConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.AddStartupTask<CallGrainStartupTask>();
-                    hostBuilder.AddStartupTask(
+                    siloBuilder.AddStartupTask<CallGrainStartupTask>();
+                    siloBuilder.AddStartupTask(
                         async (services, cancellation) =>
                         {
                             var grainFactory = services.GetRequiredService<IGrainFactory>();

@@ -12,6 +12,7 @@ using System.Linq;
 using UnitTests.TimerTests;
 using Orleans.Hosting;
 using TestExtensions;
+using Microsoft.Extensions.Hosting;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -31,9 +32,9 @@ namespace Tester.AzureUtils.TimerTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseAzureTableReminderService(options =>
+                siloBuilder.UseAzureTableReminderService(options =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 });

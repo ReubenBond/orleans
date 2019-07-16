@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Tests.Grains;
@@ -201,9 +202,9 @@ namespace Orleans.TestingHost.Tests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddMemoryGrainStorageAsDefault();
+                siloBuilder.AddMemoryGrainStorageAsDefault();
             }
         }
         public void Dispose()

@@ -15,6 +15,7 @@ using Orleans.Runtime.Configuration;
 using Orleans.Hosting;
 using Orleans.Configuration;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
@@ -198,11 +199,11 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
                 var cfg = hostBuilder.GetConfiguration();
                 var maxForwardCount = int.Parse(cfg["MaxForwardCount"]);
-                hostBuilder.Configure<SiloMessagingOptions>(options => options.MaxForwardCount = maxForwardCount);
+                siloBuilder.Configure<SiloMessagingOptions>(options => options.MaxForwardCount = maxForwardCount);
             }
         }
 
@@ -287,10 +288,10 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         public class NoForwardingSiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
                 // Disable retries in this case, to make test more predictable.
-                hostBuilder.Configure<SiloMessagingOptions>(options => options.MaxForwardCount = 0);
+                siloBuilder.Configure<SiloMessagingOptions>(options => options.MaxForwardCount = 0);
             }
         }
 
@@ -312,9 +313,9 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         public class LazyDeregistrationDelaySiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.Configure<GrainDirectoryOptions>(options => options.LazyDeregistrationDelay = TimeSpan.FromMilliseconds(5000));
+                siloBuilder.Configure<GrainDirectoryOptions>(options => options.LazyDeregistrationDelay = TimeSpan.FromMilliseconds(5000));
             }
         }
 

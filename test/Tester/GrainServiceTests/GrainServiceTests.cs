@@ -5,6 +5,7 @@ using Orleans.TestingHost;
 using Orleans.Hosting;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
+using Microsoft.Extensions.Hosting;
 
 namespace Tester
 {
@@ -20,9 +21,9 @@ namespace Tester
 
             private class GrainServiceSiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.AddTestGrainService("abc").AddGrainExtension<IEchoExtension, EchoExtension>();
+                    siloBuilder.AddTestGrainService("abc").AddGrainExtension<IEchoExtension, EchoExtension>();
                 }
             }
         }

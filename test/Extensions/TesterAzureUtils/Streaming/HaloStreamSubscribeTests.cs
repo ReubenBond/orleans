@@ -18,6 +18,7 @@ using Orleans.Hosting;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Tester.AzureUtils.Streaming;
+using Microsoft.Extensions.Hosting;
 
 namespace UnitTests.HaloTests.Streaming
 {
@@ -38,9 +39,9 @@ namespace UnitTests.HaloTests.Streaming
 
             private class SiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1)
                         .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                         {
@@ -61,7 +62,7 @@ namespace UnitTests.HaloTests.Streaming
                                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                                     options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                             })));
-                    hostBuilder
+                    siloBuilder
                         .AddAzureQueueStreams("AzureQueueProvider2", b=>b
                         .ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
                                 (options, dep) =>

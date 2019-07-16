@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -142,16 +143,16 @@ namespace UnitTests.MembershipTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.Configure<ClusterMembershipOptions>(options =>
+                siloBuilder.Configure<ClusterMembershipOptions>(options =>
                 {
                     options.NumMissedProbesLimit = 1;
                     options.ProbeTimeout = TimeSpan.FromMilliseconds(500);
                     options.NumVotesForDeathDeclaration = 1;
                 });
 
-                hostBuilder.Configure<GrainDirectoryOptions>(options => options.CacheSize = 0);
+                siloBuilder.Configure<GrainDirectoryOptions>(options => options.CacheSize = 0);
             }
         }
 

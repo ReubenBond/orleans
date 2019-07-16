@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
@@ -33,9 +34,9 @@ namespace UnitTests.StreamingTests
 
             public class SiloConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.AddSimpleMessageStreamProvider(StreamProvider)
+                    siloBuilder.AddSimpleMessageStreamProvider(StreamProvider)
                          .AddMemoryGrainStorage("PubSubStore");
                 }
             }

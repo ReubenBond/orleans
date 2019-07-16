@@ -10,6 +10,7 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using Orleans.Hosting;
+using Microsoft.Extensions.Hosting;
 
 namespace UnitTests.General
 {
@@ -28,7 +29,7 @@ namespace UnitTests.General
 
             private class TestSiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
                     hostBuilder.ConfigureServices(services =>
                         services.Replace(ServiceDescriptor.Singleton(typeof(IGrainActivator), typeof(HardcodedGrainActivator))));

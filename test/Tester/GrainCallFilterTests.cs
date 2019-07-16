@@ -15,6 +15,7 @@ using UnitTests.Grains;
 using Xunit;
 using Orleans.Hosting;
 using Orleans.Serialization;
+using Microsoft.Extensions.Hosting;
 
 namespace UnitTests.General
 {
@@ -32,9 +33,9 @@ namespace UnitTests.General
 
             private class SiloInvokerTestSiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .AddIncomingGrainCallFilter(context =>
                         {
                             if (string.Equals(context.InterfaceMethod.Name, nameof(IGrainCallFilterTestGrain.GetRequestContext)))

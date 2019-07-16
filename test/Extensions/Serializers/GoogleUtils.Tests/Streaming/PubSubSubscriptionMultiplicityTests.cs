@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers.GCP.Streams.PubSub;
@@ -34,9 +35,9 @@ namespace GoogleUtils.Tests.Streaming
 
         private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder
+                siloBuilder
                     .AddMemoryGrainStorage("PubSubStore")
                     .AddPubSubStreams<PubSubDataAdapter>(PROVIDER_NAME, options =>
                     {

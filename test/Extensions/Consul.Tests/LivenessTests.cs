@@ -9,6 +9,7 @@ using Orleans.TestingHost.Utils;
 using UnitTests.MembershipTests;
 using Xunit;
 using Xunit.Abstractions;
+using Microsoft.Extensions.Hosting;
 
 namespace Consul.Tests
 {
@@ -28,9 +29,9 @@ namespace Consul.Tests
 
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseConsulClustering(options => { options.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT); });
+                siloBuilder.UseConsulClustering(options => { options.Address = new Uri(ConsulTestUtils.CONSUL_ENDPOINT); });
             }
         }
 

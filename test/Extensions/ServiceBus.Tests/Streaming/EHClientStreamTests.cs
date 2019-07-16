@@ -19,6 +19,7 @@ using Xunit.Abstractions;
 using Orleans.Streams;
 using Orleans.ServiceBus.Providers;
 using Tester;
+using Microsoft.Extensions.Hosting;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -47,9 +48,9 @@ namespace ServiceBus.Tests.StreamingTests
 
         private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder
+                siloBuilder
                     .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>
                     {
                         b.Configure<SiloMessagingOptions>(ob => ob.Configure(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5)));
@@ -67,7 +68,7 @@ namespace ServiceBus.Tests.StreamingTests
                                 options.PersistInterval = TimeSpan.FromSeconds(10);
                             }));
                     });
-                hostBuilder
+                siloBuilder
                     .AddMemoryGrainStorage("PubSubStore");
             }
         }

@@ -20,6 +20,7 @@ using Orleans.Persistence.AzureStorage;
 using TestExtensions;
 using TestExtensions.Runners;
 using UnitTests.GrainInterfaces;
+using Microsoft.Extensions.Hosting;
 
 // ReSharper disable RedundantAssignment
 // ReSharper disable UnusedVariable
@@ -43,9 +44,9 @@ namespace Tester.AzureUtils.Persistence
         private const int MaxWriteTime = 2000;
         public class SiloBuilderConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseAzureStorageClustering(options =>
+                siloBuilder.UseAzureStorageClustering(options =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     options.MaxStorageBusyRetries = 3;

@@ -2,6 +2,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -37,9 +38,9 @@ namespace Tester.StreamingTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddSimpleMessageStreamProvider(SMSStreamProviderName)
+                siloBuilder.AddSimpleMessageStreamProvider(SMSStreamProviderName)
                      .AddMemoryGrainStorage("PubSubStore")
                      .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
             }

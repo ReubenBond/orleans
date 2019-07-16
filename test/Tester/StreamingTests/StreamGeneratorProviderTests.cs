@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.Generator;
@@ -39,9 +40,9 @@ namespace UnitTests.StreamingTests
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .ConfigureServices(services => services.AddSingletonNamedService<IStreamGeneratorConfig>(StreamProviderName, (s, n) => GeneratorConfig))
                         .AddPersistentStreams(
                             StreamProviderName,

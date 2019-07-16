@@ -1,12 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using Orleans;
+using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -28,10 +21,10 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
 
         public class SiloConfigurator : ISiloBuilderConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddSimpleMessageStreamProvider(StreamProviderName);
-                hostBuilder.AddSimpleMessageStreamProvider(StreamProviderName2, options => options.PubSubType = StreamPubSubType.ExplicitGrainBasedOnly)
+                siloBuilder.AddSimpleMessageStreamProvider(StreamProviderName);
+                siloBuilder.AddSimpleMessageStreamProvider(StreamProviderName2, options => options.PubSubType = StreamPubSubType.ExplicitGrainBasedOnly)
                     .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("PubSubStore");
             }

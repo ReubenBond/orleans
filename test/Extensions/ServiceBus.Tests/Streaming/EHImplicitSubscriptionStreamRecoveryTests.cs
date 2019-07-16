@@ -13,6 +13,7 @@ using Xunit;
 using Orleans.Hosting;
 using Orleans;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -38,9 +39,9 @@ namespace ServiceBus.Tests.StreamingTests
 
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
-                public void Configure(ISiloHostBuilder hostBuilder)
+                public void Configure(IHostBuilder hostBuilder, ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .AddEventHubStreams(StreamProviderName, b=>
                         {
                             b.ConfigureEventHub(ob => ob.Configure(options =>
@@ -57,7 +58,7 @@ namespace ServiceBus.Tests.StreamingTests
                             b.UseDynamicClusterConfigDeploymentBalancer();
                             b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
                         });
-                    hostBuilder
+                    siloBuilder
                         .AddMemoryGrainStorageAsDefault();
                 }
             }
