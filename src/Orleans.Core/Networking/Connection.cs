@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -24,6 +27,8 @@ namespace Orleans.Runtime.Messaging
         private readonly IServiceProvider serviceProvider;
         private readonly Channel<Message> outgoingMessages;
         private readonly ChannelWriter<Message> outgoingMessageWriter;
+        private readonly object lockObj = new object();
+        private readonly List<Message> inflight = new List<Message>(4);
 
         protected Connection(
             ConnectionContext connection,
@@ -46,7 +51,6 @@ namespace Orleans.Runtime.Messaging
         public ConnectionContext Context { get; }
         protected INetworkingTrace Log { get; }
         protected abstract IMessageCenter MessageCenter { get; }
-        protected CancellationToken ConnectionCloseRequested { get; private set; }
         public virtual EndPoint RemoteEndpoint => this.Context.RemoteEndPoint;
         public virtual EndPoint LocalEndpoint => this.Context.LocalEndPoint;
         public bool IsValid { get; private set; }
@@ -56,13 +60,15 @@ namespace Orleans.Runtime.Messaging
         public static async Task OnConnectedAsync(ConnectionContext context)
         {
             var connection = context.Features.Get<Connection>();
-            await connection.RunInternal().ConfigureAwait(false);
+            context.ConnectionClosed.Register(
+                state => ((Connection)state).CloseInternal(new ConnectionAbortedException("Connection closed")),
+                connection);
+            await connection.RunInternal();
         }
 
-        public async Task Run(CancellationToken cancellationToken)
+        public async Task Run()
         {
-            this.ConnectionCloseRequested = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, this.Context.ConnectionClosed).Token;
-            await this.middleware(this.Context).ConfigureAwait(false);
+            await this.middleware(this.Context);
         }
 
         protected virtual async Task RunInternal()
@@ -72,10 +78,7 @@ namespace Orleans.Runtime.Messaging
             {
                 var outgoingTask = Task.Run(this.ProcessOutgoing);
                 var incomingTask = Task.Run(this.ProcessIncoming);
-                outgoingTask.Ignore();
-                incomingTask.Ignore();
-                await outgoingTask;
-                await incomingTask;
+                await Task.WhenAll(outgoingTask, incomingTask);
             }
             catch (Exception exception)
             {
@@ -85,17 +88,19 @@ namespace Orleans.Runtime.Messaging
             {
                 try
                 {
-                    this.CloseInternal();
-
-                    if (error != null && !(error is ConnectionAbortedException))
+                    if (error is ConnectionAbortedException abortedException)
                     {
-                        this.Context.Abort(new ConnectionAbortedException(
+                        this.CloseInternal(abortedException);
+                    }
+                    else if (error != null)
+                    {
+                        this.CloseInternal(new ConnectionAbortedException(
                             $"Connection aborted. See {nameof(Exception.InnerException)}",
                             error));
                     }
                     else if (error == null)
                     {
-                        this.Context.Abort();
+                        this.CloseInternal(new ConnectionAbortedException("Connection processing completed without error"));
                     }
 
                     await this.Context.DisposeAsync();
@@ -109,8 +114,8 @@ namespace Orleans.Runtime.Messaging
                 }
             }
         }
-
-        public void Close()
+        
+        public void Close(ConnectionAbortedException exception = default)
         {
             if (this.Log.IsEnabled(LogLevel.Information))
             {
@@ -119,7 +124,7 @@ namespace Orleans.Runtime.Messaging
                     this.RemoteEndpoint);
             }
 
-            this.CloseInternal();
+            this.CloseInternal(exception);
         }
 
         /// <summary>
@@ -133,26 +138,35 @@ namespace Orleans.Runtime.Messaging
 
         protected abstract void RetryMessage(Message msg, Exception ex = null);
 
-        private void CloseInternal()
+        private void CloseInternal(ConnectionAbortedException exception)
         {
             try
             {
-                this.IsValid = false;
+                if (!this.IsValid) return;
+
+                lock (this.lockObj)
+                {
+                    if (!this.IsValid) return;
+                    this.IsValid = false;
+                }
 
                 // Try to gracefully stop the reader/writer loops.
                 this.Context.Transport.Input.CancelPendingRead();
                 this.Context.Transport.Output.CancelPendingFlush();
                 this.outgoingMessageWriter.TryComplete();
+
+                if (exception == null)
+                {
+                    this.Context.Abort();
+                }
+                else
+                {
+                    this.Context.Abort(exception);
+                }
             }
             catch
             {
             }
-        }
-
-        public void Abort(ConnectionAbortedException exception)
-        {
-            this.CloseInternal();
-            this.Context.Abort(exception);
         }
 
         public void Send(Message message)
@@ -166,6 +180,8 @@ namespace Orleans.Runtime.Messaging
         protected abstract void OnReceivedMessage(Message message);
 
         protected abstract void OnReceiveMessageFail(Message message, Exception exception);
+
+        protected abstract void OnSendingSocketFail(Message message, string error);
 
         private async Task ProcessIncoming()
         {
@@ -184,11 +200,10 @@ namespace Orleans.Runtime.Messaging
                 input = this.Context.Transport.Input;
                 var requiredBytes = 0;
                 Message message = default;
-                var cancellationToken = this.ConnectionCloseRequested;
-                while (!cancellationToken.IsCancellationRequested)
+                while (true)
                 {
                     var readResultTask = input.ReadAsync();
-                    var readResult = readResultTask.IsCompletedSuccessfully ? readResultTask.GetAwaiter().GetResult() : await readResultTask.ConfigureAwait(false);
+                    var readResult = readResultTask.IsCompletedSuccessfully ? readResultTask.GetAwaiter().GetResult() : await readResultTask;
 
                     var buffer = readResult.Buffer;
 
@@ -242,6 +257,7 @@ namespace Orleans.Runtime.Messaging
         {
             PipeWriter output = default;
             var serializer = this.serviceProvider.GetRequiredService<IMessageSerializer>();
+            var connectionClosed = this.Context.ConnectionClosed;
             try
             {
                 output = this.Context.Transport.Output;
@@ -254,11 +270,10 @@ namespace Orleans.Runtime.Messaging
                         this.RemoteEndpoint);
                 }
 
-                var cancellationToken = this.ConnectionCloseRequested;
-                while (!cancellationToken.IsCancellationRequested)
+                while (true)
                 {
                     var moreTask = reader.WaitToReadAsync();
-                    var more = moreTask.IsCompleted ? moreTask.GetAwaiter().GetResult() : await moreTask.ConfigureAwait(false);
+                    var more = moreTask.IsCompleted ? moreTask.GetAwaiter().GetResult() : await moreTask;
                     if (!more)
                     {
                         break;
@@ -267,8 +282,9 @@ namespace Orleans.Runtime.Messaging
                     Message message = default;
                     try
                     {
-                        while (reader.TryRead(out message) && this.PrepareMessageForSend(message))
+                        while (inflight.Count < inflight.Capacity && reader.TryRead(out message) && this.PrepareMessageForSend(message))
                         {
+                            inflight.Add(message);
                             serializer.Write(ref output, message);
                         }
                     }
@@ -283,11 +299,13 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     var flushTask = output.FlushAsync();
-                    var flushResult = flushTask.IsCompleted ? flushTask.GetAwaiter().GetResult() : await flushTask.ConfigureAwait(false);
-                    if (flushResult.IsCompleted || flushResult.IsCanceled)
+                    var flushResult = flushTask.IsCompleted ? flushTask.GetAwaiter().GetResult() : await flushTask;
+                    if (flushResult.IsCompleted || flushResult.IsCanceled || connectionClosed.IsCancellationRequested)
                     {
                         break;
                     }
+
+                    inflight.Clear();
                 }
             }
             catch (ConnectionAbortedException) { }
@@ -306,11 +324,17 @@ namespace Orleans.Runtime.Messaging
 
         private async Task RerouteMessages()
         {
-            var reader = this.outgoingMessages.Reader;
-            var count = 0;
-            while (reader.TryRead(out var message))
+            var i = 0;
+            foreach (var message in this.inflight)
             {
-                if (count == 0)
+                this.OnSendingSocketFail(message, "Connection terminated");
+            }
+
+            this.inflight.Clear();
+
+            while (this.outgoingMessages.Reader.TryRead(out var message))
+            {
+                if (i == 0)
                 {
                     if (this.Log.IsEnabled(LogLevel.Information))
                     {
@@ -323,15 +347,15 @@ namespace Orleans.Runtime.Messaging
                     await Task.Delay(TimeSpan.FromSeconds(2));
                 }
 
-                ++count;
+                ++i;
                 this.RetryMessage(message);
             }
 
-            if (count > 0 && this.Log.IsEnabled(LogLevel.Information))
+            if (i > 0 && this.Log.IsEnabled(LogLevel.Information))
             {
                 this.Log.LogInformation(
                     "Rerouted {Count} messages from remote endpoint {EndPoint}",
-                    count,
+                    i,
                     this.RemoteEndpoint?.ToString() ?? "(never connected)");
             }
         }

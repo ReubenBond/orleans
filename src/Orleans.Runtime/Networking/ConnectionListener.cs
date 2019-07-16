@@ -37,6 +37,8 @@ namespace Orleans.Runtime.Messaging
 
         protected IServiceProvider ServiceProvider { get; }
 
+        public int ConnectionCount => this.connections.Count;
+
         protected abstract Connection CreateConnection(ConnectionContext context);
 
         protected ConnectionDelegate ConnectionDelegate
@@ -60,7 +62,7 @@ namespace Orleans.Runtime.Messaging
 
         public async Task BindAsync(CancellationToken cancellationToken)
         {
-            this.listener = await this.listenerFactory.BindAsync(this.Endpoint, cancellationToken).ConfigureAwait(false);
+            this.listener = await this.listenerFactory.BindAsync(this.Endpoint, cancellationToken);
         }
 
         public void Start()
@@ -91,7 +93,7 @@ namespace Orleans.Runtime.Messaging
                     if (context == null) break;
 
                     var connection = this.CreateConnection(context);
-                    _ = RunConnection(connection, runCancellation);
+                    _ = RunConnection(connection);
                 }
                 catch (ObjectDisposedException)
                 {
@@ -107,15 +109,15 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-            async Task RunConnection(Connection connection, CancellationToken ct)
+            async Task RunConnection(Connection connection)
             {
                 try
                 {
                     using (this.BeginConnectionScope(connection))
                     {
-                        var connectionTask = connection.Run(ct);
+                        var connectionTask = connection.Run();
                         this.connections.TryAdd(connection, connectionTask);
-                        await connectionTask.ConfigureAwait(false);
+                        await connectionTask;
                     }
                 }
                 catch
@@ -156,13 +158,14 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 var cycles = 0;
-                while (this.connections.Count > 0 && !cancellationToken.IsCancellationRequested)
+                var exception = new ConnectionAbortedException("Shutting down");
+                while (this.ConnectionCount > 0 && !cancellationToken.IsCancellationRequested)
                 {
                     foreach (var connection in this.connections)
                     {
                         try
                         {
-                            connection.Key.Close();
+                            connection.Key.Close(exception);
                         }
                         catch
                         {
@@ -170,9 +173,9 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     await Task.Delay(10);
-                    if (++cycles > 100 && cycles % 500 == 0)
+                    if (++cycles > 100 && cycles % 500 == 0 && this.ConnectionCount > 0)
                     {
-                        this.trace?.LogWarning("Waiting for {NumRemaining} connections to terminate", this.connections.Count);
+                        this.trace?.LogWarning("Waiting for {NumRemaining} connections to terminate", this.ConnectionCount);
                     }
                 }
 

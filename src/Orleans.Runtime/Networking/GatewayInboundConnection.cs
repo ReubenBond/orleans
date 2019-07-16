@@ -128,7 +128,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override async Task RunInternal()
         {
-            var grainId = await ConnectionPreamble.Read(this.Context).ConfigureAwait(false);
+            var grainId = await ConnectionPreamble.Read(this.Context);
 
             if (grainId.Equals(Constants.SiloDirectConnectionId))
             {
@@ -271,6 +271,11 @@ namespace Orleans.Runtime.Messaging
 
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
+        }
+
+        protected override void OnSendingSocketFail(Message message, string error)
+        {
+            this.FailMessage(message, error);
         }
     }
 }

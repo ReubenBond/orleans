@@ -51,7 +51,7 @@ namespace Orleans.Runtime.Messaging
 
         public async ValueTask<Connection> ConnectAsync(EndPoint endpoint, CancellationToken cancellationToken)
         {
-            var connectionContext = await this.connectionFactory.ConnectAsync(endpoint, cancellationToken).ConfigureAwait(false);
+            var connectionContext = await this.connectionFactory.ConnectAsync(endpoint, cancellationToken);
             var connection = this.CreateConnection(connectionContext);
             return connection;
         }

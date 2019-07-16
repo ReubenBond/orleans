@@ -183,7 +183,7 @@ namespace Orleans.Runtime.Messaging
                 // this will not happen, since we drop only already disconnected clients, for socket is already null. But leave this code just to be sure.
                 client.RecordDisconnection();
                 clientConnections.TryRemove(oldConnection, out _);
-                oldConnection.Close();
+                oldConnection.Close(new ConnectionAbortedException("Dropping client"));
             }
             
             MessagingStatisticsGroup.ConnectedClientCount.DecrementBy(1);
@@ -443,49 +443,8 @@ namespace Orleans.Runtime.Messaging
                 catch (Exception exception)
                 {
                     gateway.RecordClosedConnection(client.Connection);
-                    client.Connection.Abort(new ConnectionAbortedException("Exception posting a message to sender. See InnerException for details.", exception));
+                    client.Connection.Close(new ConnectionAbortedException("Exception posting a message to sender. See InnerException for details.", exception));
                     return false;
-                }
-            }
-
-            private void OnMessageSerializationFailure(Message msg, Exception exc)
-            {
-                // we only get here if we failed to serialize the msg (or any other catastrophic failure).
-                // Request msg fails to serialize on the sending silo, so we just enqueue a rejection msg.
-                // Response msg fails to serialize on the responding silo, so we try to send an error response back.
-                this.log.LogWarning(
-                    (int)ErrorCode.Messaging_Gateway_SerializationError,
-                    "Unexpected error serializing message {Message}: {Exception}",
-                    msg,
-                    exc);
-                
-                MessagingStatisticsGroup.OnFailedSentMessage(msg);
-
-                var retryCount = msg.RetryCount ?? 0;
-
-                if (msg.Direction == Message.Directions.Request)
-                {
-                    this.gateway.messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, exc.ToString());
-                }
-                else if (msg.Direction == Message.Directions.Response && retryCount < 1)
-                {
-                    // if we failed sending an original response, turn the response body into an error and reply with it.
-                    // unless we have already tried sending the response multiple times.
-                    msg.Result = Message.ResponseTypes.Error;
-                    msg.BodyObject = Response.ExceptionResponse(exc);
-                    msg.RetryCount = retryCount + 1;
-                    this.gateway.messageCenter.SendMessage(msg);
-                }
-                else
-                {
-                    this.log.LogWarning(
-                        (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
-                        "Gateway {GatewayAddress} is dropping message which failed during serialization: {Message}. Exception = {Exception}",
-                        this.gateway.gatewayAddress,
-                        msg,
-                        exc);
-
-                    MessagingStatisticsGroup.OnDroppedSentMessage(msg);
                 }
             }
         }

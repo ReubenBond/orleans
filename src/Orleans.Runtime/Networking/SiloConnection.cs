@@ -126,18 +126,17 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnReceiveMessageFail(Message message, Exception exception)
         {
-            var msg = message;
             // If deserialization completely failed or the message was one-way, rethrow the exception
             // so that it can be handled at another level.
-            if (msg?.Headers == null || msg.Direction != Message.Directions.Request)
+            if (message?.Headers == null || message.Direction != Message.Directions.Request)
             {
                 ExceptionDispatchInfo.Capture(exception).Throw();
             }
 
             // The message body was not successfully decoded, but the headers were.
             // Send a fast fail to the caller.
-            MessagingStatisticsGroup.OnRejectedMessage(msg);
-            var response = this.messageFactory.CreateResponseMessage(msg);
+            MessagingStatisticsGroup.OnRejectedMessage(message);
+            var response = this.messageFactory.CreateResponseMessage(message);
             response.Result = Message.ResponseTypes.Error;
             response.BodyObject = Response.ExceptionResponse(exception);
 
@@ -145,17 +144,22 @@ namespace Orleans.Runtime.Messaging
             this.messageCenter.SendMessage(response);
         }
 
+        protected override void OnSendingSocketFail(Message message, string error)
+        {
+            this.FailMessage(message, error);
+        }
+
         protected override async Task RunInternal()
         {
-            await Task.WhenAll(ReadPreamble(), WritePreamble()).ConfigureAwait(false);
+            await Task.WhenAll(ReadPreamble(), WritePreamble());
 
-            await base.RunInternal().ConfigureAwait(false);
+            await base.RunInternal();
 
             Task WritePreamble() => ConnectionPreamble.Write(this.Context, Constants.SiloDirectConnectionId);
 
             async Task ReadPreamble()
             {
-                var grainId = await ConnectionPreamble.Read(this.Context).ConfigureAwait(false);
+                var grainId = await ConnectionPreamble.Read(this.Context);
 
                 if (!grainId.Equals(Constants.SiloDirectConnectionId))
                 {
@@ -180,7 +184,7 @@ namespace Orleans.Runtime.Messaging
             // If we know this silo is dead, don't bother
             if (msg.TargetSilo != null && this.siloStatusOracle.IsDeadSilo(msg.TargetSilo))
             {
-                FailMessage(msg, String.Format("Target {0} silo is known to be dead", msg.TargetSilo.ToLongString()));
+                FailMessage(msg, $"Target {msg.TargetSilo.ToLongString()} silo is known to be dead");
                 return false;
             }
 
@@ -192,14 +196,14 @@ namespace Orleans.Runtime.Messaging
             MessagingStatisticsGroup.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
-                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.Debug(ErrorCode.MessagingSendingRejection, "Silo {siloAddress} is rejecting message: {message}. Reason = {reason}", this.myAddress, msg, reason);
+                if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.Debug(ErrorCode.MessagingSendingRejection, "Silo {SiloAddress} is rejecting message: {Message}. Reason = {Reason}", this.myAddress, msg, reason);
 
                 // Done retrying, send back an error instead
-                this.messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, String.Format("Silo {0} is rejecting message: {1}. Reason = {2}", this.myAddress, msg, reason));
+                this.messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Silo {this.myAddress} is rejecting message: {msg}. Reason = {reason}");
             }
             else
             {
-                this.Log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Silo {siloAddress} is dropping message: {message}. Reason = {reason}", this.myAddress, msg, reason);
+                this.Log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Silo {SiloAddress} is dropping message: {Message}. Reason = {Reason}", this.myAddress, msg, reason);
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
         }

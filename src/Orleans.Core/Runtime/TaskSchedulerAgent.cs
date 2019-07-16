@@ -105,7 +105,7 @@ namespace Orleans.Runtime
             var handled = false;
             try
             {
-                await this.Run().ConfigureAwait(false);
+                await this.Run();
             }
             catch (Exception exception)
             {

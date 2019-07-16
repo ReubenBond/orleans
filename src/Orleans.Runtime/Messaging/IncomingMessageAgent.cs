@@ -46,7 +46,7 @@ namespace Orleans.Runtime.Messaging
             while (true)
             {
                 var moreTask = reader.WaitToReadAsync();
-                var more = moreTask.IsCompletedSuccessfully ? moreTask.GetAwaiter().GetResult() : await moreTask.ConfigureAwait(false);
+                var more = moreTask.IsCompletedSuccessfully ? moreTask.GetAwaiter().GetResult() : await moreTask;
                 if (!more) return;
 
                 // Get an application message

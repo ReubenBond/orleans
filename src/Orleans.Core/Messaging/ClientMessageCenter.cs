@@ -218,7 +218,7 @@ namespace Orleans.Messaging
             // If there's a specific gateway specified, use it
             if (msg.TargetSilo != null && gatewayManager.GetLiveGateways().Contains(msg.TargetSilo.ToGatewayUri()))
             {
-                return this.connectionManager.GetConnection(msg.TargetSilo.Endpoint);
+                return this.connectionManager.GetConnection(msg.TargetSilo);
             }
 
             // For untargeted messages to system targets, and for unordered messages, pick a next connection in round robin fashion.
@@ -240,8 +240,8 @@ namespace Orleans.Messaging
                     return new ValueTask<Connection>(default(Connection));
                 }
 
-                var gatewayName = gatewayNames[msgNumber % numGateways].ToIPEndPoint();
-                return this.connectionManager.GetConnection(gatewayName);
+                var gatewayAddress = gatewayNames[msgNumber % numGateways].ToSiloAddress();
+                return this.connectionManager.GetConnection(gatewayAddress);
             }
 
             // Otherwise, use the buckets to ensure ordering.
@@ -277,7 +277,7 @@ namespace Orleans.Messaging
                 index,
                 msg.TargetGrain.GetHashCode().ToString("x"));
 
-            var gatewayConnection = this.connectionManager.GetConnection(addr.ToIPEndPoint());
+            var gatewayConnection = this.connectionManager.GetConnection(addr.ToSiloAddress());
             if (gatewayConnection.IsCompletedSuccessfully)
             {
                 var result = this.TryUpdateConnection(index, gatewayConnection.Result, weakRef);

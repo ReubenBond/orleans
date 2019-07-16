@@ -32,25 +32,20 @@ namespace Orleans.Runtime.Messaging
             var flushTask = output.FlushAsync();
 
             if (flushTask.IsCompletedSuccessfully) return Task.CompletedTask;
-            return FlushAsync(flushTask);
-
-            async Task FlushAsync(ValueTask<FlushResult> task)
-            {
-                await task.ConfigureAwait(false);
-            }
+            return flushTask.AsTask();
         }
                 
         internal static async Task<GrainId> Read(ConnectionContext connection)
         {
             var input = connection.Transport.Input;
 
-            var readResult = await input.ReadAsync().ConfigureAwait(false);
+            var readResult = await input.ReadAsync();
             var buffer = readResult.Buffer;
             CheckForCompletion(ref readResult);
             while (buffer.Length < 4)
             {
                 input.AdvanceTo(buffer.Start, buffer.End);
-                readResult = await input.ReadAsync().ConfigureAwait(false);
+                readResult = await input.ReadAsync();
                 buffer = readResult.Buffer;
                 CheckForCompletion(ref readResult);
             }
@@ -72,7 +67,7 @@ namespace Orleans.Runtime.Messaging
             while (buffer.Length < length)
             {
                 input.AdvanceTo(buffer.Start, buffer.End);
-                readResult = await input.ReadAsync().ConfigureAwait(false);
+                readResult = await input.ReadAsync();
                 buffer = readResult.Buffer;
                 CheckForCompletion(ref readResult);
             }

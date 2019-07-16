@@ -180,7 +180,7 @@ namespace Orleans.Runtime
                 try
                 {
                     var moreTask = reader.WaitToReadAsync();
-                    var more = moreTask.IsCompletedSuccessfully ? moreTask.Result : await moreTask.ConfigureAwait(false);
+                    var more = moreTask.IsCompletedSuccessfully ? moreTask.Result : await moreTask;
                     if (!more)
                     {
                         this.logger.LogInformation($"{nameof(HostedClient)} completed processing all messages. Shutting down.");

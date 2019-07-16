@@ -92,7 +92,7 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                var senderTask = this.connectionManager.GetConnection(msg.TargetSilo.Endpoint);
+                var senderTask = this.connectionManager.GetConnection(msg.TargetSilo);
                 if (senderTask.IsCompletedSuccessfully)
                 {
                     var sender = senderTask.Result;
@@ -106,7 +106,7 @@ namespace Orleans.Runtime.Messaging
                     {
                         try
                         {
-                            var sender = await c.ConfigureAwait(false);
+                            var sender = await c;
                             sender.Send(m);
                         }
                         catch (Exception exception)

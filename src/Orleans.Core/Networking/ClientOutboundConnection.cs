@@ -28,7 +28,10 @@ namespace Orleans.Runtime.Messaging
 
         protected override IMessageCenter MessageCenter => this.messageCenter;
 
-        protected override void OnReceivedMessage(Message message) => this.messageCenter.OnReceivedMessage(message);
+        protected override void OnReceivedMessage(Message message)
+        {
+            this.messageCenter.OnReceivedMessage(message);
+        }
 
         protected override void OnReceiveMessageFail(Message message, Exception exception)
         {
@@ -56,8 +59,8 @@ namespace Orleans.Runtime.Messaging
             {
                 this.messageCenter.OnGatewayConnectionOpen();
 
-                await ConnectionPreamble.Write(this.Context, this.messageCenter.ClientId).ConfigureAwait(false);
-                await base.RunInternal().ConfigureAwait(false);
+                await ConnectionPreamble.Write(this.Context, this.messageCenter.ClientId);
+                await base.RunInternal();
             }
             finally
             {
@@ -174,6 +177,12 @@ namespace Orleans.Runtime.Messaging
 
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
             }
+        }
+
+        protected override void OnSendingSocketFail(Message message, string error)
+        {
+            message.TargetSilo = null;
+            this.messageCenter.SendMessage(message);
         }
     }
 }

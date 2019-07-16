@@ -341,6 +341,8 @@ namespace Orleans.Hosting
 
             // Networking
             services.TryAddSingleton<ConnectionManager>();
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, ConnectionManagerLifecycleAdapter<ISiloLifecycle>>();
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionMaintainer>();
             services.TryAddSingleton<IConnectionFactory, SocketConnectionFactory>();
             services.TryAddSingleton<IConnectionListenerFactory, SocketConnectionListenerFactory>();
             services.TryAddTransient<IMessageSerializer, MessageSerializer>();

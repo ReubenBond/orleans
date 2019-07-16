@@ -291,23 +291,23 @@ namespace Orleans.Messaging
         {
             if (this.connectionManager == null) return;
 
-            var liveGatewayEndpoints = new HashSet<EndPoint>();
+            var liveGatewayEndpoints = new HashSet<SiloAddress>();
             foreach (var endpoint in liveGateways)
             {
-                liveGatewayEndpoints.Add(endpoint.ToIPEndPoint());
+                liveGatewayEndpoints.Add(endpoint.ToSiloAddress());
             }
 
-            var connectedGateways = this.connectionManager.GetConnectedEndpoints();
-            foreach (var endpoint in connectedGateways)
+            var connectedGateways = this.connectionManager.GetConnectedAddresses();
+            foreach (var address in connectedGateways)
             {
-                if (!liveGatewayEndpoints.Contains(endpoint))
+                if (!liveGatewayEndpoints.Contains(address))
                 {
                     if (logger.IsEnabled(LogLevel.Information))
                     {
-                        this.logger.LogInformation("Aborting connection to {Endpoint} because it has been marked as dead", endpoint);
+                        this.logger.LogInformation("Aborting connection to {Endpoint} because it has been marked as dead", address);
                     }
 
-                    this.connectionManager.Abort(endpoint);
+                    this.connectionManager.Abort(address);
                 }
             }
         }

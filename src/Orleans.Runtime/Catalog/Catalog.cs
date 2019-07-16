@@ -24,7 +24,7 @@ using Orleans.Configuration;
 
 namespace Orleans.Runtime
 {
-    internal class Catalog : SystemTarget, ICatalog, IPlacementRuntime
+    internal class Catalog : SystemTarget, ICatalog, IPlacementRuntime, IDisposable
     {
         [Serializable]
         internal class NonExistentActivationException : Exception
@@ -1444,6 +1444,11 @@ namespace Orleans.Runtime
                     DeactivateActivations(activationsToShutdown).Ignore();
                 }
             }
+        }
+
+        void IDisposable.Dispose()
+        {
+            this.gcTimer?.Dispose();
         }
     }
 }
