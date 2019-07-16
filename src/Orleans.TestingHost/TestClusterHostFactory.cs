@@ -44,20 +44,22 @@ namespace Orleans.TestingHost
 
             string siloName = configuration[nameof(TestSiloSpecificOptions.SiloName)] ?? hostName;
 
-            var hostBuilder = new SiloHostBuilder()
+            var hostBuilder = new SiloHostBuilder();
+            hostBuilder.SiloBuilder
                 .Configure<ClusterOptions>(configuration)
-                .Configure<SiloOptions>(options => options.SiloName = siloName)
-                .ConfigureHostConfiguration(cb =>
+                .Configure<SiloOptions>(options => options.SiloName = siloName);
+
+            hostBuilder.ConfigureHostConfiguration(cb =>
+            {
+                // TODO: Instead of passing the sources individually, just chain the pre-built configuration once we upgrade to Microsoft.Extensions.Configuration 2.1
+                foreach (var source in configBuilder.Sources)
                 {
-                    // TODO: Instead of passing the sources individually, just chain the pre-built configuration once we upgrade to Microsoft.Extensions.Configuration 2.1
-                    foreach (var source in configBuilder.Sources)
-                    {
-                        cb.Add(source);
-                    }
-                });
+                    cb.Add(source);
+                }
+            });
 
             hostBuilder.Properties["Configuration"] = configuration;
-            ConfigureAppServices(configuration, hostBuilder, hostBuilder);
+            ConfigureAppServices(configuration, hostBuilder, hostBuilder.SiloBuilder);
 
             hostBuilder.ConfigureServices((context, services) =>
             {
@@ -76,7 +78,7 @@ namespace Orleans.TestingHost
                 }
             });
 
-            hostBuilder.GetApplicationPartManager().ConfigureDefaults();
+            hostBuilder.SiloBuilder.GetApplicationPartManager().ConfigureDefaults();
 
             var host = hostBuilder.Build();
             InitializeTestHooksSystemTarget(host);

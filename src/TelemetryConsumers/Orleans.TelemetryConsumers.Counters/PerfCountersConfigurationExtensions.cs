@@ -9,14 +9,6 @@ namespace Orleans.Hosting
         /// <summary>
         /// Adds a metrics telemetric consumer provider of type <see cref="OrleansPerfCounterTelemetryConsumer"/>.
         /// </summary>
-        public static ISiloHostBuilder AddPerfCountersTelemetryConsumer(this ISiloHostBuilder hostBuilder)
-        {
-            return (ISiloHostBuilder)hostBuilder.ConfigureServices(ConfigureServices);
-        }
-
-        /// <summary>
-        /// Adds a metrics telemetric consumer provider of type <see cref="OrleansPerfCounterTelemetryConsumer"/>.
-        /// </summary>
         public static ISiloBuilder AddPerfCountersTelemetryConsumer(this ISiloBuilder hostBuilder)
         {
             return hostBuilder.ConfigureServices(ConfigureServices);

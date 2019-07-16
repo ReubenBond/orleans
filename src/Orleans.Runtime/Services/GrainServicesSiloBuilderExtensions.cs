@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.Runtime;
@@ -10,15 +10,6 @@ namespace Orleans.Hosting
 {
     public static class GrainServicesSiloBuilderExtensions
     {
-        /// <summary>
-        /// Registers an application grain service to be started with the silo.
-        /// </summary>
-        public static ISiloHostBuilder AddGrainService<T>(this ISiloHostBuilder builder)
-            where T : GrainService
-        {
-            return builder.ConfigureServices(services => services.AddGrainService<T>());
-        }
-
         /// <summary>
         /// Registers an application grain service to be started with the silo.
         /// </summary>

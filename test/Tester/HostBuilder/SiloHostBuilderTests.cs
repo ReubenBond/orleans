@@ -298,13 +298,15 @@ namespace Tester.HostBuilder
         [Fact]
         public void CustomContainerTypeMismatchThrows()
         {
-            var hostBuilder = CreateBuilder()
+            var hostBuilder = CreateBuilder();
+            hostBuilder.UseServiceProviderFactory(new FakeServiceProviderFactory());
+
+            ((ISiloBuilder)hostBuilder)
                 .ConfigureServices((s) =>
                 {
                     s.AddTransient<ServiceD>();
                     s.AddScoped<ServiceC>();
-                })
-                .UseServiceProviderFactory(new FakeServiceProviderFactory());
+                });
 
             Assert.Throws<InvalidCastException>(() => 
                 hostBuilder.ConfigureContainer<IServiceCollection>((context, container) => { }));
@@ -335,7 +337,8 @@ namespace Tester.HostBuilder
         public void ConfigureServices_CanBeCalledMultipleTimes()
         {
             var callCount = 0; // Verify ordering
-            var hostBuilder = CreateBuilder()
+            var hostBuilder = CreateBuilder();
+            ((ISiloBuilder)hostBuilder)
                 .ConfigureServices((services) =>
                 {
                     Assert.Equal(0, callCount++);

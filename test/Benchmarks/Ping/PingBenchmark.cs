@@ -15,7 +15,8 @@ namespace Benchmarks.Ping
 
         public void Setup()
         {
-            this.host = new SiloHostBuilder().UseLocalhostClustering().Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev").Build();
+            var hostBuilder = new SiloHostBuilder().UseLocalhostClustering().Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev");
+            this.host = ((SiloHostBuilder)hostBuilder).Build();
             this.host.StartAsync().GetAwaiter().GetResult();
 
             this.client = new ClientBuilder().UseLocalhostClustering().Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev").Build();

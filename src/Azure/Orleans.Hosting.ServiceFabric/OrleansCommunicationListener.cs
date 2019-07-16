@@ -16,12 +16,12 @@ namespace Orleans.Hosting.ServiceFabric
     /// </summary>
     public class OrleansCommunicationListener : ICommunicationListener
     {
-        private readonly Action<ISiloHostBuilder> configure;
+        private readonly Action<ISiloBuilder> configure;
         
         /// <summary>
         /// Initializes a new instance of the <see cref="OrleansCommunicationListener" /> class.
         /// </summary>
-        public OrleansCommunicationListener(Action<ISiloHostBuilder> configure)
+        public OrleansCommunicationListener(Action<ISiloBuilder> configure)
         {
             this.configure = configure ?? throw new ArgumentNullException(nameof(configure));
         }
@@ -38,7 +38,7 @@ namespace Orleans.Hosting.ServiceFabric
             try
             {
                 var builder = new SiloHostBuilder();
-                builder.ConfigureServices(
+                builder.SiloBuilder.ConfigureServices(
                     services =>
                     {
                         services.AddOptions<FabricSiloInfo>().Configure<ILocalSiloDetails>((info, details) =>
@@ -51,7 +51,7 @@ namespace Orleans.Hosting.ServiceFabric
                             }
                         });
                     });
-                this.configure(builder);
+                this.configure(builder.SiloBuilder);
 
                 this.Host = builder.Build();
                 await this.Host.StartAsync(cancellationToken);

@@ -11,15 +11,6 @@ namespace Orleans.Hosting
         /// Adds a metrics telemetric consumer provider of type <see cref="NRTelemetryConsumer"/>.
         /// </summary>
         /// <param name="hostBuilder"></param>
-        public static ISiloHostBuilder AddNewRelicTelemetryConsumer(this ISiloHostBuilder hostBuilder)
-        {
-            return (ISiloHostBuilder)hostBuilder.ConfigureServices((context, services) => ConfigureServices(context, services));
-        }
-
-        /// <summary>
-        /// Adds a metrics telemetric consumer provider of type <see cref="NRTelemetryConsumer"/>.
-        /// </summary>
-        /// <param name="hostBuilder"></param>
         public static ISiloBuilder AddNewRelicTelemetryConsumer(this ISiloBuilder hostBuilder)
         {
             return hostBuilder.ConfigureServices((context, services) => ConfigureServices(context, services));

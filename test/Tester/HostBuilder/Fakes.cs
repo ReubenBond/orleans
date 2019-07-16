@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,7 +37,7 @@ namespace Tester.HostBuilder.Fakes
 
     internal static class FakeSiloHostBuilderExtensions
     {
-        public static ISiloHostBuilder WithFakeHost(this ISiloHostBuilder builder)
+        public static ISiloBuilder WithFakeHost(this ISiloBuilder builder)
         {
             builder.ConfigureServices((context, services) =>
             {

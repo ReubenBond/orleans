@@ -13,9 +13,9 @@ namespace Orleans.Hosting.ServiceFabric
         /// <summary>
         /// Creates a <see cref="ServiceInstanceListener"/> which manages an Orleans silo for a stateless service.
         /// </summary>
-        /// <param name="configure">The <see cref="ISiloHostBuilder"/> configuration delegate.</param>
+        /// <param name="configure">The <see cref="ISiloBuilder"/> configuration delegate.</param>
         /// <returns>A <see cref="ServiceInstanceListener"/> which manages an Orleans silo.</returns>
-        public static ServiceInstanceListener CreateStateless(Action<StatelessServiceContext, ISiloHostBuilder> configure)
+        public static ServiceInstanceListener CreateStateless(Action<StatelessServiceContext, ISiloBuilder> configure)
         {
             return new ServiceInstanceListener(
                 context => new OrleansCommunicationListener(builder => configure(context, builder)),
@@ -25,9 +25,9 @@ namespace Orleans.Hosting.ServiceFabric
         /// <summary>
         /// Creates a <see cref="ServiceInstanceListener"/> which manages an Orleans silo for a stateless service.
         /// </summary>
-        /// <param name="configure">The <see cref="ISiloHostBuilder"/> configuration delegate.</param>
+        /// <param name="configure">The <see cref="ISiloBuilder"/> configuration delegate.</param>
         /// <returns>A <see cref="ServiceInstanceListener"/> which manages an Orleans silo.</returns>
-        public static ServiceReplicaListener CreateStateful(Action<StatefulServiceContext, ISiloHostBuilder> configure)
+        public static ServiceReplicaListener CreateStateful(Action<StatefulServiceContext, ISiloBuilder> configure)
         {
             return new ServiceReplicaListener(
                 context => new OrleansCommunicationListener(builder => configure(context, builder)),

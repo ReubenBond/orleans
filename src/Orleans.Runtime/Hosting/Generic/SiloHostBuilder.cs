@@ -10,7 +10,7 @@ namespace Orleans.Hosting
     /// <summary>
     /// Functionality for building <see cref="ISiloHost"/> instances.
     /// </summary>
-    public class SiloHostBuilder : ISiloHostBuilder
+    public class SiloHostBuilder : IHostBuilder
     {
         private readonly ServiceProviderBuilder serviceProviderBuilder = new ServiceProviderBuilder();
 
@@ -22,8 +22,15 @@ namespace Orleans.Hosting
         private IHostingEnvironment hostingEnvironment;
         private bool built;
 
+        public SiloHostBuilder()
+        {
+            this.SiloBuilder = new SiloBuilder(this);
+        }
+
         /// <inheritdoc />
         public IDictionary<object, object> Properties { get; } = new Dictionary<object, object>();
+
+        public ISiloBuilder SiloBuilder { get; } 
 
         /// <inheritdoc />
         public ISiloHost Build()
@@ -34,13 +41,13 @@ namespace Orleans.Hosting
 
             // Automatically configure Orleans if it wasn't configured before. 
             // This will not happen once we use the generic host builder from Microsoft.Extensions.Hosting
-            this.ConfigureDefaults();
+            this.SiloBuilder.ConfigureDefaults();
 
             BuildHostConfiguration();
             CreateHostingEnvironment();
             CreateHostBuilderContext();
             BuildAppConfiguration();
-            this.ConfigureApplicationParts(parts =>
+            this.SiloBuilder.ConfigureApplicationParts(parts =>
             {
                 // If the user has not added any application parts, add some defaults.
                 parts.ConfigureDefaults();
@@ -55,21 +62,21 @@ namespace Orleans.Hosting
         }
 
         /// <inheritdoc />
-        public ISiloHostBuilder ConfigureHostConfiguration(Action<IConfigurationBuilder> configureDelegate)
+        public SiloHostBuilder ConfigureHostConfiguration(Action<IConfigurationBuilder> configureDelegate)
         {
             this.configureHostConfigActions.Add(configureDelegate ?? throw new ArgumentNullException(nameof(configureDelegate)));
             return this;
         }
 
         /// <inheritdoc />
-        public ISiloHostBuilder ConfigureAppConfiguration(Action<HostBuilderContext, IConfigurationBuilder> configureDelegate)
+        public SiloHostBuilder ConfigureAppConfiguration(Action<HostBuilderContext, IConfigurationBuilder> configureDelegate)
         {
             this.configureAppConfigActions.Add(configureDelegate ?? throw new ArgumentNullException(nameof(configureDelegate)));
             return this;
         }
 
         /// <inheritdoc />
-        public ISiloHostBuilder ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureDelegate)
+        public SiloHostBuilder ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureDelegate)
         {
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
             this.serviceProviderBuilder.ConfigureServices(configureDelegate);
@@ -77,14 +84,14 @@ namespace Orleans.Hosting
         }
 
         /// <inheritdoc />
-        public ISiloHostBuilder UseServiceProviderFactory<TContainerBuilder>(IServiceProviderFactory<TContainerBuilder> factory)
+        public SiloHostBuilder UseServiceProviderFactory<TContainerBuilder>(IServiceProviderFactory<TContainerBuilder> factory)
         {
             this.serviceProviderBuilder.UseServiceProviderFactory(factory);
             return this;
         }
 
         /// <inheritdoc />
-        public ISiloHostBuilder ConfigureContainer<TContainerBuilder>(Action<HostBuilderContext, TContainerBuilder> configureDelegate)
+        public SiloHostBuilder ConfigureContainer<TContainerBuilder>(Action<HostBuilderContext, TContainerBuilder> configureDelegate)
         {
             this.serviceProviderBuilder.ConfigureContainer(configureDelegate);
             return this;
@@ -162,8 +169,6 @@ namespace Orleans.Hosting
                 validator.ValidateConfiguration();
             }
         }
-
-        ISiloBuilder ISiloBuilder.ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureDelegate) => this.ConfigureServices(configureDelegate);
 
         IHostBuilder IHostBuilder.ConfigureHostConfiguration(Action<IConfigurationBuilder> configureDelegate) => this.ConfigureHostConfiguration(configureDelegate);
 

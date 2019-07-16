@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -8,16 +9,16 @@ namespace Orleans.Hosting
     /// <summary>
     /// Internal wrapper type of <see cref="IHostBuilder"/> that scope all configuration extensions related to orleans.
     /// </summary>
-    internal class SiloBuilder : ISiloBuilder
+    internal class ClientHostedServiceBuilder : IClientBuilder
     {
         private readonly IHostBuilder hostBuilder;
-        private readonly List<Action<HostBuilderContext, ISiloBuilder>> configureSiloDelegates = new List<Action<HostBuilderContext, ISiloBuilder>>();
+        private readonly List<Action<HostBuilderContext, IClientBuilder>> configureSiloDelegates = new List<Action<HostBuilderContext, IClientBuilder>>();
         private readonly List<Action<HostBuilderContext, IServiceCollection>> configureServicesDelegates = new List<Action<HostBuilderContext, IServiceCollection>>();
 
         /// <inheritdoc />
         public IDictionary<object, object> Properties => this.hostBuilder.Properties;
 
-        public SiloBuilder(IHostBuilder hostBuilder)
+        public ClientHostedServiceBuilder(IHostBuilder hostBuilder)
         {
             this.hostBuilder = hostBuilder;
         }
@@ -29,7 +30,7 @@ namespace Orleans.Hosting
                 configurationDelegate(context, this);
             }
 
-            serviceCollection.AddHostedService<SiloHostedService>();
+            serviceCollection.AddHostedService<ClientHostedService>();
             this.ConfigureDefaults();
             this.ConfigureApplicationParts(parts => parts.ConfigureDefaults());
 
@@ -39,7 +40,7 @@ namespace Orleans.Hosting
             }
         }
 
-        public ISiloBuilder ConfigureSilo(Action<HostBuilderContext, ISiloBuilder> configureDelegate)
+        public IClientBuilder ConfigureSilo(Action<HostBuilderContext, IClientBuilder> configureDelegate)
         {
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
             this.configureSiloDelegates.Add(configureDelegate);
@@ -47,7 +48,7 @@ namespace Orleans.Hosting
         }
 
         /// <inheritdoc />
-        public ISiloBuilder ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureDelegate)
+        public IClientBuilder ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureDelegate)
         {
             if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
             this.configureServicesDelegates.Add(configureDelegate);

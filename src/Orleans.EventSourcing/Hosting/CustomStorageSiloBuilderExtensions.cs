@@ -1,4 +1,4 @@
-﻿
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.LogConsistency;
@@ -11,22 +11,6 @@ namespace Orleans.Hosting
 {
     public static class CustomStorageSiloBuilderExtensions
     {
-        /// <summary>
-        /// Adds a custom storage log consistency provider as default consistency provider"/>
-        /// </summary>
-        public static ISiloHostBuilder AddCustomStorageBasedLogConsistencyProviderAsDefault(this ISiloHostBuilder builder, string primaryCluster = null)
-        {
-            return builder.AddCustomStorageBasedLogConsistencyProvider(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, primaryCluster);
-        }
-
-        /// <summary>
-        /// Adds a custom storage log consistency provider"/>
-        /// </summary>
-        public static ISiloHostBuilder AddCustomStorageBasedLogConsistencyProvider(this ISiloHostBuilder builder, string name = "LogStorage", string primaryCluster = null)
-        {
-            return builder.ConfigureServices(services => services.AddCustomStorageBasedLogConsistencyProvider(name, primaryCluster));
-        }
-
         /// <summary>
         /// Adds a custom storage log consistency provider as default consistency provider"/>
         /// </summary>

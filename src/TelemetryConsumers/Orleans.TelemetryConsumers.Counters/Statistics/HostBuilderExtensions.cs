@@ -12,7 +12,7 @@ namespace Orleans.Statistics
         /// <summary>
         /// Use Windows performance counters as source for host environment statistics
         /// </summary>
-        public static ISiloHostBuilder UsePerfCounterEnvironmentStatistics(this ISiloHostBuilder builder)
+        public static ISiloBuilder UsePerfCounterEnvironmentStatistics(this ISiloBuilder builder)
         {
             return builder.ConfigureServices(services =>
             {
