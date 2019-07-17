@@ -115,47 +115,55 @@ namespace Orleans.Runtime.Messaging
                         break;
                     }
 
+                    // Attempt to connect.
                     Connection connection = default;
+                    Exception error = default;
                     try
                     {
-                        // Start the new connection
                         connection = await this.ConnectAsync(endpoint);
+                        error = default;
                     }
                     catch (Exception exception)
                     {
                         lastFailure = DateTime.UtcNow;
-                        throw new ConnectionFailedException($"Unable to connect to endpoint {endpoint}. See {nameof(exception.InnerException)}", exception);
+                        error = exception;
                     }
-                    finally
+
+                    // Ensure the connection is added to the collection.
+                    // If the connection attempt failed, update the collection to record the failed connection attempt.
+                    ConnectionEntry updated;
+                    do
                     {
-                        // Ensure the connection is added to the collection
-                        ConnectionEntry updated;
-                        do
+                        if (connection != null)
                         {
-                            if (connection != null)
-                            {
-                                result = original.Connections.Add(connection);
-                                lastFailure = null;
-                            }
-                            else
-                            {
-                                result = original.Connections;
+                            result = original.Connections.Add(connection);
+                            lastFailure = null;
+                        }
+                        else
+                        {
+                            result = original.Connections;
 
-                                if (original.LastFailure.HasValue && lastFailure.HasValue)
-                                {
-                                    var ticks = Math.Max(lastFailure.Value.Ticks, original.LastFailure.Value.Ticks);
-                                    lastFailure = new DateTime(ticks);
-                                }
-                            }
-
-                            updated = new ConnectionEntry
+                            if (original.LastFailure.HasValue && lastFailure.HasValue)
                             {
-                                ConnectionAttemptGuard = original.ConnectionAttemptGuard,
-                                Connections = result,
-                                LastFailure = lastFailure
-                            };
-                        } while (!(this.connections.TryUpdate(endpoint, updated, original) || this.connections.TryAdd(endpoint, updated)));
+                                var ticks = Math.Max(lastFailure.Value.Ticks, original.LastFailure.Value.Ticks);
+                                lastFailure = new DateTime(ticks);
+                            }
+                        }
+
+                        updated = new ConnectionEntry
+                        {
+                            ConnectionAttemptGuard = original.ConnectionAttemptGuard,
+                            Connections = result,
+                            LastFailure = lastFailure
+                        };
+                    } while (!(this.connections.TryUpdate(endpoint, updated, original) || this.connections.TryAdd(endpoint, updated)));
+
+                    if (error != null)
+                    {
+                        throw new ConnectionFailedException(
+                            $"Unable to connect to endpoint {endpoint}. See {nameof(error.InnerException)}", error);
                     }
+
                     break;
                 }
                 finally
@@ -195,22 +203,21 @@ namespace Orleans.Runtime.Messaging
                     {
                         error = exception;
                     }
-                    finally
+
+                    this.Remove(address, connection);
+
+                    if (error != null)
                     {
-                        this.Remove(address, connection);
-                        if (error != null)
-                        {
-                            this.trace.LogWarning(
-                                "Connection to endpoint {EndPoint} terminated with exception {Exception}",
-                                address,
-                                error);
-                        }
-                        else
-                        {
-                            this.trace.LogInformation(
-                               "Connection to endpoint {EndPoint} closed.",
-                               address);
-                        }
+                        this.trace.LogWarning(
+                            "Connection to endpoint {EndPoint} terminated with exception {Exception}",
+                            address,
+                            error);
+                    }
+                    else
+                    {
+                        this.trace.LogInformation(
+                            "Connection to endpoint {EndPoint} closed.",
+                            address);
                     }
                 });
 

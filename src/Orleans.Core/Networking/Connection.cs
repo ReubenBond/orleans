@@ -77,35 +77,32 @@ namespace Orleans.Runtime.Messaging
             {
                 error = exception;
             }
-            finally
-            {
-                try
-                {
-                    if (error is ConnectionAbortedException abortedException)
-                    {
-                        this.CloseInternal(abortedException);
-                    }
-                    else if (error != null)
-                    {
-                        this.CloseInternal(new ConnectionAbortedException(
-                            $"Connection aborted. See {nameof(Exception.InnerException)}",
-                            error));
-                    }
-                    else if (error == null)
-                    {
-                        this.CloseInternal(new ConnectionAbortedException("Connection processing completed without error"));
-                    }
 
-                    await this.Context.DisposeAsync();
-                }
-                catch
+            try
+            {
+                if (error is ConnectionAbortedException abortedException)
                 {
+                    this.CloseInternal(abortedException);
                 }
-                finally
+                else if (error != null)
                 {
-                    _ = this.RerouteMessages();
+                    this.CloseInternal(new ConnectionAbortedException(
+                        $"Connection aborted. See {nameof(Exception.InnerException)}",
+                        error));
                 }
+                else if (error == null)
+                {
+                    this.CloseInternal(new ConnectionAbortedException("Connection processing completed without error"));
+                }
+
+                await this.Context.DisposeAsync();
             }
+            catch
+            {
+                // Swallow any exceptions here.
+            }
+
+            _ = this.RerouteMessages();
         }
 
         protected virtual async Task RunInternal()
