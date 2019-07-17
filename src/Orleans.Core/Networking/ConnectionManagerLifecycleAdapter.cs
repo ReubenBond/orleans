@@ -22,7 +22,10 @@ namespace Orleans.Runtime.Messaging
 
         public void Participate(TLifecycle lifecycle)
         {
-            lifecycle.Subscribe(nameof(ConnectionManager), ServiceLifecycleStage.RuntimeInitialize, this);
+            lifecycle.Subscribe(
+                nameof(ConnectionManager),
+                ServiceLifecycleStage.RuntimeInitialize,
+                this);
         }
     }
 }

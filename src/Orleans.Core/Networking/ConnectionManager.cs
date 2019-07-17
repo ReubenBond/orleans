@@ -1,8 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,15 +12,17 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class ConnectionManager
     {
+        private static readonly TimeSpan CONNECTION_RETRY_DELAY = TimeSpan.FromMilliseconds(1000);
+        private const int MaxConnectionsPerEndpoint = 1;
+
         [ThreadStatic]
         private static int nextConnection;
 
-        private static readonly TimeSpan CONNECTION_RETRY_DELAY = TimeSpan.FromMilliseconds(1000);
-        private const int MaxConnectionsPerEndpoint = 1;
         private readonly ConcurrentDictionary<SiloAddress, ConnectionEntry> connections = new ConcurrentDictionary<SiloAddress, ConnectionEntry>();
         private readonly ConnectionFactory connectionFactory;
         private readonly INetworkingTrace trace;
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
+        private readonly object collectionLock = new object();
 
         public ConnectionManager(
             ConnectionFactory connectionBuilder,
@@ -57,7 +58,6 @@ namespace Orleans.Runtime.Messaging
                 nextConnection = (nextConnection + 1) % result.Length;
                 var connection = result[nextConnection];
                 if (connection.IsValid) return new ValueTask<Connection>(connection);
-                this.Remove(siloAddress, connection);
             }
 
             return this.GetConnectionInner(siloAddress, entry);
@@ -70,7 +70,10 @@ namespace Orleans.Runtime.Messaging
             if (entry.LastFailure.HasValue
                 && (delta = DateTime.UtcNow.Subtract(entry.LastFailure.Value)) < CONNECTION_RETRY_DELAY)
             {
-                return new ValueTask<Connection>(Task.FromException<Connection>(new ConnectionFailedException($"Unable to connect to {address}, will retry after {delta.TotalMilliseconds}ms")));
+                return new ValueTask<Connection>(
+                    Task.FromException<Connection>(
+                        new ConnectionFailedException(
+                            $"Unable to connect to {address}, will retry after {delta.TotalMilliseconds}ms")));
             }
 
             return this.GetConnectionAsync(address);
@@ -81,37 +84,30 @@ namespace Orleans.Runtime.Messaging
             ImmutableArray<Connection> result;
             DateTime? lastFailure = default;
 
-            while (true)
+            ConnectionEntry entry = default;
+            var acquiredConnectionLock = false;
+            try
             {
-                // Initialize the entry for this endpoint
-                ConnectionEntry original;
-                while (!this.connections.TryGetValue(endpoint, out original))
+                while (true)
                 {
-                    original = new ConnectionEntry
+                    entry = GetOrCreateEntry(endpoint, ref acquiredConnectionLock);
+
+                    if (entry.Connections.Length >= MaxConnectionsPerEndpoint)
                     {
-                        ConnectionAttemptGuard = new SemaphoreSlim(1),
-                        Connections = ImmutableArray<Connection>.Empty
-                    };
+                        result = entry.Connections;
+                        break;
+                    }
 
-                    if (this.connections.TryAdd(endpoint, original)) break;
-                }
-
-                if (original.Connections.Length >= MaxConnectionsPerEndpoint)
-                {
-                    result = original.Connections;
-                    break;
-                }
-
-                var acquired = false;
-                try
-                {
-                    acquired = await original.ConnectionAttemptGuard.WaitAsync(100);
-                    if (!acquired) continue;
-
-                    // Re-check that a new connection is warranted.
-                    if (this.connections.TryGetValue(endpoint, out original) && original.Connections.Length >= MaxConnectionsPerEndpoint)
+                    // Lock the entry to ensure it will not be removed while the connectio attempt is occuring.
+                    if (!acquiredConnectionLock)
                     {
-                        result = original.Connections;
+                        await Task.Delay(10);
+                        continue;
+                    }
+
+                    if (entry.Connections.Length >= MaxConnectionsPerEndpoint)
+                    {
+                        result = entry.Connections;
                         break;
                     }
 
@@ -130,33 +126,34 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     // Ensure the connection is added to the collection.
-                    // If the connection attempt failed, update the collection to record the failed connection attempt.
-                    ConnectionEntry updated;
-                    do
+                    lock (this.collectionLock)
                     {
-                        if (connection != null)
-                        {
-                            result = original.Connections.Add(connection);
-                            lastFailure = null;
-                        }
-                        else
-                        {
-                            result = original.Connections;
+                        entry = this.connections[endpoint];
 
-                            if (original.LastFailure.HasValue && lastFailure.HasValue)
+                        // If the connection attempt failed, update the collection to record the failed connection attempt.
+                        if (connection is null)
+                        {
+                            result = entry.Connections;
+                            if (entry.LastFailure.HasValue && lastFailure.HasValue)
                             {
-                                var ticks = Math.Max(lastFailure.Value.Ticks, original.LastFailure.Value.Ticks);
+                                var ticks = Math.Max(lastFailure.Value.Ticks, entry.LastFailure.Value.Ticks);
                                 lastFailure = new DateTime(ticks);
                             }
                         }
-
-                        updated = new ConnectionEntry
+                        else
                         {
-                            ConnectionAttemptGuard = original.ConnectionAttemptGuard,
-                            Connections = result,
-                            LastFailure = lastFailure
-                        };
-                    } while (!(this.connections.TryUpdate(endpoint, updated, original) || this.connections.TryAdd(endpoint, updated)));
+                            result = entry.Connections.Add(connection);
+                            lastFailure = null;
+                        }
+
+                        // Clean up defunct connections
+                        foreach (var c in result)
+                        {
+                            if (!c.IsValid) result = result.Remove(c);
+                        }
+
+                        this.connections[endpoint] = entry.WithLastFailure(lastFailure).WithConnections(result);
+                    }
 
                     if (error != null)
                     {
@@ -166,14 +163,35 @@ namespace Orleans.Runtime.Messaging
 
                     break;
                 }
-                finally
-                {
-                    if (acquired) original.ConnectionAttemptGuard.Release();
-                }
-            };
+            }
+            finally
+            {
+                if (acquiredConnectionLock) entry.ReleaseLock();
+            }
 
             nextConnection = (nextConnection + 1) % result.Length;
             return result[nextConnection];
+        }
+
+        private ConnectionEntry GetOrCreateEntry(SiloAddress address, ref bool locked)
+        {
+            lock (this.collectionLock)
+            {
+                if (!this.connections.TryGetValue(address, out var entry))
+                {
+                    // Initialize the entry for this endpoint
+                    entry = ConnectionEntry.CreateNew();
+                    locked = entry.TryLock();
+
+                    this.connections[address] = entry;
+                }
+                else
+                {
+                    locked = entry.TryLock();
+                }
+
+                return entry;
+            }
         }
 
         private async ValueTask<Connection> ConnectAsync(SiloAddress address)
@@ -235,26 +253,32 @@ namespace Orleans.Runtime.Messaging
 
         internal void Remove(SiloAddress siloAddress, Connection connection)
         {
-            if (connection is object)
+            if (connection is null) return;
+
+            lock (this.collectionLock)
             {
-                while (this.connections.TryGetValue(siloAddress, out var existing) && existing.Connections.Contains(connection))
+                if (this.connections.TryGetValue(siloAddress, out var existing))
                 {
-                    var updated = new ConnectionEntry
-                    {
-                        Connections = existing.Connections.Remove(connection),
-                        ConnectionAttemptGuard = existing.ConnectionAttemptGuard
-                    };
+                    var updated = existing.WithConnections(existing.Connections.Remove(connection));
 
-                    if (this.connections.TryUpdate(siloAddress, updated, existing))
+                    if (updated.Connections.Length == 0)
                     {
-                        if (updated.Connections.Length == 0)
+                        // Remove the entire entry.
+                        var acquiredConnectionLock = false;
+                        try
                         {
-                            var dict = (IDictionary<SiloAddress, ConnectionEntry>)this.connections;
-                            var entry = new KeyValuePair<SiloAddress, ConnectionEntry>(siloAddress, updated);
-                            dict.Remove(entry);
+                            acquiredConnectionLock = existing.TryLock();
+                            this.connections.TryRemove(siloAddress, out _);
                         }
-
-                        return;
+                        finally
+                        {
+                            if (acquiredConnectionLock) existing.ReleaseLock();
+                        }
+                    }
+                    else
+                    {
+                        // Remove just the single connection.
+                        this.connections[siloAddress] = updated;
                     }
                 }
             }
@@ -262,32 +286,40 @@ namespace Orleans.Runtime.Messaging
 
         public void Abort(SiloAddress endpoint)
         {
-            this.connections.TryRemove(endpoint, out var existing);
-
-            if (!existing.Connections.IsDefault)
+            lock (this.collectionLock)
             {
-                var exception = new ConnectionAbortedException($"Aborting connection to {endpoint}");
-                foreach (var connection in existing.Connections)
+                if (!this.connections.TryGetValue(endpoint, out var entry))
                 {
-                    try
+                    // Already removed
+                    return;
+                }
+
+                if (!entry.Connections.IsDefault)
+                {
+                    var exception = new ConnectionAbortedException($"Aborting connection to {endpoint}");
+                    foreach (var connection in entry.Connections)
                     {
-                        connection.Close(exception);
-                    }
-                    catch
-                    {
+                        try
+                        {
+                            connection.Close(exception);
+                        }
+                        catch
+                        {
+                        }
                     }
                 }
-            }
-        }
 
-        public void ForEach(SiloAddress endpoint, Action<Connection> action)
-        {
-            if (this.connections.TryGetValue(endpoint, out var existing))
-            {
-                if (existing.Connections.IsDefault) return;
-                foreach (var connection in existing.Connections)
+                var acquiredConnectionLock = false;
+                try
                 {
-                    action(connection);
+                    if (acquiredConnectionLock = entry.TryLock())
+                    {
+                        this.connections.TryRemove(endpoint, out _);
+                    }
+                }
+                finally
+                {
+                    if (acquiredConnectionLock) entry.ReleaseLock();
                 }
             }
         }
@@ -318,6 +350,8 @@ namespace Orleans.Runtime.Messaging
                         }
                     }
 
+                    if (ct.IsCancellationRequested) break;
+
                     await Task.Delay(10);
                     if (++cycles > 100 && cycles % 500 == 0 && this.ConnectionCount > 0)
                     {
@@ -341,32 +375,40 @@ namespace Orleans.Runtime.Messaging
             return null;
         }
 
-        private struct ConnectionEntry : IEquatable<ConnectionEntry>
+        private struct ConnectionEntry
         {
-            public DateTime? LastFailure;
-            public ImmutableArray<Connection> Connections;
-            public SemaphoreSlim ConnectionAttemptGuard;
+            public readonly DateTime? LastFailure;
+            public readonly ImmutableArray<Connection> Connections;
+            private readonly int[] lockObj;
 
-            public override bool Equals(object obj)
+            private ConnectionEntry(
+                ImmutableArray<Connection> connections,
+                DateTime? lastFailure,
+                int[] lockObject)
             {
-                return obj is ConnectionEntry entry &&
-                       this.Connections.Equals(entry.Connections) &&
-                       ReferenceEquals(this.ConnectionAttemptGuard, entry.ConnectionAttemptGuard);
+                this.Connections = connections;
+                this.LastFailure = lastFailure;
+                this.lockObj = lockObject;
             }
 
-            public bool Equals(ConnectionEntry other)
+            public static ConnectionEntry CreateNew() => new ConnectionEntry(ImmutableArray<Connection>.Empty, default, new int[1]);
+
+            public ConnectionEntry WithLastFailure(DateTime? lastFailure)
             {
-                return this.Connections.Equals(other.Connections) &&
-                       ReferenceEquals(this.ConnectionAttemptGuard, other.ConnectionAttemptGuard);
+                return new ConnectionEntry(this.Connections, lastFailure, this.lockObj);
             }
 
-            public override int GetHashCode()
+            public ConnectionEntry WithConnections(ImmutableArray<Connection> connections)
             {
-                var hashCode = -251647159;
-                hashCode = hashCode * -1521134295 + EqualityComparer<ImmutableArray<Connection>>.Default.GetHashCode(this.Connections);
-                hashCode = hashCode * -1521134295 + RuntimeHelpers.GetHashCode(this.ConnectionAttemptGuard);
-                return hashCode;
+                return new ConnectionEntry(connections, this.LastFailure, this.lockObj);
             }
+
+            public bool TryLock()
+            {
+                return Interlocked.CompareExchange(ref this.lockObj[0], 1, 0) == 0;
+            }
+
+            public void ReleaseLock() => Interlocked.Exchange(ref this.lockObj[0], 0);
         }
     }
 }
