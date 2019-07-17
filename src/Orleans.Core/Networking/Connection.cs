@@ -68,17 +68,10 @@ namespace Orleans.Runtime.Messaging
 
         public async Task Run()
         {
-            await this.middleware(this.Context);
-        }
-
-        protected virtual async Task RunInternal()
-        {
             Exception error = default;
             try
             {
-                var outgoingTask = Task.Run(this.ProcessOutgoing);
-                var incomingTask = Task.Run(this.ProcessIncoming);
-                await Task.WhenAll(outgoingTask, incomingTask);
+                await this.middleware(this.Context);
             }
             catch (Exception exception)
             {
@@ -113,6 +106,13 @@ namespace Orleans.Runtime.Messaging
                     _ = this.RerouteMessages();
                 }
             }
+        }
+
+        protected virtual async Task RunInternal()
+        {
+            var outgoingTask = Task.Run(this.ProcessOutgoing);
+            var incomingTask = Task.Run(this.ProcessIncoming);
+            await Task.WhenAll(outgoingTask, incomingTask);
         }
         
         public void Close(ConnectionAbortedException exception = default)
