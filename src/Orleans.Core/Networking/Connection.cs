@@ -179,9 +179,9 @@ namespace Orleans.Runtime.Messaging
 
         protected abstract void OnReceivedMessage(Message message);
 
-        protected abstract void OnReceiveMessageFail(Message message, Exception exception);
+        protected abstract void OnReceiveMessageFailure(Message message, Exception exception);
 
-        protected abstract void OnSendingSocketFail(Message message, string error);
+        protected abstract void OnSendMessageFailure(Message message, string error);
 
         private async Task ProcessIncoming()
         {
@@ -229,7 +229,7 @@ namespace Orleans.Runtime.Messaging
                                     this.LocalEndpoint,
                                     exception);
 
-                                this.OnReceiveMessageFail(message, exception);
+                                this.OnReceiveMessageFailure(message, exception);
                                 break;
                             }
                         } while (requiredBytes == 0);
@@ -327,7 +327,7 @@ namespace Orleans.Runtime.Messaging
             var i = 0;
             foreach (var message in this.inflight)
             {
-                this.OnSendingSocketFail(message, "Connection terminated");
+                this.OnSendMessageFailure(message, "Connection terminated");
             }
 
             this.inflight.Clear();

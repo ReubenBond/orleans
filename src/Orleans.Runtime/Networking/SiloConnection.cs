@@ -124,7 +124,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected override void OnReceiveMessageFail(Message message, Exception exception)
+        protected override void OnReceiveMessageFailure(Message message, Exception exception)
         {
             // If deserialization completely failed or the message was one-way, rethrow the exception
             // so that it can be handled at another level.
@@ -144,7 +144,7 @@ namespace Orleans.Runtime.Messaging
             this.messageCenter.SendMessage(response);
         }
 
-        protected override void OnSendingSocketFail(Message message, string error)
+        protected override void OnSendMessageFailure(Message message, string error)
         {
             this.FailMessage(message, error);
         }

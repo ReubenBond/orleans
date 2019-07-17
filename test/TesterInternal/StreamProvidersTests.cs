@@ -17,9 +17,6 @@ using UnitTests.StorageTests;
 using Orleans.Storage;
 using Orleans.Providers;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Configuration;
-using Orleans.Configuration;
-using Microsoft.Extensions.Logging;
 
 namespace UnitTests.Streaming
 {
@@ -32,12 +29,11 @@ namespace UnitTests.Streaming
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 this.ServiceId = builder.Options.ServiceId;
-                builder.Options.InitialSilosCount = 2;
-                builder.AddSiloBuilderConfigurator<Configurator>();
-                builder.AddClientBuilderConfigurator<Configurator>();
+                builder.Options.InitialSilosCount = 4;
+                builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
             }
 
-            public class Configurator : ISiloBuilderConfigurator, IClientBuilderConfigurator
+            public class SiloHostConfigurator : ISiloBuilderConfigurator
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
@@ -49,10 +45,6 @@ namespace UnitTests.Streaming
                             services.AddSingletonNamedService<IGrainStorage, ErrorInjectionStorageProvider>("ErrorInjector");
                             services.AddSingletonNamedService<IControllable, ErrorInjectionStorageProvider>("ErrorInjector");
                         });
-                }
-
-                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-                {
                 }
             }
         }
@@ -99,14 +91,14 @@ namespace UnitTests.Streaming
             output.WriteLine("About to reset Silos .....");
             output.WriteLine("Restarting Silos ...");
 
-            foreach (var silo in this.HostedCluster.GetActiveSilos().Skip(1).ToList())
+            foreach (var silo in this.HostedCluster.GetActiveSilos().ToList())
             {
                 await this.HostedCluster.RestartSiloAsync(silo);
             }
 
             output.WriteLine("..... Silos restarted");
             
-            var activeSilos = this.HostedCluster.GetActiveSilos().Skip(1).ToArray();
+            var activeSilos = this.HostedCluster.GetActiveSilos().ToArray();
             Assert.True(activeSilos.Length > 0);
 
             foreach (var siloHandle in activeSilos)
