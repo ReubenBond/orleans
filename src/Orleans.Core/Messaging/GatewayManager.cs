@@ -23,7 +23,7 @@ namespace Orleans.Messaging
         internal readonly IGatewayListProvider ListProvider;
         private SafeTimer gatewayRefreshTimer;
         private readonly Dictionary<SiloAddress, DateTime> knownDead;
-        private IList<SiloAddress> cachedLiveGateways;
+        private List<SiloAddress> cachedLiveGateways;
         private DateTime lastRefreshTime;
         private int roundRobinCounter;
         private readonly SafeRandom rand;
@@ -101,7 +101,7 @@ namespace Orleans.Messaging
             lock (lockable)
             {
                 knownDead[gateway] = DateTime.UtcNow;
-                var copy = cachedLiveGateways.ToList();
+                var copy = new List<SiloAddress>(cachedLiveGateways);
                 copy.Remove(gateway);
                 // swap the reference, don't mutate cachedLiveGateways, so we can access cachedLiveGateways without the lock.
                 cachedLiveGateways = copy;
@@ -155,7 +155,7 @@ namespace Orleans.Messaging
             return null;
         }
 
-        public IList<SiloAddress> GetLiveGateways()
+        public List<SiloAddress> GetLiveGateways()
         {
             // Never takes a lock and returns the cachedLiveGateways list quickly without any operation.
             // Asynchronously starts gateway refresh only when it is empty.
@@ -231,7 +231,7 @@ namespace Orleans.Messaging
                 var live = new List<SiloAddress>();
                 var now = DateTime.UtcNow;
 
-                var knownGateways = currentKnownGateways as IList<SiloAddress> ?? currentKnownGateways.ToList();
+                var knownGateways = currentKnownGateways as List<SiloAddress> ?? currentKnownGateways.ToList();
                 foreach (SiloAddress trial in knownGateways)
                 {
                     // We consider a node to be dead if we recorded it is dead due to socket error

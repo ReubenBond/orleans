@@ -173,43 +173,61 @@ namespace Orleans.Messaging
                 return;
             }
 
-            void Send(ValueTask<Connection> connection, Message message)
-            {
-                try
-                {
-                    var gatewaySender = connection.Result;
-                    gatewaySender?.Send(message);
-                    if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace(ErrorCode.ProxyClient_QueueRequest, "Sending message {0} via gateway {1}", message, gatewaySender);
-                }
-                catch (Exception exception)
-                {
-                    // This exception can be thrown if the gateway connection we selected was closed since we checked (i.e., we lost the race)
-                    // If this happens, we reject if the message is targeted to a specific silo, or try again if not
-                    
-                    if (msg.TargetSilo != null)
-                    {
-                        RejectMessage(msg, string.Format("Target silo {0} is unavailable", msg.TargetSilo), exception);
-                    }
-                    else
-                    {
-                        _ = Task.Run(async () =>
-                        {
-                            await Task.Delay(TimeSpan.FromSeconds(2));
-                            this.SendMessage(msg);
-                        });
-                    }
-                }
-            }
-
             var connectionTask = this.GetGatewayConnection(msg);
             if (connectionTask.IsCompletedSuccessfully)
             {
-                Send(connectionTask, msg);
+                var connection = connectionTask.Result;
+                if (connection is null) return;
+
+                connection.Send(msg);
+
+                if (this.logger.IsEnabled(LogLevel.Trace))
+                {
+                    this.logger.Trace(
+                        ErrorCode.ProxyClient_QueueRequest,
+                        "Sending message {0} via gateway {1}",
+                        msg,
+                        connection.RemoteEndpoint);
+                }
             }
             else
             {
-                // The send function handles any failures.
-                _ = connectionTask.AsTask().ContinueWith(t => { Send(connectionTask, msg); });
+                _ = SendAsync(connectionTask, msg);
+
+                async Task SendAsync(ValueTask<Connection> task, Message message)
+                {
+                    try
+                    {
+                        var connection = await task;
+                        if (connection is null) return;
+
+                        connection.Send(message);
+
+                        if (this.logger.IsEnabled(LogLevel.Trace))
+                        {
+                            this.logger.Trace(
+                                ErrorCode.ProxyClient_QueueRequest,
+                                "Sending message {0} via gateway {1}",
+                                message,
+                                connection.RemoteEndpoint);
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        // This exception can be thrown if the gateway connection we selected was closed since we checked (i.e., we lost the race)
+                        // If this happens, we reject if the message is targeted to a specific silo, or try again if not
+
+                        if (message.TargetSilo != null)
+                        {
+                            RejectMessage(message, string.Format("Target silo {0} is unavailable", message.TargetSilo), exception);
+                        }
+                        else
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(2));
+                            this.SendMessage(message);
+                        }
+                    }
+                }
             }
         }
 
@@ -239,8 +257,8 @@ namespace Orleans.Messaging
                 // If not, create a new GatewayConnection and start it.
                 // If start fails, we will mark this connection as dead and remove it from the GetCachedLiveGatewayNames.
                 int msgNumber = Interlocked.Increment(ref numMessages);
-                var gatewayNames = gatewayManager.GetLiveGateways();
-                int numGateways = gatewayNames.Count;
+                var gatewayAddresses = gatewayManager.GetLiveGateways();
+                int numGateways = gatewayAddresses.Count;
                 if (numGateways == 0)
                 {
                     RejectMessage(msg, "No gateways available");
@@ -248,7 +266,7 @@ namespace Orleans.Messaging
                     return new ValueTask<Connection>(default(Connection));
                 }
 
-                var gatewayAddress = gatewayNames[msgNumber % numGateways];
+                var gatewayAddress = gatewayAddresses[msgNumber % numGateways];
 
                 var connectionTask = this.connectionManager.GetConnection(gatewayAddress);
                 if (connectionTask.IsCompletedSuccessfully) return connectionTask;
