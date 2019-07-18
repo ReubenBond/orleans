@@ -35,6 +35,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnReceivedMessage(Message msg)
         {
+            msg.Connection = this;
             // See it's a Ping message, and if so, short-circuit it
             var requestContext = msg.RequestContextData;
             if (requestContext != null &&

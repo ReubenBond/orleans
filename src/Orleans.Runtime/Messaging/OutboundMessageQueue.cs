@@ -92,6 +92,11 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
+                if (msg.Connection != null && msg.Connection.IsValid && msg.Connection.RemoteEndpoint.Equals(msg.TargetSilo.Endpoint))
+                {
+                    msg.Connection.Send(msg);
+                }
+
                 var senderTask = this.connectionManager.GetConnection(msg.TargetSilo);
                 if (senderTask.IsCompletedSuccessfully)
                 {

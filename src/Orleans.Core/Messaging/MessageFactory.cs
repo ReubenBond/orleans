@@ -97,7 +97,8 @@ namespace Orleans.Runtime
                 IsAlwaysInterleave = request.IsAlwaysInterleave,
                 TargetSilo = request.SendingSilo,
                 TraceContext = request.TraceContext,
-                TransactionInfo = request.TransactionInfo
+                TransactionInfo = request.TransactionInfo,
+                Connection = request.Connection
             };
 
             if (request.SendingGrain != null)
@@ -147,6 +148,7 @@ namespace Orleans.Runtime
             response.RejectionType = type;
             response.RejectionInfo = info;
             response.BodyObject = ex;
+            response.Connection = request.Connection;
             if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, Utils.GetStackTrace());
             return response;
         }

@@ -38,6 +38,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnReceivedMessage(Message message)
         {
+            message.Connection = this;
             this.messageCenter.OnReceivedMessage(message);
         }
 

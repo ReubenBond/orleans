@@ -178,7 +178,7 @@ namespace Orleans.Messaging
                 try
                 {
                     var gatewaySender = connection.Result;
-                    gatewaySender.Send(message);
+                    gatewaySender?.Send(message);
                     if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace(ErrorCode.ProxyClient_QueueRequest, "Sending message {0} via gateway {1}", message, gatewaySender);
                 }
                 catch (Exception exception)
@@ -215,6 +215,11 @@ namespace Orleans.Messaging
 
         private ValueTask<Connection> GetGatewayConnection(Message msg)
         {
+            if (msg.Connection != null && msg.Connection.IsValid)
+            {
+                return new ValueTask<Connection>(msg.Connection);
+            }
+
             // If there's a specific gateway specified, use it
             if (msg.TargetSilo != null && gatewayManager.GetLiveGateways().Contains(msg.TargetSilo))
             {
