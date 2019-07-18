@@ -29,6 +29,11 @@ namespace Orleans.Serialization
         {
         }
 
+        public BinaryTokenStreamReader2(ReadOnlySequence<byte> input)
+        {
+            this.PartialReset(input);
+        }
+
 #if SERIALIZER_SESSIONAWARE
         private ReferencedTypeCollection referencedTypes;
         internal void RecordType(Type type)
