@@ -13,6 +13,7 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly MessageFactory messageFactory;
         private readonly ClientMessageCenter messageCenter;
+        private readonly GatewayManager gatewayManager;
 
         public ClientOutboundConnection(
             ConnectionContext connection,
@@ -20,12 +21,13 @@ namespace Orleans.Runtime.Messaging
             MessageFactory messageFactory,
             IServiceProvider serviceProvider,
             ClientMessageCenter messageCenter,
+            GatewayManager gatewayManager,
             INetworkingTrace trace)
             : base(connection, middleware, serviceProvider, trace)
         {
             this.messageFactory = messageFactory;
             this.messageCenter = messageCenter;
-
+            this.gatewayManager = gatewayManager;
             if (connection.RemoteEndPoint is IPEndPoint ipEndpoint)
             {
                 this.TargetSilo = SiloAddress.New(ipEndpoint, 0);
@@ -73,6 +75,7 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
+                if (this.TargetSilo != null) this.gatewayManager.MarkAsDead(this.TargetSilo);
                 this.messageCenter.OnGatewayConnectionClosed();
             }
         }
