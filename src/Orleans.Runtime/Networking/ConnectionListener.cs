@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -89,7 +90,7 @@ namespace Orleans.Runtime.Messaging
                         if (ReferenceEquals(completed, runCancellationTask)) break;
                     }
 
-                    var context = acceptTask.GetAwaiter().GetResult();
+                    var context = acceptTask.Result;
                     if (context == null) break;
 
                     var connection = this.CreateConnection(context);
@@ -161,11 +162,11 @@ namespace Orleans.Runtime.Messaging
                 var exception = new ConnectionAbortedException("Shutting down");
                 while (this.ConnectionCount > 0 && !cancellationToken.IsCancellationRequested)
                 {
-                    foreach (var connection in this.connections)
+                    foreach (var connection in this.connections.Keys.ToImmutableList())
                     {
                         try
                         {
-                            connection.Key.Close(exception);
+                            connection.Close(exception);
                         }
                         catch
                         {

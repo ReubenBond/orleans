@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
@@ -325,9 +324,8 @@ namespace Orleans.Runtime.Messaging
                 var cycles = 0;
                 while (this.ConnectionCount > 0)
                 {
-                    foreach (var c in this.connections)
+                    foreach (var entry in this.connections.Values.ToImmutableList())
                     {
-                        var entry = c.Value;
                         if (entry.Connections.IsDefaultOrEmpty) continue;
                         foreach (var connection in entry.Connections)
                         {
