@@ -65,13 +65,12 @@ namespace Orleans.Runtime.Messaging
         private async ValueTask<Connection> GetConnectionAsync(SiloAddress endpoint)
         {
             ImmutableArray<Connection> result;
-            DateTime? lastFailure = default;
-
             ConnectionEntry entry = default;
             var acquiredConnectionLock = false;
             try
             {
-                while (true)
+                // Lock the entry to ensure it will not be removed while the connectio attempt is occuring.
+                while (!acquiredConnectionLock)
                 {
                     entry = GetOrCreateEntry(endpoint, ref acquiredConnectionLock);
 
@@ -83,64 +82,23 @@ namespace Orleans.Runtime.Messaging
 
                     ThrowIfRecentFailure(endpoint, entry);
 
-                    // Lock the entry to ensure it will not be removed while the connectio attempt is occuring.
-                    if (!acquiredConnectionLock)
-                    {
-                        await Task.Delay(10);
-                        continue;
-                    }
+                    // Wait a short time before reattempting to acquire the lock
+                    await Task.Delay(10);
+                }
 
-                    // Attempt to connect.
-                    Connection connection = default;
-                    Exception error = default;
-                    try
-                    {
-                        connection = await this.ConnectAsync(endpoint);
-                        error = default;
-                    }
-                    catch (Exception exception)
-                    {
-                        lastFailure = DateTime.UtcNow;
-                        error = exception;
-                    }
-
-                    // Ensure the connection is added to the collection.
-                    lock (this.collectionLock)
-                    {
-                        entry = this.connections[endpoint];
-
-                        // If the connection attempt failed, update the collection to record the failed connection attempt.
-                        if (connection is null)
-                        {
-                            result = entry.Connections;
-                            if (entry.LastFailure.HasValue && lastFailure.HasValue)
-                            {
-                                var ticks = Math.Max(lastFailure.Value.Ticks, entry.LastFailure.Value.Ticks);
-                                lastFailure = new DateTime(ticks);
-                            }
-                        }
-                        else
-                        {
-                            result = entry.Connections.Add(connection);
-                            lastFailure = null;
-                        }
-
-                        // Clean up defunct connections
-                        foreach (var c in result)
-                        {
-                            if (!c.IsValid) result = result.Remove(c);
-                        }
-
-                        this.connections[endpoint] = entry.WithLastFailure(lastFailure).WithConnections(result);
-                    }
-
-                    if (error != null)
-                    {
-                        throw new ConnectionFailedException(
-                            $"Unable to connect to endpoint {endpoint}. See {nameof(error.InnerException)}", error);
-                    }
-
-                    break;
+                // Attempt to connect.
+                Connection connection = default;
+                try
+                {
+                    connection = await this.ConnectAsync(endpoint);
+                    entry = OnConnectedInternal(endpoint, connection);
+                    result = entry.Connections;
+                }
+                catch (Exception exception)
+                {
+                    OnConnectionFailed(endpoint, DateTime.UtcNow);
+                    throw new ConnectionFailedException(
+                        $"Unable to connect to endpoint {endpoint}. See {nameof(exception.InnerException)}", exception);
                 }
             }
             finally
@@ -150,6 +108,67 @@ namespace Orleans.Runtime.Messaging
 
             nextConnection = (nextConnection + 1) % result.Length;
             return result[nextConnection];
+        }
+
+        private void OnConnectionFailed(SiloAddress address, DateTime lastFailure)
+        {
+            bool acquiredConnectionLock = false;
+            ConnectionEntry entry = default;
+            lock (this.collectionLock)
+            {
+                try
+                {
+                    entry = this.GetOrCreateEntry(address, ref acquiredConnectionLock);
+
+                    if (entry.LastFailure.HasValue)
+                    {
+                        var ticks = Math.Max(lastFailure.Ticks, entry.LastFailure.Value.Ticks);
+                        lastFailure = new DateTime(ticks);
+                    }
+
+                    // Clean up defunct connections
+                    var connections = entry.Connections;
+                    foreach (var c in connections)
+                    {
+                        if (!c.IsValid) connections = connections.Remove(c);
+                    }
+
+                    this.connections[address] = entry.WithLastFailure(lastFailure).WithConnections(connections);
+                }
+                finally
+                {
+                    if (acquiredConnectionLock) entry.ReleaseLock();
+                }
+            }
+        }
+
+        public void OnConnected(SiloAddress address, Connection connection) => OnConnectedInternal(address, connection);
+
+        private ConnectionEntry OnConnectedInternal(SiloAddress address, Connection connection)
+        {
+            bool acquiredConnectionLock = false;
+            ConnectionEntry entry = default;
+            lock (this.collectionLock)
+            {
+                try
+                {
+                    entry = this.GetOrCreateEntry(address, ref acquiredConnectionLock);
+
+                    // Do not add a connection multiple times.
+                    if (entry.Connections.Contains(connection)) return entry;
+
+                    return this.connections[address] = entry.WithConnections(entry.Connections.Add(connection)).WithLastFailure(default);
+                }
+                finally
+                {
+                    if (acquiredConnectionLock) entry.ReleaseLock();
+                }
+            }
+        }
+
+        public void OnConnectionTerminated(SiloAddress address, Connection connection)
+        {
+            this.Remove(address, connection);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -397,7 +416,10 @@ namespace Orleans.Runtime.Messaging
                 return Interlocked.CompareExchange(ref this.lockObj[0], 1, 0) == 0;
             }
 
-            public void ReleaseLock() => Interlocked.Exchange(ref this.lockObj[0], 0);
+            public void ReleaseLock()
+            {
+                if (this.lockObj != default) Interlocked.Exchange(ref this.lockObj[0], 0);
+            }
         }
     }
 }
