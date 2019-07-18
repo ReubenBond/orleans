@@ -212,8 +212,14 @@ namespace Orleans.Runtime.Messaging
         {
             if (msg == null) return;
 
-            int maxRetries = msg.MaxRetries ?? 1;
+            // If we know this silo is dead, don't bother
+            if (msg.TargetSilo != null && this.siloStatusOracle.IsDeadSilo(msg.TargetSilo))
+            {
+                FailMessage(msg, $"Target {msg.TargetSilo.ToLongString()} silo is known to be dead");
+                return;
+            }
 
+            int maxRetries = msg.MaxRetries ?? 1;
             int retryCount = msg.RetryCount ?? 0;
 
             if (retryCount < maxRetries)

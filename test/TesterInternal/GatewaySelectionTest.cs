@@ -57,10 +57,10 @@ namespace UnitTests.MessageCenterTests
             for (int i = 0; i < 2300; i++)
             {
                 var ip = gatewayManager.GetLiveGateway();
-                var addr = IPAddress.Parse(ip.Host);
+                var addr = ip.Endpoint.Address;
                 Assert.Equal(IPAddress.Loopback, addr);  // "Incorrect IP address returned for gateway"
-                Assert.True((0 < ip.Port) && (ip.Port < 5), "Incorrect IP port returned for gateway");
-                counts[ip.Port - 1]++;
+                Assert.True((0 < ip.Endpoint.Port) && (ip.Endpoint.Port < 5), "Incorrect IP port returned for gateway");
+                counts[ip.Endpoint.Port - 1]++;
             }
 
             // The following needed to be changed as the gateway manager now round-robins through the available gateways, rather than

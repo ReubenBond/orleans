@@ -216,9 +216,12 @@ namespace Orleans.Messaging
         private ValueTask<Connection> GetGatewayConnection(Message msg)
         {
             // If there's a specific gateway specified, use it
-            if (msg.TargetSilo != null && gatewayManager.GetLiveGateways().Contains(msg.TargetSilo.ToGatewayUri()))
+            if (msg.TargetSilo != null && gatewayManager.GetLiveGateways().Contains(msg.TargetSilo))
             {
-                return this.connectionManager.GetConnection(msg.TargetSilo);
+                var connectionTask = this.connectionManager.GetConnection(msg.TargetSilo);
+                if (connectionTask.IsCompletedSuccessfully) return connectionTask;
+
+                return ConnectAsync(msg.TargetSilo, connectionTask);
             }
 
             // For untargeted messages to system targets, and for unordered messages, pick a next connection in round robin fashion.
@@ -240,8 +243,12 @@ namespace Orleans.Messaging
                     return new ValueTask<Connection>(default(Connection));
                 }
 
-                var gatewayAddress = gatewayNames[msgNumber % numGateways].ToSiloAddress();
-                return this.connectionManager.GetConnection(gatewayAddress);
+                var gatewayAddress = gatewayNames[msgNumber % numGateways];
+
+                var connectionTask = this.connectionManager.GetConnection(gatewayAddress);
+                if (connectionTask.IsCompletedSuccessfully) return connectionTask;
+
+                return ConnectAsync(gatewayAddress, connectionTask);
             }
 
             // Otherwise, use the buckets to ensure ordering.
@@ -277,7 +284,7 @@ namespace Orleans.Messaging
                 index,
                 msg.TargetGrain.GetHashCode().ToString("x"));
 
-            var gatewayConnection = this.connectionManager.GetConnection(addr.ToSiloAddress());
+            var gatewayConnection = this.connectionManager.GetConnection(addr);
             if (gatewayConnection.IsCompletedSuccessfully)
             {
                 var result = this.TryUpdateConnection(index, gatewayConnection.Result, weakRef);
@@ -292,7 +299,7 @@ namespace Orleans.Messaging
                 Message message,
                 ValueTask<Connection> c,
                 WeakReference<Connection> existing,
-                Uri gatewayAddress)
+                SiloAddress gatewayAddress)
             {
                 try
                 {
@@ -306,6 +313,19 @@ namespace Orleans.Messaging
                 {
                     this.gatewayManager.MarkAsDead(gatewayAddress);
                     return await this.GetGatewayConnection(message);
+                }
+            }
+
+            async ValueTask<Connection> ConnectAsync(SiloAddress gateway, ValueTask<Connection> connectionTask)
+            {
+                try
+                {
+                    return await connectionTask;
+                }
+                catch
+                {
+                    this.gatewayManager.MarkAsDead(gateway);
+                    throw;
                 }
             }
         }
@@ -369,14 +389,6 @@ namespace Orleans.Messaging
             }
         }
 
-        /// <summary>
-        /// For testing use only.
-        /// </summary>
-        public void Reconnect()
-        {
-            throw new NotImplementedException("Reconnect");
-        }
-
         public int SendQueueLength
         {
             get { return 0; }
@@ -401,7 +413,7 @@ namespace Orleans.Messaging
                 throw new OrleansException("Not connected to a gateway");
             }
 
-            return gateway.ToSiloAddress();
+            return gateway;
         }
 
         internal void UpdateClientId(GrainId clientId)

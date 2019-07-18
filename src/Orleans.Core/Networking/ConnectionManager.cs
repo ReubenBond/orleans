@@ -60,23 +60,7 @@ namespace Orleans.Runtime.Messaging
                 if (connection.IsValid) return new ValueTask<Connection>(connection);
             }
 
-            return this.GetConnectionInner(siloAddress, entry);
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private ValueTask<Connection> GetConnectionInner(SiloAddress address, ConnectionEntry entry)
-        {
-            TimeSpan delta;
-            if (entry.LastFailure.HasValue
-                && (delta = DateTime.UtcNow.Subtract(entry.LastFailure.Value)) < CONNECTION_RETRY_DELAY)
-            {
-                return new ValueTask<Connection>(
-                    Task.FromException<Connection>(
-                        new ConnectionFailedException(
-                            $"Unable to connect to {address}, will retry after {delta.TotalMilliseconds}ms")));
-            }
-
-            return this.GetConnectionAsync(address);
+            return GetConnectionAsync(siloAddress);
         }
 
         private async ValueTask<Connection> GetConnectionAsync(SiloAddress endpoint)
@@ -98,17 +82,13 @@ namespace Orleans.Runtime.Messaging
                         break;
                     }
 
+                    ThrowIfRecentFailure(endpoint, entry);
+
                     // Lock the entry to ensure it will not be removed while the connectio attempt is occuring.
                     if (!acquiredConnectionLock)
                     {
                         await Task.Delay(10);
                         continue;
-                    }
-
-                    if (entry.Connections.Length >= MaxConnectionsPerEndpoint)
-                    {
-                        result = entry.Connections;
-                        break;
                     }
 
                     // Attempt to connect.
@@ -171,6 +151,17 @@ namespace Orleans.Runtime.Messaging
 
             nextConnection = (nextConnection + 1) % result.Length;
             return result[nextConnection];
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void ThrowIfRecentFailure(SiloAddress address, ConnectionEntry entry)
+        {
+            TimeSpan delta;
+            if (entry.LastFailure.HasValue
+                && (delta = DateTime.UtcNow.Subtract(entry.LastFailure.Value)) < CONNECTION_RETRY_DELAY)
+            {
+                throw new ConnectionFailedException($"Unable to connect to {address}, will retry after {delta.TotalMilliseconds}ms");
+            }
         }
 
         private ConnectionEntry GetOrCreateEntry(SiloAddress address, ref bool locked)

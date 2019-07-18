@@ -356,14 +356,6 @@ namespace Orleans
             transport.SendMessage(message);
         }
 
-        /// <summary>
-        /// For testing only.
-        /// </summary>
-        public void Reconnect()
-        {
-            transport.Reconnect();
-        }
-
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "CallbackData is IDisposable but instances exist beyond lifetime of this method so cannot Dispose yet.")]
         public void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null)
