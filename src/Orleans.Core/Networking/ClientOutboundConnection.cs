@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -24,9 +25,16 @@ namespace Orleans.Runtime.Messaging
         {
             this.messageFactory = messageFactory;
             this.messageCenter = messageCenter;
+
+            if (connection.RemoteEndPoint is IPEndPoint ipEndpoint)
+            {
+                this.TargetSilo = SiloAddress.New(ipEndpoint, 0);
+            }
         }
 
         protected override IMessageCenter MessageCenter => this.messageCenter;
+
+        private SiloAddress TargetSilo { get; }
 
         protected override void OnReceivedMessage(Message message)
         {
@@ -82,6 +90,7 @@ namespace Orleans.Runtime.Messaging
 
             if (msg.TargetSilo != null) return true;
 
+            msg.TargetSilo = this.TargetSilo;
             if (msg.TargetGrain.IsSystemTarget)
                 msg.TargetActivation = ActivationId.GetSystemActivation(msg.TargetGrain, msg.TargetSilo);
 
