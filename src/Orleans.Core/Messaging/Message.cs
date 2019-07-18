@@ -4,6 +4,7 @@ using System.Text;
 using Orleans.CodeGeneration;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Transactions;
 
@@ -25,6 +26,11 @@ namespace Orleans.Runtime
 
         [NonSerialized]
         private int? _maxRetries;
+
+        [NonSerialized]
+        private Connection connection;
+
+        public Connection Connection { get => this.connection; set => this.connection = value; }
 
         public string TargetHistory
         {

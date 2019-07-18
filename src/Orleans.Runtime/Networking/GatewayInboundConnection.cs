@@ -53,6 +53,8 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnReceivedMessage(Message msg)
         {
+            msg.Connection = this;
+
             // Don't process messages that have already timed out
             if (msg.IsExpired)
             {
@@ -79,7 +81,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            SiloAddress targetAddress = this.gateway?.TryToReroute(msg);
+            SiloAddress targetAddress = this.gateway.TryToReroute(msg);
             msg.SendingSilo = this.messageCenter.MyAddress;
 
             if (targetAddress == null)
