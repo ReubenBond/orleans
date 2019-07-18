@@ -212,20 +212,10 @@ namespace Orleans.Messaging
                                 connection.RemoteEndpoint);
                         }
                     }
-                    catch (Exception exception)
+                    catch
                     {
-                        // This exception can be thrown if the gateway connection we selected was closed since we checked (i.e., we lost the race)
-                        // If this happens, we reject if the message is targeted to a specific silo, or try again if not
-
-                        if (message.TargetSilo != null)
-                        {
-                            RejectMessage(message, string.Format("Target silo {0} is unavailable", message.TargetSilo), exception);
-                        }
-                        else
-                        {
-                            await Task.Delay(TimeSpan.FromSeconds(2));
-                            this.SendMessage(message);
-                        }
+                        message.TargetSilo = null;
+                        this.SendMessage(message);
                     }
                 }
             }
@@ -244,7 +234,7 @@ namespace Orleans.Messaging
                 var connectionTask = this.connectionManager.GetConnection(msg.TargetSilo);
                 if (connectionTask.IsCompletedSuccessfully) return connectionTask;
 
-                return ConnectAsync(msg.TargetSilo, connectionTask);
+                return ConnectAsync(msg.TargetSilo, connectionTask, msg, directGatewayMessage: true);
             }
 
             // For untargeted messages to system targets, and for unordered messages, pick a next connection in round robin fashion.
@@ -271,19 +261,18 @@ namespace Orleans.Messaging
                 var connectionTask = this.connectionManager.GetConnection(gatewayAddress);
                 if (connectionTask.IsCompletedSuccessfully) return connectionTask;
 
-                return ConnectAsync(gatewayAddress, connectionTask);
+                return ConnectAsync(gatewayAddress, connectionTask, msg, directGatewayMessage: false);
             }
 
             // Otherwise, use the buckets to ensure ordering.
             var index = msg.TargetGrain.GetHashCode_Modulo((uint)grainBuckets.Length);
-            WeakReference<Connection> weakRef;
 
             // Repeated from above, at the declaration of the grainBuckets array:
             // Requests are bucketed by GrainID, so that all requests to a grain get routed through the same bucket.
             // Each bucket holds a (possibly null) weak reference to a GatewayConnection object. That connection instance is used
             // if the WeakReference is non-null, is alive, and points to a live gateway connection. If any of these conditions is
             // false, then a new gateway is selected using the gateway manager, and a new connection established if necessary.
-            weakRef = grainBuckets[index];
+            WeakReference<Connection> weakRef = grainBuckets[index];
 
             if (weakRef != null && weakRef.TryGetTarget(out var existingConnection) && existingConnection.IsValid)
             {
@@ -339,16 +328,25 @@ namespace Orleans.Messaging
                 }
             }
 
-            async ValueTask<Connection> ConnectAsync(SiloAddress gateway, ValueTask<Connection> connectionTask)
+            async ValueTask<Connection> ConnectAsync(
+                SiloAddress gateway,
+                ValueTask<Connection> connectionTask,
+                Message message,
+                bool directGatewayMessage)
             {
+                Connection result = default;
                 try
                 {
-                    return await connectionTask;
+                    return result = await connectionTask;
                 }
-                catch
+                catch (Exception exception) when (directGatewayMessage)
                 {
-                    this.gatewayManager.MarkAsDead(gateway);
-                    throw;
+                    RejectMessage(message, string.Format("Target silo {0} is unavailable", message.TargetSilo), exception);
+                    return null;
+                }
+                finally
+                {
+                    if (result is null) this.gatewayManager.MarkAsDead(gateway);
                 }
             }
         }

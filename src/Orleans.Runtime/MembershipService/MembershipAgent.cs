@@ -192,7 +192,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private async Task StartJoining()
+        private async Task BecomeJoining()
         {
             this.log.Info(ErrorCode.MembershipJoining, "-Joining");
             try
@@ -206,7 +206,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private async Task Shutdown()
+        private async Task BecomeShuttingDown()
         {
             this.log.Info(ErrorCode.MembershipShutDown, "-Shutdown");
             try
@@ -220,7 +220,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private async Task Stop()
+        private async Task BecomeStopping()
         {
             log.Info(ErrorCode.MembershipStop, "-Stop");
             try
@@ -234,7 +234,7 @@ namespace Orleans.Runtime.MembershipService
             }
         }
 
-        private async Task KillMyself()
+        private async Task BecomeDead()
         {
             this.log.LogInformation(
                 (int)ErrorCode.MembershipKillMyself,
@@ -272,7 +272,7 @@ namespace Orleans.Runtime.MembershipService
                     this.iAmAliveTimer.Dispose();
                     this.cancellation.Cancel();
                     await Task.WhenAny(
-                        Task.Run(() => this.KillMyself()),
+                        Task.Run(() => this.BecomeDead()),
                         Task.Delay(TimeSpan.FromMinutes(1)));
                 }
 
@@ -286,7 +286,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 async Task AfterRuntimeGrainServicesStart(CancellationToken ct)
                 {
-                    await Task.Run(() => this.StartJoining());
+                    await Task.Run(() => this.BecomeJoining());
                 }
 
                 Task AfterRuntimeGrainServicesStop(CancellationToken ct) => Task.CompletedTask;
@@ -315,15 +315,15 @@ namespace Orleans.Runtime.MembershipService
 
                     if (ct.IsCancellationRequested)
                     {
-                        await Task.Run(() => this.Stop());
+                        await Task.Run(() => this.BecomeStopping());
                     }
                     else
                     {
-                        var task = await Task.WhenAny(cancellationTask, this.Shutdown());
+                        var task = await Task.WhenAny(cancellationTask, this.BecomeShuttingDown());
                         if (ReferenceEquals(task, cancellationTask))
                         {
                             this.log.LogWarning("Graceful shutdown aborted: starting ungraceful shutdown");
-                            await Task.Run(() => this.Stop());
+                            await Task.Run(() => this.BecomeStopping());
                         }
                         else
                         {
