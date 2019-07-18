@@ -214,7 +214,6 @@ namespace Orleans.Messaging
                     }
                     catch
                     {
-                        message.TargetSilo = null;
                         this.SendMessage(message);
                     }
                 }
