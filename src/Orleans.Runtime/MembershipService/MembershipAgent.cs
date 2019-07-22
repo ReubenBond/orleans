@@ -238,7 +238,7 @@ namespace Orleans.Runtime.MembershipService
         {
             this.log.LogInformation(
                 (int)ErrorCode.MembershipKillMyself,
-                "Updating status to " + nameof(SiloStatus.Dead));
+                "Updating status to Dead");
 
             try
             {

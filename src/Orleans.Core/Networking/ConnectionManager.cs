@@ -49,9 +49,9 @@ namespace Orleans.Runtime.Messaging
 
         public ImmutableArray<SiloAddress> GetConnectedAddresses() => this.connections.Keys.ToImmutableArray();
 
-        public ValueTask<Connection> GetConnection(SiloAddress siloAddress)
+        public ValueTask<Connection> GetConnection(SiloAddress endpoint)
         {
-            if (this.connections.TryGetValue(siloAddress, out var entry) && entry.Connections.Length >= MaxConnectionsPerEndpoint)
+            if (this.connections.TryGetValue(endpoint, out var entry) && entry.Connections.Length >= MaxConnectionsPerEndpoint)
             {
                 var result = entry.Connections;
                 nextConnection = (nextConnection + 1) % result.Length;
@@ -59,7 +59,7 @@ namespace Orleans.Runtime.Messaging
                 if (connection.IsValid) return new ValueTask<Connection>(connection);
             }
 
-            return GetConnectionAsync(siloAddress);
+            return GetConnectionAsync(endpoint);
         }
 
         private async ValueTask<Connection> GetConnectionAsync(SiloAddress endpoint)
