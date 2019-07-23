@@ -144,28 +144,9 @@ namespace Orleans.CodeGeneration
             var inputAssembly = options.InputAssembly.FullName;
             var referencedAssemblies = options.ReferencedAssemblies;
 
-            // Set up assembly resolver
-            var refResolver = new AssemblyResolver(inputAssembly, referencedAssemblies, false);
-
-            try
+            using (var refResolver = new MetadataLoader(inputAssembly, referencedAssemblies))
             {
-                // Set up assembly resolution.
-#if NETCOREAPP
-                AssemblyLoadContext.Default.Resolving += refResolver.AssemblyLoadContextResolving;
-#else
-                AppDomain.CurrentDomain.AssemblyResolve += refResolver.ResolveAssembly;
-#endif
-
                 return GenerateSourceForAssembly(refResolver.Assembly, options.LogLevel);
-            }
-            finally
-            {
-                refResolver.Dispose();
-#if NETCOREAPP
-                AssemblyLoadContext.Default.Resolving -= refResolver.AssemblyLoadContextResolving;
-#else
-                AppDomain.CurrentDomain.AssemblyResolve -= refResolver.ResolveAssembly;
-#endif
             }
         }
 
