@@ -3,10 +3,11 @@
     <PackageId>Microsoft.Orleans.Analyzers</PackageId>
     <Title>Microsoft Orleans Analyzers</Title>
     <Description>C# Analyzers for Microsoft Orleans.</Description>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <DevelopmentDependency>true</DevelopmentDependency>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   
   <ItemGroup>

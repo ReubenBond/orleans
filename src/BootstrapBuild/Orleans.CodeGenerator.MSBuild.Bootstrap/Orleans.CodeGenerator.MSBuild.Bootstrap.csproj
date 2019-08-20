@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <Choose>
-    <When Condition="'$(OS)' == 'Windows_NT'">
+    <When Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">
       <PropertyGroup>
         <RuntimeIdentifier>win-x64</RuntimeIdentifier>
       </PropertyGroup>
@@ -19,7 +19,7 @@
   </Choose>
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.0</TargetFramework>
+    <TargetFramework>netcoreapp2.2</TargetFramework>
     <TargetLatestRuntimePatch>false</TargetLatestRuntimePatch>
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
@@ -27,6 +27,7 @@
     <RootNamespace>Orleans.CodeGenerator.MSBuild</RootNamespace>
     <PublishDir>$(BootstrapPublishRoot)</PublishDir>
     <SourceDir>$(MSBuildThisFileDirectory)..\..\Orleans.CodeGenerator.MSBuild\</SourceDir>
+    <SelfContained>true</SelfContained>
   </PropertyGroup>
   
   <ItemGroup>
@@ -35,7 +36,7 @@
       <Link>_%(Filename)%(Extension)</Link>
       <Visible>false</Visible>
     </Compile>
-    <ProjectReference Include="..\..\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" />
+    <ProjectReference Include="..\Orleans.CodeGenerator.Bootstrap\Orleans.CodeGenerator.Bootstrap.csproj" />
   </ItemGroup>
   
   <ItemGroup>

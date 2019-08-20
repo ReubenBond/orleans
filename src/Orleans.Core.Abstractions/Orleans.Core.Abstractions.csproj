@@ -16,5 +16,13 @@
     <PackageReference Include="System.Memory" Version="$(SystemMemoryVersion)" />
     <PackageReference Include="System.Runtime.Serialization.Formatters" Version="$(SystemRuntimeVersion)" />
   </ItemGroup>
+
+  <Target Name="OrleansCodeGenBootstrapSolution" BeforeTargets="Build">
+    <PropertyGroup>
+      <_OrleansBootstrapCodeGeneratorProject>$(SourceRoot)src/BootstrapBuild/Orleans.CodeGenerator.MSBuild.Bootstrap/Orleans.CodeGenerator.MSBuild.Bootstrap.csproj</_OrleansBootstrapCodeGeneratorProject>
+    </PropertyGroup>
+    
+    <Exec Command="dotnet publish &quot;$(_OrleansBootstrapCodeGeneratorProject)&quot;" />
+  </Target>
   
 </Project>

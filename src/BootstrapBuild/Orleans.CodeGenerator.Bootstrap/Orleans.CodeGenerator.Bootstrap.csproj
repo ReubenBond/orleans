@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetLatestRuntimePatch>false</TargetLatestRuntimePatch>
+    <OutputType>Library</OutputType>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>Orleans.CodeGenerator.Bootstrap</AssemblyName>
+    <RootNamespace>Orleans.CodeGenerator</RootNamespace>
+    <SourceDir>$(MSBuildThisFileDirectory)..\..\Orleans.CodeGenerator\</SourceDir>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <Compile Include="$(SourceDir)**/*.cs" Exclude="$(SourceDir)obj/**/*.cs;$(SourceDir)bin/**/*.cs" Condition="'$(DesignTimeBuild)' != 'true'">
+      <!-- Hide the files and folder structure in the editor. -->
+      <Link>_%(Filename)%(Extension)</Link>
+      <Visible>false</Visible>
+    </Compile>
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(MicrosoftCodeAnalysisVersion)" />
+    <PackageReference Include="System.Reflection" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="System.Runtime" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="System.Runtime.Serialization.Formatters" Version="$(SystemRuntimeVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="$(MicrosoftExtensionsLoggingVersion)" />
+  </ItemGroup>
+
+</Project>
