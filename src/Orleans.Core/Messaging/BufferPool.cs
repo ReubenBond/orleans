@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.Serialization;
 using System.Threading;
 using Orleans.Configuration;
 namespace Orleans.Runtime
@@ -10,6 +12,7 @@ namespace Orleans.Runtime
         private readonly int byteBufferSize;
         private readonly int maxBuffersCount;
         private readonly bool limitBuffersCount;
+        private readonly ConcurrentDictionary<byte[], bool> bufferCheck;
         private readonly ConcurrentBag<byte[]> buffers;
         private readonly CounterStatistic allocatedBufferCounter;
         private readonly CounterStatistic checkedOutBufferCounter;
@@ -56,6 +59,7 @@ namespace Orleans.Runtime
             maxBuffersCount = maxBuffers;
             limitBuffersCount = maxBuffers > 0;
             buffers = new ConcurrentBag<byte[]>();
+            bufferCheck = new ConcurrentDictionary<byte[], bool>(ReferenceEqualsComparer<byte[]>.Instance);
 
             var globalPoolSizeStat = IntValueStatistic.FindOrCreate(StatisticNames.SERIALIZATION_BUFFERPOOL_BUFFERS_INPOOL,
                                                                     () => Count);
@@ -97,6 +101,7 @@ namespace Orleans.Runtime
 
             checkedOutBufferCounter.Increment();
 
+            bufferCheck.TryRemove(buffer, out bool ignored);
             return buffer;
         }
 
@@ -123,6 +128,10 @@ namespace Orleans.Runtime
                 }
 
                 buffers.Add(buffer);
+                if (!bufferCheck.TryAdd(buffer, true))
+                {
+                    ThrowVerySpecialException(this, buffer);
+                }
 
                 if (limitBuffersCount)
                 {
@@ -145,6 +154,25 @@ namespace Orleans.Runtime
             {
                 Release(segment.Array);
             }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowVerySpecialException(BufferPool pool, byte[] buffer)
+        {
+            throw new VerySpecialException(pool, buffer);
+        }
+    }
+
+    [Serializable]
+    internal class VerySpecialException : Exception
+    {
+        public readonly byte[] buffer;
+        public readonly BufferPool pool;
+
+        public VerySpecialException(BufferPool pool, byte[] buffer) : base("VERYSPECIALEXCEPTION!")
+        {
+            this.pool = pool;
+            this.buffer = buffer;
         }
     }
 }
