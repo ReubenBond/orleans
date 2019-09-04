@@ -21,7 +21,7 @@ namespace Orleans.Messaging
     internal class GatewayManager : IGatewayListListener, IDisposable
     {
         internal readonly IGatewayListProvider ListProvider;
-        private SafeTimer gatewayRefreshTimer;
+        private AsyncTaskSafeTimer gatewayRefreshTimer;
         private readonly Dictionary<SiloAddress, DateTime> knownDead;
         private List<SiloAddress> cachedLiveGateways;
         private DateTime lastRefreshTime;
@@ -33,7 +33,7 @@ namespace Orleans.Messaging
         private readonly object lockable;
 
         private readonly GatewayOptions gatewayOptions;
-        private bool gatewayRefreshCallInitiated;
+        private Task pendingGatewayRefresh;
         private List<SiloAddress> knownGateways;
 
         public GatewayManager(
@@ -49,7 +49,6 @@ namespace Orleans.Messaging
             this.loggerFactory = loggerFactory;
             this.connectionManager = connectionManager;
             lockable = new object();
-            gatewayRefreshCallInitiated = false;
 
             ListProvider = gatewayListProvider;
 
@@ -77,7 +76,12 @@ namespace Orleans.Messaging
             lastRefreshTime = DateTime.UtcNow;
             if (ListProvider.IsUpdatable)
             {
-                gatewayRefreshTimer = new SafeTimer(this.loggerFactory.CreateLogger<SafeTimer>(), RefreshSnapshotLiveGateways_TimerCallback, null, this.gatewayOptions.GatewayListRefreshPeriod, this.gatewayOptions.GatewayListRefreshPeriod);
+                gatewayRefreshTimer = new AsyncTaskSafeTimer(
+                    this.loggerFactory.CreateLogger<GatewayManager>(),
+                    RefreshSnapshotLiveGateways_TimerCallback,
+                    null,
+                    this.gatewayOptions.GatewayListRefreshPeriod,
+                    this.gatewayOptions.GatewayListRefreshPeriod);
             }
         }
 
@@ -181,22 +185,21 @@ namespace Orleans.Messaging
             return cachedLiveGateways;
         }
 
+        internal List<SiloAddress> GetAllGateways() => knownGateways;
+
         internal void ExpediteUpdateLiveGatewaysSnapshot()
         {
             // If there is already an expedited refresh call in place, don't call again, until the previous one is finished.
             // We don't want to issue too many Gateway refresh calls.
-            if (ListProvider == null || !ListProvider.IsUpdatable || gatewayRefreshCallInitiated) return;
+            if (ListProvider == null || !ListProvider.IsUpdatable || (pendingGatewayRefresh != null && !pendingGatewayRefresh.IsCompleted))
+            {
+                return;
+            }
 
             // Initiate gateway list refresh asynchronously. The Refresh timer will keep ticking regardless.
             // We don't want to block the client with synchronously Refresh call.
             // Client's call will fail with "No Gateways found" but we will try to refresh the list quickly.
-            gatewayRefreshCallInitiated = true;
-            var task = Task.Factory.StartNew(() =>
-            {
-                RefreshSnapshotLiveGateways_TimerCallback(null);
-                gatewayRefreshCallInitiated = false;
-            });
-            task.Ignore();
+            InitiateGatewayRefresh().Ignore();
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
@@ -204,7 +207,7 @@ namespace Orleans.Messaging
         {
             try
             {
-                UpdateLiveGatewaysSnapshot(gateways.Select(gw => gw.ToSiloAddress()), ListProvider.MaxStaleness);
+                UpdateLiveGatewaysSnapshot(gateways.Select(gw => gw.ToSiloAddress()).ToList(), ListProvider.MaxStaleness);
             }
             catch (Exception exc)
             {
@@ -212,31 +215,51 @@ namespace Orleans.Messaging
             }
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        internal void RefreshSnapshotLiveGateways_TimerCallback(object context)
+        internal Task InitiateGatewayRefresh()
         {
-            try
+            lock (this.lockable)
             {
-                if (ListProvider == null || !ListProvider.IsUpdatable) return;
-
-                // the listProvider.GetGateways() is not under lock.
-                var refreshedGateways = ListProvider.GetGateways().GetResult().Select(gw => gw.ToSiloAddress()).ToList();
-                if (logger.IsEnabled(LogLevel.Debug))
+                if (pendingGatewayRefresh is null || pendingGatewayRefresh.IsCompleted)
                 {
-                    logger.LogDebug("Discovered {GatewayCount} gateways: {Gateways}", refreshedGateways.Count, Utils.EnumerableToString(refreshedGateways));
+                    pendingGatewayRefresh = RefreshLiveGatewaysAsync();
                 }
 
-                // the next one will grab the lock.
-                UpdateLiveGatewaysSnapshot(refreshedGateways, ListProvider.MaxStaleness);
+                return pendingGatewayRefresh;
             }
-            catch (Exception exc)
+
+            async Task<List<SiloAddress>> RefreshLiveGatewaysAsync()
             {
-                logger.Error(ErrorCode.ProxyClient_GetGateways, "Exception occurred during RefreshSnapshotLiveGateways_TimerCallback -> listProvider.GetGateways()", exc);
+                try
+                {
+                    if (ListProvider == null || !ListProvider.IsUpdatable) return new List<SiloAddress>();
+
+                    // the listProvider.GetGateways() is not under lock.
+                    var refreshedGatewayUris = await ListProvider.GetGateways();
+                    var refreshedGateways = refreshedGatewayUris.Select(gw => gw.ToSiloAddress()).ToList();
+                    if (logger.IsEnabled(LogLevel.Debug))
+                    {
+                        logger.LogDebug("Discovered {GatewayCount} gateways: {Gateways}", refreshedGateways.Count, Utils.EnumerableToString(refreshedGateways));
+                    }
+
+                    // the next one will grab the lock.
+                    return UpdateLiveGatewaysSnapshot(refreshedGateways, ListProvider.MaxStaleness);
+                }
+                catch (Exception exc)
+                {
+                    logger.Error(ErrorCode.ProxyClient_GetGateways, "Exception occurred during RefreshSnapshotLiveGateways_TimerCallback -> listProvider.GetGateways()", exc);
+                    return cachedLiveGateways;
+                }
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
+        internal Task RefreshSnapshotLiveGateways_TimerCallback(object context)
+        {
+            return InitiateGatewayRefresh();
+        }
+
         // This function is called asynchronously from gateway refresh timer.
-        private void UpdateLiveGatewaysSnapshot(IEnumerable<SiloAddress> refreshedGateways, TimeSpan maxStaleness)
+        private List<SiloAddress> UpdateLiveGatewaysSnapshot(List<SiloAddress> refreshedGateways, TimeSpan maxStaleness)
         {
             // this is a short lock, protecting the access to knownDead and cachedLiveGateways.
             lock (lockable)
@@ -299,6 +322,8 @@ namespace Orleans.Messaging
                 }
 
                 this.AbortEvictedGatewayConnections(live);
+
+                return cachedLiveGateways;
             }
         }
 

@@ -223,7 +223,7 @@ namespace Orleans.Messaging
         private ValueTask<Connection> GetGatewayConnection(Message msg)
         {
             // If there's a specific gateway specified, use it
-            if (msg.TargetSilo != null && gatewayManager.GetLiveGateways().Contains(msg.TargetSilo))
+            if (msg.TargetSilo != null && gatewayManager.GetAllGateways().Contains(msg.TargetSilo))
             {
                 var connectionTask = this.connectionManager.GetConnection(msg.TargetSilo);
                 if (connectionTask.IsCompletedSuccessfully) return connectionTask;
