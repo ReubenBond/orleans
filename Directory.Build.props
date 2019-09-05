@@ -22,6 +22,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="$(SourceRoot)assets/$(PackageIcon)" Pack="true" Visible="false" PackagePath="/" Private="all" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="$(SourceRoot)assets/logo_128.png" Pack="true" Visible="false" PackagePath="/" />
   </ItemGroup>
 
