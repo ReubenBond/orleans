@@ -8,9 +8,7 @@ using Orleans.CodeGenerator;
 using Orleans.Serialization;
 using Orleans.Runtime;
 using Orleans.Metadata;
-#if NETCOREAPP
 using System.Runtime.Loader;
-#endif
 
 namespace Orleans.CodeGeneration
 {
@@ -44,11 +42,7 @@ namespace Orleans.CodeGeneration
             // Generate source
             Console.WriteLine($"Orleans-CodeGen - Generating file {outputFileName}");
 
-#if !NETCOREAPP
-            var generatedCode = GenerateCodeInAppDomain(options);
-#else
             var generatedCode = GenerateCodeInternal(options);
-#endif
             
             using (var sourceWriter = new StreamWriter(outputFileName))
             {
@@ -95,47 +89,6 @@ namespace Orleans.CodeGeneration
                 appDomain.SetData("APP_CONTEXT_DEPS_FILES", string.Join(";", depsFiles));
             }
         }
-
-#if !NETCOREAPP
-        private static string GenerateCodeInAppDomain(CodeGenOptions options)
-        {
-            AppDomain appDomain = null;
-            try
-            {
-                var assembly = typeof(CodeGenerator).Assembly;
-
-                // Create AppDomain.
-                var thisAssemblyPath = new Uri(assembly.CodeBase).LocalPath;
-                var appDomainSetup = new AppDomainSetup
-                {
-                    ApplicationBase = Path.GetDirectoryName(thisAssemblyPath),
-                    DisallowBindingRedirects = false,
-                    ConfigurationFile = AppDomain.CurrentDomain.SetupInformation.ConfigurationFile
-                };
-                appDomain = AppDomain.CreateDomain("Orleans-CodeGen Domain", null, appDomainSetup);
-                
-                // Create an instance in the new app domain.
-                var generator =
-                    (CodeGenerator)
-                    appDomain.CreateInstanceAndUnwrap(
-                        assembly.FullName,
-                        // ReSharper disable once AssignNullToNotNullAttribute
-                        typeof(CodeGenerator).FullName);
-
-                // Call the code generation method.
-                return generator.GenerateCodeInCurrentAppDomain(options);
-            }
-            finally
-            {
-                if (appDomain != null) AppDomain.Unload(appDomain); // Unload the AppDomain
-            }
-        }
-
-        private string GenerateCodeInCurrentAppDomain(CodeGenOptions options)
-        {
-            return GenerateCodeInternal(options);
-        }
-#endif
 
         private static string GenerateCodeInternal(CodeGenOptions options)
         {

@@ -12,27 +12,18 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(OrleansCodeGeneratorAssembly)' == ''">
-    <CoreAssembly20>$(MSBuildThisFileDirectory)..\tasks\netcoreapp2.0\Orleans.CodeGeneration.Build.dll</CoreAssembly20>
-    <CoreAssembly21>$(MSBuildThisFileDirectory)..\tasks\netcoreapp2.1\Orleans.CodeGeneration.Build.dll</CoreAssembly21>
-    <FullAssembly>$(MSBuildThisFileDirectory)..\tasks\net461\Orleans.CodeGeneration.Build.exe</FullAssembly>
-
-    <CoreAssembly Condition="$(TargetFramework.Equals('netcoreapp2.0')) or $(TargetFramework.Equals('netstandard2.0'))">$(CoreAssembly20)</CoreAssembly>
-    <CoreAssembly Condition="$(TargetFramework.Equals('netcoreapp2.1')) or $(TargetFramework.Equals('netstandard2.1'))">$(CoreAssembly21)</CoreAssembly>
-    <!-- Fallback to 2.0 assembly if needed -->
-    <CoreAssembly Condition="$(CoreAssembly) == ''">$(CoreAssembly20)</CoreAssembly>
+    <CoreAssembly>$(MSBuildThisFileDirectory)..\tasks\netcoreapp3.0\Orleans.CodeGeneration.Build.dll</CoreAssembly>
 
     <!-- Specify the assembly containing the MSBuild tasks. -->
     <MSBuildIsCore Condition="'$(MSBuildRuntimeType)' == 'Core' or '$(OS)' != 'Windows_NT'">true</MSBuildIsCore>
-    <TaskAssembly Condition="'$(MSBuildIsCore)' == 'true'">$(CoreAssembly)</TaskAssembly>
-    <TaskAssembly Condition="'$(MSBuildIsCore)' != 'true'">$(FullAssembly)</TaskAssembly>
+    <TaskAssembly Condition="'$(TaskAssembly)' == ''">$(CoreAssembly)</TaskAssembly>
 
     <!-- When the MSBuild host is full-framework, we defer to PATH for dotnet -->
     <DotNetHost Condition="'$(MSBuildIsCore)' != 'true'">dotnet</DotNetHost>
 
     <!-- Specify the assembly containing the code generator. -->
     <TargetIsCore Condition="$(TargetFramework.StartsWith('netcore')) or $(TargetFramework.StartsWith('netstandard')) or '$(OS)' != 'Windows_NT'">true</TargetIsCore>
-    <GeneratorAssembly Condition="'$(TargetIsCore)' == 'true'">$(CoreAssembly)</GeneratorAssembly>
-    <GeneratorAssembly Condition="'$(TargetIsCore)' != 'true'">$(FullAssembly)</GeneratorAssembly>
+    <GeneratorAssembly Condition="'$(GeneratorAssembly)' == ''">$(CoreAssembly)</GeneratorAssembly>
   </PropertyGroup>
 
   <PropertyGroup>

@@ -7,9 +7,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <TargetFramework />
-    <TargetFrameworks>netcoreapp2.0;netcoreapp2.1;net461;netcoreapp3.0</TargetFrameworks>
-    <TargetFrameworks Condition="'$(OS)' != 'Windows_NT'">netcoreapp2.0;netcoreapp2.1;netcoreapp3.0</TargetFrameworks>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <BuildOutputTargetFolder>tasks</BuildOutputTargetFolder>
