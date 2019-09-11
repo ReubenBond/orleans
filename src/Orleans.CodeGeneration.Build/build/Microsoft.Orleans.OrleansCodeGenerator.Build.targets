@@ -18,8 +18,9 @@
     <MSBuildIsCore Condition="'$(MSBuildRuntimeType)' == 'Core' or '$(OS)' != 'Windows_NT'">true</MSBuildIsCore>
     <TaskAssembly Condition="'$(TaskAssembly)' == ''">$(CoreAssembly)</TaskAssembly>
 
-    <!-- When the MSBuild host is full-framework, we defer to PATH for dotnet -->
-    <DotNetHost Condition="'$(MSBuildIsCore)' != 'true'">dotnet</DotNetHost>
+    <DotNetHost Condition="'$(DotNetFromPath)' == 'true'">dotnet</DotNetHost>
+    <DotNetHost Condition="'$(Orleans_MSBuildIsCore)' != 'true'">dotnet</DotNetHost>
+    <DotNetHost Condition="'$(DotNetHost)' != ''">$(DotNetHost)</DotNetHost>
 
     <!-- Specify the assembly containing the code generator. -->
     <TargetIsCore Condition="$(TargetFramework.StartsWith('netcore')) or $(TargetFramework.StartsWith('netstandard')) or '$(OS)' != 'Windows_NT'">true</TargetIsCore>

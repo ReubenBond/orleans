@@ -11,7 +11,6 @@
   <PropertyGroup Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' ">
     <Asm>Orleans.CodeGenerator.MSBuild.Bootstrap</Asm>
     <OrleansCodeGenCoreAssembly>$(MSBuildThisFileDirectory)../src/BootstrapBuild/$(Asm)/bin/$(Configuration)/publish/netcoreapp3.0/$(Asm).dll</OrleansCodeGenCoreAssembly>
-    <OrleansCodeGenTasksAssembly>$(MSBuildThisFileDirectory)../src/BootstrapBuild/$(Asm)/bin/$(Configuration)/publish/nnetcoreapp3.0/Orleans.CodeGenerator.MSBuild.Tasks.dll</OrleansCodeGenTasksAssembly>
     <OrleansBootstrapBuildProject>$(MSBuildThisFileDirectory)../src/BootstrapBuild/Orleans.CodeGenerator.MSBuild.Bootstrap/Orleans.CodeGenerator.MSBuild.Bootstrap.csproj</OrleansBootstrapBuildProject>
   </PropertyGroup>
 
