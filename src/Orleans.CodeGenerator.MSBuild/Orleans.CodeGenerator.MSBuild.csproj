@@ -69,7 +69,6 @@
   
   <ItemGroup>
     <ProjectReference Include="..\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" PrivateAssets="all" Publish="true" />
-    <ProjectReference Include="..\Orleans.CodeGenerator.MSBuild.Tasks\Orleans.CodeGenerator.MSBuild.Tasks.csproj" PrivateAssets="all" Publish="true" />
   </ItemGroup>
 
   <Target Name="PostBuildPublish" AfterTargets="Build">

@@ -25,7 +25,6 @@
       <Visible>false</Visible>
     </Compile>
     <ProjectReference Include="..\..\Orleans.CodeGenerator\Orleans.CodeGenerator.csproj" PrivateAssets="all" />
-    <ProjectReference Include="..\..\Orleans.CodeGenerator.MSBuild.Tasks\Orleans.CodeGenerator.MSBuild.Tasks.csproj" PrivateAssets="all" />
   </ItemGroup>
   
   <ItemGroup>
