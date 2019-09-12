@@ -51,9 +51,9 @@ namespace Orleans.CodeGenerator
         /// <param name="loggerFactory">The logger factory.</param>
         public RoslynCodeGenerator(IApplicationPartManager partManager, ILoggerFactory loggerFactory)
         {
-            var serializerFeature = partManager.CreateAndPopulateFeature<SerializerFeature>();
-            var grainClassFeature = partManager.CreateAndPopulateFeature<GrainClassFeature>();
-            var grainInterfaceFeature = partManager.CreateAndPopulateFeature<GrainInterfaceFeature>();
+            var serializerFeature = new SerializerFeature();// partManager.CreateAndPopulateFeature<SerializerFeature>();
+            var grainClassFeature = new GrainClassFeature();// partManager.CreateAndPopulateFeature<GrainClassFeature>();
+            var grainInterfaceFeature = new GrainInterfaceFeature();// partManager.CreateAndPopulateFeature<GrainInterfaceFeature>();
 
             this.knownTypes = GetKnownTypes();
             this.serializableTypes = new SerializerGenerationManager(GetExistingSerializers(), loggerFactory);
@@ -153,8 +153,11 @@ namespace Orleans.CodeGenerator
         /// </returns>
         public string GenerateSourceForAssembly(Assembly input)
         {
-            if (input.GetCustomAttributes<OrleansCodeGenerationTargetAttribute>().Any()
-                || input.GetCustomAttributes<SkipCodeGenerationAttribute>().Any())
+            var skipCodeGeneration = input.CustomAttributes
+                .Any(a =>
+                a.AttributeType == typeof(OrleansCodeGenerationTargetAttribute)
+                || a.AttributeType == typeof(SkipCodeGenerationAttribute));
+            if (skipCodeGeneration)
             {
                 return string.Empty;
             }
@@ -183,9 +186,12 @@ namespace Orleans.CodeGenerator
             var knownAssemblies =
                 new Dictionary<Assembly, KnownAssemblyAttribute>(
                     assemblies.ToDictionary(k => k, k => default(KnownAssemblyAttribute)));
-            foreach (var attribute in assemblies.SelectMany(asm => asm.GetCustomAttributes<KnownAssemblyAttribute>()))
+            foreach (var attribute in assemblies.SelectMany(asm => asm.CustomAttributes.Where(a => a.AttributeType == typeof(KnownAssemblyAttribute))))
             {
-                knownAssemblies[attribute.Assembly] = attribute;
+                var type = attribute.ConstructorArguments.First().Value as Type;
+                var treatTypesAsSerializableArg = attribute.NamedArguments.FirstOrDefault(a => a.MemberName == nameof(KnownAssemblyAttribute.TreatTypesAsSerializable)).TypedValue.Value;
+                var treatTypesAsSerializable = treatTypesAsSerializableArg is bool value ? value : false;
+                knownAssemblies[type.Assembly] = new KnownAssemblyAttribute(type) { TreatTypesAsSerializable = treatTypesAsSerializable };
             }
 
             if (logger.IsEnabled(LogLevel.Information))

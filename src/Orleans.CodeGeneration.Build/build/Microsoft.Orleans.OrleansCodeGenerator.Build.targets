@@ -18,10 +18,6 @@
     <MSBuildIsCore Condition="'$(MSBuildRuntimeType)' == 'Core' or '$(OS)' != 'Windows_NT'">true</MSBuildIsCore>
     <TaskAssembly Condition="'$(TaskAssembly)' == ''">$(CoreAssembly)</TaskAssembly>
 
-    <DotNetHost Condition="'$(DotNetFromPath)' == 'true'">dotnet</DotNetHost>
-    <DotNetHost Condition="'$(Orleans_MSBuildIsCore)' != 'true'">dotnet</DotNetHost>
-    <DotNetHost Condition="'$(DotNetHost)' != ''">$(DotNetHost)</DotNetHost>
-
     <!-- Specify the assembly containing the code generator. -->
     <TargetIsCore Condition="$(TargetFramework.StartsWith('netcore')) or $(TargetFramework.StartsWith('netstandard')) or '$(OS)' != 'Windows_NT'">true</TargetIsCore>
     <GeneratorAssembly Condition="'$(GeneratorAssembly)' == ''">$(CoreAssembly)</GeneratorAssembly>
@@ -50,6 +46,8 @@
       <IntermediateOutputPath>$(IntermediateOutputPath)codegen\</IntermediateOutputPath>
       <InputAssembly>$(IntermediateOutputPath)$(TargetName)$(TargetExt)</InputAssembly>
       <ArgsFile>$(IntermediateOutputPath)$(TargetName).orleans.g.args.txt</ArgsFile>
+      <DotNetHost Condition="'$(_dotnet)' != ''">$(_dotnet)</DotNetHost>
+      <DotNetHost Condition="'$(DotNetFromPath)' == 'true' or '$(DotNetHost)' == ''">dotnet</DotNetHost>
     </PropertyGroup>
     <Orleans.CodeGeneration.GetDotNetHost Condition="'$(DotNetHost)' == '' and '$(TargetIsCore)' == 'true' ">
       <Output TaskParameter="DotNetHost" PropertyName="DotNetHost" />
@@ -71,14 +69,10 @@
     <WriteLinesToFile Overwrite="true" File="$(ArgsFile)" Lines="@(CodeGenArgs)"/>
     <Message Text="[OrleansCodeGeneration] - Precompiled assembly"/>
 
-    <!-- If building a .NET Core or .NET Standard target, use dotnet to execute the process. -->
-    <Exec Command="&quot;$(DotNetHost)&quot; &quot;$(GeneratorAssembly)&quot; &quot;@$(ArgsFile)&quot;" Outputs="$(OutputFileName)" Condition=" '$(TargetIsCore)' == 'true' or $(OS) != 'Windows_NT' ">
-      <Output TaskParameter="Outputs" ItemName="Compile" />
-      <Output TaskParameter="Outputs" ItemName="FileWrites" />
-    </Exec>
-
-    <!-- If building a Full .NET target, execute the process directly. -->
-    <Exec Command="&quot;$(GeneratorAssembly)&quot; &quot;@$(ArgsFile)&quot;" Outputs="$(OutputFileName)" Condition=" '$(TargetIsCore)' != 'true' and $(OS) == 'Windows_NT' ">
+    <PropertyGroup>
+      <DotNetHostTrimmed>$(DotNetHost.Trim('"'))</DotNetHostTrimmed>
+    </PropertyGroup>
+    <Exec Command="&quot;$(DotNetHostTrimmed)&quot; &quot;$(GeneratorAssembly)&quot; &quot;@$(ArgsFile)&quot;" Outputs="$(OutputFileName)">
       <Output TaskParameter="Outputs" ItemName="Compile" />
       <Output TaskParameter="Outputs" ItemName="FileWrites" />
     </Exec>

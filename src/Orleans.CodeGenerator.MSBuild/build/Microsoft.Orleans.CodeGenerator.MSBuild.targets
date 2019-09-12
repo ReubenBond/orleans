@@ -15,6 +15,7 @@
     <Orleans_CoreAssembly Condition="'$(OrleansCodeGenCoreAssembly)' != ''">$(OrleansCodeGenCoreAssembly)</Orleans_CoreAssembly>
     <Orleans_CoreAssembly Condition="'$(Orleans_CoreAssembly)' == ''">$(MSBuildThisFileDirectory)..\tasks\$(Orleans_CodeGeneratorTargetFramework)\Orleans.CodeGenerator.MSBuild.dll</Orleans_CoreAssembly>
 
+    <Orleans_DotNetHost Condition="'$(_dotnet)' != ''">$(_dotnet)</Orleans_DotNetHost>
     <Orleans_DotNetHost Condition="'$(DotNetFromPath)' == 'true'">dotnet</Orleans_DotNetHost>
     <Orleans_DotNetHost Condition="'$(Orleans_MSBuildIsCore)' != 'true'">dotnet</Orleans_DotNetHost>
     <Orleans_DotNetHost Condition="'$(DotNetHost)' != ''">$(DotNetHost)</Orleans_DotNetHost>
