@@ -262,7 +262,7 @@ namespace Orleans.Serialization
 
         public void Write(DateTime dt)
         {
-            this.Write(dt.ToBinary());
+            this.Write(dt.ToUniversalTime().ToBinary());
         }
 
         public void Write(Guid id)
