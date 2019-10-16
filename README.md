@@ -13,33 +13,68 @@ Orleans takes familiar concepts like objects, interfaces, async/await, and try/c
 
 It was created by [Microsoft Research](http://research.microsoft.com/projects/orleans/) and introduced the [Virtual Actor Model](http://research.microsoft.com/apps/pubs/default.aspx?id=210931) as a novel approach to building a new generation of distributed systems for the Cloud era. The core contribution of Orleans is a programming model which tames the complexity inherent to highly-parallel distributed systems without restricting capabilities or imposing onerous constraints on the developer.
 
-The fundamental building block in any Orleans application is a *grain*. Grains are entities comprising user-defined identity, behavior, and state. Grain identities are user-defined keys which make make Grains always available for invocation. Grains can be invoked by other grains or by external clients such as Web frontends, via strongly-typed communication interfaces (contracts). Each grain is an instance of a class which implements one or more of these communication interfaces. The ability for grains to invoke each other directly makes it possible to 
+< insert grain diagram (gran = identity + behavior + state)>
 
-Grains can have volatile and/or persistent state that can be stored in any storage system. As such, grains implicitly partition application state, enabling automatic scalability and simplifies recovery from failures.
+The fundamental building block in any Orleans application is a *grain*. Grains are entities comprising user-defined identity, behavior, and state. Grain identities are user-defined keys which make make Grains always available for invocation. Grains can be invoked by other grains or by external clients such as Web frontends, via strongly-typed communication interfaces (contracts). Each grain is an instance of a class which implements one or more of these communication interfaces. *** The ability for grains to invoke each other directly makes it possible to ****
 
-* managed lifecycle
+Grains can have volatile and/or persistent state that can be stored in any storage system. As such, grains implicitly partition application state, enabling automatic scalability and simplifies recovery from failures. Grain state is kept in memory while the grain is active, leading to lower latency and less load on data stores.
 
-* Runtime works in concert with programming model to ...
+< insert managed lifecycle diagram? >
 
-* Tie factors in together to motivate how these enabled scalable, fault-tolerant applications
+Instantiation of grains is automatically performed on demand by the Orleans runtime. Grains which are not used are automatically removed from memory to free up resources. This is possible because of their stable identity, which allows invoking grains whether they are already loaded into memory or not. This also allows for transparent recovery from failure because the caller does not need to know on which server a grain is instantiated on at any point in time. Grains have a managed lifecycle, with the Orleans runtime responsible for activating/deactivating, and placing/locating grains as needed. This allows the developer to write code as if all grains were always in-memory.
+
+Taken together, the stable identity, statefulness, and managed lifecycle of Grains are core factors that make systems built on Orleans scalable, performant, &amp; reliable without forcing developers to write complex distributed systems code.
+
+-----
+
+Example: IoT Cloud Backend.
+
+Consider a cloud backend for an Internet of Things system. This application needs to process incoming device data, filter, aggregate, and process this information and enable sending commands to devices. In Orleans it is natural to model each device with a grain which becomes a *digital twin* of the physical device it corresponds to. These grains keep the latest device data in memory so that it can be quickly queried and processed without the need to communicate with the device directly. By observing streams of time-series data from the device, the grain can detect changes in conditions, such as measurements exceeding a threshold, and trigger an action.
+
+A simple thermostat could be modeled as follows:
+
+``` C#
+public interface IThermostat : IGrainWithStringKey
+{
+  Task<Command> OnUpdate(TemperatureUpdate update);
+}
+```
+
+Events arriving from the thermostat from a Web frontend can be sent to its grain by invoking the `OnUpdate` method which optionally returns a command back to the device.
 
 
-Each grain has a stable id through which it is always accessible. The runtime ensures that a grain is always available to handle calls and distributes the grains over a cluster of servers.
+``` C#
+var thermostat = client.GetGrain<IThermostat>(id);
+return await thermostat.OnUpdate(update);
+```
 
-The Orleans runtime ensures that grains are available whenever they receive a call. In order to accomplish this, the runtime forms a cluster of servers and balances load amongst them. When a grain receives a call, the runtime ensures
+The same thermostat can implement a querying interface for control systems to interact with it:
 
-Orleans is a framework that provides a straight-forward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns.
+``` C#
+public interface IThermostatControl : IGrainWithStringKey
+{
+  Task<TemperatureUpdate> GetLatest();
 
+  Task<ThermostatConfiguration> GetConfiguration();
+  Task UpdateConfiguration(ThermostatConfiguration config);
+}
+```
 
-   //offers a straightforward way to express complex application logic in a comprehendible form.
+These two interfaces (`IThermostat` and `IThermostatControl`) are implemented by a single implementation class:
 
- which are scalable, resilient, and 
+``` C#
+public class ThermostatGrain : Grain, IThermostat, IThermostatControl
+{
 
+}
+```
 
-and designed for use in the cloud.  Orleans has been used extensively running in Microsoft Azure by several Microsoft product groups, most notably by [343 Industries](https://www.halowaypoint.com/) as a platform for Halo
+-- Runtime
+s
 
+## Features
 
-
+s
 
 Installation
 ============
