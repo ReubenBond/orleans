@@ -5,13 +5,41 @@
 [![NuGet](https://img.shields.io/nuget/v/Microsoft.Orleans.Core.svg?style=flat)](http://www.nuget.org/profiles/Orleans)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/dotnet/orleans?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
-Orleans is a framework that provides a straight-forward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns. 
+Orleans is a cross-platform framework for building robust, scalable distributed applications.
 
-It was created by [Microsoft Research](http://research.microsoft.com/projects/orleans/) 
-implementing the [Virtual Actor Model](http://research.microsoft.com/apps/pubs/default.aspx?id=210931) 
-and designed for use in the cloud. 
+It builds on the developer productivity of .NET and brings it to the world of distributed applications such as cloud services. Orleans scales from a single on-premises server to globally distributed, highly-available applications in the cloud.
 
-Orleans has been used extensively running in Microsoft Azure by several Microsoft product groups, most notably by [343 Industries](https://www.halowaypoint.com/) as a platform for all of Halo 4 and Halo 5 cloud services, as well as by [a number of other projects and companies](http://dotnet.github.io/orleans/Community/Who-Is-Using-Orleans.html).
+Orleans takes familiar concepts like objects, interfaces, async/await, and try/catch and extends them to multi-server environments. As such, it helps developers experienced with single-server applications transition to building resilient, scalable cloud services and other distributed applications. For this reason, Orleans has often been referred to as "Distributed .NET".
+
+It was created by [Microsoft Research](http://research.microsoft.com/projects/orleans/) and introduced the [Virtual Actor Model](http://research.microsoft.com/apps/pubs/default.aspx?id=210931) as a novel approach to building a new generation of distributed systems for the Cloud era. The core contribution of Orleans is a programming model which tames the complexity inherent to highly-parallel distributed systems without restricting capabilities or imposing onerous constraints on the developer.
+
+The fundamental building block in any Orleans application is a *grain*. Grains are entities comprising user-defined identity, behavior, and state. Grain identities are user-defined keys which make make Grains always available for invocation. Grains can be invoked by other grains or by external clients such as Web frontends, via strongly-typed communication interfaces (contracts). Each grain is an instance of a class which implements one or more of these communication interfaces. The ability for grains to invoke each other directly makes it possible to 
+
+Grains can have volatile and/or persistent state that can be stored in any storage system. As such, grains implicitly partition application state, enabling automatic scalability and simplifies recovery from failures.
+
+* managed lifecycle
+
+* Runtime works in concert with programming model to ...
+
+* Tie factors in together to motivate how these enabled scalable, fault-tolerant applications
+
+
+Each grain has a stable id through which it is always accessible. The runtime ensures that a grain is always available to handle calls and distributes the grains over a cluster of servers.
+
+The Orleans runtime ensures that grains are available whenever they receive a call. In order to accomplish this, the runtime forms a cluster of servers and balances load amongst them. When a grain receives a call, the runtime ensures
+
+Orleans is a framework that provides a straight-forward approach to building distributed high-scale computing applications, without the need to learn and apply complex concurrency or other scaling patterns.
+
+
+   //offers a straightforward way to express complex application logic in a comprehendible form.
+
+ which are scalable, resilient, and 
+
+
+and designed for use in the cloud.  Orleans has been used extensively running in Microsoft Azure by several Microsoft product groups, most notably by [343 Industries](https://www.halowaypoint.com/) as a platform for Halo
+
+
+
 
 Installation
 ============
