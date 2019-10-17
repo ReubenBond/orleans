@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/dotnet/orleans/blob/gh-pages/assets/logo_full.png" alt="Orleans logo" width="600px"> 
+  <img src="https://raw.githubusercontent.com/dotnet/orleans/gh-pages/assets/logo_full.png" alt="Orleans logo" width="600px"> 
 </p>
 
 [![NuGet](https://img.shields.io/nuget/v/Microsoft.Orleans.Core.svg?style=flat)](http://www.nuget.org/profiles/Orleans)
@@ -15,17 +15,15 @@ It was created by [Microsoft Research](http://research.microsoft.com/projects/or
 
 < insert grain diagram (gran = identity + behavior + state)>
 
-The fundamental building block in any Orleans application is a *grain*. Grains are entities comprising user-defined identity, behavior, and state. Grain identities are user-defined keys which make make Grains always available for invocation. Grains can be invoked by other grains or by external clients such as Web frontends, via strongly-typed communication interfaces (contracts). Each grain is an instance of a class which implements one or more of these communication interfaces. *** The ability for grains to invoke each other directly makes it possible to ****
+The fundamental building block in any Orleans application is a *grain*. Grains are entities comprising user-defined identity, behavior, and state. Grain identities are user-defined keys which make make Grains always available for invocation. Grains can be invoked by other grains or by external clients such as Web frontends, via strongly-typed communication interfaces (contracts). Each grain is an instance of a class which implements one or more of these interfaces.
 
-Grains can have volatile and/or persistent state that can be stored in any storage system. As such, grains implicitly partition application state, enabling automatic scalability and simplifies recovery from failures. Grain state is kept in memory while the grain is active, leading to lower latency and less load on data stores.
+Grains can have volatile and/or persistent state that can be stored in any storage system. As such, grains implicitly partition application state, enabling automatic scalability and simplifying recovery from failures. Grain state is kept in memory while the grain is active, leading to lower latency and less load on data stores.
 
 < insert managed lifecycle diagram? >
 
 Instantiation of grains is automatically performed on demand by the Orleans runtime. Grains which are not used are automatically removed from memory to free up resources. This is possible because of their stable identity, which allows invoking grains whether they are already loaded into memory or not. This also allows for transparent recovery from failure because the caller does not need to know on which server a grain is instantiated on at any point in time. Grains have a managed lifecycle, with the Orleans runtime responsible for activating/deactivating, and placing/locating grains as needed. This allows the developer to write code as if all grains were always in-memory.
 
 Taken together, the stable identity, statefulness, and managed lifecycle of Grains are core factors that make systems built on Orleans scalable, performant, &amp; reliable without forcing developers to write complex distributed systems code.
-
------
 
 ## Example: Internet of Things Backend
 
@@ -131,8 +129,7 @@ public async Task UpdateConfiguration(ThermostatConfiguration config)
 }
 ```
 
--- Runtime
-s
+#
 
 ## Features
 
