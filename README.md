@@ -27,21 +27,20 @@ Taken together, the stable identity, statefulness, and managed lifecycle of Grai
 
 -----
 
-Example: IoT Cloud Backend.
+## Example: Internet of Things Backend
 
-Consider a cloud backend for an Internet of Things system. This application needs to process incoming device data, filter, aggregate, and process this information and enable sending commands to devices. In Orleans it is natural to model each device with a grain which becomes a *digital twin* of the physical device it corresponds to. These grains keep the latest device data in memory so that it can be quickly queried and processed without the need to communicate with the device directly. By observing streams of time-series data from the device, the grain can detect changes in conditions, such as measurements exceeding a threshold, and trigger an action.
+Consider a cloud backend for an [Internet of Things](https://en.wikipedia.org/wiki/Internet_of_things) system. This application needs to process incoming device data, filter, aggregate, and process this information and enable sending commands to devices. In Orleans it is natural to model each device with a grain which becomes a *digital twin* of the physical device it corresponds to. These grains keep the latest device data in memory so that it can be quickly queried and processed without the need to communicate with the device directly. By observing streams of time-series data from the device, the grain can detect changes in conditions, such as measurements exceeding a threshold, and trigger an action.
 
 A simple thermostat could be modeled as follows:
 
 ``` C#
 public interface IThermostat : IGrainWithStringKey
 {
-  Task<Command> OnUpdate(TemperatureUpdate update);
+  Task<List<Command>> OnUpdate(ThermostatStatus update);
 }
 ```
 
 Events arriving from the thermostat from a Web frontend can be sent to its grain by invoking the `OnUpdate` method which optionally returns a command back to the device.
-
 
 ``` C#
 var thermostat = client.GetGrain<IThermostat>(id);
@@ -53,9 +52,8 @@ The same thermostat can implement a querying interface for control systems to in
 ``` C#
 public interface IThermostatControl : IGrainWithStringKey
 {
-  Task<TemperatureUpdate> GetLatest();
+  Task<ThermostatStatus> GetLatest();
 
-  Task<ThermostatConfiguration> GetConfiguration();
   Task UpdateConfiguration(ThermostatConfiguration config);
 }
 ```
@@ -65,7 +63,71 @@ These two interfaces (`IThermostat` and `IThermostatControl`) are implemented by
 ``` C#
 public class ThermostatGrain : Grain, IThermostat, IThermostatControl
 {
+  private ThermostatStatus _status;
+  private List<Command> _commands;
 
+  public Task<List<Command>> OnUpdate(ThermostatStatus status)
+  {
+    _status = status;
+    var result = _commands;
+    _commands = new List<Command>();
+    return Task.FromResult(result);
+  }
+
+  public Task<ThermostatStatus> GetLatest() => Task.FromResult(_status);
+  
+  public Task UpdateConfiguration(ThermostatConfiguration config)
+  {
+    _commands.Add(new ConfigUpdateCommand(config));
+    return Task.CompletedTask;
+  }
+}
+```
+
+The grain class above does not persist its state. In order to persist state using a configured storage provider, some changes must be made. First, we will define a class to hold the state.
+
+``` C#
+[Serializable]
+public class ThermostatState
+{
+  public ThermostatStatus Status { get; set; }
+  public List<Command> Commands { get; set; } = new List<Command>();
+}
+```
+
+Next, inject the persistent state into the grain's constructor:
+
+```C#
+public class ThermostatGrain : Grain, IThermostat, IThermostatControl
+{
+  IPersistentState<ThermostatState> _state;
+
+  public ThermostatGrain(IPersistentState<ThermostatState> state) => _state = state;
+}
+```
+
+Now we can rewrite the grain methods to access and update the persistent state:
+
+```C#
+public async Task<List<Command>> OnUpdate(ThermostatStatus status)
+{
+  var state = _state.Value;
+  state.Status = status;
+  var result = state.Commands;
+  state.Commands = new List<Command>();
+
+  // Persist the updated state.
+  await _state.WriteStateAsync();
+
+  return result;
+}
+
+public Task<ThermostatStatus> GetLatest() => Task.FromResult(_state.Value.Status);
+
+public async Task UpdateConfiguration(ThermostatConfiguration config)
+{
+  _state.Value.Commands.Add(new ConfigUpdateCommand(config));
+  await _state.WriteStateAsync();
 }
 ```
 
@@ -74,10 +136,11 @@ s
 
 ## Features
 
-s
+### Persistence
 
-Installation
-============
+### Transactions
+
+## Packages
 
 Installation is performed via [NuGet](https://www.nuget.org/packages?q=orleans). 
 There are several packages, one for each different project type (interfaces, grains, silo, and client).
@@ -101,7 +164,7 @@ In the client project:
 PM> Install-Package Microsoft.Orleans.Client
 ```
 
-### Official Builds
+## Official Builds
 
 The stable production-quality release is located [here](https://github.com/dotnet/orleans/releases/latest).
 
@@ -114,11 +177,12 @@ To use nightly builds in your project, add the MyGet feed using either of the fo
 1. Changing the .csproj file to include this section:
 
 ```xml
-    <RestoreSources>
-      $(RestoreSources);
-      https://dotnet.myget.org/F/orleans-ci/api/v3/index.json;
-    </RestoreSources>
+  <RestoreSources>
+    $(RestoreSources);
+    https://dotnet.myget.org/F/orleans-ci/api/v3/index.json;
+  </RestoreSources>
 ```
+
 or
 
 2. Creating a `NuGet.config` file in the solution directory with the following contents:
@@ -127,74 +191,31 @@ or
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
  <packageSources>
-    <clear />
-    <add key="orleans-ci" value="https://dotnet.myget.org/F/orleans-ci/api/v3/index.json" />
-    <add key="nuget" value="https://api.nuget.org/v3/index.json" />
+  <clear />
+  <add key="orleans-ci" value="https://dotnet.myget.org/F/orleans-ci/api/v3/index.json" />
+  <add key="nuget" value="https://api.nuget.org/v3/index.json" />
  </packageSources>
 </configuration>
 ```
 
-### Building from source
+## Building
 
-Clone the sources from the GitHub [repo](https://github.com/dotnet/orleans) 
+Clone the sources from the GitHub [repo](https://github.com/dotnet/orleans)
 
-Run the `Build.cmd` script to build the nuget packages locally,
+Run the `Build.cmd` script to build the NuGet packages locally,
 then reference the required NuGet packages from `/Artifacts/Release/*`.
 You can run `Test.cmd` to run all BVT tests, and `TestAll.cmd` to also run Functional tests (which take much longer)
 
-### Building and running tests in Visual Studio 2017
-.NET Core 2.0 SDK is a pre-requisite to build Orleans.sln.
-
-There might be errors trying to build from Visual Studio because of conflicts with the test discovery engine (error says could not copy `xunit.abstractions.dll`).
-The reason for that error is that you need to configure the test runner in VS like so (after opening the solution):
-* `Test` -> `Test Settings` -> Uncheck `Keep Test Execution Engine running`
-* `Test` -> `Test Settings` -> `Default Processor Architecture` -> Check `X64`
-
-Then either restart VS, or go to the task manager and kill the processes that starts with `vstest.`. Then build once again and it should succeed and tests should appear in the `Test Explorer` window.
-
-Documentation
-=============
+## Documentation
 
 Documentation is located [here](https://dotnet.github.io/orleans/Documentation/)
 
-Code Examples
-=============
+## Blog
 
-Create an interface for your grain:
-```c#
-public interface IHello : Orleans.IGrainWithIntegerKey
-{
-  Task<string> SayHello(string greeting);
-}
-```
-
-Provide an implementation of that interface:
-```c#
-public class HelloGrain : Orleans.Grain, IHello
-{
-  public Task<string> SayHello(string greeting)
-  {
-    return Task.FromResult($"You said: '{greeting}', I say: Hello!");
-  }
-}
-```
-
-Call the grain from your Web service (or anywhere else):
-```c#
-// Get a reference to the IHello grain with id '0'.
-var friend = GrainClient.GrainFactory.GetGrain<IHello>(0);
-
-// Send a greeting to the grain and await the response.
-Console.WriteLine(await friend.SayHello("Good morning, my friend!"));
-```
-
-Blog
-=========
 [Orleans Blog](https://dotnet.github.io/orleans/blog/) is a place to share our thoughts, plans, learnings, tips and tricks, and ideas, crazy and otherwise, which don’t easily fit the documentation format. We would also like to see here posts from the community members, sharing their experiences, ideas, and wisdom. 
 So, welcome to Orleans Blog, both as a reader and as a blogger!
 
-Community
-=========
+## Community
 
 * Ask questions by [opening an issue on GitHub](https://github.com/dotnet/orleans/issues) or on [Stack Overflow](https://stackoverflow.com/questions/ask?tags=orleans)
 
@@ -208,16 +229,14 @@ Community
 
 * You are also encouraged to report bugs or start a technical discussion by starting a new [thread](https://github.com/dotnet/orleans/issues) on GitHub.
 
-License
-=======
+## License
+
 This project is licensed under the [MIT license](https://github.com/dotnet/orleans/blob/master/LICENSE).
 
-Quick Links
-===========
+## Quick Links
 
-* [MSR-ProjectOrleans](http://research.microsoft.com/projects/orleans/)
-* Orleans Tech Report - [Distributed Virtual Actors for Programmability and Scalability](http://research.microsoft.com/apps/pubs/default.aspx?id=210931)
-* [Orleans-GitHub](https://github.com/dotnet/orleans)
+* [Microsoft Research project page](http://research.microsoft.com/projects/orleans/)
+* Technical Report: [Distributed Virtual Actors for Programmability and Scalability](http://research.microsoft.com/apps/pubs/default.aspx?id=210931)
 * [Orleans Documentation](http://dotnet.github.io/orleans/)
 * [Contributing](http://dotnet.github.io/orleans/Community/Contributing.html)
 
