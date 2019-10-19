@@ -117,10 +117,12 @@ General overview of scenarios. Context-oriented compute. Systems which can be de
 
 ### Reminders &amp; Timers
 
+Application code often needs to reliably schedule some operation in the future. Reminders provide a persistent timer mechanism for this purpose. Timers are the non-durable counterpart to reminders which are useful for high-frequency events which do not need reliability.
+
 ### Persistence
 
 **REWRITE REWRITE REWRITE**
-The vast majority of applications need to deal with some kind of state, eg: user profiles, high scores, invitations, chat messages. This state must be persisted so that user data is not lost.
+The vast majority of applications need to deal with some kind of state, For example, user profiles, high scores, invitations, chat messages. This state must be persisted so that user data is not lost. Grains can have associated persistent state stored in any storage system. For example, profile data may be stored in one database and inventory in another. Orleans provides a simple persistence model which ensures that state is available to a grain before requests are processed and that consistency is always maintained.
 
 - pluggable
 - simple to use
