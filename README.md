@@ -138,9 +138,13 @@ Many applications eventually need to perform some kind of multi-object transacti
 
 ### Streams
 
+Streams allow developers to process large amounts of data in near-real time
+Streams supports batch delivery of messages to consumers
+Virtual Streams allow for sparse or dense streams to be multiplexed over a smaller number of queues in a service such as Azure Event Hubs or Amazon Kinesis (or others)
+
 ### Caching
 
-**REWRITE REWRITE REWRITE**
+Volatile state held in grains form a natural cache
 Developers leverage caches to alleviate pressure on databases, particularly in read-heavy workloads. Caches usually need to be invalidated in order to retain correctness, but this is a notoriously difficult process without some kind of coordination.
 
 ### Grain Placement
