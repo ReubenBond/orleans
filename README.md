@@ -15,7 +15,7 @@ It was created by [Microsoft Research](http://research.microsoft.com/projects/or
 
 ![A grain is composed of a stable identity, behavior, and state](assets/grain_formulation.png)
 
-The fundamental building block in any Orleans application is a *grain*. Grains are entities comprising user-defined identity, behavior, and state. Grain identities are user-defined keys which make make Grains always available for invocation. Grains can be invoked by other grains or by external clients such as Web frontends, via strongly-typed communication interfaces (contracts). Each grain is an instance of a class which implements one or more of these interfaces.
+The fundamental building block in any Orleans application is a *grain*. Grains are entities comprising user-defined identity, behavior, and state. Grain identities are user-defined keys which make Grains always available for invocation. Grains can be invoked by other grains or by external clients such as Web frontends, via strongly-typed communication interfaces (contracts). Each grain is an instance of a class which implements one or more of these interfaces.
 
 Grains can have volatile and/or persistent state that can be stored in any storage system. As such, grains implicitly partition application state, enabling automatic scalability and simplifying recovery from failures. Grain state is kept in memory while the grain is active, leading to lower latency and less load on data stores.
 
@@ -117,26 +117,15 @@ General overview of scenarios. Context-oriented compute. Systems which can be de
 
 ### Reminders &amp; Timers
 
-Application code often needs to reliably schedule some operation in the future. Reminders provide a persistent timer mechanism for this purpose. Timers are the non-durable counterpart to reminders which are useful for high-frequency events which do not need reliability.
+Reminders application code to reliably schedule future operations. Reminders are therefore persistent and they are scoped to a given grain. Timers are the non-durable counterpart to reminders and can be used for high-frequency events which do not need reliability.
 
 ### Persistence
 
-**REWRITE REWRITE REWRITE**
-The vast majority of applications need to deal with some kind of state, For example, user profiles, high scores, invitations, chat messages. This state must be persisted so that user data is not lost. Grains can have associated persistent state stored in any storage system. For example, profile data may be stored in one database and inventory in another. Orleans provides a simple persistence model which ensures that state is available to a grain before requests are processed and that consistency is always maintained.
-
-- pluggable
-- simple to use
-- entirely optional
-
-### Consistency
-
-**REWRITE REWRITE REWRITE**
-Distributed systems are highly concurrent. Access to data needs to be controlled to ensure that invariants are not violated. Eg: to ensure that a seat on a plane is not assigned to multiple people at once.
+Orleans provides a simple persistence model which ensures that state is available to a grain before requests are processed and that consistency is maintained. Grains can have multiple named persistent states, for example, one called "profile" for a user's profile and one called "inventory" for their inventory. This state can be stored in any storage system. For example, profile data may be stored in one database and inventory in another.  For more advanced scenarios, grains can also interact directly with a database. While a grain is running, this state is kept in memory so that read requests can be served without accessing storage. When the grain updates its state, a `state.WriteStateAsync()` call ensures that the backing store is updated for durability and consistency. 
 
 ### Distributed ACID Transactions
 
-**REWRITE REWRITE REWRITE**
-Many applications eventually need to perform some kind of multi-object transaction. Eg, to ensure that money does not appear/disappear during a bank account transaction. Unfortunately, the move to Microservices (and by extension Serverless architectures) has left users without support for transactions, leaving users to attempt to regain some transactional guarantees on their own. This is very difficult, though, since transactions are highly nuanced. “Every sufficiently large deployment of microservices contains an ad-hoc, informally specified, bug-ridden, slow implementation of half of transactions”.
+In addition to the simple persistence model described above, grains can have *transactional state*. Multiple grains can participate in [ACID](https://en.wikipedia.org/wiki/ACID) transactions together regardless of where their state is ultimately stored. Transactions in Orleans are distributed and decentralized (there is no central transaction manager or transaction coordinator) and have [serializable isolation](https://en.wikipedia.org/wiki/Isolation_(database_systems)#Isolation_levels). For more information on transactions in Orleans, see the [documentation](https://dotnet.github.io/orleans/Documentation/grains/transactions.html) and the [Microsoft Research technical report](https://www.microsoft.com/en-us/research/publication/transactions-distributed-actors-cloud-2/).
 
 ### Streams
 
