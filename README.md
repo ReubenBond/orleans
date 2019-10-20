@@ -100,7 +100,7 @@ Orleans is compatible with .NET Standard 2.0 and above, running on Windows, Linu
 
 ### Persistence
 
-Orleans provides a simple persistence model which ensures that state is available to a grain before requests are processed and that consistency is maintained. Grains can have multiple named persistent states, for example, one called "profile" for a user's profile and one called "inventory" for their inventory. This state can be stored in any storage system. For example, profile data may be stored in one database and inventory in another.  For more advanced scenarios, grains can also interact directly with a database. While a grain is running, this state is kept in memory so that read requests can be served without accessing storage. When the grain updates its state, a `state.WriteStateAsync()` call ensures that the backing store is updated for durability and consistency.
+Orleans provides a simple persistence model which ensures that state is available to a grain before requests are processed and that consistency is maintained. Grains can have multiple named persistent states, for example, one called "profile" for a user's profile and one called "inventory" for their inventory. This state can be stored in any storage system. For example, profile data may be stored in one database and inventory in another. While a grain is running, this state is kept in memory so that read requests can be served without accessing storage. When the grain updates its state, a `state.WriteStateAsync()` call ensures that the backing store is updated for durability and consistency. For more information, see the [Grain Persistence](https://dotnet.github.io/orleans/Documentation/grains/grain_persistence/index.html) documentation.
 
 ### Distributed ACID Transactions
 
@@ -114,7 +114,7 @@ Streams are backed by queueing services such as Azure Event Hubs, Amazon Kinesis
 
 ### Timers &amp; Reminders
 
-Reminders are a durable scheduling mechanism for grains. They can be used to ensure that some action is completed at a future point even if the grain is not currently activated at that time. Timers are the non-durable counterpart to reminders and can be used for high-frequency events which do not require reliability. For more information, see the [Timers and Reminders](https://dotnet.github.io/orleans/Documentation/grains/timers_and_reminders.html) documentation page.
+Reminders are a durable scheduling mechanism for grains. They can be used to ensure that some action is completed at a future point even if the grain is not currently activated at that time. Timers are the non-durable counterpart to reminders and can be used for high-frequency events which do not require reliability. For more information, see the [Timers and Reminders](https://dotnet.github.io/orleans/Documentation/grains/timers_and_reminders.html) documentation.
 
 ### Flexible Grain Placement
 
@@ -122,11 +122,11 @@ When a grain is activated in Orleans, the runtime decides which server to activa
 
 ### Grain Versioning &amp; Heterogeneous Clusters
 
-Application code evolves over time and upgrading live, production systems in a manner which safely accounts for these changes can be challenging, particularly in stateful systems. Grain interfaces in Orleans can be optionally versioned. The cluster maintains a mapping of which grain implementations are available on which silos in the cluster and the versions of those implementations. This version information is used by the runtime in conjunction with placement strategies to make placement decisions when routing calls to grains. In addition to safe update of versioned grains, this also enables heterogeneous clusters, where different silos have different sets of grain implementations available. For more information, see the [Grain Versioning](https://dotnet.github.io/orleans/Documentation/deployment/grain_versioning/grain_versioning.html) documentation page.
+Application code evolves over time and upgrading live, production systems in a manner which safely accounts for these changes can be challenging, particularly in stateful systems. Grain interfaces in Orleans can be optionally versioned. The cluster maintains a mapping of which grain implementations are available on which silos in the cluster and the versions of those implementations. This version information is used by the runtime in conjunction with placement strategies to make placement decisions when routing calls to grains. In addition to safe update of versioned grains, this also enables heterogeneous clusters, where different silos have different sets of grain implementations available. For more information, see the [Grain Versioning](https://dotnet.github.io/orleans/Documentation/deployment/grain_versioning/grain_versioning.html) documentation.
 
-### Elastic Scalability
+### Elastic Scalability &amp; Fault Tolerance
 
-Orleans is designed to scale elastically. When a silo joins a cluster it is able to accept new activations and when a silo leaves the cluster (either because of scale down or a machine failure) the grains which were activated on that silo will be re-activated on remaining silos as needed.
+Orleans is designed to scale elastically. When a silo joins a cluster it is able to accept new activations and when a silo leaves the cluster (either because of scale down or a machine failure) the grains which were activated on that silo will be re-activated on remaining silos as needed. An Orleans cluster can be scaled down to a single silo. The same properties which enable elastic scalability also enable fault tolerance: the cluster automatically detects and quickly recovers from failures.
 
 ### Run Anywhere
 
@@ -134,7 +134,7 @@ Orleans runs anywhere that .NET Core or .NET Framework are supported. This inclu
 
 ### Stateless Workers
 
-Stateless workers are specially marked grains which do not have any associated state and can be activated on multiple silos simultaneously. This enables increased parallelism for stateless functions. For more information, see the [Stateless Worker Grains](https://dotnet.github.io/orleans/Documentation/grains/stateless_worker_grains.html) documentation page.
+Stateless workers are specially marked grains which do not have any associated state and can be activated on multiple silos simultaneously. This enables increased parallelism for stateless functions. For more information, see the [Stateless Worker Grains](https://dotnet.github.io/orleans/Documentation/grains/stateless_worker_grains.html) documentation.
 
 ### Grain Call Filters
 
@@ -217,7 +217,7 @@ This project is licensed under the [MIT license](https://github.com/dotnet/orlea
 
 ## Quick Links
 
-* [Microsoft Research project page](http://research.microsoft.com/projects/orleans/)
+* [Microsoft Research project home](http://research.microsoft.com/projects/orleans/)
 * Technical Report: [Distributed Virtual Actors for Programmability and Scalability](http://research.microsoft.com/apps/pubs/default.aspx?id=210931)
 * [Orleans Documentation](http://dotnet.github.io/orleans/)
 * [Contributing](http://dotnet.github.io/orleans/Community/Contributing.html)
