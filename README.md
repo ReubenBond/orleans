@@ -96,32 +96,11 @@ Web frontends and other external clients call grains in the cluster using the cl
 
 Orleans is compatible with .NET Standard 2.0 and above, running on Windows, Linux, and macOS.
 
-## Scenarios
-
-Orleans has been used in production since late 2011. **LIST KEY PRODUCTION USERS**
-
-General overview of scenarios. Context-oriented compute. Systems which can be decomposed into fine-grained units. Low-latency/interactive/near-real-time workloads (fraud prevention). Batch processing workloads. Dynamic graph relationships.
-
-* User profile/inventory/commerce - eg monetization << generalize this. Entity management systems such as user profiles, inventory, online commerce.
-* IoT -variation of above. large streams of data from many devices. graph relationships
-* Control Systems - eg thunderhead
-* Game services - low latency, high scalability, variable load
-* Stream Processing - eg playstream/maelstrom/halo?
-* Anomaly Detection - Time-series Analysis, context, activity, etc
-
-**LIST OF TYPICAL SCENARIOS**
-
-**DISCUSS ANTI-PATTERNS / poor fit cases**
-
 ## Features
-
-### Reminders &amp; Timers
-
-Reminders application code to reliably schedule future operations. Reminders are therefore persistent and they are scoped to a given grain. Timers are the non-durable counterpart to reminders and can be used for high-frequency events which do not need reliability.
 
 ### Persistence
 
-Orleans provides a simple persistence model which ensures that state is available to a grain before requests are processed and that consistency is maintained. Grains can have multiple named persistent states, for example, one called "profile" for a user's profile and one called "inventory" for their inventory. This state can be stored in any storage system. For example, profile data may be stored in one database and inventory in another.  For more advanced scenarios, grains can also interact directly with a database. While a grain is running, this state is kept in memory so that read requests can be served without accessing storage. When the grain updates its state, a `state.WriteStateAsync()` call ensures that the backing store is updated for durability and consistency. 
+Orleans provides a simple persistence model which ensures that state is available to a grain before requests are processed and that consistency is maintained. Grains can have multiple named persistent states, for example, one called "profile" for a user's profile and one called "inventory" for their inventory. This state can be stored in any storage system. For example, profile data may be stored in one database and inventory in another.  For more advanced scenarios, grains can also interact directly with a database. While a grain is running, this state is kept in memory so that read requests can be served without accessing storage. When the grain updates its state, a `state.WriteStateAsync()` call ensures that the backing store is updated for durability and consistency.
 
 ### Distributed ACID Transactions
 
@@ -129,24 +108,45 @@ In addition to the simple persistence model described above, grains can have *tr
 
 ### Streams
 
-Streams allow developers to process large amounts of data in near-real time
-Streams supports batch delivery of messages to consumers
-Virtual Streams allow for sparse or dense streams to be multiplexed over a smaller number of queues in a service such as Azure Event Hubs or Amazon Kinesis (or others)
+Streams allow developers to process large amounts of data in near-real time. Streams in Orleans are *managed*: streams do not need to be created or registered before a grain or client publishes to a stream or subscribes to a stream. This allows for greater decoupling of stream producers and consumers from each other and from the infrastructure. Stream processing is reliable: grains can store checkpoints (cursors) and reset to a stored checkpoint during activation or at any point afterwards.
+Streams supports batch delivery of messages to consumers to improve efficiency and recovery performance.
+Streams are backed by queueing services such as Azure Event Hubs, Amazon Kinesis, and others. An arbitrary number of streams can be multiplexed onto a smaller number of queues and the responsibility for processing these queues is balanced evently across the cluster. 
 
-### Caching
+### Timers &amp; Reminders
 
-Volatile state held in grains form a natural cache
-Developers leverage caches to alleviate pressure on databases, particularly in read-heavy workloads. Caches usually need to be invalidated in order to retain correctness, but this is a notoriously difficult process without some kind of coordination.
+Reminders are a durable scheduling mechanism for grains. They can be used to ensure that some action is completed at a future point even if the grain is not currently activated at that time. Timers are the non-durable counterpart to reminders and can be used for high-frequency events which do not require reliability. For more information, see the [Timers and Reminders](https://dotnet.github.io/orleans/Documentation/grains/timers_and_reminders.html) documentation page.
 
-### Grain Placement
+### Flexible Grain Placement
 
 When a grain is activated in Orleans, the runtime decides which server to activate that grain on. This is called grain placement. The placement process in Orleans is fully configurable: developers can choose from a set of out-of-the-box placement policies such as random, prefer-local, and load-based, or custom logic can be configured. This allows for full flexibility in deciding where grains are created. For example, grains can be placed on a server close to resources which they need to operate on or other grains which they communicate with.
 
-### Grain Versioning
+### Grain Versioning &amp; Heterogeneous Clusters
 
+Application code evolves over time and upgrading live, production systems in a manner which safely accounts for these changes can be challenging, particularly in stateful systems. Grain interfaces in Orleans can be optionally versioned. The cluster maintains a mapping of which grain implementations are available on which silos in the cluster and the versions of those implementations. This version information is used by the runtime in conjunction with placement strategies to make placement decisions when routing calls to grains. In addition to safe update of versioned grains, this also enables heterogeneous clusters, where different silos have different sets of grain implementations available. For more information, see the [Grain Versioning](https://dotnet.github.io/orleans/Documentation/deployment/grain_versioning/grain_versioning.html) documentation page.
 
+### Elastic Scalability
+
+Orleans is designed to scale elastically. When a silo joins a cluster it is able to accept new activations and when a silo leaves the cluster (either because of scale down or a machine failure) the grains which were activated on that silo will be re-activated on remaining silos as needed.
+
+### Run Anywhere
+
+Orleans runs anywhere that .NET Core or .NET Framework are supported. This includes hosting on Linux, Windows, and macOS and deploying to Kubernetes, Virtual Machines on-premise or in the cloud, and PaaS services such as Azure Cloud Services.
 
 ### Stateless Workers
+
+Stateless workers are specially marked grains which do not have any associated state and can be activated on multiple silos simultaneously. This enables increased parallelism for stateless functions. For more information, see the [Stateless Worker Grains](https://dotnet.github.io/orleans/Documentation/grains/stateless_worker_grains.html) documentation page.
+
+### Grain Call Filters
+
+Logic which is common to many grains can be expressed as [Grain Call Filters](https://dotnet.github.io/orleans/Documentation/grains/interceptors.html). Orleans supports filters for both incoming and outgoing calls. Some common use-cases of filters are: authorization, logging and telemetry, and error handling.
+
+### Request Context
+
+Metadata and other information can be passed along a series of requests using [request context](https://dotnet.github.io/orleans/Documentation/grains/request_context.html). Request context can be used for holing distributed tracing information or any other user-defined values.
+
+### Grain Extensions
+
+Grains are implemented using a single .NET class by default. However, grains can also be augmented at runtime using grain extensions. Grain extensions can be used to enable additional behaviors on a grain, for example, transactions and streaming are implemented by the runtime by leveraging the flexibility of grain extensions.
 
 ## Documentation
 
@@ -158,17 +158,21 @@ Please see the [getting started tutorial](https://dotnet.github.io/orleans/Docum
 
 ### Building
 
-Run the `Build.cmd` script to build the NuGet packages locally,
-then reference the required NuGet packages from `/Artifacts/Release/*`.
+On Windows, run the `build.cmd` script to build the NuGet packages locally, then reference the required NuGet packages from `/Artifacts/Release/*`.
 You can run `Test.cmd` to run all BVT tests, and `TestAll.cmd` to also run Functional tests.
+
+On Linux and macOS, run the `build.sh` script or `dotnet build ./OrleansCrossPlatform.sln` to build Orleans.
 
 ## Official Builds
 
-The stable production-quality release is located [here](https://github.com/dotnet/orleans/releases/latest).
+The latest stable, production-quality release is located [here](https://github.com/dotnet/orleans/releases/latest).
 
-The latest clean development branch build from CI is located: [here](https://ci.dot.net/job/dotnet_orleans/job/master/job/bvt/lastStableBuild/artifact/)
+Nightly builds are published to https://dotnet.myget.org/gallery/orleans-ci. These builds pass all functional tests, but are not thoroughly tested as the stable builds or pre-release builds published to NuGet.
 
-Nightly builds are published to https://dotnet.myget.org/gallery/orleans-ci . These builds pass all functional tests, but are not thoroughly tested as the stable builds or pre-release builds we push to NuGet.org
+<details>
+<summary>
+Using the nightly build packages in your project
+</summary>
 
 To use nightly builds in your project, add the MyGet feed using either of the following methods:
 
@@ -195,6 +199,7 @@ or
  </packageSources>
 </configuration>
 ```
+</details>
 
 ## Community
 
