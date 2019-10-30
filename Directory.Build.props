@@ -65,6 +65,7 @@
     <SystemMemoryVersion>4.5.3</SystemMemoryVersion>
     <SystemIOPipelinesVersion>4.6.0</SystemIOPipelinesVersion>
     <SystemCodeDomVersion>4.6.0</SystemCodeDomVersion>
+    <SystemDiagnosticsDiagnosticsSourceVersion>4.6.0</SystemDiagnosticsDiagnosticsSourceVersion>
 
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>16.3.0</MicrosoftBuildVersion>
