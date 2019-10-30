@@ -92,10 +92,10 @@ namespace Orleans.Runtime.Scheduler
             switch (ContextType)
             {
                 case SchedulingContextType.Activation:
-                    return Activation.ActivationId.Key.GetHashCode();
+                    return Activation.ActivationId.GetHashCode();
 
                 case SchedulingContextType.SystemTarget:
-                    return SystemTarget.ActivationId.Key.GetHashCode();
+                    return SystemTarget.ActivationId.GetHashCode();
 
                 case SchedulingContextType.SystemThread:
                     return DispatcherTarget;

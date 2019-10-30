@@ -512,7 +512,7 @@ namespace Tests.GeoClusterTests
                     ActivationId actId = grainInfo.Instances.First().Key;
                     IActivationInfo actInfo = grainInfo.Instances[actId];
 
-                    if (grainId.IsSystemTarget || grainId.IsClient || !grainId.IsGrain)
+                    if (grainId.IsSystemTarget() || grainId.IsClient() || !grainId.IsLegacyGrain())
                     {
                         // Skip system grains, system targets and clients
                         // which never go through cluster-single-instance registration process

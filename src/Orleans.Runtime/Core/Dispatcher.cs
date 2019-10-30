@@ -30,6 +30,7 @@ namespace Orleans.Runtime
         private readonly MessageFactory messageFactory;
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
         private readonly RuntimeMessagingTrace messagingTrace;
+        private readonly GrainTypeManager grainTypeManager;
         private readonly SchedulingOptions schedulingOptions;
         private readonly ILogger invokeWorkItemLogger;
         internal Dispatcher(
@@ -44,7 +45,8 @@ namespace Orleans.Runtime
             CompatibilityDirectorManager compatibilityDirectorManager,
             ILoggerFactory loggerFactory,
             IOptions<SchedulingOptions> schedulerOptions,
-            RuntimeMessagingTrace messagingTrace)
+            RuntimeMessagingTrace messagingTrace,
+            GrainTypeManager grainTypeManager)
         {
             this.scheduler = scheduler;
             this.catalog = catalog;
@@ -57,6 +59,7 @@ namespace Orleans.Runtime
             this.messageFactory = messageFactory;
             this.compatibilityDirectorManager = compatibilityDirectorManager;
             this.messagingTrace = messagingTrace;
+            this.grainTypeManager = grainTypeManager;
             this.schedulingOptions = schedulerOptions.Value;
             logger = loggerFactory.CreateLogger<Dispatcher>();
         }
@@ -83,7 +86,7 @@ namespace Orleans.Runtime
             }
 
             // check if its targeted at a new activation
-            if (message.TargetGrain.IsSystemTarget)
+            if (message.TargetGrain.IsSystemTarget())
             {
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message);
                 throw new InvalidOperationException("Dispatcher was called ReceiveMessage on system target for " + message);
@@ -262,7 +265,7 @@ namespace Orleans.Runtime
                 if (!ActivationMayAcceptRequest(targetActivation, message))
                 {
                     // Check for deadlock before Enqueueing.
-                    if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
+                    if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget())
                     {
                         try
                         {
@@ -399,11 +402,11 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                if (targetActivation.Grain.IsGrain && message.IsUsingInterfaceVersions)
+                if (targetActivation.Grain.IsLegacyGrain() && message.IsUsingInterfaceVersions)
                 {
                     var request = (InvokeMethodRequest)message.BodyObject;
                     var compatibilityDirector = compatibilityDirectorManager.GetDirector(request.InterfaceId);
-                    var currentVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
+                    var currentVersion = this.grainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
                     if (!compatibilityDirector.IsCompatible(request.InterfaceVersion, currentVersion))
                     {
                         catalog.DeactivateActivationOnIdle(targetActivation);
@@ -617,7 +620,7 @@ namespace Orleans.Runtime
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resend {0}", message);
             message.TargetHistory = message.GetTargetHistory();
 
-            if (message.TargetGrain.IsSystemTarget)
+            if (message.TargetGrain.IsSystemTarget())
             {
                 this.SendSystemTargetMessage(message);
             }
@@ -629,7 +632,7 @@ namespace Orleans.Runtime
             }
             else
             {
-                message.TargetActivation = null;
+                message.TargetActivation = default;
                 message.TargetSilo = null;
                 message.ClearTargetAddress();
                 this.SendMessage(message);
@@ -721,7 +724,7 @@ namespace Orleans.Runtime
             // placement strategy is determined by searching for a specification. first, we check for a strategy associated with the grain reference,
             // second, we check for a strategy associated with the target's interface. third, we check for a strategy associated with the activation sending the
             // message.
-            var strategy = targetAddress.Grain.IsGrain ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
+            var strategy = targetAddress.Grain.IsLegacyGrain() ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
 
             var request = message.IsUsingInterfaceVersions
                 ? message.BodyObject as InvokeMethodRequest
@@ -745,14 +748,13 @@ namespace Orleans.Runtime
 
         private async Task AddressMessageAsync(Message message, PlacementTarget target, PlacementStrategy strategy, ActivationAddress targetAddress)
         {
-            var placementResult = await placementDirectorsManager.SelectOrAddActivation(
-                message.SendingAddress, target, this.catalog, strategy);
+            var placementResult = await placementDirectorsManager.SelectOrAddActivation(target, (IPlacementRuntime)this.catalog, strategy);
             SetMessageTargetPlacement(message, placementResult, targetAddress);
         }
 
         private void SetMessageTargetPlacement(Message message, PlacementResult placementResult, ActivationAddress targetAddress)
         {
-            if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient)
+            if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient())
             {
                 logger.Error(ErrorCode.Dispatcher_AddressMsg_UnregisteredClient, $"AddressMessage could not find target for client pseudo-grain {message}");
                 throw new KeyNotFoundException($"Attempting to send a message {message} to an unregistered client pseudo-grain {targetAddress.Grain}");
@@ -772,7 +774,7 @@ namespace Orleans.Runtime
             var message = this.messageFactory.CreateResponseMessage(request);
             message.BodyObject = response;
 
-            if (message.TargetGrain.IsSystemTarget)
+            if (message.TargetGrain.IsSystemTarget())
             {
                 SendSystemTargetMessage(message);
             }
@@ -791,9 +793,10 @@ namespace Orleans.Runtime
             {
                 message.TargetSilo = Transport.MyAddress;
             }
-            if (message.TargetActivation == null)
+
+            if (message.TargetActivation is null)
             {
-                message.TargetActivation = ActivationId.GetSystemActivation(message.TargetGrain, message.TargetSilo);
+                message.TargetActivation = ActivationId.GetDeterministic(message.TargetGrain);
             }
 
             TransportMessage(message);

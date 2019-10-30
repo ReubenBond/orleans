@@ -66,20 +66,20 @@ namespace Orleans.Runtime
             State = ActivationState.Create;
             PlacedUsing = placedUsing;
             RegistrationStrategy = registrationStrategy;
-            if (!Grain.IsSystemTarget)
+            if (!Grain.IsSystemTarget())
             {
                 this.collector = collector;
             }
 
             CollectionAgeLimit = ageLimit;
 
-            GrainReference = GrainReference.FromGrainId(addr.Grain, runtimeClient.GrainReferenceRuntime, genericArguments, Grain.IsSystemTarget ? addr.Silo : null);
+            GrainReference = GrainReference.FromGrainId(addr.Grain, runtimeClient.GrainReferenceRuntime, genericArguments, Grain.IsSystemTarget() ? addr.Silo : null);
             this.SchedulingContext = new SchedulingContext(this);
         }
 
         public Type GrainType => GrainTypeData.Type;
 
-        public IGrainIdentity GrainIdentity => this.Identity;
+        public IGrainIdentity GrainIdentity => (LegacyGrainId)this.Identity;
 
         public IServiceProvider ActivationServices => this.serviceScope.ServiceProvider;
 
@@ -321,8 +321,8 @@ namespace Orleans.Runtime
 
             numRunning++;
             if (message.Direction != Message.Directions.OneWay 
-                && message.SendingActivation != null
-                && !message.SendingGrain?.IsClient == true)
+                && !(message.SendingActivation is null)
+                && !message.SendingGrain.IsClient())
             {
                 RunningRequestsSenders.Add(message.SendingActivation);
             }
@@ -711,7 +711,7 @@ namespace Orleans.Runtime
                 String.Format(
                     "[Activation: {0}{1}{2}{3} State={4} NonReentrancyQueueSize={5} EnqueuedOnDispatcher={6} InFlightCount={7} NumRunning={8} IdlenessTimeSpan={9} CollectionAgeLimit={10}{11}]",
                     Silo.ToLongString(),
-                    Grain.ToDetailedString(),
+                    Grain.ToString(),
                     ActivationId,
                     GetActivationInfoString(),
                     State,                          // 4

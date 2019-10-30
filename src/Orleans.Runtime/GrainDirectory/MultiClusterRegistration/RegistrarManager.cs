@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Orleans.GrainDirectory;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,13 +27,13 @@ namespace Orleans.Runtime.GrainDirectory
         {
             MultiClusterRegistrationStrategy strategy;
 
-            var typeCode = grainId.TypeCode;
+            var typeCode = ((LegacyGrainId)grainId).TypeCode;
 
             if (typeCode != 0)
             {
                 string unusedGrainClass;
                 PlacementStrategy unusedPlacement;
-                this.grainTypeManager.GetTypeInfo(grainId.TypeCode, out unusedGrainClass, out unusedPlacement, out strategy);
+                this.grainTypeManager.GetTypeInfo(((LegacyGrainId)grainId).TypeCode, out unusedGrainClass, out unusedPlacement, out strategy);
             }
             else
             {

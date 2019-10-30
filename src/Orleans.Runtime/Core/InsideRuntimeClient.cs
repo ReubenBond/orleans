@@ -183,11 +183,11 @@ namespace Orleans.Runtime
             var targetGrainId = target.GrainId;
             message.TargetGrain = targetGrainId;
             SharedCallbackData sharedData;
-            if (targetGrainId.IsSystemTarget)
+            if (targetGrainId.IsSystemTarget())
             {
                 SiloAddress targetSilo = (target.SystemTargetSilo ?? MySilo);
                 message.TargetSilo = targetSilo;
-                message.TargetActivation = ActivationId.GetSystemActivation(targetGrainId, targetSilo);
+                message.TargetActivation = ActivationId.GetDeterministic(targetGrainId);
                 message.Category = targetGrainId.Equals(Constants.MembershipOracleId) ?
                     Message.Categories.Ping : Message.Categories.System;
                 sharedData = this.systemSharedCallbackData;
@@ -226,7 +226,7 @@ namespace Orleans.Runtime
 
             this.messagingTrace.OnSendRequest(message);
 
-            if (targetGrainId.IsSystemTarget)
+            if (targetGrainId.IsSystemTarget())
             {
                 // Messages to system targets bypass the task system and get sent "in-line"
                 this.Dispatcher.TransportMessage(message);
@@ -314,7 +314,7 @@ namespace Orleans.Runtime
                 }
 
                 RequestContextExtensions.Import(message.RequestContextData);
-                if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
+                if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget())
                 {
                     UpdateDeadlockInfoInRequestContext(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
                     // RequestContext is automatically saved in the msg upon send and propagated to the next hop

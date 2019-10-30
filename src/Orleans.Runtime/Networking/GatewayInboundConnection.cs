@@ -58,9 +58,9 @@ namespace Orleans.Runtime.Messaging
             }
 
             // return address translation for geo clients (replace sending address cli/* with gcl/*)
-            if (this.multiClusterOptions.HasMultiClusterNetwork && msg.SendingAddress.Grain.Category != UniqueKey.Category.GeoClient)
+            if (this.multiClusterOptions.HasMultiClusterNetwork && ((LegacyGrainId)msg.SendingAddress.Grain).Category != UniqueKey.Category.GeoClient)
             {
-                msg.SendingGrain = GrainId.NewClientId(msg.SendingAddress.Grain.PrimaryKey, this.siloDetails.ClusterId);
+                msg.SendingGrain = LegacyGrainId.NewClientId(((LegacyGrainId)msg.SendingAddress.Grain).PrimaryKey, this.siloDetails.ClusterId);
             }
 
             // Are we overloaded?
@@ -80,13 +80,13 @@ namespace Orleans.Runtime.Messaging
             {
                 // reroute via Dispatcher
                 msg.TargetSilo = null;
-                msg.TargetActivation = null;
+                msg.TargetActivation = default;
                 msg.ClearTargetAddress();
 
-                if (msg.TargetGrain.IsSystemTarget)
+                if (msg.TargetGrain.IsSystemTarget())
                 {
                     msg.TargetSilo = this.myAddress;
-                    msg.TargetActivation = ActivationId.GetSystemActivation(msg.TargetGrain, this.myAddress);
+                    msg.TargetActivation = ActivationId.GetDeterministic(msg.TargetGrain);
                 }
 
                 MessagingStatisticsGroup.OnMessageReRoute(msg);
@@ -119,13 +119,13 @@ namespace Orleans.Runtime.Messaging
             }
 
             // refuse clients that are connecting to the wrong cluster
-            if (grainId.Category == UniqueKey.Category.GeoClient)
+            if (((LegacyGrainId)grainId).Category == UniqueKey.Category.GeoClient)
             {
-                if (grainId.Key.ClusterId != this.siloDetails.ClusterId)
+                if (((LegacyGrainId)grainId).Key.ClusterId != this.siloDetails.ClusterId)
                 {
                     var message = string.Format(
                             "Refusing connection by client {0} because of cluster id mismatch: client={1} silo={2}",
-                            grainId, grainId.Key.ClusterId, this.siloDetails.ClusterId);
+                            grainId, ((LegacyGrainId)grainId).Key.ClusterId, this.siloDetails.ClusterId);
                     this.Log.Error(ErrorCode.GatewayAcceptor_WrongClusterId, message);
                     throw new InvalidOperationException(message);
                 }
@@ -135,7 +135,7 @@ namespace Orleans.Runtime.Messaging
                 //convert handshake cliendId to a GeoClient ID 
                 if (this.multiClusterOptions.HasMultiClusterNetwork)
                 {
-                    grainId = GrainId.NewClientId(grainId.PrimaryKey, this.siloDetails.ClusterId);
+                    grainId = LegacyGrainId.NewClientId(((LegacyGrainId)grainId).PrimaryKey, this.siloDetails.ClusterId);
                 }
             }
 
