@@ -97,7 +97,7 @@ namespace Orleans
             this.schedulerStageStatistics = schedulerStageStatistics;
             this.ClientStatistics = clientStatisticsManager;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
-            this.handshakeClientId = GrainId.NewClientId();
+            this.handshakeClientId = LegacyGrainId.NewClientId();
             callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
             this.typeMapRefreshInterval = typeManagementOptions.Value.TypeMapRefreshInterval;
@@ -383,13 +383,13 @@ namespace Orleans
             if (!String.IsNullOrEmpty(genericArguments))
                 message.GenericGrainType = genericArguments;
 
-            if (targetGrainId.IsSystemTarget)
+            if (targetGrainId.IsSystemTarget())
             {
                 // If the silo isn't be supplied, it will be filled in by the sender to be the gateway silo
                 message.TargetSilo = target.SystemTargetSilo;
                 if (target.SystemTargetSilo != null)
                 {
-                    message.TargetActivation = ActivationId.GetSystemActivation(targetGrainId, target.SystemTargetSilo);
+                    message.TargetActivation = ActivationId.GetDeterministic(targetGrainId);
                 }
             }
             // Client sending messages to another client (observer). Yes, we support that.

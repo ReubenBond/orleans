@@ -249,7 +249,7 @@ namespace Orleans.Messaging
             }
 
             // For untargeted messages to system targets, and for unordered messages, pick a next connection in round robin fashion.
-            if (msg.TargetGrain.IsSystemTarget || msg.IsUnordered)
+            if (msg.TargetGrain.IsSystemTarget() || msg.IsUnordered)
             {
                 // Get the cached list of live gateways.
                 // Pick a next gateway name in a round robin fashion.
@@ -431,10 +431,10 @@ namespace Orleans.Messaging
 
         internal void UpdateClientId(GrainId clientId)
         {
-            if (ClientId.Category != UniqueKey.Category.Client)
+            if (((LegacyGrainId)ClientId).Category != UniqueKey.Category.Client)
                 throw new InvalidOperationException("Only handshake client ID can be updated with a cluster ID.");
 
-            if (clientId.Category != UniqueKey.Category.GeoClient)
+            if (((LegacyGrainId)clientId).Category != UniqueKey.Category.GeoClient)
                 throw new ArgumentException("Handshake client ID can only be updated  with a geo client.", nameof(clientId));
 
             ClientId = clientId;

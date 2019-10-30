@@ -44,7 +44,7 @@ namespace Orleans.Runtime.Placement
 
         public static PlacementStrategy GetGrainPlacementStrategy(this IPlacementRuntime @this, GrainId grainId, string genericArguments = null)
         {
-            return @this.GetGrainPlacementStrategy(grainId.TypeCode, genericArguments);
+            return @this.GetGrainPlacementStrategy(((LegacyGrainId)grainId).TypeCode, genericArguments);
         }
 
         public static string GetGrainTypeName(this IPlacementRuntime @this, int typeCode, string genericArguments = null)
@@ -58,12 +58,12 @@ namespace Orleans.Runtime.Placement
 
         public static string GetGrainTypeName(this IPlacementRuntime @this, GrainId grainId, string genericArguments = null)
         {
-            return @this.GetGrainTypeName(grainId.TypeCode, genericArguments);
+            return @this.GetGrainTypeName(grainId, genericArguments);
         }
 
         public static void GetGrainTypeInfo(this IPlacementRuntime @this, GrainId grainId, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy activationStrategy, string genericArguments = null)
         {
-            @this.GetGrainTypeInfo(grainId.TypeCode, out grainClass, out placement, out activationStrategy, genericArguments);
+            @this.GetGrainTypeInfo(grainId, out grainClass, out placement, out activationStrategy, genericArguments);
         }
     }
 }

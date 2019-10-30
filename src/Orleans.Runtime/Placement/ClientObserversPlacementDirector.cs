@@ -19,7 +19,8 @@ namespace Orleans.Runtime.Placement
             AddressesAndTag addresses;
 
             // we need to look up the directory entry for this grain on a remote silo
-            switch (target.Category)
+            var legacyTarget = (LegacyGrainId)target;
+            switch (legacyTarget.Category)
             {
                 case UniqueKey.Category.Client:
                     {
@@ -30,7 +31,7 @@ namespace Orleans.Runtime.Placement
                 case UniqueKey.Category.GeoClient:
                     {
                         // we need to look up the activations in the remote cluster
-                        addresses = await context.LookupInCluster(target, target.Key.ClusterId);
+                        addresses = await context.LookupInCluster(target, legacyTarget.Key.ClusterId);
                         return ChooseRandomActivation(addresses.Addresses, context);
                     }
 

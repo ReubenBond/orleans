@@ -56,7 +56,7 @@ namespace Orleans.Runtime
             this.siloMessageCenter = messageCenter;
             this.logger = logger;
 
-            this.ClientAddress = ActivationAddress.NewActivationAddress(siloDetails.SiloAddress, GrainId.NewClientId());
+            this.ClientAddress = ActivationAddress.NewActivationAddress(siloDetails.SiloAddress, LegacyGrainId.NewClientId());
         }
 
         /// <inheritdoc />

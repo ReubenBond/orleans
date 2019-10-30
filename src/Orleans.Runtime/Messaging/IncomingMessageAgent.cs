@@ -73,7 +73,7 @@ namespace Orleans.Runtime.Messaging
 
             ISchedulingContext context;
             // Find the activation it targets; first check for a system activation, then an app activation
-            if (msg.TargetGrain.IsSystemTarget)
+            if (msg.TargetGrain.IsSystemTarget())
             {
                 SystemTarget target = directory.FindSystemTarget(msg.TargetActivation);
                 if (target == null)
