@@ -732,10 +732,11 @@ namespace DefaultCluster.Tests.General
 
             Assert.Equal("Hello!", result);
         }
-        
+
         [Fact, TestCategory("BVT"), TestCategory("Cast"), TestCategory("Generics")]
-        public async Task Generic_CastGenericInterfaceToNonGenericInterfaceBeforeActivation() {
-            var grain =  this.GrainFactory.GetGrain<IGenericCastableGrain<string>>(Guid.NewGuid());
+        public async Task Generic_CastGenericInterfaceToNonGenericInterfaceBeforeActivation()
+        {
+            var grain = this.GrainFactory.GetGrain<IGenericCastableGrain<string>>(Guid.NewGuid());
 
             var castRef = grain.AsReference<INonGenericCastGrain>();
 
@@ -743,7 +744,7 @@ namespace DefaultCluster.Tests.General
 
             Assert.Equal("Hello!", result);
         }
-        
+
         /// <summary>
         /// Tests that generic grains can have generic state and that the parameters to the Grain{TState}
         /// class do not have to match the parameters to the grain class itself.

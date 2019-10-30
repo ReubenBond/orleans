@@ -1,14 +1,192 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Core;
 using Orleans.Runtime;
 using Orleans.Streams;
-using System.Diagnostics;
 
 namespace Orleans
 {
+    [Serializable]
+    [StructLayout(LayoutKind.Auto)]
+    public readonly struct SpanId : IEquatable<SpanId>, IComparable<SpanId>, ISerializable
+    {
+        private readonly byte[] _value;
+        private readonly int _hashCode;
+
+        public SpanId(byte[] value)
+        {
+            _value = value;
+            _hashCode = GetHashCode(value);
+        }
+
+        public SpanId(byte[] value, int hashCode)
+        {
+            _value = value;
+            _hashCode = hashCode;
+        }
+
+        public SpanId(SerializationInfo info, StreamingContext context)
+        {
+            _value = (byte[])info.GetValue("v", typeof(byte[]));
+            _hashCode = info.GetInt32("h");
+        }
+
+        public readonly ReadOnlyMemory<byte> Value => _value;
+
+        public override readonly bool Equals(object obj)
+        {
+            return obj is SpanId kind && this.Equals(kind);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public readonly bool Equals(SpanId obj)
+        {
+            if (_value is null && obj._value is null) return true;
+            if (_value is null ^ obj._value is null) return false;
+            return _value.AsSpan().SequenceEqual(obj._value);
+        }
+
+        public static int GetHashCode(byte[] value) => (int)JenkinsHash.ComputeHash(value);
+
+        public override readonly int GetHashCode() => _hashCode;
+
+        public void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            info.AddValue("v", _value);
+            info.AddValue("h", _hashCode);
+        }
+
+        public static byte[] UnsafeGetArray(SpanId id) => id._value;
+
+        public int CompareTo(SpanId other) => _value.AsSpan().SequenceCompareTo(other._value.AsSpan());
+
+        public sealed class Comparer : IEqualityComparer<SpanId>, IComparer<SpanId>
+        {
+            public static Comparer Instance { get; } = new Comparer();
+
+            public int Compare(SpanId x, SpanId y) => x.CompareTo(y);
+
+            public bool Equals(SpanId x, SpanId y) => x.Equals(y);
+
+            public int GetHashCode(SpanId obj) => obj.GetHashCode();
+        }
+    }
+
+    [Serializable]
+    [StructLayout(LayoutKind.Auto)]
+    public readonly struct GrainKind : IEquatable<GrainKind>, IComparable<GrainKind>, ISerializable
+    {
+        private readonly SpanId _value;
+
+        public GrainKind(byte[] value) => _value = new SpanId(value);
+
+        public GrainKind(byte[] value, int hashCode) => _value = new SpanId(value, hashCode);
+
+        public GrainKind(SerializationInfo info, StreamingContext context)
+        {
+            _value = new SpanId((byte[])info.GetValue("v", typeof(byte[])), info.GetInt32("h"));
+        }
+
+        private GrainKind(SpanId id) => _value = id;
+
+        public static explicit operator SpanId(GrainKind kind) => kind._value;
+
+        public static explicit operator GrainKind(SpanId id) => new GrainKind(id);
+
+        public readonly ReadOnlyMemory<byte> Value => _value.Value;
+
+        public override readonly bool Equals(object obj) => obj is GrainKind kind && this.Equals(kind);
+
+        public readonly bool Equals(GrainKind obj) => _value.Equals(obj._value);
+
+        public override readonly int GetHashCode() => _value.GetHashCode();
+
+        public static byte[] UnsafeGetArray(GrainKind id) => SpanId.UnsafeGetArray(id._value);
+
+        public int CompareTo(GrainKind other) => _value.CompareTo(other._value);
+
+        public void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            info.AddValue("v", SpanId.UnsafeGetArray(_value));
+            info.AddValue("h", _value.GetHashCode());
+        }
+
+        public sealed class Comparer : IEqualityComparer<GrainKind>, IComparer<GrainKind>
+        {
+            public static Comparer Instance { get; } = new Comparer();
+
+            public int Compare(GrainKind x, GrainKind y) => x.CompareTo(y);
+
+            public bool Equals(GrainKind x, GrainKind y) => x.Equals(y);
+
+            public int GetHashCode(GrainKind obj) => obj.GetHashCode();
+        }
+    }
+
+    [Serializable]
+    [StructLayout(LayoutKind.Auto)]
+public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable
+{
+    private readonly GrainKind _kind;
+    private readonly SpanId _key;
+
+        public GrainId(GrainKind kind, byte[] key, int keyHashCode)
+        {
+            _kind = kind;
+            _key = new SpanId(key, keyHashCode);
+        }
+
+        public GrainId(SerializationInfo info, StreamingContext context)
+        {
+            _kind = new GrainKind((byte[])info.GetValue("tv", typeof(byte[])), info.GetInt32("th"));
+            _key = new SpanId((byte[])info.GetValue("kv", typeof(byte[])), info.GetInt32("kh"));
+        }
+
+        public readonly GrainKind Kind => _kind;
+
+        public readonly ReadOnlyMemory<byte> Key => _key.Value;
+
+        public override bool Equals(object obj) => obj is GrainId id && this.Equals(id);
+
+        public bool Equals(GrainId other) => this.Kind.Equals(other.Kind) && this.Key.Equals(other.Key);
+
+        public override int GetHashCode() => HashCode.Combine(_kind, _key);
+
+        public readonly void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            info.AddValue("tv", GrainKind.UnsafeGetArray(_kind));
+            info.AddValue("th", _kind.GetHashCode());
+            info.AddValue("kv", SpanId.UnsafeGetArray(_key));
+            info.AddValue("kh", _key.GetHashCode());
+        }
+
+        public int CompareTo(GrainId other)
+        {
+            var kinds = _kind.CompareTo(other._kind);
+            if (kinds != 0) return kinds;
+
+            return _key.CompareTo(other._key);
+        }
+
+        public static (byte[] Key, int KeyHashCode) UnsafeGetKey(GrainId id) => (SpanId.UnsafeGetArray(id._key), id._key.GetHashCode());
+
+        public sealed class Comparer : IEqualityComparer<GrainId>, IComparer<GrainId>
+        {
+            public static Comparer Instance { get; } = new Comparer();
+
+            public int Compare(GrainId x, GrainId y) => x.CompareTo(y);
+
+            public bool Equals(GrainId x, GrainId y) => x.Equals(y);
+
+            public int GetHashCode(GrainId obj) => obj.GetHashCode();
+        }
+    }
+
     /// <summary>
     /// The abstract base class for all grain classes.
     /// </summary>
