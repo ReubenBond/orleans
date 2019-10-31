@@ -206,7 +206,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Connections.Securit
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Connections.Security.Tests", "test\Orleans.Connections.Security.Tests\Orleans.Connections.Security.Tests.csproj", "{D53D80CC-3E14-4499-B03F-610A5D3F6359}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TracingTest", "TracingTest\TracingTest.csproj", "{861C8E98-EB26-415D-88B5-8EA69AC9D965}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TracingTest", "test\TracingTest\TracingTest.csproj", "{861C8E98-EB26-415D-88B5-8EA69AC9D965}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

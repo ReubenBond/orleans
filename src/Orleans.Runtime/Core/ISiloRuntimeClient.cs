@@ -53,5 +53,7 @@ namespace Orleans.Runtime
 
         OrleansTaskScheduler Scheduler { get; }
         Task Invoke(IAddressable target, IInvokable invokable, Message message);
+
+        MessagingTrace MessagingTrace { get; }
     }
 }

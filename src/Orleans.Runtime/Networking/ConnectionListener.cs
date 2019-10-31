@@ -16,7 +16,7 @@ namespace Orleans.Runtime.Messaging
         private readonly IConnectionListenerFactory listenerFactory;
         private readonly ConnectionManager connectionManager;
         private readonly ConcurrentDictionary<Connection, Task> connections = new ConcurrentDictionary<Connection, Task>(ReferenceEqualsComparer.Instance);
-        private readonly INetworkingTrace trace;
+        private readonly NetworkingTrace trace;
         private TaskCompletionSource<object> acceptLoopTcs;
         private IConnectionListener listener;
         private ConnectionDelegate connectionDelegate;
@@ -26,7 +26,7 @@ namespace Orleans.Runtime.Messaging
             IConnectionListenerFactory listenerFactory,
             IOptions<ConnectionOptions> connectionOptions,
             ConnectionManager connectionManager,
-            INetworkingTrace trace)
+            NetworkingTrace trace)
         {
             this.ServiceProvider = serviceProvider;
             this.listenerFactory = listenerFactory;

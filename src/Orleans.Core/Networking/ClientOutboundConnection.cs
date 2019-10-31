@@ -23,7 +23,7 @@ namespace Orleans.Runtime.Messaging
             MessageFactory messageFactory,
             IServiceProvider serviceProvider,
             ClientMessageCenter messageCenter,
-            INetworkingTrace trace,
+            NetworkingTrace trace,
             ConnectionManager connectionManager,
             ConnectionOptions connectionOptions)
             : base(connection, middleware, messageFactory, serviceProvider, trace)

@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -27,6 +29,8 @@ namespace Orleans.Runtime
         private ISiloRuntimeClient runtimeClient;
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger timerLogger;
+        private TraceGrainCallFilter trace;
+
         internal ISiloRuntimeClient RuntimeClient
         {
             get
@@ -91,16 +95,43 @@ namespace Orleans.Runtime
             return lastInvoker;
         }
 
-        internal void HandleNewRequest(Message request)
+        internal async void HandleNewRequest(Message request)
         {
             running = request;
-            this.RuntimeClient.Invoke(this, this, request).Ignore();
+
+            Activity activity = null;
+            try
+            {
+                trace ??= this.RuntimeClient.ServiceProvider.GetRequiredService<TraceGrainCallFilter>();
+                trace.BeginInvoke(request, out activity);
+                this.RuntimeClient.MessagingTrace.OnInvokeMessage(request);
+
+                await this.RuntimeClient.Invoke(this, this, request);
+            }
+            finally
+            {
+                // Ignore exceptions
+                trace.EndInvoke(request, activity);
+            }
         }
 
         internal void HandleResponse(Message response)
         {
             running = response;
-            this.RuntimeClient.ReceiveResponse(response);
+            Activity activity = null;
+            try
+            {
+                trace ??= this.RuntimeClient.ServiceProvider.GetRequiredService<TraceGrainCallFilter>();
+                trace.BeginInvoke(response, out activity);
+                this.RuntimeClient.MessagingTrace.OnInvokeMessage(response);
+
+                this.RuntimeClient.ReceiveResponse(response);
+            }
+            finally
+            {
+                // Ignore exceptions
+                trace.EndInvoke(response, activity);
+            }
         }
 
         /// <summary>

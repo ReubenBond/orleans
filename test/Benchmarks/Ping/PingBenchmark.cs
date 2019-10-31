@@ -7,12 +7,24 @@ using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using BenchmarkGrainInterfaces.Ping;
 using BenchmarkGrains.Ping;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Threading;
 
 namespace Benchmarks.Ping
 {
+#if NETCOREAPP
+    internal sealed class NetCoreThreadPoolExecutor : IExecutor
+    {
+        public void QueueWorkItem(Action<object> callback, object state = null)
+        {
+            ThreadPool.UnsafeQueueUserWorkItem(callback, state, preferLocal: true);
+        }
+    }
+#endif
+
     [MemoryDiagnoser]
     public class PingBenchmark : IDisposable 
     {
@@ -29,6 +41,10 @@ namespace Benchmarks.Ping
                 var primary = i == 0 ? null : new IPEndPoint(IPAddress.Loopback, 11111);
                 var siloBuilder = new SiloHostBuilder()
                     .ConfigureDefaults()
+                    .ConfigureServices((ctx, services) =>
+                    {
+                        services.AddSingleton<IExecutor, NetCoreThreadPoolExecutor>();
+                    })
                     .UseLocalhostClustering(
                         siloPort: 11111 + i,
                         gatewayPort: 30000 + i,

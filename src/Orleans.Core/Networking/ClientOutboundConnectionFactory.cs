@@ -13,7 +13,7 @@ namespace Orleans.Runtime.Messaging
         private readonly IServiceProvider serviceProvider;
         private readonly ClientConnectionOptions clientConnectionOptions;
         private readonly MessageFactory messageFactory;
-        private readonly INetworkingTrace trace;
+        private readonly NetworkingTrace trace;
         private readonly object initializationLock = new object();
         private bool isInitialized;
         private ClientMessageCenter messageCenter;
@@ -24,7 +24,7 @@ namespace Orleans.Runtime.Messaging
             IOptions<ConnectionOptions> connectionOptions,
             IOptions<ClientConnectionOptions> clientConnectionOptions,
             MessageFactory messageFactory,
-            INetworkingTrace trace)
+            NetworkingTrace trace)
             : base(serviceProvider.GetRequiredServiceByKey<object, IConnectionFactory>(ServicesKey), serviceProvider, connectionOptions)
         {
             this.serviceProvider = serviceProvider;

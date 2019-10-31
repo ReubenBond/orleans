@@ -12,7 +12,7 @@ namespace Orleans.Runtime.Messaging
     internal sealed class SiloConnectionListener : ConnectionListener, ILifecycleParticipant<ISiloLifecycle>
     {
         internal static readonly object ServicesKey = new object();
-        private readonly INetworkingTrace trace;
+        private readonly NetworkingTrace trace;
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly SiloConnectionOptions siloConnectionOptions;
         private readonly MessageCenter messageCenter;
@@ -26,7 +26,7 @@ namespace Orleans.Runtime.Messaging
             IOptions<SiloConnectionOptions> siloConnectionOptions,
             MessageCenter messageCenter,
             MessageFactory messageFactory,
-            INetworkingTrace trace,
+            NetworkingTrace trace,
             IOptions<EndpointOptions> endpointOptions,
             ILocalSiloDetails localSiloDetails,
             ConnectionManager connectionManager)

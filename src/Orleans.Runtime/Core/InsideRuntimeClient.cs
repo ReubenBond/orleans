@@ -66,7 +66,8 @@ namespace Orleans.Runtime
             IOptions<SiloMessagingOptions> messagingOptions,
             IGrainCancellationTokenRuntime cancellationTokenRuntime,
             IOptions<SchedulingOptions> schedulerOptions,
-            ApplicationRequestsStatisticsGroup appRequestStatistics)
+            ApplicationRequestsStatisticsGroup appRequestStatistics,
+            MessagingTrace messagingTrace)
         {
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
@@ -83,6 +84,7 @@ namespace Orleans.Runtime
             this.messagingOptions = messagingOptions.Value;
             this.cancellationTokenRuntime = cancellationTokenRuntime;
             this.appRequestStatistics = appRequestStatistics;
+            this.MessagingTrace = messagingTrace;
             this.schedulingOptions = schedulerOptions.Value;
 
             this.sharedCallbackData = new SharedCallbackData(
@@ -764,6 +766,8 @@ namespace Orleans.Runtime
         }
 
         public IGrainTypeResolver GrainTypeResolver => typeManager.GrainTypeResolver;
+
+        public MessagingTrace MessagingTrace { get; }
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
         {

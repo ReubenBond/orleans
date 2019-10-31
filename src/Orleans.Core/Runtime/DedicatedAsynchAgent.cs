@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime
 {
@@ -14,7 +14,7 @@ namespace Orleans.Runtime
 
         public override void OnStart()
         {
-            executor.QueueWorkItem(_ => Run());
+            executor.QueueWorkItem(_ => Run(), null);
         }
 
         protected abstract void Run();

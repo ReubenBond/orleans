@@ -111,7 +111,9 @@ namespace Orleans
             services.TryAddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter);
             services.TryAddFromExisting<IMessageCenter, ClientMessageCenter>();
             services.AddSingleton<GatewayManager>();
-            services.TryAddSingleton<INetworkingTrace, NetworkingTrace>();
+            services.AddSingleton<NetworkingTrace>();
+            services.AddSingleton<MessagingTrace>();
+            services.TryAddSingleton<MessagingOptions>(sp => sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value);
         }
     }
 }

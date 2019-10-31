@@ -52,7 +52,7 @@ namespace Orleans.Threading
             }
         }
 
-        public void QueueWorkItem(WaitCallback callback, object state = null)
+        public void QueueWorkItem(Action<object> callback, object state = null)
         {
             if (callback == null) throw new ArgumentNullException(nameof(callback));
 
@@ -285,7 +285,7 @@ namespace Orleans.Threading
     {
         public static WorkItem NoOp = new WorkItem(s => { }, null, TimeSpan.MaxValue);
 
-        private readonly WaitCallback callback;
+        private readonly Action<object> callback;
 
         private readonly StatusProvider statusProvider;
 
@@ -296,7 +296,7 @@ namespace Orleans.Threading
         private ITimeInterval executionTime;
 
         public WorkItem(
-            WaitCallback callback,
+            Action<object> callback,
             object state,
             TimeSpan executionTimeTreshold,
             StatusProvider statusProvider = null)

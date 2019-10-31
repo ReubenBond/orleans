@@ -30,6 +30,7 @@ namespace Orleans.Runtime
         private readonly MessageFactory messageFactory;
         private readonly SerializationManager serializationManager;
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
+        private readonly MessagingTrace messagingTrace;
         private readonly SchedulingOptions schedulingOptions;
         private readonly ILogger invokeWorkItemLogger;
         internal Dispatcher(
@@ -44,7 +45,8 @@ namespace Orleans.Runtime
             SerializationManager serializationManager,
             CompatibilityDirectorManager compatibilityDirectorManager,
             ILoggerFactory loggerFactory,
-            IOptions<SchedulingOptions> schedulerOptions)
+            IOptions<SchedulingOptions> schedulerOptions,
+            MessagingTrace messagingTrace)
         {
             this.scheduler = scheduler;
             this.catalog = catalog;
@@ -57,6 +59,7 @@ namespace Orleans.Runtime
             this.messageFactory = messageFactory;
             this.serializationManager = serializationManager;
             this.compatibilityDirectorManager = compatibilityDirectorManager;
+            this.messagingTrace = messagingTrace;
             this.schedulingOptions = schedulerOptions.Value;
             logger = loggerFactory.CreateLogger<Dispatcher>();
         }
@@ -423,6 +426,7 @@ namespace Orleans.Runtime
                 targetActivation.RecordRunning(message, message.IsAlwaysInterleave);
 
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
+                this.messagingTrace.OnScheduleMessage(message);
                 scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, this, this.invokeWorkItemLogger), targetActivation.SchedulingContext);
             }
         }
@@ -445,6 +449,7 @@ namespace Orleans.Runtime
             switch (targetActivation.EnqueueMessage(message))
             {
                 case ActivationData.EnqueueMessageResult.Success:
+                    this.messagingTrace.OnEnqueueMessageOnActivation(message);
                     // Great, nothing to do
                     break;
                 case ActivationData.EnqueueMessageResult.ErrorInvalidActivation:

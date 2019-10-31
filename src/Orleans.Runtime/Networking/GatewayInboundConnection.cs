@@ -27,7 +27,7 @@ namespace Orleans.Runtime.Messaging
             Gateway gateway,
             OverloadDetector overloadDetector,
             MessageFactory messageFactory,
-            INetworkingTrace trace,
+            NetworkingTrace trace,
             ILocalSiloDetails siloDetails,
             IOptions<MultiClusterOptions> multiClusterOptions,
             ConnectionOptions connectionOptions,

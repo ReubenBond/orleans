@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Threading;
@@ -14,7 +15,7 @@ namespace Orleans.Runtime
             ProcessAction = state => Process((T)state);
         }
 
-        public WaitCallback ProcessAction { get; }
+        public Action<object> ProcessAction { get; }
 
         public int Count => queueCounter.Count;
 

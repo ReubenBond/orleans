@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Threading;
 
@@ -13,9 +13,9 @@ namespace Orleans.Runtime
             this.serviceProvider = serviceProvider;
         }
 
-        public ThreadPoolExecutor GetExecutor(ThreadPoolExecutorOptions options)
+        public IExecutor GetExecutor(ThreadPoolExecutorOptions options)
         {
-            return ActivatorUtilities.CreateInstance<ThreadPoolExecutor>(this.serviceProvider, options);
+            return this.serviceProvider.GetService<IExecutor>() ?? ActivatorUtilities.CreateInstance<ThreadPoolExecutor>(this.serviceProvider, options);
         }
     }
 }

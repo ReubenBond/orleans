@@ -15,6 +15,7 @@ namespace Orleans.Runtime.Messaging
         private readonly MessageCenter messageCenter;
         private readonly ConnectionManager connectionManager;
         private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly MessagingTrace messagingTrace;
         private readonly ILogger logger;
         private bool stopped;
 
@@ -35,11 +36,13 @@ namespace Orleans.Runtime.Messaging
             MessageCenter mc,
             ILogger<OutboundMessageQueue> logger,
             ConnectionManager senderManager,
-            ISiloStatusOracle siloStatusOracle)
+            ISiloStatusOracle siloStatusOracle,
+            MessagingTrace messagingTrace)
         {
             messageCenter = mc;
             this.connectionManager = senderManager;
             this.siloStatusOracle = siloStatusOracle;
+            this.messagingTrace = messagingTrace;
             this.logger = logger;
             stopped = false;
         }
@@ -58,6 +61,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 msg.DropExpiredMessage(this.logger, MessagingStatisticsGroup.Phase.Send);
+                messagingTrace.OnDropMessage(msg);
                 return;
             }
 
@@ -79,6 +83,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
+            messagingTrace.OnSendMessage(msg);
             if (!messageCenter.TrySendLocal(msg))
             {
                 if (stopped)

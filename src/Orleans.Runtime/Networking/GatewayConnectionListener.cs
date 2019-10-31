@@ -12,7 +12,7 @@ namespace Orleans.Runtime.Messaging
     internal sealed class GatewayConnectionListener : ConnectionListener, ILifecycleParticipant<ISiloLifecycle>
     {
         internal static readonly object ServicesKey = new object();
-        private readonly INetworkingTrace trace;
+        private readonly NetworkingTrace trace;
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly IOptions<MultiClusterOptions> multiClusterOptions;
         private readonly MessageCenter messageCenter;
@@ -29,7 +29,7 @@ namespace Orleans.Runtime.Messaging
             MessageFactory messageFactory,
             OverloadDetector overloadDetector,
             Gateway gateway,
-            INetworkingTrace trace,
+            NetworkingTrace trace,
             ILocalSiloDetails localSiloDetails,
             IOptions<MultiClusterOptions> multiClusterOptions,
             IOptions<EndpointOptions> endpointOptions,

@@ -36,13 +36,13 @@ namespace Orleans.Runtime.Messaging
             ConnectionDelegate middleware,
             MessageFactory messageFactory,
             IServiceProvider serviceProvider,
-            INetworkingTrace trace)
+            NetworkingTrace networkingTrace)
         {
             this.Context = connection ?? throw new ArgumentNullException(nameof(connection));
             this.middleware = middleware ?? throw new ArgumentNullException(nameof(middleware));
             this.MessageFactory = messageFactory ?? throw new ArgumentNullException(nameof(messageFactory));
             this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-            this.Log = trace ?? throw new ArgumentNullException(nameof(trace));
+            this.Log = networkingTrace ?? throw new ArgumentNullException(nameof(networkingTrace));
             this.outgoingMessages = Channel.CreateUnbounded<Message>(OutgoingMessageChannelOptions);
             this.outgoingMessageWriter = this.outgoingMessages.Writer;
 
@@ -60,7 +60,7 @@ namespace Orleans.Runtime.Messaging
         protected CounterStatistic MessageReceivedCounter { get; set; }
         protected CounterStatistic MessageSentCounter { get; set; }
         protected ConnectionContext Context { get; }
-        protected INetworkingTrace Log { get; }
+        protected NetworkingTrace Log { get; }
         protected abstract ConnectionDirection ConnectionDirection { get; }
         protected MessageFactory MessageFactory { get; }
         protected abstract IMessageCenter MessageCenter { get; }
@@ -214,6 +214,7 @@ namespace Orleans.Runtime.Messaging
                                 if (requiredBytes == 0)
                                 {
                                     MessagingStatisticsGroup.OnMessageReceive(this.MessageReceivedCounter, message, bodyLength + headerLength, headerLength, this.ConnectionDirection);
+                                    this.Log.ReceiveMessage(message);
                                     this.OnReceivedMessage(message);
                                     message = null;
                                 }
@@ -286,6 +287,7 @@ namespace Orleans.Runtime.Messaging
                         {
                             inflight.Add(message);
                             var (headerLength, bodyLength) = serializer.Write(ref output, message);
+                            this.Log.SendMessage(message);
                             MessagingStatisticsGroup.OnMessageSend(this.MessageSentCounter, message, headerLength + bodyLength, headerLength, this.ConnectionDirection);
                         }
                     }

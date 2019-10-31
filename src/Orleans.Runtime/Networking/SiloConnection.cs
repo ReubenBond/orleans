@@ -22,7 +22,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionContext connection,
             ConnectionDelegate middleware,
             IServiceProvider serviceProvider,
-            INetworkingTrace trace,
+            NetworkingTrace trace,
             MessageCenter messageCenter,
             MessageFactory messageFactory,
             ILocalSiloDetails localSiloDetails,
