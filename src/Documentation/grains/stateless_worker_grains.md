@@ -1,6 +1,7 @@
 ---
 layout: page
 title: Stateless Worker Grains
+uid: stateless_workers
 ---
 
 # Stateless Worker Grains

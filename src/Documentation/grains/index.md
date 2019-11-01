@@ -1,9 +1,10 @@
 ---
 layout: page
-title: Developing a Grain
+title: Grains
+uid: grains
 ---
 
-# Setup
+# Creating grains
 
 Before you write code to implement a grain class, create a new Class Library project targeting .NET Standard (preferred) or .NET Framework 4.6.1 or higher (if you cannot use .NET Standard due to dependencies).
 Grain interfaces and grain classes can be defined in the same Class Library project or in two different projects for better separation of interfaces from implementation.
@@ -11,17 +12,16 @@ In either case, the projects need to reference `Microsoft.Orleans.Core.Abstracti
 
 For more thorough instructions, see the [Project Setup](../tutorials_and_samples/tutorial_1.md#project-setup) section of [Tutorial One – Orleans Basics](../tutorials_and_samples/tutorial_1.md).
 
-
-# Grain Interfaces and Classes
+## Grain interfaces and classes
 
 Grains interact with each other and get called from outside by invoking methods declared as part of the respective grain interfaces.
 A grain class implements one or more previously declared grain interfaces.
-All methods of a grain interface must return a `Task` (for `void` methods), a `Task<T>` or a `ValueTask<T>`(for methods returning values of type `T`).
+All methods of a grain interface must return a `Task`, `ValueTask`, `Task<T>`, or `ValueTask<T>`. This is due to the asynchronous nature of invoking a method on a grain - whether it is activated on the local host or on a remote host.
 
-The following is an excerpt from the Orleans version 1.5 Presence Service sample:
+The following is an excerpt from the Orleans Presence Service sample:
 
 ```csharp
-//an example of a Grain Interface
+// An example of a Grain Interface
 public interface IPlayerGrain : IGrainWithGuidKey
 {
   Task<IGameGrain> GetCurrentGame();
@@ -29,7 +29,7 @@ public interface IPlayerGrain : IGrainWithGuidKey
   Task LeaveGame(IGameGrain game);
 }
 
-//an example of a Grain class implementing a Grain Interface
+// An example of a Grain class implementing a Grain Interface
 public class PlayerGrain : Grain, IPlayerGrain
 {
     private IGameGrain currentGame;
@@ -66,7 +66,7 @@ public class PlayerGrain : Grain, IPlayerGrain
 }
 ```
 
-# Returning Values from Grain Methods
+## Returning values from grain methods
 
 A grain method that returns a value of type `T` is defined in a grain interface as returning a `Task<T>`.
 For grain methods not marked with the `async` keyword, when the return value is available, it is usually returned via the following statement:
@@ -135,7 +135,7 @@ public Task GrainMethod6()
 
 `ValueTask<T>` can be used instead of `Task<T>`
 
-### Grain Reference
+### Grain references
 
 A Grain Reference is a proxy object that implements the same grain interface as the corresponding grain class.
 It encapsulates a logical identity (type and unique key) of the target grain.
@@ -146,7 +146,7 @@ Since a grain reference represents a logical identity of the target grain, it is
 Developers can use grain references like any other .NET object.
 It can be passed to a method, used as a method return value, etc., and even saved to persistent storage.
 
-A grain reference can be obtained by passing the identity of a grain to the `GrainFactory.GetGrain<T>(key)` method, where `T` is the grain interface and `key` is the unique key of the grain within the type.
+A grain reference can be obtained by passing the identity of a grain to the `IGrainFactory.GetGrain<T>(key)` method, where `T` is the grain interface and `key` is the unique key of the grain within the type.
 
 The following are examples of how to obtain a grain reference of the `IPlayerGrain` interface defined above.
 
@@ -154,7 +154,7 @@ From inside a grain class:
 
 ```csharp
     //construct the grain reference of a specific player
-    IPlayerGrain player = GrainFactory.GetGrain<IPlayerGrain>(playerId);
+    IPlayerGrain player = this.GrainFactory.GetGrain<IPlayerGrain>(playerId);
 ```
 
 From Orleans Client code.
@@ -163,7 +163,7 @@ From Orleans Client code.
     IPlayerGrain player = client.GetGrain<IPlayerGrain>(playerId);
 ```
 
-### Grain Method Invocation
+### Grain method invocation
 
 The Orleans programming model is based on [Asynchronous Programming](https://docs.microsoft.com/en-us/dotnet/csharp/async).
 

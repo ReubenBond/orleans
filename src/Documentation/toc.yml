@@ -3,7 +3,7 @@
   homepage: index.md
 - name: Grains
   href: grains/toc.yml
-- name: Streaming
+- name: Streams
   href: streaming/toc.yml
 - name: Hosting
   href: clusters_and_clients/toc.yml

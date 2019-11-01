@@ -10,6 +10,8 @@
   href: reentrancy.md
 - name: Request Context
   href: request_context.md
+- name: Handling failures
+  href: handling_failures.md
 - name: Code Generation
   href: code_generation.md
 - name: Persistence

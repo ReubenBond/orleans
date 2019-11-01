@@ -1,3 +1,9 @@
+---
+layout: page
+title: Version Selector Strategy
+uid: version_selector_strategy
+---
+
 # Version selector strategy
 
 When several versions of the same grain interface exist in the cluster, and a new

@@ -1,6 +1,7 @@
 ---
 layout: page
 title: Orleans Stream Providers
+uid: stream_providers
 ---
 
 

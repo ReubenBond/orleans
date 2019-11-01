@@ -1,6 +1,7 @@
 ---
 layout: page
 title: External Tasks and Grains
+uid: external_tasks
 ---
 
 # External Tasks and Grains

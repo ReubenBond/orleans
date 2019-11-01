@@ -1,6 +1,7 @@
 ---
 layout: page
 title: Observers
+uid: observers
 ---
 
 # Observers

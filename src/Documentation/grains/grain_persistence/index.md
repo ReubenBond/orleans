@@ -1,6 +1,7 @@
 ---
 layout: page
 title: Persistence
+uid: persistence
 ---
 
 # Persistence

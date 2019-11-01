@@ -58,10 +58,10 @@ If the login action is not working, then you cannot continue.
 
 There is a guide [in the Azure documentation](https://docs.microsoft.com/en-us/azure/architecture/patterns/) about good patterns and practices for the cloud which applies to Orleans as well, in most cases.
 
-## A fairly complex example
+## A more complex example
 
 Because in Orleans grains are activated and deactivated automatically and you don't handle their life-cycle, you usually only deal with making sure that grain state is correct and actions are being started and finished correctly in relation to each other.
-Knowing the dependencies between grains and actions they perform is a big step toward understanding how to handle failure in any complex system. 
+Knowing the dependencies between grains and actions they perform is a big step toward understanding how to handle failure in any complex system.
 If you need to store relations among grains, you can simply do it and it is a widely followed practice, too.
 
 As an example, let's say we have a `GameManager` grain which starts and stops `Game` grains and adds `Player` grains to the games.
@@ -70,7 +70,7 @@ Managing memory in Orleans is automatic and the system deals with it, you only n
 You can achieve this by either calling the related methods in a sequential manner or by doing them in parallel and resetting the state of all involved grains if any of them fail.
 
 If one of the games receives a call, it will be reactivated automatically, so if you need the manager to manage the game grains, then all calls to the game which are related to management should go through the `GameManager`.
-If you need orchestration among grains, Orleans doesn't solve it "automagically" for you and you need to do your orchestration. 
+If you need orchestration among grains, Orleans doesn't solve it "automagically" for you and you need to do your orchestration.
 But the fact that you are not dealing with creating/destroying grains means you don't need to worry about resource management.
 You don't need to answer any of these questions:
 

@@ -1,12 +1,13 @@
 ---
 layout: page
 title: Grain Identity
+uid: grain_identity
 ---
 
 # Grain Identity
 
 In object-oriented environments, the identity of an object is hard to distinguish from a reference to it.
-Thus, when an object is created using new, the reference you get back represents all aspects of its identity except those that map the object to some external entity that it represents.
+Thus, when an object is created, the reference you get back represents all aspects of its identity except those that map the object to some external entity that it represents.
 
 In distributed systems, object references cannot represent instance identity, since references are typically limited to a single address space.
 That is certainly the case for .NET references.
@@ -17,7 +18,7 @@ The primary key can be a Globally Unique Identifier (GUID), a long integer, or a
 The primary key is scoped to the grain type.
 Therefore, the complete identity of a grain is formed from the grain's type and its key.
 
-The caller of the grain decides which scheme should be used. 
+The caller of the grain decides which scheme should be used.
 The options are:
 
 * long

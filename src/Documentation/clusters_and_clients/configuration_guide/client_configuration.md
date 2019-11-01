@@ -4,7 +4,7 @@ title: Client Configuration
 ---
 
 > [!NOTE]
-> If you just want to start a local silo and a local client for development purpose, look at the Local Development Configuration page.
+> If you just want to start a local silo and a local client for development purpose, look at the [Local development configuration](xref:local_development_configuration) page.
 
 # Client Configuration
 

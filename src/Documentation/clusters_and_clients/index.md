@@ -1,9 +1,9 @@
 ---
 layout: page
-title: What is a grain client
+title: Clients
 ---
 
-### What is a Grain Client?
+### Clients
 
 The term "Client" or sometimes "Grain Client" is used for application code that interacts with grains but itself is not part of a grain logic.
 Client code runs outside of the cluster of Orleans servers called silos where grains are hosted.
@@ -13,6 +13,7 @@ Hence, a client acts as a connector or conduit to the cluster and to all grains 
 
 Usually, clients are used on the frontend web servers to connect to an Orleans cluster that serves as a middle tier with grains executing business logic.
 In a typical setup, a frontend web server:
+
 * Receives a web request
 * Performs necessary authentication and authorization validation
 * Decides which grain(s) should process the request
@@ -58,7 +59,7 @@ await client.Connect();
 ### Making Calls to Grains
 
 Making calls to grain from a client is really no different from [making such calls from within grain code](../grains/index.md).
-The same `GetGrain<T>(key)` method, where `T` is the target grain interface, is used in both cases [to obtain grain references](../grains/index.md#grain-reference).
+The same `GetGrain<T>(key)` method, where `T` is the target grain interface, is used in both cases [to obtain grain references](../grains/index.md#grain-references).
 The slight difference is in through what factory object we invoke `GetGrain`.
 In client code we do that through the connected client object.
 
@@ -126,7 +127,7 @@ namespace PlayerWatcher
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IValueGrain).Assembly))
                 .Build();
 
-                // Hardcoded player ID
+                // Hard-coded player ID
                 Guid playerId = new Guid("{2349992C-860A-4EDA-9590-000000000006}");
                 IPlayerGrain player = client.GetGrain<IPlayerGrain>(playerId);
                 IGameGrain game = null;

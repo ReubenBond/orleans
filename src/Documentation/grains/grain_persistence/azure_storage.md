@@ -1,6 +1,7 @@
 ---
 layout: page
 title: Azure Storage Grain Persistence
+uid: persistence_azure_storage
 ---
 
 # Azure Storage Grain Persistence

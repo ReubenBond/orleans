@@ -1,17 +1,17 @@
-- name: External Tasks and Grains
+- name: External tasks and grains
   href: ../external_tasks_and_grains.md
-- name: Interceptors
+- name: Grain call filters
   href: ../interceptors.md
 - name: GrainServices
   href: ../grainservices.md
-- name: Stateless Worker Grains
+- name: Stateless worker grains
   href: ../stateless_worker_grains.md
-- name: Cancellation Tokens
+- name: Cancellation tokens
   href: ../cancellation_tokens.md
 - name: Transactions
   href: ../transactions.md
-- name: Grain Lifecycle
+- name: Grain lifecycle
   href: ../grain_lifecycle.md
-- name: Interface Versioning
+- name: Interface versioning
   href: ../grain_versioning/toc.yml
 

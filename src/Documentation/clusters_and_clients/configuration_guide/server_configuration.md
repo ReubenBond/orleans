@@ -1,12 +1,12 @@
 ---
 layout: page
-title: Server Configuration
+title: Silo Configuration
 ---
 
 > [!NOTE]
 > If you want to start a local silo and a local client for development purposes, look at the [Local Development Configuration page](local_development_configuration.md)
 
-# Server Configuration
+# Silo configuration
 
 A silo is configured programmatically via `SiloHostBuilder` and a number of supplemental option classes.
 Option classes in Orleans follow the [ASP.NET Options](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/options) pattern, and can be loaded via files, environment variables, etc.

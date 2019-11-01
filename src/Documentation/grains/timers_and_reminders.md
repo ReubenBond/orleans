@@ -1,6 +1,7 @@
 ---
 layout: page
 title: Timers and Reminders
+uid: timers_and_reminders
 ---
 
 # Timers and Reminders

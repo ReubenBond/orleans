@@ -1,6 +1,7 @@
 ---
 layout: page
 title: Code Generation
+uid: code_generation
 ---
 
 # Code Generation
