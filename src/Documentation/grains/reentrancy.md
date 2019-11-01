@@ -1,7 +1,9 @@
 ---
 layout: page
 title: Reentrancy
+uid: reentrancy
 ---
+
 # Reentrancy
 
 Grain activations are single-threaded and, by default, process each request from beginning to completion before the next request can begin being processing. In some circumstances, it may be desirable for an activation to process other requests while one request is waiting for an asynchronous operation to complete. For this and other reasons, Orleans gives the developer some control over the request interleaving behavior. Multiple requests may be interleaved in the following cases:

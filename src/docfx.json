@@ -59,7 +59,7 @@
         ]
       }
     ],
-    "dest": "../../_output",
+    "dest": "../_output",
     "template": [
       "default", "template"
     ],

@@ -1,6 +1,7 @@
 ---
 layout: page
 title: Amazon DynamoDB Grain Persistence
+uid: persistence_dynamodb
 ---
 
 # Amazon DynamoDB Grain Persistence

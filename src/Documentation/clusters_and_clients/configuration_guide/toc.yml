@@ -1,25 +1,25 @@
-- name: Configuration Guide
+- name: Configuration guide
   href: index.md
   homepage: index.md
-- name: Local Development Configuration
+- name: Local development configuration
   href: local_development_configuration.md
-- name: Client Configuration
+- name: Client configuration
   href: client_configuration.md
-- name: Server Configuration
+- name: Silo configuration
   href: server_configuration.md
-- name: Typical Configurations
+- name: Typical configurations
   href: typical_configurations.md
-- name: Options Classes
+- name: Options classes
   href: list_of_options_classes.md
-- name: Activation Garbage Collection
+- name: Activation collection
   href: activation_garbage_collection.md
-- name: Configuring .NET Garbage Collection
+- name: Configuring .NET garbage collection
   href: configuring_.NET_garbage_collection.md
-- name: Configuring ADO.NET Providers
-  href: configuring_ADO.NET_providers.md
+- name: Configuring ADO.NET providers
+  href: adonet_configuration.md
 - name: Serialization
   href: serialization.md  
-- name: Startup Tasks
+- name: Startup tasks
   href: startup_tasks.md
-- name: Shutting Down Orleans
+- name: Shutting down Orleans
   href: shutting_down_orleans.md   

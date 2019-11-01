@@ -32,7 +32,7 @@ All Options classes used to configure Orleans should be in the `Orleans.Configur
 | `ClusterMembershipOptions` | Settings for cluster membership |
 | `ConsistentRingOptions` | Configuration options for consistent hashing algorithm, used to balance resource allocations across the cluster. |
 | `EndpointOptions` | Setting the Silo endpoint options |
-| `GrainCollectionOptions` | Options for grain garbage collection |
+| `GrainCollectionOptions` | Options for grain collection |
 | `GrainVersioningOptions` |  Governs grain implementation selection in heterogeneous deployments |
 | `LoadSheddingOptions` | Settings for load shedding configuration. Must have a registered implementation of `IHostEnvironmentStatistics` such as through `builder.UsePerfCounterEnvironmentStatistics()` (Windows only) for `LoadShedding` to function. |
 | `MultiClusterOptions` | Options for configuring multi-cluster support |

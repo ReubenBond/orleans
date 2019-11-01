@@ -1,6 +1,7 @@
 ---
 layout: page
 title: ADO.NET Grain Persistence
+uid: persistence_adonet
 ---
 
 # ADO.NET Grain Persistence

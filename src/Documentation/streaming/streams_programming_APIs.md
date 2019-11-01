@@ -1,6 +1,7 @@
 ---
 layout: page
 title: Orleans Streams Programming APIs
+uid: streams_api
 ---
 
 # Orleans Streams Programming APIs

@@ -1,6 +1,7 @@
 ---
 layout: page
 title: Local development configuration
+uid: local_development_configuration
 ---
 
 # Local development configuration

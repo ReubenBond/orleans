@@ -1,9 +1,10 @@
 ﻿---
 layout: page
-title: Transactions in Orleans 2.0
+title: Transactions
+uid: transactions
 ---
 
-# Orleans Transactions
+# Transactions
 
 Orleans supports distributed ACID transactions against persistent grain state.
 
@@ -16,7 +17,6 @@ To enable transactions on a silo, call `UseTransactions()` on the silo host buil
 
 ```csharp
 var builder = new SiloHostBuilder().UseTransactions();
-
 ```
 
 ### Transactional State Storage

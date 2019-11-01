@@ -1,3 +1,9 @@
+---
+layout: page
+title: Compatible Grains
+uid: grain_versioning_guidelines
+---
+
 # Backward compatibility guidelines
 
 Writing backward compatible code can be hard and difficult to test.
@@ -17,6 +23,7 @@ public interface IMyGrain : IGrainWithIntegerKey
   Task MyMethod(int arg);
 }
 ```
+
 ``` cs
 [Version(2)]
 public interface IMyGrain : IGrainWithIntegerKey
@@ -30,6 +37,7 @@ public interface IMyGrain : IGrainWithIntegerKey
 ```
 
 This is not correct:
+
 ``` cs
 [Version(1)]
 public interface IMyGrain : IGrainWithIntegerKey
@@ -38,6 +46,7 @@ public interface IMyGrain : IGrainWithIntegerKey
   Task MyMethod(int arg);
 }
 ```
+
 ``` cs
 [Version(2)]
 public interface IMyGrain : IGrainWithIntegerKey
@@ -50,6 +59,7 @@ public interface IMyGrain : IGrainWithIntegerKey
 **NOTE**: you should not do this change in your code, as it's an example of a bad practice that leads to very bad side-effects.
 This is an example of what can happen if you just rename the parameter names: let's say
 that we have the two following interface version deployed in the cluster:
+
 ``` cs
 [Version(1)]
 public interface IMyGrain : IGrainWithIntegerKey
@@ -58,6 +68,7 @@ public interface IMyGrain : IGrainWithIntegerKey
   Task<int> Substract(int a, int b);
 }
 ```
+
 ``` cs
 [Version(2)]
 public interface IMyGrain : IGrainWithIntegerKey
@@ -69,6 +80,7 @@ public interface IMyGrain : IGrainWithIntegerKey
 
 This methods seems identical. But if the client was called with V1, and the request is
 handled by a V2 activation:
+
 ``` cs
 var grain = client.GetGrain<IMyGrain>(0);
 var result = await grain.Substract(5, 4); // Will return "-1" instead of expected "1"
@@ -82,6 +94,7 @@ It can seems obvious, but you should be very careful when changing the body of a
 Unless you are fixing a bug, it is better to just add a new method if you need to modify the code.
 
 Example:
+
 ``` cs
 // V1
 public interface MyGrain : IMyGrain
@@ -93,6 +106,7 @@ public interface MyGrain : IMyGrain
   }
 }
 ```
+
 ``` cs
 // V2
 public interface MyGrain : IMyGrain
@@ -117,6 +131,7 @@ public interface MyGrain : IMyGrain
 
 Unless you are sure that they are no longer used, you should not remove methods from the grain interface.
 If you want to remove methods, this should be done in 2 steps:
+
 1. Deploy V2 grains, with V1 method marked as `Obsolete`
 
   ``` cs
@@ -127,6 +142,7 @@ If you want to remove methods, this should be done in 2 steps:
     Task MyMethod(int arg);
   }
   ```
+
   ``` cs
   [Version(2)]
   public interface IMyGrain : IGrainWithIntegerKey
@@ -141,6 +157,7 @@ If you want to remove methods, this should be done in 2 steps:
   ```
 
 2. When you are sure that no V1 calls are made (effectively V1 is no longer deployed in the running cluster), deploy V3 with V1 method removed
+
   ``` cs
   [Version(3)]
   public interface IMyGrain : IGrainWithIntegerKey

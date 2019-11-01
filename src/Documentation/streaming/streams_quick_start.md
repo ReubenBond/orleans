@@ -1,6 +1,7 @@
 ---
 layout: page
 title: Orleans Streams Quick Start
+uid: streams_quick_start
 ---
 
 # Orleans Streams Quick Start

@@ -1,19 +1,26 @@
-# Deploy new version of grains
+---
+layout: page
+title: Deploying versioned grains
+uid: grain_versioning_deployment
+---
 
-### Rolling upgrade
+# Deploying versioned grains
+
+## Rolling upgrade
 
 In this method you deploy newer silos directly on your environment.
 This is the simplest method, but it can be difficult to interrupt an ongoing deployment
 and to rollback.
 
 Recommended configuration:
-- `DefaultCompatibilityStrategy` set to `BackwardCompatible`
-- `DefaultVersionSelectorStrategy` set to `AllCompatibleVersions`
+
+* `DefaultCompatibilityStrategy` set to `BackwardCompatible`
+* `DefaultVersionSelectorStrategy` set to `AllCompatibleVersions`
 
 ```csharp
 var silo = new SiloHostBuilder()
   [...]
-  .Configure<GrainVersioningOptions>(options => 
+  .Configure<GrainVersioningOptions>(options =>
   {
     options.DefaultCompatibilityStrategy = nameof(BackwardCompatible);
     options.DefaultVersionSelectorStrategy = nameof(AllCompatibleVersions);
@@ -35,13 +42,14 @@ The Production and the Staging silos and clients will be __part of the same
 cluster__. It is important that silos from both environment can talk to each other.
 
 Recommended configuration:
-- `DefaultCompatibilityStrategy` set to `BackwardCompatible`
-- `DefaultVersionSelectorStrategy` set to `MinimumVersion`
+
+* `DefaultCompatibilityStrategy` set to `BackwardCompatible`
+* `DefaultVersionSelectorStrategy` set to `MinimumVersion`
 
 ```csharp
 var silo = new SiloHostBuilder()
   [...]
-  .Configure<GrainVersioningOptions>(options => 
+  .Configure<GrainVersioningOptions>(options =>
   {
     options.DefaultCompatibilityStrategy = nameof(BackwardCompatible);
     options.DefaultVersionSelectorStrategy = nameof(MinimumVersion);
@@ -54,7 +62,7 @@ Suggested deployment steps:
 1. "V1" silos and clients are deployed and are running in the Production slot.
 2. "V2" silos and clients begin to start in the Staging slot. They will join the
 same cluster as the Production slot. No "V2" activations will be created so far.
-3. Once the deployment in the Staging slot is finished, the developper can redirect
+3. Once the deployment in the Staging slot is finished, the developer can redirect
 some traffic on the V2 clients (smoke tests, targeted beta users, ect.). This will
 create V2 activations, but since Grains are backward compatibles and that all silos
 are in the same cluster, no duplicate activations will be created.
