@@ -149,8 +149,8 @@ namespace Orleans.Runtime
             // so every GW needs to behave as a different "activation" with a different ActivationId (its not enough that they have different SiloAddress)
             string stringToHash = clientId.ToString() + myAddress.Endpoint + myAddress.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture);
             Guid hash = Utils.CalculateGuidHash(stringToHash);
-            var key = UniqueKey.NewKey(hash);
-            return ActivationAddress.GetAddress(myAddress, clientId, ActivationId.GetActivationId(key));
+            var activationId = ActivationId.GetDeterministic(clientId);
+            return ActivationAddress.GetAddress(myAddress, clientId, activationId);
         }
 
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)

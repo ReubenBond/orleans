@@ -6,12 +6,6 @@ using System.Text;
 
 namespace Orleans.Runtime
 {
-    public static class GrainKinds
-    {
-        public const string SystemPrefix = "sys.";
-        public const string SystemTargetPrefix = SystemPrefix + "st.";
-    }
-
     [Serializable]
     [StructLayout(LayoutKind.Auto)]
     public readonly struct GrainType : IEquatable<GrainType>, IComparable<GrainType>, ISerializable
@@ -31,7 +25,7 @@ namespace Orleans.Runtime
 
         public static GrainType Create(string value) => new GrainType(Encoding.UTF8.GetBytes(value));
 
-        public static GrainType CreateForSystemTarget(string name) => new GrainType(GrainKinds.SystemTargetPrefix + "." + name);
+        public static GrainType CreateForSystemTarget(string name) => Create(GrainTypePrefix.SystemTargetPrefix + "." + name);
 
         public static explicit operator SpanId(GrainType kind) => kind._value;
 

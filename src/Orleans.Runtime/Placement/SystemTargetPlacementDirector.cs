@@ -13,7 +13,8 @@ namespace Orleans.Runtime.Placement
 
         public Task<PlacementResult> OnSelectActivation(PlacementStrategy strategy, GrainId target, IPlacementRuntime context)
         {
-            return PlacementResult.IdentifySelection(ActivationAddress.GetAddress())
+            var siloAddress = SystemTarget.GetSiloAddress(target);
+            return PlacementResult.IdentifySelection(ActivationAddress.GetAddress(siloAddress, target, ))
         }
 
         public bool TrySelectActivationSynchronously(PlacementStrategy strategy, GrainId target, IPlacementRuntime context, out PlacementResult placementResult)
