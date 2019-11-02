@@ -51,6 +51,13 @@ namespace Orleans.Runtime
 
         IGrainReferenceRuntime ISystemTargetBase.GrainReferenceRuntime => this.RuntimeClient.GrainReferenceRuntime;
 
+        public static SiloAddress GetSiloAddress(GrainId grainId) => SiloAddress.FromUtf8String(grainId.Key.Span);
+
+        public static GrainId GetGrainId(GrainType kind, SiloAddress address)
+        {
+            return GrainId.Create(kind, address.ToParsableString());
+        }
+
         /// <summary>Only needed to make Reflection happy.</summary>
         protected SystemTarget()
         {

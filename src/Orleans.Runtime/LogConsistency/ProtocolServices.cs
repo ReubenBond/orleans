@@ -103,7 +103,7 @@ namespace Orleans.Runtime.LogConsistency
             if (clusterGateway == null)
                 throw new ProtocolTransportException("no active gateways found for cluster");
 
-            var repAgent = this.grainFactory.GetSystemTarget<ILogConsistencyProtocolGateway>(Constants.ProtocolGatewayId, clusterGateway);
+            var repAgent = this.grainFactory.GetSystemTarget<ILogConsistencyProtocolGateway>(Constants.GsiProtocolGateway, clusterGateway);
 
             // test hook
             var filter = (this.multiClusterOracle as MultiClusterOracle)?.ProtocolMessageFilterForTesting;

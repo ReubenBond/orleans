@@ -73,16 +73,6 @@ namespace Orleans.Runtime
             return ctr;
         }
 
-        private CounterStatistic FindSystemTargetCounter(string systemTargetTypeName)
-        {
-            CounterStatistic ctr;
-            if (systemTargetCounts.TryGetValue(systemTargetTypeName, out ctr)) return ctr;
-
-            var counterName = new StatisticName(StatisticNames.SYSTEM_TARGET_COUNTS, systemTargetTypeName);
-            ctr = systemTargetCounts[systemTargetTypeName] = CounterStatistic.FindOrCreate(counterName, false);
-            return ctr;
-        }
-
         public void RecordNewTarget(ActivationData target)
         {
             if (!activations.TryAdd(target.ActivationId, target))
@@ -96,10 +86,6 @@ namespace Orleans.Runtime
         {
             var systemTarget = (ISystemTargetBase) target;
             systemTargets.TryAdd(target.ActivationId, target);
-            if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId))
-            {
-                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId)).Increment();
-            }
         }
 
         public void RemoveSystemTarget(SystemTarget target)
@@ -107,10 +93,6 @@ namespace Orleans.Runtime
             var systemTarget = (ISystemTargetBase) target;
             SystemTarget ignore;
             systemTargets.TryRemove(target.ActivationId, out ignore);
-            if (!Constants.IsSingletonSystemTarget(systemTarget.GrainId))
-            {
-                FindSystemTargetCounter(Constants.SystemTargetName(systemTarget.GrainId)).DecrementBy(1);
-            }
         }
 
         public void RemoveTarget(ActivationData target)

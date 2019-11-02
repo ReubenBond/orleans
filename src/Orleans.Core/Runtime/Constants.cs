@@ -27,26 +27,27 @@ namespace Orleans.Runtime
         public const string ORLEANS_CLUSTERING_ZOOKEEPER = "Orleans.Clustering.ZooKeeper";
         public const string TroubleshootingHelpLink = "https://aka.ms/orleans-troubleshooting";
 
-        public static readonly GrainId DirectoryServiceId = GrainId.GetSystemTargetGrainId(10);
-        public static readonly GrainId DirectoryCacheValidatorId = GrainId.GetSystemTargetGrainId(11);
-        public static readonly GrainId SiloControlId = GrainId.GetSystemTargetGrainId(12);
-        public static readonly GrainId ClientObserverRegistrarId = GrainId.GetSystemTargetGrainId(13);
-        public static readonly GrainId CatalogId = GrainId.GetSystemTargetGrainId(14);
-        public static readonly GrainId MembershipOracleId = GrainId.GetSystemTargetGrainId(15);
-        public static readonly GrainId TypeManagerId = GrainId.GetSystemTargetGrainId(17);
-        public static readonly GrainId FallbackSystemTargetId = GrainId.GetSystemTargetGrainId(19);
-        public static readonly GrainId LifecycleSchedulingSystemTargetId = GrainId.GetSystemTargetGrainId(20);
-        public static readonly GrainId DeploymentLoadPublisherSystemTargetId = GrainId.GetSystemTargetGrainId(22);
-        public static readonly GrainId MultiClusterOracleId = GrainId.GetSystemTargetGrainId(23);
-        public static readonly GrainId ClusterDirectoryServiceId = GrainId.GetSystemTargetGrainId(24);
-        public static readonly GrainId StreamProviderManagerAgentSystemTargetId = GrainId.GetSystemTargetGrainId(25);
-        public static readonly GrainId TestHooksSystemTargetId = GrainId.GetSystemTargetGrainId(26);
-        public static readonly GrainId ProtocolGatewayId = GrainId.GetSystemTargetGrainId(27);
-        public static readonly GrainId TransactionAgentSystemTargetId = GrainId.GetSystemTargetGrainId(28);
-        public static readonly GrainId SystemMembershipTableId = GrainId.GetSystemTargetGrainId(29);
-        public static readonly GrainId SiloDirectConnectionId = GrainId.GetSystemGrainId(new Guid("01111111-1111-1111-1111-111111111111"));
+        public static readonly GrainType DirectoryServiceId = GrainType.CreateForSystemTarget("dir");
+        public static readonly GrainType DirectoryCacheValidatorId = GrainType.CreateForSystemTarget("dir-cache");
+        public static readonly GrainType SiloControlId = GrainType.CreateForSystemTarget("silo-control");
+        public static readonly GrainType ClientObserverRegistrarId = GrainType.CreateForSystemTarget("client-observer-registrar");
+        public static readonly GrainType CatalogId = GrainType.CreateForSystemTarget("catalog");
+        public static readonly GrainType MembershipOracleId = GrainType.CreateForSystemTarget("membership-oracle");
+        public static readonly GrainType TypeManagerId = GrainType.CreateForSystemTarget("type-manager");
+        public static readonly GrainType FallbackSystemTargetId = GrainType.CreateForSystemTarget("fallback");
+        public static readonly GrainType LifecycleSchedulingSystemTargetId = GrainType.CreateForSystemTarget("lifecycle");
+        public static readonly GrainType DeploymentLoadPublisherSystemTargetId = GrainType.CreateForSystemTarget("cluster-load");
+        public static readonly GrainType MultiClusterOracleId = GrainType.CreateForSystemTarget("multicluster-oracle");
+        public static readonly GrainType ClusterDirectoryServiceId = GrainType.CreateForSystemTarget("gsi-directory");
+        public static readonly GrainType TestHooksSystemTargetId = GrainType.CreateForSystemTarget("test-hooks");
+        public static readonly GrainType GsiProtocolGateway = GrainType.CreateForSystemTarget("es-gw");
+        public static readonly GrainType SystemMembershipTableId = GrainType.CreateForSystemTarget("dev-membership");
 
+        public static readonly SpanId SiloDirectConnectionId = SpanId.Create("01111111-1111-1111-1111-111111111111");
+
+        public static readonly GrainType StreamPullingAgentManagerType = GrainType.CreateForSystemTarget("stream-agent-mgr");
         public const int PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE = 254;
+        public static readonly GrainType StreamPullingAgentType = GrainType.CreateForSystemTarget("stream-agent");
         public const int PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE = 255;
 
         internal const long ReminderTableGrainId = 12345;
@@ -66,7 +67,7 @@ namespace Orleans.Runtime
 
         public static readonly TimeSpan DEFAULT_CLIENT_DROP_TIMEOUT = TimeSpan.FromMinutes(1);
 
-        private static readonly Dictionary<GrainId, string> singletonSystemTargetNames = new Dictionary<GrainId, string>
+        private static readonly Dictionary<GrainType, string> singletonSystemTargetNames = new Dictionary<GrainType, string>
         {
             {DirectoryServiceId, "DirectoryService"},
             {DirectoryCacheValidatorId, "DirectoryCacheValidator"},
@@ -76,7 +77,7 @@ namespace Orleans.Runtime
             {MembershipOracleId,"MembershipOracle"},
             {MultiClusterOracleId,"MultiClusterOracle"},
             {TypeManagerId,"TypeManagerId"},
-            {ProtocolGatewayId,"ProtocolGateway"},
+            {GsiProtocolGateway,"ProtocolGateway"},
             {FallbackSystemTargetId, "FallbackSystemTarget"},
             {DeploymentLoadPublisherSystemTargetId, "DeploymentLoadPublisherSystemTarget"},
         };

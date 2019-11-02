@@ -29,8 +29,7 @@ namespace Orleans.Serialization
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
         internal static ActivationId ReadActivationId<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
         {
-            UniqueKey key = @this.ReadUniqueKey();
-            return ActivationId.GetActivationId(key);
+            return new ActivationId(@this.ReadGuid());
         }
 
         internal static UniqueKey ReadUniqueKey<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader

@@ -3,91 +3,35 @@ using System;
 namespace Orleans.Runtime
 {
     [Serializable]
-    internal class ActivationId : UniqueIdentifier, IEquatable<ActivationId>
+    internal readonly struct ActivationId : IEquatable<ActivationId>
     {
-        public bool IsSystem { get { return Key.IsSystemTargetKey; } }
+        public static readonly ActivationId Zero = new ActivationId(Guid.Empty);
+        
+        public ActivationId(Guid key) => Value = key;
 
-        public static readonly ActivationId Zero;
+        public static ActivationId NewId() => new ActivationId(Guid.NewGuid());
 
-        private static readonly Interner<UniqueKey, ActivationId> interner;
+        public readonly bool IsDefault => !Value.Equals(Guid.Empty);
 
-        static ActivationId()
+        public readonly Guid Value { get; }
+
+        public static ActivationId GetDeterministic(GrainId id)
         {
-            interner = new Interner<UniqueKey, ActivationId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq);
-            Zero = FindOrCreate(UniqueKey.Empty);
+            var type = id.Type;
+            var key = id.Key;
+            var typeHash = type.GetHashCode();
+            var keyHash = key.GetHashCode();
+            
+            var idGuid = new Guid(typeHash, (short)keyHash, (short)(keyHash >> 32), 0x00, 0x6f, 0x72, 0x6c, 0x65, 0x61, 0x6e, 0x73);
+            return new ActivationId(idGuid);
         }
 
-        /// <summary>
-        /// Only used in Json serialization
-        /// DO NOT USE TO CREATE A RANDOM ACTIVATION ID
-        /// Use ActivationId.NewId to create new activation IDs.
-        /// </summary>
-        public ActivationId()
-        {
-        }
+        public override readonly bool Equals(object obj) => obj is ActivationId activationId && this.Equals(activationId);
 
-        private ActivationId(UniqueKey key)
-            : base(key)
-        {
-        }
+        public readonly bool Equals(ActivationId other) => Value.Equals(other.Value);
 
-        public static ActivationId NewId()
-        {
-            return FindOrCreate(UniqueKey.NewKey());
-        }
+        public override readonly int GetHashCode() => this.Value.GetHashCode();
 
-        // No need to encode SiloAddress in the activation address for system target. 
-        // System targets have unique grain ids and addressed to a concrete silo, so in fact we don't need ActivationId at all for System targets.
-        // Need to remove it all together. For now, just use grain id as activation id.
-        public static ActivationId GetSystemActivation(GrainId grain, SiloAddress location)
-        {
-            if (!grain.IsSystemTarget)
-                throw new ArgumentException("System activation IDs can only be created for system grains");
-            return FindOrCreate(grain.Key);
-        }
-
-        internal static ActivationId GetActivationId(UniqueKey key)
-        {
-            return FindOrCreate(key);
-        }
-
-        private static ActivationId FindOrCreate(UniqueKey key)
-        {
-            return interner.FindOrCreate(key, k => new ActivationId(k));
-        }
-
-        public override bool Equals(UniqueIdentifier obj)
-        {
-            var o = obj as ActivationId;
-            return o != null && Key.Equals(o.Key);
-        }
-
-        public override bool Equals(object obj)
-        {
-            var o = obj as ActivationId;
-            return o != null && Key.Equals(o.Key);
-        }
-
-        public bool Equals(ActivationId other)
-        {
-            return other != null && Key.Equals(other.Key);
-        }
-
-        public override int GetHashCode()
-        {
-            return Key.GetHashCode();
-        }
-
-        public override string ToString()
-        {
-            string idString = Key.ToString().Substring(24, 8);
-            return String.Format("@{0}{1}", IsSystem ? "S" : "", idString);
-        }
-
-        public string ToFullString()
-        {
-            string idString = Key.ToString();
-            return String.Format("@{0}{1}", IsSystem ? "S" : "", idString);
-        }
+        public override readonly string ToString() => this.Value.ToString("N");
     }
 }

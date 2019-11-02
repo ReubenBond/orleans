@@ -1,8 +1,9 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
+using System.Text;
 
 namespace Orleans.Runtime
 {
@@ -31,7 +32,11 @@ namespace Orleans.Runtime
             _hashCode = info.GetInt32("h");
         }
 
+        public static SpanId Create(string id) => new SpanId(Encoding.UTF8.GetBytes(id));
+
         public readonly ReadOnlyMemory<byte> Value => _value;
+
+        public readonly bool IsDefault => _value is null || _value.Length == 0;
 
         public override readonly bool Equals(object obj)
         {
@@ -59,6 +64,8 @@ namespace Orleans.Runtime
         public static byte[] UnsafeGetArray(SpanId id) => id._value;
 
         public int CompareTo(SpanId other) => _value.AsSpan().SequenceCompareTo(other._value.AsSpan());
+
+        public readonly string ToStringUtf8() => Encoding.UTF8.GetString(_value);
 
         public sealed class Comparer : IEqualityComparer<SpanId>, IComparer<SpanId>
         {

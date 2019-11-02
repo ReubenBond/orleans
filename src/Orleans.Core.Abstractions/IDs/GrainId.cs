@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
+using System.Text;
 
 namespace Orleans.Runtime
 {
@@ -9,46 +10,68 @@ namespace Orleans.Runtime
     [StructLayout(LayoutKind.Auto)]
     public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable
     {
-        private readonly GrainKind _kind;
+        private readonly GrainType _type;
         private readonly SpanId _key;
 
-        public GrainId(GrainKind kind, byte[] key, int keyHashCode)
+        public GrainId(byte[] type, byte[] key)
         {
-            _kind = kind;
+            _type = new GrainType(type);
+            _key = new SpanId(key);
+        }
+
+        public GrainId(GrainType type, byte[] key, int keyHashCode)
+        {
+            _type = type;
             _key = new SpanId(key, keyHashCode);
+        }
+
+        public GrainId(GrainType type, byte[] key)
+        {
+            _type = type;
+            _key = new SpanId(key);
         }
 
         public GrainId(SerializationInfo info, StreamingContext context)
         {
-            _kind = new GrainKind((byte[])info.GetValue("tv", typeof(byte[])), info.GetInt32("th"));
+            _type = new GrainType((byte[])info.GetValue("tv", typeof(byte[])), info.GetInt32("th"));
             _key = new SpanId((byte[])info.GetValue("kv", typeof(byte[])), info.GetInt32("kh"));
         }
 
-        public readonly GrainKind Kind => _kind;
+        public static GrainId Create(string type, string key) => Create(GrainType.Create(type), key);
+
+        public static GrainId Create(string type, Guid key) => Create(GrainType.Create(type), key.ToString("N"));
+
+        public static GrainId Create(GrainType type, string key) => new GrainId(type, Encoding.UTF8.GetBytes(key));
+
+        public readonly GrainType Type => _type;
 
         public readonly ReadOnlyMemory<byte> Key => _key.Value;
 
+        public readonly bool IsDefault => _type.IsDefault && _key.IsDefault;
+
         public override bool Equals(object obj) => obj is GrainId id && this.Equals(id);
 
-        public bool Equals(GrainId other) => this.Kind.Equals(other.Kind) && this.Key.Equals(other.Key);
+        public bool Equals(GrainId other) => this.Type.Equals(other.Type) && this.Key.Equals(other.Key);
 
-        public override int GetHashCode() => HashCode.Combine(_kind, _key);
+        public override readonly int GetHashCode() => HashCode.Combine(_type, _key);
 
         public readonly void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            info.AddValue("tv", GrainKind.UnsafeGetArray(_kind));
-            info.AddValue("th", _kind.GetHashCode());
+            info.AddValue("tv", GrainType.UnsafeGetArray(_type));
+            info.AddValue("th", _type.GetHashCode());
             info.AddValue("kv", SpanId.UnsafeGetArray(_key));
             info.AddValue("kh", _key.GetHashCode());
         }
 
         public int CompareTo(GrainId other)
         {
-            var kinds = _kind.CompareTo(other._kind);
-            if (kinds != 0) return kinds;
+            var typeComparison = _type.CompareTo(other._type);
+            if (typeComparison != 0) return typeComparison;
 
             return _key.CompareTo(other._key);
         }
+
+        public override readonly string ToString() => $"{_type.ToString()}/{_key.ToStringUtf8()}";
 
         public static (byte[] Key, int KeyHashCode) UnsafeGetKey(GrainId id) => (SpanId.UnsafeGetArray(id._key), id._key.GetHashCode());
 
