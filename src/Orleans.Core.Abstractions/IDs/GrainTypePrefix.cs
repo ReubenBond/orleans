@@ -12,8 +12,13 @@ namespace Orleans.Runtime
         public const string ClientPrefix = SystemPrefix + "client.";
         public static readonly ReadOnlyMemory<byte> ClientPrefixBytes = Encoding.UTF8.GetBytes(ClientPrefix);
 
+        public const string LegacyGrainPrefix = SystemPrefix + "grain.v1.";
+        public static readonly ReadOnlyMemory<byte> LegacyGrainPrefixBytes = Encoding.UTF8.GetBytes(LegacyGrainPrefix);
+
         public static bool IsClient(this in GrainType type) => type.Value.Span.StartsWith(ClientPrefixBytes.Span);
 
         public static bool IsSystemTarget(this in GrainType type) => type.Value.Span.StartsWith(SystemTargetPrefixBytes.Span);
+
+        public static bool IsLegacyGrain(this in GrainType type) => type.Value.Span.StartsWith(LegacyGrainPrefixBytes.Span);
     }
 }

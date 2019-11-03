@@ -13,22 +13,21 @@ namespace Orleans.Runtime
         private readonly GrainType _type;
         private readonly SpanId _key;
 
-        public GrainId(byte[] type, byte[] key)
-        {
-            _type = new GrainType(type);
-            _key = new SpanId(key);
-        }
-
-        public GrainId(GrainType type, byte[] key, int keyHashCode)
+        public GrainId(GrainType type, SpanId key)
         {
             _type = type;
-            _key = new SpanId(key, keyHashCode);
+            _key = key;
         }
 
-        public GrainId(GrainType type, byte[] key)
+        public GrainId(byte[] type, byte[] key) : this(new GrainType(type), new SpanId(key))
         {
-            _type = type;
-            _key = new SpanId(key);
+        }
+
+        public GrainId(GrainType type, byte[] key, int keyHashCode) : this(type, new SpanId(key, keyHashCode)) { }
+
+
+        public GrainId(GrainType type, byte[] key) : this(type, new SpanId(key))
+        {
         }
 
         public GrainId(SerializationInfo info, StreamingContext context)
@@ -42,6 +41,7 @@ namespace Orleans.Runtime
         public static GrainId Create(string type, Guid key) => Create(GrainType.Create(type), key.ToString("N"));
 
         public static GrainId Create(GrainType type, string key) => new GrainId(type, Encoding.UTF8.GetBytes(key));
+        public static GrainId Create(GrainType type, SpanId key) => new GrainId(type, key);
 
         public readonly GrainType Type => _type;
 

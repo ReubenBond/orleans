@@ -1,5 +1,7 @@
 using System;
 using System.Globalization;
+using System.Runtime.CompilerServices;
+using System.Text;
 using Orleans.Core;
 
 namespace Orleans.Runtime
@@ -152,6 +154,93 @@ namespace Orleans.Runtime
         }
 
         public int TypeCode => Key.BaseTypeCode;
+
+        private GrainType GetGrainType()
+        {
+            // TODO: intern
+            var key = this.Key;
+            return GrainType.Create($"{GrainTypePrefix.LegacyGrainPrefix}{key.TypeCodeData:X16}");
+        }
+
+        private SpanId GetGrainKey()
+        {
+            // TODO: intern
+            var key = this.Key;
+            return SpanId.Create($"{key.N0:X16}{key.N1:X16}{(key.HasKeyExt ? ("+" + key.KeyExt) : string.Empty)}");
+        }
+
+        public unsafe GrainId ToGrainId()
+        {
+            var id = GrainId.Create(this.GetGrainType(), this.GetGrainKey());
+            return id;
+
+            /*
+            if (key.HasKeyExt)
+            {
+                var numBytes = 1 + Encoding.UTF8.GetByteCount(key.KeyExt);
+                Span<byte> idSpan = stackalloc byte[numBytes];
+
+                fixed (byte* keyExtBytes = idSpan)
+                fixed (char* chars = key.KeyExt)
+                {
+                    Encoding.UTF8.GetBytes(chars, key.KeyExt.Length, keyExtBytes, numBytes);
+                }
+               
+            }
+
+            return default;
+            */
+        }
+
+        public static unsafe LegacyGrainId FromGrainId(GrainId id)
+        {
+            var typeSpan = id.Type.Value.Span;
+            if (!typeSpan.StartsWith(GrainTypePrefix.LegacyGrainPrefixBytes.Span))
+            {
+                ThrowNotLegacyGrainId(id);
+            }
+
+            ulong typeCodeData;
+            var typeCodeSlice = typeSpan.Slice(GrainTypePrefix.LegacyGrainPrefixBytes.Length);
+            fixed (byte* typeCodeBytes = typeCodeSlice)
+            {
+                // TODO: noalloc
+                var typeCodeString = Encoding.UTF8.GetString(typeCodeBytes, 16);
+                typeCodeData = ulong.Parse(typeCodeString, NumberStyles.HexNumber);
+            }
+
+            ulong n0, n1;
+            string keyExt;
+            var keySpan = id.Key.Span;
+            fixed (byte* idBytes = keySpan)
+            {
+                // TODO: noalloc
+                var n0String = Encoding.UTF8.GetString(idBytes, 16);
+                n0 = ulong.Parse(n0String, NumberStyles.HexNumber);
+
+                // TODO: noalloc
+                var n1String = Encoding.UTF8.GetString(idBytes + 16, 16);
+                n1 = ulong.Parse(n1String, NumberStyles.HexNumber);
+
+                if (keySpan.Length > 33 && idBytes[32] == (byte)'+')
+                {
+                    // Take every byte after the '+' and interpret it as UTF8
+                    keyExt = Encoding.UTF8.GetString(idBytes + 33, keySpan.Length - 32);
+                }
+                else
+                {
+                    keyExt = default;
+                }
+            }
+
+            return new LegacyGrainId(UniqueKey.NewKey(n0, n1, typeCodeData, keyExt));
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowNotLegacyGrainId(GrainId id)
+        {
+            throw new InvalidOperationException($"Cannot convert non-legacy id {id} into legacy id");
+        }
 
         private static LegacyGrainId FindOrCreateGrainId(UniqueKey key)
         {
