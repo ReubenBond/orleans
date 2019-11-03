@@ -116,7 +116,7 @@ namespace Orleans.Runtime.Placement
             if (strategy.IsDeterministicActivationId)
             {
                 // Use the grain id as the activation id.
-                activationId = ActivationId.GetActivationId(((GrainId)target.GrainIdentity).Key);
+                activationId = ActivationId.GetDeterministic(target.GrainIdentity);
             }
             else
             {

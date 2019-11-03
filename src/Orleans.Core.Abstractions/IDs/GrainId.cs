@@ -71,7 +71,7 @@ namespace Orleans.Runtime
             return _key.CompareTo(other._key);
         }
 
-        public override readonly string ToString() => $"{_type.ToString()}/{_key.ToStringUtf8()}";
+        public override readonly string ToString() => $"{_type.ToStringUtf8()}/{_key.ToStringUtf8()}";
 
         public static (byte[] Key, int KeyHashCode) UnsafeGetKey(GrainId id) => (SpanId.UnsafeGetArray(id._key), id._key.GetHashCode());
 

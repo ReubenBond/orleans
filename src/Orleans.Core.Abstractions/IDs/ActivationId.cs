@@ -1,9 +1,10 @@
 using System;
+using System.Collections.Generic;
 
 namespace Orleans.Runtime
 {
     [Serializable]
-    internal readonly struct ActivationId : IEquatable<ActivationId>
+    internal readonly struct ActivationId : IEquatable<ActivationId>, IComparable<ActivationId>
     {
         public static readonly ActivationId Zero = new ActivationId(Guid.Empty);
         
@@ -33,5 +34,18 @@ namespace Orleans.Runtime
         public override readonly int GetHashCode() => this.Value.GetHashCode();
 
         public override readonly string ToString() => this.Value.ToString("N");
+
+        public int CompareTo(ActivationId other) => Value.CompareTo(other.Value);
+
+        public sealed class Comparer : IEqualityComparer<ActivationId>, IComparer<ActivationId>
+        {
+            public static Comparer Instance { get; } = new Comparer();
+
+            public int Compare(ActivationId x, ActivationId y) => x.CompareTo(y);
+
+            public bool Equals(ActivationId x, ActivationId y) => x.Equals(y);
+
+            public int GetHashCode(ActivationId obj) => obj.GetHashCode();
+        }
     }
 }

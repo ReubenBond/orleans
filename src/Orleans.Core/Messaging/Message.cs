@@ -289,10 +289,10 @@ namespace Orleans.Runtime
             if (!dropExpiredMessages) return false;
 
             GrainId id = TargetGrain;
-            if (id == null) return false;
+            if (id.IsDefault) return false;
 
             // don't set expiration for one way, system target and system grain messages.
-            return Direction != Directions.OneWay && !id.IsSystemTarget;
+            return Direction != Directions.OneWay && !id.Type.IsSystemTarget();
         }
 
         public ITransactionInfo TransactionInfo
@@ -326,16 +326,6 @@ namespace Orleans.Runtime
 
             list.Add(address);
             CacheInvalidationHeader = list;
-        }
-        
-        /// <summary>
-        /// Set by sender's placement logic when NewPlacementRequested is true
-        /// so that receiver knows desired grain type
-        /// </summary>
-        public string NewGrainType
-        {
-            get { return GetNotNullString(Headers.NewGrainType); }
-            set { Headers.NewGrainType = value; }
         }
         
         /// <summary>
@@ -411,7 +401,6 @@ namespace Orleans.Runtime
             AppendIfExists(HeadersContainer.Headers.IS_RETURNED_FROM_REMOTE_CLUSTER, sb, (m) => m.IsReturnedFromRemoteCluster);
             AppendIfExists(HeadersContainer.Headers.READ_ONLY, sb, (m) => m.IsReadOnly);
             AppendIfExists(HeadersContainer.Headers.IS_UNORDERED, sb, (m) => m.IsUnordered);
-            AppendIfExists(HeadersContainer.Headers.NEW_GRAIN_TYPE, sb, (m) => m.NewGrainType);
             AppendIfExists(HeadersContainer.Headers.REJECTION_INFO, sb, (m) => m.RejectionInfo);
             AppendIfExists(HeadersContainer.Headers.REJECTION_TYPE, sb, (m) => m.RejectionType);
             AppendIfExists(HeadersContainer.Headers.REQUEST_CONTEXT, sb, (m) => m.RequestContextData);
@@ -478,9 +467,6 @@ namespace Orleans.Runtime
 
             if (value.IsNewPlacement)
                 IsNewPlacement = true;
-
-            if (!String.IsNullOrEmpty(value.GrainType))
-                NewGrainType = value.GrainType;
         }
 
 
@@ -492,14 +478,8 @@ namespace Orleans.Runtime
             {
                 history.Append(TargetSilo).Append(":");
             }
-            if (TargetGrain != null)
-            {
-                history.Append(TargetGrain).Append(":");
-            }
-            if (TargetActivation != null)
-            {
-                history.Append(TargetActivation);
-            }
+            history.Append(TargetGrain).Append(":");
+            history.Append(TargetActivation);
             history.Append(">");
             if (!string.IsNullOrEmpty(TargetHistory))
             {
@@ -635,7 +615,6 @@ namespace Orleans.Runtime
             private TimeSpan? _timeToLive;
             private string _debugContext;
             private List<ActivationAddress> _cacheInvalidationHeader;
-            private string _newGrainType;
             private string _genericGrainType;
             private RejectionTypes _rejectionType;
             private string _rejectionInfo;
@@ -867,19 +846,6 @@ namespace Orleans.Runtime
             }
 
             /// <summary>
-            /// Set by sender's placement logic when NewPlacementRequested is true
-            /// so that receiver knows desired grain type
-            /// </summary>
-            public string NewGrainType
-            {
-                get { return _newGrainType; }
-                set
-                {
-                    _newGrainType = value;
-                }
-            }
-
-            /// <summary>
             /// Set by caller's grain reference 
             /// </summary>
             public string GenericGrainType
@@ -947,12 +913,12 @@ namespace Orleans.Runtime
                     headers = headers | Headers.FORWARD_COUNT;
 
                 headers = _targetSilo == null ? headers & ~Headers.TARGET_SILO : headers | Headers.TARGET_SILO;
-                headers = _targetGrain == null ? headers & ~Headers.TARGET_GRAIN : headers | Headers.TARGET_GRAIN;
-                headers = _targetActivation == null ? headers & ~Headers.TARGET_ACTIVATION : headers | Headers.TARGET_ACTIVATION;
+                headers = _targetGrain.IsDefault ? headers & ~Headers.TARGET_GRAIN : headers | Headers.TARGET_GRAIN;
+                headers = _targetActivation.IsDefault ? headers & ~Headers.TARGET_ACTIVATION : headers | Headers.TARGET_ACTIVATION;
                 headers = _targetObserverId == null ? headers & ~Headers.TARGET_OBSERVER : headers | Headers.TARGET_OBSERVER;
                 headers = _sendingSilo == null ? headers & ~Headers.SENDING_SILO : headers | Headers.SENDING_SILO;
-                headers = _sendingGrain == null ? headers & ~Headers.SENDING_GRAIN : headers | Headers.SENDING_GRAIN;
-                headers = _sendingActivation == null ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
+                headers = _sendingGrain.IsDefault ? headers & ~Headers.SENDING_GRAIN : headers | Headers.SENDING_GRAIN;
+                headers = _sendingActivation.IsDefault ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
                 headers = _isNewPlacement == default(bool) ? headers & ~Headers.IS_NEW_PLACEMENT : headers | Headers.IS_NEW_PLACEMENT;
                 headers = _isReturnedFromRemoteCluster == default(bool) ? headers & ~Headers.IS_RETURNED_FROM_REMOTE_CLUSTER : headers | Headers.IS_RETURNED_FROM_REMOTE_CLUSTER;
                 headers = _isUsingIfaceVersion == default(bool) ? headers & ~Headers.IS_USING_INTERFACE_VERSION : headers | Headers.IS_USING_INTERFACE_VERSION;
@@ -960,7 +926,6 @@ namespace Orleans.Runtime
                 headers = _timeToLive == null ? headers & ~Headers.TIME_TO_LIVE : headers | Headers.TIME_TO_LIVE;
                 headers = string.IsNullOrEmpty(_debugContext) ? headers & ~Headers.DEBUG_CONTEXT : headers | Headers.DEBUG_CONTEXT;
                 headers = _cacheInvalidationHeader == null || _cacheInvalidationHeader.Count == 0 ? headers & ~Headers.CACHE_INVALIDATION_HEADER : headers | Headers.CACHE_INVALIDATION_HEADER;
-                headers = string.IsNullOrEmpty(_newGrainType) ? headers & ~Headers.NEW_GRAIN_TYPE : headers | Headers.NEW_GRAIN_TYPE;
                 headers = string.IsNullOrEmpty(GenericGrainType) ? headers & ~Headers.GENERIC_GRAIN_TYPE : headers | Headers.GENERIC_GRAIN_TYPE;
                 headers = _rejectionType == default(RejectionTypes) ? headers & ~Headers.REJECTION_TYPE : headers | Headers.REJECTION_TYPE;
                 headers = string.IsNullOrEmpty(_rejectionInfo) ? headers & ~Headers.REJECTION_INFO : headers | Headers.REJECTION_INFO;
@@ -1036,9 +1001,6 @@ namespace Orleans.Runtime
 
                 if ((headers & Headers.IS_UNORDERED) != Headers.NONE)
                     writer.Write(input.IsUnordered);
-
-                if ((headers & Headers.NEW_GRAIN_TYPE) != Headers.NONE)
-                    writer.Write(input.NewGrainType);
 
                 if ((headers & Headers.REJECTION_INFO) != Headers.NONE)
                     writer.Write(input.RejectionInfo);
@@ -1172,7 +1134,7 @@ namespace Orleans.Runtime
                     result.IsUnordered = ReadBool(reader);
 
                 if ((headers & Headers.NEW_GRAIN_TYPE) != Headers.NONE)
-                    result.NewGrainType = reader.ReadString();
+                    _ = reader.ReadString();
 
                 if ((headers & Headers.REJECTION_INFO) != Headers.NONE)
                     result.RejectionInfo = reader.ReadString();
