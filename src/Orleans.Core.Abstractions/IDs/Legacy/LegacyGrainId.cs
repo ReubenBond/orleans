@@ -169,27 +169,10 @@ namespace Orleans.Runtime
             return SpanId.Create($"{key.N0:X16}{key.N1:X16}{(key.HasKeyExt ? ("+" + key.KeyExt) : string.Empty)}");
         }
 
-        public unsafe GrainId ToGrainId()
+        public GrainId ToGrainId()
         {
             var id = GrainId.Create(this.GetGrainType(), this.GetGrainKey());
             return id;
-
-            /*
-            if (key.HasKeyExt)
-            {
-                var numBytes = 1 + Encoding.UTF8.GetByteCount(key.KeyExt);
-                Span<byte> idSpan = stackalloc byte[numBytes];
-
-                fixed (byte* keyExtBytes = idSpan)
-                fixed (char* chars = key.KeyExt)
-                {
-                    Encoding.UTF8.GetBytes(chars, key.KeyExt.Length, keyExtBytes, numBytes);
-                }
-               
-            }
-
-            return default;
-            */
         }
 
         public static unsafe LegacyGrainId FromGrainId(GrainId id)
