@@ -774,8 +774,7 @@ namespace Orleans.Runtime
 
         private async Task AddressMessageAsync(Message message, PlacementTarget target, PlacementStrategy strategy, ActivationAddress targetAddress)
         {
-            var placementResult = await placementDirectorsManager.SelectOrAddActivation(
-                message.SendingAddress, target, this.catalog, strategy);
+            var placementResult = await placementDirectorsManager.SelectOrAddActivation(target, (IPlacementRuntime)this.catalog, strategy);
             SetMessageTargetPlacement(message, placementResult, targetAddress);
         }
 

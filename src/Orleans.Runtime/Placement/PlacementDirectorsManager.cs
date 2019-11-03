@@ -77,7 +77,6 @@ namespace Orleans.Runtime.Placement
         }
 
         public async Task<PlacementResult> SelectOrAddActivation(
-            ActivationAddress sendingAddress,
             PlacementTarget targetGrain,
             IPlacementRuntime context,
             PlacementStrategy strategy)
@@ -110,7 +109,6 @@ namespace Orleans.Runtime.Placement
 
             var director = ResolveDirector(strategy);
             var siloAddress = await director.OnAddActivation(strategy, target, context);
-            var grainTypeName = context.GetGrainTypeName(target.GrainIdentity.TypeCode);
 
             ActivationId activationId;
             if (strategy.IsDeterministicActivationId)
@@ -126,8 +124,7 @@ namespace Orleans.Runtime.Placement
             return PlacementResult.SpecifyCreation(
                 siloAddress,
                 activationId,
-                strategy,
-                grainTypeName);
+                strategy);
         }
 
         private void ResolveBuiltInStrategies()
