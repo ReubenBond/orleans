@@ -763,7 +763,7 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
-        public IGrainTypeResolver GrainTypeResolver => typeManager.GrainTypeResolver;
+        public ILegacyGrainTypeResolver GrainTypeResolver => typeManager.GrainTypeResolver;
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
         {

@@ -86,24 +86,6 @@ namespace UnitTests.General
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
-        public void ID_IsSystem()
-        {
-            GrainId testGrain = Orleans.Runtime.Constants.DirectoryServiceId;
-            output.WriteLine("Testing GrainID " + testGrain);
-            Assert.True(testGrain.IsSystemTarget); // System grain ID is not flagged as a system ID
-
-            GrainId sGrain = (GrainId)this.environment.SerializationManager.DeepCopy(testGrain);
-            output.WriteLine("Testing GrainID " + sGrain);
-            Assert.True(sGrain.IsSystemTarget); // String round-trip grain ID is not flagged as a system ID
-            Assert.Equal(testGrain, sGrain); // Should be equivalent GrainId object
-            Assert.Same(testGrain, sGrain); // Should be same / intern'ed GrainId object
-
-            ActivationId testActivation = ActivationId.GetSystemActivation(testGrain, SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 2456), 0));
-            output.WriteLine("Testing ActivationID " + testActivation);
-            Assert.True(testActivation.IsSystem); // System activation ID is not flagged as a system ID
-        }
-
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void UniqueKeyKeyExtGrainCategoryDisallowsNullKeyExtension()
         {
             Assert.Throws<ArgumentNullException>(() =>

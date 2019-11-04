@@ -20,10 +20,10 @@ namespace Orleans.Runtime
 {
     internal class GrainTypeManager
     {
-        private Dictionary<SiloAddress, GrainInterfaceMap> grainInterfaceMapsBySilo;
+        private Dictionary<SiloAddress, LegacyGrainInterfaceMap> grainInterfaceMapsBySilo;
         private Dictionary<int, List<SiloAddress>> supportedSilosByTypeCode;
         private readonly ILogger logger;
-        private readonly GrainInterfaceMap grainInterfaceMap;
+        private readonly LegacyGrainInterfaceMap grainInterfaceMap;
         private readonly Dictionary<string, GrainTypeData> grainTypes;
         private readonly Dictionary<int, InvokerData> invokers;
         private readonly SerializationManager serializationManager;
@@ -31,13 +31,13 @@ namespace Orleans.Runtime
 		private readonly PlacementStrategy defaultPlacementStrategy;
         private Dictionary<int, Dictionary<ushort, List<SiloAddress>>> supportedSilosByInterface;
 
-        internal IReadOnlyDictionary<SiloAddress, GrainInterfaceMap> GrainInterfaceMapsBySilo => this.grainInterfaceMapsBySilo;
+        internal IReadOnlyDictionary<SiloAddress, LegacyGrainInterfaceMap> GrainInterfaceMapsBySilo => this.grainInterfaceMapsBySilo;
 
         public IEnumerable<KeyValuePair<string, GrainTypeData>> GrainClassTypeData => this.grainTypes;
 
-        public GrainInterfaceMap ClusterGrainInterfaceMap { get; private set; }
+        public LegacyGrainInterfaceMap ClusterGrainInterfaceMap { get; private set; }
 
-        public IGrainTypeResolver GrainTypeResolver { get; private set; }
+        public ILegacyGrainTypeResolver GrainTypeResolver { get; private set; }
 
         public GrainTypeManager(
             ILocalSiloDetails siloDetails,
@@ -53,10 +53,10 @@ namespace Orleans.Runtime
             this.defaultPlacementStrategy = defaultPlacementStrategy;
             this.serializationManager = serializationManager;
             this.multiClusterRegistrationStrategyManager = multiClusterRegistrationStrategyManager;
-            grainInterfaceMap = new GrainInterfaceMap(localTestMode, this.defaultPlacementStrategy);
+            grainInterfaceMap = new LegacyGrainInterfaceMap(localTestMode, this.defaultPlacementStrategy);
             ClusterGrainInterfaceMap = grainInterfaceMap;
             GrainTypeResolver = grainInterfaceMap.GetGrainTypeResolver();
-            grainInterfaceMapsBySilo = new Dictionary<SiloAddress, GrainInterfaceMap>();
+            grainInterfaceMapsBySilo = new Dictionary<SiloAddress, LegacyGrainInterfaceMap>();
 
             var grainClassFeature = applicationPartManager.CreateAndPopulateFeature<GrainClassFeature>();
             this.grainTypes = CreateGrainTypeMap(grainClassFeature, grainClassOptions.Value);
@@ -136,13 +136,13 @@ namespace Orleans.Runtime
             }
         }
 
-        internal void GetTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy activationStrategy, string genericArguments = null)
+        internal void GetTypeInfo(GrainType grainType, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy activationStrategy, string genericArguments = null)
         {
-            if (!ClusterGrainInterfaceMap.TryGetTypeInfo(typeCode, out grainClass, out placement, out activationStrategy, genericArguments))
-                throw new OrleansException(string.Format("Unexpected: Cannot find an implementation class for grain interface {0}", typeCode));
+            if (!ClusterGrainInterfaceMap.TryGetTypeInfo(grainType, out grainClass, out placement, out activationStrategy, genericArguments))
+                throw new OrleansException(string.Format("Unexpected: Cannot find an implementation class for grain type {0}", grainType));
         }
 
-        internal void SetInterfaceMapsBySilo(Dictionary<SiloAddress, GrainInterfaceMap> value)
+        internal void SetInterfaceMapsBySilo(Dictionary<SiloAddress, LegacyGrainInterfaceMap> value)
         {
             grainInterfaceMapsBySilo = value;
             RebuildFullGrainInterfaceMap();
@@ -232,7 +232,7 @@ namespace Orleans.Runtime
             return grainTypes.TryGetValue(name, out result);
         }
 
-        internal GrainInterfaceMap GetTypeCodeMap()
+        internal LegacyGrainInterfaceMap GetTypeCodeMap()
         {
             // the map is immutable at this point
             return grainInterfaceMap;
@@ -279,7 +279,7 @@ namespace Orleans.Runtime
 
         private void RebuildFullGrainInterfaceMap()
         {
-            var newClusterGrainInterfaceMap = new GrainInterfaceMap(false, this.defaultPlacementStrategy);
+            var newClusterGrainInterfaceMap = new LegacyGrainInterfaceMap(false, this.defaultPlacementStrategy);
             var newSupportedSilosByTypeCode = new Dictionary<int, List<SiloAddress>>();
             var newSupportedSilosByInterface = new Dictionary<int, Dictionary<ushort, List<SiloAddress>>>();
             foreach (var kvp in grainInterfaceMapsBySilo)

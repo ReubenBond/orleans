@@ -8,7 +8,7 @@ namespace Orleans.Runtime
     /// Metadata for a grain class
     /// </summary>
     [Serializable]
-    internal sealed class GrainClassData
+    internal sealed class LegacyGrainClassData
     {
         [NonSerialized]
         private readonly Dictionary<string, string> genericClassNames;
@@ -19,7 +19,7 @@ namespace Orleans.Runtime
         internal string GrainClass { get; private set; }
         internal bool IsGeneric { get { return isGeneric; } }
 
-        internal GrainClassData(int grainTypeCode, string grainClass, bool isGeneric)
+        internal LegacyGrainClassData(int grainTypeCode, string grainClass, bool isGeneric)
         {
             GrainTypeCode = grainTypeCode;
             GrainClass = grainClass;
@@ -78,10 +78,10 @@ namespace Orleans.Runtime
 
         public override bool Equals(object obj)
         {
-            if(!(obj is GrainClassData))
+            if(!(obj is LegacyGrainClassData))
                 return false;
 
-            return GrainTypeCode == ((GrainClassData) obj).GrainTypeCode;
+            return GrainTypeCode == ((LegacyGrainClassData) obj).GrainTypeCode;
         }
     }
 }

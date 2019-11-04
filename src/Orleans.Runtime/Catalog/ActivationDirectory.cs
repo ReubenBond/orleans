@@ -16,7 +16,6 @@ namespace Orleans.Runtime
         private readonly ConcurrentDictionary<ActivationId, SystemTarget> systemTargets;                // SystemTarget only.
         private readonly ConcurrentDictionary<GrainId, List<ActivationData>> grainToActivationsMap;     // Activation data (app grains) only.
         private readonly ConcurrentDictionary<string, CounterStatistic> grainCounts;                    // simple statistics type->count
-        private readonly ConcurrentDictionary<string, CounterStatistic> systemTargetCounts;             // simple statistics systemTargetTypeName->count
 
         public ActivationDirectory(ILogger<ActivationDirectory> logger)
         {
@@ -24,7 +23,6 @@ namespace Orleans.Runtime
             systemTargets = new ConcurrentDictionary<ActivationId, SystemTarget>();
             grainToActivationsMap = new ConcurrentDictionary<GrainId, List<ActivationData>>();
             grainCounts = new ConcurrentDictionary<string, CounterStatistic>();
-            systemTargetCounts = new ConcurrentDictionary<string, CounterStatistic>();
             this.logger = logger;
         }
 

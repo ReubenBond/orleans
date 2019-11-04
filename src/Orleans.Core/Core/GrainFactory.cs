@@ -177,7 +177,7 @@ namespace Orleans
                 interfaceType.IsGenericType ? TypeUtils.GenericTypeArgsString(interfaceType.UnderlyingSystemType.FullName) : null);
         }
 
-        private GrainClassData GetGrainClassData(Type interfaceType, string grainClassNamePrefix)
+        private LegacyGrainClassData GetGrainClassData(Type interfaceType, string grainClassNamePrefix)
         {
             if (!GrainInterfaceUtils.IsGrainType(interfaceType))
             {
@@ -185,7 +185,7 @@ namespace Orleans
             }
 
             var grainTypeResolver = this.runtimeClient.GrainTypeResolver;
-            GrainClassData implementation;
+            LegacyGrainClassData implementation;
             if (!grainTypeResolver.TryGetGrainClassData(interfaceType, out implementation, grainClassNamePrefix))
             {
                 var loadedAssemblies = grainTypeResolver.GetLoadedGrainAssemblies();
@@ -374,7 +374,7 @@ namespace Orleans
    
         private long GetTypeCode(Type grainInterfaceType)
         {
-            this.runtimeClient.GrainTypeResolver.TryGetGrainClassData(grainInterfaceType, out GrainClassData implementation, string.Empty);
+            this.runtimeClient.GrainTypeResolver.TryGetGrainClassData(grainInterfaceType, out LegacyGrainClassData implementation, string.Empty);
             return implementation.GetTypeCode(grainInterfaceType);
         }
 

@@ -598,7 +598,7 @@ namespace Orleans
             GC.SuppressFinalize(this);
         }
 
-        public IGrainTypeResolver GrainTypeResolver { get; private set; }
+        public ILegacyGrainTypeResolver GrainTypeResolver { get; private set; }
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
         {

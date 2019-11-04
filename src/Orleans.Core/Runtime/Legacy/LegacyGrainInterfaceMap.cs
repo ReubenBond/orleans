@@ -11,13 +11,13 @@ namespace Orleans.Runtime
     /// Internal data structure that holds a grain interfaces to grain classes map.
     /// </summary>
     [Serializable]
-    internal class GrainInterfaceMap
+    internal class LegacyGrainInterfaceMap
     {
         private readonly Dictionary<string, GrainInterfaceData> typeToInterfaceData;
         private readonly Dictionary<int, GrainInterfaceData> table;
         private readonly HashSet<int> unordered;
 
-        private readonly Dictionary<int, GrainClassData> implementationIndex;
+        private readonly Dictionary<int, LegacyGrainClassData> implementationIndex;
         private readonly Dictionary<int, PlacementStrategy> placementStrategiesIndex;
         private readonly Dictionary<int, MultiClusterRegistrationStrategy> registrationStrategiesIndex;
 
@@ -29,7 +29,7 @@ namespace Orleans.Runtime
 		
 		private readonly PlacementStrategy defaultPlacementStrategy;
 
-        internal IEnumerable<GrainClassData> SupportedGrainClassData
+        internal IEnumerable<LegacyGrainClassData> SupportedGrainClassData
         {
             get { return implementationIndex.Values; }
         }
@@ -39,12 +39,12 @@ namespace Orleans.Runtime
             get { return table.Values; }
         }
 
-        public GrainInterfaceMap(bool localTestMode, PlacementStrategy defaultPlacementStrategy)
+        public LegacyGrainInterfaceMap(bool localTestMode, PlacementStrategy defaultPlacementStrategy)
         {
             table = new Dictionary<int, GrainInterfaceData>();
             typeToInterfaceData = new Dictionary<string, GrainInterfaceData>();
             primaryImplementations = new Dictionary<string, string>();
-            implementationIndex = new Dictionary<int, GrainClassData>();
+            implementationIndex = new Dictionary<int, LegacyGrainClassData>();
             placementStrategiesIndex = new Dictionary<int, PlacementStrategy>();
             registrationStrategiesIndex = new Dictionary<int, MultiClusterRegistrationStrategy>();
             unordered = new HashSet<int>();
@@ -54,7 +54,7 @@ namespace Orleans.Runtime
                 loadedGrainAsemblies = new HashSet<string>();
         }
 
-        internal void AddMap(GrainInterfaceMap map)
+        internal void AddMap(LegacyGrainInterfaceMap map)
         {
             foreach (var kvp in map.typeToInterfaceData)
             {
@@ -112,7 +112,7 @@ namespace Orleans.Runtime
 
                 var grainInterfaceData = GetOrAddGrainInterfaceData(iface, isGenericGrainClass);
 
-                var implementation = new GrainClassData(grainTypeCode, grainName, isGenericGrainClass);
+                var implementation = new LegacyGrainClassData(grainTypeCode, grainName, isGenericGrainClass);
                 if (!implementationIndex.ContainsKey(grainTypeCode))
                     implementationIndex.Add(grainTypeCode, implementation);
                 if (!placementStrategiesIndex.ContainsKey(grainTypeCode))
@@ -250,9 +250,9 @@ namespace Orleans.Runtime
             return unordered.Contains(grainTypeCode);
         }
 
-        public IGrainTypeResolver GetGrainTypeResolver()
+        public ILegacyGrainTypeResolver GetGrainTypeResolver()
         {
-            return new GrainTypeResolver(
+            return new LegacyGrainTypeResolver(
                 this.typeToInterfaceData,
                 this.table,
                 this.loadedGrainAsemblies,

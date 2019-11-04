@@ -368,7 +368,7 @@ namespace Orleans.Messaging
             }
         }
 
-        public Task<IGrainTypeResolver> GetGrainTypeResolver(IInternalGrainFactory grainFactory)
+        public Task<ILegacyGrainTypeResolver> GetGrainTypeResolver(IInternalGrainFactory grainFactory)
         {
             var silo = GetLiveGatewaySiloAddress();
             return GetTypeManager(silo, grainFactory).GetClusterGrainTypeResolver();

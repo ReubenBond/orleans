@@ -30,6 +30,7 @@ namespace Orleans.Runtime
         private readonly MessageFactory messageFactory;
         private readonly SerializationManager serializationManager;
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
+        private readonly GrainTypeManager grainTypeManager;
         private readonly SchedulingOptions schedulingOptions;
         private readonly ILogger invokeWorkItemLogger;
         internal Dispatcher(
@@ -44,7 +45,8 @@ namespace Orleans.Runtime
             SerializationManager serializationManager,
             CompatibilityDirectorManager compatibilityDirectorManager,
             ILoggerFactory loggerFactory,
-            IOptions<SchedulingOptions> schedulerOptions)
+            IOptions<SchedulingOptions> schedulerOptions,
+            GrainTypeManager grainTypeManager)
         {
             this.scheduler = scheduler;
             this.catalog = catalog;
@@ -57,6 +59,7 @@ namespace Orleans.Runtime
             this.messageFactory = messageFactory;
             this.serializationManager = serializationManager;
             this.compatibilityDirectorManager = compatibilityDirectorManager;
+            this.grainTypeManager = grainTypeManager;
             this.schedulingOptions = schedulerOptions.Value;
             logger = loggerFactory.CreateLogger<Dispatcher>();
         }
@@ -84,7 +87,7 @@ namespace Orleans.Runtime
             }
 
             // check if its targeted at a new activation
-            if (message.TargetGrain.IsSystemTarget)
+            if (message.TargetGrain.Type.IsSystemTarget())
             {
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "ReceiveMessage on system target.");
                 throw new InvalidOperationException("Dispatcher was called ReceiveMessage on system target for " + message);
@@ -265,7 +268,7 @@ namespace Orleans.Runtime
                 if (!ActivationMayAcceptRequest(targetActivation, message))
                 {
                     // Check for deadlock before Enqueueing.
-                    if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
+                    if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.Type.IsSystemTarget())
                     {
                         try
                         {
@@ -402,11 +405,11 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                if (targetActivation.Grain.IsGrain && message.IsUsingInterfaceVersions)
+                if (targetActivation.Grain.Type.IsLegacyGrain() && message.IsUsingInterfaceVersions)
                 {
                     var request = (InvokeMethodRequest)message.BodyObject;
                     var compatibilityDirector = compatibilityDirectorManager.GetDirector(request.InterfaceId);
-                    var currentVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
+                    var currentVersion = this.grainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
                     if (!compatibilityDirector.IsCompatible(request.InterfaceVersion, currentVersion))
                     {
                         catalog.DeactivateActivationOnIdle(targetActivation);
@@ -634,7 +637,7 @@ namespace Orleans.Runtime
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resend {0}", message);
             message.TargetHistory = message.GetTargetHistory();
 
-            if (message.TargetGrain.IsSystemTarget)
+            if (message.TargetGrain.Type.IsSystemTarget())
             {
                 this.SendSystemTargetMessage(message);
             }
@@ -646,7 +649,7 @@ namespace Orleans.Runtime
             }
             else
             {
-                message.TargetActivation = null;
+                message.TargetActivation = default;
                 message.TargetSilo = null;
                 message.ClearTargetAddress();
                 this.SendMessage(message);
@@ -750,7 +753,7 @@ namespace Orleans.Runtime
             // placement strategy is determined by searching for a specification. first, we check for a strategy associated with the grain reference,
             // second, we check for a strategy associated with the target's interface. third, we check for a strategy associated with the activation sending the
             // message.
-            var strategy = targetAddress.Grain.IsGrain ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
+            var strategy = targetAddress.Grain.Type.IsLegacyGrain() ? catalog.GetGrainPlacementStrategy(targetAddress.Grain) : null;
 
             var request = message.IsUsingInterfaceVersions
                 ? message.BodyObject as InvokeMethodRequest
@@ -781,7 +784,7 @@ namespace Orleans.Runtime
 
         private void SetMessageTargetPlacement(Message message, PlacementResult placementResult, ActivationAddress targetAddress)
         {
-            if (placementResult.IsNewPlacement && targetAddress.Grain.IsClient)
+            if (placementResult.IsNewPlacement && targetAddress.Grain.Type.IsClient())
             {
                 logger.Error(ErrorCode.Dispatcher_AddressMsg_UnregisteredClient, $"AddressMessage could not find target for client pseudo-grain {message}");
                 throw new KeyNotFoundException($"Attempting to send a message {message} to an unregistered client pseudo-grain {targetAddress.Grain}");
@@ -801,7 +804,7 @@ namespace Orleans.Runtime
             var message = this.messageFactory.CreateResponseMessage(request);
             message.BodyObject = response;
 
-            if (message.TargetGrain.IsSystemTarget)
+            if (message.TargetGrain.Type.IsSystemTarget())
             {
                 SendSystemTargetMessage(message);
             }
@@ -820,9 +823,10 @@ namespace Orleans.Runtime
             {
                 message.TargetSilo = Transport.MyAddress;
             }
-            if (message.TargetActivation == null)
+
+            if (message.TargetActivation.IsDefault)
             {
-                message.TargetActivation = ActivationId.GetSystemActivation(message.TargetGrain, message.TargetSilo);
+                message.TargetActivation = ActivationId.GetDeterministic(message.TargetGrain);
             }
 
             TransportMessage(message);

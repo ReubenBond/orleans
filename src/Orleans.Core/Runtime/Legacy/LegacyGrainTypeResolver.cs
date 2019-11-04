@@ -5,24 +5,24 @@ using System.Reflection;
 
 namespace Orleans.Runtime
 {
-    internal interface IGrainTypeResolver
+    internal interface ILegacyGrainTypeResolver
     {
-        bool TryGetGrainClassData(Type grainInterfaceType, out GrainClassData implementation, string grainClassNamePrefix);
-        bool TryGetGrainClassData(int grainInterfaceId, out GrainClassData implementation, string grainClassNamePrefix);
-        bool TryGetGrainClassData(string grainImplementationClassName, out GrainClassData implementation);
+        bool TryGetGrainClassData(Type grainInterfaceType, out LegacyGrainClassData implementation, string grainClassNamePrefix);
+        bool TryGetGrainClassData(int grainInterfaceId, out LegacyGrainClassData implementation, string grainClassNamePrefix);
+        bool TryGetGrainClassData(string grainImplementationClassName, out LegacyGrainClassData implementation);
         bool IsUnordered(int grainTypeCode);
         string GetLoadedGrainAssemblies();
     }
 
     [Serializable]
-    internal class GrainTypeResolver : IGrainTypeResolver
+    internal class LegacyGrainTypeResolver : ILegacyGrainTypeResolver
     {
         private readonly Dictionary<string, GrainInterfaceData> typeToInterfaceData;
         private readonly Dictionary<int, GrainInterfaceData> table;
         private readonly HashSet<string> loadedGrainAsemblies;
         private readonly HashSet<int> unordered;
 
-        public GrainTypeResolver(
+        public LegacyGrainTypeResolver(
             Dictionary<string, GrainInterfaceData> typeToInterfaceData,
             Dictionary<int, GrainInterfaceData> table,
             HashSet<string> loadedGrainAsemblies,
@@ -34,13 +34,13 @@ namespace Orleans.Runtime
             this.unordered = unordered;
         }
 
-        public bool TryGetGrainClassData(Type interfaceType, out GrainClassData implementation, string grainClassNamePrefix)
+        public bool TryGetGrainClassData(Type interfaceType, out LegacyGrainClassData implementation, string grainClassNamePrefix)
         {
             implementation = null;
             GrainInterfaceData interfaceData;
 
             // First, try to find a non-generic grain implementation:
-            if (this.typeToInterfaceData.TryGetValue(GrainInterfaceMap.GetTypeKey(interfaceType, false), out interfaceData) &&
+            if (this.typeToInterfaceData.TryGetValue(LegacyGrainInterfaceMap.GetTypeKey(interfaceType, false), out interfaceData) &&
                 TryGetGrainClassData(interfaceData, out implementation, grainClassNamePrefix))
             {
                 return true;
@@ -49,7 +49,7 @@ namespace Orleans.Runtime
             // If a concrete implementation was not found and the interface is generic, 
             // try to find a generic grain implementation:
             if (interfaceType.IsGenericType &&
-                this.typeToInterfaceData.TryGetValue(GrainInterfaceMap.GetTypeKey(interfaceType, true), out interfaceData) &&
+                this.typeToInterfaceData.TryGetValue(LegacyGrainInterfaceMap.GetTypeKey(interfaceType, true), out interfaceData) &&
                 TryGetGrainClassData(interfaceData, out implementation, grainClassNamePrefix))
             {
                 return true;
@@ -58,7 +58,7 @@ namespace Orleans.Runtime
             return false;
         }
 
-        public bool TryGetGrainClassData(int grainInterfaceId, out GrainClassData implementation, string grainClassNamePrefix = null)
+        public bool TryGetGrainClassData(int grainInterfaceId, out LegacyGrainClassData implementation, string grainClassNamePrefix = null)
         {
             implementation = null;
             GrainInterfaceData interfaceData;
@@ -69,7 +69,7 @@ namespace Orleans.Runtime
             return TryGetGrainClassData(interfaceData, out implementation, grainClassNamePrefix);
         }
 
-        public bool TryGetGrainClassData(string grainImplementationClassName, out GrainClassData implementation)
+        public bool TryGetGrainClassData(string grainImplementationClassName, out LegacyGrainClassData implementation)
         {
             implementation = null;
             // have to iterate since _primaryImplementations is not serialized.
@@ -95,7 +95,7 @@ namespace Orleans.Runtime
             return unordered.Contains(grainTypeCode);
         }
 
-        private static bool TryGetGrainClassData(GrainInterfaceData interfaceData, out GrainClassData implementation, string grainClassNamePrefix)
+        private static bool TryGetGrainClassData(GrainInterfaceData interfaceData, out LegacyGrainClassData implementation, string grainClassNamePrefix)
         {
             implementation = null;
             var implementations = interfaceData.Implementations;

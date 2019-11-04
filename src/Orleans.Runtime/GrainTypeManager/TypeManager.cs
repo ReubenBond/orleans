@@ -55,7 +55,7 @@ namespace Orleans.Runtime
             this.scheduler = scheduler;
             this.refreshClusterMapInterval = refreshClusterMapInterval;
             // We need this so we can place needed local activations
-            this.grainTypeManager.SetInterfaceMapsBySilo(new Dictionary<SiloAddress, GrainInterfaceMap>
+            this.grainTypeManager.SetInterfaceMapsBySilo(new Dictionary<SiloAddress, LegacyGrainInterfaceMap>
             {
                 {this.Silo, grainTypeManager.GetTypeCodeMap()}
             });
@@ -75,12 +75,12 @@ namespace Orleans.Runtime
                 this.refreshClusterMapInterval);
         }
 
-        public Task<IGrainTypeResolver> GetClusterGrainTypeResolver()
+        public Task<ILegacyGrainTypeResolver> GetClusterGrainTypeResolver()
         {
-            return Task.FromResult<IGrainTypeResolver>(grainTypeManager.GrainTypeResolver);
+            return Task.FromResult<ILegacyGrainTypeResolver>(grainTypeManager.GrainTypeResolver);
         }
 
-        public Task<GrainInterfaceMap> GetSiloTypeCodeMap()
+        public Task<LegacyGrainInterfaceMap> GetSiloTypeCodeMap()
         {
             return Task.FromResult(grainTypeManager.GetTypeCodeMap());
         }
@@ -122,18 +122,18 @@ namespace Orleans.Runtime
                 var knownSilosClusterGrainInterfaceMap = grainTypeManager.GrainInterfaceMapsBySilo;
 
                 // Build the new map. Always start by himself
-                var newSilosClusterGrainInterfaceMap = new Dictionary<SiloAddress, GrainInterfaceMap>
+                var newSilosClusterGrainInterfaceMap = new Dictionary<SiloAddress, LegacyGrainInterfaceMap>
                 {
                     {this.Silo, grainTypeManager.GetTypeCodeMap()}
                 };
-                var getGrainInterfaceMapTasks = new List<Task<KeyValuePair<SiloAddress, GrainInterfaceMap>>>();
+                var getGrainInterfaceMapTasks = new List<Task<KeyValuePair<SiloAddress, LegacyGrainInterfaceMap>>>();
 
 
                 foreach (var siloAddress in activeSilos.Keys)
                 {
                     if (siloAddress.IsSameLogicalSilo(this.Silo)) continue;
 
-                    GrainInterfaceMap value;
+                    LegacyGrainInterfaceMap value;
                     if (knownSilosClusterGrainInterfaceMap.TryGetValue(siloAddress, out value))
                     {
                         if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("OnRefreshClusterMapTimer: value already found locally for {SiloAddress}", siloAddress);
@@ -240,20 +240,20 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task<KeyValuePair<SiloAddress, GrainInterfaceMap>> GetTargetSiloGrainInterfaceMap(SiloAddress siloAddress)
+        private async Task<KeyValuePair<SiloAddress, LegacyGrainInterfaceMap>> GetTargetSiloGrainInterfaceMap(SiloAddress siloAddress)
         {
             try
             {
                 var remoteTypeManager = this.grainFactory.GetSystemTarget<ISiloTypeManager>(Constants.TypeManagerId, siloAddress);
                 var siloTypeCodeMap = await scheduler.QueueTask(() => remoteTypeManager.GetSiloTypeCodeMap(), SchedulingContext);
-                return new KeyValuePair<SiloAddress, GrainInterfaceMap>(siloAddress, siloTypeCodeMap);
+                return new KeyValuePair<SiloAddress, LegacyGrainInterfaceMap>(siloAddress, siloTypeCodeMap);
             }
             catch (Exception ex)
             {
 				// Will be retried on the next timer hit
                 logger.Error(ErrorCode.TypeManager_GetSiloGrainInterfaceMapError, $"Exception when trying to get GrainInterfaceMap for silos {siloAddress}", ex);
 				hasToRefreshClusterGrainInterfaceMap = true;
-                return new KeyValuePair<SiloAddress, GrainInterfaceMap>(siloAddress, null);
+                return new KeyValuePair<SiloAddress, LegacyGrainInterfaceMap>(siloAddress, null);
             }
         }
 

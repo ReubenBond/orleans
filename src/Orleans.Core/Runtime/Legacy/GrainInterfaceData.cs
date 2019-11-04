@@ -12,14 +12,14 @@ namespace Orleans.Runtime
     {
         [NonSerialized]
         private readonly Type iface;
-        private readonly HashSet<GrainClassData> implementations;
+        private readonly HashSet<LegacyGrainClassData> implementations;
 
         internal Type Interface { get { return iface; } }
         internal int InterfaceId { get; private set; }
         internal ushort InterfaceVersion { get; private set; }
         internal string GrainInterface { get; private set; }
-        internal GrainClassData[] Implementations { get { return implementations.ToArray(); } }
-        internal GrainClassData PrimaryImplementation { get; private set; }
+        internal LegacyGrainClassData[] Implementations { get { return implementations.ToArray(); } }
+        internal LegacyGrainClassData PrimaryImplementation { get; private set; }
 
         internal GrainInterfaceData(int interfaceId, ushort interfaceVersion, Type iface, string grainInterface)
         {
@@ -27,10 +27,10 @@ namespace Orleans.Runtime
             InterfaceVersion = interfaceVersion;
             this.iface = iface;
             GrainInterface = grainInterface;
-            implementations = new HashSet<GrainClassData>();
+            implementations = new HashSet<LegacyGrainClassData>();
         }
 
-        internal void AddImplementation(GrainClassData implementation, bool primaryImplemenation = false)
+        internal void AddImplementation(LegacyGrainClassData implementation, bool primaryImplemenation = false)
         {
             lock (this)
             {

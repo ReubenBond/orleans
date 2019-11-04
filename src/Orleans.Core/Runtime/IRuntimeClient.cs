@@ -63,7 +63,7 @@ namespace Orleans.Runtime
         
         Streams.IStreamProviderRuntime CurrentStreamProviderRuntime { get; }
 
-        IGrainTypeResolver GrainTypeResolver { get; }
+        ILegacyGrainTypeResolver GrainTypeResolver { get; }
 
         IGrainReferenceRuntime GrainReferenceRuntime { get; }
 
