@@ -13,11 +13,11 @@ namespace Orleans.Runtime
     public readonly struct GrainType : IEquatable<GrainType>, IComparable<GrainType>, ISerializable
     {
         private readonly SpanId _value;
-        
+
         public GrainType(byte[] value) => _value = new SpanId(value);
 
         public GrainType(byte[] value, int hashCode) => _value = new SpanId(value, hashCode);
-        
+
         public GrainType(SerializationInfo info, StreamingContext context)
         {
             _value = new SpanId((byte[])info.GetValue("v", typeof(byte[])), info.GetInt32("h"));
