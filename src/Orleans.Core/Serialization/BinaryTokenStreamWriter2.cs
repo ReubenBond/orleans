@@ -1,7 +1,6 @@
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.Buffers.Text;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
@@ -21,7 +20,9 @@ namespace Orleans.Serialization
     {
         private static readonly Dictionary<Type, SerializationTokenType> typeTokens;
         private static readonly Dictionary<Type, Action<BinaryTokenStreamWriter2<TBufferWriter>, object>> writers;
+        private static readonly Encoding Utf8Encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: false);
 
+        private readonly Encoder utf8Encoder = Utf8Encoding.GetEncoder();
         private TBufferWriter output;
         private Memory<byte> currentBuffer;
         private int currentOffset;
@@ -135,29 +136,36 @@ namespace Orleans.Serialization
         {
             this.Write(Decimal.GetBits(d));
         }
-        
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Write(string s)
         {
-            if (null == s)
+            if (s is null)
             {
                 this.Write(-1);
             }
             else
             {
 #if NETCOREAPP
-                var count = Encoding.UTF8.GetByteCount(s);
-                this.Write(count);
-                var span = this.TryGetContiguous(count);
-                if (span.Length > count)
+                var enc = this.utf8Encoder;
+                enc.Reset();
+
+                // Attempt a fast write. Note that we could accurately determine the required bytes to encode the input here,
+                // but that requires an additional scan over the string. We could determine an upper bound here, too, but that may
+                // be wasteful. Instead, we are optimistic that the output is large enough to hold the encoded data and we will
+                // fall back to a slower and more accurate method if it is not.
+                var writableSpan = this.WritableSpan;
+                enc.Convert(s, writableSpan.Slice(4), true, out var charsUsed, out var bytesUsed, out var completed);
+
+                if (completed)
                 {
-                    Encoding.UTF8.GetBytes(s, span);
-                    this.currentOffset += count;
+                    BinaryPrimitives.WriteInt32LittleEndian(writableSpan, bytesUsed);
+                    this.currentOffset += 4 + bytesUsed;
+                    return;
                 }
-                else
-                {
-                    var bytes = Encoding.UTF8.GetBytes(s);
-                    this.WriteMultiSegment(bytes);
-                }
+
+                // Otherwise, try again more slowly, overwriting whatever data was just copied to the output buffer.
+                this.WriteStringInternalSlower(s);
 #else
                 var bytes = Encoding.UTF8.GetBytes(s);
                 this.Write(bytes.Length);
@@ -165,7 +173,27 @@ namespace Orleans.Serialization
 #endif
             }
         }
-        
+
+#if NETCOREAPP
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void WriteStringInternalSlower(string s)
+        {
+            var count = Encoding.UTF8.GetByteCount(s);
+            this.Write(count);
+            var span = this.TryGetContiguous(count);
+            if (span.Length > count)
+            {
+                Encoding.UTF8.GetBytes(s, span);
+                this.currentOffset += count;
+            }
+            else
+            {
+                var bytes = Encoding.UTF8.GetBytes(s);
+                this.WriteMultiSegment(bytes);
+            }
+        }
+#endif
+
         public void Write(char c)
         {
             this.Write(Convert.ToInt16(c));

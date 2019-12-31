@@ -32,18 +32,6 @@ namespace Orleans.Serialization
         {
             this.PartialReset(input);
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void PartialReset(ReadOnlySequence<byte> input)
-        {
-            this.input = input;
-            this.nextSequencePosition = input.Start;
-            this.currentSpan = input.First;
-            this.bufferPos = 0;
-            this.bufferSize = this.currentSpan.Length;
-            this.previousBuffersSize = 0;
-        }
-
         public long Length => this.input.Length;
         
         public long Position
@@ -56,6 +44,17 @@ namespace Orleans.Serialization
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => (int)this.previousBuffersSize + this.bufferPos;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void PartialReset(ReadOnlySequence<byte> input)
+        {
+            this.input = input;
+            this.nextSequencePosition = input.Start;
+            this.currentSpan = input.First;
+            this.bufferPos = 0;
+            this.bufferSize = this.currentSpan.Length;
+            this.previousBuffersSize = 0;
         }
 
         public void Skip(long count)
@@ -289,13 +288,13 @@ namespace Orleans.Serialization
         public string ReadString()
         {
             var n = this.ReadInt32();
-            if (n == 0)
+            if (n <= 0)
             {
-                return string.Empty;
-            }
+                if (n == 0) return string.Empty;
 
-            // a length of -1 indicates that the string is null.
-            if (n == -1) return null;
+                // a length of -1 indicates that the string is null.
+                if (n == -1) return null;
+            }
 
 #if NETCOREAPP
             if (this.bufferSize - this.bufferPos >= n)
@@ -320,7 +319,7 @@ namespace Orleans.Serialization
             return Encoding.UTF8.GetString(bytes);
 #endif
         }
-        
+
         /// <summary> Read the next bytes from the stream. </summary>
         /// <param name="destination">Output array to store the returned data in.</param>
         /// <param name="offset">Offset into the destination array to write to.</param>
@@ -407,7 +406,6 @@ namespace Orleans.Serialization
             byte[] bytes = ReadBytes(16);
             return new Guid(bytes);
 #endif
-
         }
 
         /// <summary> Read an <c>IPEndPoint</c> value from the stream. </summary>
