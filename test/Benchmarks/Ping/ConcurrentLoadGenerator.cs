@@ -76,7 +76,7 @@ namespace Benchmarks.Ping
                 {
                     SingleReader = true,
                     SingleWriter = false,
-                    AllowSynchronousContinuations = false
+                    AllowSynchronousContinuations = true
                 });
         }
 
