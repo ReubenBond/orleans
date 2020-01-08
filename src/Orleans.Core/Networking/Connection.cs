@@ -24,8 +24,8 @@ namespace Orleans.Runtime.Messaging
             AllowSynchronousContinuations = false
         };
 
+        private readonly ConnectionShared shared;
         private readonly ConnectionDelegate middleware;
-        private readonly IServiceProvider serviceProvider;
         private readonly Channel<Message> outgoingMessages;
         private readonly ChannelWriter<Message> outgoingMessageWriter;
         private readonly object lockObj = new object();
@@ -34,15 +34,11 @@ namespace Orleans.Runtime.Messaging
         protected Connection(
             ConnectionContext connection,
             ConnectionDelegate middleware,
-            MessageFactory messageFactory,
-            IServiceProvider serviceProvider,
-            NetworkingTrace networkingTrace)
+            ConnectionShared shared)
         {
             this.Context = connection ?? throw new ArgumentNullException(nameof(connection));
             this.middleware = middleware ?? throw new ArgumentNullException(nameof(middleware));
-            this.MessageFactory = messageFactory ?? throw new ArgumentNullException(nameof(messageFactory));
-            this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-            this.Log = networkingTrace ?? throw new ArgumentNullException(nameof(networkingTrace));
+            this.shared = shared;
             this.outgoingMessages = Channel.CreateUnbounded<Message>(OutgoingMessageChannelOptions);
             this.outgoingMessageWriter = this.outgoingMessages.Writer;
 
@@ -60,9 +56,9 @@ namespace Orleans.Runtime.Messaging
         protected CounterStatistic MessageReceivedCounter { get; set; }
         protected CounterStatistic MessageSentCounter { get; set; }
         protected ConnectionContext Context { get; }
-        protected NetworkingTrace Log { get; }
+        protected NetworkingTrace Log => this.shared.NetworkingTrace;
         protected abstract ConnectionDirection ConnectionDirection { get; }
-        protected MessageFactory MessageFactory { get; }
+        protected MessageFactory MessageFactory => this.shared.MessageFactory;
         protected abstract IMessageCenter MessageCenter { get; }
 
         public bool IsValid { get; private set; }
@@ -184,7 +180,7 @@ namespace Orleans.Runtime.Messaging
 
             Exception error = default;
             PipeReader input = default;
-            var serializer = this.serviceProvider.GetRequiredService<IMessageSerializer>();
+            var serializer = this.shared.ServiceProvider.GetRequiredService<IMessageSerializer>();
             try
             {
                 if (this.Log.IsEnabled(LogLevel.Information))
@@ -214,7 +210,6 @@ namespace Orleans.Runtime.Messaging
                                 if (requiredBytes == 0)
                                 {
                                     MessagingStatisticsGroup.OnMessageReceive(this.MessageReceivedCounter, message, bodyLength + headerLength, headerLength, this.ConnectionDirection);
-                                    this.Log.ReceiveMessage(message);
                                     this.OnReceivedMessage(message);
                                     message = null;
                                 }
@@ -259,7 +254,7 @@ namespace Orleans.Runtime.Messaging
 
             Exception error = default;   
             PipeWriter output = default;
-            var serializer = this.serviceProvider.GetRequiredService<IMessageSerializer>();
+            var serializer = this.shared.ServiceProvider.GetRequiredService<IMessageSerializer>();
             try
             {
                 output = this.Context.Transport.Output;
@@ -287,7 +282,6 @@ namespace Orleans.Runtime.Messaging
                         {
                             inflight.Add(message);
                             var (headerLength, bodyLength) = serializer.Write(ref output, message);
-                            this.Log.SendMessage(message);
                             MessagingStatisticsGroup.OnMessageSend(this.MessageSentCounter, message, headerLength + bodyLength, headerLength, this.ConnectionDirection);
                         }
                     }

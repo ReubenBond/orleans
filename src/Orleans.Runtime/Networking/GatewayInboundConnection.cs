@@ -23,17 +23,14 @@ namespace Orleans.Runtime.Messaging
         public GatewayInboundConnection(
             ConnectionContext connection,
             ConnectionDelegate middleware,
-            IServiceProvider serviceProvider,
             Gateway gateway,
             OverloadDetector overloadDetector,
-            MessageFactory messageFactory,
-            NetworkingTrace trace,
             ILocalSiloDetails siloDetails,
             IOptions<MultiClusterOptions> multiClusterOptions,
             ConnectionOptions connectionOptions,
             MessageCenter messageCenter,
-            ILocalSiloDetails localSiloDetails)
-            : base(connection, middleware, messageFactory, serviceProvider, trace)
+            ConnectionShared connectionShared)
+            : base(connection, middleware, connectionShared)
         {
             this.connectionOptions = connectionOptions;
             this.gateway = gateway;
@@ -42,7 +39,7 @@ namespace Orleans.Runtime.Messaging
             this.messageCenter = messageCenter;
             this.multiClusterOptions = multiClusterOptions.Value;
             this.loadSheddingCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_LOAD_SHEDDING);
-            this.myAddress = localSiloDetails.SiloAddress;
+            this.myAddress = siloDetails.SiloAddress;
             this.MessageReceivedCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_RECEIVED);
             this.MessageSentCounter = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_SENT);
         }

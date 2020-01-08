@@ -20,13 +20,11 @@ namespace Orleans.Runtime.Messaging
             SiloAddress remoteSiloAddress,
             ConnectionContext connection,
             ConnectionDelegate middleware,
-            MessageFactory messageFactory,
-            IServiceProvider serviceProvider,
             ClientMessageCenter messageCenter,
-            NetworkingTrace trace,
             ConnectionManager connectionManager,
-            ConnectionOptions connectionOptions)
-            : base(connection, middleware, messageFactory, serviceProvider, trace)
+            ConnectionOptions connectionOptions,
+            ConnectionShared connectionShared)
+            : base(connection, middleware, connectionShared)
         {
             this.messageCenter = messageCenter;
             this.connectionManager = connectionManager;

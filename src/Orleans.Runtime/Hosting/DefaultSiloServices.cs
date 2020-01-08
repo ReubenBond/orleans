@@ -348,6 +348,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton(typeof(IAttributeToFactoryMapper<PersistentStateAttribute>), typeof(PersistentStateAttributeMapper));
 
             // Networking
+            services.TryAddSingleton<ConnectionShared>();
             services.TryAddSingleton<ConnectionManager>();
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, ConnectionManagerLifecycleAdapter<ISiloLifecycle>>();
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionMaintainer>();
