@@ -87,7 +87,7 @@ namespace Orleans.Runtime.Scheduler
             get { return workItems.Count; }
         }
 
-        internal float AverageQueueLenght
+        internal float AverageQueueLength
         {
             get
             {
@@ -453,9 +453,9 @@ namespace Orleans.Runtime.Scheduler
                         CurrentTask.Id, CurrentTask.Status, Utils.Since(currentTaskStarted));
                 }
 
-                if (AverageQueueLenght > 0)
+                if (AverageQueueLength > 0)
                 {
-                    sb.AppendFormat("average queue length at enqueue: {0}; ", AverageQueueLenght);
+                    sb.AppendFormat("average queue length at enqueue: {0}; ", AverageQueueLength);
                     if (!totalQueuingDelay.Equals(TimeSpan.Zero) && totalItemsProcessed > 0)
                     {
                         sb.AppendFormat("average queue delay: {0}ms; ", totalQueuingDelay.Divide(totalItemsProcessed).TotalMilliseconds);
