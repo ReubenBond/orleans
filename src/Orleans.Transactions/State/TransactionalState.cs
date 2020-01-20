@@ -11,6 +11,7 @@ using Orleans.Transactions.Diagnostics;
 using Orleans.Transactions.State;
 using Orleans.Configuration;
 using Orleans.Timers.Internal;
+using Orleans.Transactions.DeadlockDetection;
 
 namespace Orleans.Transactions
 {

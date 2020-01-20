@@ -12,6 +12,7 @@ using Orleans.Transactions.Diagnostics;
 using Orleans.Storage;
 using Orleans.Configuration;
 using Orleans.Timers.Internal;
+using Orleans.Transactions.DeadlockDetection;
 
 namespace Orleans.Transactions.State
 {
@@ -33,6 +34,9 @@ namespace Orleans.Transactions.State
         protected StorageBatch<TState> storageBatch = null!;
 
         private int failCounter;
+
+        // We have to expose this to the deadlock detection system.
+        internal ParticipantId Resource => this.resource;
 
         // collection tasks
         private readonly Dictionary<DateTime, PreparedMessages> unprocessedPreparedMessages;
@@ -74,7 +78,7 @@ namespace Orleans.Transactions.State
             this.activationLifetime = activationLifetime;
             this.diagnosticIdentity = diagnosticIdentity;
             this.storageWorker = new BatchWorkerFromDelegate(StorageWork, this.activationLifetime.OnDeactivating);
-            this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger, activationLifetime);
+            this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger, activationLifetime, transactionalLockObserver);
             this.confirmationWorker = new ConfirmationWorker<TState>(options, this.resource, this.storageWorker, () => this.storageBatch, this.logger, timerManager, activationLifetime);
             this.unprocessedPreparedMessages = new Dictionary<DateTime, PreparedMessages>();
             this.commitQueue = new CommitQueue<TState>();
