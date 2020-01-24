@@ -41,8 +41,15 @@ namespace Orleans.Runtime.Scheduler
 #if DEBUG
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Executing TaskWorkItem for Task Id={0},Name={1},Status={2} on Scheduler={3}", task.Id, Name, task.Status, this.scheduler);
 #endif
-
-            scheduler.RunTask(task);
+            try
+            {
+                RuntimeContext.SetExecutionContext(this.SchedulingContext);
+                scheduler.RunTask(task);
+            }
+            finally
+            {
+                RuntimeContext.ResetExecutionContext();
+            }
 
 #if DEBUG
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Completed Task Id={0},Name={1} with Status={2} {3}",
