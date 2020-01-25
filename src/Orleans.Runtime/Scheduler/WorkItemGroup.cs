@@ -123,7 +123,7 @@ namespace Orleans.Runtime.Scheduler
         // per ActivationWorker. An attempt to wait when there are already too many threads waiting
         // will result in a TooManyWaitersException being thrown.
         //private static readonly int MaxWaitingThreads = 500;
-        
+
         internal WorkItemGroup(
             OrleansTaskScheduler sched,
             ISchedulingContext schedulingContext,

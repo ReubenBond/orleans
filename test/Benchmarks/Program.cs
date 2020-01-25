@@ -153,7 +153,11 @@ namespace Benchmarks
             },
             ["ConcurrentPing_SiloToSilo_Long"] = () =>
             {
-                new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true).PingConcurrentHostedClient(blocksPerWorker: 1000).GetAwaiter().GetResult();
+                new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true).PingConcurrentHostedClient(blocksPerWorker: 100_000).GetAwaiter().GetResult();
+            },
+            ["ConcurrentPing_HostedClient_Long"] = () =>
+            {
+                new PingBenchmark(numSilos: 1, startClient: false).PingConcurrentHostedClient(blocksPerWorker: 100_000).GetAwaiter().GetResult();
             },
             ["PingForever"] = () =>
             {
