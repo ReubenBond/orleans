@@ -52,13 +52,10 @@ namespace Orleans.Runtime
 
         private readonly ILocalSiloDetails siloDetails;
         private readonly ClusterOptions clusterOptions;
-        private readonly ISiloMessageCenter messageCenter;
+        private readonly MessageCenter messageCenter;
         private readonly OrleansTaskScheduler scheduler;
         private readonly LocalGrainDirectory localGrainDirectory;
         private readonly ActivationDirectory activationDirectory;
-        private readonly IncomingMessageAgent incomingAgent;
-        private readonly IncomingMessageAgent incomingSystemAgent;
-        private readonly IncomingMessageAgent incomingPingAgent;
         private readonly ILogger logger;
         private TypeManager typeManager;
         private readonly TaskCompletionSource<int> siloTerminatedTask =
@@ -214,9 +211,14 @@ namespace Orleans.Runtime
             // Now the incoming message agents
             var messageFactory = this.Services.GetRequiredService<MessageFactory>();
             var messagingTrace = this.Services.GetRequiredService<MessagingTrace>();
-            incomingSystemAgent = new IncomingMessageAgent(Message.Categories.System, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, this.loggerFactory, messagingTrace);
-            incomingPingAgent = new IncomingMessageAgent(Message.Categories.Ping, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, this.loggerFactory, messagingTrace);
-            incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, catalog.Dispatcher, messageFactory, this.loggerFactory, messagingTrace);
+            messageCenter.RegisterLocalMessageHandler(new IncomingMessageHandler(
+                messageCenter,
+                activationDirectory,
+                scheduler,
+                catalog.Dispatcher,
+                messageFactory,
+                this.loggerFactory.CreateLogger<IncomingMessageHandler>(),
+                messagingTrace));
 
             siloStatusOracle = Services.GetRequiredService<ISiloStatusOracle>();
             this.membershipService = Services.GetRequiredService<IMembershipService>();
@@ -409,13 +411,6 @@ namespace Orleans.Runtime
             var stopWatch = Stopwatch.StartNew();
             // The order of these 4 is pretty much arbitrary.
             StartTaskWithPerfAnalysis("Start Message center",messageCenter.Start,stopWatch);
-            StartTaskWithPerfAnalysis("Start Incoming message agents", IncomingMessageAgentsStart, stopWatch);
-            void IncomingMessageAgentsStart()
-            {
-                incomingPingAgent.Start();
-                incomingSystemAgent.Start();
-                incomingAgent.Start();
-            } 
 
             StartTaskWithPerfAnalysis("Start local grain directory", LocalGrainDirectory.Start, stopWatch);
 
@@ -711,11 +706,6 @@ namespace Orleans.Runtime
         {
             // 10, 11, 12: Write Dead in the table, Drain scheduler, Stop msg center, ...
             logger.Info(ErrorCode.SiloStopped, "Silo is Stopped()");
-
-            // incoming messages
-            SafeExecute(incomingSystemAgent.Stop);
-            SafeExecute(incomingPingAgent.Stop);
-            SafeExecute(incomingAgent.Stop);
 
             // timers
             if (platformWatchdog != null) 
