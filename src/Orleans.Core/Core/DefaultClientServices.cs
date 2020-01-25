@@ -40,7 +40,6 @@ namespace Orleans
             services.TryAddSingleton<SchedulerStatisticsGroup>();
             services.TryAddSingleton<SerializationStatisticsGroup>();
             services.AddLogging();
-            services.TryAddSingleton<ExecutorService>();
             services.TryAddSingleton<TypeMetadataCache>();
             services.TryAddSingleton<OutsideRuntimeClient>();
             services.TryAddFromExisting<IRuntimeClient, OutsideRuntimeClient>();

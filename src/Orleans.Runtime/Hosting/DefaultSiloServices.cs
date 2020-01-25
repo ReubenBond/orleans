@@ -94,7 +94,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<SerializationStatisticsGroup>();
             services.TryAddSingleton<OverloadDetector>();
 
-            services.TryAddSingleton<ExecutorService>();
             // queue balancer contructing related
             services.TryAddTransient<IStreamQueueBalancer, ConsistentRingQueueBalancer>();
 

@@ -16,7 +16,7 @@ using Orleans.Internal;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class GlobalSingleInstanceActivationMaintainer : DedicatedAsynchAgent, IMultiClusterConfigurationListener
+    internal class GlobalSingleInstanceActivationMaintainer : TaskSchedulerAgent, IMultiClusterConfigurationListener
     {
         private readonly object lockable = new object();
         private readonly LocalGrainDirectory router;
@@ -34,19 +34,18 @@ namespace Orleans.Runtime.GrainDirectory
         private List<GrainId> doubtfulGrains = new List<GrainId>();
 
         // used to cut short the waiting time before next run
-        private ManualResetEvent runNow = new ManualResetEvent(false);
+        private AsyncManualResetEvent runNow = new AsyncManualResetEvent(false);
 
         public GlobalSingleInstanceActivationMaintainer(
             LocalGrainDirectory router,
             ILogger logger,
             IInternalGrainFactory grainFactory,
             IMultiClusterOracle multiClusterOracle,
-            ExecutorService executorService,
             ILocalSiloDetails siloDetails,
             IOptions<MultiClusterOptions> multiClusterOptions,
             ILoggerFactory loggerFactory,
             RegistrarManager registrarManager)
-            : base(executorService, loggerFactory)
+            : base(nameSuffix: null, loggerFactory)
         {
             this.router = router;
             this.logger = logger;
@@ -93,7 +92,7 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         // the following method runs for the whole lifetime of the silo, doing the periodic maintenance
-        protected override void Run()
+        protected override async Task Run()
         {
             if (!this.multiClusterOptions.HasMultiClusterNetwork)
                 return;
@@ -107,7 +106,7 @@ namespace Orleans.Runtime.GrainDirectory
                 try
                 {
                     // wait until it is time, or someone prodded us to continue
-                    runNow.WaitOne(period);
+                    await Task.WhenAny(Task.Delay(period), runNow.WaitAsync());
                     runNow.Reset();
 
                     if (!router.Running || Cts.IsCancellationRequested) break;
@@ -131,10 +130,10 @@ namespace Orleans.Runtime.GrainDirectory
 
                         logger.Debug("GSIP:M Not joined to multicluster. Make {0} owned entries doubtful {1}", ownedEntries.Count, logger.IsEnabled(LogLevel.Trace) ? string.Join(",", ownedEntries.Select(s => s.Item1)) : "");
 
-                        router.Scheduler.QueueTask(
+                        await router.Scheduler.QueueTask(
                             () => RunBatchedDemotion(ownedEntries),
                             router.CacheValidator.SchedulingContext
-                        ).Wait();
+                        );
                     }
                     else
                     {
@@ -146,10 +145,10 @@ namespace Orleans.Runtime.GrainDirectory
                             .ToList();
 
                         // validate entries that point to remote clusters
-                        router.Scheduler.QueueTask(
+                        await router.Scheduler.QueueTask(
                                   () => RunBatchedValidation(),
                                   router.CacheValidator.SchedulingContext
-                              ).Wait();
+                              );
 
                         if (!remoteClusters.Any(kvp => kvp.Value == null))
                         {
@@ -165,10 +164,10 @@ namespace Orleans.Runtime.GrainDirectory
 
                             logger.Debug("GSIP:M retry {0} doubtful entries {1}", grains.Count, logger.IsEnabled(LogLevel.Trace) ? string.Join(",", grains) : "");
 
-                            router.Scheduler.QueueTask(
+                            await router.Scheduler.QueueTask(
                                 () => RunBatchedActivationRequests(remoteClusters, grains),
                                 router.CacheValidator.SchedulingContext
-                            ).Wait();
+                            );
                         }
                     }
                 }

@@ -66,7 +66,6 @@ namespace Orleans.Runtime
         private SystemTarget fallbackScheduler;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IMultiClusterOracle multiClusterOracle;
-        private readonly ExecutorService executorService;
         private Watchdog platformWatchdog;
         private readonly TimeSpan initTimeout;
         private readonly TimeSpan stopTimeout = TimeSpan.FromMinutes(1);
@@ -124,7 +123,6 @@ namespace Orleans.Runtime
             // Temporarily still require this. Hopefuly gone when 2.0 is released.
             this.siloDetails = siloDetails;
             this.SystemStatus = SystemStatus.Creating;
-            AsynchAgent.IsStarting = true; // todo. use ISiloLifecycle instead?
 
             var startTime = DateTime.UtcNow;
 
@@ -206,8 +204,6 @@ namespace Orleans.Runtime
 
             catalog = Services.GetRequiredService<Catalog>();
 
-            executorService = Services.GetRequiredService<ExecutorService>();
-
             // Now the incoming message agents
             var messageFactory = this.Services.GetRequiredService<MessageFactory>();
             var messagingTrace = this.Services.GetRequiredService<MessagingTrace>();
@@ -235,7 +231,6 @@ namespace Orleans.Runtime
             }
 
             this.SystemStatus = SystemStatus.Created;
-            AsynchAgent.IsStarting = false;
 
             StringValueStatistic.FindOrCreate(StatisticNames.SILO_START_TIME,
                 () => LogFormatter.PrintDate(startTime)); // this will help troubleshoot production deployment when looking at MDS logs.
@@ -486,7 +481,7 @@ namespace Orleans.Runtime
 
                 // Start background timer tick to watch for platform execution stalls, such as when GC kicks in
                 var healthCheckParticipants = this.Services.GetService<IEnumerable<IHealthCheckParticipant>>().ToList();
-                this.platformWatchdog = new Watchdog(statisticsOptions.LogWriteInterval, healthCheckParticipants, this.executorService, this.loggerFactory);
+                this.platformWatchdog = new Watchdog(statisticsOptions.LogWriteInterval, healthCheckParticipants, this.loggerFactory.CreateLogger<Watchdog>());
                 this.platformWatchdog.Start();
                 if (this.logger.IsEnabled(LogLevel.Debug)) { logger.Debug("Silo platform watchdog started successfully."); }
             }
