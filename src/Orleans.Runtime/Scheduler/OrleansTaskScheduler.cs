@@ -376,7 +376,7 @@ namespace Orleans.Runtime.Scheduler
 
             var sb = new StringBuilder();
             sb.AppendLine("Dump of current OrleansTaskScheduler status:");
-            sb.AppendFormat("CPUs={0} WorkItems={2} {2}",
+            sb.AppendFormat("CPUs={0} WorkItems={1} {2}",
                 Environment.ProcessorCount,
                 workgroupDirectory.Count,
                 applicationTurnsStopped ? "STOPPING" : "").AppendLine();
