@@ -51,7 +51,7 @@ namespace Orleans.Runtime
 
         public readonly GrainType Type => _type;
 
-        public readonly ReadOnlyMemory<byte> Key => _key.Value;
+        public readonly SpanId Key => _key;
 
         public readonly bool IsDefault => _type.IsDefault && _key.IsDefault;
 

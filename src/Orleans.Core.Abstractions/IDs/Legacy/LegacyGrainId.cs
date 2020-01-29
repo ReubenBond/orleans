@@ -236,7 +236,7 @@ namespace Orleans.Runtime
 
             ulong n0, n1;
             string keyExt;
-            var keySpan = id.Key.Span;
+            var keySpan = id.Key.Value.Span;
             fixed (byte* idBytes = keySpan)
             {
                 const int fieldLength = 16;

@@ -692,9 +692,6 @@ namespace Orleans.Runtime
 
             GrainTypeData grainTypeData = grainTypeManager[grainClassName];
 
-            //Get the grain's type
-            Type grainType = grainTypeData.Type;
-
             lock (data)
             {
                 data.SetupContext(grainTypeData, this.serviceProvider);

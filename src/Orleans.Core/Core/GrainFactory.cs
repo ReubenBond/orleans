@@ -188,16 +188,12 @@ namespace Orleans
             GrainClassData implementation;
             if (!grainTypeResolver.TryGetGrainClassData(interfaceType, out implementation, grainClassNamePrefix))
             {
-                var loadedAssemblies = grainTypeResolver.GetLoadedGrainAssemblies();
-                var assembliesString = string.IsNullOrEmpty(loadedAssemblies)
-                    ? string.Empty
-                    : " Loaded grain assemblies: " + loadedAssemblies;
                 var grainClassPrefixString = string.IsNullOrEmpty(grainClassNamePrefix)
                     ? string.Empty
                     : ", grainClassNamePrefix: " + grainClassNamePrefix;
                 throw new ArgumentException(
                     $"Cannot find an implementation class for grain interface: {interfaceType}{grainClassPrefixString}. " +
-                    "Make sure the grain assembly was correctly deployed and loaded in the silo." + assembliesString);
+                    "Make sure the grain assembly was correctly deployed and loaded in the silo.");
             }
 
             return implementation;

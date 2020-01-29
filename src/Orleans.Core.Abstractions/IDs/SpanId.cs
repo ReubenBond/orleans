@@ -67,6 +67,8 @@ namespace Orleans.Runtime
 
         public int CompareTo(SpanId other) => _value.AsSpan().SequenceCompareTo(other._value.AsSpan());
 
+        public override string ToString() => this.ToStringUtf8();
+
         public readonly string ToStringUtf8()
         {
             if (_value is object) return Encoding.UTF8.GetString(_value);

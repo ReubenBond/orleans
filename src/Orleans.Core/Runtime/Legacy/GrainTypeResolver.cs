@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 
 namespace Orleans.Runtime
 {
@@ -11,7 +10,6 @@ namespace Orleans.Runtime
         bool TryGetGrainClassData(int grainInterfaceId, out GrainClassData implementation, string grainClassNamePrefix);
         bool TryGetGrainClassData(string grainImplementationClassName, out GrainClassData implementation);
         bool IsUnordered(int grainTypeCode);
-        string GetLoadedGrainAssemblies();
     }
 
     [Serializable]
@@ -19,18 +17,15 @@ namespace Orleans.Runtime
     {
         private readonly Dictionary<string, GrainInterfaceData> typeToInterfaceData;
         private readonly Dictionary<int, GrainInterfaceData> table;
-        private readonly HashSet<string> loadedGrainAsemblies;
         private readonly HashSet<int> unordered;
 
         public GrainTypeResolver(
             Dictionary<string, GrainInterfaceData> typeToInterfaceData,
             Dictionary<int, GrainInterfaceData> table,
-            HashSet<string> loadedGrainAsemblies,
             HashSet<int> unordered)
         {
             this.typeToInterfaceData = typeToInterfaceData;
             this.table = table;
-            this.loadedGrainAsemblies = loadedGrainAsemblies;
             this.unordered = unordered;
         }
 
@@ -76,18 +71,16 @@ namespace Orleans.Runtime
             foreach (var interfaceData in table.Values)
             {
                 foreach (var implClass in interfaceData.Implementations)
+                {
                     if (implClass.GrainClass.Equals(grainImplementationClassName))
                     {
                         implementation = implClass;
                         return true;
                     }
+                }
             }
-            return false;
-        }
 
-        public string GetLoadedGrainAssemblies()
-        {
-            return loadedGrainAsemblies != null ? loadedGrainAsemblies.ToStrings() : String.Empty;
+            return false;
         }
 
         public bool IsUnordered(int grainTypeCode)

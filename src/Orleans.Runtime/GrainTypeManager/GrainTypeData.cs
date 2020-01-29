@@ -22,7 +22,7 @@ namespace Orleans.Runtime
         internal bool IsReentrant { get; private set; }
         internal bool IsStatelessWorker { get; private set; }
         internal Func<InvokeMethodRequest, bool> MayInterleave { get; private set; }
-   
+
         public GrainTypeData(Type type)
         {
             Type = type;
@@ -84,7 +84,6 @@ namespace Orleans.Runtime
             }
         }
 
-#pragma warning disable 612,618
         internal static PlacementStrategy GetPlacementStrategy(Type grainClass, PlacementStrategy defaultPlacement)
         {
             PlacementStrategy placement;
@@ -98,6 +97,13 @@ namespace Orleans.Runtime
             }
 
             return defaultPlacement;
+        }
+
+        public GrainTypeData MakeGenericType(Type[] typeArgs)
+        {
+            // Need to make a non-generic instance of the class to access the static data field. The field itself is independent of the instantiated type.
+            var concreteActivationType = this.Type.MakeGenericType(typeArgs);
+            return new GrainTypeData(concreteActivationType);
         }
 
         /// <summary>

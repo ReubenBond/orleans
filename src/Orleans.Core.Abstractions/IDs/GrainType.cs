@@ -55,6 +55,8 @@ namespace Orleans.Runtime
             info.AddValue("h", _value.GetHashCode());
         }
 
+        public override string ToString() => this.ToStringUtf8();
+
         public readonly string ToStringUtf8() => _value.ToStringUtf8();
 
         public sealed class Comparer : IEqualityComparer<GrainType>, IComparer<GrainType>

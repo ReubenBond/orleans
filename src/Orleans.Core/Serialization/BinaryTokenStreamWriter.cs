@@ -53,7 +53,7 @@ namespace Orleans.Serialization
         internal static void Write<TWriter>(this TWriter @this, GrainId id) where TWriter : IBinaryTokenStreamWriter
         {
             @this.Write(id.Type);
-            @this.Write(GrainId.KeyAsSpanId(id));
+            @this.Write(id.Key);
         }
 
         /// <summary> Write a <c>GrainId</c> value to the stream. </summary>
