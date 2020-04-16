@@ -254,6 +254,11 @@ namespace Orleans.Transactions.State
             Exception? exception,
             TransactionDiagnosticEvents.LockBreakReason reason = TransactionDiagnosticEvents.LockBreakReason.TransactionAbort)
         {
+            if (this.logger.IsEnabled(LogLevel.Information))
+            {
+                this.logger.LogInformation("aborting all transactions in {CurrentGroup}",
+                    string.Join(",", this.currentGroup?.Keys));
+            }
             if (currentGroup != null)
             {
                 Task[] pending = currentGroup.Select(g => BreakLock(g.Key, g.Value, exception, reason)).ToArray();
