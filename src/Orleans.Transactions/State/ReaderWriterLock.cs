@@ -145,6 +145,13 @@ namespace Orleans.Transactions.State
                     }
                     LogTraceSetLockExpiration(new(group.Deadline));
                 }
+                else
+                {
+                    if (this.transactionalLockObserver != null)
+                    {
+                        group.DeadlockDeadline = now + this.options.DeadlockDetectionThreshold;
+                    }
+                }
 
                 // create a new record for this transaction
                 record = new TransactionRecord<TState>()
@@ -191,7 +198,7 @@ namespace Orleans.Transactions.State
             else
             {
                 // execute task right now
-                this.transactionalLockObserver?.OnResourceLocked(transactionId, this.queue.Resource, isRead);
+                this.transactionalLockObserver?.OnResourceLocked(transactionId, this.queue.Resource);
                 completion();
             }
 
@@ -358,6 +365,10 @@ namespace Orleans.Transactions.State
                             storageWorker.Notify();
                         }
                         else if(currentGroup.DeadlockDeadline.HasValue){
+                            if (this.logger.IsEnabled(LogLevel.Trace))
+                            {
+                                this.logger.LogTrace($"deadlock deadline has value - {this.currentGroup.DeadlockDeadline.Value}, checking it");
+                            }
                             if (currentGroup.DeadlockDeadline.Value < now)
                             {
                                 this.logger.LogInformation($"deadlock possible for {this.currentGroup} on {this.queue.Resource} (observer: {this.transactionalLockObserver}");
@@ -369,8 +380,10 @@ namespace Orleans.Transactions.State
                             }
                             else
                             {
+                                if(this.logger.IsEnabled(LogLevel.Information)) this.logger.LogInformation($"notifying later (lock-work)");
                                 this.lockWorker.Notify(
                                     this.currentGroup.NextDeadline ?? this.currentGroup.DeadlockDeadline.Value);
+                                if(this.logger.IsEnabled(LogLevel.Information)) this.logger.LogInformation($"done notify later (lock-work)");
                             }
                         }
                         else if (currentGroup.Deadline.HasValue)
@@ -407,11 +420,18 @@ namespace Orleans.Transactions.State
                         {
                             LogWarningDeadlineNotSet(new(currentGroup.Keys));
                         }
+
+                        if(this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace("done with non-empty current group");
                     }
                     else
                     {
                         // the lock is empty, a new group can enter
                         currentGroup = currentGroup.Next;
+
+                        if (this.logger.IsEnabled(LogLevel.Trace))
+                        {
+                            this.logger.LogTrace("empty group, starting next group");
+                        }
 
                         if (currentGroup != null)
                         {
