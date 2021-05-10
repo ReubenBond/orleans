@@ -8,7 +8,6 @@ using Orleans.Metadata;
 using Orleans.Placement.Repartitioning;
 using Orleans.Providers;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.MembershipService;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
@@ -24,7 +23,7 @@ namespace Orleans.Runtime.Management
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IVersionStore versionStore;
-        private readonly MembershipTableManager membershipTableManager;
+        private readonly IClusterMembershipService clusterMembershipService;
         private readonly GrainManifest siloManifest;
         private readonly ClusterManifest clusterManifest;
         private readonly ILogger logger;
@@ -36,12 +35,12 @@ namespace Orleans.Runtime.Management
             ISiloStatusOracle siloStatusOracle,
             IVersionStore versionStore,
             ILogger<ManagementGrain> logger,
-            MembershipTableManager membershipTableManager,
+            IClusterMembershipService clusterMembershipService,
             IClusterManifestProvider clusterManifestProvider,
             Catalog catalog,
             GrainLocator grainLocator)
         {
-            this.membershipTableManager = membershipTableManager;
+            this.clusterMembershipService = clusterMembershipService;
             this.siloManifest = clusterManifestProvider.LocalGrainManifest;
             this.clusterManifest = clusterManifestProvider.Current;
             this.internalGrainFactory = internalGrainFactory;
@@ -54,30 +53,30 @@ namespace Orleans.Runtime.Management
 
         public async Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false)
         {
-            await this.membershipTableManager.Refresh();
+            await this.clusterMembershipService.Refresh();
             return this.siloStatusOracle.GetApproximateSiloStatuses(onlyActive);
         }
 
-        public async Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false)
+        public async Task<ClusterMemberInfo[]> GetDetailedHosts(bool onlyActive = false)
         {
             logger.LogInformation("GetDetailedHosts OnlyActive={OnlyActive}", onlyActive);
 
-            await this.membershipTableManager.Refresh();
+            await this.clusterMembershipService.Refresh();
 
-            var table = this.membershipTableManager.MembershipTableSnapshot;
+            var table = this.clusterMembershipService.CurrentSnapshot;
 
-            MembershipEntry[] result;
+            ClusterMemberInfo[] result;
             if (onlyActive)
             {
-                result = table.Entries
+                result = table.Members
                     .Where(item => item.Value.Status == SiloStatus.Active)
-                    .Select(x => x.Value)
+                    .Select(x => new ClusterMemberInfo(x.Value.SiloAddress, x.Value.Status, x.Value.Name))
                     .ToArray();
             }
             else
             {
-                result = table.Entries
-                    .Select(x => x.Value)
+                result = table.Members
+                    .Select(x => new ClusterMemberInfo(x.Value.SiloAddress, x.Value.Status, x.Value.Name))
                     .ToArray();
             }
 

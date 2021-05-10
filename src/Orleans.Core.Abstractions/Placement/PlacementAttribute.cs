@@ -123,4 +123,16 @@ namespace Orleans.Placement
         public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
             => properties[WellKnownGrainTypeProperties.Immovable] = "true";
     }
+
+    /// <summary>
+    /// Marks a grain class as using the <c>FixedPlacement</c> policy.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
+    public sealed class SiloServicePlacementAttribute : PlacementAttribute
+    {
+        public SiloServicePlacementAttribute() :
+            base(FixedPlacement.Singleton)
+        {
+        }
+    }
 }

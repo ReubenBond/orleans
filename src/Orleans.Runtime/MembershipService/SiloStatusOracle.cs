@@ -8,34 +8,34 @@ namespace Orleans.Runtime.MembershipService
     internal class SiloStatusOracle : ISiloStatusOracle
     {
         private readonly ILocalSiloDetails localSiloDetails;
-        private readonly MembershipTableManager membershipTableManager;
+        private readonly IClusterMembershipService  clusterMembershipService;
         private readonly SiloStatusListenerManager listenerManager;
         private readonly ILogger log;
         private readonly object cacheUpdateLock = new object();
-        private MembershipTableSnapshot cachedSnapshot;
+        private ClusterMembershipSnapshot cachedSnapshot;
         private Dictionary<SiloAddress, SiloStatus> siloStatusCache = new Dictionary<SiloAddress, SiloStatus>();
         private Dictionary<SiloAddress, SiloStatus> siloStatusCacheOnlyActive = new Dictionary<SiloAddress, SiloStatus>();
         private ImmutableArray<SiloAddress> _activeSilos = [];
 
         public SiloStatusOracle(
             ILocalSiloDetails localSiloDetails,
-            MembershipTableManager membershipTableManager,
+            IClusterMembershipService clusterMembershipService,
             ILogger<SiloStatusOracle> logger,
             SiloStatusListenerManager listenerManager)
         {
             this.localSiloDetails = localSiloDetails;
-            this.membershipTableManager = membershipTableManager;
+            this.clusterMembershipService = clusterMembershipService;
             this.listenerManager = listenerManager;
             this.log = logger;
         }
 
-        public SiloStatus CurrentStatus => this.membershipTableManager.CurrentStatus;
+        public SiloStatus CurrentStatus => this.clusterMembershipService.CurrentStatus;
         public string SiloName => this.localSiloDetails.Name;
         public SiloAddress SiloAddress => this.localSiloDetails.SiloAddress;
-        
-        public SiloStatus GetApproximateSiloStatus(SiloAddress silo)
+
+        public SiloStatus GetSiloStatus(SiloAddress silo)
         {
-            var status = this.membershipTableManager.MembershipTableSnapshot.GetSiloStatus(silo);
+            var status = this.clusterMembershipService.CurrentSnapshot.GetSiloStatus(silo);
 
             if (status == SiloStatus.None)
             {
@@ -105,8 +105,8 @@ namespace Orleans.Runtime.MembershipService
         {
             if (silo.Equals(this.SiloAddress)) return false;
 
-            var status = this.GetApproximateSiloStatus(silo);
-            
+            var status = this.GetSiloStatus(silo);
+
             return status == SiloStatus.Dead;
         }
 
@@ -114,16 +114,16 @@ namespace Orleans.Runtime.MembershipService
         {
             if (silo.Equals(this.SiloAddress)) return true;
 
-            var status = this.GetApproximateSiloStatus(silo);
+            var status = this.GetSiloStatus(silo);
             return !status.IsTerminating();
         }
 
         public bool TryGetSiloName(SiloAddress siloAddress, out string siloName)
         {
-            var snapshot = this.membershipTableManager.MembershipTableSnapshot.Entries;
+            var snapshot = this.clusterMembershipService.CurrentSnapshot.Members;
             if (snapshot.TryGetValue(siloAddress, out var entry))
             {
-                siloName = entry.SiloName;
+                siloName = entry.Name;
                 return true;
             }
 
@@ -134,6 +134,5 @@ namespace Orleans.Runtime.MembershipService
         public bool SubscribeToSiloStatusEvents(ISiloStatusListener listener) => this.listenerManager.Subscribe(listener);
 
         public bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener listener) => this.listenerManager.Unsubscribe(listener);
-    
     }
 }

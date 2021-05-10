@@ -159,7 +159,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (!IsValidSilo(address.SiloAddress))
             {
-                var siloStatus = this.siloStatusOracle.GetApproximateSiloStatus(address.SiloAddress);
+                var siloStatus = this.siloStatusOracle.GetSiloStatus(address.SiloAddress);
                 throw new OrleansException($"Trying to register {address.GrainId} on invalid silo: {address.SiloAddress}. Known status: {siloStatus}");
             }
 

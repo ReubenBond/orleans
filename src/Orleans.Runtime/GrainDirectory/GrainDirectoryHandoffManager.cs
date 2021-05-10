@@ -73,7 +73,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             if (!this.localDirectory.Running) return;
 
-            if (this.siloStatusOracle.GetApproximateSiloStatus(addedSilo) == SiloStatus.Active)
+            if (this.siloStatusOracle.GetSiloStatus(addedSilo) == SiloStatus.Active)
             {
                 if (splitPartListSingle.Count > 0)
                 {
@@ -163,7 +163,7 @@ namespace Orleans.Runtime.GrainDirectory
             while (duplicates.Count > 0)
             {
                 var pair = duplicates.FirstOrDefault();
-                if (this.siloStatusOracle.GetApproximateSiloStatus(pair.Key) == SiloStatus.Active)
+                if (this.siloStatusOracle.GetSiloStatus(pair.Key) == SiloStatus.Active)
                 {
                     if (this.logger.IsEnabled(LogLevel.Debug))
                     {

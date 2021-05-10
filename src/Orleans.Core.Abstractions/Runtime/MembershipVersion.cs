@@ -31,11 +31,30 @@ namespace Orleans.Runtime
         /// </summary>
         public static MembershipVersion MinValue => new MembershipVersion(long.MinValue);
 
+        /// <summary>
+        /// Gets a version with a value of zero.
+        /// </summary>
+        public static MembershipVersion Zero => new(0);
+
         /// <inheritdoc/>
         public int CompareTo(MembershipVersion other) => this.Value.CompareTo(other.Value);
 
         /// <inheritdoc/>
         public bool Equals(MembershipVersion other) => this.Value == other.Value;
+
+        /// <summary>
+        /// Compares this value to the provided value and returns <see langword="true"/> if this
+        /// value is the immediate successor to the provided value.
+        /// </summary>
+        /// <returns>
+        /// <see langword="true"/> if this value is the immediate successor to the provided value, otherwise <see langword="false"/>.
+        /// </returns>
+        public bool IsSuccessorTo(MembershipVersion predecessor) => Value == predecessor.Value + 1;
+
+        /// <summary>
+        /// Returns the subequent version.
+        /// </summary>
+        public MembershipVersion Next() => new(Value + 1);
 
         /// <inheritdoc/>
         public override bool Equals(object obj) => obj is MembershipVersion other && this.Equals(other);

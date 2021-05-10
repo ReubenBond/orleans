@@ -33,5 +33,7 @@ namespace Orleans.Runtime
         /// <param name="siloAddress">The silo address which is being declared defunct.</param>
         /// <returns><see langword="true"/> if the silo has been evicted, <see langword="false"/> otherwise.</returns>
         Task<bool> TryKill(SiloAddress siloAddress);
+
+        SiloStatus CurrentStatus { get; }
     }
 }

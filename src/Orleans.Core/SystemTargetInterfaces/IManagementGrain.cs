@@ -25,7 +25,7 @@ namespace Orleans.Runtime
         /// <param name="onlyActive">Whether data on just current active silos should be returned,
         /// or by default data for all current and previous silo instances [including those in Joining or Dead status].</param>
         /// <returns>The host entries.</returns>
-        Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false);
+        Task<ClusterMemberInfo[]> GetDetailedHosts(bool onlyActive = false);
 
         /// <summary>
         /// Perform a run of the .NET garbage collector in the specified silos.

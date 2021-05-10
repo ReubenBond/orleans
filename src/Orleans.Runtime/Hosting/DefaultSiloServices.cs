@@ -208,6 +208,7 @@ namespace Orleans.Hosting
 
             // Placement directors
             services.AddPlacementDirector<RandomPlacement, RandomPlacementDirector>();
+            services.AddPlacementDirector<FixedPlacement, FixedPlacementDirector>();
             services.AddPlacementDirector<PreferLocalPlacement, PreferLocalPlacementDirector>();
             services.AddPlacementDirector<StatelessWorkerPlacement, StatelessWorkerDirector>(ServiceLifetime.Transient);
             services.AddPlacementDirector<ActivationCountBasedPlacement, ActivationCountPlacementDirector>();

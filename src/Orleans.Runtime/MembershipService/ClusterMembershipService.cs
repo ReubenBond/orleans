@@ -48,6 +48,8 @@ namespace Orleans.Runtime
             }
         }
 
+        public SiloStatus CurrentStatus => this.membershipTableManager.CurrentStatus;
+
         public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => this.updates;
 
         public ValueTask Refresh(MembershipVersion targetVersion) => Refresh(targetVersion, CancellationToken.None);

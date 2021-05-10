@@ -15,17 +15,17 @@ namespace Orleans.Runtime.MembershipService
     {
         private readonly object listenersLock = new object();
         private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
-        private readonly MembershipTableManager membershipTableManager;
+        private readonly IClusterMembershipService clusterMembershipService;
         private readonly ILogger<SiloStatusListenerManager> log;
         private readonly IFatalErrorHandler fatalErrorHandler;
         private ImmutableList<WeakReference<ISiloStatusListener>> listeners = ImmutableList<WeakReference<ISiloStatusListener>>.Empty;
 
         public SiloStatusListenerManager(
-            MembershipTableManager membershipTableManager,
+            IClusterMembershipService clusterMembershipService,
             ILogger<SiloStatusListenerManager> log,
             IFatalErrorHandler fatalErrorHandler)
         {
-            this.membershipTableManager = membershipTableManager;
+            this.clusterMembershipService = clusterMembershipService;
             this.log = log;
             this.fatalErrorHandler = fatalErrorHandler;
         }
@@ -77,10 +77,8 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug("Starting to process membership updates");
-                await foreach (var tableSnapshot in this.membershipTableManager.MembershipTableUpdates.WithCancellation(this.cancellation.Token))
+                await foreach (var snapshot in this.clusterMembershipService.MembershipUpdates.WithCancellation(this.cancellation.Token))
                 {
-                    var snapshot = tableSnapshot.CreateClusterMembershipSnapshot();
-
                     var update = (previous is null || snapshot.Version == MembershipVersion.MinValue) ? snapshot.AsUpdate() : snapshot.CreateUpdate(previous);
                     this.NotifyObservers(update);
                     previous = snapshot;
