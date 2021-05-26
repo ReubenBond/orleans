@@ -7,10 +7,10 @@ namespace Orleans.MetadataStore
     [Immutable]
     [Serializable]
     [GenerateSerializer]
-    public class ReplicaSetConfiguration : IVersioned
+    public class ClusterMembers
     {
-        public ReplicaSetConfiguration(
-            Ballot stamp,
+        public ClusterMembers(
+            ConfigBallot stamp,
             long version,
             SiloAddress[] members,
             int acceptQuorum,
@@ -45,7 +45,7 @@ namespace Orleans.MetadataStore
         /// The unique ballot number of this configuration.
         /// </summary>
         [Id(3)]
-        public Ballot Stamp { get; }
+        public ConfigBallot Stamp { get; }
 
         /// <summary>
         /// The monotonically increasing version number of this configuration.

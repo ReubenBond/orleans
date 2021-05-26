@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Orleans.MetadataStore.Tests
 {
-    public delegate ValueTask<PrepareResponse<TValue>> OnPrepare<TValue>((string Key, Ballot OroposerParentBallot, Ballot Ballot) args);
+    public delegate ValueTask<PrepareResponsee>> OnPrepare<TValue>((string Key, Ballot OroposerParentBallot, Ballot Ballot) args);
 
     public class TestRemoteMetadataStore : IRemoteMetadataStore
     {

@@ -4,37 +4,38 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 using AsyncEx = Nito.AsyncEx;
 
 namespace Orleans.MetadataStore
 {
-    public class ConfigProposer<TValue> : IProposer<TValue>, ConfigProposer<TValue>.ITestAccessor
+    public class ConfigProposer : ConfigProposer.ITestAccessor
     {
         private readonly AsyncEx.AsyncLock _lockObj;
         private readonly ILogger _log;
-        private readonly string _key;
+        private readonly IConfigAcceptorManager  _acceptors;
         private readonly Func<ExpandedReplicaSetConfiguration> _getConfiguration;
         private bool _skipPrepare;
         private int _nextInstanceId;
-        private TValue _cachedValue;
+        private ClusterMembers _cachedValue;
         private ConfigBallot _ballot;
 
-        public ConfigProposer(string key, ConfigBallot initialBallot, Func<ExpandedReplicaSetConfiguration> getConfiguration, ILogger log)
+        public ConfigProposer(ConfigBallot initialBallot, Func<ExpandedReplicaSetConfiguration> getConfiguration, ILogger log, IConfigAcceptorManager acceptors)
         {
             _lockObj = new AsyncEx.AsyncLock();
-            _key = key;
             _ballot = initialBallot;
             _getConfiguration = getConfiguration;
             _log = log;
+            _acceptors = acceptors;
         }
 
         internal ConfigBallot Ballot { get => _ballot; set => _ballot = value; }
 
         ConfigBallot ITestAccessor.Ballot { get => _ballot; set => _ballot = value; }
         bool ITestAccessor.SkipPrepare { get => _skipPrepare; set => _skipPrepare = value; }
-        TValue ITestAccessor.CachedValue { get => _cachedValue; set => _cachedValue = value; }
+        ClusterMembers ITestAccessor.CachedValue { get => _cachedValue; set => _cachedValue = value; }
 
-        public async Task<(ReplicationStatus Status, TValue Value)> TryUpdate<TArg>(TArg value, ChangeFunction<TArg, TValue> changeFunction, CancellationToken cancellationToken)
+        public async Task<(ReplicationStatus Status, ClusterMembers Value)> TryUpdate<TArg>(TArg value, ChangeFunction<TArg, ClusterMembers> changeFunction, CancellationToken cancellationToken)
         {
             using (await _lockObj.LockAsync(cancellationToken))
             {
@@ -42,9 +43,9 @@ namespace Orleans.MetadataStore
             }
         }
 
-        private async Task<(ReplicationStatus Status, TValue Value)> TryUpdateInternal<TArg>(
+        private async Task<(ReplicationStatus Status, ClusterMembers Value)> TryUpdateInternal<TArg>(
             TArg value,
-            ChangeFunction<TArg, TValue> changeFunction,
+            ChangeFunction<TArg, ClusterMembers> changeFunction,
             CancellationToken cancellationToken,
             int numRetries)
         {
@@ -57,7 +58,7 @@ namespace Orleans.MetadataStore
             // Select a ballot number for this attempt. The ballot must be consistent between propose and accept for the attempt.
             var prepareBallot = _ballot = _ballot.Successor();
 
-            TValue currentValue;
+            ClusterMembers currentValue;
             if (_skipPrepare)
             {
                 // If this node is leader, attempt to skip the prepare phase and at go straight to another accept
@@ -123,25 +124,25 @@ namespace Orleans.MetadataStore
             return (ReplicationStatus.Uncertain, currentValue);
         }
 
-        private async Task<(bool, TValue)> TryPrepare(ConfigBallot prepareBallot, ExpandedReplicaSetConfiguration config, CancellationToken cancellationToken)
+        private async Task<(bool, ClusterMembers)> TryPrepare(ConfigBallot prepareBallot, ClusterMembers config, CancellationToken cancellationToken)
         {
-            if (config.StoreReferences is null)
+            if (config.Members is null)
             {
                 return (false, default);
             }
 
-            var prepareTasks = new List<Task<PrepareResponse<TValue>>>(config.StoreReferences.Length);
-            foreach (var acceptors in config.StoreReferences)
+            var prepareTasks = new List<Task<ConfigPrepareResponse>>(config.Members.Length);
+            foreach (var server in config.Members)
             {
-                var acceptor = SelectInstance(acceptors);
-                prepareTasks.Add(acceptor.Prepare<TValue>(_key, config.Configuration.Stamp, prepareBallot).AsTask());
+                var prepareTask = _acceptors.Prepare(server, prepareBallot).AsTask();
+                prepareTasks.Add(prepareTask);
             }
 
             // Run a Prepare round in order to learn the current value of the register and secure a promise that a quorum
             // of nodes which accept our new value.
-            var requiredConfirmations = config.Configuration.PrepareQuorum;
+            var requiredConfirmations = config.PrepareQuorum;
             var remainingAllowedFailures = prepareTasks.Count - requiredConfirmations;
-            var currentValue = default(TValue);
+            var currentValue = default(ClusterMembers);
             var maxSuccess = ConfigBallot.Zero;
             var maxConflict = ConfigBallot.Zero;
             while (prepareTasks.Count > 0 && requiredConfirmations > 0 && !cancellationToken.IsCancellationRequested)
@@ -202,7 +203,7 @@ namespace Orleans.MetadataStore
             return (achievedQuorum, currentValue);
         }
 
-        private IRemoteMetadataStore SelectInstance(IRemoteMetadataStore[] acceptors)
+        private SiloAddress SelectInstance(SiloAddress[] acceptors)
         {
             if (_nextInstanceId >= acceptors.Length)
             {
@@ -212,17 +213,17 @@ namespace Orleans.MetadataStore
             return acceptors[_nextInstanceId++];
         }
 
-        private async Task<bool> TryAccept(ConfigBallot thisBallot, TValue newValue, ExpandedReplicaSetConfiguration config, CancellationToken cancellationToken)
+        private async Task<bool> TryAccept(ConfigBallot thisBallot, ClusterMembers newValue, ClusterMembers config, CancellationToken cancellationToken)
         {
             // The prepare phase succeeded, proceed to propagate the new value to all acceptors.
-            var acceptTasks = new List<Task<AcceptResponse>>(config.StoreReferences.Length);
-            foreach (var acceptors in config.StoreReferences)
+            var acceptTasks = new List<Task<ConfigAcceptResponse>>(config.Members.Length);
+            foreach (var server in config.Members)
             {
-                var acceptor = SelectInstance(acceptors);
-                acceptTasks.Add(acceptor.Accept(_key, config.Configuration.Stamp, thisBallot, newValue).AsTask());
+                var acceptTask = _acceptors.Accept(server, thisBallot, newValue).AsTask();
+                acceptTasks.Add(acceptTask);
             }
 
-            var requiredConfirmations = config.Configuration.AcceptQuorum;
+            var requiredConfirmations = config.AcceptQuorum;
             var remainingAllowedFailures = acceptTasks.Count - requiredConfirmations;
             var maxConflict = ConfigBallot.Zero;
             while (acceptTasks.Count > 0 && requiredConfirmations > 0 && !cancellationToken.IsCancellationRequested)
@@ -293,7 +294,7 @@ namespace Orleans.MetadataStore
         }
 
         [Conditional("DEBUG")]
-        private void LogSkippingPrepare(TValue currentValue)
+        private void LogSkippingPrepare(ClusterMembers currentValue)
         {
             if (_log.IsEnabled(LogLevel.Trace))
             {
@@ -311,7 +312,7 @@ namespace Orleans.MetadataStore
         }
 
         [Conditional("DEBUG")]
-        private void LogAcceptStarted(TValue newValue)
+        private void LogAcceptStarted(ClusterMembers newValue)
         {
             if (_log.IsEnabled(LogLevel.Trace))
             {
@@ -320,7 +321,7 @@ namespace Orleans.MetadataStore
         }
 
         [Conditional("DEBUG")]
-        private void LogAcceptSucceded(TValue newValue)
+        private void LogAcceptSucceded(ClusterMembers newValue)
         {
             if (_log.IsEnabled(LogLevel.Trace))
             {
@@ -356,7 +357,7 @@ namespace Orleans.MetadataStore
         }
 
         [Conditional("DEBUG")]
-        private void LogPrepareSuccess(TValue currentValue)
+        private void LogPrepareSuccess(ClusterMembers currentValue)
         {
             if (_log.IsEnabled(LogLevel.Trace))
             {
@@ -368,7 +369,7 @@ namespace Orleans.MetadataStore
         {
             ConfigBallot Ballot { get; set; }
             bool SkipPrepare { get; set; }
-            TValue CachedValue { get; set; }
+            ClusterMembers CachedValue { get; set; }
         }
     }
 }

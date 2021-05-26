@@ -4,7 +4,7 @@ namespace Orleans.MetadataStore
 {
     [Serializable]
     [GenerateSerializer]
-    public struct ReadResult<TValue> where TValue : class, IVersioned
+    public struct ReadResult<TValue> where TValue : class
     {
         public ReadResult(bool success, TValue value)
         {
