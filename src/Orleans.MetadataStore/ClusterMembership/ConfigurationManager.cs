@@ -1,12 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.MetadataStore.Storage;
 using Orleans.Runtime;
 using AsyncEx = Nito.AsyncEx;
 
@@ -24,7 +21,13 @@ namespace Orleans.MetadataStore
         public SiloAddress[] Members { get; }
     }
 
-    public delegate (bool ShouldUpdate, ClusterMembersUpdate Update) ConfigurationUpdater<T>(ClusterMembers existingConfiguration, T input);
+    internal interface IConfigurationManager
+    {
+        SiloAddress ServerId { get; }
+        ClusterMembers CommittedConfiguration { get; }
+        ConfigAcceptor Acceptor { get; }
+        void OnCommittedConfiguration(ClusterMembers state);
+    }
 
     /// <summary>
     /// The Configuration Manager is responsible for coordinating configuration (cluster membership) changes
@@ -35,89 +38,72 @@ namespace Orleans.MetadataStore
     /// properties of this register are used to ensure that safety requirements of the system are not violated.
     /// In particular, at no point in time and under no situation 
     /// </remarks>
-    public class ConfigurationManager
+    public class ConfigurationManager : IConfigurationManager
     {
-        private readonly IStoreReferenceFactory _referenceFactory;
-        private readonly IServiceProvider _serviceProvider;
+        private delegate (bool ShouldUpdate, ClusterMembersUpdate Update) ConfigurationUpdater(ClusterMembers existingConfiguration, SiloAddress input);
         private readonly MetadataStoreOptions _options;
 
-        private readonly ChangeFunction<ClusterMembers, ClusterMembers> _updateFunction = (current, updated) => (current?.Version ?? 0) == updated.Version - 1 ? updated : current;
-        private readonly ConfigurationUpdater<SiloAddress> _addFunction;
-        private readonly ConfigurationUpdater<SiloAddress> _removeFunction;
-        private readonly ChangeFunction<object, ClusterMembers> _readFunction = (current, updated) => current;
-        private readonly AsyncEx.AsyncLock _updateLock = new AsyncEx.AsyncLock();
+        private readonly ConfigurationUpdater _addFunction;
+        private readonly ConfigurationUpdater _removeFunction;
+        private readonly AsyncEx.AsyncLock _updateLock = new();
+        private readonly object _committedStateLock = new();
         private readonly ConfigProposer _proposer;
-        private readonly Acceptor<ClusterMembers> _acceptor;
         private readonly ILogger<ConfigurationManager> _log;
+        private readonly ILocalSiloDetails _localSiloDetails;
 
         public ConfigurationManager(
             ILoggerFactory loggerFactory,
-            IStoreReferenceFactory referenceFactory,
+            IConfigurationManagerMediator remoteManagerMediator,
             IOptions<MetadataStoreOptions> options,
-            IServiceProvider serviceProvider)
+            ILocalSiloDetails localSiloDetails)
         {
-            _referenceFactory = referenceFactory;
-            _serviceProvider = serviceProvider;
             _log = loggerFactory.CreateLogger<ConfigurationManager>();
             _options = options.Value;
             _addFunction = AddServer;
             _removeFunction = RemoveServer;
 
-            _acceptor = new ConfigAcceptor<ClusterMembers>(
-                key: ClusterConfigurationKey,
-                store: store,
-                getParentBallot: _getAcceptorParentBallot,
-                onUpdateState: OnUpdateConfiguration,
-                log: loggerFactory.CreateLogger("MetadataStore.ConfigAcceptor")
-            );
-
             // The config proposer always uses the configuration which it's proposing.
             _proposer = new ConfigProposer(
-                getConfiguration: () => AcceptedConfiguration,
-                log: loggerFactory.CreateLogger("MetadataStore.ConfigProposer")
-            );
+                this,
+                log: loggerFactory.CreateLogger("MetadataStore.ConfigProposer"),
+                remoteManagerMediator);
+            _localSiloDetails = localSiloDetails;
         }
 
-        private ValueTask OnUpdateConfiguration(RegisterState<ClusterMembers> state)
+        public void OnCommittedConfiguration(ClusterMembers state)
         {
-            //using (await this.updateLock.LockAsync())
+            lock (_committedStateLock)
             {
-                AcceptedConfiguration = ExpandedClusterMembers.Create(state.Value, _options, _referenceFactory);
-                //this.ProposedConfiguration = null;
+                if (CommittedConfiguration is null || CommittedConfiguration.Version < state.Version)
+                {
+                    CommittedConfiguration = state;
+                    Acceptor.OnCommittedConfiguration(state);
+                }
             }
-            return default;
         }
 
-        /// <summary>
-        /// Returns the most recently accepted configuration. Note that this configuration may not be committed.
-        /// </summary>
-        public ClusterMembers AcceptedConfiguration { get; private set; }
+        public ConfigAcceptor Acceptor { get; } = new();
 
         /// <summary>
-        /// Returns the most recently proposed configuration.
+        /// Returns the most recently known-committed configuration.
         /// </summary>
-        public ClusterMembers ProposedConfiguration { get; private set; }
+        public ClusterMembers CommittedConfiguration { get; private set; }
 
-        /// <summary>
-        /// Returns the active configuration.
-        /// </summary>
-        public ClusterMembers ActiveConfiguration => ProposedConfiguration ?? AcceptedConfiguration;
+        public SiloAddress ServerId => _localSiloDetails.SiloAddress;
 
-        public Task ForceLocalConfiguration(ClusterMembers configuration) => _acceptor.ForceState(configuration);
+        public void ForceLocalConfiguration(ClusterMembers configuration) => Acceptor.ForceState(configuration);
 
         public Task<UpdateResult<ClusterMembers>> TryAddServer(SiloAddress address) => ModifyConfiguration(_addFunction, address);
 
         public Task<UpdateResult<ClusterMembers>> TryRemoveServer(SiloAddress address) => ModifyConfiguration(_removeFunction, address);
 
-        public Task<UpdateResult<ClusterMembers>> TryUpdate<T>(ConfigurationUpdater<T> func, T state) => ModifyConfiguration(func, state);
-
         public async Task<ReadResult<ClusterMembers>> TryRead(CancellationToken cancellationToken = default)
         {
-            var result = await _proposer.TryUpdate(null, _readFunction, cancellationToken);
-            return new ReadResult<ClusterMembers>(result.Status == ReplicationStatus.Success, result.Value);
+            var (status, value) = await _proposer.TryRead(cancellationToken);
+            return new ReadResult<ClusterMembers>(status == ReplicationStatus.Success, value);
         }
 
-        private async Task<UpdateResult<ClusterMembers>> ModifyConfiguration<T>(ConfigurationUpdater<T> changeFunc, T input)
+        private async Task<UpdateResult<ClusterMembers>> ModifyConfiguration(ConfigurationUpdater changeFunc, SiloAddress input)
         {
             // Update the configuration using two consensus rounds, first reading/committing the existing configuration,
             // then modifying it to add or remove a single server and committing the new value.
@@ -128,56 +114,46 @@ namespace Orleans.MetadataStore
             // by the hypothetical single read-modify-write consensus round before the majority of acceptors are using
             // that configuration. The effect is that the majority may see a configuration change which changes by two
             // or more nodes simultaneously.
-            var cancellation = CancellationToken.None;
+            var cancellationToken = CancellationToken.None;
             using (await _updateLock.LockAsync())
             {
                 // Read the currently committed configuration, potentially committing a partially-committed configuration in the process.
-                var (status, committedValue) = await _proposer.TryUpdate(null, _readFunction, cancellation);
-                var committedConfig = committedValue;
+                var (status, committedValue) = await _proposer.TryRead(cancellationToken);
                 if (status != ReplicationStatus.Success)
                 {
-                    return new UpdateResult<ClusterMembers>(false, committedConfig);
+                    return new UpdateResult<ClusterMembers>(false, committedValue);
                 }
 
                 // Modify the replica set.
-                var (shouldUpdate, update) = changeFunc(committedConfig, input);
+                var (shouldUpdate, update) = changeFunc(committedValue, input);
                 if (!shouldUpdate)
                 {
                     // The new address was already in the committed configuration, so no additional work needs to be done.
-                    return new UpdateResult<ClusterMembers>(true, committedConfig);
+                    return new UpdateResult<ClusterMembers>(true, committedValue);
                 }
 
                 // Assemble the new configuration.
-                var committedStamp = committedConfig?.Stamp ?? default;
+                var committedStamp = committedValue?.Stamp ?? default;
                 _proposer.Ballot = _proposer.Ballot.AdvanceTo(committedStamp);
                 var newStamp = _proposer.Ballot.Successor();
 
                 var quorum = update.Members.Length / 2 + 1;
                 var updatedConfig = new ClusterMembers(
                     stamp: newStamp,
-                    version: (committedValue?.Version ?? 0) + 1,
+                    version: (committedValue?.Version ?? MembershipVersion.Zero).Next(),
                     members: update.Members,
                     acceptQuorum: quorum,
                     prepareQuorum: quorum);
-                var success = false;
 
-                try
+                // Attempt to commit the new configuration.
+                (status, committedValue) = await _proposer.TryUpdate(updatedConfig, cancellationToken);
+                var success = status == ReplicationStatus.Success;
+                if (success)
                 {
-                    ProposedConfiguration = ExpandedClusterMembers.Create(updatedConfig, _options, _referenceFactory);
-
-                    // Attempt to commit the new configuration.
-                    (status, committedValue) = await _proposer.TryUpdate(updatedConfig, _updateFunction, cancellation);
-                    success = status == ReplicationStatus.Success;
-
-                    return new UpdateResult<ClusterMembers>(success, committedValue);
+                    OnCommittedConfiguration(committedValue);
                 }
-                finally
-                {
-                    if (success)
-                    {
-                        AcceptedConfiguration = ProposedConfiguration;
-                    }
-                }
+
+                return new UpdateResult<ClusterMembers>(success, committedValue);
             }
         }
 

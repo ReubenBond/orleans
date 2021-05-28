@@ -11,7 +11,7 @@ namespace Orleans.MetadataStore
     {
         public ClusterMembers(
             ConfigBallot stamp,
-            long version,
+            MembershipVersion version,
             SiloAddress[] members,
             int acceptQuorum,
             int prepareQuorum)
@@ -48,10 +48,10 @@ namespace Orleans.MetadataStore
         public ConfigBallot Stamp { get; }
 
         /// <summary>
-        /// The monotonically increasing version number of this configuration.
+        /// The version of this membership.
         /// </summary>
         [Id(4)]
-        public long Version { get; }
+        public MembershipVersion Version { get; }
 
         /// <inheritdoc />
         public override string ToString()

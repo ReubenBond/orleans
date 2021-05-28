@@ -4,27 +4,42 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using AsyncEx = Nito.AsyncEx;
 
 namespace Orleans.MetadataStore
 {
+    [GenerateSerializer]
+    public enum ReplicationStatus
+    {
+        Failed,
+        Uncertain,
+        Success
+    }
+
+    public delegate TValue ChangeFunction<in TArg, TValue>(TValue existingValue, TArg newValue);
+
+    [GenerateSerializer]
+    public enum ConfigOperation
+    {
+        Read,
+        Update,
+    }
+
     public class ConfigProposer : ConfigProposer.ITestAccessor
     {
         private readonly AsyncEx.AsyncLock _lockObj;
+        private readonly IConfigurationManager _localConfiguration;
         private readonly ILogger _log;
-        private readonly IConfigAcceptorManager  _acceptors;
-        private readonly Func<ExpandedReplicaSetConfiguration> _getConfiguration;
+        private readonly IConfigurationManagerMediator  _acceptors;
         private bool _skipPrepare;
-        private int _nextInstanceId;
         private ClusterMembers _cachedValue;
         private ConfigBallot _ballot;
 
-        public ConfigProposer(ConfigBallot initialBallot, Func<ExpandedReplicaSetConfiguration> getConfiguration, ILogger log, IConfigAcceptorManager acceptors)
+        public ConfigProposer(IConfigurationManager localConfiguration, ILogger log, IConfigurationManagerMediator acceptors)
         {
             _lockObj = new AsyncEx.AsyncLock();
-            _ballot = initialBallot;
-            _getConfiguration = getConfiguration;
+            _localConfiguration = localConfiguration;
+            _ballot = new ConfigBallot(0, localConfiguration.ServerId);
             _log = log;
             _acceptors = acceptors;
         }
@@ -35,25 +50,41 @@ namespace Orleans.MetadataStore
         bool ITestAccessor.SkipPrepare { get => _skipPrepare; set => _skipPrepare = value; }
         ClusterMembers ITestAccessor.CachedValue { get => _cachedValue; set => _cachedValue = value; }
 
-        public async Task<(ReplicationStatus Status, ClusterMembers Value)> TryUpdate<TArg>(TArg value, ChangeFunction<TArg, ClusterMembers> changeFunction, CancellationToken cancellationToken)
+        public async Task<(ReplicationStatus Status, ClusterMembers Value)> TryRead(CancellationToken cancellationToken)
         {
             using (await _lockObj.LockAsync(cancellationToken))
             {
-                return await TryUpdateInternal(value, changeFunction, cancellationToken, numRetries: 1);
+                return await TryCommit(ConfigOperation.Read, null, cancellationToken, numRetries: 1);
             }
         }
 
-        private async Task<(ReplicationStatus Status, ClusterMembers Value)> TryUpdateInternal<TArg>(
-            TArg value,
-            ChangeFunction<TArg, ClusterMembers> changeFunction,
+        public async Task<(ReplicationStatus Status, ClusterMembers Value)> TryUpdate(ClusterMembers updatedValue, CancellationToken cancellationToken)
+        {
+            using (await _lockObj.LockAsync(cancellationToken))
+            {
+                return await TryCommit(ConfigOperation.Update, updatedValue, cancellationToken, numRetries: 1);
+            }
+        }
+
+        private static ClusterMembers ApplyOperation((ConfigOperation Operation, ClusterMembers Updated) arg, ClusterMembers currentValue) => arg switch
+        {
+            (ConfigOperation.Read, _) => currentValue,
+            (ConfigOperation.Update, var updated) when currentValue is null || updated.Version.IsSuccessorTo(currentValue.Version) => updated,
+            (ConfigOperation.Update, var updated) when !updated.Version.IsSuccessorTo(currentValue.Version) => currentValue,
+            _ => throw new InvalidOperationException(),
+        };
+
+        private async Task<(ReplicationStatus Status, ClusterMembers Value)> TryCommit(
+            ConfigOperation operation,
+            ClusterMembers updatedValue,
             CancellationToken cancellationToken,
             int numRetries)
         {
             // Configuration is observed once per attempt.
-            // If this node's configuration changes while this proposer is still attempting to commit a value, the commit will
+            // If this server's configuration changes while this proposer is still attempting to commit a value, the commit will
             // continue under the old configuration. If that configuration has already been observed by some of the acceptors,
             // the commit may fail and in that case the proposer may retry.
-            var config = _getConfiguration();
+            var config = _localConfiguration.CommittedConfiguration;
 
             // Select a ballot number for this attempt. The ballot must be consistent between propose and accept for the attempt.
             var prepareBallot = _ballot = _ballot.Successor();
@@ -80,7 +111,7 @@ namespace Orleans.MetadataStore
                     {
                         LogPrepareFailed();
 
-                        return await TryUpdateInternal(value, changeFunction, cancellationToken, numRetries - 1);
+                        return await TryCommit(operation, updatedValue, cancellationToken, numRetries - 1);
                     }
 
                     LogPrepareFailedFinal();
@@ -91,7 +122,7 @@ namespace Orleans.MetadataStore
             }
 
             // Modify the currently accepted value and attempt to have it accepted on all acceptors.
-            var newValue = changeFunction(currentValue, value);
+            var newValue = ApplyOperation((operation, updatedValue), currentValue);
             LogAcceptStarted(newValue);
 
             var acceptSuccess = await TryAccept(prepareBallot, newValue, config, cancellationToken);
@@ -113,7 +144,7 @@ namespace Orleans.MetadataStore
                 // This attempt may have failed because another proposer interfered, so attempt again to have this value accepted.
                 LogAcceptFailed();
 
-                return await TryUpdateInternal(value, changeFunction, cancellationToken, numRetries - 1);
+                return await TryCommit(operation, updatedValue, cancellationToken, numRetries - 1);
             }
 
             // It is possible that the value was committed successfully without this node receiving a quorum of acknowledgements,
@@ -134,7 +165,7 @@ namespace Orleans.MetadataStore
             var prepareTasks = new List<Task<ConfigPrepareResponse>>(config.Members.Length);
             foreach (var server in config.Members)
             {
-                var prepareTask = _acceptors.Prepare(server, prepareBallot).AsTask();
+                var prepareTask = _acceptors.Prepare(server, config.Stamp, prepareBallot).AsTask();
                 prepareTasks.Add(prepareTask);
             }
 
@@ -143,7 +174,7 @@ namespace Orleans.MetadataStore
             var requiredConfirmations = config.PrepareQuorum;
             var remainingAllowedFailures = prepareTasks.Count - requiredConfirmations;
             var currentValue = default(ClusterMembers);
-            var maxSuccess = ConfigBallot.Zero;
+            var maxAccepted = ConfigBallot.Zero;
             var maxConflict = ConfigBallot.Zero;
             while (prepareTasks.Count > 0 && requiredConfirmations > 0 && !cancellationToken.IsCancellationRequested)
             {
@@ -154,11 +185,11 @@ namespace Orleans.MetadataStore
                     var prepareResult = await resultTask;
                     switch (prepareResult)
                     {
-                        case (PrepareStatus.Success, var promised, var value):
+                        case (PrepareStatus.Success, var accepted, var value):
                             --requiredConfirmations;
-                            if (promised >= maxSuccess)
+                            if (accepted >= maxAccepted)
                             {
-                                maxSuccess = promised;
+                                maxAccepted = accepted;
                                 currentValue = value;
                             }
 
@@ -171,11 +202,26 @@ namespace Orleans.MetadataStore
                             }
 
                             break;
-                        case (PrepareStatus.ConfigConflict, var conflicting):
+                        case (PrepareStatus.ConfigConflict, _, var value):
                             --remainingAllowedFailures;
+
                             // Nothing needs to be done when encountering a configuration conflict, however it
                             // poses a good opportunity to ensure that this node's configuration is up-to-date.
-                            // TODO: Signal to configuration manager that we need to update configuration.
+                            if (value is not null)
+                            {
+                                var accepted = value.Stamp;
+                                if (accepted >= maxAccepted)
+                                {
+                                    maxAccepted = accepted;
+                                    currentValue = value;
+                                }
+
+                                if (accepted > maxConflict)
+                                {
+                                    maxConflict = accepted;
+                                }
+                            }
+
                             break;
                     }
                 }
@@ -203,23 +249,13 @@ namespace Orleans.MetadataStore
             return (achievedQuorum, currentValue);
         }
 
-        private SiloAddress SelectInstance(SiloAddress[] acceptors)
-        {
-            if (_nextInstanceId >= acceptors.Length)
-            {
-                _nextInstanceId = 0;
-            }
-
-            return acceptors[_nextInstanceId++];
-        }
-
         private async Task<bool> TryAccept(ConfigBallot thisBallot, ClusterMembers newValue, ClusterMembers config, CancellationToken cancellationToken)
         {
             // The prepare phase succeeded, proceed to propagate the new value to all acceptors.
             var acceptTasks = new List<Task<ConfigAcceptResponse>>(config.Members.Length);
             foreach (var server in config.Members)
             {
-                var acceptTask = _acceptors.Accept(server, thisBallot, newValue).AsTask();
+                var acceptTask = _acceptors.Accept(server, config.Stamp, thisBallot, newValue).AsTask();
                 acceptTasks.Add(acceptTask);
             }
 
@@ -249,7 +285,6 @@ namespace Orleans.MetadataStore
                         case (AcceptStatus.ConfigConflict, var conflicting):
                             // Nothing needs to be done when encountering a configuration conflict, however it
                             // poses a good opportunity to ensure that this node's configuration is up-to-date.
-                            // TODO: Signal to configuration manager that we need to update configuration?
                             --remainingAllowedFailures;
                             break;
                     }
