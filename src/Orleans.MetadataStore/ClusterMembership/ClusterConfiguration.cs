@@ -7,9 +7,9 @@ namespace Orleans.MetadataStore
     [Immutable]
     [Serializable]
     [GenerateSerializer]
-    public class ClusterMembers
+    public class ClusterConfiguration
     {
-        public ClusterMembers(
+        public ClusterConfiguration(
             ConfigBallot stamp,
             MembershipVersion version,
             SiloAddress[] members,

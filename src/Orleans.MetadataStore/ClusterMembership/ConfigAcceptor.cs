@@ -10,8 +10,12 @@ namespace Orleans.MetadataStore
     public interface IConfigurationManagerMediator
     {
         ValueTask<ConfigPrepareResponse> Prepare(SiloAddress server, ConfigBallot proposerConfig, ConfigBallot ballot);
-        ValueTask<ConfigAcceptResponse> Accept(SiloAddress server, ConfigBallot proposerConfig, ConfigBallot ballot, ClusterMembers value);
-        ValueTask Learn(SiloAddress server, ClusterMembers value);
+        ValueTask<ConfigAcceptResponse> Accept(SiloAddress server, ConfigBallot proposerConfig, ConfigBallot ballot, ClusterConfiguration value);
+
+        /// <summary>
+        /// Informs the specified server that a value was committed.
+        /// </summary>
+        ValueTask Committed(SiloAddress server, ClusterConfiguration value);
     }
 
     public class ConfigurationManagerMediator : IConfigurationManagerMediator
@@ -19,7 +23,7 @@ namespace Orleans.MetadataStore
         private readonly IGrainFactory _grainFactory;
         public ConfigurationManagerMediator(IGrainFactory grainFactory) => _grainFactory = grainFactory;
 
-        public ValueTask<ConfigAcceptResponse> Accept(SiloAddress server, ConfigBallot proposerConfig, ConfigBallot ballot, ClusterMembers value)
+        public ValueTask<ConfigAcceptResponse> Accept(SiloAddress server, ConfigBallot proposerConfig, ConfigBallot ballot, ClusterConfiguration value)
         {
             var grain = GetConfigurationManagerReference(server);
             return grain.Accept(proposerConfig, ballot, value);
@@ -31,10 +35,10 @@ namespace Orleans.MetadataStore
             return grain.Prepare(proposerConfig, ballot);
         }
 
-        public ValueTask Learn(SiloAddress server, ClusterMembers value)
+        public ValueTask Committed(SiloAddress server, ClusterConfiguration value)
         {
             var grain = GetConfigurationManagerReference(server);
-            return grain.Learn(value);
+            return grain.Committed(value);
         }
 
         private IConfigurationManagerGrain GetConfigurationManagerReference(SiloAddress server) => _grainFactory.GetGrain<IConfigurationManagerGrain>(FixedPlacement.CreateGrainId(ConfigurationManagerGrain.GrainType, server));
@@ -44,9 +48,9 @@ namespace Orleans.MetadataStore
     public interface IConfigurationManagerGrain : IGrain
     {
         ValueTask<ConfigPrepareResponse> Prepare(ConfigBallot proposerConfig, ConfigBallot ballot);
-        ValueTask<ConfigAcceptResponse> Accept(ConfigBallot proposerConfig, ConfigBallot ballot, ClusterMembers value);
-        ValueTask Learn(ClusterMembers value);
-        ValueTask<ClusterMembers> GetCommittedConfiguration();
+        ValueTask<ConfigAcceptResponse> Accept(ConfigBallot proposerConfig, ConfigBallot ballot, ClusterConfiguration value);
+        ValueTask Committed(ClusterConfiguration value);
+        ValueTask<ClusterConfiguration> GetCommittedConfiguration();
     }
 
     [GrainType(GrainTypeName)]
@@ -55,47 +59,56 @@ namespace Orleans.MetadataStore
     {
         public const string GrainTypeName = "sys.membership";
         public static readonly GrainType GrainType = GrainType.Create(GrainTypeName);
-        private readonly IConfigurationManager _configurationManager;
+        private readonly IInternalConfigurationManager _configurationManager;
+        private readonly ILocalConfiguration _localConfiguration;
 
-        public ConfigurationManagerGrain(IConfigurationManager configurationManager)
+        public ConfigurationManagerGrain(IInternalConfigurationManager configurationManager, ILocalConfiguration localConfiguration)
         {
             _configurationManager = configurationManager;
+            _localConfiguration = localConfiguration;
         }
 
         public ValueTask<ConfigPrepareResponse> Prepare(ConfigBallot proposerConfig, ConfigBallot ballot) => new(_configurationManager.Acceptor.Prepare(proposerConfig, ballot));
 
-        public ValueTask<ConfigAcceptResponse> Accept(ConfigBallot proposerConfig, ConfigBallot ballot, ClusterMembers value) => new(_configurationManager.Acceptor.Accept(proposerConfig, ballot, value));
+        public ValueTask<ConfigAcceptResponse> Accept(ConfigBallot proposerConfig, ConfigBallot ballot, ClusterConfiguration value) => new(_configurationManager.Acceptor.Accept(proposerConfig, ballot, value));
 
-        public ValueTask Learn(ClusterMembers value)
+        public ValueTask Committed(ClusterConfiguration value)
         {
-            _configurationManager.OnCommittedConfiguration(value);
+            _localConfiguration.OnCommittedConfiguration(value);
             return default;
         }
 
-        public ValueTask<ClusterMembers> GetCommittedConfiguration() => new(_configurationManager.CommittedConfiguration);
+        public ValueTask<ClusterConfiguration> GetCommittedConfiguration() => new(_localConfiguration.CommittedConfiguration);
     }
 
-    public class ConfigAcceptor : ConfigAcceptor.ITestAccessor
+    public sealed class ConfigAcceptor : ConfigAcceptor.ITestAccessor
     {
+        private readonly ILocalConfiguration _localConfiguration;
         private ConfigBallot _promised;
         private ConfigBallot _accepted;
-        private ClusterMembers _value;
+        private ClusterConfiguration _value;
+
+        public ConfigAcceptor(ILocalConfiguration localConfiguration)
+        {
+            _localConfiguration = localConfiguration;
+        }
 
         ConfigBallot ITestAccessor.Promised { get => _promised; set => _promised = value; }
         ConfigBallot ITestAccessor.Accepted { get => _accepted; set => _accepted = value; }
-        ClusterMembers ITestAccessor.Value { get => _value; set => _value = value; }
+        ClusterConfiguration ITestAccessor.Value { get => _value; set => _value = value; }
 
         public ConfigPrepareResponse Prepare(ConfigBallot proposerConfig, ConfigBallot ballot)
         {
             lock (this)
             {
                 ConfigPrepareResponse result;
-                if (_value is { } acceptedConfiguration && proposerConfig < acceptedConfiguration.Stamp)
+                var activeConfiguration = GetActiveConfiguration();
+                if (activeConfiguration is not null && proposerConfig < activeConfiguration.Stamp)
                 {
                     // If this acceptor has already accepted a configuration with a higher stamp than the proper's, reject this.
                     // This passivates proposers which are operating on out-dated configurations, ensuring that they are not able to commit
                     // values when they may not know of the most recent quorum configuration.
-                    result = ConfigPrepareResponse.ConfigConflict(acceptedConfiguration);
+                    result = ConfigPrepareResponse.ConfigConflict(activeConfiguration);
                 }
                 else if (_promised > ballot)
                 {
@@ -118,18 +131,18 @@ namespace Orleans.MetadataStore
             }
         }
 
-        public ConfigAcceptResponse Accept(ConfigBallot proposerConfig, ConfigBallot ballot, ClusterMembers value)
+        public ConfigAcceptResponse Accept(ConfigBallot proposerConfig, ConfigBallot ballot, ClusterConfiguration value)
         {
             lock (this)
             {
                 ConfigAcceptResponse result;
-
-                if (_value is { } acceptedConfiguration && proposerConfig < acceptedConfiguration.Stamp)
+                var activeConfiguration = GetActiveConfiguration();
+                if (activeConfiguration is not null && proposerConfig < activeConfiguration.Stamp)
                 {
                     // If this acceptor has already accepted a configuration with a higher stamp than the proper's, reject this.
                     // This passivates proposers which are operating on out-dated configurations, ensuring that they are not able to commit
                     // values when they may not know of the most recent quorum configuration.
-                    result = ConfigAcceptResponse.ConfigConflict(acceptedConfiguration.Stamp);
+                    result = ConfigAcceptResponse.ConfigConflict(activeConfiguration.Stamp);
                 }
                 else if (_promised > ballot)
                 {
@@ -154,30 +167,23 @@ namespace Orleans.MetadataStore
             }
         }
 
-        internal void OnCommittedConfiguration(ClusterMembers newState)
+        private ClusterConfiguration GetActiveConfiguration()
         {
-            if (newState is null)
+            var committed = _localConfiguration.CommittedConfiguration;
+            var accepted = _value;
+            return (committed, accepted) switch
             {
-                throw new ArgumentNullException(nameof(newState));
-            }
-
-            lock (this)
-            {
-                if (_value is null || _value is { } acceptedConfiguration && acceptedConfiguration.Stamp < newState.Stamp)
-                {
-                    _accepted = newState.Stamp;
-                    _promised = newState.Stamp;
-                    _value = newState;
-                }
-            }
+                (not null, not null) when committed.Stamp >= accepted.Stamp => committed,
+                _ => accepted ?? committed,
+            };
         }
 
-        internal void ForceState(ClusterMembers newState)
+        internal void ForceState(ClusterConfiguration newState)
         {
             lock (this)
             {
-                _accepted = ConfigBallot.Zero;
-                _promised = ConfigBallot.Zero;
+                _accepted = newState?.Stamp ?? ConfigBallot.Zero;
+                _promised = newState?.Stamp ?? ConfigBallot.Zero;
                 _value = newState;
             }
         }
@@ -186,7 +192,7 @@ namespace Orleans.MetadataStore
         {
             ConfigBallot Promised { get; set; }
             ConfigBallot Accepted { get; set; }
-            ClusterMembers Value { get; set; }
+            ClusterConfiguration Value { get; set; }
         }
     }
 
@@ -203,9 +209,9 @@ namespace Orleans.MetadataStore
         public ConfigBallot Ballot;
 
         [Id(2)]
-        public ClusterMembers Value;
+        public ClusterConfiguration Value;
 
-        public static ConfigPrepareResponse Success(ConfigBallot accepted, ClusterMembers value) => new()
+        public static ConfigPrepareResponse Success(ConfigBallot accepted, ClusterConfiguration value) => new()
         {
             _status = (byte)PrepareStatus.Success,
             Ballot = accepted,
@@ -218,14 +224,14 @@ namespace Orleans.MetadataStore
             Ballot = conflicting,
         };
 
-        public static ConfigPrepareResponse ConfigConflict(ClusterMembers value) => new()
+        public static ConfigPrepareResponse ConfigConflict(ClusterConfiguration value) => new()
         {
             _status = (byte)PrepareStatus.ConfigConflict,
             Ballot = value.Stamp,
             Value = value,
         };
 
-        public void Deconstruct(out PrepareStatus status, out ConfigBallot accepted, out ClusterMembers value)
+        public void Deconstruct(out PrepareStatus status, out ConfigBallot accepted, out ClusterConfiguration value)
         {
             status = Status;
             accepted = Ballot;
