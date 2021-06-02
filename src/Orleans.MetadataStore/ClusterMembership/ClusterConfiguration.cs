@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Orleans.Runtime;
 
@@ -7,10 +8,10 @@ namespace Orleans.MetadataStore
     [Immutable]
     [Serializable]
     [GenerateSerializer]
-    public class ClusterConfiguration
+    public class ClusterConfiguration : IEquatable<ClusterConfiguration>
     {
         public ClusterConfiguration(
-            ConfigBallot stamp,
+            Ballot stamp,
             MembershipVersion version,
             SiloAddress[] members,
             int acceptQuorum,
@@ -45,13 +46,73 @@ namespace Orleans.MetadataStore
         /// The unique ballot number of this configuration.
         /// </summary>
         [Id(3)]
-        public ConfigBallot Stamp { get; }
+        public Ballot Stamp { get; }
 
         /// <summary>
         /// The version of this membership.
         /// </summary>
         [Id(4)]
         public MembershipVersion Version { get; }
+
+        public bool Equals([AllowNull] ClusterConfiguration other)
+        {
+            if (other is null)
+            {
+                return false;
+            }
+
+            if (other.Stamp != Stamp)
+            {
+                return false;
+            }
+
+            if (other.Version != Version)
+            {
+                return false;
+            }
+
+            if (other.AcceptQuorum != AcceptQuorum)
+            {
+                return false;
+            }
+
+            if (other.PrepareQuorum != PrepareQuorum)
+            {
+                return false;
+            }
+
+            if (ReferenceEquals(other.Members, Members))
+            {
+                return true;
+            }
+
+            if (other.Members is null ^ Members is null)
+            {
+                return false;
+            }
+
+            if (other.Members.Length != Members.Length)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < Members.Length; i++)
+            {
+                if (Members[i] != other.Members[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is ClusterConfiguration cfg && Equals(cfg);
+        }
+
+        public override int GetHashCode() => HashCode.Combine(Stamp, Version, PrepareQuorum, AcceptQuorum, Members);
 
         /// <inheritdoc />
         public override string ToString()

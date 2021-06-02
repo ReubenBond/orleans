@@ -26,58 +26,35 @@ namespace Orleans.MetadataStore
         Update,
     }
 
-    public sealed class ConfigProposer : ConfigProposer.ITestAccessor
+    public abstract class Proposer<TOperation, TValue> : Proposer<TOperation, TValue>.ITestAccessor
     {
-        private readonly ILocalConfiguration _localConfiguration;
-        private readonly AsyncEx.AsyncLock _lockObj;
         private readonly ILogger _log;
-        private readonly IConfigurationManagerMediator  _acceptors;
+        private readonly IAcceptorRouter<TValue> _acceptors;
         private bool _skipPrepare;
-        private ClusterConfiguration _cachedValue;
-        private ConfigBallot _ballot;
+        private TValue _cachedValue;
 
-        public ConfigProposer(ILocalConfiguration localConfiguration, SiloAddress serverId, ILogger log, IConfigurationManagerMediator acceptors)
+        public Proposer(ILocalConfiguration localConfiguration, SiloAddress serverId, ILogger log, IAcceptorRouter<TValue> acceptors)
         {
-            _localConfiguration = localConfiguration;
-            _lockObj = new AsyncEx.AsyncLock();
-            _ballot = new ConfigBallot(0, serverId);
+            LocalConfiguration = localConfiguration;
+            Ballot = new Ballot(0, serverId);
             _log = log;
             _acceptors = acceptors;
         }
 
-        internal ConfigBallot Ballot { get => _ballot; set => _ballot = value; }
+        protected ILocalConfiguration LocalConfiguration { get; }
 
-        ConfigBallot ITestAccessor.Ballot { get => _ballot; set => _ballot = value; }
+        internal Ballot Ballot { get; set; }
+
+        Ballot ITestAccessor.Ballot { get => Ballot; set => Ballot = value; }
         bool ITestAccessor.SkipPrepare { get => _skipPrepare; set => _skipPrepare = value; }
-        ClusterConfiguration ITestAccessor.CachedValue { get => _cachedValue; set => _cachedValue = value; }
+        TValue ITestAccessor.CachedValue { get => _cachedValue; set => _cachedValue = value; }
 
-        public async Task<(ReplicationStatus Status, ClusterConfiguration Value)> TryRead(CancellationToken cancellationToken)
-        {
-            using (await _lockObj.LockAsync(cancellationToken))
-            {
-                return await TryCommit(ConfigOperation.Read, null, cancellationToken, numRetries: 1);
-            }
-        }
+        protected abstract TValue ApplyOperation(TOperation operation, TValue current);
 
-        public async Task<(ReplicationStatus Status, ClusterConfiguration Value)> TryUpdate(ClusterConfiguration updatedValue, CancellationToken cancellationToken)
-        {
-            using (await _lockObj.LockAsync(cancellationToken))
-            {
-                return await TryCommit(ConfigOperation.Update, updatedValue, cancellationToken, numRetries: 1);
-            }
-        }
+        protected abstract void OnCommittedValue(TValue committed);
 
-        private static ClusterConfiguration ApplyOperation((ConfigOperation Operation, ClusterConfiguration Updated) arg, ClusterConfiguration currentValue) => arg switch
-        {
-            (ConfigOperation.Read, _) => currentValue,
-            (ConfigOperation.Update, var updated) when currentValue is null || updated.Version.IsSuccessorTo(currentValue.Version) => updated,
-            (ConfigOperation.Update, var updated) when !updated.Version.IsSuccessorTo(currentValue.Version) => currentValue,
-            _ => throw new InvalidOperationException(),
-        };
-
-        private async Task<(ReplicationStatus Status, ClusterConfiguration Value)> TryCommit(
-            ConfigOperation operation,
-            ClusterConfiguration updatedValue,
+        protected async Task<(ReplicationStatus Status, TValue Value)> TryCommit(
+            TOperation operation,
             CancellationToken cancellationToken,
             int numRetries)
         {
@@ -85,12 +62,12 @@ namespace Orleans.MetadataStore
             // If this server's configuration changes while this proposer is still attempting to commit a value, the commit will
             // continue under the old configuration. If that configuration has already been observed by some of the acceptors,
             // the commit may fail and in that case the proposer may retry.
-            var config = _localConfiguration.CommittedConfiguration;
+            var config = LocalConfiguration.CommittedConfiguration;
 
             // Select a ballot number for this attempt. The ballot must be consistent between propose and accept for the attempt.
-            var prepareBallot = _ballot = _ballot.Successor();
+            var prepareBallot = Ballot = Ballot.Successor();
 
-            ClusterConfiguration currentValue;
+            TValue currentValue;
             if (_skipPrepare)
             {
                 // If this node is leader, attempt to skip the prepare phase and at go straight to another accept
@@ -112,7 +89,7 @@ namespace Orleans.MetadataStore
                     {
                         LogPrepareFailed();
 
-                        return await TryCommit(operation, updatedValue, cancellationToken, numRetries - 1);
+                        return await TryCommit(operation, cancellationToken, numRetries - 1);
                     }
 
                     LogPrepareFailedFinal();
@@ -123,7 +100,7 @@ namespace Orleans.MetadataStore
             }
 
             // Modify the currently accepted value and attempt to have it accepted on all acceptors.
-            var newValue = ApplyOperation((operation, updatedValue), currentValue);
+            var newValue = ApplyOperation(operation, currentValue);
             LogAcceptStarted(newValue);
 
             var acceptSuccess = await TryAccept(prepareBallot, newValue, config, cancellationToken);
@@ -134,7 +111,7 @@ namespace Orleans.MetadataStore
 
                 _skipPrepare = true;
                 _cachedValue = newValue;
-                _localConfiguration.OnCommittedConfiguration(newValue);
+                OnCommittedValue(newValue);
                 return (ReplicationStatus.Success, newValue);
             }
 
@@ -146,7 +123,7 @@ namespace Orleans.MetadataStore
                 // This attempt may have failed because another proposer interfered, so attempt again to have this value accepted.
                 LogAcceptFailed();
 
-                return await TryCommit(operation, updatedValue, cancellationToken, numRetries - 1);
+                return await TryCommit(operation, cancellationToken, numRetries - 1);
             }
 
             // It is possible that the value was committed successfully without this node receiving a quorum of acknowledgements,
@@ -157,14 +134,14 @@ namespace Orleans.MetadataStore
             return (ReplicationStatus.Uncertain, currentValue);
         }
 
-        private async Task<(bool, ClusterConfiguration)> TryPrepare(ConfigBallot prepareBallot, ClusterConfiguration config, CancellationToken cancellationToken)
+        private async Task<(bool, TValue)> TryPrepare(Ballot prepareBallot, ClusterConfiguration config, CancellationToken cancellationToken)
         {
             if (config.Members is null)
             {
                 return (false, default);
             }
 
-            var prepareTasks = new List<Task<ConfigPrepareResponse>>(config.Members.Length);
+            var prepareTasks = new List<Task<PrepareResponse<TValue>>>(config.Members.Length);
             foreach (var server in config.Members)
             {
                 var prepareTask = _acceptors.Prepare(server, config.Stamp, prepareBallot).AsTask();
@@ -175,9 +152,9 @@ namespace Orleans.MetadataStore
             // of nodes which accept our new value.
             var requiredConfirmations = config.PrepareQuorum;
             var remainingAllowedFailures = prepareTasks.Count - requiredConfirmations;
-            var currentValue = default(ClusterConfiguration);
-            var maxAccepted = ConfigBallot.Zero;
-            var maxConflict = ConfigBallot.Zero;
+            var currentValue = default(TValue);
+            var maxAccepted = Ballot.Zero;
+            var maxConflict = Ballot.Zero;
             while (prepareTasks.Count > 0 && requiredConfirmations > 0 && !cancellationToken.IsCancellationRequested)
             {
                 try
@@ -209,6 +186,7 @@ namespace Orleans.MetadataStore
 
                             // Nothing needs to be done when encountering a configuration conflict, however it
                             // poses a good opportunity to ensure that this node's configuration is up-to-date.
+                            /*
                             if (value is not null)
                             {
                                 var accepted = value.Stamp;
@@ -223,6 +201,7 @@ namespace Orleans.MetadataStore
                                     maxConflict = accepted;
                                 }
                             }
+                            */
 
                             break;
                     }
@@ -240,9 +219,9 @@ namespace Orleans.MetadataStore
             }
 
             // Advance the ballot to the highest conflicting ballot to improve the likelihood of the next attempt succeeding.
-            if (maxConflict > _ballot)
+            if (maxConflict > Ballot)
             {
-                _ballot = _ballot.AdvanceTo(maxConflict);
+                Ballot = Ballot.AdvanceTo(maxConflict);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -251,10 +230,10 @@ namespace Orleans.MetadataStore
             return (achievedQuorum, currentValue);
         }
 
-        private async Task<bool> TryAccept(ConfigBallot thisBallot, ClusterConfiguration newValue, ClusterConfiguration config, CancellationToken cancellationToken)
+        private async Task<bool> TryAccept(Ballot thisBallot, TValue newValue, ClusterConfiguration config, CancellationToken cancellationToken)
         {
             // The prepare phase succeeded, proceed to propagate the new value to all acceptors.
-            var acceptTasks = new List<Task<ConfigAcceptResponse>>(config.Members.Length);
+            var acceptTasks = new List<Task<AcceptResponse>>(config.Members.Length);
             foreach (var server in config.Members)
             {
                 var acceptTask = _acceptors.Accept(server, config.Stamp, thisBallot, newValue).AsTask();
@@ -263,7 +242,7 @@ namespace Orleans.MetadataStore
 
             var requiredConfirmations = config.AcceptQuorum;
             var remainingAllowedFailures = acceptTasks.Count - requiredConfirmations;
-            var maxConflict = ConfigBallot.Zero;
+            var maxConflict = Ballot.Zero;
             while (acceptTasks.Count > 0 && requiredConfirmations > 0 && !cancellationToken.IsCancellationRequested)
             {
                 try
@@ -305,7 +284,7 @@ namespace Orleans.MetadataStore
             // Advance the ballot past the highest conflicting ballot to improve the likelihood of the next Prepare succeeding.
             if (maxConflict > thisBallot)
             {
-                _ballot = _ballot.AdvanceTo(maxConflict);
+                Ballot = Ballot.AdvanceTo(maxConflict);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -331,7 +310,7 @@ namespace Orleans.MetadataStore
         }
 
         [Conditional("DEBUG")]
-        private void LogSkippingPrepare(ClusterConfiguration currentValue)
+        private void LogSkippingPrepare(TValue currentValue)
         {
             if (_log.IsEnabled(LogLevel.Trace))
             {
@@ -349,7 +328,7 @@ namespace Orleans.MetadataStore
         }
 
         [Conditional("DEBUG")]
-        private void LogAcceptStarted(ClusterConfiguration newValue)
+        private void LogAcceptStarted(TValue newValue)
         {
             if (_log.IsEnabled(LogLevel.Trace))
             {
@@ -358,7 +337,7 @@ namespace Orleans.MetadataStore
         }
 
         [Conditional("DEBUG")]
-        private void LogAcceptSucceded(ClusterConfiguration newValue)
+        private void LogAcceptSucceded(TValue newValue)
         {
             if (_log.IsEnabled(LogLevel.Trace))
             {
@@ -394,7 +373,7 @@ namespace Orleans.MetadataStore
         }
 
         [Conditional("DEBUG")]
-        private void LogPrepareSuccess(ClusterConfiguration currentValue)
+        private void LogPrepareSuccess(TValue currentValue)
         {
             if (_log.IsEnabled(LogLevel.Trace))
             {
@@ -404,9 +383,49 @@ namespace Orleans.MetadataStore
 
         public interface ITestAccessor
         {
-            ConfigBallot Ballot { get; set; }
+            Ballot Ballot { get; set; }
             bool SkipPrepare { get; set; }
-            ClusterConfiguration CachedValue { get; set; }
+            TValue CachedValue { get; set; }
         }
     }
+
+    public sealed class ConfigProposer : Proposer<(ConfigOperation, ClusterConfiguration), ClusterConfiguration>
+    {
+        private readonly AsyncEx.AsyncLock _lockObj;
+
+        public ConfigProposer(ILocalConfiguration localConfiguration, SiloAddress serverId, ILogger log, IAcceptorRouter<ClusterConfiguration> acceptors) : base(localConfiguration, serverId, log, acceptors)
+        {
+            _lockObj = new AsyncEx.AsyncLock();
+        }
+
+        protected override ClusterConfiguration ApplyOperation((ConfigOperation, ClusterConfiguration) arg, ClusterConfiguration currentValue) => arg switch
+        {
+            (ConfigOperation.Read, _) => currentValue,
+            (ConfigOperation.Update, var updated) when currentValue is null || updated.Version.IsSuccessorTo(currentValue.Version) => updated,
+            (ConfigOperation.Update, var updated) when !updated.Version.IsSuccessorTo(currentValue.Version) => currentValue,
+            _ => throw new InvalidOperationException(),
+        };
+
+        public async Task<(ReplicationStatus Status, ClusterConfiguration Value)> TryRead(CancellationToken cancellationToken)
+        {
+            using (await _lockObj.LockAsync(cancellationToken))
+            {
+                return await base.TryCommit((ConfigOperation.Read, null), cancellationToken, numRetries: 1);
+            }
+        }
+
+        public async Task<(ReplicationStatus Status, ClusterConfiguration Value)> TryUpdate(ClusterConfiguration updatedValue, CancellationToken cancellationToken)
+        {
+            using (await _lockObj.LockAsync(cancellationToken))
+            {
+                return await TryCommit((ConfigOperation.Update, updatedValue), cancellationToken, numRetries: 1);
+            }
+        }
+
+        protected override void OnCommittedValue(ClusterConfiguration committed)
+        {
+            LocalConfiguration.OnCommittedConfiguration(committed);
+        }
+    }
+
 }

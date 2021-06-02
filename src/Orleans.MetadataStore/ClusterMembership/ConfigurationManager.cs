@@ -51,11 +51,11 @@ namespace Orleans.MetadataStore
         private readonly object _committedStateLock = new();
         private readonly ILocalSiloDetails _localSiloDetails;
         private readonly ILogger<ConfigurationManager> _log;
-        private readonly IConfigurationManagerMediator _remoteManagerMediator;
+        private readonly IAcceptorRouter<ClusterConfiguration> _remoteManagerMediator;
 
         public ConfigurationManager(
             ILoggerFactory loggerFactory,
-            IConfigurationManagerMediator remoteManagerMediator,
+            IAcceptorRouter<ClusterConfiguration> remoteManagerMediator,
             IOptions<MetadataStoreOptions> options,
             ILocalSiloDetails localSiloDetails)
         {

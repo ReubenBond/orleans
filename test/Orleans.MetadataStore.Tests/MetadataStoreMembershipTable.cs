@@ -1,3 +1,4 @@
+#if false
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -466,3 +467,4 @@ namespace Orleans.MetadataStore.Tests
         }
     }
 }
+#endif

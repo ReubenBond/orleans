@@ -1,3 +1,4 @@
+#if false
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.MetadataStore;
 using Orleans.MetadataStore.Storage;
@@ -60,3 +61,4 @@ namespace Orleans.Hosting
         }
     }
 }
+#endif

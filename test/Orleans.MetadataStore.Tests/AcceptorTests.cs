@@ -1,252 +1,184 @@
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading.Channels;
-using System.Threading.Tasks;
-using Orleans.MetadataStore.Storage;
+using Orleans.Runtime;
+using System.Data;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Orleans.MetadataStore.Tests
 {
-    [Trait("Category", "BVT"), Trait("Category", "MetadataStore")]
-    public class AcceptorTests
+    public class LocalConfiguration : ILocalConfiguration
     {
-        private const string Key = "key";
-        private readonly TestMemoryLocalStore store = new TestMemoryLocalStore();
-        private readonly Func<Ballot> getParentBallot;
-        private readonly Func<RegisterState<int>, ValueTask> onUpdateState;
-        private readonly Channel<RegisterState<int>> acceptorStates = Channel.CreateUnbounded<RegisterState<int>>(new UnboundedChannelOptions
+        private readonly object _lock = new();
+
+        public ClusterConfiguration CommittedConfiguration { get; set; }
+
+        public void OnCommittedConfiguration(ClusterConfiguration state)
         {
-            AllowSynchronousContinuations = false,
-            SingleReader = true,
-            SingleWriter = true
-        });
-        private readonly Acceptor<int> acceptor;
-
-        private Ballot acceptorParentBallot = Ballot.Zero;        
-
-        public AcceptorTests(ITestOutputHelper output)
-        {
-            this.getParentBallot = () => this.acceptorParentBallot;
-            this.onUpdateState = s => { Assert.True(this.acceptorStates.Writer.TryWrite(s), "TryWrite failed"); return default; };
-            this.acceptor = new Acceptor<int>(
-                Key,
-                this.store,
-                this.getParentBallot,
-                this.onUpdateState,
-                new XunitLogger(output, "Acceptor"));
-        }
-
-        [Fact]
-        public async Task AcceptorLoadsCorrectState()
-        {
-            var expectedInitialState = new RegisterState<int>(new Ballot(10, 2), new Ballot(3, 4), 42);
-            var acceptorInternal = (Acceptor<int>.ITestAccessor)this.acceptor;
-            await this.store.Write<RegisterState<int>>(Key, expectedInitialState);
-
-            Assert.Null(acceptorInternal.VolatileState);
-            Assert.False(this.acceptorStates.Reader.TryRead(out _));
-
-            await ((Acceptor<int>.ITestAccessor)this.acceptor).EnsureStateLoaded();
-            Assert.Equal(expectedInitialState, acceptorInternal.VolatileState);
-
-            Assert.True(this.acceptorStates.Reader.TryRead(out var initialRegisterState));
-            Assert.Equal(expectedInitialState, initialRegisterState);
-        }
-
-        [Fact]
-        public async Task PrepareRejectsSupersededParentBallot()
-        {
-            this.acceptorParentBallot = new Ballot(2, 6);
-            var acceptorInternal = (Acceptor<int>.ITestAccessor)this.acceptor;
-
-            // The acceptor has a higher parent ballot than the proposer
-            acceptorInternal.VolatileState = new RegisterState<int>(promised: Ballot.Zero, accepted: new Ballot(3, 4), value: 42);
-            var response = await this.acceptor.Prepare(proposerParentBallot: new Ballot(1, 7), ballot: new Ballot(2, 7));
-            Assert.Equal(PrepareStatus.ConfigConflict, response.Status);
-            Assert.Equal(response.Ballot, this.acceptorParentBallot);
-
-            // No change
-            var expected = new RegisterState<int>(promised: Ballot.Zero, accepted: new Ballot(3, 4), value: 42);
-            Assert.False(this.acceptorStates.Reader.TryRead(out _));
-            Assert.False(this.store.Values.ContainsKey(Key));
-            Assert.Equal(expected.Promised, acceptorInternal.VolatileState.Promised);
-            Assert.Equal(expected.Accepted, acceptorInternal.VolatileState.Accepted);
-            Assert.Equal(expected.Value, acceptorInternal.VolatileState.Value);
-        }
-
-        [Fact]
-        public async Task PrepareRejectsSupersededBallot()
-        {
-            this.acceptorParentBallot = new Ballot(2, 6);
-            var acceptorInternal = (Acceptor<int>.ITestAccessor)this.acceptor;
-
-            // The acceptor has a higher accepted ballot than the proposer, which results in a rejection.
-            acceptorInternal.VolatileState = new RegisterState<int>(promised: Ballot.Zero, accepted: new Ballot(3, 4), value: 42);
-            var response = await this.acceptor.Prepare(proposerParentBallot: this.acceptorParentBallot, ballot: new Ballot(2, 7));
-            Assert.Equal(PrepareStatus.Conflict, response.Status);
-            Assert.Equal(response.Ballot, new Ballot(3, 4));
-
-            // No change
-            var expected = new RegisterState<int>(promised: Ballot.Zero, accepted: new Ballot(3, 4), value: 42);
-            Assert.False(this.acceptorStates.Reader.TryRead(out _));
-            Assert.False(this.store.Values.ContainsKey(Key));
-            Assert.Equal(expected.Promised, acceptorInternal.VolatileState.Promised);
-            Assert.Equal(expected.Accepted, acceptorInternal.VolatileState.Accepted);
-            Assert.Equal(expected.Value, acceptorInternal.VolatileState.Value);
-
-            // The acceptor has a higher promised ballot than the proposer, which results in a rejection.
-            acceptorInternal.VolatileState = new RegisterState<int>(promised: new Ballot(3, 4), accepted: Ballot.Zero, value: 42);
-            response = await this.acceptor.Prepare(proposerParentBallot: this.acceptorParentBallot, ballot: new Ballot(2, 7));
-            Assert.Equal(PrepareStatus.Conflict, response.Status);
-            Assert.Equal(response.Ballot, new Ballot(3, 4));
-
-            // No change
-            expected = new RegisterState<int>(promised: new Ballot(3, 4), accepted: Ballot.Zero, value: 42);
-            Assert.False(this.acceptorStates.Reader.TryRead(out _));
-            Assert.False(this.store.Values.ContainsKey(Key));
-            Assert.Equal(expected.Promised, acceptorInternal.VolatileState.Promised);
-            Assert.Equal(expected.Accepted, acceptorInternal.VolatileState.Accepted);
-            Assert.Equal(expected.Value, acceptorInternal.VolatileState.Value);
-        }
-
-        [Fact]
-        public async Task PrepareAcceptsSupersedingBallot()
-        {
-            this.acceptorParentBallot = new Ballot(2, 6);
-            var acceptorInternal = (Acceptor<int>.ITestAccessor)this.acceptor;
-
-            acceptorInternal.VolatileState = new RegisterState<int>(promised: Ballot.Zero, accepted: new Ballot(3, 4), value: 42);
-            var response = await this.acceptor.Prepare(proposerParentBallot: this.acceptorParentBallot, ballot: new Ballot(3, 7));
-            Assert.Equal(PrepareStatus.Success, response.Status);
-            Assert.Equal(42, response.Value);
-            Assert.Equal(new Ballot(3, 4), response.Ballot);
-            Assert.False(this.acceptorStates.Reader.TryRead(out _));
-            var writtenState = (RegisterState<int>)this.store.Values[Key];
-            Assert.Equal(new Ballot(3, 7), acceptorInternal.VolatileState.Promised);
-            Assert.Equal(new Ballot(3, 7), writtenState.Promised);
-        }
-
-        [Fact]
-        public async Task AcceptRejectsSupersededParentBallot()
-        {
-            this.acceptorParentBallot = new Ballot(2, 6);
-            var acceptorInternal = (Acceptor<int>.ITestAccessor)this.acceptor;
-
-            // The acceptor has a higher parent ballot than the proposer
-            acceptorInternal.VolatileState = new RegisterState<int>(promised: new Ballot(2, 7), accepted: Ballot.Zero, value: 42);
-            var response = await this.acceptor.Accept(proposerParentBallot: new Ballot(1, 7), ballot: new Ballot(2, 7), 43);
-            Assert.Equal(AcceptStatus.ConfigConflict, response.Status);
-            Assert.Equal(response.Ballot, this.acceptorParentBallot);
-
-            // No change
-            var expected = new RegisterState<int>(promised: new Ballot(2, 7), accepted: Ballot.Zero, value: 42);
-            Assert.False(this.acceptorStates.Reader.TryRead(out _));
-            Assert.False(this.store.Values.ContainsKey(Key));
-            Assert.Equal(expected.Promised, acceptorInternal.VolatileState.Promised);
-            Assert.Equal(expected.Accepted, acceptorInternal.VolatileState.Accepted);
-            Assert.Equal(expected.Value, acceptorInternal.VolatileState.Value);
-        }
-
-        [Fact]
-        public async Task AcceptRejectsSupersededBallot()
-        {
-            this.acceptorParentBallot = new Ballot(2, 6);
-            var acceptorInternal = (Acceptor<int>.ITestAccessor)this.acceptor;
-
-            // The acceptor has a higher accepted ballot than the proposer, which results in a rejection.
-            acceptorInternal.VolatileState = new RegisterState<int>(promised: Ballot.Zero, accepted: new Ballot(3, 4), value: 42);
-            var response = await this.acceptor.Accept(proposerParentBallot: this.acceptorParentBallot, ballot: new Ballot(2, 7), 43);
-            Assert.Equal(AcceptStatus.Conflict, response.Status);
-            Assert.Equal(response.Ballot, new Ballot(3, 4));
-
-            // No change
-            var expected = new RegisterState<int>(promised: Ballot.Zero, accepted: new Ballot(3, 4), value: 42);
-            Assert.False(this.acceptorStates.Reader.TryRead(out _));
-            Assert.False(this.store.Values.ContainsKey(Key));
-            Assert.Equal(expected.Promised, acceptorInternal.VolatileState.Promised);
-            Assert.Equal(expected.Accepted, acceptorInternal.VolatileState.Accepted);
-            Assert.Equal(expected.Value, acceptorInternal.VolatileState.Value);
-
-            // The acceptor has a higher promised ballot than the proposer, which results in a rejection.
-            acceptorInternal.VolatileState = new RegisterState<int>(promised: new Ballot(3, 4), accepted: Ballot.Zero, value: 42);
-            response = await this.acceptor.Accept(proposerParentBallot: this.acceptorParentBallot, ballot: new Ballot(2, 7), 43);
-            Assert.Equal(AcceptStatus.Conflict, response.Status);
-            Assert.Equal(response.Ballot, new Ballot(3, 4));
-
-            // No change
-            expected = new RegisterState<int>(promised: new Ballot(3, 4), accepted: Ballot.Zero, value: 42);
-            Assert.False(this.acceptorStates.Reader.TryRead(out _));
-            Assert.False(this.store.Values.ContainsKey(Key));
-            Assert.Equal(expected.Promised, acceptorInternal.VolatileState.Promised);
-            Assert.Equal(expected.Accepted, acceptorInternal.VolatileState.Accepted);
-            Assert.Equal(expected.Value, acceptorInternal.VolatileState.Value);
-        }
-
-        [Fact]
-        public async Task AcceptAcceptsPromisedBallot()
-        {
-            this.acceptorParentBallot = new Ballot(2, 6);
-            var acceptorInternal = (Acceptor<int>.ITestAccessor)this.acceptor;
-
-            acceptorInternal.VolatileState = new RegisterState<int>(promised: new Ballot(3, 4), accepted: Ballot.Zero, value: 42);
-            var response = await this.acceptor.Accept(this.acceptorParentBallot, new Ballot(3, 4), 43);
-            Assert.Equal(AcceptStatus.Success, response.Status);
-            Assert.True(this.acceptorStates.Reader.TryRead(out var updatedState));
-            var writtenState = (RegisterState<int>)this.store.Values[Key];
-
-            var expected = new RegisterState<int>(new Ballot(3, 4), new Ballot(3, 4), 43);
-            Assert.Equal(expected.Promised, acceptorInternal.VolatileState.Promised);
-            Assert.Equal(expected.Accepted, acceptorInternal.VolatileState.Accepted);
-            Assert.Equal(expected.Value, acceptorInternal.VolatileState.Value);
-
-            Assert.Equal(expected.Promised, writtenState.Promised);
-            Assert.Equal(expected.Accepted, writtenState.Accepted);
-            Assert.Equal(expected.Value, writtenState.Value);
-
-            Assert.Equal(expected.Promised, updatedState.Promised);
-            Assert.Equal(expected.Accepted, updatedState.Accepted);
-            Assert.Equal(expected.Value, updatedState.Value);
+            lock (_lock)
+            {
+                if (CommittedConfiguration is null || CommittedConfiguration.Version < state.Version)
+                {
+                    CommittedConfiguration = state;
+                }
+            }
         }
     }
 
-    public class TestMemoryLocalStore : ILocalStore
+    [Trait("Category", "BVT"), Trait("Category", "MetadataStore")]
+    public class AcceptorTests
     {
-        public ConcurrentDictionary<string, object> Values { get; } = new ConcurrentDictionary<string, object>();
+        private readonly LocalConfiguration _localConfig;
+        private readonly ConfigAcceptor _acceptor;
+        private readonly ConfigAcceptor.ITestAccessor _testAccessor;
+        private readonly ClusterConfiguration[] _committedConfigs;
 
-        public ValueTask<TValue> Read<TValue>(string key)
+        private static SiloAddress Silo(int num) => SiloAddress.FromParsableString($"127.0.0.1:{num}@1");
+
+        public AcceptorTests(ITestOutputHelper output)
         {
-            if (this.Values.TryGetValue(key, out var value))
+            _committedConfigs = new[]
             {
-                return new ValueTask<TValue>((TValue)value);
-            }
+                new ClusterConfiguration(new Ballot(1, Silo(1)), new MembershipVersion(1), new[] { Silo(1), Silo(2), Silo(3) }, 2, 2),
+                new ClusterConfiguration(new Ballot(2, Silo(2)), new MembershipVersion(2), new[] { Silo(1), Silo(2), Silo(3), Silo(4) }, 3, 3),
+                new ClusterConfiguration(new Ballot(3, Silo(4)), new MembershipVersion(2), new[] { Silo(1), Silo(2), Silo(3), Silo(4), Silo(5) }, 3, 3),
+            };
 
-            return new ValueTask<TValue>(default(TValue));
+            _localConfig = new LocalConfiguration
+            {
+                CommittedConfiguration = _committedConfigs[1]
+            };
+
+            _acceptor = new ConfigAcceptor(_localConfig);
+            _testAccessor = _acceptor;
         }
 
-        public ValueTask Write<TValue>(string key, TValue value)
+        [Fact]
+        public void PrepareRejectsSupersededParentBallot()
         {
-            this.Values[key] = value;
-            return default;
+            _testAccessor.Value = _committedConfigs[2];
+            _localConfig.CommittedConfiguration = _committedConfigs[2];
+
+            var response = _acceptor.Prepare(_committedConfigs[1].Stamp, new Ballot(10, Silo(3)));
+            Assert.Equal(PrepareStatus.ConfigConflict, response.Status);
+            Assert.Equal(response.Ballot, _testAccessor.Value.Stamp);
+
+            // No change
+            Assert.Equal(Ballot.Zero, _testAccessor.Promised);
+            Assert.Equal(Ballot.Zero, _testAccessor.Accepted);
+            Assert.Equal(_committedConfigs[2], _testAccessor.Value);
         }
 
-        public ValueTask<List<string>> GetKeys(int maxResults = 100, string afterKey = null)
+        [Fact]
+        public void PrepareRejectsSupersededBallot()
         {
-            var include = afterKey == null;
-            var results = new List<string>();
-            foreach (var pair in this.Values)
-            {
-                if (include)
-                {
-                    results.Add(pair.Key);
-                }
+            var committedBallot = _localConfig.CommittedConfiguration.Stamp;
+            var acceptedBallot = new Ballot(3, Silo(2));
+            var supersededBallot = new Ballot(2, Silo(3));
+            var initialValue = _testAccessor.Value;
 
-                if (string.Equals(pair.Key, afterKey, StringComparison.Ordinal)) include = true;
-                if (results.Count >= maxResults) break;
-            }
+            // Set an accepted ballot
+            _testAccessor.Accepted = acceptedBallot;
+            var response = _acceptor.Prepare(proposerConfig: committedBallot, ballot: supersededBallot);
+            Assert.Equal(PrepareStatus.Conflict, response.Status);
+            Assert.Equal(response.Ballot, acceptedBallot);
 
-            return new ValueTask<List<string>>(results);
+            // No change
+            Assert.Equal(Ballot.Zero, _testAccessor.Promised);
+            Assert.Equal(acceptedBallot, _testAccessor.Accepted);
+            Assert.Equal(initialValue, _testAccessor.Value);
+
+            // Set a promised ballot instead
+            _testAccessor.Promised = _testAccessor.Accepted;
+            _testAccessor.Accepted = Ballot.Zero;
+            response = _acceptor.Prepare(proposerConfig: committedBallot, ballot: supersededBallot);
+            Assert.Equal(PrepareStatus.Conflict, response.Status);
+            Assert.Equal(response.Ballot, acceptedBallot);
+
+            // No change
+            Assert.Equal(acceptedBallot, _testAccessor.Promised);
+            Assert.Equal(Ballot.Zero, _testAccessor.Accepted);
+            Assert.Equal(initialValue, _testAccessor.Value);
+        }
+
+        [Fact]
+        public void PrepareAcceptsSupersedingBallot()
+        {
+            var committedBallot = _localConfig.CommittedConfiguration.Stamp;
+            var committedValue = _localConfig.CommittedConfiguration;
+            _testAccessor.Accepted = committedValue.Stamp;
+            _testAccessor.Value = committedValue;
+
+            var proposedBallot = new Ballot(4, Silo(2));
+            var response = _acceptor.Prepare(committedBallot, ballot: proposedBallot);
+            Assert.Equal(PrepareStatus.Success, response.Status);
+            Assert.Equal(committedValue, response.Value);
+            Assert.Equal(committedValue.Stamp, response.Ballot);
+            Assert.Equal(proposedBallot, _testAccessor.Promised);
+        }
+
+        [Fact]
+        public void AcceptRejectsSupersededParentBallot()
+        {
+            var promisedBallot = _testAccessor.Promised = new Ballot(2, Silo(2));
+            var committedBallot = _localConfig.CommittedConfiguration.Stamp;
+            var committedValue = _localConfig.CommittedConfiguration;
+            _testAccessor.Accepted = committedValue.Stamp;
+            _testAccessor.Value = committedValue;
+
+            // The acceptor has a higher parent ballot than the proposer
+            var response = _acceptor.Accept(proposerConfig: _committedConfigs[0].Stamp, ballot: committedBallot.Successor(), null);
+            Assert.Equal(AcceptStatus.ConfigConflict, response.Status);
+            Assert.Equal(committedBallot, response.Ballot);
+
+            // No change
+            Assert.Equal(promisedBallot, _testAccessor.Promised);
+            Assert.Equal(committedBallot, _testAccessor.Accepted);
+            Assert.Equal(committedValue, _testAccessor.Value);
+        }
+
+        [Fact]
+        public void AcceptRejectsSupersededBallot()
+        {
+            _testAccessor.Promised = Ballot.Zero;
+            var acceptedBallot = new Ballot(10, Silo(1));
+            _testAccessor.Accepted = acceptedBallot;
+            _testAccessor.Value = _committedConfigs[1];
+
+            // The acceptor has a higher accepted ballot than the proposer, which results in a rejection.
+            var response = _acceptor.Accept(proposerConfig: _committedConfigs[1].Stamp, ballot: new Ballot(9, Silo(2)), _committedConfigs[2]);
+            Assert.Equal(AcceptStatus.Conflict, response.Status);
+            Assert.Equal(acceptedBallot, response.Ballot);
+
+            // No change
+            Assert.Equal(Ballot.Zero, _testAccessor.Promised);
+            Assert.Equal(acceptedBallot, _testAccessor.Accepted);
+            Assert.Equal(_committedConfigs[1], _testAccessor.Value);
+
+            // The acceptor has a higher promised ballot than the proposer, which results in a rejection.
+            var promisedBallot = acceptedBallot.Successor();
+            _testAccessor.Promised = promisedBallot;
+            response = _acceptor.Accept(proposerConfig: _committedConfigs[1].Stamp, ballot: new Ballot(9, Silo(2)), _committedConfigs[2]);
+            Assert.Equal(AcceptStatus.Conflict, response.Status);
+            Assert.Equal(promisedBallot, response.Ballot);
+
+            // No change
+            Assert.Equal(promisedBallot, _testAccessor.Promised);
+            Assert.Equal(acceptedBallot, _testAccessor.Accepted);
+            Assert.Equal(_committedConfigs[1], _testAccessor.Value);
+        }
+
+        [Fact]
+        public void AcceptAcceptsPromisedBallot()
+        {
+            var committedBallot = _localConfig.CommittedConfiguration.Stamp;
+            var promisedBallot = new Ballot(3, Silo(4));
+            _testAccessor.Promised = promisedBallot;
+
+            var response = _acceptor.Accept(committedBallot, promisedBallot, _committedConfigs[2]);
+            Assert.Equal(AcceptStatus.Success, response.Status);
+
+            Assert.Equal(promisedBallot, _testAccessor.Promised);
+            Assert.Equal(promisedBallot, _testAccessor.Accepted);
+            Assert.Equal(_committedConfigs[2], _testAccessor.Value);
         }
     }
 }

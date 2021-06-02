@@ -23,9 +23,9 @@ await Host.CreateDefaultBuilder(args)
             primaryEndpoint = new IPEndPoint(IPAddress.Loopback, 11111);
         }
 
-        siloBuilder.UseLocalhostClustering(siloPort: port, gatewayPort: 0, primarySiloEndpoint: primaryEndpoint)
-            .UseMetadataStore()
-            .UseMemoryLocalStore();
+        siloBuilder.UseLocalhostClustering(siloPort: port, gatewayPort: 0, primarySiloEndpoint: primaryEndpoint);
+//            .UseMetadataStore()
+ //           .UseMemoryLocalStore();
         siloBuilder.ConfigureServices(services =>
         {
             services.AddHostedService<ClusterBootstrapper>();
@@ -91,6 +91,7 @@ internal class ClusterBootstrapper : BackgroundService
 
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
+        /*
         if (_configurationManager.AcceptedConfiguration?.Configuration is null)
         {
             await _configurationManager.ForceLocalConfiguration(
@@ -100,6 +101,7 @@ internal class ClusterBootstrapper : BackgroundService
                 1,
                 1));
         }
+        */
 
         await _configurationManager.TryAddServer(_localSiloDetails.SiloAddress);
 

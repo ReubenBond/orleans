@@ -1,35 +1,36 @@
-using Orleans.Concurrency;
 using Orleans.Metadata;
 using Orleans.Placement;
 using Orleans.Runtime;
-using System;
 using System.Threading.Tasks;
 
 namespace Orleans.MetadataStore
 {
-    public interface IConfigurationManagerMediator
+    public interface IAcceptorRouter<TValue>
     {
-        ValueTask<ConfigPrepareResponse> Prepare(SiloAddress server, ConfigBallot proposerConfig, ConfigBallot ballot);
-        ValueTask<ConfigAcceptResponse> Accept(SiloAddress server, ConfigBallot proposerConfig, ConfigBallot ballot, ClusterConfiguration value);
+        ValueTask<PrepareResponse<TValue>> Prepare(SiloAddress server, Ballot proposerConfig, Ballot ballot);
+        ValueTask<AcceptResponse> Accept(SiloAddress server, Ballot proposerConfig, Ballot ballot, TValue value);
+    }
 
+    public interface ILearnerRouter<TValue>
+    {
         /// <summary>
         /// Informs the specified server that a value was committed.
         /// </summary>
-        ValueTask Committed(SiloAddress server, ClusterConfiguration value);
+        ValueTask Committed(SiloAddress server, TValue value);
     }
 
-    public class ConfigurationManagerMediator : IConfigurationManagerMediator
+    public class ConfigurationManagerRouter : IAcceptorRouter<ClusterConfiguration>, ILearnerRouter<ClusterConfiguration>
     {
         private readonly IGrainFactory _grainFactory;
-        public ConfigurationManagerMediator(IGrainFactory grainFactory) => _grainFactory = grainFactory;
+        public ConfigurationManagerRouter(IGrainFactory grainFactory) => _grainFactory = grainFactory;
 
-        public ValueTask<ConfigAcceptResponse> Accept(SiloAddress server, ConfigBallot proposerConfig, ConfigBallot ballot, ClusterConfiguration value)
+        public ValueTask<AcceptResponse> Accept(SiloAddress server, Ballot proposerConfig, Ballot ballot, ClusterConfiguration value)
         {
             var grain = GetConfigurationManagerReference(server);
             return grain.Accept(proposerConfig, ballot, value);
         }
 
-        public ValueTask<ConfigPrepareResponse> Prepare(SiloAddress server, ConfigBallot proposerConfig, ConfigBallot ballot)
+        public ValueTask<PrepareResponse<ClusterConfiguration>> Prepare(SiloAddress server, Ballot proposerConfig, Ballot ballot)
         {
             var grain = GetConfigurationManagerReference(server);
             return grain.Prepare(proposerConfig, ballot);
@@ -41,14 +42,15 @@ namespace Orleans.MetadataStore
             return grain.Committed(value);
         }
 
-        private IConfigurationManagerGrain GetConfigurationManagerReference(SiloAddress server) => _grainFactory.GetGrain<IConfigurationManagerGrain>(FixedPlacement.CreateGrainId(ConfigurationManagerGrain.GrainType, server));
+        private IConfigurationManagerGrain GetConfigurationManagerReference(SiloAddress server) =>
+            _grainFactory.GetGrain<IConfigurationManagerGrain>(FixedPlacement.CreateGrainId(ConfigurationManagerGrain.GrainType, server));
     }
 
     [DefaultGrainType(ConfigurationManagerGrain.GrainTypeName)]
     public interface IConfigurationManagerGrain : IGrain
     {
-        ValueTask<ConfigPrepareResponse> Prepare(ConfigBallot proposerConfig, ConfigBallot ballot);
-        ValueTask<ConfigAcceptResponse> Accept(ConfigBallot proposerConfig, ConfigBallot ballot, ClusterConfiguration value);
+        ValueTask<PrepareResponse<ClusterConfiguration>> Prepare(Ballot proposerConfig, Ballot ballot);
+        ValueTask<AcceptResponse> Accept(Ballot proposerConfig, Ballot ballot, ClusterConfiguration value);
         ValueTask Committed(ClusterConfiguration value);
         ValueTask<ClusterConfiguration> GetCommittedConfiguration();
     }
@@ -68,9 +70,9 @@ namespace Orleans.MetadataStore
             _localConfiguration = localConfiguration;
         }
 
-        public ValueTask<ConfigPrepareResponse> Prepare(ConfigBallot proposerConfig, ConfigBallot ballot) => new(_configurationManager.Acceptor.Prepare(proposerConfig, ballot));
+        public ValueTask<PrepareResponse<ClusterConfiguration>> Prepare(Ballot proposerConfig, Ballot ballot) => new(_configurationManager.Acceptor.Prepare(proposerConfig, ballot));
 
-        public ValueTask<ConfigAcceptResponse> Accept(ConfigBallot proposerConfig, ConfigBallot ballot, ClusterConfiguration value) => new(_configurationManager.Acceptor.Accept(proposerConfig, ballot, value));
+        public ValueTask<AcceptResponse> Accept(Ballot proposerConfig, Ballot ballot, ClusterConfiguration value) => new(_configurationManager.Acceptor.Accept(proposerConfig, ballot, value));
 
         public ValueTask Committed(ClusterConfiguration value)
         {
@@ -81,96 +83,116 @@ namespace Orleans.MetadataStore
         public ValueTask<ClusterConfiguration> GetCommittedConfiguration() => new(_localConfiguration.CommittedConfiguration);
     }
 
+    public struct AcceptorRegister<TValue>
+    {
+        public Ballot PromisedBallot { get; set; }
+        public Ballot AcceptedBallot { get; set; }
+        public TValue AcceptedValue { get; set; }
+
+        public PrepareResponse<TValue> Prepare(Ballot ballot)
+        {
+            if (PromisedBallot > ballot)
+            {
+                // If a Prepare with a higher ballot has already been encountered, reject this.
+                return PrepareResponse<TValue>.Conflict(PromisedBallot);
+            }
+
+            if (AcceptedBallot > ballot)
+            {
+                // If an Accept with a higher ballot has already been encountered, reject this.
+                return PrepareResponse<TValue>.Conflict(AcceptedBallot);
+            }
+
+            // Record a tentative promise to accept this proposer's value.
+            PromisedBallot = ballot;
+            return PrepareResponse<TValue>.Success(AcceptedBallot, AcceptedValue);
+        }
+
+        public AcceptResponse Accept(Ballot ballot, TValue value)
+        {
+            if (PromisedBallot > ballot)
+            {
+                // If a Prepare with a higher ballot has already been encountered, reject this.
+                return AcceptResponse.Conflict(PromisedBallot);
+            }
+
+            if (AcceptedBallot > ballot)
+            {
+                // If an Accept with a higher ballot has already been encountered, reject this.
+                return AcceptResponse.Conflict(AcceptedBallot);
+            }
+
+            // Record the new state.
+            PromisedBallot = ballot;
+            AcceptedBallot = ballot;
+            AcceptedValue = value;
+            return AcceptResponse.Success();
+        }
+    }
+
     public sealed class ConfigAcceptor : ConfigAcceptor.ITestAccessor
     {
         private readonly ILocalConfiguration _localConfiguration;
-        private ConfigBallot _promised;
-        private ConfigBallot _accepted;
-        private ClusterConfiguration _value;
+        private AcceptorRegister<ClusterConfiguration> _register;
 
         public ConfigAcceptor(ILocalConfiguration localConfiguration)
         {
             _localConfiguration = localConfiguration;
         }
 
-        ConfigBallot ITestAccessor.Promised { get => _promised; set => _promised = value; }
-        ConfigBallot ITestAccessor.Accepted { get => _accepted; set => _accepted = value; }
-        ClusterConfiguration ITestAccessor.Value { get => _value; set => _value = value; }
+        Ballot ITestAccessor.Promised { get => _register.PromisedBallot; set => _register.PromisedBallot = value; }
+        Ballot ITestAccessor.Accepted { get => _register.AcceptedBallot; set => _register.AcceptedBallot = value; }
+        ClusterConfiguration ITestAccessor.Value { get => _register.AcceptedValue; set => _register.AcceptedValue = value; }
 
-        public ConfigPrepareResponse Prepare(ConfigBallot proposerConfig, ConfigBallot ballot)
+        public PrepareResponse<ClusterConfiguration> Prepare(Ballot proposerConfig, Ballot ballot)
         {
             lock (this)
             {
-                ConfigPrepareResponse result;
                 var activeConfiguration = GetActiveConfiguration();
                 if (activeConfiguration is not null && proposerConfig < activeConfiguration.Stamp)
                 {
                     // If this acceptor has already accepted a configuration with a higher stamp than the proper's, reject this.
                     // This passivates proposers which are operating on out-dated configurations, ensuring that they are not able to commit
                     // values when they may not know of the most recent quorum configuration.
-                    result = ConfigPrepareResponse.ConfigConflict(activeConfiguration);
-                }
-                else if (_promised > ballot)
-                {
-                    // If a Prepare with a higher ballot has already been encountered, reject this.
-                    result = ConfigPrepareResponse.Conflict(_promised);
-                }
-                else if (_accepted > ballot)
-                {
-                    // If an Accept with a higher ballot has already been encountered, reject this.
-                    result = ConfigPrepareResponse.Conflict(_accepted);
-                }
-                else
-                {
-                    // Record a tentative promise to accept this proposer's value.
-                    _promised = ballot;
-                    result = ConfigPrepareResponse.Success(_accepted, _value);
+                    return PrepareResponse<ClusterConfiguration>.ConfigConflict(activeConfiguration.Stamp, activeConfiguration);
                 }
 
-                return result;
+                return _register.Prepare(ballot);
             }
         }
 
-        public ConfigAcceptResponse Accept(ConfigBallot proposerConfig, ConfigBallot ballot, ClusterConfiguration value)
+
+        public AcceptResponse Accept(Ballot proposerConfig, Ballot ballot, ClusterConfiguration value)
         {
             lock (this)
             {
-                ConfigAcceptResponse result;
                 var activeConfiguration = GetActiveConfiguration();
                 if (activeConfiguration is not null && proposerConfig < activeConfiguration.Stamp)
                 {
                     // If this acceptor has already accepted a configuration with a higher stamp than the proper's, reject this.
                     // This passivates proposers which are operating on out-dated configurations, ensuring that they are not able to commit
                     // values when they may not know of the most recent quorum configuration.
-                    result = ConfigAcceptResponse.ConfigConflict(activeConfiguration.Stamp);
-                }
-                else if (_promised > ballot)
-                {
-                    // If a Prepare with a higher ballot has already been encountered, reject this.
-                    result = ConfigAcceptResponse.Conflict(_promised);
-                }
-                else if (_accepted > ballot)
-                {
-                    // If an Accept with a higher ballot has already been encountered, reject this.
-                    result = ConfigAcceptResponse.Conflict(_accepted);
-                }
-                else
-                {
-                    // Record the new state.
-                    _promised = ballot;
-                    _accepted = ballot;
-                    _value = value;
-                    result = ConfigAcceptResponse.Success();
+                    return AcceptResponse.ConfigConflict(activeConfiguration.Stamp);
                 }
 
-                return result;
+                return _register.Accept(ballot, value);
+            }
+        }
+
+        internal void ForceState(ClusterConfiguration newState)
+        {
+            lock (this)
+            {
+                _register.PromisedBallot = newState?.Stamp ?? Ballot.Zero;
+                _register.AcceptedBallot = newState?.Stamp ?? Ballot.Zero;
+                _register.AcceptedValue = newState;
             }
         }
 
         private ClusterConfiguration GetActiveConfiguration()
         {
             var committed = _localConfiguration.CommittedConfiguration;
-            var accepted = _value;
+            var accepted = _register.AcceptedValue;
             return (committed, accepted) switch
             {
                 (not null, not null) when committed.Stamp >= accepted.Stamp => committed,
@@ -178,27 +200,17 @@ namespace Orleans.MetadataStore
             };
         }
 
-        internal void ForceState(ClusterConfiguration newState)
-        {
-            lock (this)
-            {
-                _accepted = newState?.Stamp ?? ConfigBallot.Zero;
-                _promised = newState?.Stamp ?? ConfigBallot.Zero;
-                _value = newState;
-            }
-        }
-
         public interface ITestAccessor
         {
-            ConfigBallot Promised { get; set; }
-            ConfigBallot Accepted { get; set; }
+            Ballot Promised { get; set; }
+            Ballot Accepted { get; set; }
             ClusterConfiguration Value { get; set; }
         }
     }
 
     [Immutable]
     [GenerateSerializer]
-    public struct ConfigPrepareResponse
+    public struct PrepareResponse<TValue>
     {
         [Id(0)]
         public byte _status;
@@ -206,39 +218,39 @@ namespace Orleans.MetadataStore
         public PrepareStatus Status => (PrepareStatus)_status;
 
         [Id(1)]
-        public ConfigBallot Ballot;
+        public Ballot Ballot;
 
         [Id(2)]
-        public ClusterConfiguration Value;
+        public TValue Value;
 
-        public static ConfigPrepareResponse Success(ConfigBallot accepted, ClusterConfiguration value) => new()
+        public static PrepareResponse<TValue> Success(Ballot accepted, TValue value) => new()
         {
             _status = (byte)PrepareStatus.Success,
             Ballot = accepted,
             Value = value,
         };
 
-        public static ConfigPrepareResponse Conflict(ConfigBallot conflicting) => new() 
+        public static PrepareResponse<TValue> Conflict(Ballot conflicting) => new() 
         {
             _status = (byte)PrepareStatus.Conflict,
             Ballot = conflicting,
         };
 
-        public static ConfigPrepareResponse ConfigConflict(ClusterConfiguration value) => new()
+        public static PrepareResponse<TValue> ConfigConflict(Ballot conflicting, TValue value) => new()
         {
             _status = (byte)PrepareStatus.ConfigConflict,
-            Ballot = value.Stamp,
+            Ballot = conflicting,
             Value = value,
         };
 
-        public void Deconstruct(out PrepareStatus status, out ConfigBallot accepted, out ClusterConfiguration value)
+        public void Deconstruct(out PrepareStatus status, out Ballot accepted, out TValue value)
         {
             status = Status;
             accepted = Ballot;
             value = Value;
         }
 
-        public void Deconstruct(out PrepareStatus status, out ConfigBallot conflict)
+        public void Deconstruct(out PrepareStatus status, out Ballot conflict)
         {
             status = Status;
             conflict = Ballot;
@@ -247,7 +259,7 @@ namespace Orleans.MetadataStore
 
     [Immutable]
     [GenerateSerializer]
-    public struct ConfigAcceptResponse
+    public struct AcceptResponse
     {
         [Id(0)]
         public byte _status;
@@ -255,26 +267,26 @@ namespace Orleans.MetadataStore
         public AcceptStatus Status => (AcceptStatus)_status;
 
         [Id(1)]
-        public ConfigBallot Ballot;
+        public Ballot Ballot;
 
-        public static ConfigAcceptResponse Success() => new()
+        public static AcceptResponse Success() => new()
         {
             _status = (byte)AcceptStatus.Success,
         };
 
-        public static ConfigAcceptResponse Conflict(ConfigBallot conflicting) => new() 
+        public static AcceptResponse Conflict(Ballot conflicting) => new() 
         {
             _status = (byte)AcceptStatus.Conflict,
             Ballot = conflicting,
         };
 
-        public static ConfigAcceptResponse ConfigConflict(ConfigBallot conflicting) => new()
+        public static AcceptResponse ConfigConflict(Ballot conflicting) => new()
         {
             _status = (byte)AcceptStatus.ConfigConflict,
             Ballot = conflicting,
         };
 
-        public void Deconstruct(out AcceptStatus status, out ConfigBallot conflict)
+        public void Deconstruct(out AcceptStatus status, out Ballot conflict)
         {
             status = (AcceptStatus)_status;
             conflict = Ballot;

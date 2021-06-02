@@ -1,3 +1,4 @@
+#if false
 using System;
 using System.Threading.Tasks;
 
@@ -38,3 +39,4 @@ namespace Orleans.MetadataStore.Tests
         }
     }
 }
+#endif
