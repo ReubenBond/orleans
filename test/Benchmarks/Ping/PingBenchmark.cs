@@ -8,7 +8,6 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkGrainInterfaces.Ping;
 using BenchmarkGrains.Ping;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -19,7 +18,7 @@ namespace Benchmarks.Ping
     [MemoryDiagnoser]
     public class PingBenchmark : IDisposable 
     {
-        private readonly List<IHost> hosts = new List<IHost>();
+        private readonly List<ISiloHost> hosts = new List<ISiloHost>();
         private readonly IPingGrain grain;
         private readonly IClusterClient client;
 
@@ -30,27 +29,22 @@ namespace Benchmarks.Ping
             for (var i = 0; i < numSilos; ++i)
             {
                 var primary = i == 0 ? null : new IPEndPoint(IPAddress.Loopback, 11111);
-                var hostBuilder = new HostBuilder().UseOrleans(siloBuilder =>
-                {
-                    siloBuilder.UseLocalhostClustering(
+                var siloBuilder = new SiloHostBuilder()
+                    .ConfigureDefaults()
+                    .UseLocalhostClustering(
                         siloPort: 11111 + i,
                         gatewayPort: 30000 + i,
                         primarySiloEndpoint: primary);
 
-                    if (i == 0 && grainsOnSecondariesOnly)
-                    {
-                        siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
-                        siloBuilder.ConfigureServices(services =>
-                        {
-                            services.Remove(services.First(s => s.ImplementationType?.Name == "ApplicationPartValidator"));
-                        });
-                    }
-                });
+                if (i == 0 && grainsOnSecondariesOnly)
+                {
+                    siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
+                }
 
-                var host = hostBuilder.Build();
+                var silo = siloBuilder.Build();
 
-                host.StartAsync().GetAwaiter().GetResult();
-                this.hosts.Add(host);
+                silo.StartAsync().GetAwaiter().GetResult();
+                this.hosts.Add(silo);
             }
 
             if (grainsOnSecondariesOnly) Thread.Sleep(4000);
