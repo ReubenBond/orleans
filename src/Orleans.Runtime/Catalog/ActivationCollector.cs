@@ -328,7 +328,14 @@ namespace Orleans.Runtime
         {
             if (member is ActivationData activation)
             {
-                ScheduleCollection(activation);
+                if (activation.CollectionTicket == default)
+                {
+                    ScheduleCollection(activation);
+                }
+                else
+                {
+                    TryRescheduleCollection(activation);
+                }
             }
         }
 
