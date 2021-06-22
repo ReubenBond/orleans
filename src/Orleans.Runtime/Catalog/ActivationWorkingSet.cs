@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
@@ -22,6 +23,8 @@ namespace Orleans.Runtime
         private readonly ILogger _logger;
         private readonly IAsyncTimer _scanPeriodTimer;
         private readonly List<IActivationWorkingSetObserver> _observers;
+
+        private int _count;
         private Task _runTask;
 
         public ActivationWorkingSet(
@@ -34,6 +37,8 @@ namespace Orleans.Runtime
             _observers = observers.ToList();
         }
 
+        public int Count => _count;
+
         public void Add(IActivationWorkingSetMember member)
         {
             if (!_members.TryAdd(member, new MemberState()))
@@ -41,6 +46,7 @@ namespace Orleans.Runtime
                 throw new InvalidOperationException($"Member {member} is already a member of the working set");
             }
 
+            Interlocked.Increment(ref _count);
             foreach (var observer in _observers)
             {
                 observer.OnAdded(member);
@@ -59,6 +65,7 @@ namespace Orleans.Runtime
             }
             else if (_members.TryAdd(member, new()))
             {
+                Interlocked.Increment(ref _count);
                 foreach (var observer in _observers)
                 {
                     observer.OnAdded(member);
@@ -70,6 +77,7 @@ namespace Orleans.Runtime
         {
             if (_members.TryRemove(member, out _))
             {
+                Interlocked.Decrement(ref _count);
                 foreach (var observer in _observers)
                 {
                     observer.OnRemoved(member);
@@ -149,6 +157,11 @@ namespace Orleans.Runtime
     /// </summary>
     public interface IActivationWorkingSet
     {
+        /// <summary>
+        /// Returns the number of grains in the working set.
+        /// </summary>
+        public int Count { get; }
+
         /// <summary>
         /// Adds a new member to the working set.
         /// </summary>
