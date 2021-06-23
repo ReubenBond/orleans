@@ -8,17 +8,18 @@ using BenchmarkDotNet.Attributes;
 using BenchmarkGrainInterfaces.Ping;
 using BenchmarkGrains.Ping;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Metadata;
 
 namespace Benchmarks.Ping
 {
     [MemoryDiagnoser]
     public class PingBenchmark : IDisposable 
     {
-        private readonly List<ISiloHost> hosts = new List<ISiloHost>();
+        private readonly List<IHost> hosts = new List<IHost>();
+
         private readonly IPingGrain grain;
         private readonly IClusterClient client;
 
@@ -29,22 +30,24 @@ namespace Benchmarks.Ping
             for (var i = 0; i < numSilos; ++i)
             {
                 var primary = i == 0 ? null : new IPEndPoint(IPAddress.Loopback, 11111);
-                var siloBuilder = new SiloHostBuilder()
-                    .ConfigureDefaults()
+                var hostBuilder = new HostBuilder().UseOrleans(siloBuilder =>
+                {
+                    siloBuilder.ConfigureDefaults()
                     .UseLocalhostClustering(
                         siloPort: 11111 + i,
                         gatewayPort: 30000 + i,
                         primarySiloEndpoint: primary);
 
-                if (i == 0 && grainsOnSecondariesOnly)
-                {
-                    siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
-                }
+                    if (i == 0 && grainsOnSecondariesOnly)
+                    {
+                        siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
+                    }
+                });
 
-                var silo = siloBuilder.Build();
+                var host = hostBuilder.Build();
 
-                silo.StartAsync().GetAwaiter().GetResult();
-                this.hosts.Add(silo);
+                host.StartAsync().GetAwaiter().GetResult();
+                this.hosts.Add(host);
             }
 
             if (grainsOnSecondariesOnly) Thread.Sleep(4000);
