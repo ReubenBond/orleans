@@ -153,6 +153,11 @@ namespace Orleans.Runtime
         public GrainInterfaceType GrainInterfaceType { get; set; }
     }
 
+    public interface ICachedMessageHandler
+    {
+        bool SendMessage(object message);
+    }
+
     /// <summary>
     /// This is the base class for all typed grain references.
     /// </summary>
@@ -168,6 +173,8 @@ namespace Orleans.Runtime
 
         [NonSerialized]
         private IdSpan _key;
+
+        internal ICachedMessageHandler CachedHandler { get; set; }
 
         internal GrainReferenceShared Shared => _shared ?? throw new GrainReferenceNotBoundException(this);
 
@@ -280,22 +287,6 @@ namespace Orleans.Runtime
 
         /// <summary>Returns a string representation of this reference.</summary>
         public override string ToString() => $"GrainReference:{GrainId}:{InterfaceType}";
-
-        /// <summary>
-        /// Called from generated code.
-        /// </summary>
-        protected void InvokeOneWayMethod(int methodId, object[] arguments, InvokeMethodOptions options = InvokeMethodOptions.None)
-        {
-            this.Runtime.InvokeOneWayMethod(this, methodId, arguments, options | _shared.InvokeMethodOptions);
-        }
-
-        /// <summary>
-        /// Called from generated code.
-        /// </summary>
-        protected Task<T> InvokeMethodAsync<T>(int methodId, object[] arguments, InvokeMethodOptions options = InvokeMethodOptions.None)
-        {
-            return this.Runtime.InvokeMethodAsync<T>(this, methodId, arguments, options | _shared.InvokeMethodOptions);
-        }
 
         protected TInvokable GetInvokable<TInvokable>() => ActivatorUtilities.GetServiceOrCreateInstance<TInvokable>(Shared.ServiceProvider);
 

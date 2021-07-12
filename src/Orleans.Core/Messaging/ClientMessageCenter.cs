@@ -139,7 +139,7 @@ namespace Orleans.Messaging
             static void ThrowNullMessageHandler() => throw new InvalidOperationException("MessageCenter does not have a message handler set");
         }
 
-        public void SendMessage(Message msg)
+        public void SendMessage(Message msg, GrainReference targetReference = null)
         {
             if (!Running)
             {

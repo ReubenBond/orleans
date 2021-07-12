@@ -352,5 +352,10 @@ namespace Orleans.Runtime
         public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
         public void Deactivate(CancellationToken? cancellationToken = null) { }
         public Task Deactivated => Task.CompletedTask;
+        public bool SendMessage(object message)
+        {
+            ReceiveMessage(message);
+            return true;
+        }
     }
 }

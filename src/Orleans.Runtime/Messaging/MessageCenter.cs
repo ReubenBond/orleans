@@ -134,7 +134,7 @@ namespace Orleans.Runtime.Messaging
             get => this.sniffIncomingMessageHandler;
         }
 
-        public void SendMessage(Message msg)
+        public void SendMessage(Message msg, GrainReference targetReference = default)
         {
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
             if (IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && (msg.Result != Message.ResponseTypes.Rejection)
@@ -184,7 +184,7 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     MessagingStatisticsGroup.LocalMessagesSent.Increment();
-                    this.ReceiveMessage(msg);
+                    this.ReceiveMessage(msg, targetReference);
                 }
                 else
                 {
@@ -213,17 +213,19 @@ namespace Orleans.Runtime.Messaging
                         if (connectionTask.IsCompletedSuccessfully)
                         {
                             var sender = connectionTask.Result;
+                            targetReference.CachedHandler = sender;
                             sender.Send(msg);
                         }
                         else
                         {
-                            _ = SendAsync(this, connectionTask, msg);
+                            _ = SendAsync(this, connectionTask, msg, targetReference);
 
-                            static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg)
+                            static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg, GrainReference targetReference)
                             {
                                 try
                                 {
                                     var sender = await connectionTask;
+                                    targetReference.CachedHandler = sender;
                                     sender.Send(msg);
                                 }
                                 catch (Exception exception)
@@ -417,17 +419,17 @@ namespace Orleans.Runtime.Messaging
         /// - add ordering info and maintain send order
         /// 
         /// </summary>
-        internal Task AddressAndSendMessage(Message message)
+        internal Task AddressAndSendMessage(Message message, GrainReference target = null)
         {
             try
             {
                 var messageAddressingTask = placementService.AddressMessage(message);
                 if (messageAddressingTask.Status != TaskStatus.RanToCompletion)
                 {
-                    return SendMessageAsync(messageAddressingTask, message);
+                    return SendMessageAsync(target, messageAddressingTask, message);
                 }
 
-                SendMessage(message);
+                SendMessage(message, target);
             }
             catch (Exception ex)
             {
@@ -436,7 +438,7 @@ namespace Orleans.Runtime.Messaging
 
             return Task.CompletedTask;
 
-            async Task SendMessageAsync(Task addressMessageTask, Message m)
+            async Task SendMessageAsync(GrainReference target, Task addressMessageTask, Message m)
             {
                 try
                 {
@@ -448,7 +450,7 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                SendMessage(m);
+                SendMessage(m, target);
             }
 
             void OnAddressingFailure(Message m, Exception ex)
@@ -488,15 +490,15 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public void ReceiveMessage(Message msg)
+        public void ReceiveMessage(Message msg, GrainReference targetReference = null)
         {
             this.messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);
 
             // Find the activation it targets; first check for a system activation, then an app activation
             if (msg.TargetGrain.IsSystemTarget())
             {
-                SystemTarget target = this.activationDirectory.FindSystemTarget(msg.TargetActivation);
-                if (target == null)
+                SystemTarget systemTarget = this.activationDirectory.FindSystemTarget(msg.TargetActivation);
+                if (systemTarget == null)
                 {
                     MessagingStatisticsGroup.OnRejectedMessage(msg);
                     this.log.LogWarning(
@@ -517,7 +519,12 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                target.ReceiveMessage(msg);
+                if (targetReference is not null)
+                {
+                    targetReference.CachedHandler = systemTarget;
+                }
+
+                systemTarget.ReceiveMessage(msg);
             }
             else if (TryDeliverToProxy(msg))
             {
@@ -548,6 +555,11 @@ namespace Orleans.Runtime.Messaging
                             var nonExistentActivation = msg.TargetAddress;
                             ProcessRequestToInvalidActivation(msg, nonExistentActivation, null, "Non-existent activation");
                             return;
+                        }
+
+                        if (targetReference is not null)
+                        {
+                            targetReference.CachedHandler = targetActivation;
                         }
 
                         targetActivation.ReceiveMessage(msg);
