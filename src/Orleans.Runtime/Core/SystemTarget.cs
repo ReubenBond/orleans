@@ -308,5 +308,11 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public Task Deactivated => Task.CompletedTask;
+
+        public bool SendMessage(object message)
+        {
+            ReceiveMessage(message);
+            return true;
+        }
     }
 }

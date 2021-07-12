@@ -240,6 +240,11 @@ namespace Orleans.Runtime
         public GrainInterfaceType GrainInterfaceType { get; set; }
     }
 
+    public interface ICachedMessageHandler
+    {
+        bool SendMessage(object message);
+    }
+
     /// <summary>
     /// This is the base class for all grain references.
     /// </summary>
@@ -261,6 +266,8 @@ namespace Orleans.Runtime
         /// </summary>
         [NonSerialized]
         private IdSpan _key;
+
+        internal ICachedMessageHandler CachedHandler { get; set; }
 
         /// <summary>
         /// Gets the grain reference functionality which is shared by all grain references of a given type.

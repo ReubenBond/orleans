@@ -128,7 +128,9 @@ namespace Orleans.Runtime
 
             // fill in sender
             if (message.SendingSilo == null)
+            {
                 message.SendingSilo = MySilo;
+            }
 
             IGrainContext sendingActivation = RuntimeContext.Current;
 
@@ -183,7 +185,20 @@ namespace Orleans.Runtime
             }
 
             this.messagingTrace.OnSendRequest(message);
-            this.MessageCenter.AddressAndSendMessage(message);
+
+            if (target.CachedHandler is { } handler)
+            {
+                // Send a message to this cached value.
+                // This must succeed, but a false return value indicates that the cache should be invalidated.
+                if (!handler.SendMessage(message))
+                {
+                    target.CachedHandler = null;
+                }
+            }
+            else
+            {
+                this.MessageCenter.AddressAndSendMessage(message, target);
+            }
         }
 
         public void SendResponse(Message request, Response response)

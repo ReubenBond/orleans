@@ -142,8 +142,6 @@ namespace Benchmarks
             ["ConcurrentPing_HostedClient_Forever"] = _ =>
             {
                 var benchmark = new PingBenchmark(numSilos: 1, startClient: false);
-                Console.WriteLine("Press any key to begin.");
-                Console.ReadKey();
                 Console.WriteLine("Press any key to end.");
                 Console.WriteLine("## Hosted Client ##");
                 while (!Console.KeyAvailable)
