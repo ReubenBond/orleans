@@ -14,10 +14,11 @@ using Orleans.Messaging;
 
 using Microsoft.Extensions.ObjectPool;
 using Orleans.Serialization.Invocation;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal abstract class Connection
+    internal abstract class Connection : ICachedMessageHandler
     {
         private static readonly Func<ConnectionContext, Task> OnConnectedDelegate = context => OnConnectedAsync(context);
         private static readonly Action<object> OnConnectionClosedDelegate = state => ((Connection)state).OnTransportConnectionClosed();
@@ -495,6 +496,12 @@ namespace Orleans.Runtime.Messaging
 
                 MessagingStatisticsGroup.OnDroppedSentMessage(message);
             }
+        }
+
+        bool ICachedMessageHandler.SendMessage(object message)
+        {
+            Send(Unsafe.As<Message>(message));
+            return IsValid;
         }
 
         private sealed class MessageHandlerPoolPolicy : PooledObjectPolicy<MessageHandler>

@@ -11,22 +11,6 @@ namespace Orleans.Runtime
     /// </summary>
     public interface IGrainReferenceRuntime
     {
-        /// <summary>Invokes a fire and forget method on a remote object.</summary>
-        /// <param name="reference">The reference to the addressable target.</param>
-        /// <param name="methodId">The method to invoke.</param>
-        /// <param name="arguments">The method payload.</param>
-        /// <param name="options">Invocation options.</param>
-        void InvokeOneWayMethod(GrainReference reference, int methodId, object[] arguments, InvokeMethodOptions options);
-
-        /// <summary>Invokes a method on a remote object.</summary>
-        /// <typeparam name="T">The result type</typeparam>
-        /// <param name="reference">The reference to the addressable target.</param>
-        /// <param name="methodId">The method to invoke.</param>
-        /// <param name="arguments">The method payload.</param>
-        /// <param name="options">Invocation options.</param>
-        /// <returns>Returns the response from the remote object.</returns>
-        Task<T> InvokeMethodAsync<T>(GrainReference reference, int methodId, object[] arguments, InvokeMethodOptions options);
-
         ValueTask<T> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options);
 
         ValueTask InvokeMethodAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options);
