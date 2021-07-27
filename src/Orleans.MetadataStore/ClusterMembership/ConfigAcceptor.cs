@@ -122,8 +122,10 @@ namespace Orleans.MetadataStore
                 return AcceptResponse.Conflict(AcceptedBallot);
             }
 
-            // Record the new state.
-            PromisedBallot = ballot;
+            // Dual-purpose this call as 1) an accept, 2) a prepare for the next accept.
+            // This is to support the "Distinguished Proposer" optimization, in which we piggy-back
+            // the next prepare message off of the current accept message.
+            PromisedBallot = ballot.Successor();
             AcceptedBallot = ballot;
             AcceptedValue = value;
             return AcceptResponse.Success();

@@ -22,6 +22,7 @@ namespace Orleans.MetadataStore
             Members = members;
             AcceptQuorum = acceptQuorum;
             PrepareQuorum = prepareQuorum;
+            Array.Sort(Members);
         }
 
         /// <summary>
