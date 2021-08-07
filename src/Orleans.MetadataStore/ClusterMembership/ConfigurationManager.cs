@@ -51,11 +51,12 @@ namespace Orleans.MetadataStore
         private readonly object _committedStateLock = new();
         private readonly ILocalSiloDetails _localSiloDetails;
         private readonly ILogger<ConfigurationManager> _log;
-        private readonly IAcceptorRouter<ClusterConfiguration> _remoteManagerMediator;
+        private readonly ILearnerRouter<ClusterConfiguration> _learners;
 
         public ConfigurationManager(
             ILoggerFactory loggerFactory,
-            IAcceptorRouter<ClusterConfiguration> remoteManagerMediator,
+            IAcceptorRouter<ClusterConfiguration> accepters,
+            ILearnerRouter<ClusterConfiguration> learners,
             IOptions<MetadataStoreOptions> options,
             ILocalSiloDetails localSiloDetails)
         {
@@ -70,8 +71,8 @@ namespace Orleans.MetadataStore
                 this,
                 localSiloDetails.SiloAddress,
                 log: loggerFactory.CreateLogger("MetadataStore.ConfigProposer"),
-                remoteManagerMediator);
-            _remoteManagerMediator = remoteManagerMediator;
+                accepters);
+            _learners = learners;
         }
 
         public void OnCommittedConfiguration(ClusterConfiguration state)
@@ -151,16 +152,13 @@ namespace Orleans.MetadataStore
                 Proposer.Ballot = Proposer.Ballot.AdvanceTo(committedStamp);
                 var newStamp = Proposer.Ballot.Successor();
 
-                var quorum = update.Members.Length / 2 + 1;
                 var updatedConfig = new ClusterConfiguration(
                     stamp: newStamp,
                     version: (committedValue?.Version ?? MembershipVersion.Zero).Next(),
-                    members: update.Members,
-                    acceptQuorum: quorum,
-                    prepareQuorum: quorum);
+                    members: update.Members);
 
                 // Attempt to commit the new configuration.
-                (status, committedValue) = await Proposer.TryUpdate(updatedConfig, cancellationToken);
+                (status, committedValue) = await Proposer.TryUpdate(updatedConfig, numRetries: 1, cancellationToken);
                 var success = status == ReplicationStatus.Success;
                 if (success)
                 {
@@ -237,7 +235,7 @@ namespace Orleans.MetadataStore
                         continue;
                     }
 
-                    var task = _remoteManagerMediator.Committed(server, value).AsTask();
+                    var task = _learners.Committed(server, value).AsTask();
                     tasks.Add(task);
                 }
 

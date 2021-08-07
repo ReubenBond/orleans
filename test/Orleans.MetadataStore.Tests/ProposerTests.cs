@@ -6,24 +6,22 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 using Xunit;
 using Xunit.Abstractions;
-#if false
 
 namespace Orleans.MetadataStore.Tests
 {
-
-    public class TestConfigManagerMediator<TValue> : IConfigurationManagerMediator<TValue>
+    public class TestConfigRemotes<TValue> : IAcceptorRouter<TValue>, ILearnerRouter<TValue>
     {
         public delegate ValueTask<AcceptResponse> AcceptHandler(Ballot proposerConfig, Ballot ballot, TValue value);
         public delegate ValueTask<PrepareResponse<TValue>> PrepareHandler(Ballot proposerConfig, Ballot ballot);
 
-        public Dictionary<SiloAddress, (AcceptHandler Accept, PrepareHandler Prepare)> Acceptors { get; } = new();
+        public Dictionary<SiloAddress, (PrepareHandler Prepare, AcceptHandler Accept)> Acceptors { get; } = new();
 
         public ValueTask<AcceptResponse> Accept(SiloAddress server, Ballot proposerConfig, Ballot ballot, TValue value)
         {
             return Acceptors[server].Accept(proposerConfig, ballot, value);
         }
 
-        public ValueTask Committed(SiloAddress server, ClusterConfiguration value)
+        public ValueTask Committed(SiloAddress server, TValue value)
         {
             throw new NotImplementedException();
         }
@@ -39,10 +37,10 @@ namespace Orleans.MetadataStore.Tests
     {
         private readonly ConfigProposer _proposer;
         private readonly ConfigProposer.ITestAccessor _proposerAccessor;
+        private readonly List<(ConfigAcceptor Acceptor, ConfigAcceptor.ITestAccessor Accessor, ILocalConfiguration Config)> _acceptors;
         private readonly SiloAddress[] _silos;
         private readonly LocalConfiguration _localConfig;
-        private readonly TestConfigManagerMediator<int> _remotes;
-        private readonly ChangeFunction<int, int> permitIncrement = (existing, val) => val == existing + 1 ? val : existing;
+        private readonly TestConfigRemotes<ClusterConfiguration> _remotes;
 
         public ProposerTests(ITestOutputHelper output)
         {
@@ -58,102 +56,121 @@ namespace Orleans.MetadataStore.Tests
                 CommittedConfiguration = GetConfigWithVersion(1)
             };
 
-            _remotes = new TestConfigManagerMediator();
+            _remotes = new TestConfigRemotes<ClusterConfiguration>();
             _proposer = new ConfigProposer(
                 _localConfig,
                 _silos[0],
                 new XunitLogger(output, "Proposer"),
                 _remotes);
             _proposerAccessor = _proposer;
+
+            _acceptors = new List<(ConfigAcceptor Acceptor, ConfigAcceptor.ITestAccessor Accessor, ILocalConfiguration Config)>();
+            foreach (var server in _silos)
+            {
+                var acceptor = new ConfigAcceptor(_localConfig);
+                var config = new LocalConfiguration
+                {
+                    CommittedConfiguration = GetConfigWithVersion(1)
+                };
+                _acceptors.Add((acceptor, acceptor, config));
+
+                ValueTask<AcceptResponse> OnAccept(Ballot proposerConfig, Ballot ballot, ClusterConfiguration value) => new(acceptor.Accept(proposerConfig, ballot, value));
+                ValueTask<PrepareResponse<ClusterConfiguration>> OnPrepare(Ballot proposerConfig, Ballot ballot) => new(acceptor.Prepare(proposerConfig, ballot));
+                _remotes.Acceptors[server] = (OnPrepare, OnAccept);
+            }
         }
 
-        private ClusterConfiguration GetConfigWithVersion(long version) => new(new(1, _silos[0]), new(version), _silos, 2, 2);
+        private ClusterConfiguration GetConfigWithVersion(long version) => new(new(1, _silos[0]), new(version), _silos);
 
         [Fact]
         public async Task TryUpdateSucceeds()
         {
-            foreach (var server in _silos)
-            {
-                _remotes.OnPrepare[server] = (_, _) => new ValueTask<PrepareResponse<>(PrepareResponse.Success(new Ballot(1, _silos[0]), _localConfig.CommittedConfiguration));
-                _remotes.OnAccept[server] = (_, _, _) => new ValueTask<AcceptResponse>(AcceptResponse.Success());
-            }
-
             _proposerAccessor.Ballot = new Ballot(2, _silos[0]);
             var expectedBallot = _proposerAccessor.Ballot.Successor();
 
             var updatedConfig = GetConfigWithVersion(2);
-            var result = await _proposer.TryUpdate(updatedConfig, CancellationToken.None);
-            await this.AssertSuccess(expectedValue: updatedConfig, expectedBallot: expectedBallot);
+            var result = await _proposer.TryUpdate(updatedConfig, numRetries: 0, CancellationToken.None);
+            Assert.Equal(ReplicationStatus.Success, result.Status);
+            Assert.Equal(updatedConfig, result.Value);
+            foreach (var (_, accessor, _) in _acceptors)
+            {
+                Assert.Equal(updatedConfig, accessor.Value);
+                Assert.Equal(expectedBallot, accessor.Accepted);
+
+                // Promise for distinguished leader commit.
+                Assert.Equal(expectedBallot.Successor(), accessor.Promised);
+            }
 
             // Now try calling again. The 'distinguished leader' optimization should allow us to avoid the prepare round.
             expectedBallot = _proposerAccessor.Ballot.Successor();
-            result = await _proposer.TryUpdate(44, CancellationToken.None);
+            var updatedConfig2 = GetConfigWithVersion(3);
+            result = await _proposer.TryUpdate(updatedConfig2, numRetries: 0, CancellationToken.None);
             Assert.Equal(ReplicationStatus.Success, result.Status);
-            Assert.Equal(44, result.Value);
-            await this.AssertDistinguishedLeaderSuccess(44, expectedBallot);
+            Assert.Equal(updatedConfig2, result.Value);
+            foreach (var (_, accessor, _) in _acceptors)
+            {
+                Assert.Equal(updatedConfig2, accessor.Value);
+                Assert.Equal(expectedBallot, accessor.Accepted);
+
+                // Promise for distinguished leader commit.
+                Assert.Equal(expectedBallot.Successor(), accessor.Promised);
+            }
         }
 
         [Fact]
         public async Task TryUpdateRequiresPrepareQuorum()
         {
-            this.remoteStores[0].OnPrepare = (args) => new ValueTask<PrepareResponse<object>>(PrepareResponse<object>.Success(new Ballot(1, 1), 42));
-            this.remoteStores[0].OnAccept = (args) => new ValueTask<AcceptResponse>(AcceptResponse.Success());
+            _acceptors[0].Accessor.Accepted = new Ballot(1, _silos[0]);
+            _acceptors[0].Accessor.Value = GetConfigWithVersion(1);
 
-            this.remoteStores[1].OnPrepare = (args) => new ValueTask<PrepareResponse<object>>(PrepareResponse<object>.Success(new Ballot(1, 1), 42));
-            this.remoteStores[1].OnAccept = (args) => new ValueTask<AcceptResponse>(AcceptResponse.Success());
+            _acceptors[1].Accessor.Accepted = new Ballot(1, _silos[0]);
+            _acceptors[1].Accessor.Value = GetConfigWithVersion(1);
 
             // Conflict!
-            this.remoteStores[2].OnPrepare = (args) => new ValueTask<PrepareResponse<object>>(PrepareResponse<object>.Conflict(new Ballot(3, 1)));
-            this.remoteStores[2].OnAccept = (args) => new ValueTask<AcceptResponse>(AcceptResponse.Success());
+            _acceptors[2].Accessor.Accepted = new Ballot(3, _silos[0]);
+            _acceptors[2].Accessor.Value = GetConfigWithVersion(3);
 
-            _proposerAccessor.Ballot = new Ballot(2, 1);
+            _proposerAccessor.Ballot = new Ballot(2, _silos[1]);
             var expectedBallot = _proposerAccessor.Ballot.Successor();
 
-            var result = await _proposer.TryUpdate(43, permitIncrement, CancellationToken.None);
+            var valueVersion2 = GetConfigWithVersion(2);
+            var result = await _proposer.TryUpdate(valueVersion2, numRetries: 0, CancellationToken.None);
             Assert.Equal(ReplicationStatus.Success, result.Status);
-            Assert.Equal(43, result.Value);
+            Assert.Equal(valueVersion2, result.Value);
 
-            await this.AssertSuccess(expectedValue: 43, expectedBallot: expectedBallot);
+            foreach (var (_, accessor, _) in _acceptors)
+            {
+                Assert.Equal(valueVersion2, accessor.Value);
+                Assert.Equal(expectedBallot, accessor.Accepted);
 
-            this.remoteStores[0].OnPrepare = (args) => new ValueTask<PrepareResponse<object>>(PrepareResponse<object>.Success(new Ballot(1, 2), 99));
-            this.remoteStores[0].OnAccept = (args) => new ValueTask<AcceptResponse>(AcceptResponse.Success());
+                // Promise for distinguished leader commit.
+                Assert.Equal(expectedBallot.Successor(), accessor.Promised);
+            }
+
+            // Ok
+            _acceptors[0].Accessor.Promised = expectedBallot.Successor();
+            _acceptors[0].Accessor.Accepted = new Ballot(2, _silos[0]);
+            _acceptors[0].Accessor.Value = valueVersion2;
 
             // Conflict!
-            this.remoteStores[1].OnPrepare = (args) => new ValueTask<PrepareResponse<object>>(PrepareResponse<object>.Conflict(new Ballot(7, 2)));
-            this.remoteStores[1].OnAccept = (args) => new ValueTask<AcceptResponse>(AcceptResponse.Conflict(new Ballot(3, 2)));
+            _acceptors[1].Accessor.Promised = new Ballot(7, _silos[0]);
+            _acceptors[1].Accessor.Accepted = new Ballot(2, _silos[0]);
+            _acceptors[1].Accessor.Value = valueVersion2;
 
-            this.remoteStores[2].OnPrepare = (args) => new ValueTask<PrepareResponse<object>>(PrepareResponse<object>.Conflict(new Ballot(7, 2)));
-            this.remoteStores[2].OnAccept = (args) => new ValueTask<AcceptResponse>(AcceptResponse.Conflict(new Ballot(3, 2)));
+            _acceptors[2].Accessor.Promised = new Ballot(7, _silos[0]);
+            _acceptors[2].Accessor.Accepted = new Ballot(2, _silos[0]);
+            _acceptors[2].Accessor.Value = valueVersion2;
 
-            _proposerAccessor.Ballot = new Ballot(2, 1);
-            expectedBallot = _proposerAccessor.Ballot.Successor();
+            _proposerAccessor.Ballot = new Ballot(3, _silos[1]);
 
             _proposerAccessor.SkipPrepare = false;
-            result = await _proposer.TryUpdate(43, permitIncrement, CancellationToken.None);
+            var valueVersion3 = GetConfigWithVersion(3);
+            result = await _proposer.TryUpdate(valueVersion3, numRetries: 0, CancellationToken.None);
             Assert.Equal(ReplicationStatus.Failed, result.Status);
-            Assert.Equal(99, result.Value);
-
-            foreach (var store in this.remoteStores)
-            {
-                Assert.True(await store.PrepareCalls.WaitToReadAsync());
-                Assert.True(store.PrepareCalls.TryRead(out var prepareArgs));
-                Assert.Equal(config.Stamp, prepareArgs.ProposerParentBallot);
-                Assert.Equal(Key, prepareArgs.Key);
-                Assert.Equal(expectedBallot, prepareArgs.Ballot);
-
-                Assert.True(await store.PrepareCalls.WaitToReadAsync());
-                Assert.True(store.PrepareCalls.TryRead(out prepareArgs));
-                Assert.Equal(config.Stamp, prepareArgs.ProposerParentBallot);
-                Assert.Equal(Key, prepareArgs.Key);
-
-                // Fast-forward to the new ballot
-                Assert.Equal(new Ballot(8, 1), prepareArgs.Ballot);
-
-                // Accept should not be called
-                Assert.False(store.AcceptCalls.TryRead(out _));
-            }
+            Assert.Equal(valueVersion2, result.Value);
         }
 
+        /*
         [Fact]
         public async Task TryUpdateRequiresPrepareQuorum_HardFailure()
         {
@@ -277,6 +294,6 @@ namespace Orleans.MetadataStore.Tests
                 Assert.False(store.PrepareCalls.TryRead(out _));
             }
         }
+        */
     }
 }
-#endif

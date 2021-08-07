@@ -37,9 +37,9 @@ namespace Orleans.MetadataStore.Tests
         {
             _committedConfigs = new[]
             {
-                new ClusterConfiguration(new Ballot(1, Silo(1)), new MembershipVersion(1), new[] { Silo(1), Silo(2), Silo(3) }, 2, 2),
-                new ClusterConfiguration(new Ballot(2, Silo(2)), new MembershipVersion(2), new[] { Silo(1), Silo(2), Silo(3), Silo(4) }, 3, 3),
-                new ClusterConfiguration(new Ballot(3, Silo(4)), new MembershipVersion(2), new[] { Silo(1), Silo(2), Silo(3), Silo(4), Silo(5) }, 3, 3),
+                new ClusterConfiguration(new Ballot(1, Silo(1)), new MembershipVersion(1), new[] { Silo(1), Silo(2), Silo(3) }),
+                new ClusterConfiguration(new Ballot(2, Silo(2)), new MembershipVersion(2), new[] { Silo(1), Silo(2), Silo(3), Silo(4) }),
+                new ClusterConfiguration(new Ballot(3, Silo(4)), new MembershipVersion(2), new[] { Silo(1), Silo(2), Silo(3), Silo(4), Silo(5) }),
             };
 
             _localConfig = new LocalConfiguration
@@ -176,7 +176,10 @@ namespace Orleans.MetadataStore.Tests
             var response = _acceptor.Accept(committedBallot, promisedBallot, _committedConfigs[2]);
             Assert.Equal(AcceptStatus.Success, response.Status);
 
-            Assert.Equal(promisedBallot, _testAccessor.Promised);
+            // The promised ballot is incremented to support the distinguished proposer optimization.
+            // i.e, the next Prepare call is piggy-backed onto each Accept call.
+            Assert.Equal(promisedBallot.Successor(), _testAccessor.Promised);
+
             Assert.Equal(promisedBallot, _testAccessor.Accepted);
             Assert.Equal(_committedConfigs[2], _testAccessor.Value);
         }

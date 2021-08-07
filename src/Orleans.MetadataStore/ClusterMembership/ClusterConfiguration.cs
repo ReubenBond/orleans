@@ -13,15 +13,11 @@ namespace Orleans.MetadataStore
         public ClusterConfiguration(
             Ballot stamp,
             MembershipVersion version,
-            SiloAddress[] members,
-            int acceptQuorum,
-            int prepareQuorum)
+            SiloAddress[] members)
         {
             Stamp = stamp;
             Version = version;
-            Members = members;
-            AcceptQuorum = acceptQuorum;
-            PrepareQuorum = prepareQuorum;
+            Members = members ?? throw new ArgumentNullException(nameof(members));
             Array.Sort(Members);
         }
 
@@ -32,27 +28,15 @@ namespace Orleans.MetadataStore
         public SiloAddress[] Members { get; }
 
         /// <summary>
-        /// The quorum size for Accept operations.
-        /// </summary>
-        [Id(1)]
-        public int AcceptQuorum { get; }
-
-        /// <summary>
-        /// The quorum size for Prepare operations.
-        /// </summary>
-        [Id(2)]
-        public int PrepareQuorum { get; }
-
-        /// <summary>
         /// The unique ballot number of this configuration.
         /// </summary>
-        [Id(3)]
+        [Id(1)]
         public Ballot Stamp { get; }
 
         /// <summary>
         /// The version of this membership.
         /// </summary>
-        [Id(4)]
+        [Id(2)]
         public MembershipVersion Version { get; }
 
         public bool Equals([AllowNull] ClusterConfiguration other)
@@ -68,16 +52,6 @@ namespace Orleans.MetadataStore
             }
 
             if (other.Version != Version)
-            {
-                return false;
-            }
-
-            if (other.AcceptQuorum != AcceptQuorum)
-            {
-                return false;
-            }
-
-            if (other.PrepareQuorum != PrepareQuorum)
             {
                 return false;
             }
@@ -113,13 +87,13 @@ namespace Orleans.MetadataStore
             return obj is ClusterConfiguration cfg && Equals(cfg);
         }
 
-        public override int GetHashCode() => HashCode.Combine(Stamp, Version, PrepareQuorum, AcceptQuorum, Members);
+        public override int GetHashCode() => HashCode.Combine(Stamp, Version, Members);
 
         /// <inheritdoc />
         public override string ToString()
         {
             var nodes = Members == null ? "[]" : $"[{string.Join(", ", Members.Select(_ => _.ToString()))}]";
-            return $"{nameof(Stamp)}: {Stamp}, {nameof(Version)}: {Version}, {nameof(Members)}: {nodes}, {nameof(AcceptQuorum)}: {AcceptQuorum}, {nameof(PrepareQuorum)}: {PrepareQuorum}";
+            return $"{nameof(Stamp)}: {Stamp}, {nameof(Version)}: {Version}, {nameof(Members)}: {nodes}";
         }
     }
 }

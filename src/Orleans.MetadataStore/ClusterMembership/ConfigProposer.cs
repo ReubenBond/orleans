@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
@@ -150,7 +151,7 @@ namespace Orleans.MetadataStore
 
             // Run a Prepare round in order to learn the current value of the register and secure a promise that a quorum
             // of nodes which accept our new value.
-            var requiredConfirmations = config.PrepareQuorum;
+            var requiredConfirmations = config.Members.Length / 2 + 1;
             var remainingAllowedFailures = prepareTasks.Count - requiredConfirmations;
             var currentValue = default(TValue);
             var maxAccepted = Ballot.Zero;
@@ -183,25 +184,6 @@ namespace Orleans.MetadataStore
                             break;
                         case (PrepareStatus.ConfigConflict, _, var value):
                             --remainingAllowedFailures;
-
-                            // Nothing needs to be done when encountering a configuration conflict, however it
-                            // poses a good opportunity to ensure that this node's configuration is up-to-date.
-                            /*
-                            if (value is not null)
-                            {
-                                var accepted = value.Stamp;
-                                if (accepted >= maxAccepted)
-                                {
-                                    maxAccepted = accepted;
-                                    currentValue = value;
-                                }
-
-                                if (accepted > maxConflict)
-                                {
-                                    maxConflict = accepted;
-                                }
-                            }
-                            */
 
                             break;
                     }
@@ -240,7 +222,7 @@ namespace Orleans.MetadataStore
                 acceptTasks.Add(acceptTask);
             }
 
-            var requiredConfirmations = config.AcceptQuorum;
+            var requiredConfirmations = config.Members.Length / 2 + 1;
             var remainingAllowedFailures = acceptTasks.Count - requiredConfirmations;
             var maxConflict = Ballot.Zero;
             while (acceptTasks.Count > 0 && requiredConfirmations > 0 && !cancellationToken.IsCancellationRequested)
@@ -414,11 +396,11 @@ namespace Orleans.MetadataStore
             }
         }
 
-        public async Task<(ReplicationStatus Status, ClusterConfiguration Value)> TryUpdate(ClusterConfiguration updatedValue, CancellationToken cancellationToken)
+        public async Task<(ReplicationStatus Status, ClusterConfiguration Value)> TryUpdate(ClusterConfiguration updatedValue, int numRetries = 1, CancellationToken cancellationToken = default)
         {
             using (await _lockObj.LockAsync(cancellationToken))
             {
-                return await TryCommit((ConfigOperation.Update, updatedValue), cancellationToken, numRetries: 1);
+                return await TryCommit((ConfigOperation.Update, updatedValue), cancellationToken, numRetries: numRetries);
             }
         }
 
@@ -428,4 +410,73 @@ namespace Orleans.MetadataStore
         }
     }
 
+    /*
+    * This is *intentionally* a relatively heavy proposer which is designed for higher-throughput scenarios, such as a partition in a key-value store.
+    * Proposer actor has a queue of requests, each containing a completion source
+    * Adding to the queue involves fetching a new completion source from a pool
+    * Actor follows a simple loop of observing configuration, forming a batch of commands to process, and processing them.
+    * Batches which are formed from the request queue have the following characteristics:
+    *   * Read operations are ordered after write operations
+    * The messaging loop is awoken any time a new operation is added to the queue and any time an outbound request completes
+     */
+
+    internal class BatchProposer<TStateMachine>
+    {
+        private readonly ConcurrentQueue<Operation<TStateMachine>> _workItems = new();
+        private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = false };
+        private readonly ILogger _logger;
+        private readonly Task _workTask;
+
+        public BatchProposer(ILogger logger)
+        {
+            _logger = logger;
+            _workTask = Task.Run(Process);
+        }
+
+        private async Task Process()
+        {
+            List<Operation<TStateMachine>> pendingOperations = new();
+            while (true)
+            {
+                try
+                {
+                    while (_workItems.TryDequeue(out var op))
+                    {
+                        pendingOperations.Add(op);
+                    }
+
+                    await _workSignal.WaitAsync();
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(exception, "Error processing operations");
+                }
+            }
+        }
+    }
+
+    public abstract class Operation<TStateMachine>
+    {
+        public abstract bool IsReadOnly { get; }
+
+        /*
+        TODO: Do we need this for cluster membership? Are there any other scenarios where it's needed?
+        /// <summary>
+        /// The state machine value passed to <see cref="Apply"/> must be committed and cannot be an intermediate result.
+        /// </summary>
+        public abstract bool IsRequireCommittedInput { get; }
+        */
+
+        /// <summary>
+        /// Executed to apply an update to the state machine
+        /// </summary>
+        /// <param name="stateMachine"></param>
+        /// <returns></returns>
+        public abstract bool Apply(TStateMachine stateMachine);
+
+        /// <summary>
+        /// Executed once the operation is successfully committed.
+        /// </summary>
+        public abstract void OnCommitted();
+    }
 }
