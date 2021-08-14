@@ -20,7 +20,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public Task Unregister(ActivationAddress address, UnregistrationCause cause) => GetGrainLocator(address.Grain.Type).Unregister(address, cause);
 
-        public bool TryCachedLookup(GrainId grainId, out ActivationAddress address) => GetGrainLocator(grainId.Type).TryCachedLookup(grainId, out address);
+        public bool TryCacheOnlyLookup(GrainId grainId, out ActivationAddress address) => GetGrainLocator(grainId.Type).TryCacheOnlyLookup(grainId, out address);
 
         public void InvalidateCache(GrainId grainId) => GetGrainLocator(grainId.Type).InvalidateCache(grainId);
 

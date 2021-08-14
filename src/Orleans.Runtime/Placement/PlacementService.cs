@@ -312,7 +312,7 @@ namespace Orleans.Runtime.Placement
                 var siloAddress = await director.OnAddActivation(strategy, target, _placementService);
                 
                 // Give the grain locator one last chance to tell us that the grain has already been placed
-                if (_placementService._grainLocator.TryCachedLookup(targetGrain, out result))
+                if (_placementService._grainLocator.TryCacheOnlyLookup(targetGrain, out result))
                 {
                     return (result, false);
                 }

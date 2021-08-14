@@ -87,7 +87,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void InvalidateCache(ActivationAddress address) { }
 
-        public bool TryCachedLookup(GrainId grainId, out ActivationAddress address)
+        public bool TryCacheOnlyLookup(GrainId grainId, out ActivationAddress address)
         {
             address = default;
             return false;
