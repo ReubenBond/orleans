@@ -218,6 +218,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public void CachePlacementDecision(ActivationAddress address) => cache.AddOrUpdate(address, 0);
         public void InvalidateCache(GrainId grainId) => cache.Remove(grainId);
+        public void InvalidateCache(ActivationAddress address) => cache.Remove(address);
         public bool TryCachedLookup(GrainId grainId, out ActivationAddress address) => TryLocalLookup(grainId, out address);
     }
 

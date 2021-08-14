@@ -19,6 +19,9 @@ namespace Orleans.GrainDirectory
         void CachePlacementDecision(ActivationAddress address);
 
         void InvalidateCache(GrainId grainId);
+
+        void InvalidateCache(ActivationAddress address);
+
         bool TryCachedLookup(GrainId grainId, out ActivationAddress address);
     }
 }
