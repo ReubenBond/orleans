@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Analyzers\Orleans.Analyzers.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.Grpc\Orleans.Serialization.CoreRPC.csproj" />
+    <ProjectReference Include="..\src\Orleans.Core\Orleans.Core.csproj" />
   </ItemGroup>
 </Project>
