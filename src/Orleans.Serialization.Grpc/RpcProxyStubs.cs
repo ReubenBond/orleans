@@ -60,7 +60,6 @@ namespace Orleans.Serialization.CoreRPC
             var request = (RequestBase)body;
             var method = GetMethod(request);
             var call = CallInvoker.AsyncUnaryCall(method, null, new CallOptions(), request);
-            await call.ResponseHeadersAsync;
             var result = await call.ResponseAsync;
             return result.GetResult<T>();
         }
@@ -75,8 +74,8 @@ namespace Orleans.Serialization.CoreRPC
 
             method = new Method<RequestBase, Response>(
                 MethodType.Unary,
-                request.InterfaceName,
-                request.MethodName,
+                request.InterfaceType.Name,
+                request.Method.Name,
                 _requestMarshaller,
                 _responseMarshaller);
             _requestMethods[requestType] = method;
