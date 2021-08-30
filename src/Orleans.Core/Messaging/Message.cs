@@ -1,6 +1,9 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text;
+using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
@@ -31,8 +34,44 @@ namespace Orleans.Runtime
         [NonSerialized]
         public readonly CoarseStopwatch _timeSinceCreation = CoarseStopwatch.StartNew();
 
-        public object BodyObject { get; set; }
+        private bool _payloadIsSerialized;
+        private object _payload;
 
+        public Message() { }
+
+        public object BodyObject { get => GetPayload(); set => SetPayload(value); }
+
+        public object RawPayload => _payload;
+        public bool RawPayloadIsSerialized => _payloadIsSerialized;
+
+        public object GetPayload()
+        {
+            if (!_payloadIsSerialized) return _payload;
+            if (_payload is null) return null;
+
+            using var payloadData = Unsafe.As<IMemoryOwner<byte>>(_payload);
+            _payload = Factory.PayloadSerializer.Deserialize<object>(payloadData.Memory);
+            return _payload;
+        }
+
+        public void SetPayload(object value)
+        {
+            if (_payloadIsSerialized)
+            {
+                Unsafe.As<IMemoryOwner<byte>>(_payload).Dispose();
+            }
+
+            _payloadIsSerialized = false;
+            _payload = value;
+        }
+
+        public void SetSerializedPayload(IMemoryOwner<byte> value)
+        {
+            _payloadIsSerialized = true;
+            _payload = value;
+        }
+
+        public MessageFactory Factory { get; init; }
         public Categories _category;
         public Directions? _direction;
         public bool _isReadOnly;
@@ -460,13 +499,16 @@ namespace Orleans.Runtime
 
         public static Message CreatePromptExceptionResponse(Message request, Exception exception)
         {
-            return new Message
+            var result = new Message
             {
+                Factory = request.Factory,
                 Category = request.Category,
                 Direction = Message.Directions.Response,
                 Result = Message.ResponseTypes.Error,
-                BodyObject = Response.FromException(exception)
             };
+
+            result.SetPayload(Response.FromException(exception));
+            return result;
         }
 
         [Flags]
