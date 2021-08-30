@@ -1,5 +1,6 @@
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
@@ -13,17 +14,24 @@ namespace Orleans.Runtime
         private readonly ILogger logger;
         private readonly MessagingTrace messagingTrace;
 
-        public MessageFactory(DeepCopier deepCopier, ILogger<MessageFactory> logger, MessagingTrace messagingTrace)
+        public MessageFactory(DeepCopier deepCopier, Serializer serializer, ILogger<MessageFactory> logger, MessagingTrace messagingTrace)
         {
             this.deepCopier = deepCopier;
             this.logger = logger;
             this.messagingTrace = messagingTrace;
+            this.PayloadSerializer = serializer;
+            this.PayloadMemoryPool = MemoryPool<byte>.Shared;
         }
+
+        public Serializer PayloadSerializer { get; }
+
+        public MemoryPool<byte> PayloadMemoryPool { get; }
 
         public Message CreateMessage(object body, InvokeMethodOptions options)
         {
             var message = new Message
             {
+                Factory = this,
                 Category = Message.Categories.Application,
                 Direction = (options & InvokeMethodOptions.OneWay) != 0 ? Message.Directions.OneWay : Message.Directions.Request,
                 Id = CorrelationId.GetNext(),
@@ -42,6 +50,7 @@ namespace Orleans.Runtime
         {
             var response = new Message
             {
+                Factory = this,
                 Category = request.Category,
                 Direction = Message.Directions.Response,
                 Id = request.Id,
@@ -92,7 +101,7 @@ namespace Orleans.Runtime
             response.Result = Message.ResponseTypes.Rejection;
             response.RejectionType = type;
             response.RejectionInfo = info;
-            response.BodyObject = ex;
+            response.SetPayload(ex);
             if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.Debug("Creating {0} rejection with info '{1}' for {2} at:" + Environment.NewLine + "{3}", type, info, this, Utils.GetStackTrace());
             return response;
         }
