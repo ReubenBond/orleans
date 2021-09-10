@@ -12,6 +12,11 @@ namespace Orleans.Serialization.Invocation
     {
         private ManualResetValueTaskSourceCore<Response> _core;
 
+        public ResponseCompletionSource()
+        {
+            _core.RunContinuationsAsynchronously = false;
+        }
+
         /// <summary>
         /// Returns this instance as a <see cref="ValueTask{Response}"/>.
         /// </summary>
@@ -114,6 +119,11 @@ namespace Orleans.Serialization.Invocation
     public sealed class ResponseCompletionSource<TResult> : IResponseCompletionSource, IValueTaskSource<TResult>, IValueTaskSource
     {
         private ManualResetValueTaskSourceCore<TResult> _core;
+
+        public ResponseCompletionSource()
+        {
+            _core.RunContinuationsAsynchronously = false;
+        }
 
         /// <summary>
         /// Returns this instance as a <see cref="ValueTask{Response}"/>.
