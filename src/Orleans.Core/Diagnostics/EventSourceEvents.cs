@@ -1,4 +1,6 @@
+using System;
 using System.Diagnostics.Tracing;
+using System.Threading;
 
 namespace Orleans.Runtime
 {
@@ -185,5 +187,68 @@ namespace Orleans.Runtime
 
         [Event(1, Level = EventLevel.Verbose)]
         private void ReceiveMessage() => WriteEvent(1);
+    }
+
+    [EventSource(Name = "Microsoft-Orleans-Messaging")]
+    internal sealed class MessagingEventSource : EventSource
+    {
+        public static readonly MessagingEventSource Log = new ();
+        private long _numActiveConnections;
+        private readonly PollingCounter ActiveConnectionsCounter;
+        private readonly EventCounter ConnectionOutgoingMessageActiveTime;
+        private readonly EventCounter ConnectionOutgoingMessageIdleTime;
+        private readonly EventCounter ConnectionMessageSerializationTime;
+        private MessagingEventSource()
+        {
+            ConnectionOutgoingMessageIdleTime = new EventCounter("connection-outgoing-idle-time", this)
+            {
+                DisplayName = "Outgoing Message Processing Idle Time",
+                DisplayUnits = "μs",
+            };
+            ConnectionOutgoingMessageActiveTime = new EventCounter("connection-outgoing-active-time", this)
+            {
+                DisplayName = "Outgoing Message Processing Active Time",
+                DisplayUnits = "μs",
+            };
+            ConnectionMessageSerializationTime = new EventCounter("connection-message-serialization-time", this)
+            {
+                DisplayName = "Message Serialization Time",
+                DisplayUnits = "μs",
+            };
+            ActiveConnectionsCounter = new PollingCounter("connection-count", this, () => _numActiveConnections)
+            {
+                DisplayName = "Active Connections"
+            };
+        }
+
+        [NonEvent]
+        public void OnConnectionOutgoingMessageActiveTime(ValueStopwatch activeTime)
+        {
+            ConnectionOutgoingMessageActiveTime.WriteMetric(activeTime.TotalMicroseconds);
+        }
+
+        [NonEvent]
+        public void OnConnectionOutgoingMessageIdleTime(ValueStopwatch idleTime)
+        {
+            ConnectionOutgoingMessageIdleTime.WriteMetric(idleTime.TotalMicroseconds);
+        }
+
+        [NonEvent]
+        public void OnConnectionMessageSerializationTime(ValueStopwatch idleTime)
+        {
+            ConnectionMessageSerializationTime.WriteMetric(idleTime.TotalMicroseconds);
+        }
+
+        [NonEvent]
+        internal void OnConnectionStart()
+        {
+            Interlocked.Increment(ref _numActiveConnections);
+        }
+
+        [NonEvent]
+        internal void OnConnectionStop()
+        {
+            Interlocked.Decrement(ref _numActiveConnections);
+        }
     }
 }
