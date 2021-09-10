@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.ClientObservers;
@@ -14,22 +13,24 @@ namespace Orleans.Runtime.Messaging
 {
     internal class Gateway : IConnectedClientCollection
     {
-        private readonly GatewayClientCleanupAgent clientCleanupAgent;
+        private readonly GatewayClientCleanupAgent _clientCleanupAgent;
 
         // clients is the main authorative collection of all connected clients. 
         // Any client currently in the system appears in this collection. 
         // In addition, we use clientConnections collection for fast retrival of ClientState. 
         // Anything that appears in those 2 collections should also appear in the main clients collection.
-        private readonly ConcurrentDictionary<ClientGrainId, ClientState> clients = new();
-        private readonly Dictionary<GatewayInboundConnection, ClientState> clientConnections = new();
-        private readonly SiloAddress gatewayAddress;
-        private readonly GatewaySender sender;
+        private readonly ConcurrentDictionary<ClientGrainId, ClientState> _clients = new();
+        private readonly Dictionary<GatewayInboundConnection, ClientState> _clientConnections = new();
+        private readonly SiloAddress _gatewayAddress;
+        private readonly ILogger<ClientState> _clientStateLog;
+        private readonly MessageFactory _messageFactory;
+        private readonly MessageCenter _messageCenter;
         private readonly ClientsReplyRoutingCache clientsReplyRoutingCache;
 
-        private readonly ILogger logger;
-        private readonly ILoggerFactory loggerFactory;
-        private readonly SiloMessagingOptions messagingOptions;
-        private long clientsCollectionVersion = 0;
+        private readonly ILogger _log;
+        private readonly CounterStatistic _gatewaySends;
+        private readonly SiloMessagingOptions _messagingOptions;
+        private long _clientsCollectionVersion = 0;
 
         public Gateway(
             MessageCenter msgCtr, 
@@ -38,13 +39,15 @@ namespace Orleans.Runtime.Messaging
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> options)
         {
-            this.messagingOptions = options.Value;
-            this.loggerFactory = loggerFactory;
-            this.logger = this.loggerFactory.CreateLogger<Gateway>();
-            clientCleanupAgent = new GatewayClientCleanupAgent(this, loggerFactory, messagingOptions.ClientDropTimeout);
-            clientsReplyRoutingCache = new ClientsReplyRoutingCache(messagingOptions.ResponseTimeout);
-            this.gatewayAddress = siloDetails.GatewayAddress;
-            this.sender = new GatewaySender(this, msgCtr, messageFactory, loggerFactory.CreateLogger<GatewaySender>());
+            _gatewaySends = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_SENT);
+            _messagingOptions = options.Value;
+            _log = loggerFactory.CreateLogger<Gateway>();
+            _clientCleanupAgent = new GatewayClientCleanupAgent(this, loggerFactory, _messagingOptions.ClientDropTimeout);
+            clientsReplyRoutingCache = new ClientsReplyRoutingCache(_messagingOptions.ResponseTimeout);
+            _gatewayAddress = siloDetails.GatewayAddress;
+            _clientStateLog = loggerFactory.CreateLogger<ClientState>();
+            _messageFactory = messageFactory;
+            _messageCenter = msgCtr;
         }
 
         public static ActivationAddress GetClientActivationAddress(GrainId clientId, SiloAddress siloAddress)
@@ -60,36 +63,36 @@ namespace Orleans.Runtime.Messaging
 
         internal void Start()
         {
-            clientCleanupAgent.Start();
+            _clientCleanupAgent.Start();
         }
 
         internal async Task SendStopSendMessages(IInternalGrainFactory grainFactory)
         {
-            lock (clients)
+            lock (_clients)
             {
-                foreach (var client in clients)
+                foreach (var client in _clients)
                 {
                     if (client.Value.IsConnected)
                     {
                         var observer = ClientGatewayObserver.GetObserver(grainFactory, client.Key);
-                        observer.StopSendingToGateway(this.gatewayAddress);
+                        observer.StopSendingToGateway(this._gatewayAddress);
                     }
                 }
             }
-            await Task.Delay(this.messagingOptions.ClientGatewayShutdownNotificationTimeout);
+            await Task.Delay(this._messagingOptions.ClientGatewayShutdownNotificationTimeout);
         }
 
         internal void Stop()
         {
-            clientCleanupAgent.Stop();
+            _clientCleanupAgent.Stop();
         }
 
-        long IConnectedClientCollection.Version => Interlocked.Read(ref clientsCollectionVersion);
+        long IConnectedClientCollection.Version => Interlocked.Read(ref _clientsCollectionVersion);
 
         List<GrainId> IConnectedClientCollection.GetConnectedClientIds()
         {
             var result = new List<GrainId>();
-            foreach (var pair in clients)
+            foreach (var pair in _clients)
             {
                 result.Add(pair.Key.GrainId);
             }
@@ -99,27 +102,27 @@ namespace Orleans.Runtime.Messaging
 
         internal void RecordOpenedConnection(GatewayInboundConnection connection, ClientGrainId clientId)
         {
-            logger.LogInformation((int)ErrorCode.GatewayClientOpenedSocket, "Recorded opened connection from endpoint {EndPoint}, client ID {ClientId}.", connection.RemoteEndPoint, clientId);
-            lock (clients)
+            _log.LogInformation((int)ErrorCode.GatewayClientOpenedSocket, "Recorded opened connection from endpoint {EndPoint}, client ID {ClientId}.", connection.RemoteEndPoint, clientId);
+            lock (_clients)
             {
-                if (clients.TryGetValue(clientId, out var clientState))
+                if (_clients.TryGetValue(clientId, out var clientState))
                 {
                     var oldSocket = clientState.Connection;
                     if (oldSocket != null)
                     {
                         // The old socket will be closed by itself later.
-                        clientConnections.Remove(oldSocket);
+                        _clientConnections.Remove(oldSocket);
                     }
                 }
                 else
                 {
-                    clientState = new ClientState(clientId, messagingOptions.ClientDropTimeout);
-                    clients[clientId] = clientState;
+                    clientState = new ClientState(clientId, this);
+                    _clients[clientId] = clientState;
                     MessagingStatisticsGroup.ConnectedClientCount.Increment();
                 }
                 clientState.RecordConnection(connection);
-                clientConnections[connection] = clientState;
-                clientsCollectionVersion++;
+                _clientConnections[connection] = clientState;
+                _clientsCollectionVersion++;
             }
         }
 
@@ -128,15 +131,15 @@ namespace Orleans.Runtime.Messaging
             if (connection == null) return;
 
             ClientState clientState;
-            lock (clients)
+            lock (_clients)
             {
-                if (!clientConnections.Remove(connection, out clientState)) return;
+                if (!_clientConnections.Remove(connection, out clientState)) return;
 
                 clientState.RecordDisconnection();
-                clientsCollectionVersion++;
+                _clientsCollectionVersion++;
             }
 
-            logger.LogInformation(
+            _log.LogInformation(
                 (int)ErrorCode.GatewayClientClosedSocket,
                 "Recorded closed socket from endpoint {Endpoint}, client ID {clientId}.",
                 connection.RemoteEndPoint?.ToString() ?? "null",
@@ -169,7 +172,7 @@ namespace Orleans.Runtime.Messaging
 
         internal void DropExpiredRoutingCachedEntries()
         {
-            lock (clients)
+            lock (_clients)
             {
                 clientsReplyRoutingCache.DropExpiredEntries();
             }
@@ -178,34 +181,35 @@ namespace Orleans.Runtime.Messaging
         private bool IsTargetingLocalGateway(SiloAddress siloAddress)
         {
             // Special case if the address used by the client was loopback
-            return this.gatewayAddress.Matches(siloAddress)
+            return this._gatewayAddress.Matches(siloAddress)
                 || (IPAddress.IsLoopback(siloAddress.Endpoint.Address)
-                    && siloAddress.Endpoint.Port == this.gatewayAddress.Endpoint.Port
-                    && siloAddress.Generation == this.gatewayAddress.Generation);
+                    && siloAddress.Endpoint.Port == this._gatewayAddress.Endpoint.Port
+                    && siloAddress.Generation == this._gatewayAddress.Generation);
         }
 
         // There is NO need to acquire individual ClientState lock, since we only close an older socket.
         internal void DropDisconnectedClients()
         {
-            foreach (var kv in clients)
+            foreach (var kv in _clients)
             {
                 if (kv.Value.ReadyToDrop())
                 {
-                    lock (clients)
+                    lock (_clients)
                     {
-                        if (clients.TryGetValue(kv.Key, out var client) && client.ReadyToDrop())
+                        if (_clients.TryGetValue(kv.Key, out var client) && client.ReadyToDrop())
                         {
-                            if (logger.IsEnabled(LogLevel.Information))
+                            if (_log.IsEnabled(LogLevel.Information))
                             {
-                                logger.LogInformation(
+                                _log.LogInformation(
                                     (int)ErrorCode.GatewayDroppingClient,
                                     "Dropping client {ClientId}, {IdleDuration} after disconnect with no reconnect",
                                     kv.Key,
                                     DateTime.UtcNow.Subtract(client.DisconnectedSince));
                             }
 
-                            clients.TryRemove(kv.Key, out _);
-                            clientsCollectionVersion++;
+                            _clients.TryRemove(kv.Key, out _);
+                            client.OnDropped();
+                            _clientsCollectionVersion++;
                             MessagingStatisticsGroup.ConnectedClientCount.DecrementBy(1);
                         }
                     }
@@ -227,12 +231,12 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            if (!clients.TryGetValue(clientId, out var client))
+            if (!_clients.TryGetValue(clientId, out var client))
             {
                 return false;
             }
             
-            // when this Gateway receives a message from client X to client addressale object Y
+            // When this Gateway receives a message from client X to client addressable object Y
             // it needs to record the original Gateway address through which this message came from (the address of the Gateway that X is connected to)
             // it will use this Gateway to re-route the REPLY from Y back to X.
             if (msg.SendingGrain.IsClient())
@@ -245,29 +249,56 @@ namespace Orleans.Runtime.Messaging
             // a system target
             if (!msg.SendingGrain.IsSystemTarget())
             {
-                msg.SendingSilo = gatewayAddress;
+                msg.SendingSilo = _gatewayAddress;
             }
 
-            QueueRequest(client, msg);
+            client.SendMessage(msg);
             return true;
         }
 
-        private void QueueRequest(ClientState clientState, Message msg) => this.sender.Send(clientState, msg);
-        
         private class ClientState
         {
-            private readonly TimeSpan clientDropTimeout;
-            internal Queue<Message> PendingToSend { get; } = new();
+#pragma warning disable IDE0052 // Remove unread private members
+            /// <summary>
+            /// The Task which represents the message draining process.
+            /// </summary>
+            private readonly Task _outgoingMessageDrainTask;
+#pragma warning restore IDE0052 // Remove unread private members
+            private readonly Gateway _gateway;
+            private readonly SingleWaiterAutoResetEvent _signal = new() { RunContinuationsAsynchronously = true };
+
+            private ConcurrentQueue<Message> _pendingMessages { get; } = new();
             internal GatewayInboundConnection Connection { get; private set; }
             internal DateTime DisconnectedSince { get; private set; }
             internal ClientGrainId Id { get; }
+            private bool _dropped;
 
             public bool IsConnected => this.Connection != null;
 
-            internal ClientState(ClientGrainId id, TimeSpan clientDropTimeout)
+            internal ClientState(ClientGrainId id, Gateway gateway)
             {
                 Id = id;
-                this.clientDropTimeout = clientDropTimeout;
+                _gateway = gateway;
+                _outgoingMessageDrainTask = Task.Run(DrainOutgoingMessages);
+            }
+
+            internal void SendMessage(Message message)
+            {
+                if (Connection is { IsValid: true } connection)
+                {
+                    // Send the message immediately, without waking the pending message processor loop
+                    connection.Send(message);
+                }
+                else
+                {
+                    _pendingMessages.Enqueue(message);
+                    _signal.Signal();
+
+                    if (_gateway._clientStateLog.IsEnabled(LogLevel.Trace))
+                    {
+                        _gateway._clientStateLog.Trace("Queued message {Message} for client {ClientId}", message, Id);
+                    }
+                }
             }
 
             internal void RecordDisconnection()
@@ -276,18 +307,72 @@ namespace Orleans.Runtime.Messaging
 
                 DisconnectedSince = DateTime.UtcNow;
                 Connection = null;
+                _signal.Signal();
             }
 
             internal void RecordConnection(GatewayInboundConnection connection)
             {
                 Connection = connection;
                 DisconnectedSince = DateTime.MaxValue;
+                _signal.Signal();
             }
 
             internal bool ReadyToDrop()
             {
-                return !IsConnected &&
-                       (DateTime.UtcNow.Subtract(DisconnectedSince) >= clientDropTimeout);
+                return !IsConnected && DateTime.UtcNow.Subtract(DisconnectedSince) >= _gateway._messagingOptions.ClientDropTimeout;
+            }
+
+            internal void OnDropped()
+            {
+                _dropped = true;
+                _signal.Signal();
+            }
+
+            private async Task DrainOutgoingMessages()
+            {
+                while (true)
+                {
+                    Message message = null;
+                    try
+                    {
+                        await _signal.WaitAsync();
+                        while (_pendingMessages.TryDequeue(out message))
+                        {
+                            if (Connection is { IsValid: true } connection)
+                            {
+                                connection.Send(message);
+                                message = null;
+                            }
+                            else if (_dropped)
+                            {
+                                // Most likely, the messages have all expired by now, but this allows for consistent and centralized handling.
+                                _gateway._messageCenter.RerouteMessage(message);
+                                message = null;
+                            }
+                            else
+                            {
+                                // Re-enqueue the message on the back of the queue.
+                                // Message ordering is not guaranteed.
+                                _pendingMessages.Enqueue(message);
+                                message = null;
+
+                                // Wait for something to change, such as a reconnection.
+                                break;
+                            }
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        if (message is not null)
+                        {
+                            _gateway._clientStateLog.LogError(exception, "Error in outbound client message send loop while sending message {Message}", message);
+                        }
+                        else
+                        {
+                            _gateway._clientStateLog.LogError(exception, "Error in outbound client message send loop");
+                        }
+                    }
+                }
             }
         }
 
@@ -355,128 +440,6 @@ namespace Orleans.Runtime.Messaging
                     {
                         clientRoutes.TryRemove(client.Key, out _);
                     }
-                }
-            }
-        }
-
-        private sealed class GatewaySender
-        {
-            private readonly Gateway gateway;
-            private readonly MessageCenter messageCenter;
-            private readonly MessageFactory messageFactory;
-            private readonly ILogger<GatewaySender> log;
-            private readonly CounterStatistic gatewaySends;
-
-            internal GatewaySender(Gateway gateway, MessageCenter messageCenter, MessageFactory messageFactory, ILogger<GatewaySender> log)
-            {
-                this.gateway = gateway;
-                this.messageCenter = messageCenter;
-                this.messageFactory = messageFactory;
-                this.log = log;
-                this.gatewaySends = CounterStatistic.FindOrCreate(StatisticNames.GATEWAY_SENT);
-            }
-
-            public void Send(ClientState clientState, Message msg)
-            {
-                // This should never happen -- but make sure to handle it reasonably, just in case
-                if (clientState == null)
-                {
-                    if (msg == null) return;
-
-                    this.log.Info(ErrorCode.GatewayTryingToSendToUnrecognizedClient, "Trying to send a message {0} to an unrecognized client {1}", msg.ToString(), msg.TargetGrain);
-                    MessagingStatisticsGroup.OnFailedSentMessage(msg);
-                    // Message for unrecognized client -- reject it
-                    if (msg.Direction == Message.Directions.Request)
-                    {
-                        MessagingStatisticsGroup.OnRejectedMessage(msg);
-                        Message error = this.messageFactory.CreateRejectionResponse(
-                            msg,
-                            Message.RejectionTypes.Unrecoverable,
-                            "Unknown client " + msg.TargetGrain);
-                        messageCenter.SendMessage(error);
-                    }
-                    else
-                    {
-                        MessagingStatisticsGroup.OnDroppedSentMessage(msg);
-                    }
-                    return;
-                }
-
-                lock (clientState.PendingToSend)
-                {
-                    // if disconnected - queue for later.
-                    if (!clientState.IsConnected)
-                    {
-                        if (msg == null) return;
-
-                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace("Queued message {0} for client {1}", msg, msg.TargetGrain);
-                        clientState.PendingToSend.Enqueue(msg);
-                        return;
-                    }
-
-                    // if the queue is non empty - drain it first.
-                    if (clientState.PendingToSend.Count > 0)
-                    {
-                        if (msg != null)
-                            clientState.PendingToSend.Enqueue(msg);
-
-                        // For now, drain in-line, although in the future this should happen in yet another asynch agent
-                        Drain(clientState);
-                        return;
-                    }
-                    // the queue was empty AND we are connected.
-
-                    // If the request includes a message to send, send it (or enqueue it for later)
-                    if (msg == null) return;
-
-                    if (!Send(msg, clientState))
-                    {
-                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace("Queued message {0} for client {1}", msg, msg.TargetGrain);
-                        clientState.PendingToSend.Enqueue(msg);
-                    }
-                    else
-                    {
-                        if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace("Sent message {0} to client {1}", msg, msg.TargetGrain);
-                    }
-                }
-            }
-
-            private void Drain(ClientState clientState)
-            {
-                lock (clientState.PendingToSend)
-                {
-                    while (clientState.PendingToSend.Count > 0)
-                    {
-                        var m = clientState.PendingToSend.Peek();
-                        if (Send(m, clientState))
-                        {
-                            if (this.log.IsEnabled(LogLevel.Trace)) this.log.Trace("Sent queued message {0} to client {1}", m, clientState.Id);
-                            clientState.PendingToSend.Dequeue();
-                        }
-                        else
-                        {
-                            return;
-                        }
-                    }
-                }
-            }
-
-            private bool Send(Message msg, ClientState client)
-            {
-                var connection = client.Connection;
-                if (connection is null) return false;
-
-                try
-                {
-                    connection.Send(msg);
-                    gatewaySends.Increment();
-                    return true;
-                }
-                catch (Exception exception)
-                {
-                    gateway.RecordClosedConnection(connection);
-                    connection.CloseAsync(new ConnectionAbortedException("Exception posting a message to sender. See InnerException for details.", exception)).Ignore();
-                    return false;
                 }
             }
         }
