@@ -358,14 +358,14 @@ namespace Orleans.Hosting
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, ConnectionManagerLifecycleAdapter<ISiloLifecycle>>();
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionMaintainer>();
 
-            services.AddSingletonKeyedService<object, IConnectionFactory>(
-                SiloConnectionFactory.ServicesKey,
+            services.AddSingletonNamedService<IConnectionFactory>(
+                "Connection",
                 (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionFactory>(sp));
-            services.AddSingletonKeyedService<object, IConnectionListenerFactory>(
-                SiloConnectionListener.ServicesKey,
+            services.AddSingletonNamedService<IConnectionListenerFactory>(
+                "Silo",
                 (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionListenerFactory>(sp));
-            services.AddSingletonKeyedService<object, IConnectionListenerFactory>(
-                GatewayConnectionListener.ServicesKey,
+            services.AddSingletonNamedService<IConnectionListenerFactory>(
+                "Gateway",
                 (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionListenerFactory>(sp));
 
             services.AddSerializer();

@@ -8,7 +8,6 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class ClientOutboundConnectionFactory : ConnectionFactory
     {
-        internal static readonly object ServicesKey = new object();
         private readonly ConnectionCommon connectionShared;
         private readonly ClientConnectionOptions clientConnectionOptions;
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
@@ -22,7 +21,7 @@ namespace Orleans.Runtime.Messaging
             IOptions<ClientConnectionOptions> clientConnectionOptions,
             ConnectionCommon connectionShared,
             ConnectionPreambleHelper connectionPreambleHelper)
-            : base(connectionShared.ServiceProvider.GetRequiredServiceByKey<object, IConnectionFactory>(ServicesKey), connectionShared.ServiceProvider, connectionOptions)
+            : base(connectionShared.ServiceProvider.GetRequiredServiceByName<IConnectionFactory>("Connection"), connectionShared.ServiceProvider, connectionOptions)
         {
             this.connectionShared = connectionShared;
             this.clientConnectionOptions = clientConnectionOptions.Value;

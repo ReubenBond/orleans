@@ -86,7 +86,6 @@ namespace Orleans.Networking.Shared
             _currentIConnectionItemsFeature = this;
             _currentIMemoryPoolFeature = this;
             _currentIConnectionLifetimeFeature = this;
-
         }
 
         // Internal for testing

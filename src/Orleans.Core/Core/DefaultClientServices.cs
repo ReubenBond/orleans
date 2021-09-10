@@ -88,7 +88,7 @@ namespace Orleans
             services.AddSingleton<ILifecycleParticipant<IClusterClientLifecycle>, ConnectionManagerLifecycleAdapter<IClusterClientLifecycle>>();
 
             services.AddSingletonKeyedService<object, IConnectionFactory>(
-                ClientOutboundConnectionFactory.ServicesKey,
+                "Connection",
                 (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionFactory>(sp));
 
             services.AddSerializer();
