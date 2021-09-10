@@ -15,6 +15,7 @@ using Orleans.Messaging;
 using Microsoft.Extensions.ObjectPool;
 using Orleans.Serialization.Invocation;
 using System.Runtime.CompilerServices;
+using System.Collections.Concurrent;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -22,18 +23,12 @@ namespace Orleans.Runtime.Messaging
     {
         private static readonly Func<ConnectionContext, Task> OnConnectedDelegate = context => OnConnectedAsync(context);
         private static readonly Action<object> OnConnectionClosedDelegate = state => ((Connection)state).OnTransportConnectionClosed();
-        private static readonly UnboundedChannelOptions OutgoingMessageChannelOptions = new UnboundedChannelOptions
-        {
-            SingleReader = true,
-            SingleWriter = false,
-            AllowSynchronousContinuations = false
-        };
 
         private static readonly ObjectPool<MessageHandler> MessageHandlerPool = ObjectPool.Create(new MessageHandlerPoolPolicy());
         private readonly ConnectionCommon shared;
         private readonly ConnectionDelegate middleware;
-        private readonly Channel<Message> outgoingMessages;
-        private readonly ChannelWriter<Message> outgoingMessageWriter;
+        private readonly SingleWaiterAutoResetEvent outgoingMessagesSignal = new();
+        private readonly ConcurrentQueue<Message> outgoingMessageQueue = new();
         private readonly List<Message> inflight = new List<Message>(4);
         private readonly TaskCompletionSource<int> _transportConnectionClosed = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private IDuplexPipe _transport;
@@ -49,8 +44,6 @@ namespace Orleans.Runtime.Messaging
             this.Context = connection ?? throw new ArgumentNullException(nameof(connection));
             this.middleware = middleware ?? throw new ArgumentNullException(nameof(middleware));
             this.shared = shared;
-            this.outgoingMessages = Channel.CreateUnbounded<Message>(OutgoingMessageChannelOptions);
-            this.outgoingMessageWriter = this.outgoingMessages.Writer;
 
             // Set the connection on the connection context so that it can be retrieved by the middleware.
             this.Context.Features.Set<Connection>(this);
@@ -108,10 +101,18 @@ namespace Orleans.Runtime.Messaging
 
         protected virtual async Task RunInternal()
         {
-            _transport = this.Context.Transport;
-            _processIncomingTask = this.ProcessIncoming();
-            _processOutgoingTask = this.ProcessOutgoing();
-            await Task.WhenAll(_processIncomingTask, _processOutgoingTask);
+            MessagingEventSource.Log.OnConnectionStart();
+            try
+            {
+                _transport = this.Context.Transport;
+                _processIncomingTask = this.ProcessIncoming();
+                _processOutgoingTask = this.ProcessOutgoing();
+                await Task.WhenAll(_processIncomingTask, _processOutgoingTask);
+            }
+            finally
+            {
+                MessagingEventSource.Log.OnConnectionStop();
+            }
         }
 
         /// <summary>
@@ -167,7 +168,8 @@ namespace Orleans.Runtime.Messaging
             NetworkingStatisticsGroup.OnClosedSocket(this.ConnectionDirection);
 
             // Signal the outgoing message processor to exit gracefully.
-            this.outgoingMessageWriter.TryComplete();
+            this.outgoingMessageQueue.Enqueue(null);
+            outgoingMessagesSignal.Signal();
 
             if (Context.Features.Get<IConnectionCloseFeature>() is { } closeFeature)
             {
@@ -181,6 +183,7 @@ namespace Orleans.Runtime.Messaging
 
             // Try to gracefully stop the reader/writer loops, if they are running.
             if (_processIncomingTask is { IsCompleted: false } incoming)
+            {
                 try
                 {
                     await incoming;
@@ -190,8 +193,10 @@ namespace Orleans.Runtime.Messaging
                     // Swallow any exceptions here.
                     this.Log.LogWarning(processIncomingException, "Exception processing incoming messages on connection {Connection}", this);
                 }
+            }
 
             if (_processOutgoingTask is { IsCompleted: false } outgoing)
+            {
                 try
                 {
                     await outgoing;
@@ -201,6 +206,7 @@ namespace Orleans.Runtime.Messaging
                     // Swallow any exceptions here.
                     this.Log.LogWarning(processOutgoingException, "Exception processing outgoing messages on connection {Connection}", this);
                 }
+            }
 
             // Wait for the transport to signal that it's closed before disposing it.
             await _transportConnectionClosed.Task;
@@ -221,38 +227,24 @@ namespace Orleans.Runtime.Messaging
                 this.OnSendMessageFailure(message, "Connection terminated");
             }
 
-            this.inflight.Clear();
-
-            // Reroute enqueued messages.
-            var i = 0;
-            while (this.outgoingMessages.Reader.TryRead(out var message))
+            _ = Task.Run(RerouteAllEnqueuedMessages);
+            async Task RerouteAllEnqueuedMessages()
             {
-                if (i == 0 && Log.IsEnabled(LogLevel.Information))
+                while (true)
                 {
-                    this.Log.LogInformation(
-                        "Rerouting messages for remote endpoint {EndPoint}",
-                        this.RemoteEndPoint?.ToString() ?? "(never connected)");
+                    await outgoingMessagesSignal.WaitAsync();
+                    while (outgoingMessageQueue.TryDequeue(out var message))
+                    {
+                        RerouteMessage(message);
+                    }
                 }
-
-                ++i;
-                this.RetryMessage(message);
-            }
-
-            if (i > 0 && this.Log.IsEnabled(LogLevel.Information))
-            {
-                this.Log.LogInformation(
-                    "Rerouted {Count} messages for remote endpoint {EndPoint}",
-                    i,
-                    this.RemoteEndPoint?.ToString() ?? "(never connected)");
             }
         }
 
         public virtual void Send(Message message)
         {
-            if (!this.outgoingMessageWriter.TryWrite(message))
-            {
-                this.RerouteMessage(message);
-            }
+            this.outgoingMessageQueue.Enqueue(message);
+            outgoingMessagesSignal.Signal();
         }
 
         public override string ToString() => $"[Local: {this.LocalEndPoint}, Remote: {this.RemoteEndPoint}, ConnectionId: {this.Context.ConnectionId}]";
@@ -329,26 +321,34 @@ namespace Orleans.Runtime.Messaging
 
             Exception error = default;
             var serializer = this.shared.ServiceProvider.GetRequiredService<IMessageSerializer>();
+            var flushTask = new ValueTask<FlushResult>(new FlushResult(isCanceled: false, isCompleted: false));
             try
             {
                 var output = this._transport.Output;
-                var reader = this.outgoingMessages.Reader;
 
+                var dutyTimer = ValueStopwatch.StartNew();
                 while (true)
                 {
-                    var more = await reader.WaitToReadAsync();
-                    if (!more)
+                    if (!outgoingMessageQueue.TryPeek(out _))
                     {
-                        break;
+                        // Wait for more messages.
+                        MessagingEventSource.Log.OnConnectionOutgoingMessageActiveTime(dutyTimer);
+                        dutyTimer.Restart();
+                        await outgoingMessagesSignal.WaitAsync();
+                        MessagingEventSource.Log.OnConnectionOutgoingMessageIdleTime(dutyTimer);
+                        dutyTimer.Restart();
                     }
 
                     Message message = default;
                     try
                     {
-                        while (inflight.Count < inflight.Capacity && reader.TryRead(out message) && this.PrepareMessageForSend(message))
+                        while (outgoingMessageQueue.TryDequeue(out message) && this.PrepareMessageForSend(message))
                         {
                             inflight.Add(message);
+                            var serializationTimer = ValueStopwatch.StartNew();
                             var (headerLength, bodyLength) = serializer.Write(ref output, message);
+                            serializationTimer.Stop();
+                            MessagingEventSource.Log.OnConnectionMessageSerializationTime(serializationTimer);
                             MessagingStatisticsGroup.OnMessageSend(this.MessageSentCounter, message, headerLength + bodyLength, headerLength, this.ConnectionDirection);
                         }
                     }
@@ -357,12 +357,26 @@ namespace Orleans.Runtime.Messaging
                         this.OnMessageSerializationFailure(message, exception);
                     }
 
-                    var flushResult = await output.FlushAsync();
-                    if (flushResult.IsCompleted || flushResult.IsCanceled)
+                    if (flushTask.IsCompleted && inflight.Count > 0)
                     {
-                        break;
+                        flushTask = output.FlushAsync();
                     }
 
+                    if (flushTask.IsCompleted)
+                    {
+                        var flushResult = await flushTask;
+
+                        inflight.Clear();
+                        if (flushResult.IsCompleted || flushResult.IsCanceled)
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                if (flushTask.IsCompleted && inflight.Count > 0)
+                {
+                    await output.FlushAsync();
                     inflight.Clear();
                 }
             }
@@ -443,7 +457,7 @@ namespace Orleans.Runtime.Messaging
                 // Send a fast fail to the caller.
                 var response = this.MessageFactory.CreateResponseMessage(message);
                 response.Result = Message.ResponseTypes.Error;
-                response.SetPayload(Response.FromException(exception));
+                response.BodyObject = Response.FromException(exception);
 
                 // Send the error response and continue processing the next message.
                 this.Send(response);
@@ -452,7 +466,7 @@ namespace Orleans.Runtime.Messaging
             {
                 // If the message was a response, propagate the exception to the intended recipient.
                 message.Result = Message.ResponseTypes.Error;
-                message.SetPayload(Response.FromException(exception));
+                message.BodyObject = Response.FromException(exception);
                 this.MessageCenter.DispatchLocalMessage(message);
             }
 
@@ -477,7 +491,7 @@ namespace Orleans.Runtime.Messaging
             {
                 var response = this.MessageFactory.CreateResponseMessage(message);
                 response.Result = Message.ResponseTypes.Error;
-                response.SetPayload(Response.FromException(exception));
+                response.BodyObject = Response.FromException(exception);
 
                 this.MessageCenter.DispatchLocalMessage(response);
             }
@@ -486,7 +500,7 @@ namespace Orleans.Runtime.Messaging
                 // If we failed sending an original response, turn the response body into an error and reply with it.
                 // unless we have already tried sending the response multiple times.
                 message.Result = Message.ResponseTypes.Error;
-                message.SetPayload(Response.FromException(exception));
+                message.BodyObject = Response.FromException(exception);
                 ++message.RetryCount;
 
                 this.Send(message);
