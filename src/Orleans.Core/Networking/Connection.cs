@@ -169,6 +169,11 @@ namespace Orleans.Runtime.Messaging
             // Signal the outgoing message processor to exit gracefully.
             this.outgoingMessageWriter.TryComplete();
 
+            if (Context.Features.Get<IConnectionCloseFeature>() is { } closeFeature)
+            {
+                await closeFeature.CloseAsync();
+            }
+            
             var transportFeature = Context.Features.Get<IUnderlyingTransportFeature>();
             var transport = transportFeature?.Transport ?? _transport;
             await transport.Input.CompleteAsync();

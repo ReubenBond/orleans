@@ -1,4 +1,6 @@
 using System.IO.Pipelines;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -20,5 +22,10 @@ namespace Orleans.Runtime.Messaging
     {
         /// <inheritdoc />
         public IDuplexPipe Transport { get; set; }
+    }
+
+    internal interface IConnectionCloseFeature
+    {
+        public ValueTask CloseAsync(CancellationToken cancellationToken = default);
     }
 }

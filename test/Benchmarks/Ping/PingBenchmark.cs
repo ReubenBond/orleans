@@ -7,11 +7,14 @@ using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using BenchmarkGrainInterfaces.Ping;
 using BenchmarkGrains.Ping;
+using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Networking.Shared;
+using Xunit;
 
 namespace Benchmarks.Ping
 {
@@ -32,6 +35,7 @@ namespace Benchmarks.Ping
                 var primary = i == 0 ? null : new IPEndPoint(IPAddress.Loopback, 11111);
                 var hostBuilder = new HostBuilder().UseOrleans(siloBuilder =>
                 {
+                    siloBuilder.ConfigureDefaults();
                     siloBuilder.UseLocalhostClustering(
                         siloPort: 11111 + i,
                         gatewayPort: 30000 + i,
@@ -41,6 +45,10 @@ namespace Benchmarks.Ping
                     {
                         siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
                     }
+                    siloBuilder.ConfigureServices(services =>
+                    {
+                        services.AddPipeConnectionFactory();
+                    });
                 });
 
                 var host = hostBuilder.Build();
@@ -55,6 +63,10 @@ namespace Benchmarks.Ping
             {
                 var clientBuilder = new ClientBuilder()
                     .Configure<ClusterOptions>(options => options.ClusterId = options.ServiceId = "dev");
+                clientBuilder.ConfigureServices(services =>
+                {
+                    services.AddPipeConnectionFactory();
+                });
 
                 if (numSilos == 1)
                 {
@@ -118,7 +130,11 @@ namespace Benchmarks.Ping
                 issueRequest: g => g.Run(),
                 getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode()));
             await loadGenerator.Warmup();
-            while (runs-- > 0) await loadGenerator.Run();
+            while (runs-- > 0 && !Console.KeyAvailable) await loadGenerator.Run();
+            if (Console.KeyAvailable)
+            {
+                Console.WriteLine("Interrupted by user");
+            }
         }
 
         public async Task PingPongForever()

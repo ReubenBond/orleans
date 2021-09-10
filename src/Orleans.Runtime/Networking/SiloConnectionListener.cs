@@ -11,7 +11,6 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class SiloConnectionListener : ConnectionListener, ILifecycleParticipant<ISiloLifecycle>, ILifecycleObserver
     {
-        internal static readonly object ServicesKey = new object();
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly SiloConnectionOptions siloConnectionOptions;
         private readonly MessageCenter messageCenter;
@@ -32,7 +31,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionCommon connectionShared,
             ProbeRequestMonitor probeRequestMonitor,
             ConnectionPreambleHelper connectionPreambleHelper)
-            : base(serviceProvider.GetRequiredServiceByKey<object, IConnectionListenerFactory>(ServicesKey), connectionOptions, connectionManager, connectionShared)
+            : base(serviceProvider.GetRequiredServiceByName<IConnectionListenerFactory>("Silo"), connectionOptions, connectionManager, connectionShared)
         {
             this.siloConnectionOptions = siloConnectionOptions.Value;
             this.messageCenter = messageCenter;
