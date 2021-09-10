@@ -9,6 +9,11 @@ namespace Orleans.Serialization.Invocation
     {
         private ManualResetValueTaskSourceCore<Response> _core;
 
+        public ResponseCompletionSource()
+        {
+            _core.RunContinuationsAsynchronously = false;
+        }
+
         public ValueTask<Response> AsValueTask() => new(this, _core.Version);
 
         public ValueTask AsVoidValueTask() => new(this, _core.Version);
@@ -75,6 +80,11 @@ namespace Orleans.Serialization.Invocation
     public sealed class ResponseCompletionSource<TResult> : IResponseCompletionSource, IValueTaskSource<TResult>, IValueTaskSource
     {
         private ManualResetValueTaskSourceCore<TResult> _core;
+
+        public ResponseCompletionSource()
+        {
+            _core.RunContinuationsAsynchronously = false;
+        }
 
         public ValueTask<TResult> AsValueTask() => new(this, _core.Version);
 
