@@ -1,49 +1,37 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO.Pipelines;
-using System.Threading;
+using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace Orleans.Networking.Shared
 {
-    internal sealed class IOQueue : PipeScheduler,  IThreadPoolWorkItem
+    internal sealed class IOQueue : PipeScheduler
     {
-        private readonly object _workSync = new object();
+        private readonly Task _runTask;
         private readonly ConcurrentQueue<Work> _workItems = new();
+        private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
 
-        private bool _doingWork;
+        public IOQueue()
+        {
+            _runTask = Task.Run(Run);
+        }
 
         public override void Schedule(Action<object> action, object state)
         {
-            var work = new Work(action, state);
-
-            _workItems.Enqueue(work);
-
-            lock (_workSync)
-            {
-                if (!_doingWork)
-                {
-                    System.Threading.ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: false);
-                    _doingWork = true;
-                }
-            }
+            _workItems.Enqueue(new Work(action, state));
+            _workSignal.Signal();
         }
 
-        public void Execute()
+        private async Task Run()
         {
             while (true)
             {
+                await _workSignal.WaitAsync();
+
                 while (_workItems.TryDequeue(out var item))
                 {
                     item.Callback(item.State);
-                }
-
-                lock (_workSync)
-                {
-                    if (_workItems.IsEmpty)
-                    {
-                        _doingWork = false;
-                        return;
-                    }
                 }
             }
         }
