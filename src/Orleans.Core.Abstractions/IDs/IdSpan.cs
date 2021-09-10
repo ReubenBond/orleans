@@ -15,7 +15,13 @@ namespace Orleans.Runtime
     [RegisterSerializer]
     public sealed class IdSpanCodec : IFieldCodec<IdSpan>
     {
-        private static readonly ConcurrentDictionary<int, IdSpan> _cache = new ConcurrentDictionary<int, IdSpan>();
+        private struct CacheEntry
+        {
+            public WeakReference<byte[]> Array { get; set; }
+            public int ConsistentHashCode { get; set; }
+        }
+
+        private static readonly ConcurrentDictionary<int, CacheEntry> _cache = new ConcurrentDictionary<int, CacheEntry>();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteField<TBufferWriter>(
@@ -62,15 +68,18 @@ namespace Orleans.Runtime
             var candidateHashCode = hashCode;
             while (_cache.TryGetValue(candidateHashCode, out var existing))
             {
-                if (existing.GetHashCode() != hashCode)
+                if (existing.ConsistentHashCode != hashCode)
                 {
                     break;
                 }
 
-                var existingSpan = new ReadOnlySpan<byte>(IdSpan.UnsafeGetArray(existing));
-                if (existingSpan.SequenceEqual(payloadSpan))
+                if (existing.Array.TryGetTarget(out var existingBytes))
                 {
-                    return existing;
+                    var existingSpan = new ReadOnlySpan<byte>(existingBytes);
+                    if (existingSpan.SequenceEqual(payloadSpan))
+                    {
+                        return IdSpan.UnsafeCreate(existingBytes, hashCode);
+                    }
                 }
 
                 // Try the next slot. 
@@ -84,7 +93,8 @@ namespace Orleans.Runtime
             }
 
             var value = IdSpan.UnsafeCreate(payloadArray, hashCode);
-            while (!_cache.TryAdd(candidateHashCode++, value))
+            var newEntry = new CacheEntry { Array = new WeakReference<byte[]>(payloadArray), ConsistentHashCode = hashCode };
+            while (!_cache.TryAdd(candidateHashCode++, newEntry))
             {
                 // Insert the value at the first available position.
             }
@@ -109,15 +119,18 @@ namespace Orleans.Runtime
             var candidateHashCode = hashCode;
             while (_cache.TryGetValue(candidateHashCode, out var existing))
             {
-                if (existing.GetHashCode() != hashCode)
+                if (existing.ConsistentHashCode != hashCode)
                 {
                     break;
                 }
 
-                var existingSpan = new ReadOnlySpan<byte>(IdSpan.UnsafeGetArray(existing));
-                if (existingSpan.SequenceEqual(payloadSpan))
+                if (existing.Array.TryGetTarget(out var existingBytes))
                 {
-                    return existing;
+                    var existingSpan = new ReadOnlySpan<byte>(existingBytes);
+                    if (existingSpan.SequenceEqual(payloadSpan))
+                    {
+                        return IdSpan.UnsafeCreate(existingBytes, hashCode);
+                    }
                 }
 
                 // Try the next slot. 
@@ -131,7 +144,8 @@ namespace Orleans.Runtime
             }
 
             var value = IdSpan.UnsafeCreate(payloadArray, hashCode);
-            while (!_cache.TryAdd(candidateHashCode++, value))
+            var newEntry = new CacheEntry { Array = new WeakReference<byte[]>(payloadArray), ConsistentHashCode = hashCode };
+            while (!_cache.TryAdd(candidateHashCode++, newEntry))
             {
                 // Insert the value at the first available position.
             }
@@ -245,7 +259,7 @@ namespace Orleans.Runtime
         public static IdSpan UnsafeCreate(byte[] value, int hashCode) => new IdSpan(value, hashCode);
 
         /// <inheritdoc/>
-        public static byte[] UnsafeGetArray(IdSpan id) => id._value;
+        public static byte[] UnsafeGetArray(in IdSpan id) => id._value;
 
         /// <inheritdoc/>
         public int CompareTo(IdSpan other) => _value.AsSpan().SequenceCompareTo(other._value.AsSpan());
