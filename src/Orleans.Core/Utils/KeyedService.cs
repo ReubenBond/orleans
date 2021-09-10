@@ -73,7 +73,7 @@ namespace Orleans.Runtime
     {
         public TService GetService(IServiceProvider services, TKey key)
         {
-            return this.GetServices(services).FirstOrDefault(s => s.Equals(key))?.GetService(services);
+            return this.GetServices(services).LastOrDefault(s => s.Equals(key))?.GetService(services);
         }
 
         public IEnumerable<IKeyedService<TKey, TService>> GetServices(IServiceProvider services)
