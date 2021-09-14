@@ -27,7 +27,7 @@ namespace Orleans.Runtime
         private readonly IServiceScope serviceScope;
         private readonly WorkItemGroup _workItemGroup;
         private readonly List<(Message Message, CoarseStopwatch QueuedTime)> _waitingRequests = new();
-        private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new();
+        private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new(ReferenceEqualsComparer<Message>.Instance);
         private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
         private readonly GrainLifecycle lifecycle;
         private List<object> _pendingOperations;
