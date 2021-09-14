@@ -374,10 +374,11 @@ namespace Orleans.Hosting
             services.AddSingleton<ISpecializableCopier, GrainReferenceCopierProvider>();
             services.AddSingleton<OnDeserializedCallbacks>();
 
-            services.TryAddTransient<IMessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
+            services.TryAddTransient<MessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
                 sp,
                 sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value.MaxMessageHeaderSize,
                 sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value.MaxMessageBodySize));
+            services.TryAddFromExisting<IMessageSerializer, MessageSerializer>();
             services.TryAddSingleton<ConnectionFactory, SiloConnectionFactory>();
             services.AddSingleton<NetworkingTrace>();
             services.AddSingleton<RuntimeMessagingTrace>();
