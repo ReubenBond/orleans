@@ -161,6 +161,7 @@ namespace Orleans.Runtime
             sentMsgSizeHistogram.AddData(numTotalBytes);
             messageSendCounter?.Increment();
             perSocketDirectionStatsSend[(byte)connectionDirection].OnMessage(1, numTotalBytes);
+            MessagingEventSource.Log.OnMessageSendRemote();
         }
 
         private static CounterStatistic FindCounter(ConcurrentDictionary<string, CounterStatistic> counters, StatisticName name, CounterStorage storage)
@@ -190,6 +191,7 @@ namespace Orleans.Runtime
             receiveMsgSizeHistogram.AddData(numTotalBytes);
             messageReceivedCounter?.Increment();
             perSocketDirectionStatsReceive[(byte)connectionDirection].OnMessage(1, numTotalBytes);
+            MessagingEventSource.Log.OnMessageReceiveRemote();
         }
 
         internal static void OnMessageExpired(Phase phase)

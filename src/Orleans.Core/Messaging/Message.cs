@@ -1,15 +1,14 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Text;
-using Orleans.Serialization;
+using Orleans.Networking.Shared;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
     [WellKnownId(101)]
-    internal sealed class Message
+    internal sealed class Message : IDisposable
     {
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
@@ -35,22 +34,40 @@ namespace Orleans.Runtime
         public readonly CoarseStopwatch _timeSinceCreation = CoarseStopwatch.StartNew();
 
         private bool _payloadIsSerialized;
+        private ReadOnlySequence<byte> _serializedPayload;
         private object _payload;
 
         public Message() { }
 
         public object BodyObject { get => GetPayload(); set => SetPayload(value); }
 
-        public object RawPayload => _payload;
-        public bool RawPayloadIsSerialized => _payloadIsSerialized;
+        public bool TryGetSerializedPayload(out ReadOnlySequence<byte> serializedPayload)
+        {
+            if (_payloadIsSerialized)
+            {
+                serializedPayload = _serializedPayload;
+                return true;
+            }
+
+            serializedPayload = default;
+            return false;
+        }
 
         public object GetPayload()
         {
             if (!_payloadIsSerialized) return _payload;
-            if (_payload is null) return null;
 
-            using var payloadData = Unsafe.As<IMemoryOwner<byte>>(_payload);
-            _payload = Factory.PayloadSerializer.Deserialize<object>(payloadData.Memory);
+            var bytes = _serializedPayload;
+            if (bytes.IsSingleSegment)
+            {
+                _payload = Factory.PayloadSerializer.Deserialize<object>(bytes.FirstSpan);
+            }
+            else
+            {
+                _payload = Factory.PayloadSerializer.Deserialize<object>(bytes);
+            }
+
+            DisposeSerializedPayload();
             return _payload;
         }
 
@@ -58,17 +75,37 @@ namespace Orleans.Runtime
         {
             if (_payloadIsSerialized)
             {
-                Unsafe.As<IMemoryOwner<byte>>(_payload).Dispose();
+                DisposeSerializedPayload();
             }
 
             _payloadIsSerialized = false;
             _payload = value;
         }
 
-        public void SetSerializedPayload(IMemoryOwner<byte> value)
+        public void SetSerializedPayload(ReadOnlySequence<byte> value)
         {
+            if (_payloadIsSerialized)
+            {
+                DisposeSerializedPayload();
+            }
+
             _payloadIsSerialized = true;
-            _payload = value;
+            _serializedPayload = value;
+            _payload = null;
+        }
+
+        private void DisposeSerializedPayload()
+        {
+            if (_payloadIsSerialized)
+            {
+                ReferenceCountingPinnedMemoryPool.Return(_serializedPayload);
+                _serializedPayload = ReadOnlySequence<byte>.Empty;
+            }
+        }
+
+        public void Dispose()
+        {
+            DisposeSerializedPayload();
         }
 
         public MessageFactory Factory { get; init; }

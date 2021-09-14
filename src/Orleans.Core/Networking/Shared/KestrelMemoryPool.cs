@@ -9,10 +9,7 @@ namespace Orleans.Networking.Shared
             return CreateSlabMemoryPool();
         }
 
-        public static MemoryPool<byte> CreateSlabMemoryPool()
-        {
-            return new SlabMemoryPool();
-        }
+        public static MemoryPool<byte> CreateSlabMemoryPool() => ReferenceCountingPinnedMemoryPool.Shared;
 
         public static readonly int MinimumSegmentSize = 4096;
     }
