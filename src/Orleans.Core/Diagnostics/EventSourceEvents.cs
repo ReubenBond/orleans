@@ -189,54 +189,66 @@ namespace Orleans.Runtime
         private void ReceiveMessage() => WriteEvent(1);
     }
 
-    [EventSource(Name = "Microsoft-Orleans-Messaging")]
+    [EventSource(Name = "Orleans.Messaging")]
     internal sealed class MessagingEventSource : EventSource
     {
         public static readonly MessagingEventSource Log = new ();
         private long _numActiveConnections;
-        private readonly PollingCounter ActiveConnectionsCounter;
-        private readonly EventCounter ConnectionOutgoingMessageActiveTime;
-        private readonly EventCounter ConnectionOutgoingMessageIdleTime;
-        private readonly EventCounter ConnectionMessageSerializationTime;
+        private long _numSentRemoteMessages;
+        private long _numReceivedRemoteMessages;
+        private readonly PollingCounter _activeConnectionsCounter;
+        private readonly IncrementingPollingCounter _connectionSentMessagesCounter;
+        private readonly IncrementingPollingCounter _connectionReceivedMessagesCounter;
+        private readonly EventCounter _connectionOutgoingMessageActiveTime;
+        private readonly EventCounter _connectionOutgoingMessageIdleTime;
+        private readonly EventCounter _connectionMessageSerializationTime;
         private MessagingEventSource()
         {
-            ConnectionOutgoingMessageIdleTime = new EventCounter("connection-outgoing-idle-time", this)
+            _connectionOutgoingMessageIdleTime = new EventCounter("connection-outgoing-idle-time", this)
             {
                 DisplayName = "Outgoing Message Processing Idle Time",
                 DisplayUnits = "μs",
             };
-            ConnectionOutgoingMessageActiveTime = new EventCounter("connection-outgoing-active-time", this)
+            _connectionOutgoingMessageActiveTime = new EventCounter("connection-outgoing-active-time", this)
             {
                 DisplayName = "Outgoing Message Processing Active Time",
                 DisplayUnits = "μs",
             };
-            ConnectionMessageSerializationTime = new EventCounter("connection-message-serialization-time", this)
+            _connectionMessageSerializationTime = new EventCounter("connection-message-serialization-time", this)
             {
                 DisplayName = "Message Serialization Time",
                 DisplayUnits = "μs",
             };
-            ActiveConnectionsCounter = new PollingCounter("connection-count", this, () => _numActiveConnections)
+            _activeConnectionsCounter = new PollingCounter("connection-count", this, () => _numActiveConnections)
             {
                 DisplayName = "Active Connections"
+            };
+            _connectionSentMessagesCounter = new IncrementingPollingCounter("connection-messages-sent-count", this, () => _numSentRemoteMessages)
+            {
+                DisplayName = "Messages Sent To Remote"
+            };
+            _connectionReceivedMessagesCounter = new IncrementingPollingCounter("connection-messages-received-count", this, () => _numReceivedRemoteMessages)
+            {
+                DisplayName = "Messages Received From Remote"
             };
         }
 
         [NonEvent]
         public void OnConnectionOutgoingMessageActiveTime(ValueStopwatch activeTime)
         {
-            ConnectionOutgoingMessageActiveTime.WriteMetric(activeTime.TotalMicroseconds);
+            _connectionOutgoingMessageActiveTime.WriteMetric(activeTime.TotalMicroseconds);
         }
 
         [NonEvent]
         public void OnConnectionOutgoingMessageIdleTime(ValueStopwatch idleTime)
         {
-            ConnectionOutgoingMessageIdleTime.WriteMetric(idleTime.TotalMicroseconds);
+            _connectionOutgoingMessageIdleTime.WriteMetric(idleTime.TotalMicroseconds);
         }
 
         [NonEvent]
         public void OnConnectionMessageSerializationTime(ValueStopwatch idleTime)
         {
-            ConnectionMessageSerializationTime.WriteMetric(idleTime.TotalMicroseconds);
+            _connectionMessageSerializationTime.WriteMetric(idleTime.TotalMicroseconds);
         }
 
         [NonEvent]
@@ -250,5 +262,11 @@ namespace Orleans.Runtime
         {
             Interlocked.Decrement(ref _numActiveConnections);
         }
+
+        [NonEvent]
+        internal void OnMessageSendRemote() => Interlocked.Increment(ref _numSentRemoteMessages);
+
+        [NonEvent]
+        internal void OnMessageReceiveRemote() => Interlocked.Increment(ref _numReceivedRemoteMessages);
     }
 }
