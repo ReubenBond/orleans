@@ -18,7 +18,7 @@
     <RepositoryType>git</RepositoryType>
     <IncludeSymbols>true</IncludeSymbols>
     <IncludeSource>true</IncludeSource>
-    <LangVersion>9.0</LangVersion>
+    <LangVersion>latest</LangVersion>
     <Features>strict</Features>
   </PropertyGroup>
 
