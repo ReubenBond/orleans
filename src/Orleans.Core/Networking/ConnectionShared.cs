@@ -1,4 +1,6 @@
-﻿using System;
+using System;
+using Orleans.Serialization.Session;
+using static Orleans.Runtime.Messaging.Connection;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -8,14 +10,19 @@ namespace Orleans.Runtime.Messaging
             IServiceProvider serviceProvider,
             MessageFactory messageFactory,
             MessagingTrace messagingTrace,
-            NetworkingTrace networkingTrace)
+            NetworkingTrace networkingTrace,
+            SerializerSessionPool sessionPool,
+            MessageSerializer messageSerializer)
         {
-            this.ServiceProvider = serviceProvider;
-            this.MessageFactory = messageFactory;
-            this.MessagingTrace = messagingTrace;
-            this.NetworkingTrace = networkingTrace;
+            ServiceProvider = serviceProvider;
+            MessageFactory = messageFactory;
+            MessagingTrace = messagingTrace;
+            NetworkingTrace = networkingTrace;
+            IncomingMessageWorkerPool = new IncomingMessageWorkerPool(sessionPool, messageSerializer);
+            IncomingMessageWorkerPool.Start();
         }
 
+        public IncomingMessageWorkerPool IncomingMessageWorkerPool { get; } 
         public MessageFactory MessageFactory { get; }
         public IServiceProvider ServiceProvider { get; }
         public NetworkingTrace NetworkingTrace { get; }
