@@ -9,6 +9,7 @@ using Orleans.Serialization.Serializers;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using System.Text;
+using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -23,12 +24,18 @@ namespace Orleans.Runtime
             ushort interfaceVersion,
             IGrainReferenceRuntime runtime,
             InvokeMethodOptions invokeMethodOptions,
+            CodecProvider codecProvider,
+            CopyContextPool copyContextPool,
+            DeepCopier deepCopier,
             IServiceProvider serviceProvider)
         {
             this.GrainType = graintype;
             this.InterfaceType = grainInterfaceType;
             this.Runtime = runtime;
             this.InvokeMethodOptions = invokeMethodOptions;
+            this.CodecProvider = codecProvider;
+            this.CopyContextPool = copyContextPool;
+            this.DeepCopier = deepCopier;
             this.ServiceProvider = serviceProvider;
             this.InterfaceVersion = interfaceVersion;
         }
@@ -37,8 +44,11 @@ namespace Orleans.Runtime
         public GrainType GrainType { get; }
         public GrainInterfaceType InterfaceType { get; }
         public InvokeMethodOptions InvokeMethodOptions { get; }
+        public CodecProvider CodecProvider { get; }
+        public CopyContextPool CopyContextPool { get; }
         public IServiceProvider ServiceProvider { get; }
         public ushort InterfaceVersion { get; }
+        public DeepCopier DeepCopier { get; }
     }
 
     [RegisterSerializer]
@@ -184,6 +194,10 @@ namespace Orleans.Runtime
 
         public GrainInterfaceType InterfaceType => _shared.InterfaceType;
 
+        protected CopyContextPool CopyContextPool => _shared.CopyContextPool;
+        protected CodecProvider CodecProvider => _shared.CodecProvider;
+        protected DeepCopier DeepCopier => _shared.DeepCopier;
+
         /// <summary>Constructs a reference to the grain with the specified Id.</summary>
         protected GrainReference(GrainReferenceShared shared, IdSpan key)
         {
@@ -192,12 +206,9 @@ namespace Orleans.Runtime
         }
 
         /// <summary>Constructs a reference to the grain with the specified ID.</summary>
-        internal static GrainReference FromGrainId(GrainReferenceShared shared, GrainId grainId)
-        {
-            return new GrainReference(shared, grainId.Key);
-        }
+        internal static GrainReference FromGrainId(GrainReferenceShared shared, GrainId grainId) => new GrainReference(shared, grainId.Key);
 
-        public virtual TGrainInterface Cast<TGrainInterface>() where TGrainInterface : IAddressable => (TGrainInterface)_shared.Runtime.Cast(this, typeof(TGrainInterface));
+        public virtual TGrainInterface Cast<TGrainInterface>() where TGrainInterface : IAddressable => (TGrainInterface)Runtime.Cast(this, typeof(TGrainInterface));
 
         /// <summary>
         /// Tests this reference for equality to another object.
@@ -303,6 +314,7 @@ namespace Orleans.Runtime
         }
     }
 
+    [SuppressReferenceTracking]
     [GenerateSerializer]
     public abstract class RequestBase : IInvokable
     {
