@@ -12,7 +12,10 @@ using Orleans.Configuration;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Runtime.Versions;
+using Orleans.Serialization;
+using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Configuration;
+using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.GrainReferences
@@ -118,6 +121,9 @@ namespace Orleans.GrainReferences
     /// </summary>
     internal class UntypedGrainReferenceActivatorProvider : IGrainReferenceActivatorProvider
     {
+        private readonly DeepCopier _deepCopier;
+        private readonly CopyContextPool _copyContextPool;
+        private readonly CodecProvider _codecProvider;
         private readonly GrainVersionManifest _versionManifest;
         private readonly IServiceProvider _serviceProvider;
         private IGrainReferenceRuntime _grainReferenceRuntime;
@@ -127,9 +133,17 @@ namespace Orleans.GrainReferences
         /// </summary>
         /// <param name="manifest">The grain version manifest.</param>
         /// <param name="serviceProvider">The service provider.</param>
-        public UntypedGrainReferenceActivatorProvider(GrainVersionManifest manifest, IServiceProvider serviceProvider)
+        public UntypedGrainReferenceActivatorProvider(
+            GrainVersionManifest manifest,
+            CodecProvider codecProvider,
+            CopyContextPool copyContextPool,
+            DeepCopier deepCopier,
+            IServiceProvider serviceProvider)
         {
             _versionManifest = manifest;
+            _codecProvider = codecProvider;
+            _copyContextPool = copyContextPool;
+            _deepCopier = deepCopier;
             _serviceProvider = serviceProvider;
         }
 
@@ -145,7 +159,7 @@ namespace Orleans.GrainReferences
             var interfaceVersion = _versionManifest.GetLocalVersion(interfaceType);
        
             var runtime = _grainReferenceRuntime ??= _serviceProvider.GetRequiredService<IGrainReferenceRuntime>();
-            var shared = new GrainReferenceShared(grainType, interfaceType, interfaceVersion, runtime, InvokeMethodOptions.None, _serviceProvider);
+            var shared = new GrainReferenceShared(grainType, interfaceType, interfaceVersion, runtime, InvokeMethodOptions.None, _codecProvider, _copyContextPool, _deepCopier, _serviceProvider);
             activator = new UntypedGrainReferenceActivator(shared);
             return true;
         }
@@ -281,6 +295,9 @@ namespace Orleans.GrainReferences
     /// </summary>
     internal class GrainReferenceActivatorProvider : IGrainReferenceActivatorProvider
     {
+        private readonly CopyContextPool _copyContextPool;
+        private readonly CodecProvider _codecProvider;
+        private readonly DeepCopier _deepCopier;
         private readonly IServiceProvider _serviceProvider;
         private readonly GrainPropertiesResolver _propertiesResolver;
         private readonly RpcProvider _rpcProvider;
@@ -298,11 +315,17 @@ namespace Orleans.GrainReferences
             IServiceProvider serviceProvider,
             GrainPropertiesResolver propertiesResolver,
             RpcProvider rpcProvider,
+            CopyContextPool copyContextPool,
+            CodecProvider codecProvider,
+            DeepCopier deepCopier,
             GrainVersionManifest grainVersionManifest)
         {
             _serviceProvider = serviceProvider;
             _propertiesResolver = propertiesResolver;
             _rpcProvider = rpcProvider;
+            _copyContextPool = copyContextPool;
+            _codecProvider = codecProvider;
+            _deepCopier = deepCopier;
             _grainVersionManifest = grainVersionManifest;
         }
 
@@ -327,7 +350,7 @@ namespace Orleans.GrainReferences
 
             var invokeMethodOptions = unordered ? InvokeMethodOptions.Unordered : InvokeMethodOptions.None;
             var runtime = _grainReferenceRuntime ??= _serviceProvider.GetRequiredService<IGrainReferenceRuntime>();
-            var shared = new GrainReferenceShared(grainType, interfaceType, interfaceVersion, runtime, invokeMethodOptions, _serviceProvider);
+            var shared = new GrainReferenceShared(grainType, interfaceType, interfaceVersion, runtime, invokeMethodOptions, _codecProvider, _copyContextPool, _deepCopier, _serviceProvider);
             activator = new GrainReferenceActivator(proxyType, shared);
             return true;
         }
