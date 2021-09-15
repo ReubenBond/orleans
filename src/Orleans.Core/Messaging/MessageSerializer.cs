@@ -459,7 +459,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             string result;
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
             if (reader.TryReadBytes(length, out var span))
             {
                 result = Encoding.UTF8.GetString(span);
@@ -483,7 +483,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-#if NETCOREAPP
+#if NETCOREAPP3_1_OR_GREATER
             var numBytes = Encoding.UTF8.GetByteCount(value);
             writer.WriteVarInt32(numBytes);
             if (numBytes < 512)
@@ -545,7 +545,7 @@ namespace Orleans.Runtime.Messaging
             {
                 return null;
             }
-#if NET5_0
+#if NET5_0_OR_GREATER
             if (reader.TryReadBytes(length, out var bytes))
             {
                 ip = new IPAddress(bytes);
@@ -555,7 +555,7 @@ namespace Orleans.Runtime.Messaging
 #endif
                 var addressBytes = reader.ReadBytes((uint)length);
                 ip = new IPAddress(addressBytes);
-#if NET5_0
+#if NET5_0_OR_GREATER
             }
 #endif
             var port = (int)reader.ReadVarUInt32();
@@ -573,7 +573,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             var ep = value.Endpoint;
-#if NET5_0
+#if NET5_0_OR_GREATER
             Span<byte> buffer = stackalloc byte[64];
             if (ep.Address.TryWriteBytes(buffer, out var length))
             {
