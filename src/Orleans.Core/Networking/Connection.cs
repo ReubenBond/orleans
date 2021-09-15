@@ -305,10 +305,10 @@ namespace Orleans.Runtime.Messaging
                     {
                         do
                         {
-                            requiredBytes = serializer.TryParse(ref buffer, out var headerBytes, out var bodyBytes);
+                            (requiredBytes, _, _) = serializer.TryRead(ref buffer, out var message);
                             if (requiredBytes == 0)
                             {
-                                shared.IncomingMessageWorkerPool.Enqueue(ref headerBytes, ref bodyBytes, this);
+                                shared.IncomingMessageWorkerPool.Enqueue(message, this);
                             }
                         } while (requiredBytes == 0);
                     }
@@ -536,15 +536,15 @@ namespace Orleans.Runtime.Messaging
             private readonly SerializerSessionPool _sessionPool;
             private readonly MessageSerializer _serializer;
 
-            public IncomingMessageWorkerPool(SerializerSessionPool sessionPool, MessageSerializer serializer) : base(numWorkers: 0)
+            public IncomingMessageWorkerPool(SerializerSessionPool sessionPool, MessageSerializer serializer) : base(numWorkers: 4)
             {
                 _sessionPool = sessionPool;
                 _serializer = serializer;
             }
 
-            public void Enqueue(ref ReadOnlySequence<byte> headerBytes, ref ReadOnlySequence<byte> bodyBytes, Connection connection)
+            public void Enqueue(Message message, Connection connection)
             {
-                Enqueue(new IncomingMessageWorkItem { HeaderBytes = headerBytes, BodyBytes = bodyBytes, Connection = connection });
+                Enqueue(new IncomingMessageWorkItem { Message = message, Connection = connection });
             }
 
             protected override async Task RunAsync(SingleWaiterAutoResetEvent workSignal, CancellationToken shutdownToken)
@@ -565,32 +565,11 @@ namespace Orleans.Runtime.Messaging
             private void Process(SerializerSession serializerSession, ref IncomingMessageWorkItem workItem)
             {
                 var connection = workItem.Connection;
-                Message message = default;
+                var message = workItem.Message;
 
                 try
                 {
-                    // Decode header
-                    var header = workItem.HeaderBytes;
-
-                    // build message
-                    if (header.IsSingleSegment)
-                    {
-                        var headersReader = Reader.Create(header.First.Span, serializerSession);
-                        message = _serializer.Deserialize(ref headersReader);
-                    }
-                    else
-                    {
-                        var headersReader = Reader.Create(header, serializerSession);
-                        message = _serializer.Deserialize(ref headersReader);
-                    }
-
-                    ReferenceCountingPinnedMemoryPool.Return(header);
-
-                    // Body deserialization is more likely to fail than header deserialization.
-                    // Separating the two allows for these kinds of errors to be propagated back to the caller.
-                    message.SetSerializedPayload(workItem.BodyBytes);
-
-                    MessagingStatisticsGroup.OnMessageReceive(connection.MessageReceivedCounter, message, (int)header.Length + (int)workItem.BodyBytes.Length, (int)header.Length, connection.ConnectionDirection);
+                    MessagingStatisticsGroup.OnMessageReceive(connection.MessageReceivedCounter, message, 0, 0, connection.ConnectionDirection);
                     connection.OnReceivedMessage(message);
                 }
                 catch (Exception exception) when (connection.HandleReceiveMessageFailure(message, exception))
@@ -604,8 +583,7 @@ namespace Orleans.Runtime.Messaging
 
             internal readonly struct IncomingMessageWorkItem
             {
-                public ReadOnlySequence<byte> HeaderBytes { get; init; }
-                public ReadOnlySequence<byte> BodyBytes { get; init; }
+                public Message Message { get; init; }
                 public Connection Connection { get; init; }
             }
         }
