@@ -129,10 +129,7 @@ namespace Orleans.Runtime
         public static void Clear()
         {
             // Remove the key to prevent passing of its value from this point on
-            if (CallContextData.Value != null)
-            {
-                CallContextData.Value = null;
-            }
+            CallContextData.Value = null;
         }
     }
 }

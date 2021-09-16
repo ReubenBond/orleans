@@ -277,7 +277,10 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                RequestContextExtensions.Import(message.RequestContextData);
+                if (message.RequestContextData is { } requestContextData)
+                {
+                    RequestContextExtensions.Import(requestContextData);
+                }
 
                 Response response;
                 try
@@ -353,7 +356,11 @@ namespace Orleans.Runtime
             }
             finally
             {
-                RequestContext.Clear();
+                // RequestContext is an async local, so if it is set by 
+                if (message.RequestContextData is { })
+                {
+                    RequestContext.Clear();
+                }
             }
         }
 
