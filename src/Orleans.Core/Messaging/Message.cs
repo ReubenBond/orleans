@@ -337,26 +337,10 @@ namespace Orleans.Runtime
             set => _result = value;
         }
 
-        public TimeSpan? TimeToLive
+        public TimeSpan TimeToLive
         {
-            get
-            {
-                if (!_timeToLive.IsRunning) return null;
-                return TimeSpan.FromMilliseconds(-_timeToLive.ElapsedMilliseconds);
-            }
-
-            set
-            {
-                if (!value.HasValue)
-                {
-                    _timeToLive = default;
-                }
-                else
-                {
-                    var delta = value.Value;
-                    _timeToLive = CoarseStopwatch.FromTimeSpan(delta);
-                }
-            }
+            get => TimeSpan.FromMilliseconds(-_timeToLive.ElapsedMilliseconds);
+            set => _timeToLive = CoarseStopwatch.FromTimeSpan(value);
         }
 
         public List<ActivationAddress> CacheInvalidationHeader

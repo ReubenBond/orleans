@@ -40,7 +40,7 @@ namespace UnitTests.Serialization
 
             message.TimeToLive = TimeSpan.FromSeconds(1);
             await Task.Delay(TimeSpan.FromMilliseconds(500));
-            Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
+            Assert.InRange(message.TimeToLive, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
@@ -52,8 +52,8 @@ namespace UnitTests.Serialization
             await Task.Delay(TimeSpan.FromMilliseconds(500));
             var deserializedMessage = RoundTripMessage(message);
 
-            Assert.NotNull(deserializedMessage.TimeToLive);
-            Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
+            Assert.InRange(deserializedMessage.TimeToLive, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
+            Assert.InRange(message.TimeToLive, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
