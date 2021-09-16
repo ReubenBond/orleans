@@ -10,24 +10,24 @@ namespace Orleans.Runtime
     {
         public static void Import(Dictionary<string, object> contextData)
         {
-            if (RequestContext.PropagateActivityId)
-            {
-                object activityIdObj = Guid.Empty;
-                if (contextData?.TryGetValue(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER, out activityIdObj) == true)
-                {
-                    Trace.CorrelationManager.ActivityId = (Guid)activityIdObj;
-                }
-                else
-                {
-                    Trace.CorrelationManager.ActivityId = Guid.Empty;
-                }
-            }
-
             if (contextData != null && contextData.Count > 0)
             {
                 var values = contextData.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
                 // We have some data, so store RC data into the async local field.
                 RequestContext.CallContextData.Value = values;
+
+                if (RequestContext.PropagateActivityId)
+                {
+                    if (contextData.TryGetValue(RequestContext.E2_E_TRACING_ACTIVITY_ID_HEADER, out var activityIdObj))
+                    {
+                        Trace.CorrelationManager.ActivityId = (Guid)activityIdObj;
+                    }
+                    else
+                    {
+                        Trace.CorrelationManager.ActivityId = Guid.Empty;
+                    }
+                }
             }
             else
             {
