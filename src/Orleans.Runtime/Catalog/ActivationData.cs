@@ -278,12 +278,10 @@ namespace Orleans.Runtime
         /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>c></returns>
         public LimitExceededException CheckOverloaded()
         {
-            string limitName = LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS;
             int maxRequestsHardLimit = _shared.MessagingOptions.MaxEnqueuedRequestsHardLimit;
             int maxRequestsSoftLimit = _shared.MessagingOptions.MaxEnqueuedRequestsSoftLimit;
             if (IsStatelessWorker)
             {
-                limitName = LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER;
                 maxRequestsHardLimit = _shared.MessagingOptions.MaxEnqueuedRequestsHardLimit_StatelessWorker;
                 maxRequestsSoftLimit = _shared.MessagingOptions.MaxEnqueuedRequestsSoftLimit_StatelessWorker;
             }
@@ -294,6 +292,19 @@ namespace Orleans.Runtime
 
             if (maxRequestsHardLimit > 0 && count > maxRequestsHardLimit) // Hard limit
             {
+                return HardLimitExceeded(maxRequestsHardLimit, count);
+            }
+
+            if (maxRequestsSoftLimit > 0 && count > maxRequestsSoftLimit) // Soft limit
+            {
+                return SoftLimitExceeded(maxRequestsSoftLimit, count);
+            }
+
+            return null;
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            LimitExceededException HardLimitExceeded(int maxRequestsHardLimit, int count)
+            {
                 _shared.Logger.LogWarning(
                     (int)ErrorCode.Catalog_Reject_ActivationTooManyRequests,
                     "Overload - {Count} enqueued requests for activation {Activation}, exceeding hard limit rejection threshold of {HardLimit}",
@@ -301,10 +312,12 @@ namespace Orleans.Runtime
                     this,
                     maxRequestsHardLimit);
 
+                var limitName = IsStatelessWorker ? LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER : LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS;
                 return new LimitExceededException(limitName, count, maxRequestsHardLimit, ToString());
             }
 
-            if (maxRequestsSoftLimit > 0 && count > maxRequestsSoftLimit) // Soft limit
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            LimitExceededException SoftLimitExceeded(int maxRequestsSoftLimit, int count)
             {
                 _shared.Logger.LogWarning(
                     (int)ErrorCode.Catalog_Warn_ActivationTooManyRequests,
@@ -314,8 +327,6 @@ namespace Orleans.Runtime
                     maxRequestsSoftLimit);
                 return null;
             }
-
-            return null;
         }
 
         internal int GetRequestCount()
