@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -946,8 +947,8 @@ namespace Orleans.Runtime
         /// <param name="message"></param>
         private void InvokeIncomingRequest(Message message)
         {
-            MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
-            _shared.InternalRuntime.MessagingTrace.OnScheduleMessage(message);
+            //MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
+            //_shared.InternalRuntime.MessagingTrace.OnScheduleMessage(message);
 
             try
             {
@@ -1028,7 +1029,7 @@ namespace Orleans.Runtime
         public void ReceiveMessage(object message) => ReceiveMessage((Message)message);
         public void ReceiveMessage(Message message)
         {
-            _shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveMessage(message);
+            //_shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveMessage(message);
 
             // Don't process messages that have already timed out
             if (message.IsExpired)
@@ -1061,7 +1062,7 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
+                //MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
                 _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
             }
         }
