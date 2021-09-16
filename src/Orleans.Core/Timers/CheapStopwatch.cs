@@ -73,6 +73,8 @@ namespace Orleans.Runtime
         /// <returns>A new, stopped <see cref="CoarseStopwatch"/> with the provided start and end timestamps.</returns>
         public static CoarseStopwatch FromTimestamp(long start, long end) => new(-(end - start));
 
+        public static CoarseStopwatch FromTimeSpan(TimeSpan expiration) => new(GetTimestamp() + (long)expiration.TotalMilliseconds);
+
         /// <summary>
         /// Gets the raw counter value for this instance.
         /// </summary>
