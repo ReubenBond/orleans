@@ -96,6 +96,17 @@ namespace Orleans.Runtime
             //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
+        public void OnFastPathResponse(Response response)
+        {
+            if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
+            {
+                return;
+            }
+
+            context.Complete(response);
+            shared.Unregister(Message);
+        }
+
         public void DoCallback(Message response)
         {
             if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
