@@ -19,6 +19,7 @@ using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Serialization.Invocation;
 using Orleans.Runtime.Messaging;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Runtime
 {
@@ -70,7 +71,7 @@ namespace Orleans.Runtime
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
             this.disposables = new List<IDisposable>();
-            this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>();
+            this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>(CallbackDictionaryComparer.Instance);
             this.messageFactory = messageFactory;
             this.ConcreteGrainFactory = new GrainFactory(this, referenceActivator, interfaceIdResolver, interfaceToTypeResolver);
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
@@ -602,6 +603,13 @@ namespace Orleans.Runtime
 
                 if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(responseTimeout);
             }
+        }
+
+        private sealed class CallbackDictionaryComparer : IEqualityComparer<(GrainId, CorrelationId)>
+        {
+            public static CallbackDictionaryComparer Instance { get; } = new();
+            public bool Equals([AllowNull] (GrainId, CorrelationId) x, [AllowNull] (GrainId, CorrelationId) y) => x.Item1 == y.Item1 && x.Item2 == y.Item2;
+            public int GetHashCode([DisallowNull] (GrainId, CorrelationId) obj) => obj.GetHashCode();
         }
     }
 }
