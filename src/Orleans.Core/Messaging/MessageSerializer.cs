@@ -239,7 +239,7 @@ namespace Orleans.Runtime.Messaging
 
             if ((headers & Headers.TIME_TO_LIVE) != Headers.NONE)
             {
-                writer.WriteInt64(value.TimeToLive.Value.Ticks);
+                writer.WriteInt64(value.TimeToLive.Ticks);
             }
 
             if ((headers & Headers.FORWARD_COUNT) != Headers.NONE)
