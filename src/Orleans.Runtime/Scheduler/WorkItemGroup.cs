@@ -14,7 +14,7 @@ using Orleans.Internal;
 namespace Orleans.Runtime.Scheduler
 {
     [DebuggerDisplay("WorkItemGroup Name={Name} State={state}")]
-    internal class WorkItemGroup : IWorkItem, IDisposable, IWorkItemScheduler
+    internal class WorkItemGroup : SynchronizationContext, IWorkItem, IDisposable, IWorkItemScheduler
     {
         private enum WorkGroupStatus
         {
@@ -23,16 +23,50 @@ namespace Orleans.Runtime.Scheduler
             Running = 2
         }
 
+        public enum WorkItemKind : byte
+        {
+            None,
+            Task,
+            //WorkItem,
+            SendOrPostCallback,
+            Action,
+            ActionWithState
+        }
+
+        public struct WorkItemEntry
+        {
+            public object WorkItem { get; set; }
+            public object State { get; set; } // used for SendOrPostCallback from SynchronizationContext
+            public WorkItemKind Type { get; set; }
+
+            public override string ToString() => Type switch
+            {
+                WorkItemKind.Task => OrleansTaskExtentions.ToString((Task)WorkItem),
+                _ => WorkItem?.ToString()
+            };
+        }
+
+        public override void Post(SendOrPostCallback callback, object state)
+        {
+            var workItem = new WorkItemEntry { State = state, Type = WorkItemKind.SendOrPostCallback, WorkItem = callback };
+            this.EnqueueWorkItem(workItem);
+        }
+
+        public override void Send(SendOrPostCallback callback, object state)
+        {
+            throw new NotSupportedException("Synchronous execution is not allowed");
+        }
+
         private readonly ILogger log;
         private WorkGroupStatus state;
         private readonly object lockable;
-        private readonly Queue<Task> workItems;
+        private readonly Queue<WorkItemEntry> workItems;
 
         private long totalItemsEnqueued;
         private long totalItemsProcessed;
         private long lastLongQueueWarningTimestamp;
 
-        private Task currentTask;
+        private WorkItemEntry currentTask;
         private long currentTaskStarted;
 
         private readonly QueueTrackingStatistic queueTracking;
@@ -40,7 +74,7 @@ namespace Orleans.Runtime.Scheduler
         private readonly SchedulingOptions schedulingOptions;
         private readonly SchedulerStatisticsGroup schedulerStatistics;
 
-        internal ActivationTaskScheduler TaskScheduler { get; } 
+        internal ActivationTaskScheduler TaskScheduler { get; }
 
         public IGrainContext GrainContext { get; set; }
 
@@ -53,7 +87,7 @@ namespace Orleans.Runtime.Scheduler
             get { lock (lockable) { return WorkItemCount; } }
         }
 
-        private Task CurrentTask
+        private WorkItemEntry CurrentTask
         {
             get => currentTask;
             set
@@ -77,7 +111,7 @@ namespace Orleans.Runtime.Scheduler
             this.schedulingOptions = schedulingOptions.Value;
             this.schedulerStatistics = schedulerStatistics;
             state = WorkGroupStatus.Waiting;
-            workItems = new Queue<Task>();
+            workItems = new Queue<WorkItemEntry>();
             lockable = new object();
             totalItemsEnqueued = 0;
             totalItemsProcessed = 0;
@@ -98,7 +132,6 @@ namespace Orleans.Runtime.Scheduler
                         var sb = new StringBuilder();
                         lock (lockable)
                         {
-
                             sb.Append("QueueLength = " + WorkItemCount);
                             sb.Append($", State = {state}");
                             if (state == WorkGroupStatus.Runnable)
@@ -116,12 +149,51 @@ namespace Orleans.Runtime.Scheduler
         /// <param name="task">The work item to add.</param>
         public void EnqueueTask(Task task)
         {
+            var workItem = new WorkItemEntry { WorkItem = task, Type = WorkItemKind.Task };
+            EnqueueWorkItem(workItem);
+        }
+
+        /*
+        public void EnqueueWorkItem(IWorkItem task, bool forceAsync = false)
+        {
+            var workItem = new WorkItemEntry
+            {
+                Type = WorkItemKind.WorkItem,
+                WorkItem = task
+            };
+            EnqueueWorkItem(workItem, forceAsync);
+        }
+        */
+
+        public void Enqueue(Action task, bool forceAsync = false)
+        {
+            var workItem = new WorkItemEntry
+            {
+                Type = WorkItemKind.Action,
+                WorkItem = task,
+            };
+            EnqueueWorkItem(workItem, forceAsync);
+        }
+
+        public void Enqueue(Action<object> task, object state, bool forceAsync = false)
+        {
+            var workItem = new WorkItemEntry
+            {
+                Type = WorkItemKind.ActionWithState,
+                WorkItem = task,
+                State = state,
+            };
+            EnqueueWorkItem(workItem, forceAsync);
+        }
+
+        public void EnqueueWorkItem(WorkItemEntry workItem, bool forceAsync = false)
+        {
 #if DEBUG
             if (log.IsEnabled(LogLevel.Trace))
             {
                 this.log.LogTrace(
                     "EnqueueWorkItem {Task} into {GrainContext} when TaskScheduler.Current={TaskScheduler}",
-                    task,
+                    workItem.ToString(),
                     this.GrainContext,
                     System.Threading.Tasks.TaskScheduler.Current);
             }
@@ -132,7 +204,7 @@ namespace Orleans.Runtime.Scheduler
                 long thisSequenceNumber = totalItemsEnqueued++;
                 int count = WorkItemCount;
 
-                workItems.Enqueue(task);
+                workItems.Enqueue(workItem);
                 int maxPendingItemsLimit = schedulingOptions.MaxPendingWorkItemsSoftLimit;
                 if (maxPendingItemsLimit > 0 && count > maxPendingItemsLimit)
                 {
@@ -149,21 +221,36 @@ namespace Orleans.Runtime.Scheduler
 
                     lastLongQueueWarningTimestamp = now;
                 }
-                if (state != WorkGroupStatus.Waiting) return;
+
+                if (state != WorkGroupStatus.Waiting)
+                {
+                    return;
+                }
 
                 state = WorkGroupStatus.Runnable;
-#if DEBUG
-                if (log.IsEnabled(LogLevel.Trace))
-                {
-                    log.LogTrace(
-                        "Add to RunQueue {Task}, #{SequenceNumber}, onto {GrainContext}",
-                        task,
-                        thisSequenceNumber,
-                        GrainContext);
-                }
-#endif
                 ScheduleExecution(this);
+
+                /*
+                if (forceAsync)
+                {
+                    ScheduleExecution(this);
+                }
+                else
+                {
+                    state = WorkGroupStatus.Running;
+                }
+                */
             }
+
+            // Start executing outside of the lock.
+            // The state has already been transitioned into 'Running',
+            // so we know that this is the only thread able to call Execute.
+            /*
+            if (!forceAsync)
+            {
+                Execute();
+            }
+            */
         }
 
         /// <summary>
@@ -171,13 +258,16 @@ namespace Orleans.Runtime.Scheduler
         /// </summary>
         internal IEnumerable<Task> GetScheduledTasks()
         {
-            foreach (var task in this.workItems)
+            foreach (var workItem in workItems)
             {
-                yield return task;
+                if (workItem.Type == WorkItemKind.Task)
+                {
+                    yield return (Task)workItem.WorkItem;
+                }
             }
         }
 
-        private static object DumpAsyncState(object o)
+        private static string DumpAsyncState(object o)
         {
             if (o is Delegate action)
                 return action.Target is null ? action.Method.DeclaringType + "." + action.Method.Name
@@ -189,7 +279,7 @@ namespace Orleans.Runtime.Scheduler
                     )?.GetValue(o) is Action continuation)
                 return DumpAsyncState(continuation);
 
-            return o;
+            return o?.ToString();
         }
 
         // Execute one or more turns for this activation. 
@@ -197,8 +287,10 @@ namespace Orleans.Runtime.Scheduler
         // thread will be in this method at once -- but other asynch threads may still be queueing tasks, etc.
         public void Execute()
         {
+            var outer = SynchronizationContext.Current;
             try
             {
+                SynchronizationContext.SetSynchronizationContext(this);
                 RuntimeContext.SetExecutionContext(this.GrainContext);
 
                 // Process multiple items -- drain the applicationMessageQueue (up to max items) for this physical activation
@@ -212,7 +304,7 @@ namespace Orleans.Runtime.Scheduler
                     }
 
                     // Get the first Work Item on the list
-                    Task task;
+                    WorkItemEntry task;
                     lock (lockable)
                     {
                         if (workItems.Count > 0)
@@ -226,7 +318,7 @@ namespace Orleans.Runtime.Scheduler
                     {
                         log.LogTrace(
                         "About to execute task {Task} in GrainContext={GrainContext}",
-                        OrleansTaskExtentions.ToString(task),
+                        task.ToString(),
                         this.GrainContext);
                     }
 #endif
@@ -234,7 +326,23 @@ namespace Orleans.Runtime.Scheduler
 
                     try
                     {
-                        TaskScheduler.RunTask(task);
+                        switch (task.Type)
+                        {
+                            case WorkItemKind.Task:
+                                TaskScheduler.RunTask(Unsafe.As<Task>(task.WorkItem));
+                                break;
+                            case WorkItemKind.SendOrPostCallback:
+                                Unsafe.As<SendOrPostCallback>(task.WorkItem)(task.State);
+                                break;
+                            case WorkItemKind.Action:
+                                Unsafe.As<Action>(task.WorkItem)();
+                                break;
+                            case WorkItemKind.ActionWithState:
+                                Unsafe.As<Action<object>>(task.WorkItem)(task.State);
+                                break;
+                            default:
+                                throw new InvalidOperationException($"Unknown WorkItem: {task}");
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -242,7 +350,7 @@ namespace Orleans.Runtime.Scheduler
                             (int)ErrorCode.SchedulerExceptionFromExecute,
                             ex,
                             "Worker thread caught an exception thrown from Execute by task {Task}. Exception: {Exception}",
-                            OrleansTaskExtentions.ToString(task),
+                            task.ToString(),
                             ex);
                         throw;
                     }
@@ -256,14 +364,14 @@ namespace Orleans.Runtime.Scheduler
                             this.log.LogWarning(
                                 (int)ErrorCode.SchedulerTurnTooLong3,
                                 "Task {Task} in WorkGroup {GrainContext} took elapsed time {Duration} for execution, which is longer than {TurnWarningLengthThreshold}. Running on thread {Thread}",
-                                OrleansTaskExtentions.ToString(task),
+                                task.ToString(),
                                 this.GrainContext.ToString(),
                                 taskLength.ToString("g"),
                                 schedulingOptions.TurnWarningLengthThreshold,
                                 Thread.CurrentThread.ManagedThreadId.ToString());
                         }
 
-                        CurrentTask = null;
+                        CurrentTask = default;
                     }
                     count++;
                 }
@@ -297,6 +405,7 @@ namespace Orleans.Runtime.Scheduler
                 }
 
                 RuntimeContext.ResetExecutionContext();
+                SynchronizationContext.SetSynchronizationContext(outer);
             }
         }
 
@@ -310,10 +419,12 @@ namespace Orleans.Runtime.Scheduler
                 sb.Append(this);
                 sb.AppendFormat(". Currently QueuedWorkItems={0}; Total Enqueued={1}; Total processed={2}; ",
                     WorkItemCount, totalItemsEnqueued, totalItemsProcessed);
-                if (CurrentTask is Task task)
+                if (CurrentTask is { Type: not WorkItemKind.None } task)
                 {
-                    sb.AppendFormat(" Executing Task Id={0} Status={1} for {2}.",
-                        task.Id, task.Status, TimeSpan.FromMilliseconds(Environment.TickCount64 - currentTaskStarted));
+                    sb.AppendFormat(
+                        " Executing Task {0} for {1}",
+                        task.ToString(),
+                        TimeSpan.FromMilliseconds(Environment.TickCount64 - currentTaskStarted));
                 }
 
                 sb.AppendFormat("TaskRunner={0}; ", TaskScheduler);
@@ -343,7 +454,8 @@ namespace Orleans.Runtime.Scheduler
             this.schedulerStatistics.UnregisterWorkItemGroup(workItemGroupStatisticsNumber);
         }
 
-        public void QueueAction(Action action) => TaskScheduler.QueueAction(action);
+        public void QueueAction(Action action) => Enqueue(action);
+        public void QueueAction(Action<object> action, object state) => Enqueue(action, state);
         public void QueueTask(Task task) => task.Start(TaskScheduler);
         public void QueueWorkItem(IThreadPoolWorkItem workItem) => TaskScheduler.QueueThreadPoolWorkItem(workItem);
     }
