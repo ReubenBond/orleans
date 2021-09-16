@@ -177,6 +177,7 @@ namespace Orleans.Runtime
             if (!oneWay)
             {
                 var callbackData = new CallbackData(sharedData, context, message);
+                message.CompletionCallback = callbackData;
                 callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
             }
             else
@@ -598,6 +599,7 @@ namespace Orleans.Runtime
             {
                 var callback = pair.Value;
                 if (callback.IsCompleted) continue;
+
                 if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(responseTimeout);
             }
         }
