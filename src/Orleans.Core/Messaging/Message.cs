@@ -33,6 +33,9 @@ namespace Orleans.Runtime
         [NonSerialized]
         public readonly CoarseStopwatch _timeSinceCreation = CoarseStopwatch.StartNew();
 
+        [field: NonSerialized]
+        internal CallbackData CompletionCallback { get; set; }
+
         private bool _payloadIsSerialized;
         private ReadOnlySequence<byte> _serializedPayload;
         private object _payload;

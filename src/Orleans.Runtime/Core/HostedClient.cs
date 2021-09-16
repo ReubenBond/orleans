@@ -143,7 +143,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public bool TryDispatchToClient(Message message)
+        public bool TryDispatchToClient(Message message, GrainReference targetReference = null)
         {
             if (!ClientGrainId.TryParse(message.TargetGrain, out var targetClient) || !this.ClientId.Equals(targetClient))
             {
@@ -154,6 +154,11 @@ namespace Orleans.Runtime
             {
                 this.messagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Receive);
                 return true;
+            }
+
+            if (targetReference is not null)
+            {
+                targetReference.CachedHandler = this;
             }
 
             this.ReceiveMessage(message);

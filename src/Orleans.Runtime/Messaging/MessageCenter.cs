@@ -66,11 +66,11 @@ namespace Orleans.Runtime.Messaging
 
         public void SetHostedClient(HostedClient client) => this.hostedClient = client;
 
-        public bool TryDeliverToProxy(Message msg)
+        public bool TryDeliverToProxy(Message msg, GrainReference targetReference = null)
         {
             if (!msg.TargetGrain.IsClient()) return false;
-            if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)) return true;
-            return this.hostedClient is HostedClient client && client.TryDispatchToClient(msg);
+            if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg, targetReference)) return true;
+            return this.hostedClient is HostedClient client && client.TryDispatchToClient(msg, targetReference);
         }
 
         public void Start()
@@ -162,7 +162,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 // First check to see if it's really destined for a proxied client, instead of a local grain.
-                if (TryDeliverToProxy(msg))
+                if (TryDeliverToProxy(msg, targetReference))
                 {
                     // Message was successfully delivered to the proxy.
                     return;
@@ -463,6 +463,12 @@ namespace Orleans.Runtime.Messaging
         internal void SendResponse(Message request, Response response)
         {
             // create the response
+            if (request.CompletionCallback is { } callbackData)
+            {
+                callbackData.OnFastPathResponse(response);
+                return;
+            }
+
             var message = this.messageFactory.CreateResponseMessage(request);
             message.BodyObject = response;
 
@@ -534,7 +540,7 @@ namespace Orleans.Runtime.Messaging
 
                     systemTarget.ReceiveMessage(msg);
                 }
-                else if (TryDeliverToProxy(msg))
+                else if (TryDeliverToProxy(msg, targetReference))
                 {
                     return;
                 }

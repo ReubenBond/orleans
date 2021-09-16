@@ -220,9 +220,8 @@ namespace Orleans.Runtime.Messaging
         /// <summary>
         /// See if this message is intended for a grain we're proxying, and queue it for delivery if so.
         /// </summary>
-        /// <param name="msg"></param>
         /// <returns>true if the message should be delivered to a proxied grain, false if not.</returns>
-        internal bool TryDeliverToProxy(Message msg)
+        internal bool TryDeliverToProxy(Message msg, GrainReference targetReference = null)
         {
             // See if it's a grain we're proxying.
             var targetGrain = msg.TargetGrain;
@@ -252,11 +251,16 @@ namespace Orleans.Runtime.Messaging
                 msg.SendingSilo = _gatewayAddress;
             }
 
+            if (targetReference is not null)
+            {
+                targetReference.CachedHandler = client;
+            }
+
             client.SendMessage(msg);
             return true;
         }
 
-        private class ClientState
+        private class ClientState : ICachedMessageHandler
         {
 #pragma warning disable IDE0052 // Remove unread private members
             /// <summary>
@@ -373,6 +377,14 @@ namespace Orleans.Runtime.Messaging
                         }
                     }
                 }
+            }
+
+            public bool SendMessage(object message)
+            {
+                if (_dropped) return false;
+
+                SendMessage((Message)message);
+                return true;
             }
         }
 
