@@ -594,7 +594,7 @@ namespace Orleans.Runtime
 
         private void OnCallbackExpiryTick(object state)
         {
-            var currentStopwatchTicks = Stopwatch.GetTimestamp();
+            var currentStopwatchTicks = CoarseStopwatch.GetTimestamp();
             var responseTimeout = this.messagingOptions.ResponseTimeout;
             foreach (var pair in callbacks)
             {
@@ -608,8 +608,8 @@ namespace Orleans.Runtime
         private sealed class CallbackDictionaryComparer : IEqualityComparer<(GrainId, CorrelationId)>
         {
             public static CallbackDictionaryComparer Instance { get; } = new();
-            public bool Equals([AllowNull] (GrainId, CorrelationId) x, [AllowNull] (GrainId, CorrelationId) y) => x.Item1 == y.Item1 && x.Item2 == y.Item2;
-            public int GetHashCode([DisallowNull] (GrainId, CorrelationId) obj) => obj.GetHashCode();
+            public bool Equals([AllowNull] (GrainId, CorrelationId) x, [AllowNull] (GrainId, CorrelationId) y) => x.Item2 == y.Item2 && x.Item1 == y.Item1;
+            public int GetHashCode([DisallowNull] (GrainId, CorrelationId) obj) => HashCode.Combine(obj.Item1, obj.Item2);
         }
     }
 }
