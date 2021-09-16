@@ -1039,14 +1039,10 @@ namespace Orleans.Runtime
                 return;
             }
 
-            ActivationState state;
-            Message blockingMessage;
+            var stopwatch = CoarseStopwatch.StartNew();
             lock (this)
             {
-                state = State;
-                blockingMessage = _blockingRequest;
-
-                _waitingRequests.Add((message, CoarseStopwatch.StartNew()));
+                _waitingRequests.Add((message, stopwatch));
             }
 
             _workSignal.Signal();
