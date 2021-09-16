@@ -132,8 +132,6 @@ namespace Orleans.Runtime
                         ExceptionDispatchInfo.Capture(exception).Throw();
                     }
 
-                    this.Response = this.responseCopier.Copy(this.Response);
-
                     return;
                 }
             }

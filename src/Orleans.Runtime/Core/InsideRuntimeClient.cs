@@ -300,7 +300,6 @@ namespace Orleans.Runtime
                                 else
                                 {
                                     response = await invokable.Invoke();
-                                    response = this.responseCopier.Copy(response);
                                 }
                                 break;
                             }
@@ -369,7 +368,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                SendResponse(message, (Response)this._deepCopier.Copy(response));
+                SendResponse(message, response);
             }
             catch (Exception exc)
             {
