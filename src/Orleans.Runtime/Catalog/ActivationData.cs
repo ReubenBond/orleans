@@ -980,19 +980,21 @@ namespace Orleans.Runtime
         /// This will be <c>null</c> for the case of completion of Activate/Deactivate calls.</param>
         private void OnCompletedRequest(Message message)
         {
+            var newIdleDuration = CoarseStopwatch.StartNew();
+            var wasNotInWorkingSet = false;
             lock (this)
             {
                 _runningRequests.Remove(message);
 
                 if (_runningRequests.Count == 0)
                 {
-                    _idleDuration = CoarseStopwatch.StartNew();
+                    _idleDuration = newIdleDuration; 
                 }
 
                 if (!isInWorkingSet)
                 {
                     isInWorkingSet = true;
-                    _shared.InternalRuntime.ActivationWorkingSet.OnActive(this);
+                    wasNotInWorkingSet = true;
                 }
 
                 // The below logic only works for non-reentrant activations
@@ -1001,6 +1003,11 @@ namespace Orleans.Runtime
                     _blockingRequest = null;
                     _busyDuration = default;
                 }
+            }
+
+            if (wasNotInWorkingSet)
+            {
+                _shared.InternalRuntime.ActivationWorkingSet.OnActive(this);
             }
 
             // Signal the message pump to see if there is another request which can be processed now that this one has completed
