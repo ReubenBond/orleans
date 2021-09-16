@@ -26,13 +26,6 @@ namespace Orleans.Runtime
         [NonSerialized]
         private ActivationAddress _sendingAddress;
 
-        // For statistical measuring of time spent in queues.
-        [NonSerialized]
-        private CoarseStopwatch _timeInterval;
-
-        [NonSerialized]
-        public readonly CoarseStopwatch _timeSinceCreation = CoarseStopwatch.StartNew();
-
         [field: NonSerialized]
         internal CallbackData CompletionCallback { get; set; }
 
@@ -133,7 +126,7 @@ namespace Orleans.Runtime
         public SiloAddress _sendingSilo;
         public GrainId _sendingGrain;
         public ActivationId _sendingActivation;
-        public TimeSpan? _timeToLive;
+        public CoarseStopwatch _timeToLive;
 
         public List<ActivationAddress> _cacheInvalidationHeader;
         public ResponseTypes _result;
@@ -220,18 +213,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public bool IsExpired
-        {
-            get
-            {
-                if (!TimeToLive.HasValue)
-                {
-                    return false;
-                }
-                
-                return TimeToLive <= TimeSpan.Zero;
-            }
-        }
+        public bool IsExpired => _timeToLive.ElapsedMilliseconds > 0;
 
         public string TargetHistory
         {
@@ -246,8 +228,6 @@ namespace Orleans.Runtime
         }
 
         public bool HasCacheInvalidationHeader => CacheInvalidationHeader is { Count: > 0 };
-
-        public TimeSpan Elapsed => _timeInterval.Elapsed;
 
         public Categories Category
         {
@@ -359,8 +339,24 @@ namespace Orleans.Runtime
 
         public TimeSpan? TimeToLive
         {
-            get => _timeToLive - _timeSinceCreation.Elapsed;
-            set => _timeToLive = value;
+            get
+            {
+                if (!_timeToLive.IsRunning) return null;
+                return TimeSpan.FromMilliseconds(-_timeToLive.ElapsedMilliseconds);
+            }
+
+            set
+            {
+                if (!value.HasValue)
+                {
+                    _timeToLive = default;
+                }
+                else
+                {
+                    var delta = value.Value;
+                    _timeToLive = CoarseStopwatch.FromTimeSpan(delta);
+                }
+            }
         }
 
         public List<ActivationAddress> CacheInvalidationHeader
@@ -522,21 +518,6 @@ namespace Orleans.Runtime
             return history.ToString();
         }
 
-        public void Start()
-        {
-            _timeInterval = CoarseStopwatch.StartNew();
-        }
-
-        public void Stop()
-        {
-            _timeInterval.Stop();
-        }
-
-        public void Restart()
-        {
-            _timeInterval.Restart();
-        }
-
         public static Message CreatePromptExceptionResponse(Message request, Exception exception)
         {
             var result = new Message
@@ -629,7 +610,7 @@ namespace Orleans.Runtime
             headers = _sendingActivation.IsDefault ? headers & ~Headers.SENDING_ACTIVATION : headers | Headers.SENDING_ACTIVATION;
             headers = _interfaceVersion == 0 ? headers & ~Headers.INTERFACE_VERSION : headers | Headers.INTERFACE_VERSION;
             headers = _result == default(ResponseTypes) ? headers & ~Headers.RESULT : headers | Headers.RESULT;
-            headers = _timeToLive == null ? headers & ~Headers.TIME_TO_LIVE : headers | Headers.TIME_TO_LIVE;
+            headers = _timeToLive.IsRunning ? headers & ~Headers.TIME_TO_LIVE : headers | Headers.TIME_TO_LIVE;
             headers = _cacheInvalidationHeader == null || _cacheInvalidationHeader.Count == 0 ? headers & ~Headers.CACHE_INVALIDATION_HEADER : headers | Headers.CACHE_INVALIDATION_HEADER;
             headers = _rejectionType == default(RejectionTypes) ? headers & ~Headers.REJECTION_TYPE : headers | Headers.REJECTION_TYPE;
             headers = string.IsNullOrEmpty(_rejectionInfo) ? headers & ~Headers.REJECTION_INFO : headers | Headers.REJECTION_INFO;
