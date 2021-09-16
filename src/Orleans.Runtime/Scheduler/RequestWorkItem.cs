@@ -4,6 +4,8 @@ namespace Orleans.Runtime.Scheduler
 {
     internal class RequestWorkItem : WorkItemBase
     {
+        public static readonly Action<object> ExecuteAction = state => ((RequestWorkItem)state).Execute();
+
         private readonly Message request;
         private readonly SystemTarget target;
 
