@@ -282,14 +282,7 @@ namespace Orleans.Runtime
         /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>c></returns>
         public LimitExceededException CheckOverloaded()
         {
-            int maxRequestsHardLimit = _shared.MessagingOptions.MaxEnqueuedRequestsHardLimit;
-            int maxRequestsSoftLimit = _shared.MessagingOptions.MaxEnqueuedRequestsSoftLimit;
-            if (IsStatelessWorker)
-            {
-                maxRequestsHardLimit = _shared.MessagingOptions.MaxEnqueuedRequestsHardLimit_StatelessWorker;
-                maxRequestsSoftLimit = _shared.MessagingOptions.MaxEnqueuedRequestsSoftLimit_StatelessWorker;
-            }
-
+            var (maxRequestsSoftLimit, maxRequestsHardLimit) = _shared.GetRequestCountLimits();
             if (maxRequestsHardLimit <= 0 && maxRequestsSoftLimit <= 0) return null; // No limits are set
 
             int count = GetRequestCount();
