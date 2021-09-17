@@ -20,9 +20,94 @@ using Orleans.Metadata;
 using Orleans.Serialization.Invocation;
 using Orleans.Runtime.Messaging;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime
 {
+    internal struct PerCoreConcurrentDictionary<TKey, TValue>
+    {
+        private readonly object _lock;
+        private readonly IEqualityComparer<TKey> _comparer;
+        private (int Core, ConcurrentDictionary<TKey, TValue> Value)[] _dictionaries;
+
+        public PerCoreConcurrentDictionary(IEqualityComparer<TKey> comparer)
+        {
+            _lock = new object();
+            _dictionaries = new (int, ConcurrentDictionary<TKey, TValue>)[Environment.ProcessorCount];
+            _comparer = comparer;
+            for (int i = 0; i < _dictionaries.Length; i++)
+            {
+                var dictionary = new ConcurrentDictionary<TKey, TValue>(comparer);
+                _dictionaries[i] = (i, dictionary); 
+            }
+        }
+
+        public (int Core, ConcurrentDictionary<TKey, TValue> Value)[] AllDictionaries => _dictionaries;
+
+        public ConcurrentDictionary<TKey, TValue> GetDictionary(int slot)
+        {
+            var dictionaries = _dictionaries;
+            if (dictionaries.Length <= slot || dictionaries[slot] is { } entry && entry.Core != slot)
+            {
+                return TryFindSlow(slot, dictionaries) ?? GetOrAddInternal(slot);
+            }
+
+            return entry.Value;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ConcurrentDictionary<TKey, TValue> TryGet(int slot, (int Core, ConcurrentDictionary<TKey, TValue> Value)[] dictionaries)
+        {
+            if (dictionaries.Length < slot || dictionaries[slot] is { } entry && entry.Core != slot)
+            {
+                return TryFindSlow(slot, dictionaries);
+            }
+
+            return entry.Value;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static ConcurrentDictionary<TKey, TValue> TryFindSlow(int slot, (int Core, ConcurrentDictionary<TKey, TValue> Value)[] dictionaries)
+        {
+            foreach (var pair in dictionaries)
+            {
+                if (pair.Core == slot) return pair.Value;
+                if (pair.Core > slot) return null;
+            }
+
+            return null;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private ConcurrentDictionary<TKey, TValue> GetOrAddInternal(int slot)
+        {
+            lock (_lock)
+            {
+                var result = TryGet(slot, _dictionaries);
+                if (result is not null)
+                {
+                    return result;
+                }
+
+                var newDictionaries = new (int Core, ConcurrentDictionary<TKey, TValue> Value)[Math.Max(_dictionaries.Length + 1, slot + 1)];
+                result = new ConcurrentDictionary<TKey, TValue>(_comparer);
+                Array.Copy(_dictionaries, newDictionaries, _dictionaries.Length);
+                newDictionaries[^1] = (slot, result);
+                Array.Sort(newDictionaries, SlotComparer.Instance);
+
+                _dictionaries = newDictionaries;
+
+                return result;
+            }
+        }
+
+        private sealed class SlotComparer : IComparer<(int, ConcurrentDictionary<TKey, TValue>)>
+        {
+            public static SlotComparer Instance { get; } = new();
+            public int Compare([AllowNull] (int, ConcurrentDictionary<TKey, TValue>) x, [AllowNull] (int, ConcurrentDictionary<TKey, TValue>) y) => x.Item1.CompareTo(y.Item1);
+        }
+    }
+
     /// <summary>
     /// Internal class for system grains to get access to runtime object
     /// </summary>
@@ -33,7 +118,7 @@ namespace Orleans.Runtime
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
         private readonly List<IDisposable> disposables;
-        private readonly ConcurrentDictionary<(GrainId, CorrelationId), CallbackData> callbacks;
+        private PerCoreConcurrentDictionary<(GrainId, CorrelationId), CallbackData> callbacks;
         private readonly SharedCallbackData sharedCallbackData;
         private readonly SharedCallbackData systemSharedCallbackData;
         private SafeTimer callbackTimer;
@@ -71,7 +156,7 @@ namespace Orleans.Runtime
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
             this.disposables = new List<IDisposable>();
-            this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>(CallbackDictionaryComparer.Instance);
+            this.callbacks = new PerCoreConcurrentDictionary<(GrainId, CorrelationId), CallbackData>(CallbackDictionaryComparer.Instance);
             this.messageFactory = messageFactory;
             this.ConcreteGrainFactory = new GrainFactory(this, referenceActivator, interfaceIdResolver, interfaceToTypeResolver);
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
@@ -179,7 +264,7 @@ namespace Orleans.Runtime
             {
                 var callbackData = new CallbackData(sharedData, context, message);
                 message.CompletionCallback = callbackData;
-                callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
+                callbacks.GetDictionary(message.Id.GetSlotId()).TryAdd((message.SendingGrain, message.Id), callbackData);
             }
             else
             {
@@ -222,7 +307,7 @@ namespace Orleans.Runtime
         /// </summary>
         private void UnregisterCallback(GrainId grainId, CorrelationId correlationId)
         {
-            callbacks.TryRemove((grainId, correlationId), out _);
+            callbacks.GetDictionary(correlationId.GetSlotId()).TryRemove((grainId, correlationId), out _);
         }
 
         public void SniffIncomingMessage(Message message)
@@ -485,7 +570,7 @@ namespace Orleans.Runtime
             else if (message.Result == Message.ResponseTypes.Status)
             {
                 var status = (StatusResponse)message.BodyObject;
-                callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
+                callbacks.GetDictionary(message.Id.GetSlotId()).TryGetValue((message.TargetGrain, message.Id), out var callback);
                 var request = callback?.Message;
                 if (!(request is null))
                 {
@@ -509,7 +594,7 @@ namespace Orleans.Runtime
             }
 
             CallbackData callbackData;
-            bool found = callbacks.TryRemove((message.TargetGrain, message.Id), out callbackData);
+            bool found = callbacks.GetDictionary(message.Id.GetSlotId()).TryRemove((message.TargetGrain, message.Id), out callbackData);
             if (found)
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
@@ -584,11 +669,14 @@ namespace Orleans.Runtime
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
         {
-            foreach (var callback in callbacks)
+            foreach (var (_, dictionary) in callbacks.AllDictionaries)
             {
-                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
+                foreach (var callback in dictionary)
                 {
-                    callback.Value.OnTargetSiloFail();
+                    if (deadSilo.Equals(callback.Value.Message.TargetSilo))
+                    {
+                        callback.Value.OnTargetSiloFail();
+                    }
                 }
             }
         }
@@ -602,12 +690,15 @@ namespace Orleans.Runtime
         {
             var currentStopwatchTicks = CoarseStopwatch.GetTimestamp();
             var responseTimeout = this.messagingOptions.ResponseTimeout;
-            foreach (var pair in callbacks)
+            foreach (var (_, dictionary) in callbacks.AllDictionaries)
             {
-                var callback = pair.Value;
-                if (callback.IsCompleted) continue;
+                foreach (var pair in dictionary)
+                {
+                    var callback = pair.Value;
+                    if (callback.IsCompleted) continue;
 
-                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(responseTimeout);
+                    if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(responseTimeout);
+                }
             }
         }
 
