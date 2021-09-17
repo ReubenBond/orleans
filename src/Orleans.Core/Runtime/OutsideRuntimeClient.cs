@@ -247,13 +247,6 @@ namespace Orleans
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource context, InvokeMethodOptions options)
         {
             var message = this.messageFactory.CreateMessage(request, options);
-            OrleansOutsideRuntimeClientEvent.Log.SendRequest(message);
-
-            SendRequestMessage(target, message, context, options);
-        }
-
-        private void SendRequestMessage(GrainReference target, Message message, IResponseCompletionSource context, InvokeMethodOptions options)
-        {
             message.InterfaceType = target.InterfaceType;
             message.InterfaceVersion = target.InterfaceVersion;
             var targetGrainId = target.GrainId;
@@ -286,6 +279,7 @@ namespace Orleans
             }
 
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace("Send {0}", message);
+            OrleansOutsideRuntimeClientEvent.Log.SendRequest(message);
             MessageCenter.SendMessage(message);
         }
 
