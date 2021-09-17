@@ -49,7 +49,7 @@ namespace Orleans.Runtime
                 procId = 0;
             }
 
-            var slot = PerCoreValues[procId];
+            ref var slot = ref PerCoreValues[procId];
             var result = Interlocked.Increment(ref slot.NextId);
             return new CorrelationId(result);
         }
