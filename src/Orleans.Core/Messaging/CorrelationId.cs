@@ -22,7 +22,7 @@ namespace Orleans.Runtime
             PerCoreValues = new CorrelationIdRecord[Environment.ProcessorCount];
             for (var i = 0; i < PerCoreValues.Length; i++)
             {
-                PerCoreValues[i].NextId = i + (1 << 8);
+                PerCoreValues[i].NextId = (i << 56) + 1;
             }
         }
 
@@ -39,7 +39,7 @@ namespace Orleans.Runtime
             _id = other._id;
         }
 
-        public int GetSlotId() => (byte)_id;
+        public int GetSlotId() => (int)(_id >> 56);
 
         public static CorrelationId GetNext()
         {
@@ -49,7 +49,7 @@ namespace Orleans.Runtime
                 procId = 0;
             }
 
-            var slot = PerCoreValues[procId]; 
+            var slot = PerCoreValues[procId];
             var result = Interlocked.Increment(ref slot.NextId);
             return new CorrelationId(result);
         }

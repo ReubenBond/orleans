@@ -47,7 +47,7 @@ namespace Orleans.Runtime
         public ConcurrentDictionary<TKey, TValue> GetDictionary(int slot)
         {
             var dictionaries = _dictionaries;
-            if (dictionaries.Length < slot || dictionaries[slot] is { } entry && entry.Core != slot)
+            if (dictionaries.Length <= slot || dictionaries[slot] is { } entry && entry.Core != slot)
             {
                 return TryFindSlow(slot, dictionaries) ?? GetOrAddInternal(slot);
             }
