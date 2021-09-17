@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 
 namespace Orleans.Runtime
 {
@@ -6,29 +7,34 @@ namespace Orleans.Runtime
     [GenerateSerializer]
     internal readonly struct CorrelationId : IEquatable<CorrelationId>, IComparable<CorrelationId>
     {
+        private static long _nextToUse = 1;
+
         [Id(1)]
-        private readonly long id;
-        private static long nextToUse = 1;
+        private readonly long _id;
 
         public CorrelationId(long value)
         {
-            id = value;
+            _id = value;
         }
 
         public CorrelationId(CorrelationId other)
         {
-            id = other.id;
+            _id = other._id;
         }
+
+        public int GetSlotId() => ((int)_id) & 0x0000FFFF;
         
         public static CorrelationId GetNext()
         {
-            long val = System.Threading.Interlocked.Increment(ref nextToUse);
-            return new CorrelationId(val);
+            var val = Interlocked.Increment(ref _nextToUse) << 16;
+            var procId = (long)Thread.GetCurrentProcessorId();
+            var result = val | procId;
+            return new CorrelationId(result);
         }
 
         public override int GetHashCode()
         {
- 	        return id.GetHashCode();
+ 	        return _id.GetHashCode();
         }
 
         public override bool Equals(object obj)
@@ -43,29 +49,29 @@ namespace Orleans.Runtime
 
         public bool Equals(CorrelationId other)
         {
-            return id == other.id;
+            return _id == other._id;
         }
 
         public static bool operator ==(CorrelationId lhs, CorrelationId rhs)
         {
-            return rhs.id == lhs.id;
+            return rhs._id == lhs._id;
         }
 
         public static bool operator !=(CorrelationId lhs, CorrelationId rhs)
         {
-            return rhs.id != lhs.id;
+            return rhs._id != lhs._id;
         }
 
         public int CompareTo(CorrelationId other)
         {
-            return id.CompareTo(other.id);
+            return _id.CompareTo(other._id);
         }
 
         public override string ToString()
         {
-            return id.ToString();
+            return _id.ToString();
         }
 
-        internal long ToInt64() => this.id;
+        internal long ToInt64() => this._id;
     }
 }
