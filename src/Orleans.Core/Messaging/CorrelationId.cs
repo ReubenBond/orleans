@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace Orleans.Runtime
@@ -7,7 +8,23 @@ namespace Orleans.Runtime
     [GenerateSerializer]
     internal readonly struct CorrelationId : IEquatable<CorrelationId>, IComparable<CorrelationId>
     {
-        private static long _nextToUse = 1;
+        private static readonly CorrelationIdRecord[] PerCoreValues;
+
+        [StructLayout(LayoutKind.Explicit, Size = 64)]
+        private struct CorrelationIdRecord
+        {
+            [FieldOffset(0)]
+            public long NextId;
+        }
+
+        static CorrelationId()
+        {
+            PerCoreValues = new CorrelationIdRecord[Environment.ProcessorCount];
+            for (var i = 0; i < PerCoreValues.Length; i++)
+            {
+                PerCoreValues[i].NextId = i + (1 << 8);
+            }
+        }
 
         [Id(1)]
         private readonly long _id;
@@ -22,13 +39,18 @@ namespace Orleans.Runtime
             _id = other._id;
         }
 
-        public int GetSlotId() => ((int)_id) & 0x0000FFFF;
-        
+        public int GetSlotId() => (byte)_id;
+
         public static CorrelationId GetNext()
         {
-            var val = Interlocked.Increment(ref _nextToUse) << 16;
-            var procId = (long)Thread.GetCurrentProcessorId();
-            var result = val | procId;
+            var procId = Thread.GetCurrentProcessorId();
+            if (procId >= PerCoreValues.Length)
+            {
+                procId = 0;
+            }
+
+            var slot = PerCoreValues[procId]; 
+            var result = Interlocked.Increment(ref slot.NextId);
             return new CorrelationId(result);
         }
 
