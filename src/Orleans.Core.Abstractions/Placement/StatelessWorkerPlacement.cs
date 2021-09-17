@@ -10,7 +10,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-    internal class StatelessWorkerPlacement : PlacementStrategy
+    internal sealed class StatelessWorkerPlacement : PlacementStrategy
     {
         private const string MaxLocalPropertyKey = "max-local-instances";
         private static readonly int DefaultMaxStatelessWorkers = Environment.ProcessorCount;

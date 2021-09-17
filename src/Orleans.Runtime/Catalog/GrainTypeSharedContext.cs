@@ -82,6 +82,14 @@ namespace Orleans.Runtime
                 grainClass,
                 clusterManifestProvider.LocalGrainManifest,
                 collectionOptions.Value);
+
+            _maxRequestsHardLimit = MessagingOptions.MaxEnqueuedRequestsHardLimit;
+            _maxRequestsSoftLimit = MessagingOptions.MaxEnqueuedRequestsSoftLimit;
+            if (PlacementStrategy is StatelessWorkerPlacement)
+            {
+                _maxRequestsHardLimit = MessagingOptions.MaxEnqueuedRequestsHardLimit_StatelessWorker;
+                _maxRequestsSoftLimit = MessagingOptions.MaxEnqueuedRequestsSoftLimit_StatelessWorker;
+            }
         }
 
         private TimeSpan GetCollectionAgeLimit(GrainType grainType, Type grainClass, GrainManifest siloManifest, GrainCollectionOptions collectionOptions)
@@ -140,6 +148,10 @@ namespace Orleans.Runtime
         }
 
         public TimeSpan CollectionAgeLimit { get; }
+
+        private readonly int _maxRequestsHardLimit;
+        private readonly int _maxRequestsSoftLimit;
+
         public ILogger Logger { get; }
 
         public SiloMessagingOptions MessagingOptions { get; }
@@ -151,6 +163,8 @@ namespace Orleans.Runtime
 
         public PlacementStrategy PlacementStrategy { get; }
         public IGrainRuntime Runtime { get; }
+
+        public (int SoftLimit, int HardLimit) GetRequestCountLimits() => (_maxRequestsSoftLimit, _maxRequestsHardLimit);
 
         internal InternalGrainRuntime InternalRuntime => _internalGrainRuntime ??= _serviceProvider.GetRequiredService<InternalGrainRuntime>();
 
