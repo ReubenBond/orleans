@@ -74,7 +74,7 @@ namespace UnitTests.Grains
             this.logger = logger;
         }
 
-        public Task<int> GetMyIdAsync() { return Task.FromResult(State.MyId); } 
+        public Task<int> GetMyIdAsync() { return Task.FromResult(State.MyId); }
         public Task<string> GetLastEchoAsync() { return Task.FromResult(State.LastEcho); }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
@@ -292,7 +292,7 @@ namespace UnitTests.Grains
 
             // Note: We deliberately use .Result here in this test case to block current executing thread
             var result = avGrain.Echo(data).Result;
-            
+
             logger.Info(name + " Result=" + result);
             return result;
         }
@@ -385,7 +385,7 @@ namespace UnitTests.Grains
 
             // Note: We deliberately use .Result here in this test case to block current executing thread
             var result = avGrain.Echo(data).Result;
-            
+
             logger.Info(name + " Result=" + result);
             return result;
         }

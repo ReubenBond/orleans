@@ -23,7 +23,7 @@ namespace Orleans.Runtime
 
         /// <summary>Gets the instance of the grain associated with this activation context. 
         /// The value will be <see langword="null"/> if the grain is being created.</summary>
-        IAddressable GrainInstance { get; }
+        object GrainInstance { get; }
 
         /// <summary>
         /// Gets the activation id.

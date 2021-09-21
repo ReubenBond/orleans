@@ -28,7 +28,7 @@ namespace UnitTests.Grains
         private readonly string _id = Guid.NewGuid().ToString();
 
         private readonly ActivationCollector activationCollector;
-        
+
         private int burstCount = 0;
 
         public BusyActivationGcTestGrain1(ActivationCollector activationCollector)
@@ -74,7 +74,7 @@ namespace UnitTests.Grains
                 {
                     g.Delay(TimeSpan.FromMilliseconds(10)).Ignore();
                 }
-            }         
+            }
         }
     }
 
