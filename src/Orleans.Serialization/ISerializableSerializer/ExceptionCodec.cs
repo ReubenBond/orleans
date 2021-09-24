@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
@@ -15,13 +16,16 @@ using System.Runtime.Serialization;
 
 namespace Orleans.Serialization
 {
-    /// <summary>
-    /// Serializer for <see cref="Exception"/> types.
-    /// </summary>
+    public class ExceptionSerializationOptions
+    {
+        public HashSet<string> SupportedNamespacePrefixes { get; } = new HashSet<string>(StringComparer.Ordinal) { "Microsoft", "System", "Azure" };
+        public Func<Type, bool> SupportedExceptionTypeFilter { get; set; } = _ => false;
+    }
+
     [RegisterSerializer]
     [RegisterCopier]
     [WellKnownAlias("Exception")]
-    public class ExceptionCodec : IFieldCodec<Exception>, IBaseCodec<Exception>, IGeneralizedCodec, IGeneralizedBaseCodec, IBaseCopier<Exception>
+    internal class ExceptionCodec : IFieldCodec<Exception>, IBaseCodec<Exception>, IGeneralizedCodec, IGeneralizedBaseCodec, IBaseCopier<Exception>
     {
         private readonly StreamingContext _streamingContext;
         private readonly FormatterConverter _formatterConverter;
@@ -32,6 +36,7 @@ namespace Orleans.Serialization
         private readonly IFieldCodec<Dictionary<object, object>> _dictionaryCodec;
         private readonly IDeepCopier<Dictionary<object, object>> _dictionaryCopier;
         private readonly IDeepCopier<Exception> _exceptionCopier;
+        private readonly ExceptionSerializationOptions _options;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ExceptionCodec"/> class.
@@ -46,7 +51,8 @@ namespace Orleans.Serialization
             TypeConverter typeConverter,
             IFieldCodec<Dictionary<object, object>> dictionaryCodec,
             IDeepCopier<Dictionary<object, object>> dictionaryCopier,
-            IDeepCopier<Exception> exceptionCopier)
+            IDeepCopier<Exception> exceptionCopier,
+            IOptions<ExceptionSerializationOptions> exceptionSerializationOptions)
         {
             _streamingContext = new StreamingContext(StreamingContextStates.All);
             _formatterConverter = new FormatterConverter();
@@ -58,6 +64,7 @@ namespace Orleans.Serialization
             _dictionaryCodec = dictionaryCodec;
             _dictionaryCopier = dictionaryCopier;
             _exceptionCopier = exceptionCopier;
+            _options = exceptionSerializationOptions.Value;
         }
 
         /// <inheritdoc />
@@ -248,9 +255,20 @@ namespace Orleans.Serialization
                 return false;
             }
 
-            if (typeof(Exception).IsAssignableFrom(type) && type.Namespace is { } ns && (ns.StartsWith("System", StringComparison.Ordinal) || ns.StartsWith("Microsoft", StringComparison.Ordinal)))
+            if (typeof(Exception).IsAssignableFrom(type) && type.Namespace is { } ns)
             {
-                return true;
+                if (_options.SupportedExceptionTypeFilter is { } filter && filter(type))
+                {
+                    return true;
+                }
+
+                foreach (var prefix in _options.SupportedNamespacePrefixes)
+                {
+                    if (ns.StartsWith(prefix))
+                    {
+                        return true;
+                    }
+                }
             }
 
             return false;
@@ -396,7 +414,7 @@ namespace Orleans.Serialization
     /// Serializer for <see cref="AggregateException"/>.
     /// </summary>
     [RegisterSerializer]
-    public class AggregateExceptionCodec : GeneralizedReferenceTypeSurrogateCodec<AggregateException, AggregateExceptionSurrogate>
+    internal class AggregateExceptionCodec : GeneralizedReferenceTypeSurrogateCodec<AggregateException, AggregateExceptionSurrogate>
     {
         private readonly ExceptionCodec _baseCodec;
 
