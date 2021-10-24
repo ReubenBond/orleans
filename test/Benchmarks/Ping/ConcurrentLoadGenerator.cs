@@ -82,6 +82,7 @@ namespace Benchmarks.Ping
 
         public async Task Run()
         {
+            await Task.Yield();
             this.ResetBetweenRuns();
             var completedBlockReader = this.completedBlocks.Reader;
 
@@ -143,6 +144,7 @@ namespace Benchmarks.Ping
 
         private async Task RunWorker(TState state, int requestsPerBlock, int numBlocks)
         {
+            await Task.Yield();
             var completedBlockWriter = this.completedBlocks.Writer;
             while (numBlocks > 0)
             {

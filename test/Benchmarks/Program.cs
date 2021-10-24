@@ -99,6 +99,20 @@ namespace Benchmarks
             ["ConcurrentPing"] = _ =>
             {
                 {
+                    Console.WriteLine("## Hosted Client ##");
+                    var test = new PingBenchmark(numSilos: 1, startClient: false);
+                    test.PingConcurrentHostedClient().GetAwaiter().GetResult();
+                    test.Shutdown().GetAwaiter().GetResult();
+                }
+                GC.Collect();
+                {
+                    Console.WriteLine("## System Service ##");
+                    var test = new PingBenchmark(numSilos: 1, startClient: false);
+                    test.PingSystemService().GetAwaiter().GetResult();
+                    test.Shutdown().GetAwaiter().GetResult();
+                }
+                GC.Collect();
+                {
                     Console.WriteLine("## Client to Silo ##");
                     var test = new PingBenchmark(numSilos: 1, startClient: true);
                     test.PingConcurrent().GetAwaiter().GetResult();
@@ -109,13 +123,6 @@ namespace Benchmarks
                     Console.WriteLine("## Client to 2 Silos ##");
                     var test = new PingBenchmark(numSilos: 2, startClient: true);
                     test.PingConcurrent().GetAwaiter().GetResult();
-                    test.Shutdown().GetAwaiter().GetResult();
-                }
-                GC.Collect();
-                {
-                    Console.WriteLine("## Hosted Client ##");
-                    var test = new PingBenchmark(numSilos: 1, startClient: false);
-                    test.PingConcurrentHostedClient().GetAwaiter().GetResult();
                     test.Shutdown().GetAwaiter().GetResult();
                 }
                 GC.Collect();
@@ -139,6 +146,10 @@ namespace Benchmarks
             {
                 new PingBenchmark(numSilos: 1, startClient: false).PingConcurrentHostedClient().GetAwaiter().GetResult();
             },
+            ["ConcurrentPing_StatelessService"] = _ =>
+            {
+                new PingBenchmark(numSilos: 1, startClient: false).PingSystemService().GetAwaiter().GetResult();
+            },
             ["ConcurrentPing_HostedClient_Forever"] = _ =>
             {
                 var benchmark = new PingBenchmark(numSilos: 1, startClient: false);
@@ -152,6 +163,22 @@ namespace Benchmarks
                 }
 
                 Console.WriteLine("Interrupted by user");
+                benchmark.Shutdown().GetAwaiter().GetResult();
+            },
+            ["ConcurrentPing_StatelessService_Forever"] = _ =>
+            {
+                var benchmark = new PingBenchmark(numSilos: 1, startClient: false);
+                Console.WriteLine("Press any key to begin.");
+                Console.ReadKey();
+                Console.WriteLine("Press any key to end.");
+                Console.WriteLine("## Stateless Service ##");
+                while (!Console.KeyAvailable)
+                {
+                    benchmark.PingSystemService().GetAwaiter().GetResult();
+                }
+
+                Console.WriteLine("Interrupted by user");
+                benchmark.Shutdown().GetAwaiter().GetResult();
             },
             ["ConcurrentPing_SiloToSilo"] = _ =>
             {

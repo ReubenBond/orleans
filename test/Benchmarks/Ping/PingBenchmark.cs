@@ -75,7 +75,7 @@ namespace Benchmarks.Ping
                 var grainFactory = this.client;
 
                 this.grain = grainFactory.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
-                this.grain.Run().AsTask().GetAwaiter().GetResult();
+                this.grain.Ping().AsTask().GetAwaiter().GetResult();
             }
 
             _onCancelEvent = CancelPressed;
@@ -88,13 +88,13 @@ namespace Benchmarks.Ping
         }
 
         [Benchmark]
-        public ValueTask Ping() => grain.Run();
+        public ValueTask Ping() => grain.Ping();
 
         public async Task PingForever()
         {
             while (true)
             {
-                await grain.Run();
+                await grain.Ping();
             }
         }
 
@@ -113,14 +113,32 @@ namespace Benchmarks.Ping
             grainFactory: (IGrainFactory)this.hosts[0].Services.GetService(typeof(IGrainFactory)),
             blocksPerWorker: blocksPerWorker);
 
+        public Task PingSystemService(int blocksPerWorker = 30) => this.RunSystemService(
+            runs: 3,
+            grainFactory: (IGrainFactory)this.hosts[0].Services.GetService(typeof(IGrainFactory)),
+            blocksPerWorker: blocksPerWorker);
+
         private async Task Run(int runs, IGrainFactory grainFactory, int blocksPerWorker)
         {
             var loadGenerator = new ConcurrentLoadGenerator<IPingGrain>(
                 maxConcurrency: 250,
                 blocksPerWorker: blocksPerWorker,
                 requestsPerBlock: 500,
-                issueRequest: g => g.Run(),
-                getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode()));
+                issueRequest: g => g.Ping(),
+                getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId));
+            await loadGenerator.Warmup();
+            while (runs-- > 0) await loadGenerator.Run();
+        }
+
+        private async Task RunSystemService(int runs, IGrainFactory grainFactory, int blocksPerWorker)
+        {
+            var hostAddress = hosts.First().Services.GetRequiredService<ILocalSiloDetails>().SiloAddress.ToParsableString();
+            var loadGenerator = new ConcurrentLoadGenerator<IPingService>(
+                maxConcurrency: 250,
+                blocksPerWorker: blocksPerWorker,
+                requestsPerBlock: 500,
+                issueRequest: g => g.Ping(),
+                getStateForWorker: _ => grainFactory.GetGrain<IPingService>(GrainId.Create("ping-svc", hostAddress)));
             await loadGenerator.Warmup();
             while (runs-- > 0) await loadGenerator.Run();
         }

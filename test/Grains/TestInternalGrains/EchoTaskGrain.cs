@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Concurrency;
+using Orleans.Placement;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Utilities;
@@ -392,5 +393,38 @@ namespace UnitTests.Grains
             return result;
         }
 #pragma warning restore 1998
+    }
+
+    [SystemServicePlacement]
+    public class EchoService : IEchoService
+    {
+        private readonly ILogger _logger;
+        private string _lastEcho;
+
+        public EchoService(ILogger<EchoService> logger)
+        {
+            _logger = logger;
+        }
+
+        public Task<string> GetLastEcho()
+        {
+            return Task.FromResult(_lastEcho);
+        }
+
+        public Task<string> Echo(string data)
+        {
+            _logger.LogInformation("IEchoService.Echo {Data}", data);
+            _lastEcho = data;
+            return Task.FromResult(data);
+        }
+
+        public Task<string> EchoError(string data)
+        {
+            _logger.LogInformation("IEchoService.Echo {Data}", data);
+            _lastEcho = data;
+            throw new Exception(data);
+        }
+
+        public Task<DateTime?> EchoNullable(DateTime? value) => Task.FromResult(value);
     }
 }
