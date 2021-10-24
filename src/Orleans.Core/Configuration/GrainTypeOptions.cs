@@ -70,6 +70,11 @@ namespace Orleans.Configuration
                     return true;
                 }
 
+                if (typeof(IStatelessService).IsAssignableFrom(type))
+                {
+                    return true;
+                }
+
                 return false;
             }
         }

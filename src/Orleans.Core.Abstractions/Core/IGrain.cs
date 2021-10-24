@@ -45,4 +45,11 @@ namespace Orleans
     public interface IGrainWithIntegerCompoundKey : IGrain
     {
     }
+
+    /// <summary>
+    /// Marker interface for stateless services.
+    /// </summary>
+    public interface IStatelessService : IAddressable
+    {
+    }
 }

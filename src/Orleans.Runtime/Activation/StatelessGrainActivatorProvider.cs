@@ -1,0 +1,86 @@
+﻿using System;
+using Orleans.Metadata;
+
+namespace Orleans.Runtime
+{
+    internal class StatelessGrainActivatorProvider : IGrainContextActivatorProvider
+    {
+        private readonly IServiceProvider _serviceProvider;
+        private readonly GrainTypeSharedContextResolver _sharedComponentsResolver;
+        private readonly GrainClassMap _grainClassMap;
+
+        public StatelessGrainActivatorProvider(
+            GrainClassMap grainClassMap,
+            IServiceProvider serviceProvider,
+            GrainTypeSharedContextResolver sharedComponentsResolver)
+        {
+            _sharedComponentsResolver = sharedComponentsResolver;
+            _grainClassMap = grainClassMap;
+            _serviceProvider = serviceProvider;
+        }
+
+        public bool TryGet(GrainType grainType, out IGrainContextActivator activator)
+        {
+            // TODO: this could be metadata-driven instead, eg driven by an attribute on the implementation
+            if (!_grainClassMap.TryGetGrainClass(grainType, out var serviceClass) || !typeof(IStatelessService).IsAssignableFrom(serviceClass))
+            {
+                activator = null;
+                return false;
+            }
+
+            var sharedContext = _sharedComponentsResolver.GetComponents(grainType);
+            var instanceActivator = sharedContext.GetComponent<IGrainActivator>();
+            if (instanceActivator is null)
+            {
+                throw new InvalidOperationException($"Could not find a suitable {nameof(IGrainActivator)} implementation for grain type {grainType}");
+            }
+
+            activator = new StatelessGrainActivator(
+                instanceActivator,
+                _serviceProvider,
+                sharedContext);
+
+            return true;
+        }
+
+        private class StatelessGrainActivator : IGrainContextActivator
+        {
+            private readonly IGrainActivator _grainActivator;
+            private readonly IServiceProvider _serviceProvider;
+            private readonly GrainTypeSharedContext _sharedComponents;
+
+            public StatelessGrainActivator(
+                IGrainActivator grainActivator,
+                IServiceProvider serviceProvider,
+                GrainTypeSharedContext sharedComponents)
+            {
+                _grainActivator = grainActivator;
+                _serviceProvider = serviceProvider;
+                _sharedComponents = sharedComponents;
+            }
+
+            public IGrainContext CreateContext(ActivationAddress activationAddress)
+            {
+                var context = new StatelessGrainContext(
+                    activationAddress,
+                    _serviceProvider,
+                    _sharedComponents);
+
+                RuntimeContext.SetExecutionContext(context, out var existingContext);
+
+                try
+                {
+                    // Instantiate the grain itself
+                    var instance = _grainActivator.CreateInstance(context);
+                    context.SetServiceInstance(instance);
+                }
+                finally
+                {
+                    RuntimeContext.SetExecutionContext(existingContext);
+                }
+
+                return context;
+            }
+        }
+    }
+}
