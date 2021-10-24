@@ -66,4 +66,16 @@ namespace UnitTests.GrainInterfaces
     {
         Task OrleansDebuggerHelper_GetGrainInstance_Test();
     }
+
+    /// <summary>
+    ///  An echo service
+    /// </summary>
+    public interface IEchoService : ISystemService
+    {
+        Task<string> GetLastEcho();
+
+        Task<string> Echo(string data);
+        Task<string> EchoError(string data);
+        Task<Nullable<DateTime>> EchoNullable(Nullable<DateTime> value);
+    }
 }

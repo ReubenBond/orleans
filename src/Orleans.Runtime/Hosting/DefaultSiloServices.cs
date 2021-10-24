@@ -124,6 +124,10 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
             services.AddSingleton<GrainLocator>();
             services.AddSingleton<GrainLocatorResolver>();
+            services.AddSingleton<IGrainLocatorResolver, ClientGrainLocatorResolver>();
+            services.AddSingleton<IGrainLocatorResolver, CustomGrainDirectoryGrainLocatorResolver>();
+            services.AddSingleton<SystemServiceGrainLocator>();
+            services.AddSingleton<IGrainLocatorResolver, SystemServiceGrainLocatorResolver>();
             services.AddSingleton<DhtGrainLocator>(sp => DhtGrainLocator.FromLocalGrainDirectory(sp.GetService<LocalGrainDirectory>()));
             services.AddSingleton<GrainDirectoryResolver>();
             services.AddSingleton<IGrainDirectoryResolver, GenericGrainDirectoryResolver>();
@@ -204,6 +208,7 @@ namespace Orleans.Hosting
             services.AddPlacementDirector<HashBasedPlacement, HashBasedPlacementDirector>();
             services.AddPlacementDirector<ClientObserversPlacement, ClientObserversPlacementDirector>();
             services.AddPlacementDirector<SiloRoleBasedPlacement, SiloRoleBasedPlacementDirector>();
+            services.AddPlacementDirector<SystemServicePlacement, SystemServicePlacementDirector>();
 
             // Versioning
             services.TryAddSingleton<VersionSelectorManager>();
@@ -244,6 +249,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<GrainReferenceActivator>();
             services.AddSingleton<IGrainContextActivatorProvider, ActivationDataActivatorProvider>();
             services.AddSingleton<IGrainContextAccessor, GrainContextAccessor>();
+            services.AddSingleton<IGrainContextActivatorProvider, SystemServiceGrainActivatorProvider>();
             services.AddSingleton<IncomingRequestMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IncomingRequestMonitor>();
             services.AddFromExisting<IActivationWorkingSetObserver, IncomingRequestMonitor>();

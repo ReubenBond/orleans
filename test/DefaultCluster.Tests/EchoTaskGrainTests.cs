@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans;
 using Orleans.Internal;
 using Orleans.Runtime;
 using TestExtensions;
@@ -303,6 +304,23 @@ namespace DefaultCluster.Tests.General
             received = await grain.EchoNullable(null);
             this.Logger.LogInformation("EchoGrain.EchoNullable took {Elapsed}", clock.Elapsed);
             Assert.Null(received);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Echo")]
+        public async Task EchoService_Echo()
+        {
+            Stopwatch clock = new Stopwatch();
+
+            clock.Start();
+            var host = this.Fixture.HostedCluster.Primary.SiloAddress;
+            var grain = this.GrainFactory.GetService<IEchoService>(host);
+            this.Logger.Info("CreateGrain took " + clock.Elapsed);
+
+            clock.Restart();
+            string received = await grain.Echo(expectedEcho);
+            this.Logger.Info("EchoGrain.Echo took " + clock.Elapsed);
+
+            Assert.Equal(expectedEcho, received);
         }
 
         // ---------- Utility methods ----------

@@ -146,6 +146,12 @@ namespace Orleans
         }
 
         /// <inheritdoc />
+        public TGrainInterface GetGrain<TGrainInterface>(IdSpan grainKey) where TGrainInterface : IAddressable
+        {
+            return (TGrainInterface)GetGrain(typeof(TGrainInterface), grainKey, grainClassNamePrefix: null);
+        }
+
+        /// <inheritdoc />
         public IAddressable GetGrain(GrainId grainId) => this.referenceActivator.CreateReference(grainId, default);
 
         /// <inheritdoc />

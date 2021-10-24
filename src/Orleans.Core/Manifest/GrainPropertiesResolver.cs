@@ -35,7 +35,6 @@ namespace Orleans.Metadata
         {
             if (!TryGetGrainProperties(grainType, out var result))
             {
-                //ThrowNotFoundException(grainType);
                 result = new GrainProperties(ImmutableDictionary<string, string>.Empty);
             }
 

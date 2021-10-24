@@ -34,7 +34,7 @@ namespace BenchmarkGrains.Ping
             {
                 foreach(Pending pending in pendingWork.Where(t => t.PendingCall == default))
                 {
-                    pending.PendingCall = pending.Grain.Run();
+                    pending.PendingCall = pending.Grain.Ping();
                 }
                 await ResolvePending(pendingWork, report);
             }

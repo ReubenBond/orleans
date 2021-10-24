@@ -1,49 +1,43 @@
 using System;
 using System.Collections.Concurrent;
-using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Generic;
+using System.Linq;
 using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.GrainDirectory
 {
     internal class GrainLocatorResolver
     {
-        private readonly ConcurrentDictionary<GrainType, IGrainLocator> resolvedLocators = new(GrainType.Comparer.Instance);
-        private readonly Func<GrainType, IGrainLocator> getLocatorInternal;
-        private readonly IServiceProvider _servicesProvider;
-        private readonly GrainDirectoryResolver grainDirectoryResolver;
-        private readonly CachedGrainLocator cachedGrainLocator;
-        private readonly DhtGrainLocator dhtGrainLocator;
-        private ClientGrainLocator _clientGrainLocator;
+        private readonly ConcurrentDictionary<GrainType, IGrainLocator> _resolvedLocators = new(GrainType.Comparer.Instance);
+        private readonly IGrainLocatorResolver[] _grainLocatorResolvers;
+        private readonly Func<GrainType, IGrainLocator> _getLocatorInternal;
+        private readonly DhtGrainLocator _dhtGrainLocator;
 
         public GrainLocatorResolver(
-            IServiceProvider servicesProvider,
-            GrainDirectoryResolver grainDirectoryResolver,
-            CachedGrainLocator cachedGrainLocator,
-            DhtGrainLocator dhtGrainLocator)
+            DhtGrainLocator dhtGrainLocator,
+            IEnumerable<IGrainLocatorResolver> grainLocatorResolvers)
         {
-            this.getLocatorInternal = GetGrainLocatorInternal;
-            _servicesProvider = servicesProvider;
-            this.grainDirectoryResolver = grainDirectoryResolver;
-            this.cachedGrainLocator = cachedGrainLocator;
-            this.dhtGrainLocator = dhtGrainLocator;
+            _grainLocatorResolvers = grainLocatorResolvers.ToArray();
+            _getLocatorInternal = GetGrainLocatorInternal;
+            _dhtGrainLocator = dhtGrainLocator;
         }
 
-        public IGrainLocator GetGrainLocator(GrainType grainType) => resolvedLocators.GetOrAdd(grainType, this.getLocatorInternal);
+        public IGrainLocator GetGrainLocator(GrainType grainType) => _resolvedLocators.GetOrAdd(grainType, _getLocatorInternal);
 
-        public IGrainLocator GetGrainLocatorInternal(GrainType grainType)
+        private IGrainLocator GetGrainLocatorInternal(GrainType grainType)
         {
-            IGrainLocator result;
-            if (grainType.IsClient())
+            IGrainLocator result = null;
+            foreach (var resolver in _grainLocatorResolvers)
             {
-                result = this._clientGrainLocator ??= _servicesProvider.GetRequiredService<ClientGrainLocator>();
+                if (resolver.TryResolveGrainLocator(grainType, out result))
+                {
+                    break;
+                }
             }
-            else if (this.grainDirectoryResolver.HasNonDefaultDirectory(grainType))
+
+            if (result is null)
             {
-                result = this.cachedGrainLocator;
-            }
-            else
-            {
-                result = this.dhtGrainLocator;
+                result = _dhtGrainLocator;
             }
 
             return result;

@@ -210,6 +210,59 @@ namespace Orleans.Runtime
             return New(new IPEndPoint(host, port), generation);
         }
 
+        /// <summary>
+        /// Create a new SiloAddress object by parsing string in a standard form returned from <c>ToParsableString</c> method.
+        /// </summary>
+        /// <param name="encoded">UTF8 string containing the SiloAddress info to be parsed.</param>
+        /// <param name="address">The silo address.</param>
+        /// <returns><see langword="true"/> if the silo address was decoded, otherwise <see langword="false"/>.</returns>
+        public static bool TryParse(ReadOnlySpan<byte> encoded, out SiloAddress address)
+        {
+            // This must be the "inverse" of ToParsableString, and must be the same across all silos in a deployment.
+            // Basically, this should never change unless the data content of SiloAddress changes
+
+            // First is the IPEndpoint; then '@'; then the generation
+            var atSign = encoded.LastIndexOf((byte)SEPARATOR);
+            if (atSign < 0) 
+            {
+                address = null;
+                return false;
+            }
+
+            // IPEndpoint is the host, then ':', then the port
+            var endpointSlice = encoded.Slice(0, atSign);
+            int lastColon = endpointSlice.LastIndexOf((byte)':');
+            if (lastColon < 0) 
+            {
+                address = null;
+                return false;
+            }
+
+            var hostString = endpointSlice.Slice(0, lastColon).GetUtf8String();
+            if (!IPAddress.TryParse(hostString, out var host))
+            {
+                address = null;
+                return false;
+            }
+
+            var portSlice = endpointSlice.Slice(lastColon + 1);
+            if (!Utf8Parser.TryParse(portSlice, out int port, out var len) || len < portSlice.Length)
+            {
+                address = null;
+                return false;
+            }
+
+            var genSlice = encoded.Slice(atSign + 1);
+            if (!Utf8Parser.TryParse(genSlice, out int generation, out len) || len < genSlice.Length)
+            {
+                address = null;
+                return false;
+            }
+
+            address = New(new IPEndPoint(host, port), generation);
+            return true;
+        }
+
         private static void ThrowInvalidUtf8SiloAddress(ReadOnlySpan<byte> addr)
             => throw new FormatException("Invalid string SiloAddress: " + addr.GetUtf8String());
 

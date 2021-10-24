@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Text;
+using Orleans.Metadata;
 using Orleans.Runtime;
 
 namespace Orleans.Metadata
@@ -150,7 +151,10 @@ namespace Orleans.Metadata
             }
         }
     }
+}
 
+namespace Orleans
+{
     /// <summary>
     /// Specifies the default grain type to use when constructing a grain reference for this interface without specifying a grain type.
     /// </summary>
