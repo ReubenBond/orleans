@@ -36,6 +36,8 @@ namespace Orleans.ClientObservers
             return new Message
             {
                 Direction = Message.Directions.OneWay,
+                TargetGrain = GrainId.GetGrainId(-1, -1, "client"),
+                SendingGrain = GrainId.GetGrainId(-1, -1, "silo"),
                 SendingSilo = gateway,
                 TargetObserverId = Id,
                 BodyObject = new InvokeMethodRequest(InterfaceId, 0, MethodId, new object[] { gateway })
