@@ -17,7 +17,7 @@ builder.Host.UseOrleans((ctx, orleansBuilder) =>
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
-builder.Services.AddSingleton<PollService>();
+builder.Services.AddScoped<PollService>();
 
 var app = builder.Build();
 

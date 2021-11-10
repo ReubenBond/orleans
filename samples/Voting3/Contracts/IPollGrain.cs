@@ -7,10 +7,13 @@ namespace VotingContract
 {
     public interface IPollGrain : IGrainWithStringKey
     {
-        Task CreatePoll(PollState initialState);
-        Task<PollState> Get();
+        Task CreatePoll(IUserAgentGrain creator, PollState initialState);
+
+        Task<PollState> GetCurrentResults();
         Task<PollState> AddVote(int optionId);
-        Task<PollState> RemoveVote(int optionId);
+
+        Task StartWatching(IPollWatcher watcher);
+        Task StopWatching(IPollWatcher watcher);
     }
 
     [Serializable]

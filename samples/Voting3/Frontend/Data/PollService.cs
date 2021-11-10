@@ -2,44 +2,52 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Orleans;
 using VotingContract;
 
 namespace Frontend.Data
 {
-    public class PollService
+    public partial class PollService
     {
-        private IGrainFactory _grainFactory;
+        private readonly IGrainFactory _grainFactory;
+        private IUserAgentGrain _userAgentGrain;
+
         public PollService(IGrainFactory grainFactory)
         {
             _grainFactory = grainFactory;
         }
 
+        public void Initialize(string clientIp)
+        {
+            _userAgentGrain = _grainFactory.GetGrain<IUserAgentGrain>(clientIp);
+        }
+
         public async Task<string> CreatePollAsync(string question, List<string> options)
         {
-            var pollId = Guid.NewGuid().ToString("N").Substring(0, 6);
-            var pollGrain = _grainFactory.GetGrain<IPollGrain>(pollId);
-            var pollState = new PollState
+            return await _userAgentGrain.CreatePoll(new PollState
             {
                 Question = question,
                 Options = options.Select(o => (o, 0)).ToList()
-            };
-            await pollGrain.CreatePoll(pollState);
-            return pollId;
+            });
         }
 
-        public async Task<PollState> GetPollAsync(string pollId)
+        public async Task<(PollState Results, bool Voted)> GetPollResultsAsync(string pollId)
+        {
+            return await _userAgentGrain.GetPollResults(pollId);
+        }
+
+        public async Task<PollState> AddVoteAsync(string pollId, int optionId)
+        {
+            return await _userAgentGrain.AddVote(pollId, optionId);
+        }
+
+        public async Task<IAsyncDisposable> WatchPoll(string pollId, IPollWatcher watcherObject)
         {
             var pollGrain = _grainFactory.GetGrain<IPollGrain>(pollId);
-            var result = await pollGrain.Get();
+            var watcherReference = await _grainFactory.CreateObjectReference<IPollWatcher>(watcherObject);
+            var result = new PollWatcherSubscription(watcherObject, pollGrain, watcherReference);
             return result;
-        }
-
-        public async Task<PollState> VoteForOption(string pollId, int index)
-        {
-            var pollGrain = _grainFactory.GetGrain<IPollGrain>(pollId);
-            var updatedState = await pollGrain.AddVote(index);
-            return updatedState;
         }
     }
 }

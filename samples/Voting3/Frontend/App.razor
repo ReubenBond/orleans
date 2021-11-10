@@ -1,4 +1,7 @@
-﻿<Router AppAssembly="@typeof(App).Assembly">
+@using Frontend.Data
+@inject PollService PollService
+
+<Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
         <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
@@ -10,3 +13,12 @@
         </LayoutView>
     </NotFound>
 </Router>
+@code
+{
+	[Parameter] public string ClientIP { get; set; }
+	protected override Task OnInitializedAsync()
+	{
+		PollService.Initialize(ClientIP);
+		return base.OnInitializedAsync();
+    }
+}

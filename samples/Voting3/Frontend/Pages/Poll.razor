@@ -1,17 +1,25 @@
 @page "/p/{PollId}"
 @using Frontend.Data
 @using VotingContract
+@implements IAsyncDisposable
 @inject PollService PollService
-@if (!loaded)
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+	<div class="alert alert-danger" role="alert">
+		@_errorMessage
+	</div>
+}
+else if (!_loaded)
 {
 	<h2>Loading poll @(PollId)...</h2>
 }
-else if (!voted)
+else if (!_voted)
 {
-	<h1>@pollState.Question</h1>
+	<h1>@_results.Question</h1>
 	<br />
 	<div>
-		@foreach (var (index, option) in pollState.Options.Select((value, index) => (index, value)))
+		@foreach (var (index, option) in _results.Options.Select((value, index) => (index, value)))
 		{
 			<div class="input-group mb-3">
 				<button class="btn btn-outline-secondary" type="button" id="button-add" @onclick="@(e => VoteForOption(index))">👍</button>
@@ -19,56 +27,94 @@ else if (!voted)
 			</div>
 		}
 	</div>
+	<br />
+	<div>
+		<h2>Share this poll: @PollId</h2>
+	</div>
 }
 else
 {
-	<h1>@pollState.Question</h1>
+	<h1>@_results.Question</h1>
 	<br />
 	<div>
-		@foreach (var (option, votes, percentage) in GetCurrentResults())
+		@foreach (var (option, votes, percentage) in GetResults())
 		{
 			<div class="bg-light p-2 m-2 rounded">
-				<h3>@option:</h3>
-				<div class="progress" style="height: 20px;">
-				  <div class="progress-bar" role="progressbar" style="width: @(percentage)%;" aria-valuenow="@percentage" aria-valuemin="0" aria-valuemax="100">@votes</div>
+				<h2>@option:</h2>
+				<div class="progress" style="height: 80px;">
+				  <div class="progress-bar" role="progressbar" style="width: @(percentage)%;" aria-valuenow="@percentage" aria-valuemin="0" aria-valuemax="100"><h3>@percentage%</h3></div>
 				</div>
 			</div>
 		}
 	</div>
 }
-@code {
-	[Parameter]
-	public string PollId { get; set; } = "Undefined";
-	private bool loaded;
-	private bool voted;
+@code
+{
+	[Parameter] public string PollId { get; set; }
+	private MyPollWatcher _watcher;
+	private IAsyncDisposable _subscription;
+	private bool _loaded;
+	private bool _voted;
+	private string _errorMessage;
 
 	private Guid ownerKey = Guid.NewGuid();
-	private PollState pollState;
+	private PollState _results;
 
 	protected override async Task OnInitializedAsync()
 	{
-		pollState = await PollService.GetPollAsync(PollId);
-		loaded = true;
-		await base.OnInitializedAsync();
+		try
+		{
+			(_results, _voted) = await PollService.GetPollResultsAsync(PollId);
+			_watcher = new MyPollWatcher(this);
+			_subscription = await PollService.WatchPoll(PollId, _watcher);
+			_loaded = true;
+			await base.OnInitializedAsync();
+		}
+		catch (Exception exception)
+		{
+			_errorMessage = exception.Message;
+		}
+	}
+
+	public async ValueTask DisposeAsync()
+	{
+		if (_subscription is { } sub)
+		{
+			await sub.DisposeAsync();
+		}
 	}
 
 	private async Task VoteForOption(int index)
 	{
-		pollState = await PollService.VoteForOption(PollId, index);
-		voted = true;
-	}
-
-	private List<(string Option, int Votes, int Percentage)> GetCurrentResults()
-	{
-		if (pollState?.Options is not {Count: > 0} options) return new();
-		var totalVotes = options.Sum(o => o.Votes);
-		var result = new List<(string Option, int Votes, int Percentage)>();
-		foreach (var val in options)
+		try
 		{
-			var percentage = Math.Clamp(val.Votes * 100 / totalVotes, 0, 100);
-			result.Add((val.Option, val.Votes, percentage));
+			_results = await PollService.AddVoteAsync(PollId, index);
+			_voted = true;
 		}
-
-		return result;
+		catch (Exception exception)
+		{
+			_errorMessage = exception.Message;
+		}
 	}
+
+    private List<(string Option, int Votes, int Percentage)> GetResults()
+    {
+        if (_results?.Options is not {Count: > 0} options) return new();
+        var totalVotes = options.Sum(o => o.Votes);
+        var result = new List<(string Option, int Votes, int Percentage)>();
+        foreach (var val in options)
+        {
+            var percentage = Math.Clamp(val.Votes * 100 / totalVotes, 0, 100);
+            result.Add((val.Option, val.Votes, percentage));
+        }
+
+        return result;
+    }
+
+    private class MyPollWatcher : IPollWatcher
+    {
+        private readonly Poll _page;
+        public MyPollWatcher(Poll page) => _page = page;
+        public void OnPollUpdated(PollState state) => _page._results = state;
+    }
 }

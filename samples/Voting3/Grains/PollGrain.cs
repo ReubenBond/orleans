@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Grains;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
@@ -20,13 +22,13 @@ namespace VotingData
             _votes = state;
         }
 
-        public async Task CreatePoll(PollState initialState)
+        public async Task CreatePoll(IUserAgentGrain creator, PollState initialState)
         {
             _votes.State = initialState;
             await _votes.WriteStateAsync();
         }
 
-        public Task<PollState> Get() => Task.FromResult(_votes.State);
+        public Task<PollState> GetCurrentResults() => Task.FromResult(_votes.State);
 
         public async Task<PollState> AddVote(int optionId)
         {
@@ -42,26 +44,25 @@ namespace VotingData
             await _votes.WriteStateAsync();
 
             _logger.LogInformation("Added vote to option {Option}", optionId);
+
+            // Notify the watchers.
+            _pollWatchers.Notify(watcher => watcher.OnPollUpdated(_votes.State));
+
             return _votes.State;
         }
 
-        public async Task<PollState> RemoveVote(int optionId)
+        private readonly ObserverManager<IPollWatcher> _pollWatchers = new(TimeSpan.FromMinutes(1));
+
+        public Task StartWatching(IPollWatcher watcher)
         {
-            _logger.LogInformation("Deleting vote option");
+            _pollWatchers.Subscribe(watcher);
+            return Task.CompletedTask;
+        }
 
-            var options = _votes.State.Options;
-            if (optionId < 0 || optionId >= options.Count)
-            {
-                _logger.LogWarning("Invalid option {Option}", optionId);
-                throw new KeyNotFoundException($"Invalid option {optionId}");
-            }
-
-            var (optionName, optionVotes) = options[optionId];
-            options[optionId] = (optionName, optionVotes - 1);
-            await _votes.WriteStateAsync();
-
-            _logger.LogInformation("Removed vote from option {Option}", optionId);
-            return _votes.State;
+        public Task StopWatching(IPollWatcher watcher)
+        {
+            _pollWatchers.Unsubscribe(watcher);
+            return Task.CompletedTask;
         }
     }
 }
