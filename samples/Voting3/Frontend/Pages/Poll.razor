@@ -6,22 +6,41 @@
 {
 	<h2>Loading poll @(PollId)...</h2>
 }
-else
+else if (!voted)
 {
 	<h1>@pollState.Question</h1>
+	<br />
 	<div>
 		@foreach (var (index, option) in pollState.Options.Select((value, index) => (index, value)))
 		{
-			<h2>@(option.Option) - @(option.Votes)</h2>
-			<button class="btn btn-outline-secondary" type="button" id="button-add" @onclick="@(e => VoteForOption(index))">Vote</button>
+			<div class="input-group mb-3">
+				<button class="btn btn-outline-secondary" type="button" id="button-add" @onclick="@(e => VoteForOption(index))">👍</button>
+				<span class="input-group-text col-9">@(option.Option)</span>
+			</div>
 		}
 	</div>
-
+}
+else
+{
+	<h1>@pollState.Question</h1>
+	<br />
+	<div>
+		@foreach (var (option, votes, percentage) in GetCurrentResults())
+		{
+			<div class="bg-light p-2 m-2 rounded">
+				<h3>@option:</h3>
+				<div class="progress" style="height: 20px;">
+				  <div class="progress-bar" role="progressbar" style="width: @(percentage)%;" aria-valuenow="@percentage" aria-valuemin="0" aria-valuemax="100">@votes</div>
+				</div>
+			</div>
+		}
+	</div>
 }
 @code {
 	[Parameter]
 	public string PollId { get; set; } = "Undefined";
 	private bool loaded;
+	private bool voted;
 
 	private Guid ownerKey = Guid.NewGuid();
 	private PollState pollState;
@@ -36,5 +55,20 @@ else
 	private async Task VoteForOption(int index)
 	{
 		pollState = await PollService.VoteForOption(PollId, index);
+		voted = true;
+	}
+
+	private List<(string Option, int Votes, int Percentage)> GetCurrentResults()
+	{
+		if (pollState?.Options is not {Count: > 0} options) return new();
+		var totalVotes = options.Sum(o => o.Votes);
+		var result = new List<(string Option, int Votes, int Percentage)>();
+		foreach (var val in options)
+		{
+			var percentage = Math.Clamp(val.Votes * 100 / totalVotes, 0, 100);
+			result.Add((val.Option, val.Votes, percentage));
+		}
+
+		return result;
 	}
 }
