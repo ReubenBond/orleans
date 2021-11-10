@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.1.31903.286
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Frontend", "Frontend\Frontend.csproj", "{7682BDB2-2FA4-45CA-BB51-2972D1DD260F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Grains", "Grains\Grains.csproj", "{E56EE418-B0AF-47EA-8474-A0934B1DE8A0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Contracts", "Contracts\Contracts.csproj", "{A06E30E9-DE9E-4D70-9263-E40B222E09B9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7682BDB2-2FA4-45CA-BB51-2972D1DD260F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7682BDB2-2FA4-45CA-BB51-2972D1DD260F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7682BDB2-2FA4-45CA-BB51-2972D1DD260F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7682BDB2-2FA4-45CA-BB51-2972D1DD260F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E56EE418-B0AF-47EA-8474-A0934B1DE8A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E56EE418-B0AF-47EA-8474-A0934B1DE8A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E56EE418-B0AF-47EA-8474-A0934B1DE8A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E56EE418-B0AF-47EA-8474-A0934B1DE8A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A06E30E9-DE9E-4D70-9263-E40B222E09B9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A06E30E9-DE9E-4D70-9263-E40B222E09B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A06E30E9-DE9E-4D70-9263-E40B222E09B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A06E30E9-DE9E-4D70-9263-E40B222E09B9}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {CC3C88BE-8446-40B0-B945-C72C730FE2E4}
+	EndGlobalSection
+EndGlobal

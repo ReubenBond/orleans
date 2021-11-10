@@ -1,0 +1,40 @@
+@page "/p/{PollId}"
+@using Frontend.Data
+@using VotingContract
+@inject PollService PollService
+@if (!loaded)
+{
+	<h2>Loading poll @(PollId)...</h2>
+}
+else
+{
+	<h1>@pollState.Question</h1>
+	<div>
+		@foreach (var (index, option) in pollState.Options.Select((value, index) => (index, value)))
+		{
+			<h2>@(option.Option) - @(option.Votes)</h2>
+			<button class="btn btn-outline-secondary" type="button" id="button-add" @onclick="@(e => VoteForOption(index))">Vote</button>
+		}
+	</div>
+
+}
+@code {
+	[Parameter]
+	public string PollId { get; set; } = "Undefined";
+	private bool loaded;
+
+	private Guid ownerKey = Guid.NewGuid();
+	private PollState pollState;
+
+	protected override async Task OnInitializedAsync()
+	{
+		pollState = await PollService.GetPollAsync(PollId);
+		loaded = true;
+		await base.OnInitializedAsync();
+	}
+
+	private async Task VoteForOption(int index)
+	{
+		pollState = await PollService.VoteForOption(PollId, index);
+	}
+}

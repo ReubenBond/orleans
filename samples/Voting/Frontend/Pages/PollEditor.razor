@@ -1,0 +1,48 @@
+@page "/new"
+
+<h1>Create Poll</h1>
+
+<input placeholder="Question?" @bind="@question" />
+@foreach (var (index, option) in options.Select((name, index) => (index, name)))
+{
+    <div class="input-group mb-3">
+        <div class="input-group-prepend">
+            <button class="btn btn-outline-secondary" type="button" @onclick="@(e => DeleteOption(index))">
+                <span class="oi oi-trash" aria-hidden="true"></span>
+            </button>
+        </div>
+        <input class="form-control" value="@option" @onchange="@(e => RenameOption(index, (string)e.Value))" />
+    </div>
+}
+
+<input placeholder="Option name" @bind="@newOption" />
+<button @onclick="AddOption">Add Todo</button>
+
+@code {
+
+	private Guid ownerKey = Guid.NewGuid();
+	private List<string> options = new ();
+	private string question;
+	private string newOption;
+
+	protected override async Task OnInitializedAsync()
+	{
+
+		await base.OnInitializedAsync();
+	}
+
+	private void AddOption()
+	{
+		options.Add(newOption);
+	}
+
+    private void RenameOption(int index, string title)
+    {
+		options[index] = title;
+    }
+
+    private void DeleteOption(int index)
+    {
+        options.RemoveAt(index);
+    }
+}
