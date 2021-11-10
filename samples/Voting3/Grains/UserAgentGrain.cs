@@ -11,9 +11,10 @@ using System.Linq;
 namespace Grains
 {
     /// <summary>
-    /// This grain demonstrates a simple way to throttle a given client (identified by their IP address, which is used as the primary key of the grain)
-    /// It uses a call filter to maintain a count of recent calls and throttles if they exceed a defined threshold. The score decays over time until, allowing
-    /// the client to resume making calls.
+    /// This grain demonstrates a simple way to throttle a given client
+    /// (identified by their IP address, which is used as the primary key of the grain)
+    /// It maintains a count of recent calls and throttles if they exceed a defined threshold.
+    /// The score decays over time until, allowing the client to resume making calls.
     /// </summary>
     internal class UserAgentGrain : Grain, IUserAgentGrain
     {
@@ -41,7 +42,13 @@ namespace Grains
 
         public async Task<(PollState Results, bool Voted)> GetPollResults(string pollId)
         {
-            var results = await _grainFactory.GetGrain<IPollGrain>(pollId).GetCurrentResults();
+            // Get a reference to the poll grain
+            var pollGrain = _grainFactory.GetGrain<IPollGrain>(pollId);
+
+            // Get the current poll results
+            var results = await pollGrain.GetCurrentResults();
+
+            // Return the results as well as whether we've voted in the poll or not
             return (Results: results, Voted: _votedPolls.Contains(pollId));
         }
 
@@ -49,10 +56,19 @@ namespace Grains
         {
             ThrowIfThrottled();
 
-            var pollId = Guid.NewGuid().ToString("N")[..5];
+            // Limit the number of polls any one user can make
+            if (_myPolls.Count > 5)
+            {
+                throw new InvalidOperationException("You have already created 5 polls, which is enough for anybody.");
+            }
+
+            // Generate a new id and get a reference to the PollGrain with that id
+            var pollId = Guid.NewGuid().ToString("N").Substring(0, 6);
             var pollGrain = _grainFactory.GetGrain<IPollGrain>(pollId);
-            var myself = this.AsReference<IUserAgentGrain>();
-            await pollGrain.CreatePoll(myself, initialState);
+
+            // Create the poll. We could avoid colitions here by making this return an error if a poll
+            // with that id already exists.
+            await pollGrain.CreatePoll(initialState);
 
             _myPolls.Add(pollId);
             return pollId;

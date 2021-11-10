@@ -22,7 +22,7 @@ namespace VotingData
             _votes = state;
         }
 
-        public async Task CreatePoll(IUserAgentGrain creator, PollState initialState)
+        public async Task CreatePoll(PollState initialState)
         {
             _votes.State = initialState;
             await _votes.WriteStateAsync();
