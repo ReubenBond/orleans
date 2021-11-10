@@ -84,14 +84,6 @@ else
         }
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        if (_subscription is { } sub)
-        {
-            await sub.DisposeAsync();
-        }
-    }
-
     private async Task VoteForOption(int index)
     {
         try
@@ -117,6 +109,14 @@ else
         }
 
         return result;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_subscription is not null)
+        {
+            await _subscription.DisposeAsync();
+        }
     }
 
     private void DemoTryDoubleVoting()

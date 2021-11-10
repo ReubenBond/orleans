@@ -7,9 +7,20 @@ using Orleans.Hosting;
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseOrleans((ctx, orleansBuilder) =>
 {
-    orleansBuilder
-        .UseLocalhostClustering()
-        .AddMemoryGrainStorage("votes");
+    if (ctx.HostingEnvironment.IsDevelopment())
+    {
+        orleansBuilder
+            .UseLocalhostClustering()
+            .AddMemoryGrainStorage("votes");
+    }
+    else
+    {
+        // Eg, hosting in Azure, use Azure Storage, or Redis, or CosmosDB, etc...
+        var connectionString = ctx.Configuration["CLUSTER_CONNECTIONSTRING"];
+        orleansBuilder
+            .UseAzureStorageClustering(options => options.ConnectionString = connectionString)
+            .AddAzureBlobGrainStorage("votes", options => options.ConnectionString = connectionString);
+    }
 });
 
 // Add services to the container.
