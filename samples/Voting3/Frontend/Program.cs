@@ -1,7 +1,5 @@
 using Frontend.Data;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
@@ -18,6 +16,7 @@ builder.Host.UseOrleans((ctx, orleansBuilder) =>
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddScoped<PollService>();
+builder.Services.AddScoped<DemoService>();
 
 var app = builder.Build();
 

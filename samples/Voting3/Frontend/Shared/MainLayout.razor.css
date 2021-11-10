@@ -17,7 +17,9 @@ main {
     border-bottom: 1px solid #d6d5d5;
     height: 4rem;
     display: flex;
-    justify-content: space-between;
+    justify-items: center;
+    align-self: center;
+    align-content: center;
 }
 
     .top-row ::deep a, .top-row .btn-link {

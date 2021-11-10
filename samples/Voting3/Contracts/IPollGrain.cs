@@ -7,7 +7,7 @@ namespace VotingContract
 {
     public interface IPollGrain : IGrainWithStringKey
     {
-        Task CreatePoll(IUserAgentGrain creator, PollState initialState);
+        Task CreatePoll(PollState initialState);
 
         Task<PollState> GetCurrentResults();
         Task<PollState> AddVote(int optionId);

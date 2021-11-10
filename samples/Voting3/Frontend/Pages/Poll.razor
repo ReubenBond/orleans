@@ -1,8 +1,10 @@
 @page "/p/{PollId}"
 @using Frontend.Data
+@using Orleans
 @using VotingContract
 @implements IAsyncDisposable
 @inject PollService PollService
+@inject DemoService DemoService
 
 @if (!string.IsNullOrWhiteSpace(_errorMessage))
 {
@@ -42,60 +44,66 @@ else
 			<div class="bg-light p-2 m-2 rounded">
 				<h2>@option:</h2>
 				<div class="progress" style="height: 80px;">
-				  <div class="progress-bar" role="progressbar" style="width: @(percentage)%;" aria-valuenow="@percentage" aria-valuemin="0" aria-valuemax="100"><h3>@percentage%</h3></div>
+				  <div class="progress-bar" role="progressbar" style="width: @(percentage)%;" aria-valuenow="@percentage" aria-valuemin="0" aria-valuemax="100"><h3>@percentage% (@votes votes)</h3></div>
 				</div>
 			</div>
 		}
 	</div>
+    <br />
+    <br />
+    <div class="border bg-light">
+        <button class="btn btn-danger" @onclick="DemoTryDoubleVoting">DEMO: try double-voting</button>
+        <button class="btn btn-danger" @onclick="DemoSimulateVoters">DEMO: simulate other voters</button>
+    </div>
 }
 @code
 {
-	[Parameter] public string PollId { get; set; }
-	private MyPollWatcher _watcher;
-	private IAsyncDisposable _subscription;
-	private bool _loaded;
-	private bool _voted;
-	private string _errorMessage;
+    [Parameter] public string PollId { get; set; }
+    private MyPollWatcher _watcher;
+    private IAsyncDisposable _subscription;
+    private bool _loaded;
+    private bool _voted;
+    private string _errorMessage;
 
-	private Guid ownerKey = Guid.NewGuid();
-	private PollState _results;
+    private Guid ownerKey = Guid.NewGuid();
+    private PollState _results;
 
-	protected override async Task OnInitializedAsync()
-	{
-		try
-		{
-			(_results, _voted) = await PollService.GetPollResultsAsync(PollId);
-			_watcher = new MyPollWatcher(this);
-			_subscription = await PollService.WatchPoll(PollId, _watcher);
-			_loaded = true;
-			await base.OnInitializedAsync();
-		}
-		catch (Exception exception)
-		{
-			_errorMessage = exception.Message;
-		}
-	}
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            (_results, _voted) = await PollService.GetPollResultsAsync(PollId);
+            _watcher = new MyPollWatcher(this);
+            _subscription = await PollService.WatchPoll(PollId, _watcher);
+            _loaded = true;
+            await base.OnInitializedAsync();
+        }
+        catch (Exception exception)
+        {
+            _errorMessage = exception.Message;
+        }
+    }
 
-	public async ValueTask DisposeAsync()
-	{
-		if (_subscription is { } sub)
-		{
-			await sub.DisposeAsync();
-		}
-	}
+    public async ValueTask DisposeAsync()
+    {
+        if (_subscription is { } sub)
+        {
+            await sub.DisposeAsync();
+        }
+    }
 
-	private async Task VoteForOption(int index)
-	{
-		try
-		{
-			_results = await PollService.AddVoteAsync(PollId, index);
-			_voted = true;
-		}
-		catch (Exception exception)
-		{
-			_errorMessage = exception.Message;
-		}
-	}
+    private async Task VoteForOption(int index)
+    {
+        try
+        {
+            _results = await PollService.AddVoteAsync(PollId, index);
+            _voted = true;
+        }
+        catch (Exception exception)
+        {
+            _errorMessage = exception.Message;
+        }
+    }
 
     private List<(string Option, int Votes, int Percentage)> GetResults()
     {
@@ -111,10 +119,31 @@ else
         return result;
     }
 
+    private void DemoTryDoubleVoting()
+    {
+        _voted = false;
+    }
+
+    private void DemoSimulateVoters()
+    {
+        DemoService.SimulateVoters(PollId, 200).Ignore();
+    }
+
+    private void UpdateResults(PollState results)
+    {
+        // We use InvokeAsync to schedule our update on the UI thread,
+        // instead of updating it from a background thread, which is not allowed
+        InvokeAsync(() =>
+        {
+            _results = results;
+            this.StateHasChanged();
+        });
+    }
+
     private class MyPollWatcher : IPollWatcher
     {
         private readonly Poll _page;
         public MyPollWatcher(Poll page) => _page = page;
-        public void OnPollUpdated(PollState state) => _page._results = state;
+        public void OnPollUpdated(PollState state) => _page.UpdateResults(state);
     }
 }
