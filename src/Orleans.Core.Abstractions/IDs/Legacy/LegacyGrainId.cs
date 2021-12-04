@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Buffers.Text;
 using System.Diagnostics;
+using System.Net;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Text;
@@ -17,7 +18,6 @@ namespace Orleans.Runtime
         private static readonly Interner<UniqueKey, byte[]> grainKeyInternCache = new Interner<UniqueKey, byte[]>();
         private static readonly ReadOnlyMemory<byte> ClientPrefixBytes = Encoding.UTF8.GetBytes(GrainTypePrefix.ClientPrefix + ".");
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         [DataMember]
         [Id(1)]
         internal readonly UniqueKey Key;
@@ -206,6 +206,29 @@ namespace Orleans.Runtime
         {
             legacyId = FromGrainIdInternal(id);
             return legacyId is object;
+        }
+
+        /// <summary>
+        /// Return this GrainId in a standard components form, suitable for later use with the <see cref="FromKeyInfo"/> method.
+        /// </summary>
+        /// <returns>GrainId in a standard components form.</returns>
+        internal (ulong, ulong, ulong, string) ToKeyInfo()
+        {
+            return (Key.N0, Key.N1, Key.TypeCodeData, Key.KeyExt);
+        }
+
+        /// <summary>
+        /// Create a new GrainId object by parsing components returned form <see cref="ToKeyInfo"/>.
+        /// </summary>
+        /// <param name="grainId">Components containing the GrainId to be parsed.</param>
+        /// <returns>New GrainId object created from the input data.</returns>
+        internal static LegacyGrainId FromKeyInfo((ulong, ulong, ulong, string) grainId)
+        {
+            // NOTE: This function must be the "inverse" of ToKeyInfo, and data must round-trip reliably.
+
+            var (n0, n1, typeCodeData, keyExt) = grainId;
+            var key = UniqueKey.NewKey(n0, n1, typeCodeData, keyExt);
+            return FindOrCreateGrainId(key);
         }
 
         public static LegacyGrainId FromGrainId(GrainId id)

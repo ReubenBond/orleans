@@ -6,15 +6,29 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 
-namespace Orleans.Runtime
+namespace Orleans.Legacy.Runtime
 {
     /// <summary>
     /// A collection of utility functions for dealing with Type information.
     /// </summary>
-    internal static class XXXXTypeUtils
+    internal static class TypeUtils
     {
+        /// <summary>
+        /// The assembly name of the core Orleans assembly.
+        /// </summary>
+        private static readonly AssemblyName OrleansCoreAssembly = typeof(ClientBuilder).Assembly.GetName();
+
+        /// <summary>
+        /// The assembly name of the core Orleans abstractions assembly.
+        /// </summary>
+        private static readonly AssemblyName OrleansAbstractionsAssembly = typeof(IGrain).Assembly.GetName();
+
         private static readonly ConcurrentDictionary<Tuple<Type, TypeFormattingOptions>, string> ParseableNameCache = new ConcurrentDictionary<Tuple<Type, TypeFormattingOptions>, string>();
+
+        private static readonly ConcurrentDictionary<Tuple<Type, bool>, List<Type>> ReferencedTypes = new ConcurrentDictionary<Tuple<Type, bool>, List<Type>>();
 
         public static string GetSimpleTypeName(Type type, Predicate<Type> fullName = null)
         {
@@ -25,7 +39,7 @@ namespace Orleans.Runtime
                     return GetTemplatedName(
                         GetUntemplatedTypeName(type.DeclaringType.Name),
                         type.DeclaringType,
-                        type.GetGenericArgumentsSafe(),
+                        type.GetGenericArguments(),
                         _ => true) + "." + GetUntemplatedTypeName(type.Name);
                 }
 
@@ -72,12 +86,18 @@ namespace Orleans.Runtime
             return typeName;
         }
 
+        public static bool IsConcreteTemplateType(Type t)
+        {
+            if (t.IsGenericType) return true;
+            return t.IsArray && IsConcreteTemplateType(t.GetElementType());
+        }
+
         public static string GetTemplatedName(Type t, Predicate<Type> fullName = null)
         {
             if (fullName == null)
                 fullName = _ => true; // default to full type names
 
-            if (t.IsGenericType) return GetTemplatedName(GetSimpleTypeName(t, fullName), t, t.GetGenericArgumentsSafe(), fullName);
+            if (t.IsGenericType) return GetTemplatedName(GetSimpleTypeName(t, fullName), t, t.GetGenericArguments(), fullName);
 
             if (t.IsArray)
             {
@@ -100,44 +120,17 @@ namespace Orleans.Runtime
             return s;
         }
 
-        public static Type[] GetGenericArgumentsSafe(this Type type)
-        {
-            var result = type.GetGenericArguments();
-
-            if (type.ContainsGenericParameters)
-            {
-                // Get generic parameter from generic type definition to have consistent naming for inherited interfaces
-                // Example: interface IA<TName>, class A<TOtherName>: IA<OtherName>
-                // in this case generic parameter name of IA interface from class A is OtherName instead of TName.
-                // To avoid this situation use generic parameter from generic type definition.
-                // Matching by position in array, because GenericParameterPosition is number across generic parameters.
-                // For half open generic types (IA<int,T>) T will have position 0.
-                var originalGenericArguments = type.GetGenericTypeDefinition().GetGenericArguments();
-                if (result.Length != originalGenericArguments.Length) // this check may be redunant
-                    return result;
-
-                for (int i = 0; i < result.Length; i++)
-                {
-                    if (result[i].IsGenericParameter)
-                        result[i] = originalGenericArguments[i];
-                }
-            }
-            return result;
-        }
-
         public static string GetGenericTypeArgs(IEnumerable<Type> args, Predicate<Type> fullName)
         {
             string s = string.Empty;
 
             bool first = true;
-
             foreach (var genericParameter in args)
             {
                 if (!first)
                 {
                     s += ",";
                 }
-
                 if (!genericParameter.IsGenericType)
                 {
                     s += GetSimpleTypeName(genericParameter, fullName);
@@ -213,10 +206,109 @@ namespace Orleans.Runtime
             return i <= 0 ? typeName : typeName.Substring(0, i);
         }
 
+        public static Type[] GenericTypeArgsFromClassName(string className)
+        {
+            return GenericTypeArgsFromArgsString(GenericTypeArgsString(className));
+        }
+
+        public static Type[] GenericTypeArgsFromArgsString(string genericArgs)
+        {
+            if (string.IsNullOrEmpty(genericArgs)) return Type.EmptyTypes;
+
+            var genericTypeDef = genericArgs.Replace("[]", "##"); // protect array arguments
+
+            return InnerGenericTypeArgs(genericTypeDef);
+        }
+
+        private static Type[] InnerGenericTypeArgs(string className)
+        {
+            var typeArgs = new List<Type>();
+            var innerTypes = GetInnerTypes(className);
+
+            foreach (var innerType in innerTypes)
+            {
+                if (innerType.StartsWith("[[", StringComparison.Ordinal)) // Resolve and load generic types recursively
+                {
+                    InnerGenericTypeArgs(GenericTypeArgsString(innerType));
+                    string genericTypeArg = className.Trim('[', ']');
+                    typeArgs.Add(Type.GetType(genericTypeArg.Replace("##", "[]")));
+                }
+
+                else
+                {
+                    string nonGenericTypeArg = innerType.Trim('[', ']');
+                    typeArgs.Add(Type.GetType(nonGenericTypeArg.Replace("##", "[]")));
+                }
+            }
+
+            return typeArgs.ToArray();
+        }
+
+        private static string[] GetInnerTypes(string input)
+        {
+            // Iterate over strings of length 2 positionwise.
+            var charsWithPositions = input.Zip(Enumerable.Range(0, input.Length), (c, i) => new { Ch = c, Pos = i });
+            var candidatesWithPositions = charsWithPositions.Zip(charsWithPositions.Skip(1), (c1, c2) => new { Str = c1.Ch.ToString() + c2.Ch, Pos = c1.Pos });
+
+            var results = new List<string>();
+            int startPos = -1;
+            int endPos = -1;
+            int endTokensNeeded = 0;
+            string curStartToken = "";
+            string curEndToken = "";
+            var tokenPairs = new[] { (Start: "[[", End: "]]"), (Start: "[", End: "]") }; // Longer tokens need to come before shorter ones
+
+            foreach (var candidate in candidatesWithPositions)
+            {
+                if (startPos == -1)
+                {
+                    foreach (var token in tokenPairs)
+                    {
+                        if (candidate.Str.StartsWith(token.Start, StringComparison.Ordinal))
+                        {
+                            curStartToken = token.Start;
+                            curEndToken = token.End;
+                            startPos = candidate.Pos;
+                            break;
+                        }
+                    }
+                }
+
+                if (curStartToken != "" && candidate.Str.StartsWith(curStartToken, StringComparison.Ordinal))
+                    endTokensNeeded++;
+
+                if (curEndToken != "" && candidate.Str.EndsWith(curEndToken, StringComparison.Ordinal))
+                {
+                    endPos = candidate.Pos;
+                    endTokensNeeded--;
+                }
+
+                if (endTokensNeeded == 0 && startPos != -1)
+                {
+                    results.Add(input.Substring(startPos, endPos - startPos + 2));
+                    startPos = -1;
+                    curStartToken = "";
+                }
+            }
+
+            return results.ToArray();
+        }
+
+        public static string GenericTypeArgsString(string className)
+        {
+            int startIndex = className.IndexOf('[');
+            int endIndex = className.LastIndexOf(']');
+            return className.Substring(startIndex + 1, endIndex - startIndex - 1);
+        }
+
+        public static bool IsGenericClass(string name)
+        {
+            return name.Contains("`") || name.Contains("[");
+        }
+
         public static string GetFullName(Type t)
         {
             if (t == null) throw new ArgumentNullException(nameof(t));
-
             if (t.IsNested && !t.IsGenericParameter)
             {
                 return t.Namespace + "." + t.DeclaringType.Name + "." + t.Name;
@@ -228,11 +320,6 @@ namespace Orleans.Runtime
                        + new string(',', t.GetArrayRank() - 1)
                        + "]";
             }
-
-            // using of t.FullName breaks interop with core and full .net in one cluster, because
-            // FullName of types from corelib is different.
-            // .net core int: [System.Int32, System.Private.CoreLib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]
-            // full .net int: [System.Int32, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089]
             return t.FullName ?? (t.IsGenericParameter ? t.Name : t.Namespace + "." + t.Name);
         }
 
@@ -283,7 +370,7 @@ namespace Orleans.Runtime
             if (!grainType.IsAssignableFrom(type)) return false;
 
             // exclude generated classes.
-            return !type.IsDefined(typeof(GeneratedCodeAttribute), false);
+            return !IsGeneratedType(type);
         }
 
         public static bool IsConcreteGrainClass(Type type, out IEnumerable<string> complaints, bool complain)
@@ -299,6 +386,105 @@ namespace Orleans.Runtime
         public static bool IsConcreteGrainClass(Type type, out IEnumerable<string> complaints)
         {
             return IsConcreteGrainClass(type, out complaints, complain: true);
+        }
+
+        public static bool IsConcreteGrainClass(Type type)
+        {
+            return IsConcreteGrainClass(type, out _, complain: false);
+        }
+
+        public static bool IsGeneratedType(Type type)
+        {
+            return TypeHasAttribute(type, typeof(GeneratedCodeAttribute));
+        }
+
+        /// <summary>
+        /// Returns true if the provided <paramref name="type"/> is in any of the provided
+        /// <paramref name="namespaces"/>, false otherwise.
+        /// </summary>
+        /// <param name="type">The type to check.</param>
+        /// <param name="namespaces"></param>
+        /// <returns>
+        /// true if the provided <paramref name="type"/> is in any of the provided <paramref name="namespaces"/>, false
+        /// otherwise.
+        /// </returns>
+        public static bool IsInNamespace(Type type, List<string> namespaces)
+        {
+            if (type.Namespace == null)
+            {
+                return false;
+            }
+
+            foreach (var ns in namespaces)
+            {
+                if (ns.Length > type.Namespace.Length)
+                {
+                    continue;
+                }
+
+                // If the candidate namespace is a prefix of the type's namespace, return true.
+                if (type.Namespace.StartsWith(ns, StringComparison.Ordinal)
+                    && (type.Namespace.Length == ns.Length || type.Namespace[ns.Length] == '.'))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Returns true if <paramref name="type"/> has implementations of all serialization methods, false otherwise.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>
+        /// true if <paramref name="type"/> has implementations of all serialization methods, false otherwise.
+        /// </returns>
+        public static bool HasAllSerializationMethods(Type type)
+        {
+            // Check if the type has any of the serialization methods.
+            var hasCopier = false;
+            var hasSerializer = false;
+            var hasDeserializer = false;
+            foreach (var method in type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+            {
+                hasSerializer |= method.GetCustomAttribute<SerializerMethodAttribute>(false) != null;
+                hasDeserializer |= method.GetCustomAttribute<DeserializerMethodAttribute>(false) != null;
+                hasCopier |= method.GetCustomAttribute<CopierMethodAttribute>(false) != null;
+            }
+
+            var hasAllSerializationMethods = hasCopier && hasSerializer && hasDeserializer;
+            return hasAllSerializationMethods;
+        }
+
+        public static IEnumerable<Type> GetTypes(Assembly assembly, Predicate<Type> whereFunc, ILogger logger)
+        {
+            return assembly.IsDynamic ? Enumerable.Empty<Type>() : GetDefinedTypes(assembly, logger).Where(type => !type.IsNestedPrivate && whereFunc(type));
+        }
+
+        public static IEnumerable<Type> GetDefinedTypes(Assembly assembly, ILogger logger = null)
+        {
+            try
+            {
+                return assembly.DefinedTypes;
+            }
+            catch (Exception exception)
+            {
+                if (logger != null && logger.IsEnabled(LogLevel.Warning))
+                {
+                    var message =
+                        $"Exception loading types from assembly '{assembly.FullName}': {LogFormatter.PrintException(exception)}.";
+                    logger.Warn(ErrorCode.Loader_TypeLoadError_5, message, exception);
+                }
+
+                var typeLoadException = exception as ReflectionTypeLoadException;
+                if (typeLoadException != null)
+                {
+                    return typeLoadException.Types?.Where(type => type != null) ?? Enumerable.Empty<Type>();
+                }
+
+                return Enumerable.Empty<Type>();
+            }
         }
 
         /// <summary>
@@ -319,6 +505,49 @@ namespace Orleans.Runtime
                    && typeof(IAddressable).IsAssignableFrom(methodInfo.DeclaringType);
         }
 
+        public static bool TypeHasAttribute(Type type, Type attribType)
+        {
+            return type.IsDefined(attribType, true);
+        }
+
+        /// <summary>
+        /// Returns a sanitized version of <paramref name="type"/>s name which is suitable for use as a class name.
+        /// </summary>
+        /// <param name="type">
+        /// The grain type.
+        /// </param>
+        /// <returns>
+        /// A sanitized version of <paramref name="type"/>s name which is suitable for use as a class name.
+        /// </returns>
+        public static string GetSuitableClassName(Type type)
+        {
+            return GetClassNameFromInterfaceName(type.GetUnadornedTypeName());
+        }
+
+        /// <summary>
+        /// Returns a class-like version of <paramref name="interfaceName"/>.
+        /// </summary>
+        /// <param name="interfaceName">
+        /// The interface name.
+        /// </param>
+        /// <returns>
+        /// A class-like version of <paramref name="interfaceName"/>.
+        /// </returns>
+        public static string GetClassNameFromInterfaceName(string interfaceName)
+        {
+            string cleanName;
+            if (interfaceName.StartsWith("i", StringComparison.OrdinalIgnoreCase))
+            {
+                cleanName = interfaceName.Substring(1);
+            }
+            else
+            {
+                cleanName = interfaceName;
+            }
+
+            return cleanName;
+        }
+
         /// <summary>
         /// Returns the non-generic type name without any special characters.
         /// </summary>
@@ -335,6 +564,27 @@ namespace Orleans.Runtime
             // An ampersand can appear as a suffix to a by-ref type.
             return (index > 0 ? type.Name.Substring(0, index) : type.Name).TrimEnd('&');
         }
+
+        /// <summary>
+        /// Returns the non-generic method name without any special characters.
+        /// </summary>
+        /// <param name="method">
+        /// The method.
+        /// </param>
+        /// <returns>
+        /// The non-generic method name without any special characters.
+        /// </returns>
+        public static string GetUnadornedMethodName(this MethodInfo method)
+        {
+            var index = method.Name.IndexOf('`');
+
+            return index > 0 ? method.Name.Substring(0, index) : method.Name;
+        }
+
+        /// <summary>Returns a string representation of <paramref name="type"/>.</summary>
+        /// <param name="type">The type.</param>
+        /// <returns>A string representation of the <paramref name="type"/>.</returns>
+        public static string GetLogFormat(this Type type) => type.GetParseableName(TypeFormattingOptions.LogFormat);
 
         /// <summary>Returns a string representation of <paramref name="type"/>.</summary>
         /// <param name="type">The type.</param>
@@ -467,6 +717,20 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
+        /// Returns the namespaces of the specified types.
+        /// </summary>
+        /// <param name="types">
+        /// The types to include.
+        /// </param>
+        /// <returns>
+        /// The namespaces of the specified types.
+        /// </returns>
+        public static IEnumerable<string> GetNamespaces(params Type[] types)
+        {
+            return types.Select(type => "global::" + type.Namespace).Distinct();
+        }
+
+        /// <summary>
         /// Returns the <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.
         /// </summary>
         /// <typeparam name="T">
@@ -541,6 +805,59 @@ namespace Orleans.Runtime
             throw new ArgumentException("Expression type unsupported.");
         }
 
+        /// <summary>
+        /// Returns the <see cref="MemberInfo"/> for the simple member access in the provided <paramref name="expression"/>.
+        /// </summary>
+        /// <typeparam name="T">
+        /// The containing type of the method.
+        /// </typeparam>
+        /// <typeparam name="TResult">
+        /// The return type of the method.
+        /// </typeparam>
+        /// <param name="expression">
+        /// The expression.
+        /// </param>
+        /// <returns>
+        /// The <see cref="MemberInfo"/> for the simple member access call in the provided <paramref name="expression"/>.
+        /// </returns>
+        public static MemberInfo Member<T, TResult>(Expression<Func<T, TResult>> expression)
+        {
+            var methodCall = expression.Body as MethodCallExpression;
+            if (methodCall != null)
+            {
+                return methodCall.Method;
+            }
+
+            var property = expression.Body as MemberExpression;
+            if (property != null)
+            {
+                return property.Member;
+            }
+
+            throw new ArgumentException("Expression type unsupported.");
+        }
+
+        /// <summary>Returns the <see cref="MemberInfo"/> for the simple member access in the provided <paramref name="expression"/>.</summary>
+        /// <typeparam name="TResult">The return type of the method.</typeparam>
+        /// <param name="expression">The expression.</param>
+        /// <returns>The <see cref="MemberInfo"/> for the simple member access call in the provided <paramref name="expression"/>.</returns>
+        public static MemberInfo Member<TResult>(Expression<Func<TResult>> expression)
+        {
+            var methodCall = expression.Body as MethodCallExpression;
+            if (methodCall != null)
+            {
+                return methodCall.Method;
+            }
+
+            var property = expression.Body as MemberExpression;
+            if (property != null)
+            {
+                return property.Member;
+            }
+
+            throw new ArgumentException("Expression type unsupported.");
+        }
+
         /// <summary>Returns the <see cref="MethodInfo"/> for the simple method call in the provided <paramref name="expression"/>.</summary>
         /// <typeparam name="T">The containing type of the method.</typeparam>
         /// <param name="expression">The expression.</param>
@@ -590,6 +907,140 @@ namespace Orleans.Runtime
             }
 
             throw new ArgumentException("Expression type unsupported.");
+        }
+
+        /// <summary>Returns the namespace of the provided type, or <see cref="string.Empty"/> if the type has no namespace.</summary>
+        /// <param name="type">The type.</param>
+        /// <returns>The namespace of the provided type, or <see cref="string.Empty"/> if the type has no namespace.</returns>
+        public static string GetNamespaceOrEmpty(this Type type)
+        {
+            if (type == null || string.IsNullOrEmpty(type.Namespace))
+            {
+                return string.Empty;
+            }
+
+            return type.Namespace;
+        }
+
+        /// <summary>Returns the types referenced by the provided <paramref name="type"/>.</summary>
+        /// <param name="type">The type.</param>
+        /// <param name="includeMethods">Whether or not to include the types referenced in the methods of this type.</param>
+        /// <returns>The types referenced by the provided <paramref name="type"/>.</returns>
+        public static IList<Type> GetTypes(this Type type, bool includeMethods = false)
+        {
+            List<Type> results;
+            var key = Tuple.Create(type, includeMethods);
+            if (!ReferencedTypes.TryGetValue(key, out results))
+            {
+                results = GetTypes(type, includeMethods, null).ToList();
+                ReferencedTypes.TryAdd(key, results);
+            }
+
+            return results;
+        }
+
+        /// <summary>
+        /// Get a public or non-public constructor that matches the constructor arguments signature
+        /// </summary>
+        /// <param name="type">The type to use.</param>
+        /// <param name="constructorArguments">The constructor argument types to match for the signature.</param>
+        /// <returns>A constructor that matches the signature or <see langword="null"/>.</returns>
+        public static ConstructorInfo GetConstructorThatMatches(Type type, Type[] constructorArguments)
+        {
+            var constructorInfo = type.GetConstructor(
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                null,
+                constructorArguments,
+                null);
+            return constructorInfo;
+        }
+
+        /// <summary>
+        /// Returns a value indicating whether or not the provided assembly is the Orleans assembly or references it.
+        /// </summary>
+        /// <param name="assembly">The assembly.</param>
+        /// <returns>A value indicating whether or not the provided assembly is the Orleans assembly or references it.</returns>
+        internal static bool IsOrleansOrReferencesOrleans(Assembly assembly)
+        {
+            // We want to be loosely coupled to the assembly version if an assembly depends on an older Orleans,
+            // but we want a strong assembly match for the Orleans binary itself 
+            // (so we don't load 2 different versions of Orleans by mistake)
+            var references = assembly.GetReferencedAssemblies();
+            return DoReferencesContain(references, OrleansCoreAssembly) || DoReferencesContain(references, OrleansAbstractionsAssembly)
+                   || string.Equals(assembly.GetName().FullName, OrleansCoreAssembly.FullName, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// Returns a value indicating whether or not the specified references contain the provided assembly name.
+        /// </summary>
+        /// <param name="references">The references.</param>
+        /// <param name="assemblyName">The assembly name.</param>
+        /// <returns>A value indicating whether or not the specified references contain the provided assembly name.</returns>
+        private static bool DoReferencesContain(IReadOnlyCollection<AssemblyName> references, AssemblyName assemblyName)
+        {
+            if (references.Count == 0)
+            {
+                return false;
+            }
+
+            return references.Any(asm => string.Equals(asm.Name, assemblyName.Name, StringComparison.Ordinal));
+        }
+
+        /// <summary>Returns the types referenced by the provided <paramref name="type"/>.</summary>
+        /// <param name="type">The type.</param>
+        /// <param name="includeMethods">Whether or not to include the types referenced in the methods of this type.</param>
+        /// <param name="exclude">Types to exclude</param>
+        /// <returns>The types referenced by the provided <paramref name="type"/>.</returns>
+        private static IEnumerable<Type> GetTypes(
+            this Type type,
+            bool includeMethods,
+            HashSet<Type> exclude)
+        {
+            exclude = exclude ?? new HashSet<Type>();
+            if (!exclude.Add(type))
+            {
+                yield break;
+            }
+
+            yield return type;
+
+            if (type.IsArray)
+            {
+                foreach (var elementType in type.GetElementType().GetTypes(false, exclude: exclude))
+                {
+                    yield return elementType;
+                }
+            }
+
+            if (type.IsConstructedGenericType)
+            {
+                foreach (var genericTypeArgument in
+                    type.GetGenericArguments().SelectMany(_ => GetTypes(_, false, exclude: exclude)))
+                {
+                    yield return genericTypeArgument;
+                }
+            }
+
+            if (!includeMethods)
+            {
+                yield break;
+            }
+
+            foreach (var method in type.GetMethods())
+            {
+                foreach (var referencedType in GetTypes(method.ReturnType, false, exclude: exclude))
+                {
+                    yield return referencedType;
+                }
+
+                foreach (var parameter in method.GetParameters())
+                {
+                    foreach (var referencedType in GetTypes(parameter.ParameterType, false, exclude: exclude))
+                    {
+                        yield return referencedType;
+                    }
+                }
+            }
         }
 
         private static string EscapeIdentifier(string identifier)

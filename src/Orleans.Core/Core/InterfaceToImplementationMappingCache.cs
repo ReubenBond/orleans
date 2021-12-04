@@ -26,8 +26,8 @@ namespace Orleans
         /// <summary>
         /// The map from implementation types to interface types to map of method to method infos.
         /// </summary>
-        private readonly CachedReadConcurrentDictionary<Type, Dictionary<Type, Dictionary<MethodInfo, Entry>>> mappings =
-            new CachedReadConcurrentDictionary<Type, Dictionary<Type, Dictionary<MethodInfo, Entry>>>();
+        private readonly ConcurrentDictionary<Type, Dictionary<Type, Dictionary<MethodInfo, Entry>>> mappings =
+            new ConcurrentDictionary<Type, Dictionary<Type, Dictionary<MethodInfo, Entry>>>();
 
         /// <summary>
         /// Returns a mapping from method id to method info for the provided implementation and interface types.

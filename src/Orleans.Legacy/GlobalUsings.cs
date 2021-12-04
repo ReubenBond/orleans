@@ -1,0 +1,15 @@
+global using GrainReference = Orleans.Legacy.Runtime.GrainReference;
+global using GuidId = Orleans.Legacy.Runtime.GuidId;
+global using GrainId = Orleans.Legacy.Runtime.GrainId;
+global using ActivationId = Orleans.Legacy.Runtime.ActivationId;
+global using ActivationAddress = Orleans.Legacy.Runtime.ActivationAddress;
+global using InvokeMethodOptions = Orleans.Legacy.CodeGeneration.InvokeMethodOptions;
+global using LogFormatter = Orleans.Legacy.Utilities.LogFormatter;
+global using UniqueKey = Orleans.Legacy.Runtime.UniqueKey;
+global using UniqueIdentifier = Orleans.Legacy.Runtime.UniqueIdentifier;
+global using DeserializationContext = Orleans.Legacy.Serialization;
+global using SerializationContext = Orleans.Legacy.Serialization;
+global using Orleans.Legacy.Runtime;
+global using Orleans.Legacy.CodeGeneration;
+global using Orleans.Legacy.Serialization;
+global using Orleans.Legacy.ApplicationParts;

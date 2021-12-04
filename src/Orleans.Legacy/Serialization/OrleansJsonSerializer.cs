@@ -4,12 +4,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Orleans.Runtime;
-using Orleans.GrainReferences;
-using Orleans.Serialization.TypeSystem;
 
-namespace Orleans.Serialization
+namespace Orleans.Legacy.Serialization
 {
-    public class OrleansJsonSerializer
+    using Orleans.Legacy.Runtime;
+
+    public class OrleansJsonSerializer : IExternalSerializer
     {
         public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
         public const string IndentJsonProperty = "IndentJSON";
@@ -20,7 +20,9 @@ namespace Orleans.Serialization
         {
             this.settings = new Lazy<JsonSerializerSettings>(() =>
             {
-                return GetDefaultSerializerSettings(services);
+                var typeResolver = services.GetRequiredService<ITypeResolver>();
+                var grainFactory = services.GetRequiredService<IGrainFactory>();
+                return GetDefaultSerializerSettings(typeResolver, grainFactory, services);
             });
         }
 
@@ -28,9 +30,8 @@ namespace Orleans.Serialization
         /// Returns the default serializer settings.
         /// </summary>
         /// <returns>The default serializer settings.</returns>
-        public static JsonSerializerSettings GetDefaultSerializerSettings(IServiceProvider services)
+        public static JsonSerializerSettings GetDefaultSerializerSettings(ITypeResolver typeResolver, IGrainFactory grainFactory, IServiceProvider serviceProvider)
         {
-            var typeResolver = services.GetRequiredService<TypeResolver>();
             var serializationBinder = new OrleansJsonSerializationBinder(typeResolver);
             var settings = new JsonSerializerSettings
             {
@@ -50,7 +51,8 @@ namespace Orleans.Serialization
             settings.Converters.Add(new IPEndPointConverter());
             settings.Converters.Add(new GrainIdConverter());
             settings.Converters.Add(new SiloAddressConverter());
-            settings.Converters.Add(new GrainReferenceJsonConverter(services.GetRequiredService<GrainReferenceActivator>()));
+            settings.Converters.Add(new UniqueKeyConverter());
+            settings.Converters.Add(new GrainReferenceConverter(serviceProvider, grainFactory, serializationBinder));
 
             return settings;
         }
@@ -82,22 +84,66 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
-        public object Deserialize(Type expectedType, string input)
+        public object DeepCopy(object source, ICopyContext context)
         {
-            if (string.IsNullOrWhiteSpace(input))
+            if (source == null)
             {
                 return null;
             }
 
-            return JsonConvert.DeserializeObject(input, expectedType, this.settings.Value);
+            var outputWriter = new BinaryTokenStreamWriter();
+            var serializationContext = new SerializationContext(context.GetSerializationManager())
+            {
+                StreamWriter = outputWriter
+            };
+            
+            Serialize(source, serializationContext, source.GetType());
+            var deserializationContext = new DeserializationContext(context.GetSerializationManager())
+            {
+                StreamReader = new BinaryTokenStreamReader(outputWriter.ToBytes())
+            };
+
+            var retVal = Deserialize(source.GetType(), deserializationContext);
+            outputWriter.ReleaseBuffers();
+            return retVal;
+        }
+
+        /// <inheritdoc />
+        public object Deserialize(Type expectedType, IDeserializationContext context)
+        {
+            if (context == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            var reader = context.StreamReader;
+            var str = reader.ReadString();
+            return JsonConvert.DeserializeObject(str, expectedType, this.settings.Value);
         }
 
         /// <summary>
         /// Serializes an object to a binary stream
         /// </summary>
         /// <param name="item">The object to serialize</param>
+        /// <param name="context">The serialization context.</param>
         /// <param name="expectedType">The type the deserializer should expect</param>
-        public string Serialize(object item, Type expectedType) => JsonConvert.SerializeObject(item, expectedType, this.settings.Value);
+        public void Serialize(object item, ISerializationContext context, Type expectedType)
+        {
+            if (context == null)
+            {
+                throw new ArgumentNullException(nameof(context));
+            }
+
+            var writer = context.StreamWriter;
+            if (item == null)
+            {
+                writer.WriteNull();
+                return;
+            }
+
+            var str = JsonConvert.SerializeObject(item, expectedType, this.settings.Value);
+            writer.Write(str);
+        }
     }
 
     public class IPAddressConverter : JsonConverter
@@ -131,17 +177,15 @@ namespace Orleans.Serialization
         {
             GrainId id = (GrainId)value;
             writer.WriteStartObject();
-            writer.WritePropertyName("Type");
-            writer.WriteValue(id.Type.ToStringUtf8());
-            writer.WritePropertyName("Key");
-            writer.WriteValue(id.Key.ToStringUtf8());
+            writer.WritePropertyName("GrainId");
+            writer.WriteValue(id.ToParsableString());
             writer.WriteEndObject();
         }
 
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
             JObject jo = JObject.Load(reader);
-            GrainId grainId = GrainId.Create(jo["Type"].ToObject<string>(), jo["Key"].ToObject<string>());
+            GrainId grainId = GrainId.FromParsableString(jo["GrainId"].ToObject<string>());
             return grainId;
         }
     }
@@ -166,6 +210,30 @@ namespace Orleans.Serialization
         {
             JObject jo = JObject.Load(reader);
             SiloAddress addr = SiloAddress.FromParsableString(jo["SiloAddress"].ToObject<string>());
+            return addr;
+        }
+    }
+
+    public class UniqueKeyConverter : JsonConverter
+    {
+        public override bool CanConvert(Type objectType)
+        {
+            return (objectType == typeof(UniqueKey));
+        }
+
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            UniqueKey key = (UniqueKey)value;
+            writer.WriteStartObject();
+            writer.WritePropertyName("UniqueKey");
+            writer.WriteValue(key.ToHexString());
+            writer.WriteEndObject();
+        }
+
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            JObject jo = JObject.Load(reader);
+            UniqueKey addr = UniqueKey.Parse(jo["UniqueKey"].ToObject<string>().AsSpan());
             return addr;
         }
     }
@@ -197,14 +265,41 @@ namespace Orleans.Serialization
         }
     }
 
-    public class GrainReferenceJsonConverter : JsonConverter
+    public class GrainReferenceConverter : JsonConverter
     {
         private static readonly Type AddressableType = typeof(IAddressable);
-        private readonly GrainReferenceActivator referenceActivator;
+        private readonly IGrainFactory grainFactory;
+        private readonly JsonSerializer internalSerializer;
+        private readonly IGrainReferenceRuntime _grainReferenceRuntime;
 
-        public GrainReferenceJsonConverter(GrainReferenceActivator referenceActivator)
+        public GrainReferenceConverter(IServiceProvider serviceProvider, IGrainFactory grainFactory, OrleansJsonSerializationBinder serializationBinder)
         {
-            this.referenceActivator = referenceActivator;
+            this.grainFactory = grainFactory;
+
+            // Create a serializer for internal serialization which does not have a specified GrainReference serializer.
+            // This internal serializer will use GrainReference's ISerializable implementation for serialization and deserialization.
+            this.internalSerializer = JsonSerializer.Create(new JsonSerializerSettings
+            {
+                TypeNameHandling = TypeNameHandling.All,
+                PreserveReferencesHandling = PreserveReferencesHandling.None,
+                DateFormatHandling = DateFormatHandling.IsoDateFormat,
+                DefaultValueHandling = DefaultValueHandling.Ignore,
+                MissingMemberHandling = MissingMemberHandling.Ignore,
+                NullValueHandling = NullValueHandling.Ignore,
+                ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
+                Formatting = Formatting.None,
+                SerializationBinder = serializationBinder,
+                Converters =
+                {
+                    new IPAddressConverter(),
+                    new IPEndPointConverter(),
+                    new GrainIdConverter(),
+                    new SiloAddressConverter(),
+                    new UniqueKeyConverter()
+                }
+            });
+
+            _grainReferenceRuntime = serviceProvider.GetRequiredService<IGrainReferenceRuntime>();
         }
 
         public override bool CanConvert(Type objectType)
@@ -214,27 +309,19 @@ namespace Orleans.Serialization
 
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            var val = (GrainReference)value;
-            writer.WriteStartObject();
-            writer.WritePropertyName("Id");
-            writer.WriteStartObject();
-            writer.WritePropertyName("Type");
-            writer.WriteValue(val.GrainId.Type.ToStringUtf8());
-            writer.WritePropertyName("Key");
-            writer.WriteValue(val.GrainId.Key.ToStringUtf8());
-            writer.WriteEndObject();
-            writer.WritePropertyName("Interface");
-            writer.WriteValue(val.InterfaceType.ToStringUtf8());
-            writer.WriteEndObject();
+            // Serialize the grain reference using the internal serializer.
+            this.internalSerializer.Serialize(writer, value);
         }
 
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
-            JObject jo = JObject.Load(reader);
-            var id = jo["Id"];
-            GrainId grainId = GrainId.Create(id["Type"].ToObject<string>(), id["Key"].ToObject<string>());
-            var iface = GrainInterfaceType.Create(jo["Interface"].ToString());
-            return this.referenceActivator.CreateReference(grainId, iface);
+            // Deserialize using the internal serializer which will use the concrete GrainReference implementation's
+            // ISerializable constructor.
+            var result = this.internalSerializer.Deserialize(reader, objectType);
+            var grainRef = result as IAddressable;
+            if (grainRef == null) return result;
+
+            return grainRef;
         }
     }
 }

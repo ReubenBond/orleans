@@ -1,9 +1,10 @@
-﻿using Orleans.Providers;
+using Orleans.Providers;
 using Orleans.Runtime;
 using System;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using System.Linq;
+using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Storage
 {
@@ -35,7 +36,7 @@ namespace Orleans.Storage
 
         private static void ThrowMissingProviderException(Type grainType, string name)
         {
-            var grainTypeName = grainType.GetParseableName(TypeFormattingOptions.LogFormat);
+            var grainTypeName = RuntimeTypeNameFormatter.Format(grainType);
             var errMsg = string.IsNullOrEmpty(name)
                 ? $"No default storage provider found loading grain type {grainTypeName}."
                 : $"No storage provider named \"{name}\" found loading grain type {grainTypeName}.";

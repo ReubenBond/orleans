@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,7 +12,8 @@ using Xunit.Abstractions;
 namespace UnitTests.General
 {
     [Collection(TestEnvironmentFixture.DefaultCollection)]
-    public class IdentifierTests
+    [TestCategory("Identifiers")]
+    public class LegacyGrainIdTests
     {
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture environment;
@@ -20,7 +22,7 @@ namespace UnitTests.General
         class A { }
         class B : A { }
         
-        public IdentifierTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
+        public LegacyGrainIdTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
             this.environment = fixture;
@@ -34,28 +36,28 @@ namespace UnitTests.General
             Assert.Equal((uint)2618661990, hashCode);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT")]
         public void UniqueKeyKeyExtGrainCategoryDisallowsNullKeyExtension()
         {
             Assert.Throws<ArgumentNullException>(() =>
             UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: null));
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT")]
         public void UniqueKeyKeyExtGrainCategoryDisallowsEmptyKeyExtension()
         {
             Assert.Throws<ArgumentException>(() =>
             UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: ""));
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT")]
         public void UniqueKeyKeyExtGrainCategoryDisallowsWhiteSpaceKeyExtension()
         {
             Assert.Throws<ArgumentException>(() =>
             UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: " \t\n\r"));
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT")]
         public void ParsingUniqueKeyStringificationShouldReproduceAnIdenticalObject()
         {
             UniqueKey expected1 = UniqueKey.NewKey(Guid.NewGuid());
@@ -84,7 +86,7 @@ namespace UnitTests.General
         }
 
 
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT")]
         public void GrainIdShouldEncodeAndDecodePrimaryKeyGuidCorrectly()
         {
             const int repeat = 100;
@@ -97,7 +99,7 @@ namespace UnitTests.General
             }
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT"), ]
         public void GrainId_ToFromPrintableString()
         {
             Guid guid = Guid.NewGuid();
@@ -138,7 +140,7 @@ namespace UnitTests.General
             return GrainId.Parse(str);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT")]
         public void UniqueTypeCodeDataShouldStore32BitsOfInformation()
         {
             const int expected = unchecked((int)0xfabccbaf);
@@ -148,7 +150,7 @@ namespace UnitTests.General
             Assert.Equal(expected, actual);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT")]
         public void UniqueKeysShouldPreserveTheirPrimaryKeyValueIfItIsGuid()
         {
             const int all32Bits = unchecked((int)0xffffffff);
@@ -169,7 +171,7 @@ namespace UnitTests.General
             Assert.Equal(expectedKeyExt2, actualKeyExt2); // "UniqueKey objects should preserve the value of their key extension (Guid case #2).");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT")]
         public void UniqueKeysShouldPreserveTheirPrimaryKeyValueIfItIsLong()
         {
             const int all32Bits = unchecked((int)0xffffffff);
@@ -187,7 +189,7 @@ namespace UnitTests.General
             Assert.Equal(expectedKeyExt, actualKeyExt); // "UniqueKey objects should preserve the value of their key extension (long case).");
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT")]
         public void ID_HashCorrectness()
         {
             // This tests that our optimized Jenkins hash computes the same value as the reference implementation
@@ -205,7 +207,7 @@ namespace UnitTests.General
             }
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT")]
         public void ID_Interning_GrainID()
         {
             Guid guid = new Guid();
@@ -219,7 +221,7 @@ namespace UnitTests.General
             Assert.Equal(gid2, gid3); // Should be equal GrainId's
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT")]
         public void ID_Interning_string_equals()
         {
             using var interner = new Interner<string, string>();
@@ -237,7 +239,7 @@ namespace UnitTests.General
             Assert.Equal(r2, r3); // 4: Should be equal
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT")]
         public void ID_Intern_FindOrCreate_derived_class()
         {
             using var interner = new Interner<int, A>();
@@ -269,7 +271,7 @@ namespace UnitTests.General
             Assert.Same(obj2, r5); // FindOrCreate return previously cached object
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT")]
         public void Interning_SiloAddress()
         {
             //string addrStr1 = "1.2.3.4@11111@1";
@@ -286,7 +288,7 @@ namespace UnitTests.General
             Assert.Same(a2, a3); // Should be same / intern'ed SiloAddress object
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT")]
         public void Interning_SiloAddress2()
         {
             SiloAddress a1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
@@ -295,7 +297,7 @@ namespace UnitTests.General
             Assert.NotSame(a1, a2); // Should not be same / intern'ed SiloAddress object
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT")]
         public void Interning_SiloAddress_Serialization()
         {
             SiloAddress a1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1111), 12345);
@@ -306,7 +308,7 @@ namespace UnitTests.General
             Assert.Same(a1, a3); // Should be same / intern'ed SiloAddress object
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
+        [Fact, TestCategory("BVT")]
         public void SiloAddress_ToFrom_ParsableString()
         {
             SiloAddress address1 = SiloAddressUtils.NewLocalSiloAddress(12345);
@@ -329,7 +331,7 @@ namespace UnitTests.General
 
             Assert.Equal(addressStr2, addressStr2Out); // SiloAddress equal after From-To-ParsableString
         }
-        [Fact, TestCategory("BVT"), TestCategory("Identifiers"), TestCategory("GrainReference")]
+        [Fact, TestCategory("BVT"), TestCategory("GrainReference")]
         public void GrainReference_Test1()
         {
             Guid guid = Guid.NewGuid();
