@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Tester.HeterogeneousSilosTests.UpgradeTests
 {
-    [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
+    [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("Functional")]
     public class VersionPlacementTests : UpgradeTestsBase
     {
         protected override short SiloCount => 3;

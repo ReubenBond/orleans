@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Tester.HeterogeneousSilosTests.UpgradeTests
 {
-    [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
+    [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("Functional")]
     public class MinimumVersionTests : UpgradeTestsBase
     {
         protected override Type VersionSelectorStrategy => typeof(MinimumVersion);
@@ -22,7 +22,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         }
     }
 
-    [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
+    [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("Functional")]
     public class LatestVersionTests : UpgradeTestsBase
     {
         protected override Type VersionSelectorStrategy => typeof(LatestVersion);
@@ -52,7 +52,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         }
     }
 
-    [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
+    [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("Functional")]
     public class AllVersionsCompatibleTests : UpgradeTestsBase
     {
         protected override Type VersionSelectorStrategy => typeof(LatestVersion);
@@ -75,7 +75,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         }
     }
 
-    [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT"), TestCategory("Functional")]
+    [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("Functional")]
     public class RandomCompatibleVersionTests : UpgradeTestsBase
     {
         protected override Type VersionSelectorStrategy => typeof(AllCompatibleVersions);

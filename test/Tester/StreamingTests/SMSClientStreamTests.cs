@@ -56,14 +56,14 @@ namespace Tester.StreamingTests
             }
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMSStreamProducerOnDroppedClientTest()
         {
             logger.Info("************************ SMSStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(SMSStreamProviderName, StreamNamespace);
         }
 
-        [Fact, TestCategory("SlowBVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
         public async Task SMSStreamConsumerOnDroppedClientTest()
         {
             logger.Info("************************ SMSStreamConsumerOnDroppedClientTest *********************************");
