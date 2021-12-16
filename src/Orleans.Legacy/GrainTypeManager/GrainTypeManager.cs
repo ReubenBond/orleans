@@ -13,9 +13,10 @@ using Orleans.Legacy;
 using Orleans.Legacy.Metadata;
 using Orleans.Metadata;
 using Orleans.Serialization;
+using Orleans.Runtime;
 using Orleans.Utilities;
 
-namespace Orleans.Runtime
+namespace Orleans.Legacy.Runtime
 {
     internal class GrainTypeManager
     {
@@ -34,7 +35,7 @@ namespace Orleans.Runtime
 
         public GrainInterfaceMap ClusterGrainInterfaceMap { get; private set; }
 
-        public IGrainTypeResolver GrainTypeResolver { get; private set; }
+        public ILegacyGrainTypeResolver GrainTypeResolver { get; private set; }
 
         public GrainTypeManager(
             ILocalSiloDetails siloDetails,

@@ -10,7 +10,7 @@ using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 
-namespace Orleans.Runtime
+namespace Orleans.Legacy.Runtime
 {
     /*
     internal class TypeManager : SystemTarget, IClusterTypeManager, ISiloTypeManager, ISiloStatusListener, IDisposable

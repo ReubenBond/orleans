@@ -2,11 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Orleans.Runtime;
 using Orleans.Serialization;
 
-namespace Orleans.Runtime
+namespace Orleans.Legacy.Runtime
 {
-    internal interface IGrainTypeResolver
+    internal interface ILegacyGrainTypeResolver
     {
         bool TryGetGrainClassData(Type grainInterfaceType, out GrainClassData implementation, string grainClassNamePrefix);
         bool TryGetGrainClassData(int grainInterfaceId, out GrainClassData implementation, string grainClassNamePrefix);
@@ -18,7 +19,7 @@ namespace Orleans.Runtime
     }
 
     [Serializable]
-    internal class GrainTypeResolver : IGrainTypeResolver, Legacy.Serialization.IOnDeserialized
+    internal class LegacyGrainTypeResolver : ILegacyGrainTypeResolver, Legacy.Serialization.IOnDeserialized
     {
         private readonly Dictionary<string, GrainInterfaceData> typeToInterfaceData;
         private readonly Dictionary<int, GrainInterfaceData> table;
@@ -30,7 +31,7 @@ namespace Orleans.Runtime
         [NonSerialized]
         private Dictionary<int, string> grainTypeToTypeName;
 
-        public GrainTypeResolver(
+        public LegacyGrainTypeResolver(
             Dictionary<string, GrainInterfaceData> typeToInterfaceData,
             Dictionary<int, GrainInterfaceData> table,
             HashSet<string> loadedGrainAsemblies,

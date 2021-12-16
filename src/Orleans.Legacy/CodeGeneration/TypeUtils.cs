@@ -7,6 +7,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using Orleans.Legacy.Utilities;
 using Orleans.Runtime;
 
 namespace Orleans.Legacy.Runtime
@@ -473,7 +474,7 @@ namespace Orleans.Legacy.Runtime
                 if (logger != null && logger.IsEnabled(LogLevel.Warning))
                 {
                     var message =
-                        $"Exception loading types from assembly '{assembly.FullName}': {LogFormatter.PrintException(exception)}.";
+                        $"Exception loading types from assembly '{assembly.FullName}': {LegacyLogFormatter.PrintException(exception)}.";
                     logger.Warn(ErrorCode.Loader_TypeLoadError_5, message, exception);
                 }
 

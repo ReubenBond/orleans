@@ -9,47 +9,47 @@ namespace Orleans.Legacy.Runtime
     /// </summary>
     [Serializable]
     [Immutable]
-    public sealed class GuidId : IEquatable<GuidId>, IComparable<GuidId>, ISerializable
+    public sealed class LegacyGuidId : IEquatable<LegacyGuidId>, IComparable<LegacyGuidId>, ISerializable
     {
-        private static readonly Lazy<Interner<Guid, GuidId>> guidIdInternCache = new Lazy<Interner<Guid, GuidId>>(
-                    () => new Interner<Guid, GuidId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq));
+        private static readonly Lazy<Interner<Guid, LegacyGuidId>> guidIdInternCache = new Lazy<Interner<Guid, LegacyGuidId>>(
+                    () => new Interner<Guid, LegacyGuidId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq));
 
         public readonly Guid Guid;
 
         // TODO: Need to integrate with Orleans serializer to really use Interner.
-        private GuidId(Guid guid)
+        private LegacyGuidId(Guid guid)
         {
             this.Guid = guid;
         }
 
-        public static GuidId GetNewGuidId()
+        public static LegacyGuidId GetNewGuidId()
         {
             return FindOrCreateGuidId(Guid.NewGuid());
         }
 
-        public static GuidId GetGuidId(Guid guid)
+        public static LegacyGuidId GetGuidId(Guid guid)
         {
             return FindOrCreateGuidId(guid);
         }
 
-        private static GuidId FindOrCreateGuidId(Guid guid)
+        private static LegacyGuidId FindOrCreateGuidId(Guid guid)
         {
-            return guidIdInternCache.Value.FindOrCreate(guid, g => new GuidId(g));
+            return guidIdInternCache.Value.FindOrCreate(guid, g => new LegacyGuidId(g));
         }
 
-        public int CompareTo(GuidId other)
+        public int CompareTo(LegacyGuidId other)
         {
             return this.Guid.CompareTo(other.Guid);
         }
 
-        public bool Equals(GuidId other)
+        public bool Equals(LegacyGuidId other)
         {
             return other != null && this.Guid.Equals(other.Guid);
         }
 
         public override bool Equals(object obj)
         {
-            return this.Equals(obj as GuidId);
+            return this.Equals(obj as LegacyGuidId);
         }
 
         public override int GetHashCode()
@@ -72,7 +72,7 @@ namespace Orleans.Legacy.Runtime
             return Guid.ToString();
         }
 
-        public static GuidId FromParsableString(string guidId)
+        public static LegacyGuidId FromParsableString(string guidId)
         {
             Guid id = System.Guid.Parse(guidId);
             return GetGuidId(id);
@@ -83,13 +83,13 @@ namespace Orleans.Legacy.Runtime
             stream.Write(this.Guid);
         }
 
-        internal static GuidId DeserializeFromStream(IBinaryTokenStreamReader stream)
+        internal static LegacyGuidId DeserializeFromStream(IBinaryTokenStreamReader stream)
         {
             Guid guid = stream.ReadGuid();
-            return GuidId.GetGuidId(guid);
+            return LegacyGuidId.GetGuidId(guid);
         }
 
-        public static bool operator ==(GuidId a, GuidId b)
+        public static bool operator ==(LegacyGuidId a, LegacyGuidId b)
         {
             if (ReferenceEquals(a, b)) return true;
             if (ReferenceEquals(a, null)) return false;
@@ -97,7 +97,7 @@ namespace Orleans.Legacy.Runtime
             return a.Guid.Equals(b.Guid);
         }
 
-        public static bool operator !=(GuidId a, GuidId b)
+        public static bool operator !=(LegacyGuidId a, LegacyGuidId b)
         {
             return !(a == b);
         }
@@ -108,7 +108,7 @@ namespace Orleans.Legacy.Runtime
         }
 
         // The special constructor is used to deserialize values. 
-        private GuidId(SerializationInfo info, StreamingContext context)
+        private LegacyGuidId(SerializationInfo info, StreamingContext context)
         {
             Guid = (Guid) info.GetValue("Guid", typeof(Guid));
         }

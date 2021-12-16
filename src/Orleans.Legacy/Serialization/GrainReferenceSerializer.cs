@@ -3,7 +3,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Legacy.Serialization
 {
-    [Serializer(typeof(GrainReference))]
+    [Serializer(typeof(LegacyGrainReference))]
     internal class GrainReferenceSerializer
     {
         /// <summary> Serializer function for grain reference.</summary>
@@ -12,7 +12,7 @@ namespace Orleans.Legacy.Serialization
         protected internal static void SerializeGrainReference(object obj, ISerializationContext context, Type expected)
         {
             var writer = context.StreamWriter;
-            var input = (GrainReference)obj;
+            var input = (LegacyGrainReference)obj;
             writer.Write(input.GrainId);
             if (input.IsSystemTarget)
             {
@@ -42,9 +42,9 @@ namespace Orleans.Legacy.Serialization
         protected internal static object DeserializeGrainReference(Type t, IDeserializationContext context)
         {
             var reader = context.StreamReader;
-            GrainId id = reader.ReadGrainId();
+            LegacyGrainId id = reader.ReadGrainId();
             SiloAddress silo = null;
-            GuidId observerId = null;
+            LegacyGuidId observerId = null;
             byte siloAddressPresent = reader.ReadByte();
             if (siloAddressPresent != 0)
             {
@@ -53,23 +53,21 @@ namespace Orleans.Legacy.Serialization
             bool expectObserverId = id.IsClient;
             if (expectObserverId)
             {
-                observerId = GuidId.DeserializeFromStream(reader);
+                observerId = LegacyGuidId.DeserializeFromStream(reader);
             }
             // store as null, serialize as empty.
             var genericArg = reader.ReadString();
             if (string.IsNullOrEmpty(genericArg))
-                genericArg = null;
-
-            /*
-            var runtimeClient = context.AdditionalContext as IRuntimeClient;
-            var runtime = runtimeClient?.GrainReferenceRuntime;
-            */
-            if (expectObserverId)
             {
-                return GrainReference.NewObserverGrainReference(id, observerId);
+                genericArg = null;
             }
 
-            return GrainReference.FromGrainId(id, genericArg, silo);
+            if (expectObserverId)
+            {
+                return LegacyGrainReference.NewObserverGrainReference(id, observerId);
+            }
+
+            return LegacyGrainReference.FromGrainId(id, genericArg, silo);
         }
 
         /// <summary> Copier function for grain reference. </summary>
@@ -77,7 +75,7 @@ namespace Orleans.Legacy.Serialization
         [CopierMethod]
         protected internal static object CopyGrainReference(object original, ICopyContext context)
         {
-            return (GrainReference)original;
+            return (LegacyGrainReference)original;
         }
     }
 }

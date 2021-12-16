@@ -1,7 +1,7 @@
 using System;
 using System.Reflection;
 
-namespace Orleans.Runtime
+namespace Orleans.Legacy.Runtime
 {
     [Serializable]
     internal class GenericGrainTypeData : GrainTypeData

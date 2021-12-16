@@ -2,6 +2,8 @@ using System;
 using System.Buffers.Binary;
 using System.Buffers.Text;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -14,7 +16,7 @@ namespace Orleans.Legacy
 {
     internal static class LegacyGrainIdHelper
     {
-        public static IdSpan ConvertKeyToNewIdFormat(GrainId grainId)
+        public static IdSpan ConvertKeyToNewIdFormat(LegacyGrainId grainId)
         {
             var key = grainId.Key;
             var (n0, n1, keyExt) = (key.N0, key.N1, key.KeyExt);
@@ -61,7 +63,7 @@ namespace Orleans.Legacy
             var (n0, n1, keyExt) = ExtractKeyComponents(key);
 
             // Convert the grain class into TypeCodeData
-            var typeCode = (ulong)GetTypeCode(grainClass);
+            var typeCode = (ulong)(uint)GetTypeCode(grainClass);
 
             var hasKeyExt = string.IsNullOrEmpty(keyExt);
             var isSystemTarget = typeof(SystemTarget).IsAssignableFrom(grainClass);
@@ -107,43 +109,69 @@ namespace Orleans.Legacy
 
         public static (ulong n0, ulong n1, string keyExt) ExtractKeyComponents(IdSpan key)
         {
-            string keyExt = null;
+            string keyExt;
             var keySpan = key.Value.Span;
-            ulong n0 = 0;
-            ulong n1 = 0;
+            ulong n0;
+            ulong n1;
             var keyString = key.ToStringUtf8();
 
             // Try to extract N0 and N1
-            var hasNumericKeyComponent = false;
-            if (keySpan.Length >= 16 && Utf8Parser.TryParse(keySpan.Slice(0, 16), out n0, out var len, 'X') && len == 16)
+            if (keySpan.Length >= 32 && Guid.TryParseExact(keyString.AsSpan().Slice(0, 32), "N", out var guidKey) && (keyString.Length == 32 || keyString[33] == '+'))
             {
-                // Has N0 or N1
-                hasNumericKeyComponent = true;
+                // We have a GUID
+                Span<byte> guidBytes = stackalloc byte[16];
+                var wroteBytes = guidKey.TryWriteBytes(guidBytes);
+                Debug.Assert(wroteBytes);
+                n0 = BitConverter.ToUInt64(guidBytes[0..8]);
+                n1 = BitConverter.ToUInt64(guidBytes[8..16]);
 
-                if (keySpan.Length >= 32 && Utf8Parser.TryParse(keySpan.Slice(16, 16), out n1, out len, 'X') && len == 16)
+                // Decode the key extension, if present.
+                if (keyString.Length > 32 && keyString[33] == '+')
                 {
-                    // Has both N0 and N1
+                    if (keyString.Length == 33)
+                    {
+                        // Key ends in a '+', so the key extension is the empty string.
+                        keyExt = string.Empty;
+                    }
+                    else
+                    {
+                        keyExt = keyString[34..];
+                    }
                 }
                 else
                 {
-                    // If there is a single numeric component, it's stored in N1
-                    n1 = n0;
-                    n0 = 0;
+                    keyExt = null;
                 }
             }
-
-            if (hasNumericKeyComponent)
+            else if (keyString.Length >= 16 && ulong.TryParse(keyString.AsSpan().Slice(0, 16), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var integerKey) && (keyString.Length == 16 || keyString[17] == '+'))
             {
-                // The key has numeric components and may have a key extension
-                var separatorIndex = keyString.IndexOf('+');
-                if (separatorIndex > 0)
+                // N1 is set to the decoded hexadecimal value.
+                n1 = integerKey;
+                n0 = 0;
+
+                // Decode the key extension, if present.
+                if (keyString.Length > 16 && keyString[17] == '+')
                 {
-                    keyExt = keyString[(separatorIndex + 1)..];
+                    if (keyString.Length == 17)
+                    {
+                        // Key ends in a '+', so the key extension is the empty string.
+                        keyExt = string.Empty;
+                    }
+                    else
+                    {
+                        keyExt = keyString[18..];
+                    }
+                }
+                else
+                {
+                    keyExt = null;
                 }
             }
             else
             {
-                // The entire key is a string key
+                // The entire key is a string.
+                n0 = 0;
+                n1 = 0;
                 keyExt = keyString;
             }
 
@@ -152,6 +180,8 @@ namespace Orleans.Legacy
 
         public static int GetTypeCode(Type type)
         {
+            if (type.IsConstructedGenericType) type = type.GetGenericTypeDefinition();
+
             var attr = type.GetCustomAttributes<TypeCodeOverrideAttribute>(false).FirstOrDefault();
             if (attr != null) return attr.TypeCode;
 

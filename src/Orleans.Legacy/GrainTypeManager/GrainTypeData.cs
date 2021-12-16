@@ -9,8 +9,9 @@ using Orleans.Concurrency;
 using Orleans.GrainDirectory;
 using Orleans.Legact.CodeGeneration;
 using Orleans.Placement;
+using Orleans.Runtime;
 
-namespace Orleans.Runtime
+namespace Orleans.Legacy.Runtime
 {
     /// <summary>
     /// Grain type meta data

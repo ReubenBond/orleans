@@ -67,7 +67,7 @@ namespace UnitTests.CompatibilityTests
                         .AddMemoryGrainStorage("MemoryStore")
                         .ConfigureServices(services =>
                         {
-                            //services.AddOrleansLegacySuppport();
+                            services.AddOrleansLegacySuppport();
                         });
                 }
             }

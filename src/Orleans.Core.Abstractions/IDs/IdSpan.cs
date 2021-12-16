@@ -244,6 +244,14 @@ namespace Orleans.Runtime
         /// </remarks>
         public static IdSpan UnsafeCreate(byte[] value, int hashCode) => new IdSpan(value, hashCode);
 
+        /// <summary>
+        /// Creates an instance, specifying both the hash code and the value.
+        /// </summary>
+        /// <remarks>
+        /// This method is intended for use by serializers and other low-level libraries.
+        /// </remarks>
+        public static IdSpan UnsafeCreate(byte[] value) => new (value);
+
         /// <inheritdoc/>
         public static byte[] UnsafeGetArray(IdSpan id) => id._value;
 

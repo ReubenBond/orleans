@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using Orleans.CodeGeneration;
@@ -26,8 +27,7 @@ namespace Orleans
         /// <summary>
         /// The map from implementation types to interface types to map of method to method infos.
         /// </summary>
-        private readonly ConcurrentDictionary<Type, Dictionary<Type, Dictionary<MethodInfo, Entry>>> mappings =
-            new ConcurrentDictionary<Type, Dictionary<Type, Dictionary<MethodInfo, Entry>>>();
+        private readonly ConcurrentDictionary<Type, Dictionary<Type, Dictionary<MethodInfo, Entry>>> mappings = new();
 
         /// <summary>
         /// Returns a mapping from method id to method info for the provided implementation and interface types.

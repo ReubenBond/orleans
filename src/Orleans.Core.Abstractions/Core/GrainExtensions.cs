@@ -108,11 +108,6 @@ namespace Orleans
                 return true;
             }
 
-            if (LegacyGrainId.TryConvertFromGrainId(grainId, out var legacyId))
-            {
-                return legacyId.IsLongKey;
-            }
-
             throw new InvalidOperationException($"Unable to extract integer key from grain id {grainId}");
         }
 
@@ -128,11 +123,6 @@ namespace Orleans
             if (GrainIdKeyExtensions.TryGetIntegerKey(grainId, out var primaryKey, out keyExt))
             {
                 return primaryKey;
-            }
-
-            if (LegacyGrainId.TryConvertFromGrainId(grainId, out var legacyId))
-            {
-                return legacyId.GetPrimaryKeyLong(out keyExt);
             }
 
             throw new InvalidOperationException($"Unable to extract integer key from grain id {grainId}");
@@ -151,11 +141,6 @@ namespace Orleans
                 return primaryKey;
             }
 
-            if (LegacyGrainId.TryConvertFromGrainId(grainId, out var legacyId))
-            {
-                return legacyId.GetPrimaryKeyLong();
-            }
-
             throw new InvalidOperationException($"Unable to extract integer key from grain id {grainId}");
         }
 
@@ -171,11 +156,6 @@ namespace Orleans
             if (GrainIdKeyExtensions.TryGetGuidKey(grainId, out var guid, out keyExt))
             {
                 return guid;
-            }
-
-            if (LegacyGrainId.TryConvertFromGrainId(grainId, out var legacyId))
-            {
-                return legacyId.GetPrimaryKey(out keyExt);
             }
 
             if (GrainIdKeyExtensions.TryGetIntegerKey(grainId, out var integerKey, out keyExt))
@@ -198,9 +178,6 @@ namespace Orleans
             if (GrainIdKeyExtensions.TryGetGuidKey(grainId, out var guid))
                 return guid;
 
-            if (LegacyGrainId.TryConvertFromGrainId(grainId, out var legacyId))
-                return legacyId.GetPrimaryKey();
-
             if (GrainIdKeyExtensions.TryGetIntegerKey(grainId, out var integerKey))
             {
                 var N1 = integerKey;
@@ -218,10 +195,6 @@ namespace Orleans
         public static string GetPrimaryKeyString(this IAddressable grain)
         {
             var grainId = GetGrainId(grain);
-            if (LegacyGrainId.TryConvertFromGrainId(grainId, out var legacyId))
-            {
-                return legacyId.GetPrimaryKeyString();
-            }
 
             return grainId.Key.ToStringUtf8();
         }

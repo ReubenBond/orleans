@@ -27,24 +27,24 @@ namespace Orleans.Legacy.Runtime
         public const string ORLEANS_CLUSTERING_ZOOKEEPER = "Orleans.Clustering.ZooKeeper";
         public const string TroubleshootingHelpLink = "https://aka.ms/orleans-troubleshooting";
 
-        public static readonly GrainId DirectoryServiceId = GrainId.GetSystemTargetGrainId(10);
-        public static readonly GrainId DirectoryCacheValidatorId = GrainId.GetSystemTargetGrainId(11);
-        public static readonly GrainId SiloControlId = GrainId.GetSystemTargetGrainId(12);
-        public static readonly GrainId ClientObserverRegistrarId = GrainId.GetSystemTargetGrainId(13);
-        public static readonly GrainId CatalogId = GrainId.GetSystemTargetGrainId(14);
-        public static readonly GrainId MembershipOracleId = GrainId.GetSystemTargetGrainId(15);
-        public static readonly GrainId TypeManagerId = GrainId.GetSystemTargetGrainId(17);
-        public static readonly GrainId FallbackSystemTargetId = GrainId.GetSystemTargetGrainId(19);
-        public static readonly GrainId LifecycleSchedulingSystemTargetId = GrainId.GetSystemTargetGrainId(20);
-        public static readonly GrainId DeploymentLoadPublisherSystemTargetId = GrainId.GetSystemTargetGrainId(22);
-        public static readonly GrainId MultiClusterOracleId = GrainId.GetSystemTargetGrainId(23);
-        public static readonly GrainId ClusterDirectoryServiceId = GrainId.GetSystemTargetGrainId(24);
-        public static readonly GrainId StreamProviderManagerAgentSystemTargetId = GrainId.GetSystemTargetGrainId(25);
-        public static readonly GrainId TestHooksSystemTargetId = GrainId.GetSystemTargetGrainId(26);
-        public static readonly GrainId ProtocolGatewayId = GrainId.GetSystemTargetGrainId(27);
-        public static readonly GrainId TransactionAgentSystemTargetId = GrainId.GetSystemTargetGrainId(28);
-        public static readonly GrainId SystemMembershipTableId = GrainId.GetSystemTargetGrainId(29);
-        public static readonly GrainId SiloDirectConnectionId = GrainId.GetSystemGrainId(new Guid("01111111-1111-1111-1111-111111111111"));
+        public static readonly LegacyGrainId DirectoryServiceId = LegacyGrainId.GetSystemTargetGrainId(10);
+        public static readonly LegacyGrainId DirectoryCacheValidatorId = LegacyGrainId.GetSystemTargetGrainId(11);
+        public static readonly LegacyGrainId SiloControlId = LegacyGrainId.GetSystemTargetGrainId(12);
+        public static readonly LegacyGrainId ClientObserverRegistrarId = LegacyGrainId.GetSystemTargetGrainId(13);
+        public static readonly LegacyGrainId CatalogId = LegacyGrainId.GetSystemTargetGrainId(14);
+        public static readonly LegacyGrainId MembershipOracleId = LegacyGrainId.GetSystemTargetGrainId(15);
+        public static readonly LegacyGrainId TypeManagerId = LegacyGrainId.GetSystemTargetGrainId(17);
+        public static readonly LegacyGrainId FallbackSystemTargetId = LegacyGrainId.GetSystemTargetGrainId(19);
+        public static readonly LegacyGrainId LifecycleSchedulingSystemTargetId = LegacyGrainId.GetSystemTargetGrainId(20);
+        public static readonly LegacyGrainId DeploymentLoadPublisherSystemTargetId = LegacyGrainId.GetSystemTargetGrainId(22);
+        public static readonly LegacyGrainId MultiClusterOracleId = LegacyGrainId.GetSystemTargetGrainId(23);
+        public static readonly LegacyGrainId ClusterDirectoryServiceId = LegacyGrainId.GetSystemTargetGrainId(24);
+        public static readonly LegacyGrainId StreamProviderManagerAgentSystemTargetId = LegacyGrainId.GetSystemTargetGrainId(25);
+        public static readonly LegacyGrainId TestHooksSystemTargetId = LegacyGrainId.GetSystemTargetGrainId(26);
+        public static readonly LegacyGrainId ProtocolGatewayId = LegacyGrainId.GetSystemTargetGrainId(27);
+        public static readonly LegacyGrainId TransactionAgentSystemTargetId = LegacyGrainId.GetSystemTargetGrainId(28);
+        public static readonly LegacyGrainId SystemMembershipTableId = LegacyGrainId.GetSystemTargetGrainId(29);
+        public static readonly LegacyGrainId SiloDirectConnectionId = LegacyGrainId.GetSystemGrainId(new Guid("01111111-1111-1111-1111-111111111111"));
 
         public const int PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE = 254;
         public const int PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE = 255;
@@ -66,7 +66,7 @@ namespace Orleans.Legacy.Runtime
 
         public static readonly TimeSpan DEFAULT_CLIENT_DROP_TIMEOUT = TimeSpan.FromMinutes(1);
 
-        private static readonly Dictionary<GrainId, string> singletonSystemTargetNames = new Dictionary<GrainId, string>
+        private static readonly Dictionary<LegacyGrainId, string> singletonSystemTargetNames = new Dictionary<LegacyGrainId, string>
         {
             {DirectoryServiceId, "DirectoryService"},
             {DirectoryCacheValidatorId, "DirectoryCacheValidator"},
@@ -95,7 +95,7 @@ namespace Orleans.Legacy.Runtime
 
         public static ushort DefaultInterfaceVersion = 1;
 
-        public static string SystemTargetName(GrainId id)
+        public static string SystemTargetName(LegacyGrainId id)
         {
             string name;
             if (singletonSystemTargetNames.TryGetValue(id, out name)) return name;
@@ -103,7 +103,7 @@ namespace Orleans.Legacy.Runtime
             return String.Empty;
         }
 
-        public static bool IsSingletonSystemTarget(GrainId id)
+        public static bool IsSingletonSystemTarget(LegacyGrainId id)
         {
             return singletonSystemTargetNames.ContainsKey(id);
         }

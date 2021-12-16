@@ -120,13 +120,13 @@ namespace Orleans.Legacy.Serialization
                     BuiltInTypes.SerializeInvokeMethodRequest,
                     BuiltInTypes.DeserializeInvokeMethodRequest);
             feature.AddSerializerDelegates(
-                    typeof(Response),
+                    typeof(LegacyResponse),
                     BuiltInTypes.CopyOrleansResponse,
                     BuiltInTypes.SerializeOrleansResponse,
                     BuiltInTypes.DeserializeOrleansResponse);
-            feature.AddSerializerDelegates(typeof(ActivationId), BuiltInTypes.CopyActivationId, BuiltInTypes.SerializeActivationId, BuiltInTypes.DeserializeActivationId);
-            feature.AddSerializerDelegates(typeof(GrainId), BuiltInTypes.CopyGrainId, BuiltInTypes.SerializeGrainId, BuiltInTypes.DeserializeGrainId);
-            feature.AddSerializerDelegates(typeof(ActivationAddress), BuiltInTypes.CopyActivationAddress, BuiltInTypes.SerializeActivationAddress, BuiltInTypes.DeserializeActivationAddress);
+            feature.AddSerializerDelegates(typeof(LegacyActivationId), BuiltInTypes.CopyActivationId, BuiltInTypes.SerializeActivationId, BuiltInTypes.DeserializeActivationId);
+            feature.AddSerializerDelegates(typeof(LegacyGrainId), BuiltInTypes.CopyGrainId, BuiltInTypes.SerializeGrainId, BuiltInTypes.DeserializeGrainId);
+            feature.AddSerializerDelegates(typeof(LegacyActivationAddress), BuiltInTypes.CopyActivationAddress, BuiltInTypes.SerializeActivationAddress, BuiltInTypes.DeserializeActivationAddress);
             feature.AddSerializerDelegates(typeof(CorrelationId), BuiltInTypes.CopyCorrelationId, BuiltInTypes.SerializeCorrelationId, BuiltInTypes.DeserializeCorrelationId);
             feature.AddSerializerDelegates(typeof(SiloAddress), BuiltInTypes.CopySiloAddress, BuiltInTypes.SerializeSiloAddress, BuiltInTypes.DeserializeSiloAddress);
 
@@ -154,13 +154,13 @@ namespace Orleans.Legacy.Serialization
             feature.AddKnownType(typeof(IPEndPoint));
             feature.AddKnownType(typeof(Guid));
 
-            feature.AddKnownType(typeof(GrainId));
-            feature.AddKnownType(typeof(ActivationId));
+            feature.AddKnownType(typeof(LegacyGrainId));
+            feature.AddKnownType(typeof(LegacyActivationId));
             feature.AddKnownType(typeof(SiloAddress));
-            feature.AddKnownType(typeof(ActivationAddress));
+            feature.AddKnownType(typeof(LegacyActivationAddress));
             feature.AddKnownType(typeof(CorrelationId));
             feature.AddKnownType(typeof(InvokeMethodRequest));
-            feature.AddKnownType(typeof(Response));
+            feature.AddKnownType(typeof(LegacyResponse));
 
             feature.AddKnownType(typeof(IList<>));
             feature.AddKnownType(typeof(IDictionary<,>));

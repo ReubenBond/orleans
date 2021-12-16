@@ -202,7 +202,7 @@ namespace Orleans.Runtime
 
         public static void SafeExecute(Action action, ILogger logger = null, string caller = null)
         {
-            SafeExecute(action, logger, caller);
+            SafeExecute(action, logger, (object)caller);
         }
 
         // a function to safely execute an action without any exception being thrown.

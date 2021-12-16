@@ -4,8 +4,9 @@ using System.Linq;
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 using Orleans.Legact.CodeGeneration;
+using Orleans.Runtime;
 
-namespace Orleans.Runtime
+namespace Orleans.Legacy.Runtime
 {
     /// <summary>
     /// Internal data structure that holds a grain interfaces to grain classes map.
@@ -281,9 +282,9 @@ namespace Orleans.Runtime
             return unordered.Contains(grainTypeCode);
         }
 
-        public IGrainTypeResolver GetGrainTypeResolver()
+        public ILegacyGrainTypeResolver GetGrainTypeResolver()
         {
-            return new GrainTypeResolver(
+            return new LegacyGrainTypeResolver(
                 this.typeToInterfaceData,
                 this.table,
                 this.loadedGrainAsemblies,

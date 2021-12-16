@@ -18,18 +18,18 @@ namespace Orleans.Legacy.Serialization
     {
         /// <summary> Read an <c>GrainId</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        internal static GrainId ReadGrainId<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
+        internal static LegacyGrainId ReadGrainId<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
         {
             UniqueKey key = @this.ReadUniqueKey();
-            return GrainId.GetGrainId(key);
+            return LegacyGrainId.GetGrainId(key);
         }
 
         /// <summary> Read an <c>ActivationId</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        internal static ActivationId ReadActivationId<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
+        internal static LegacyActivationId ReadActivationId<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
         {
             UniqueKey key = @this.ReadUniqueKey();
-            return ActivationId.GetActivationId(key);
+            return LegacyActivationId.GetActivationId(key);
         }
 
         internal static UniqueKey ReadUniqueKey<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
@@ -54,7 +54,7 @@ namespace Orleans.Legacy.Serialization
 
         /// <summary> Read an <c>ActivationAddress</c> value from the stream. </summary>
         /// <returns>Data from current position in stream, converted to the appropriate output type.</returns>
-        internal static ActivationAddress ReadActivationAddress<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
+        internal static LegacyActivationAddress ReadActivationAddress<TReader>(this TReader @this) where TReader : IBinaryTokenStreamReader
         {
             var silo = @this.ReadSiloAddress();
             var grain = @this.ReadGrainId();
@@ -63,10 +63,10 @@ namespace Orleans.Legacy.Serialization
             if (silo.Equals(SiloAddress.Zero))
                 silo = null;
 
-            if (act.Equals(ActivationId.Zero))
+            if (act.Equals(LegacyActivationId.Zero))
                 act = null;
 
-            return ActivationAddress.GetAddress(silo, grain, act);
+            return LegacyActivationAddress.GetAddress(silo, grain, act);
         }
 
         /// <summary>
@@ -230,13 +230,13 @@ namespace Orleans.Legacy.Serialization
                 case SerializationTokenType.IpEndPoint:
                     return typeof(IPEndPoint);
                 case SerializationTokenType.GrainId:
-                    return typeof(GrainId);
+                    return typeof(LegacyGrainId);
                 case SerializationTokenType.ActivationId:
-                    return typeof(ActivationId);
+                    return typeof(LegacyActivationId);
                 case SerializationTokenType.SiloAddress:
                     return typeof(SiloAddress);
                 case SerializationTokenType.ActivationAddress:
-                    return typeof(ActivationAddress);
+                    return typeof(LegacyActivationAddress);
                 case SerializationTokenType.CorrelationId:
                     return typeof(CorrelationId);
 #if false // Note: not yet implemented as simple types on the Writer side
@@ -319,19 +319,19 @@ namespace Orleans.Legacy.Serialization
                 case SerializationTokenType.IpEndPoint:
                     return typeof(IPEndPoint);
                 case SerializationTokenType.GrainId:
-                    return typeof(GrainId);
+                    return typeof(LegacyGrainId);
                 case SerializationTokenType.ActivationId:
-                    return typeof(ActivationId);
+                    return typeof(LegacyActivationId);
                 case SerializationTokenType.SiloAddress:
                     return typeof(SiloAddress);
                 case SerializationTokenType.ActivationAddress:
-                    return typeof(ActivationAddress);
+                    return typeof(LegacyActivationAddress);
                 case SerializationTokenType.CorrelationId:
                     return typeof(CorrelationId);
                 case SerializationTokenType.Request:
                     return typeof(InvokeMethodRequest);
                 case SerializationTokenType.Response:
-                    return typeof(Response);
+                    return typeof(LegacyResponse);
                 case SerializationTokenType.StringObjDict:
                     return typeof(Dictionary<string, object>);
                 case SerializationTokenType.Object:

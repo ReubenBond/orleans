@@ -72,25 +72,6 @@ namespace Orleans
                 [WellKnownGrainTypeProperties.StreamIdMapperKey] = this.StreamIdMapper,
             };
 
-            if (LegacyGrainId.IsLegacyGrainType(grainClass))
-            {
-                string keyType;
-
-                if (typeof(IGrainWithGuidKey).IsAssignableFrom(grainClass) || typeof(IGrainWithGuidCompoundKey).IsAssignableFrom(grainClass))
-                    keyType = nameof(Guid);
-                else if (typeof(IGrainWithIntegerKey).IsAssignableFrom(grainClass) || typeof(IGrainWithIntegerCompoundKey).IsAssignableFrom(grainClass))
-                    keyType = nameof(Int64);
-                else // fallback to string
-                    keyType = nameof(String);
-
-                binding[WellKnownGrainTypeProperties.LegacyGrainKeyType] = keyType;
-            }
-
-            if (LegacyGrainId.IsLegacyKeyExtGrainType(grainClass))
-            {
-                binding[WellKnownGrainTypeProperties.StreamBindingIncludeNamespaceKey] = "true";
-            }
-
             yield return binding;
         }
     }

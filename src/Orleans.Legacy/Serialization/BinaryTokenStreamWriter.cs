@@ -24,13 +24,13 @@ namespace Orleans.Legacy.Serialization
         }
 
         /// <summary> Write a <c>ActivationAddress</c> value to the stream. </summary>
-        internal static void Write<TWriter>(this TWriter @this, ActivationAddress addr) where TWriter : IBinaryTokenStreamWriter
+        internal static void Write<TWriter>(this TWriter @this, LegacyActivationAddress addr) where TWriter : IBinaryTokenStreamWriter
         {
             @this.Write(addr.Silo ?? SiloAddress.Zero);
 
             // GrainId must not be null
             @this.Write(addr.Grain);
-            @this.Write(addr.Activation ?? ActivationId.Zero);
+            @this.Write(addr.Activation ?? LegacyActivationId.Zero);
         }
 
         internal static void Write<TWriter>(this TWriter @this, UniqueKey key) where TWriter : IBinaryTokenStreamWriter
@@ -42,14 +42,14 @@ namespace Orleans.Legacy.Serialization
         }
 
         /// <summary> Write a <c>ActivationId</c> value to the stream. </summary>
-        internal static void Write<TWriter>(this TWriter @this, ActivationId id) where TWriter : IBinaryTokenStreamWriter
+        internal static void Write<TWriter>(this TWriter @this, LegacyActivationId id) where TWriter : IBinaryTokenStreamWriter
         {
             @this.Write(id.Key);
         }
 
         /// <summary> Write a <c>GrainId</c> value to the stream. </summary>
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters")]
-        internal static void Write<TWriter>(this TWriter @this, GrainId id) where TWriter : IBinaryTokenStreamWriter
+        internal static void Write<TWriter>(this TWriter @this, LegacyGrainId id) where TWriter : IBinaryTokenStreamWriter
         {
             @this.Write(id.Key);
         }
@@ -108,15 +108,15 @@ namespace Orleans.Legacy.Serialization
             typeTokens[typeof(Guid).TypeHandle] = SerializationTokenType.Guid;
             typeTokens[typeof(DateTime).TypeHandle] = SerializationTokenType.Date;
             typeTokens[typeof(TimeSpan).TypeHandle] = SerializationTokenType.TimeSpan;
-            typeTokens[typeof(GrainId).TypeHandle] = SerializationTokenType.GrainId;
-            typeTokens[typeof(ActivationId).TypeHandle] = SerializationTokenType.ActivationId;
+            typeTokens[typeof(LegacyGrainId).TypeHandle] = SerializationTokenType.GrainId;
+            typeTokens[typeof(LegacyActivationId).TypeHandle] = SerializationTokenType.ActivationId;
             typeTokens[typeof(SiloAddress).TypeHandle] = SerializationTokenType.SiloAddress;
-            typeTokens[typeof(ActivationAddress).TypeHandle] = SerializationTokenType.ActivationAddress;
+            typeTokens[typeof(LegacyActivationAddress).TypeHandle] = SerializationTokenType.ActivationAddress;
             typeTokens[typeof(IPAddress).TypeHandle] = SerializationTokenType.IpAddress;
             typeTokens[typeof(IPEndPoint).TypeHandle] = SerializationTokenType.IpEndPoint;
             typeTokens[typeof(CorrelationId).TypeHandle] = SerializationTokenType.CorrelationId;
             typeTokens[typeof(InvokeMethodRequest).TypeHandle] = SerializationTokenType.Request;
-            typeTokens[typeof(Response).TypeHandle] = SerializationTokenType.Response;
+            typeTokens[typeof(LegacyResponse).TypeHandle] = SerializationTokenType.Response;
             typeTokens[typeof(Dictionary<string, object>).TypeHandle] = SerializationTokenType.StringObjDict;
             typeTokens[typeof(Object).TypeHandle] = SerializationTokenType.Object;
             typeTokens[typeof(List<>).TypeHandle] = SerializationTokenType.List;
@@ -154,10 +154,10 @@ namespace Orleans.Legacy.Serialization
             writers[typeof(Guid).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Guid); stream.Write((Guid) obj); };
             writers[typeof(DateTime).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.Date); stream.Write((DateTime) obj); };
             writers[typeof(TimeSpan).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.TimeSpan); stream.Write((TimeSpan) obj); };
-            writers[typeof(GrainId).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.GrainId); stream.Write((GrainId) obj); };
-            writers[typeof(ActivationId).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.ActivationId); stream.Write((ActivationId) obj); };
+            writers[typeof(LegacyGrainId).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.GrainId); stream.Write((LegacyGrainId) obj); };
+            writers[typeof(LegacyActivationId).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.ActivationId); stream.Write((LegacyActivationId) obj); };
             writers[typeof(SiloAddress).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.SiloAddress); stream.Write((SiloAddress) obj); };
-            writers[typeof(ActivationAddress).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.ActivationAddress); stream.Write((ActivationAddress) obj); };
+            writers[typeof(LegacyActivationAddress).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.ActivationAddress); stream.Write((LegacyActivationAddress) obj); };
             writers[typeof(IPAddress).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.IpAddress); stream.Write((IPAddress) obj); };
             writers[typeof(IPEndPoint).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.IpEndPoint); stream.Write((IPEndPoint) obj); };
             writers[typeof(CorrelationId).TypeHandle] = (stream, obj) => { stream.Write(SerializationTokenType.CorrelationId); stream.Write((CorrelationId) obj); };

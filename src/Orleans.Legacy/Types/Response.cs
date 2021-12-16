@@ -3,13 +3,13 @@ using System;
 namespace Orleans.Legacy.Runtime
 {
     [Serializable]
-    internal class Response
+    internal class LegacyResponse
     {
         public bool ExceptionFlag { get; private set; }
         public Exception Exception { get; private set; }
         public object Data { get; private set; }
 
-        public Response(object data)
+        public LegacyResponse(object data)
         {
             switch (data)
             {
@@ -24,13 +24,13 @@ namespace Orleans.Legacy.Runtime
             }
         }
 
-        private Response()
+        private LegacyResponse()
         {
         }
 
-        static public Response ExceptionResponse(Exception exc)
+        static public LegacyResponse ExceptionResponse(Exception exc)
         {
-            return new Response
+            return new LegacyResponse
             {
                 ExceptionFlag = true,
                 Exception = exc

@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Orleans.Runtime;
 
-namespace Orleans.Runtime
+namespace Orleans.Legacy.Runtime
 {
     /// <summary>
     /// Metadata for a grain class

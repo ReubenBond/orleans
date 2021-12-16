@@ -1948,7 +1948,7 @@ namespace Orleans.Legacy.Serialization
 
         internal static void SerializeGrainId(object obj, ISerializationContext context, Type expected)
         {
-            var id = (GrainId)obj;
+            var id = (LegacyGrainId)obj;
             context.StreamWriter.Write(id);
         }
 
@@ -1964,7 +1964,7 @@ namespace Orleans.Legacy.Serialization
 
         internal static void SerializeActivationId(object obj, ISerializationContext context, Type expected)
         {
-            var id = (ActivationId)obj;
+            var id = (LegacyActivationId)obj;
             context.StreamWriter.Write(id);
         }
 
@@ -1980,7 +1980,7 @@ namespace Orleans.Legacy.Serialization
 
         internal static void SerializeActivationAddress(object obj, ISerializationContext context, Type expected)
         {
-            var addr = (ActivationAddress)obj;
+            var addr = (LegacyActivationAddress)obj;
             context.StreamWriter.Write(addr);
         }
 
@@ -2124,7 +2124,7 @@ namespace Orleans.Legacy.Serialization
 
         internal static void SerializeOrleansResponse(object obj, ISerializationContext context, Type expected)
         {
-            var resp = (Response)obj;
+            var resp = (LegacyResponse)obj;
 
             SerializationManager.SerializeInner(resp.ExceptionFlag ? resp.Exception : resp.Data, context, null);
         }
@@ -2132,19 +2132,19 @@ namespace Orleans.Legacy.Serialization
         internal static object DeserializeOrleansResponse(Type expected, IDeserializationContext context)
         {
             var obj = SerializationManager.DeserializeInner(null, context);
-            return new Response(obj);
+            return new LegacyResponse(obj);
         }
 
         internal static object CopyOrleansResponse(object original, ICopyContext context)
         {
-            var resp = (Response)original;
+            var resp = (LegacyResponse)original;
 
             if (resp.ExceptionFlag)
             {
                 return original;
             }
 
-            var result = new Response(SerializationManager.DeepCopyInner(resp.Data, context));
+            var result = new LegacyResponse(SerializationManager.DeepCopyInner(resp.Data, context));
             context.RecordCopy(original, result);
             return result;
         }

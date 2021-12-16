@@ -46,12 +46,13 @@ namespace UnitTests.StorageTests.Relational
                 var extension = keyExtension ? GetRandomCharacters(symbolSet, range) : null;
 
                 Guid grainId = GetRandom<Guid>();
-                if(type != typeof(NotApplicable))
+                var grainType = "test";
+                if (type != typeof(NotApplicable))
                 {
-                    return grainFactory.GetGrain(LegacyGrainId.GetGrainId(UniqueKey.NewKey(grainId, keyExtension ? UniqueKey.Category.KeyExtGrain : UniqueKey.Category.Grain, keyExtension ? KeyExtensionGrainTypeCode : NormalGrainTypeCode, extension)));
+                    grainType = $"test`1[[{type}]]";
                 }
 
-                return grainFactory.GetGrain(LegacyGrainId.GetGrainId(UniqueKey.NewKey(grainId, keyExtension ? UniqueKey.Category.KeyExtGrain : UniqueKey.Category.Grain, keyExtension ? KeyExtensionGrainTypeCode : NormalGrainTypeCode, extension)));
+                return grainFactory.GetGrain(GrainId.Create(grainType, extension is {Length: > 0 } ? $"{grainId}+{extension}" : grainId.ToString()));
             },
             [typeof(long)] = (grainFactory, type, keyExtension, state) =>
             {
@@ -60,12 +61,13 @@ namespace UnitTests.StorageTests.Relational
                 var extension = keyExtension ? GetRandomCharacters(symbolSet, range) : null;
 
                 long grainId = GetRandom<long>();
-                if(type != typeof(NotApplicable))
+                string grainType = "test";
+                if (type != typeof(NotApplicable))
                 {
-                    return grainFactory.GetGrain(GrainId.Create("faketype", grainId.ToString()));
+                    grainType = $"test`1[[{type}]]";
                 }
 
-                return grainFactory.GetGrain(LegacyGrainId.GetGrainId(UniqueKey.NewKey(grainId, keyExtension ? UniqueKey.Category.KeyExtGrain : UniqueKey.Category.Grain, keyExtension ? KeyExtensionGrainTypeCode : NormalGrainTypeCode, extension)));
+                return grainFactory.GetGrain(GrainId.Create(grainType, extension is {Length: > 0 } ? $"{grainId}+{extension}" : grainId.ToString()));
             },
             [typeof(string)] = (grainFactory, type, keyExtension, state) =>
             {
@@ -73,12 +75,13 @@ namespace UnitTests.StorageTests.Relational
                 var symbolSet = ((Tuple<Range<long>, SymbolSet>)state).Item2;
 
                 var grainId = GetRandomCharacters(symbolSet, range);
-                if(type != typeof(NotApplicable))
+                string grainType = "test";
+                if (type != typeof(NotApplicable))
                 {
-                    return grainFactory.GetGrain(LegacyGrainId.FromParsableString(LegacyGrainId.GetGrainId(NormalGrainTypeCode, grainId).ToParsableString()));
+                    grainType = $"test`1[[{type}]]";
                 }
 
-                return grainFactory.GetGrain(LegacyGrainId.GetGrainId(NormalGrainTypeCode, grainId).ToGrainId());
+                return grainFactory.GetGrain(GrainId.Create(grainType, grainId));
             }
         };
 

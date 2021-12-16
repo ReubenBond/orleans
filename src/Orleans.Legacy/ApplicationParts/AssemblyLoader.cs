@@ -8,6 +8,7 @@ using System.Reflection.PortableExecutable;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Legacy.Utilities;
 using Orleans.Runtime;
 
 namespace Orleans.Legacy.Runtime
@@ -409,7 +410,7 @@ namespace Orleans.Legacy.Runtime
             }
             catch (Exception ex)
             {
-                complaints = new[] { LogFormatter.PrintException(ex) };
+                complaints = new[] { LegacyLogFormatter.PrintException(ex) };
                 return false;
             }
             finally

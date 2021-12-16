@@ -5,13 +5,13 @@ using Orleans.Legacy.Core;
 namespace Orleans.Legacy.Runtime
 {
     [Serializable]
-    internal class GrainId : UniqueIdentifier, IEquatable<GrainId>, IGrainIdentity
+    internal class LegacyGrainId : UniqueIdentifier, IEquatable<LegacyGrainId>, IGrainIdentity
     {
         private static readonly object lockable = new object();
         private const int INTERN_CACHE_INITIAL_SIZE = InternerConstants.SIZE_LARGE;
         private static readonly TimeSpan internCacheCleanupInterval = InternerConstants.DefaultCacheCleanupFreq;
 
-        private static Interner<UniqueKey, GrainId> grainIdInternCache;
+        private static Interner<UniqueKey, LegacyGrainId> grainIdInternCache;
 
         public UniqueKey.Category Category => Key.IdCategory;
 
@@ -21,79 +21,79 @@ namespace Orleans.Legacy.Runtime
 
         public bool IsClient => Category == UniqueKey.Category.Client; 
 
-        internal GrainId(UniqueKey key)
+        internal LegacyGrainId(UniqueKey key)
             : base(key)
         {
         }
 
-        public static GrainId NewId()
+        public static LegacyGrainId NewId()
         {
             return FindOrCreateGrainId(UniqueKey.NewKey(Guid.NewGuid(), UniqueKey.Category.Grain));
         }
 
-        public static GrainId NewClientId()
+        public static LegacyGrainId NewClientId()
         {
             return NewClientId(Guid.NewGuid());
         }
 
-        internal static GrainId NewClientId(Guid id)
+        internal static LegacyGrainId NewClientId(Guid id)
         {
             return FindOrCreateGrainId(UniqueKey.NewKey(id, UniqueKey.Category.Client, 0));
         }
 
-        internal static GrainId GetGrainId(UniqueKey key)
+        internal static LegacyGrainId GetGrainId(UniqueKey key)
         {
             return FindOrCreateGrainId(key);
         }
 
-        internal static GrainId GetSystemGrainId(Guid guid)
+        internal static LegacyGrainId GetSystemGrainId(Guid guid)
         {
             return FindOrCreateGrainId(UniqueKey.NewKey(guid, UniqueKey.Category.SystemGrain));
         }
 
         // For testing only.
-        internal static GrainId GetGrainIdForTesting(Guid guid)
+        internal static LegacyGrainId GetGrainIdForTesting(Guid guid)
         {
             return FindOrCreateGrainId(UniqueKey.NewKey(guid, UniqueKey.Category.None));
         }
 
-        internal static GrainId NewSystemTargetGrainIdByTypeCode(int typeData)
+        internal static LegacyGrainId NewSystemTargetGrainIdByTypeCode(int typeData)
         {
             return FindOrCreateGrainId(UniqueKey.NewSystemTargetKey(Guid.NewGuid(), typeData));
         }
 
-        internal static GrainId GetSystemTargetGrainId(short systemGrainId)
+        internal static LegacyGrainId GetSystemTargetGrainId(short systemGrainId)
         {
             return FindOrCreateGrainId(UniqueKey.NewSystemTargetKey(systemGrainId));
         }
 
-        internal static GrainId GetGrainId(long typeCode, long primaryKey, string keyExt=null)
+        internal static LegacyGrainId GetGrainId(long typeCode, long primaryKey, string keyExt=null)
         {
             return FindOrCreateGrainId(UniqueKey.NewKey(primaryKey, 
                 keyExt == null ? UniqueKey.Category.Grain : UniqueKey.Category.KeyExtGrain, 
                 typeCode, keyExt));
         }
 
-        internal static GrainId GetGrainId(long typeCode, Guid primaryKey, string keyExt=null)
+        internal static LegacyGrainId GetGrainId(long typeCode, Guid primaryKey, string keyExt=null)
         {
             return FindOrCreateGrainId(UniqueKey.NewKey(primaryKey, 
                 keyExt == null ? UniqueKey.Category.Grain : UniqueKey.Category.KeyExtGrain, 
                 typeCode, keyExt));
         }
 
-        internal static GrainId GetGrainId(long typeCode, string primaryKey)
+        internal static LegacyGrainId GetGrainId(long typeCode, string primaryKey)
         {
             return FindOrCreateGrainId(UniqueKey.NewKey(0L,
                 UniqueKey.Category.KeyExtGrain,
                 typeCode, primaryKey));
         }
 
-        internal static GrainId GetGrainServiceGrainId(short id, int typeData)
+        internal static LegacyGrainId GetGrainServiceGrainId(short id, int typeData)
         {
             return FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(id, typeData));
         }
 
-        internal static GrainId GetGrainServiceGrainId(int typeData, string systemGrainId)
+        internal static LegacyGrainId GetGrainServiceGrainId(int typeData, string systemGrainId)
         {
             return FindOrCreateGrainId(UniqueKey.NewGrainServiceKey(systemGrainId, typeData));
         }
@@ -152,35 +152,35 @@ namespace Orleans.Legacy.Runtime
 
         public int TypeCode => Key.BaseTypeCode;
 
-        private static GrainId FindOrCreateGrainId(UniqueKey key)
+        private static LegacyGrainId FindOrCreateGrainId(UniqueKey key)
         {
             // Note: This is done here to avoid a wierd cyclic dependency / static initialization ordering problem involving the GrainId, Constants & Interner classes
-            if (grainIdInternCache != null) return grainIdInternCache.FindOrCreate(key, k => new GrainId(k));
+            if (grainIdInternCache != null) return grainIdInternCache.FindOrCreate(key, k => new LegacyGrainId(k));
 
             lock (lockable)
             {
                 if (grainIdInternCache == null)
                 {
-                    grainIdInternCache = new Interner<UniqueKey, GrainId>(INTERN_CACHE_INITIAL_SIZE, internCacheCleanupInterval);
+                    grainIdInternCache = new Interner<UniqueKey, LegacyGrainId>(INTERN_CACHE_INITIAL_SIZE, internCacheCleanupInterval);
                 }
             }
-            return grainIdInternCache.FindOrCreate(key, k => new GrainId(k));
+            return grainIdInternCache.FindOrCreate(key, k => new LegacyGrainId(k));
         }
 
-        public bool Equals(GrainId other)
+        public bool Equals(LegacyGrainId other)
         {
             return other != null && Key.Equals(other.Key);
         }
 
         public override bool Equals(UniqueIdentifier obj)
         {
-            var o = obj as GrainId;
+            var o = obj as LegacyGrainId;
             return o != null && Key.Equals(o.Key);
         }
 
         public override bool Equals(object obj)
         {
-            var o = obj as GrainId;
+            var o = obj as LegacyGrainId;
             return o != null && Key.Equals(o.Key);
         }
 
@@ -306,7 +306,7 @@ namespace Orleans.Legacy.Runtime
         /// </summary>
         /// <param name="grainId">String containing the GrainId info to be parsed.</param>
         /// <returns>New GrainId object created from the input data.</returns>
-        internal static GrainId FromParsableString(string grainId)
+        internal static LegacyGrainId FromParsableString(string grainId)
         {
             return FromParsableString(grainId.AsSpan());
         }
@@ -316,7 +316,7 @@ namespace Orleans.Legacy.Runtime
         /// </summary>
         /// <param name="grainId">String containing the GrainId info to be parsed.</param>
         /// <returns>New GrainId object created from the input data.</returns>
-        internal static GrainId FromParsableString(ReadOnlySpan<char> grainId)
+        internal static LegacyGrainId FromParsableString(ReadOnlySpan<char> grainId)
         {
             // NOTE: This function must be the "inverse" of ToParsableString, and data must round-trip reliably.
 
@@ -329,7 +329,7 @@ namespace Orleans.Legacy.Runtime
         /// </summary>
         /// <param name="grainId">Components containing the GrainId to be parsed.</param>
         /// <returns>New GrainId object created from the input data.</returns>
-        internal static GrainId FromKeyInfo((ulong, ulong, ulong, string) grainId)
+        internal static LegacyGrainId FromKeyInfo((ulong, ulong, ulong, string) grainId)
         {
             // NOTE: This function must be the "inverse" of ToKeyInfo, and data must round-trip reliably.
 

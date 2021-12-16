@@ -404,11 +404,11 @@ namespace Orleans.Streams
         // These fields have to be public non-readonly for JSonSerialization to work!
         // Implement ISerializable if changing any of them to readonly
         [JsonProperty]
-        public GuidId SubscriptionId;
+        public LegacyGuidId SubscriptionId;
         [JsonProperty]
         public StreamId Stream;
         [JsonProperty]
-        public GrainReference consumerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
+        public LegacyGrainReference consumerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
         [JsonProperty]
         public object filterWrapper; // Serialized func info
         [JsonProperty]
@@ -425,13 +425,13 @@ namespace Orleans.Streams
         // This constructor has to be public for JSonSerialization to work!
         // Implement ISerializable if changing it to non-public
         public PubSubSubscriptionState(
-            GuidId subscriptionId,
+            LegacyGuidId subscriptionId,
             StreamId streamId,
             IStreamConsumerExtension streamConsumer)
         {
             SubscriptionId = subscriptionId;
             Stream = streamId;
-            consumerReference = streamConsumer as GrainReference;
+            consumerReference = streamConsumer as LegacyGrainReference;
             state = SubscriptionStates.Active;
         }
 
@@ -467,7 +467,7 @@ namespace Orleans.Streams
             // Note: PubSubSubscriptionState is a struct, so 'other' can never be null.
             return Equals(other.SubscriptionId);
         }
-        public bool Equals(GuidId subscriptionId)
+        public bool Equals(LegacyGuidId subscriptionId)
         {
             if (ReferenceEquals(null, subscriptionId)) return false;
             return SubscriptionId.Equals(subscriptionId);
@@ -516,7 +516,7 @@ namespace Orleans.Streams
         [JsonProperty]
         public StreamId Stream;
         [JsonProperty]
-        public GrainReference producerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
+        public LegacyGrainReference producerReference; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
         // This property does not need to be Json serialized, since we already have producerReference.
         [JsonIgnore]
         public IStreamProducerExtension Producer { get { return producerReference as IStreamProducerExtension; } }
@@ -526,7 +526,7 @@ namespace Orleans.Streams
         public PubSubPublisherState(StreamId streamId, IStreamProducerExtension streamProducer)
         {
             Stream = streamId;
-            producerReference = streamProducer as GrainReference;
+            producerReference = streamProducer as LegacyGrainReference;
         }
 
         public override bool Equals(object obj)

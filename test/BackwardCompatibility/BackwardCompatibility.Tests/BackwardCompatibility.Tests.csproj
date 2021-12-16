@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <LangVersion>10</LangVersion>
@@ -10,7 +10,7 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Legacy\Orleans.Legacy.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
-    <ProjectReference Include="..\Grains\TestGrains\TestGrains.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestGrains\TestGrains.csproj" />
   </ItemGroup>
 
   <ItemGroup>

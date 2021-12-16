@@ -36,7 +36,6 @@ namespace Orleans.Legacy.Serialization
         private readonly ConcurrentDictionary<Type, IKeyedSerializer> typeToKeyedSerializer =
             new ConcurrentDictionary<Type, IKeyedSerializer>();
         private readonly Dictionary<Type, Deserializer> deserializers;
-        private readonly ConcurrentDictionary<Type, Func<GrainReference, GrainReference>> grainRefConstructorDictionary;
 
         private readonly IExternalSerializer fallbackSerializer;
         private readonly ILogger logger;
@@ -85,7 +84,6 @@ namespace Orleans.Legacy.Serialization
             copiers = new Dictionary<Type, Copier>();
             serializers = new Dictionary<Type, Serializer>();
             deserializers = new Dictionary<Type, Deserializer>();
-            grainRefConstructorDictionary = new ConcurrentDictionary<Type, Func<GrainReference, GrainReference>>();
 
             this.SerializationProviderOptions = serializationProviderOptions.Value;
 
@@ -407,8 +405,9 @@ namespace Orleans.Legacy.Serialization
         private void RegisterGrainReferenceSerializers(GrainInterfaceMetadata ifaceMetadata)
         {
             // Register GrainReference serialization methods.
+            var grainRefOrleansTypeKey = 
             Register(
-                type,
+                ,
                 GrainReferenceSerializer.CopyGrainReference,
                 GrainReferenceSerializer.SerializeGrainReference,
                 (expected, context) =>
@@ -430,35 +429,6 @@ namespace Orleans.Legacy.Serialization
                 });
         }
         */
-
-        private static Func<GrainReference, GrainReference> CreateGrainRefConstructorDelegate(Type type, Type[] genericArgs)
-        {
-            if (type.IsGenericType)
-            {
-                if (type.IsConstructedGenericType == false && genericArgs == null)
-                {
-                    return null;
-                }
-
-                type = type.MakeGenericType(genericArgs);
-            }
-
-            var constructor = TypeUtils.GetConstructorThatMatches(type, new[] { typeof(GrainReference) });
-            var method = new DynamicMethod(
-                ".ctor_" + type.Name,
-                typeof(GrainReference),
-                new[] { typeof(GrainReference) },
-                typeof(SerializationManager).Module,
-                true);
-            var il = method.GetILGenerator();
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Newobj, constructor);
-            il.Emit(OpCodes.Ret);
-            return
-                (Func<GrainReference, GrainReference>)
-                method.CreateDelegate(typeof(Func<GrainReference, GrainReference>));
-        }
-
 
         private SerializerMethods RegisterConcreteSerializer(Type concreteType, Type genericSerializerType)
         {

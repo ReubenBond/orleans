@@ -240,7 +240,7 @@ namespace BackwardCompatibility.Tests
         public void Serialize_ActivationAddress(SerializerToUse serializerToUse)
         {
             var serializationManager = InitializeSerializer(serializerToUse);
-            var grain = GrainId.NewId();
+            var grain = LegacyGrainId.NewId();
             var addr = ActivationAddress.GetAddress(null, grain, null);
             object deserialized = OrleansSerializationLoop(serializationManager, addr, false);
             Assert.IsAssignableFrom<ActivationAddress>(deserialized);

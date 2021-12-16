@@ -1,4 +1,4 @@
-namespace Orleans.Runtime
+namespace Orleans.Legacy.Runtime
 {
     /// <summary>
     /// Client gateway interface for forwarding client requests to silos.

@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Buffers.Text;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -17,7 +18,7 @@ namespace Orleans.Runtime
         public static IdSpan CreateIntegerKey(long key)
         {
             Span<byte> buf = stackalloc byte[sizeof(long) * 2];
-            Utf8Formatter.TryFormat(key, buf, out var len, 'X');
+            Utf8Formatter.TryFormat(key, buf, out var len, new StandardFormat('X', 16));
             Debug.Assert(len > 0);
             return new IdSpan(buf.Slice(0, len).ToArray());
         }
@@ -30,7 +31,7 @@ namespace Orleans.Runtime
             if (string.IsNullOrWhiteSpace(keyExtension)) return CreateIntegerKey(key);
 
             Span<byte> tmp = stackalloc byte[sizeof(long) * 2];
-            Utf8Formatter.TryFormat(key, tmp, out var len, 'X');
+            Utf8Formatter.TryFormat(key, tmp, out var len, new StandardFormat('X', 16));
             Debug.Assert(len > 0);
 
             var extLen = Encoding.UTF8.GetByteCount(keyExtension);

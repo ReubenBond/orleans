@@ -42,7 +42,7 @@ namespace Orleans.Legacy.CodeGeneration
     /// <remarks>
     /// These flag values are used in Orleans generated invoker code, and should not be altered. </remarks>
     [Flags]
-    public enum InvokeMethodOptions
+    public enum LegacyInvokeMethodOptions
     {
         /// <summary>No options defined.</summary>
         None = 0,
@@ -78,14 +78,14 @@ namespace Orleans.Legacy.CodeGeneration
 
     public static class InvokeMethodOptionsExtensions
     {
-        public static bool IsTransactional(this InvokeMethodOptions options)
+        public static bool IsTransactional(this LegacyInvokeMethodOptions options)
         {
-            return (options & InvokeMethodOptions.TransactionMask) != 0;
+            return (options & LegacyInvokeMethodOptions.TransactionMask) != 0;
         }
 
-        public static bool IsTransactionOption(this InvokeMethodOptions options, InvokeMethodOptions test)
+        public static bool IsTransactionOption(this LegacyInvokeMethodOptions options, LegacyInvokeMethodOptions test)
         {
-            return (options & InvokeMethodOptions.TransactionMask) == test;
+            return (options & LegacyInvokeMethodOptions.TransactionMask) == test;
         }
     }
 }

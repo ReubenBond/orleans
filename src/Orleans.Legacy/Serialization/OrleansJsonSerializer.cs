@@ -170,12 +170,12 @@ namespace Orleans.Legacy.Serialization
     {
         public override bool CanConvert(Type objectType)
         {
-            return (objectType == typeof(GrainId));
+            return (objectType == typeof(LegacyGrainId));
         }
 
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            GrainId id = (GrainId)value;
+            LegacyGrainId id = (LegacyGrainId)value;
             writer.WriteStartObject();
             writer.WritePropertyName("GrainId");
             writer.WriteValue(id.ToParsableString());
@@ -185,7 +185,7 @@ namespace Orleans.Legacy.Serialization
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
             JObject jo = JObject.Load(reader);
-            GrainId grainId = GrainId.FromParsableString(jo["GrainId"].ToObject<string>());
+            LegacyGrainId grainId = LegacyGrainId.FromParsableString(jo["GrainId"].ToObject<string>());
             return grainId;
         }
     }

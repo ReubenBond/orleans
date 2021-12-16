@@ -4,17 +4,17 @@ using Orleans.Runtime;
 namespace Orleans.Legacy.Runtime
 {
     [Serializable]
-    internal class ActivationId : UniqueIdentifier, IEquatable<ActivationId>
+    internal class LegacyActivationId : UniqueIdentifier, IEquatable<LegacyActivationId>
     {
         public bool IsSystem { get { return Key.IsSystemTargetKey; } }
 
-        public static readonly ActivationId Zero;
+        public static readonly LegacyActivationId Zero;
 
-        private static readonly Interner<UniqueKey, ActivationId> interner;
+        private static readonly Interner<UniqueKey, LegacyActivationId> interner;
 
-        static ActivationId()
+        static LegacyActivationId()
         {
-            interner = new Interner<UniqueKey, ActivationId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq);
+            interner = new Interner<UniqueKey, LegacyActivationId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq);
             Zero = FindOrCreate(UniqueKey.Empty);
         }
 
@@ -23,16 +23,16 @@ namespace Orleans.Legacy.Runtime
         /// DO NOT USE TO CREATE A RANDOM ACTIVATION ID
         /// Use ActivationId.NewId to create new activation IDs.
         /// </summary>
-        public ActivationId()
+        public LegacyActivationId()
         {
         }
 
-        private ActivationId(UniqueKey key)
+        private LegacyActivationId(UniqueKey key)
             : base(key)
         {
         }
 
-        public static ActivationId NewId()
+        public static LegacyActivationId NewId()
         {
             return FindOrCreate(UniqueKey.NewKey());
         }
@@ -40,36 +40,36 @@ namespace Orleans.Legacy.Runtime
         // No need to encode SiloAddress in the activation address for system target. 
         // System targets have unique grain ids and addressed to a concrete silo, so in fact we don't need ActivationId at all for System targets.
         // Need to remove it all together. For now, just use grain id as activation id.
-        public static ActivationId GetSystemActivation(GrainId grain, SiloAddress location)
+        public static LegacyActivationId GetSystemActivation(LegacyGrainId grain, SiloAddress location)
         {
             if (!grain.IsSystemTarget)
                 throw new ArgumentException("System activation IDs can only be created for system grains");
             return FindOrCreate(grain.Key);
         }
 
-        internal static ActivationId GetActivationId(UniqueKey key)
+        internal static LegacyActivationId GetActivationId(UniqueKey key)
         {
             return FindOrCreate(key);
         }
 
-        private static ActivationId FindOrCreate(UniqueKey key)
+        private static LegacyActivationId FindOrCreate(UniqueKey key)
         {
-            return interner.FindOrCreate(key, k => new ActivationId(k));
+            return interner.FindOrCreate(key, k => new LegacyActivationId(k));
         }
 
         public override bool Equals(UniqueIdentifier obj)
         {
-            var o = obj as ActivationId;
+            var o = obj as LegacyActivationId;
             return o != null && Key.Equals(o.Key);
         }
 
         public override bool Equals(object obj)
         {
-            var o = obj as ActivationId;
+            var o = obj as LegacyActivationId;
             return o != null && Key.Equals(o.Key);
         }
 
-        public bool Equals(ActivationId other)
+        public bool Equals(LegacyActivationId other)
         {
             return other != null && Key.Equals(other.Key);
         }

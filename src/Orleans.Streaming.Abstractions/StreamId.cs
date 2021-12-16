@@ -18,13 +18,13 @@ namespace Orleans.Runtime
     public readonly struct StreamId : IEquatable<StreamId>, IComparable<StreamId>, ISerializable
     {
         [Id(0)]
-        private readonly byte[] fullKey;
-        
+        private readonly int hash;
+
         [Id(1)]
         private readonly ushort keyIndex;
-        
+
         [Id(2)]
-        private readonly int hash;
+        private readonly byte[] fullKey;
 
         public ReadOnlyMemory<byte> FullKey => fullKey;
 

@@ -4,10 +4,10 @@ using Orleans.Runtime;
 namespace Orleans.Legacy.Runtime
 {
     [Serializable]
-    internal class ActivationAddress
+    internal class LegacyActivationAddress
     {
-        public GrainId Grain { get; private set; }
-        public ActivationId Activation { get; private set; }
+        public LegacyGrainId Grain { get; private set; }
+        public LegacyActivationId Activation { get; private set; }
         public SiloAddress Silo { get; private set; }
 
         public bool IsComplete
@@ -15,30 +15,30 @@ namespace Orleans.Legacy.Runtime
             get { return Grain != null && Activation != null && Silo != null; }
         }
 
-        private ActivationAddress(SiloAddress silo, GrainId grain, ActivationId activation)
+        private LegacyActivationAddress(SiloAddress silo, LegacyGrainId grain, LegacyActivationId activation)
         {
             Silo = silo;
             Grain = grain;
             Activation = activation;
         }
 
-        public static ActivationAddress NewActivationAddress(SiloAddress silo, GrainId grain)
+        public static LegacyActivationAddress NewActivationAddress(SiloAddress silo, LegacyGrainId grain)
         {
-            var activation = ActivationId.NewId();
+            var activation = LegacyActivationId.NewId();
             return GetAddress(silo, grain, activation);
         }
 
-        public static ActivationAddress GetAddress(SiloAddress silo, GrainId grain, ActivationId activation)
+        public static LegacyActivationAddress GetAddress(SiloAddress silo, LegacyGrainId grain, LegacyActivationId activation)
         {
             // Silo part is not mandatory
             if (grain is null) throw new ArgumentNullException("grain");
 
-            return new ActivationAddress(silo, grain, activation);
+            return new LegacyActivationAddress(silo, grain, activation);
         }
 
         public override bool Equals(object obj)
         {
-            var other = obj as ActivationAddress;
+            var other = obj as LegacyActivationAddress;
             return other != null && Equals(Silo, other.Silo) && Equals(Grain, other.Grain) && Equals(Activation, other.Activation);
         }
 
@@ -64,7 +64,7 @@ namespace Orleans.Legacy.Runtime
                     this.Activation.ToFullString());        // 2
         }
 
-        public bool Matches(ActivationAddress other)
+        public bool Matches(LegacyActivationAddress other)
         {
             return Equals(Grain, other.Grain) && Equals(Activation, other.Activation);
         }
