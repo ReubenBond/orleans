@@ -73,6 +73,10 @@
     <AzureStorageQueuesVersion>12.8.0</AzureStorageQueuesVersion>
     <MicrosoftServiceFabricServicesVersion>4.1.456</MicrosoftServiceFabricServicesVersion>
 
+    <!-- Orleans.Legacy dependencies -->
+    <SystemRuntimeVersion>4.3.1</SystemRuntimeVersion>
+    <MicrosoftWin32RegistryVersion>5.0.0</MicrosoftWin32RegistryVersion>
+
     <!-- 3rd party packages -->
     <AWSSDKDynamoDBv2Version>3.3.102.2</AWSSDKDynamoDBv2Version>
     <AWSSDKSQSVersion>3.3.2.7</AWSSDKSQSVersion>
