@@ -58,9 +58,14 @@ namespace Orleans.Runtime.Messaging
             if (this.overloadDetector.Overloaded)
             {
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
-                Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
-                this.messageCenter.TryDeliverToProxy(rejection);
                 if (this.Log.IsEnabled(LogLevel.Debug)) this.Log.Debug("Rejecting a request due to overloading: {0}", msg.ToString());
+                Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
+                msg.Release();
+                if (!this.messageCenter.TryDeliverToProxy(rejection))
+                {
+                    // The newly created rejection could not be delivered, so release it not
+                    rejection.Release();
+                }
                 loadSheddingCounter.Increment();
                 return;
             }
@@ -160,6 +165,7 @@ namespace Orleans.Runtime.Messaging
             {
                 this.Log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Silo {siloAddress} is dropping message: {message}. Reason = {reason}", this.myAddress, msg, reason);
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
+                msg.Release();
             }
         }
 

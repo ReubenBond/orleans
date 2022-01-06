@@ -144,6 +144,7 @@ namespace Orleans.Messaging
             if (!Running)
             {
                 this.logger.Error(ErrorCode.ProxyClient_MsgCtrNotRunning, $"Ignoring {msg} because the Client message center is not running");
+                msg.Release();
                 return;
             }
 
@@ -355,12 +356,26 @@ namespace Orleans.Messaging
             if (msg.Direction != Message.Directions.Request)
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_DroppingMsg, "Dropping message: {0}. Reason = {1}", msg, reason);
+
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+
+                // Release the dropped message.
+                msg.Release();
             }
             else
             {
                 if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.ProxyClient_RejectingMsg, "Rejecting message: {0}. Reason = {1}", msg, reason);
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
                 var error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
+                msg.Release();
+
                 DispatchLocalMessage(error);
             }
         }

@@ -14,6 +14,8 @@ using Orleans.Messaging;
 
 using Microsoft.Extensions.ObjectPool;
 using Orleans.Serialization.Invocation;
+using System.Runtime.CompilerServices;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -50,7 +52,7 @@ namespace Orleans.Runtime.Messaging
             this.shared = shared;
             this.outgoingMessages = Channel.CreateUnbounded<Message>(OutgoingMessageChannelOptions);
             this.outgoingMessageWriter = this.outgoingMessages.Writer;
-
+Dispose
             // Set the connection on the connection context so that it can be retrieved by the middleware.
             this.Context.Features.Set<Connection>(this);
 
@@ -237,7 +239,11 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 ++i;
-                this.RetryMessage(message);
+
+                if (message is not null)
+                {
+                    this.RetryMessage(message);
+                }
             }
 
             if (i > 0 && this.Log.IsEnabled(LogLevel.Information))
@@ -251,10 +257,19 @@ namespace Orleans.Runtime.Messaging
 
         public virtual void Send(Message message)
         {
+            if (message is null)
+            {
+                ThrowMessageNull();
+            }
+
             if (!this.outgoingMessageWriter.TryWrite(message))
             {
                 this.RerouteMessage(message);
             }
+
+            [DoesNotReturn]
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            static void ThrowMessageNull() => throw new ArgumentNullException(nameof(message));
         }
 
         public override string ToString() => $"[Local: {this.LocalEndPoint}, Remote: {this.RemoteEndPoint}, ConnectionId: {this.Context.ConnectionId}]";

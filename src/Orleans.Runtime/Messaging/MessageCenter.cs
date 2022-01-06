@@ -252,11 +252,13 @@ namespace Orleans.Runtime.Messaging
 
                 var str = string.Format("{0} {1}", rejectInfo ?? "", exc == null ? "" : exc.ToString());
                 var rejection = this.messageFactory.CreateRejectionResponse(message, rejectionType, str, exc);
+                message.Release();
                 SendMessage(rejection);
             }
             else
             {
                 this.messagingTrace.OnDispatcherDiscardedRejection(message, rejectionType, rejectInfo, exc);
+                message.Release();
             }
         }
 
@@ -511,9 +513,25 @@ namespace Orleans.Runtime.Messaging
                             msg,
                             Message.RejectionTypes.Unrecoverable,
                             $"SystemTarget {msg.TargetGrain} not active on this silo. Msg={msg}");
+                        msg.Release();
 
                         SendMessage(response);
                     }
+                    else
+                    {
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+
+                        // Release the dropped message.
+                        msg.Release();
+                    }
+
                     return;
                 }
 
@@ -578,11 +596,13 @@ namespace Orleans.Runtime.Messaging
                 // Do not send reject a rejection locally, it will create a stack overflow
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
                 if (this.log.IsEnabled(LogLevel.Debug)) log.Debug("Dropping rejection {msg}", msg);
+                msg.Release();
             }
             else
             {
                 if (string.IsNullOrEmpty(reason)) reason = $"Rejection from silo {this._siloAddress} - Unknown reason.";
                 var error = this.messageFactory.CreateRejectionResponse(msg, rejectionType, reason);
+                msg.Release();
                 // rejection msgs are always originated in the local silo, they are never remote.
                 this.ReceiveMessage(error);
             }

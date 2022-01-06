@@ -1,8 +1,10 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
@@ -13,6 +15,9 @@ namespace Orleans.Runtime
     {
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
+
+        [NonSerialized]
+        private volatile int _referenceCount = 1;
 
         [NonSerialized]
         private string _targetHistory;
@@ -34,7 +39,15 @@ namespace Orleans.Runtime
         [NonSerialized]
         public readonly CoarseStopwatch _timeSinceCreation = CoarseStopwatch.StartNew();
 
-        private bool _payloadIsSerialized;
+        [Flags]
+        private enum StatusFlags : byte
+        {
+            Disposed = 1,
+            PayloadIsSerialized = 1 << 1,
+        }
+
+        [NonSerialized]
+        private StatusFlags _status;
         private object _payload;
 
         public Message() { }
@@ -42,11 +55,20 @@ namespace Orleans.Runtime
         public object BodyObject { get => GetPayload(); set => SetPayload(value); }
 
         public object RawPayload => _payload;
-        public bool RawPayloadIsSerialized => _payloadIsSerialized;
+        public bool RawPayloadIsSerialized
+        {
+            get => _status.HasFlag(StatusFlags.PayloadIsSerialized);
+            private set => _status = value switch
+            {
+                true => _status | StatusFlags.PayloadIsSerialized,
+                false => _status & ~StatusFlags.PayloadIsSerialized,
+            };
+        }
 
         public object GetPayload()
         {
-            if (!_payloadIsSerialized) return _payload;
+            ThrowIfDisposed();
+            if (!RawPayloadIsSerialized) return _payload;
             if (_payload is null) return null;
 
             using var payloadData = Unsafe.As<IMemoryOwner<byte>>(_payload);
@@ -56,18 +78,20 @@ namespace Orleans.Runtime
 
         public void SetPayload(object value)
         {
-            if (_payloadIsSerialized)
+            ThrowIfDisposed();
+            if (RawPayloadIsSerialized)
             {
                 Unsafe.As<IMemoryOwner<byte>>(_payload).Dispose();
             }
 
-            _payloadIsSerialized = false;
+            RawPayloadIsSerialized = false;
             _payload = value;
         }
 
         public void SetSerializedPayload(IMemoryOwner<byte> value)
         {
-            _payloadIsSerialized = true;
+            ThrowIfDisposed();
+            RawPayloadIsSerialized = true;
             _payload = value;
         }
 
@@ -167,7 +191,7 @@ namespace Orleans.Runtime
                 _targetAddress = value;
             }
         }
-        
+
         public GrainAddress SendingAddress
         {
             get => _sendingAddress ??= GrainAddress.GetAddress(SendingSilo, SendingGrain, SendingActivation);
@@ -188,7 +212,7 @@ namespace Orleans.Runtime
                 {
                     return false;
                 }
-                
+
                 return TimeToLive <= TimeSpan.Zero;
             }
         }
@@ -361,6 +385,7 @@ namespace Orleans.Runtime
 
         public bool IsExpirableMessage(bool dropExpiredMessages)
         {
+            ThrowIfDisposed();
             if (!dropExpiredMessages) return false;
 
             GrainId id = TargetGrain;
@@ -369,9 +394,10 @@ namespace Orleans.Runtime
             // don't set expiration for one way, system target and system grain messages.
             return Direction != Directions.OneWay && !id.IsSystemTarget();
         }
-        
+
         internal void AddToCacheInvalidationHeader(GrainAddress address)
         {
+            ThrowIfDisposed();
             var list = new List<GrainAddress>();
             if (CacheInvalidationHeader != null)
             {
@@ -381,9 +407,10 @@ namespace Orleans.Runtime
             list.Add(address);
             CacheInvalidationHeader = list;
         }
-        
+
         public void ClearTargetAddress()
         {
+            ThrowIfDisposed();
             _targetAddress = null;
         }
 
@@ -415,7 +442,7 @@ namespace Orleans.Runtime
 
             return sb.ToString();
         }
-        
+
         private void AppendIfExists(Headers header, StringBuilder sb, Func<Message, object> valueProvider)
         {
             // used only under log3 level
@@ -460,6 +487,7 @@ namespace Orleans.Runtime
 
         public string GetTargetHistory()
         {
+            ThrowIfDisposed();
             var history = new StringBuilder();
             history.Append("<");
             if (TargetSilo != null)
@@ -484,16 +512,19 @@ namespace Orleans.Runtime
 
         public void Start()
         {
+            ThrowIfDisposed();
             _timeInterval = CoarseStopwatch.StartNew();
         }
 
         public void Stop()
         {
+            ThrowIfDisposed();
             _timeInterval.Stop();
         }
 
         public void Restart()
         {
+            ThrowIfDisposed();
             _timeInterval.Restart();
         }
 
@@ -597,6 +628,53 @@ namespace Orleans.Runtime
             headers = _callChainId.ToInt64() == 0 ? headers & ~Headers.CALL_CHAIN_ID : headers | Headers.CALL_CHAIN_ID;
             headers = _interfaceType.IsDefault ? headers & ~Headers.INTERFACE_TYPE : headers | Headers.INTERFACE_TYPE;
             return headers;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ThrowIfDisposed()
+        {
+            if (_status.HasFlag(StatusFlags.Disposed)) ThrowDisposed();
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            static void ThrowDisposed() => throw new ObjectDisposedException(nameof(Message));
+        }
+
+        public bool TryPreserve()
+        {
+            do
+            {
+                var expectedValue = _referenceCount;
+                if (expectedValue <= 0)
+                {
+                    Debug.Assert(expectedValue == 0, $"Expected value should not be less than zero, but it was {expectedValue}");
+                    return false;
+                }
+
+                var originalValue = Interlocked.CompareExchange(ref _referenceCount, value: expectedValue + 1, comparand: expectedValue);
+                if (originalValue == expectedValue)
+                {
+                    return true;
+                }
+            }
+            while (true);
+        }
+
+        public void Release()
+        {
+            if (Interlocked.Decrement(ref _referenceCount) <= 0)
+            {
+                _status |= StatusFlags.Disposed;
+                ResetBuffers();
+            }
+        }
+
+        private void ResetBuffers()
+        {
+            if (RawPayloadIsSerialized && _payload is IMemoryOwner<byte> payload)
+            {
+                _payload = null;
+                payload.Dispose();
+            }
         }
     }
 }

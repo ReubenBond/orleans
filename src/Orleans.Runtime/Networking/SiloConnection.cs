@@ -68,6 +68,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 this.MessagingTrace.OnDropExpiredMessage(msg, MessagingStatisticsGroup.Phase.Receive);
+                msg.Release();
                 return;
             }
 
@@ -84,6 +85,8 @@ namespace Orleans.Runtime.Messaging
 
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
                 var rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, "Silo stopping");
+                msg.Release();
+
                 this.Send(rejection);
                 return;
             }
@@ -111,23 +114,11 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            // If the message was for this endpoint but an older epoch, then reject the message
-            // (if it was a request), or drop it on the floor if it was a response or one-way.
+            // Otherwise, the message was for this endpoint but an older epoch.
+            // Reject the message if it was a request, or drop it on the floor if it was a response or one-way.
             if (msg.Direction == Message.Directions.Request)
             {
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
-                var rejection = this.MessageFactory.CreateRejectionResponse(
-                    msg,
-                    Message.RejectionTypes.Transient,
-                    $"The target silo is no longer active: target was {msg.TargetSilo.ToLongString()}, but this silo is {this.LocalSiloAddress.ToLongString()}. The rejected message is {msg}.");
-
-                // Invalidate the remote caller's activation cache entry.
-                if (msg.TargetAddress != null)
-                {
-                    rejection.AddToCacheInvalidationHeader(msg.TargetAddress);
-                }
-
-                this.Send(rejection);
 
                 if (this.Log.IsEnabled(LogLevel.Debug))
                 {
@@ -137,6 +128,35 @@ namespace Orleans.Runtime.Messaging
                         this.LocalSiloAddress.ToLongString(),
                         msg);
                 }
+
+                var targetAddress = msg.TargetAddress;
+                var rejection = this.MessageFactory.CreateRejectionResponse(
+                    msg,
+                    Message.RejectionTypes.Transient,
+                    $"The target silo is no longer active: target was {msg.TargetSilo.ToLongString()}, but this silo is {this.LocalSiloAddress.ToLongString()}. The rejected message is {msg}.");
+                msg.Release();
+
+                // Invalidate the remote caller's activation cache entry.
+                if (targetAddress != null)
+                {
+                    rejection.AddToCacheInvalidationHeader(targetAddress);
+                }
+
+                this.Send(rejection);
+            }
+            else
+            {
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+//TODO: EventSource/counter for dropped message
+
+                // Release the dropped message.
+                msg.Release();
             }
         }
 
@@ -157,12 +177,14 @@ namespace Orleans.Runtime.Messaging
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
                     $"The target silo is no longer active: target was {msg.TargetSilo.ToLongString()}, but this silo is {this.LocalSiloAddress.ToLongString()}. " +
                     $"The rejected ping message is {msg}.");
+                msg.Release();
                 this.Send(rejection);
             }
             else
             {
                 this.probeMonitor.OnReceivedProbeRequest();
                 var response = this.MessageFactory.CreateResponseMessage(msg);
+                msg.Release();
                 response.BodyObject = PingResponse;
                 this.Send(response);
             }
@@ -279,13 +301,14 @@ namespace Orleans.Runtime.Messaging
             // Don't send messages that have already timed out
             if (msg.IsExpired)
             {
-                this.MessagingTrace.OnDropExpiredMessage(msg,  MessagingStatisticsGroup.Phase.Send);
+                this.MessagingTrace.OnDropExpiredMessage(msg, MessagingStatisticsGroup.Phase.Send);
 
                 if (msg.IsPing())
                 {
                     this.Log.LogWarning("Droppping expired ping message {Message}", msg);
                 }
 
+                msg.Release();
                 return false;
             }
 
@@ -327,6 +350,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 this.MessagingTrace.OnSiloDropSendingMessage(this.LocalSiloAddress, msg, reason);
+                msg.Release();
             }
         }
 
@@ -345,9 +369,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override void RetryMessage(Message msg, Exception ex = null)
         {
-            if (msg == null) return;
-
-            if (msg != null && msg.IsPing())
+            if (msg.IsPing())
             {
                 this.Log.LogWarning("Retrying ping message {Message}", msg);
             }

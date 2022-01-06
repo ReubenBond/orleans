@@ -132,6 +132,7 @@ namespace Orleans.Runtime.Messaging
             MessagingStatisticsGroup.OnRejectedMessage(msg);
             if (string.IsNullOrEmpty(reason)) reason = string.Format("Rejection from silo - Unknown reason.");
             var error = this.MessageFactory.CreateRejectionResponse(msg, rejectionType, reason);
+            msg.Release();
 
             // rejection msgs are always originated locally, they are never remote.
             this.OnReceivedMessage(error);
@@ -150,6 +151,7 @@ namespace Orleans.Runtime.Messaging
             {
                 this.Log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Client is dropping message: {<essage}. Reason = {Reason}", msg, reason);
                 MessagingStatisticsGroup.OnDroppedSentMessage(msg);
+                msg.Release();
             }
         }
 

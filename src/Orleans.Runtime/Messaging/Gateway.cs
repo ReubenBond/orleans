@@ -393,12 +393,15 @@ namespace Orleans.Runtime.Messaging
                             msg,
                             Message.RejectionTypes.Unrecoverable,
                             "Unknown client " + msg.TargetGrain);
+                        msg.Release();
                         messageCenter.SendMessage(error);
                     }
                     else
                     {
                         MessagingStatisticsGroup.OnDroppedSentMessage(msg);
+                        msg.Release();
                     }
+
                     return;
                 }
 
