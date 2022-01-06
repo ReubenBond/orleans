@@ -39,60 +39,101 @@ namespace Orleans.Runtime
         [NonSerialized]
         public readonly CoarseStopwatch _timeSinceCreation = CoarseStopwatch.StartNew();
 
-        [Flags]
-        private enum StatusFlags : byte
-        {
-            Disposed = 1,
-            PayloadIsSerialized = 1 << 1,
-        }
-
-        [NonSerialized]
-        private StatusFlags _status;
-        private object _payload;
+        private IMemoryOwner<byte> _bodyBuffers;
+        private object _bodyObject;
 
         public Message() { }
 
         public object BodyObject { get => GetPayload(); set => SetPayload(value); }
 
-        public object RawPayload => _payload;
-        public bool RawPayloadIsSerialized
-        {
-            get => _status.HasFlag(StatusFlags.PayloadIsSerialized);
-            private set => _status = value switch
-            {
-                true => _status | StatusFlags.PayloadIsSerialized,
-                false => _status & ~StatusFlags.PayloadIsSerialized,
-            };
-        }
+        public IMemoryOwner<byte> RawBodyBuffers => _bodyBuffers;
+        public object RawBodyObject => _bodyObject;
 
         public object GetPayload()
         {
-            ThrowIfDisposed();
-            if (!RawPayloadIsSerialized) return _payload;
-            if (_payload is null) return null;
+            lock (this)
+            {
+                if (_bodyObject is { } bodyObject)
+                {
+                    return bodyObject;
+                }
 
-            using var payloadData = Unsafe.As<IMemoryOwner<byte>>(_payload);
-            _payload = Factory.PayloadSerializer.Deserialize<object>(payloadData.Memory);
-            return _payload;
+                if (_bodyBuffers is not { } bodyBuffers)
+                {
+                    return null;
+                }
+
+                bodyObject = _bodyObject = Factory.PayloadSerializer.Deserialize<object>(bodyBuffers.Memory);
+                ResetBuffers();
+
+                return bodyObject;
+            }
         }
 
         public void SetPayload(object value)
         {
-            ThrowIfDisposed();
-            if (RawPayloadIsSerialized)
+            lock (this)
             {
-                Unsafe.As<IMemoryOwner<byte>>(_payload).Dispose();
+                ResetBuffers();
+                _bodyObject = value;
             }
-
-            RawPayloadIsSerialized = false;
-            _payload = value;
         }
 
         public void SetSerializedPayload(IMemoryOwner<byte> value)
         {
-            ThrowIfDisposed();
-            RawPayloadIsSerialized = true;
-            _payload = value;
+            lock (this)
+            {
+                ResetBuffers();
+                _bodyBuffers = value;
+                _bodyObject = null;
+            }
+        }
+
+        internal void GetAndResetPayloadInternal(out object bodyObject, out IMemoryOwner<byte> bodyBuffers)
+        {
+            lock (this)
+            {
+                bodyBuffers = _bodyBuffers;
+                _bodyBuffers = null;
+                bodyObject = _bodyObject;
+            }
+        }
+
+        private void ResetBuffers()
+        {
+            if (_bodyBuffers is { } bodyBuffers)
+            {
+                _bodyBuffers = null;
+                bodyBuffers.Dispose();
+            }
+        }
+
+        public void Release()
+        {
+            if (Interlocked.Decrement(ref _referenceCount) <= 0)
+            {
+                ResetBuffers();
+            }
+        }
+
+        public bool TryPreserve()
+        {
+            do
+            {
+                var expectedValue = _referenceCount;
+                if (expectedValue <= 0)
+                {
+                    Debug.Assert(expectedValue == 0, $"Expected value should not be less than zero, but it was {expectedValue}");
+                    return false;
+                }
+
+                var originalValue = Interlocked.CompareExchange(ref _referenceCount, value: expectedValue + 1, comparand: expectedValue);
+                if (originalValue == expectedValue)
+                {
+                    return true;
+                }
+            }
+            while (true);
         }
 
         public MessageFactory Factory { get; init; }
@@ -385,7 +426,6 @@ namespace Orleans.Runtime
 
         public bool IsExpirableMessage(bool dropExpiredMessages)
         {
-            ThrowIfDisposed();
             if (!dropExpiredMessages) return false;
 
             GrainId id = TargetGrain;
@@ -397,7 +437,6 @@ namespace Orleans.Runtime
 
         internal void AddToCacheInvalidationHeader(GrainAddress address)
         {
-            ThrowIfDisposed();
             var list = new List<GrainAddress>();
             if (CacheInvalidationHeader != null)
             {
@@ -410,7 +449,6 @@ namespace Orleans.Runtime
 
         public void ClearTargetAddress()
         {
-            ThrowIfDisposed();
             _targetAddress = null;
         }
 
@@ -487,7 +525,6 @@ namespace Orleans.Runtime
 
         public string GetTargetHistory()
         {
-            ThrowIfDisposed();
             var history = new StringBuilder();
             history.Append("<");
             if (TargetSilo != null)
@@ -512,19 +549,16 @@ namespace Orleans.Runtime
 
         public void Start()
         {
-            ThrowIfDisposed();
             _timeInterval = CoarseStopwatch.StartNew();
         }
 
         public void Stop()
         {
-            ThrowIfDisposed();
             _timeInterval.Stop();
         }
 
         public void Restart()
         {
-            ThrowIfDisposed();
             _timeInterval.Restart();
         }
 
@@ -628,53 +662,6 @@ namespace Orleans.Runtime
             headers = _callChainId.ToInt64() == 0 ? headers & ~Headers.CALL_CHAIN_ID : headers | Headers.CALL_CHAIN_ID;
             headers = _interfaceType.IsDefault ? headers & ~Headers.INTERFACE_TYPE : headers | Headers.INTERFACE_TYPE;
             return headers;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ThrowIfDisposed()
-        {
-            if (_status.HasFlag(StatusFlags.Disposed)) ThrowDisposed();
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            static void ThrowDisposed() => throw new ObjectDisposedException(nameof(Message));
-        }
-
-        public bool TryPreserve()
-        {
-            do
-            {
-                var expectedValue = _referenceCount;
-                if (expectedValue <= 0)
-                {
-                    Debug.Assert(expectedValue == 0, $"Expected value should not be less than zero, but it was {expectedValue}");
-                    return false;
-                }
-
-                var originalValue = Interlocked.CompareExchange(ref _referenceCount, value: expectedValue + 1, comparand: expectedValue);
-                if (originalValue == expectedValue)
-                {
-                    return true;
-                }
-            }
-            while (true);
-        }
-
-        public void Release()
-        {
-            if (Interlocked.Decrement(ref _referenceCount) <= 0)
-            {
-                _status |= StatusFlags.Disposed;
-                ResetBuffers();
-            }
-        }
-
-        private void ResetBuffers()
-        {
-            if (RawPayloadIsSerialized && _payload is IMemoryOwner<byte> payload)
-            {
-                _payload = null;
-                payload.Dispose();
-            }
         }
     }
 }

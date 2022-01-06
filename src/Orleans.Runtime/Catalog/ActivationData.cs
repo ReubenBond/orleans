@@ -491,30 +491,37 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                if (_blockingRequest is object)
+                if (_blockingRequest is { } blocking && blocking.TryPreserve())
                 {
-                    var message = _blockingRequest;
-                    TimeSpan? timeSinceQueued = default;
-                    if (_runningRequests.TryGetValue(message, out var waitTime))
+                    try
                     {
-                        timeSinceQueued = waitTime.Elapsed;
-                    }
-                    
-                    var executionTime = _busyDuration.Elapsed;
-                    if (executionTime >= slowRunningRequestDuration)
-                    {
-                        GetStatusList(ref diagnostics);
-                        if (timeSinceQueued.HasValue)
+                        var message = _blockingRequest;
+                        TimeSpan? timeSinceQueued = default;
+                        if (_runningRequests.TryGetValue(message, out var waitTime))
                         {
-                            diagnostics.Add($"Message {message} was enqueued {timeSinceQueued} ago and has now been executing for {executionTime}.");
-                        }
-                        else
-                        {
-                            diagnostics.Add($"Message {message} has been executing for {executionTime}.");
+                            timeSinceQueued = waitTime.Elapsed;
                         }
 
-                        var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, diagnostics);
-                        messageCenter.SendMessage(response);
+                        var executionTime = _busyDuration.Elapsed;
+                        if (executionTime >= slowRunningRequestDuration)
+                        {
+                            GetStatusList(ref diagnostics);
+                            if (timeSinceQueued.HasValue)
+                            {
+                                diagnostics.Add($"Message {message} was enqueued {timeSinceQueued} ago and has now been executing for {executionTime}.");
+                            }
+                            else
+                            {
+                                diagnostics.Add($"Message {message} has been executing for {executionTime}.");
+                            }
+
+                            var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, diagnostics);
+                            messageCenter.SendMessage(response);
+                        }
+                    }
+                    finally
+                    {
+                        blocking.Release();
                     }
                 }
 
@@ -524,19 +531,29 @@ namespace Orleans.Runtime
                     var runDuration = running.Value;
                     if (ReferenceEquals(message, _blockingRequest)) continue;
 
-                    // Check how long they've been executing.
-                    var executionTime = runDuration.Elapsed;
-                    if (executionTime >= slowRunningRequestDuration)
+                    if (message.TryPreserve())
                     {
-                        // Interleaving message X has been executing for a long time
-                        GetStatusList(ref diagnostics);
-                        var messageDiagnostics = new List<string>(diagnostics)
+                        try
+                        {
+                            // Check how long they've been executing.
+                            var executionTime = runDuration.Elapsed;
+                            if (executionTime >= slowRunningRequestDuration)
+                            {
+                                // Interleaving message X has been executing for a long time
+                                GetStatusList(ref diagnostics);
+                                var messageDiagnostics = new List<string>(diagnostics)
                         {
                             $"Interleaving message {message} has been executing for {executionTime}."
                         };
 
-                        var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, messageDiagnostics);
-                        messageCenter.SendMessage(response);
+                                var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, messageDiagnostics);
+                                messageCenter.SendMessage(response);
+                            }
+                        }
+                        finally
+                        {
+                            message.Release();
+                        }
                     }
                 }
 
@@ -544,18 +561,28 @@ namespace Orleans.Runtime
                 foreach (var pair in _waitingRequests)
                 {
                     var message = pair.Message;
-                    var queuedTime = pair.QueuedTime.Elapsed;
-                    if (queuedTime >= longQueueTimeDuration)
+                    if (message.TryPreserve())
                     {
-                        // Message X has been enqueued on the target grain for Y and is currently position QueueLength in queue for processing.
-                        GetStatusList(ref diagnostics);
-                        var messageDiagnostics = new List<string>(diagnostics)
+                        try
                         {
-                           $"Message {message} has been enqueued on the target grain for {queuedTime} and is currently position {queueLength} in queue for processing."
-                        };
+                            var queuedTime = pair.QueuedTime.Elapsed;
+                            if (queuedTime >= longQueueTimeDuration)
+                            {
+                                // Message X has been enqueued on the target grain for Y and is currently position QueueLength in queue for processing.
+                                GetStatusList(ref diagnostics);
+                                var messageDiagnostics = new List<string>(diagnostics)
+                                {
+                                   $"Message {message} has been enqueued on the target grain for {queuedTime} and is currently position {queueLength} in queue for processing."
+                                };
 
-                        var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: false, isWaiting: true, messageDiagnostics);
-                        messageCenter.SendMessage(response);
+                                var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: false, isWaiting: true, messageDiagnostics);
+                                messageCenter.SendMessage(response);
+                            }
+                        }
+                        finally
+                        {
+                            message.Release();
+                        }
                     }
 
                     queueLength++;
@@ -998,6 +1025,7 @@ namespace Orleans.Runtime
             {
                 MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message);
                 _shared.InternalRuntime.MessagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Dispatch);
+                message.Release();
                 return;
             }
 

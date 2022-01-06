@@ -52,7 +52,7 @@ namespace Orleans.Runtime.Messaging
             this.shared = shared;
             this.outgoingMessages = Channel.CreateUnbounded<Message>(OutgoingMessageChannelOptions);
             this.outgoingMessageWriter = this.outgoingMessages.Writer;
-Dispose
+
             // Set the connection on the connection context so that it can be retrieved by the middleware.
             this.Context.Features.Set<Connection>(this);
 
@@ -465,6 +465,7 @@ Dispose
             {
                 // Send a fast fail to the caller.
                 var response = this.MessageFactory.CreateResponseMessage(message);
+                message.Release();
                 response.Result = Message.ResponseTypes.Error;
                 response.SetPayload(Response.FromException(exception));
 
@@ -499,6 +500,7 @@ Dispose
             if (message.Direction == Message.Directions.Request)
             {
                 var response = this.MessageFactory.CreateResponseMessage(message);
+                message.Release();
                 response.Result = Message.ResponseTypes.Error;
                 response.SetPayload(Response.FromException(exception));
 
@@ -523,6 +525,7 @@ Dispose
                     message);
 
                 MessagingStatisticsGroup.OnDroppedSentMessage(message);
+                message.Release();
             }
         }
 

@@ -80,6 +80,7 @@ namespace Orleans.Runtime.Messaging
                 if (msg.Direction != Message.Directions.Request)
                 {
                     this.MessagingTrace.OnDropBlockedApplicationMessage(msg);
+                    msg.Release();
                     return;
                 }
 
@@ -301,13 +302,12 @@ namespace Orleans.Runtime.Messaging
             // Don't send messages that have already timed out
             if (msg.IsExpired)
             {
-                this.MessagingTrace.OnDropExpiredMessage(msg, MessagingStatisticsGroup.Phase.Send);
-
                 if (msg.IsPing())
                 {
                     this.Log.LogWarning("Droppping expired ping message {Message}", msg);
                 }
 
+                this.MessagingTrace.OnDropExpiredMessage(msg, MessagingStatisticsGroup.Phase.Send);
                 msg.Release();
                 return false;
             }

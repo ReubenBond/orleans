@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using Orleans.Serialization.Invocation;
 
@@ -21,6 +23,14 @@ namespace Orleans.Runtime
             this.context = ctx;
             this.Message = msg;
             this.stopwatch = ValueStopwatch.StartNew();
+            if (!Message.TryPreserve())
+            {
+                ThrowMessageTryPreserveFatalError();
+
+                [DoesNotReturn]
+                [MethodImpl(MethodImplOptions.NoInlining)]
+                static void ThrowMessageTryPreserveFatalError() => throw new InvalidOperationException($"{nameof(Message)}.{nameof(Message.TryPreserve)} returned false in the {nameof(CallbackData)} constructor. This is a fatal error.");
+            }
         }
 
         public Message Message { get; } // might hold metadata used by response pipeline
@@ -66,7 +76,6 @@ namespace Orleans.Runtime
 
             var error = Message.CreatePromptExceptionResponse(msg, new TimeoutException(errorMsg));
             ResponseCallback(error, this.context);
-            //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
         public void OnTargetSiloFail()
@@ -93,13 +102,13 @@ namespace Orleans.Runtime
             this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
             var error = Message.CreatePromptExceptionResponse(msg, new SiloUnavailableException(errorMsg));
             ResponseCallback(error, this.context);
-            //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
         public void DoCallback(Message response)
         {
             if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
             {
+                response.Release();
                 return;
             }
 
@@ -114,55 +123,72 @@ namespace Orleans.Runtime
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);
-            //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
-        public static void ResponseCallback(Message message, IResponseCompletionSource context)
+        public void ResponseCallback(Message response, IResponseCompletionSource context)
         {
-            if (message.Result != Message.ResponseTypes.Rejection)
+            try
             {
-                try
+                if (response.Result != Message.ResponseTypes.Rejection)
                 {
-                    var response = (Response)message.BodyObject;
-                    context.Complete(response);
+                    try
+                    {
+                        context.Complete((Response)response.BodyObject);
+                    }
+                    catch (Exception exc)
+                    {
+                        // catch the exception and break the promise with it.
+                        context.Complete(Response.FromException(exc));
+                    }
+                    finally
+                    {
+                        response.Release();
+                    }
                 }
-                catch (Exception exc)
+                else
                 {
-                    // catch the exception and break the promise with it.
-                    context.Complete(Response.FromException(exc));
+                    OnRejection(response, context);
                 }
             }
-            else
+            finally
             {
-                OnRejection(message, context);
+                // Release the original request message
+                Message.Release();
             }
         }
 
         private static void OnRejection(Message message, IResponseCompletionSource context)
         {
-            Exception rejection;
-            switch (message.RejectionType)
+            try
             {
-                case Message.RejectionTypes.GatewayTooBusy:
-                    rejection = new GatewayTooBusyException();
-                    break;
-                case Message.RejectionTypes.DuplicateRequest:
-                    return; // Ignore duplicates
+                Exception rejection;
+                switch (message.RejectionType)
+                {
+                    case Message.RejectionTypes.GatewayTooBusy:
+                        rejection = new GatewayTooBusyException();
+                        break;
+                    case Message.RejectionTypes.DuplicateRequest:
+                        return; // Ignore duplicates
 
-                default:
-                    rejection = message.BodyObject as Exception;
-                    if (rejection == null)
-                    {
-                        if (string.IsNullOrEmpty(message.RejectionInfo))
+                    default:
+                        rejection = message.BodyObject as Exception;
+                        if (rejection == null)
                         {
-                            message.RejectionInfo = "Unable to send request - no rejection info available";
+                            if (string.IsNullOrEmpty(message.RejectionInfo))
+                            {
+                                message.RejectionInfo = "Unable to send request - no rejection info available";
+                            }
+                            rejection = new OrleansMessageRejectionException(message.RejectionInfo);
                         }
-                        rejection = new OrleansMessageRejectionException(message.RejectionInfo);
-                    }
-                    break;
-            }
+                        break;
+                }
 
-            context.Complete(Response.FromException(rejection));
+                context.Complete(Response.FromException(rejection));
+            }
+            finally
+            {
+                message.Release();
+            }
         }
     }
 }

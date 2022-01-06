@@ -108,11 +108,10 @@ namespace Orleans.Runtime
 
         internal Message CreateDiagnosticResponseMessage(Message request, bool isExecuting, bool isWaiting, List<string> diagnostics)
         {
+            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Creating {RequestMesssage} status update with diagnostics {Diagnostics}", request, diagnostics);
             var response = this.CreateResponseMessage(request);
             response.Result = Message.ResponseTypes.Status;
             response.BodyObject = new StatusResponse(isExecuting, isWaiting, diagnostics);
-
-            if (this.logger.IsEnabled(LogLevel.Debug)) this.logger.LogDebug("Creating {RequestMesssage} status update with diagnostics {Diagnostics}", request, diagnostics);
 
             return response;
         }

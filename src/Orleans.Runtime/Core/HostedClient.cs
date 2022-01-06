@@ -152,6 +152,7 @@ namespace Orleans.Runtime
             if (message.IsExpired)
             {
                 this.messagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Receive);
+                message.Release();
                 return true;
             }
 

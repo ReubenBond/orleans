@@ -249,14 +249,15 @@ namespace Orleans
             }
         }
 
-        public void SendResponse(Message request, Response response)
+        public void SendResponse(Message message, Response response)
         {
             ThrowIfDisposed();
-            var message = this.messageFactory.CreateResponseMessage(request);
-            OrleansOutsideRuntimeClientEvent.Log.SendResponse(message);
-            message.BodyObject = response;
+            var responseMessage = this.messageFactory.CreateResponseMessage(message);
+            message.Release();
+            OrleansOutsideRuntimeClientEvent.Log.SendResponse(responseMessage);
+            responseMessage.BodyObject = response;
 
-            MessageCenter.SendMessage(message);
+            MessageCenter.SendMessage(responseMessage);
         }
 
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource context, InvokeMethodOptions options)
@@ -316,6 +317,7 @@ namespace Orleans
                 && (response.RejectionType == Message.RejectionTypes.DuplicateRequest
                  || response.RejectionType == Message.RejectionTypes.CacheInvalidation))
             {
+                response.Release();
                 return;
             }
             else if (response.Result == Message.ResponseTypes.Status)
@@ -342,6 +344,7 @@ namespace Orleans
                     }
                 }
 
+                response.Release();
                 return;
             }
             
@@ -357,6 +360,7 @@ namespace Orleans
             else
             {
                 logger.Warn(ErrorCode.Runtime_Error_100011, "No callback for response message: " + response);
+                response.Release();
             }
         }
 

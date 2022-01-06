@@ -194,6 +194,7 @@ namespace Orleans.Runtime
             if (request.IsExpired)
             {
                 this.messagingTrace.OnDropExpiredMessage(request, MessagingStatisticsGroup.Phase.Respond);
+                request.Release();
                 return;
             }
 
@@ -257,6 +258,7 @@ namespace Orleans.Runtime
                 if (message.IsExpired)
                 {
                     this.messagingTrace.OnDropExpiredMessage(message, MessagingStatisticsGroup.Phase.Invoke);
+                    message.Release();
                     return;
                 }
 

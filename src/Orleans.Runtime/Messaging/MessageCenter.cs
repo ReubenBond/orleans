@@ -142,6 +142,7 @@ namespace Orleans.Runtime.Messaging
             {
                 // Drop the message on the floor if it's an application message that isn't a rejection
                 this.messagingTrace.OnDropBlockedApplicationMessage(msg);
+                msg.Release();
             }
             else
             {
@@ -158,6 +159,7 @@ namespace Orleans.Runtime.Messaging
                 if (msg.IsExpired)
                 {
                     this.messagingTrace.OnDropExpiredMessage(msg, MessagingStatisticsGroup.Phase.Send);
+                    msg.Release();
                     return;
                 }
 
@@ -460,18 +462,19 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal void SendResponse(Message request, Response response)
+        internal void SendResponse(Message message, Response response)
         {
             // create the response
-            var message = this.messageFactory.CreateResponseMessage(request);
-            message.BodyObject = response;
+            var responseMessage = this.messageFactory.CreateResponseMessage(message);
+            message.Release();
+            responseMessage.BodyObject = response;
 
-            if (message.TargetGrain.IsSystemTarget())
+            if (responseMessage.TargetGrain.IsSystemTarget())
             {
-                PrepareSystemTargetMessage(message);
+                PrepareSystemTargetMessage(responseMessage);
             }
 
-            SendMessage(message);
+            SendMessage(responseMessage);
         }
 
         internal void PrepareSystemTargetMessage(Message message)

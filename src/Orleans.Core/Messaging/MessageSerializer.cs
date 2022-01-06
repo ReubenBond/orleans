@@ -145,15 +145,15 @@ namespace Orleans.Runtime.Messaging
                 var headerLength = bufferWriter.CommittedBytes;
 
                 _serializationSession.PartialReset();
-                var rawPayload = message.RawPayload;
-                if (message.RawPayloadIsSerialized)
+                message.GetAndResetPayloadInternal(out var bodyObject, out var bodyBuffers);
+                if (bodyBuffers is not null)
                 {
-                    using var payloadData = Unsafe.As<IMemoryOwner<byte>>(rawPayload);
-                    buffer.Write(payloadData.Memory.Span);
+                    buffer.Write(bodyBuffers.Memory.Span);
+                    bodyBuffers.Dispose();
                 }
                 else
                 {
-                    message.Factory.PayloadSerializer.Serialize(rawPayload, buffer, _serializationSession);
+                    message.Factory.PayloadSerializer.Serialize(bodyObject, buffer, _serializationSession);
                 }
 
                 // Write length prefixes, first header length then body length.
