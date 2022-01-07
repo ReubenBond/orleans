@@ -131,63 +131,33 @@ namespace Orleans.Runtime
             {
                 if (response.Result != Message.ResponseTypes.Rejection)
                 {
-                    try
-                    {
-                        context.Complete((Response)response.BodyObject);
-                    }
-                    catch (Exception exc)
-                    {
-                        // catch the exception and break the promise with it.
-                        context.Complete(Response.FromException(exc));
-                    }
-                    finally
-                    {
-                        response.Release();
-                    }
+                    context.Complete((Response)response.BodyObject);
                 }
                 else
                 {
-                    OnRejection(response, context);
+                    context.Complete(GetRejectionResponse(response));
                 }
+            }
+            catch (Exception exception)
+            {
+                context.Complete(Response.FromException(exception));
             }
             finally
             {
-                // Release the original request message
+                response.Release();
                 Message.Release();
             }
-        }
 
-        private static void OnRejection(Message message, IResponseCompletionSource context)
-        {
-            try
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            static Response GetRejectionResponse(Message response)
             {
-                Exception rejection;
-                switch (message.RejectionType)
+                var rejection = response.RejectionType switch
                 {
-                    case Message.RejectionTypes.GatewayTooBusy:
-                        rejection = new GatewayTooBusyException();
-                        break;
-                    case Message.RejectionTypes.DuplicateRequest:
-                        return; // Ignore duplicates
+                    Message.RejectionTypes.GatewayTooBusy => new GatewayTooBusyException(),
+                    _ => response.BodyObject as Exception ?? new OrleansMessageRejectionException(response.RejectionInfo ?? "Unable to send request - no rejection info available"),
+                };
 
-                    default:
-                        rejection = message.BodyObject as Exception;
-                        if (rejection == null)
-                        {
-                            if (string.IsNullOrEmpty(message.RejectionInfo))
-                            {
-                                message.RejectionInfo = "Unable to send request - no rejection info available";
-                            }
-                            rejection = new OrleansMessageRejectionException(message.RejectionInfo);
-                        }
-                        break;
-                }
-
-                context.Complete(Response.FromException(rejection));
-            }
-            finally
-            {
-                message.Release();
+                return Response.FromException(rejection);
             }
         }
     }

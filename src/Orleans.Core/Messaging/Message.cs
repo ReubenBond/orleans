@@ -195,8 +195,7 @@ namespace Orleans.Runtime
         {
             Transient,
             Overloaded,
-            DuplicateRequest,
-            Unrecoverable,
+            Unrecoverable ,
             GatewayTooBusy,
             CacheInvalidation
         }
@@ -493,34 +492,56 @@ namespace Orleans.Runtime
 
         public override string ToString()
         {
-            var response = "";
-            if (Direction == Directions.Response)
+            var res = new StringBuilder();
+
+            if (IsReadOnly)
             {
-                switch (Result)
-                {
-                    case ResponseTypes.Error:
-                        response = "Error ";
-                        break;
-
-                    case ResponseTypes.Rejection:
-                        response = string.Format("{0} Rejection (info: {1}) ", RejectionType, RejectionInfo);
-                        break;
-
-                    case ResponseTypes.Status:
-                        response = "Status ";
-                        break;
-
-                    default:
-                        break;
-                }
+                res.Append("[ReadOnly]");
             }
 
-            return $"{(IsReadOnly ? "ReadOnly" : "")}" +
-                $"{(IsAlwaysInterleave ? " IsAlwaysInterleave" : "")}" +
-                $" {response}{Direction}" +
-                $" {$"[{SendingSilo} {SendingGrain} {SendingActivation}]"}->{$"[{TargetSilo} {TargetGrain} {TargetActivation}]"}" +
-                $"{(BodyObject is { } request ? $" {request}" : string.Empty)}" +
-                $" #{Id}{(ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : "")}";
+            if (IsAlwaysInterleave)
+            {
+                AddSeparatorIfNeeded(res);
+                res.Append("[AlwaysInterleave]");
+            }
+
+            if (Direction == Directions.Response)
+            {
+                var response = Result switch
+                {
+                    ResponseTypes.Error => "Error",
+                    ResponseTypes.Rejection => $"{RejectionType} Rejection (info: {RejectionInfo})",
+                    ResponseTypes.Status => "Status",
+                    _ => string.Empty
+                };
+
+                AddSeparatorIfNeeded(res);
+                res.Append(response);
+            }
+
+            AddSeparatorIfNeeded(res);
+            res.Append(Direction.ToString());
+            res.Append($" {$"[{SendingSilo} {SendingGrain} {SendingActivation}]"}->{$"[{TargetSilo} {TargetGrain} {TargetActivation}]"}");
+
+            try
+            {
+                res.Append(' ');
+                res.Append(BodyObject);
+            }
+            catch (Exception exception)
+            {
+                res.Append("[Exception formatting message body: ");
+                res.Append(LogFormatter.PrintException(exception));
+                res.Append(']');
+            }
+
+            res.Append($" #{Id}{(ForwardCount > 0 ? "[ForwardCount=" + ForwardCount + "]" : "")}");
+            return res.ToString();
+
+            static void AddSeparatorIfNeeded(StringBuilder res)
+            {
+                if (res.Length > 0) res.Append(' ');
+            }
         }
 
         public string GetTargetHistory()
