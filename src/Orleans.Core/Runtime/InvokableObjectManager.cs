@@ -259,7 +259,7 @@ namespace Orleans
                     catch (Exception outerException)
                     {
                         // ignore, keep looping.
-                        _manager.logger.LogWarning(
+                        _manager.logger.LogError(
                             outerException,
                             "Exception in " + nameof(LocalObjectMessagePumpAsync));
                     }
