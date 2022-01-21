@@ -21,7 +21,7 @@ namespace Orleans.Runtime
     /// MUST lock this object for any concurrent access
     /// Consider: compartmentalize by usage, e.g., using separate interfaces for data for catalog, etc.
     /// </summary>
-    internal class ActivationData : IActivationData, IGrainExtensionBinder, ICollectibleGrainContext, IAsyncDisposable, IActivationWorkingSetMember, IGrainTimerRegistry, IGrainManagementExtension
+    internal class ActivationData : IGrainContext, ICollectibleGrainContext, IGrainExtensionBinder, IActivationWorkingSetMember, IGrainTimerRegistry, IGrainManagementExtension, IAsyncDisposable
     {
         private readonly GrainTypeSharedContext _shared;
         private readonly IServiceScope serviceScope;

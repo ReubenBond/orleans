@@ -20,7 +20,7 @@ namespace Orleans
 
             var context = grain switch
             {
-                Grain grainBase => grainBase.Data,
+                Grain grainBase => grainBase.GrainContext,
                 IGrainBase activation => activation.GrainContext,
                 ISystemTargetBase systemTarget => systemTarget,
                 _ => throw new ArgumentException(GetWrongGrainTypeErrorMessage(grain), nameof(grain))

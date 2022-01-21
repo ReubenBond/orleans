@@ -101,11 +101,6 @@ namespace Orleans.Runtime
         void DelayDeactivation(TimeSpan timeSpan);
     }
 
-    internal interface IActivationData : ICollectibleGrainContext
-    {
-        IGrainRuntime GrainRuntime { get; }
-    }
-
     internal interface IGrainTimerRegistry
     {
         void OnTimerCreated(IGrainTimer timer);
