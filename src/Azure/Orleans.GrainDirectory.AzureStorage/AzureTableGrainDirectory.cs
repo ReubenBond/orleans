@@ -14,6 +14,9 @@ using Orleans.Runtime;
 
 namespace Orleans.GrainDirectory.AzureStorage
 {
+    /// <summary>
+    /// An <see cref="IGrainDirectory"/> implementation which uses Azure Table Storage as the backing store.
+    /// </summary>
     public class AzureTableGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>
     {
         private readonly AzureTableDataManager<GrainDirectoryEntity> tableDataManager;
@@ -54,6 +57,12 @@ namespace Orleans.GrainDirectory.AzureStorage
             internal static GrainId RowKeyToGrainId(string rowKey) => GrainId.Parse(HttpUtility.UrlDecode(rowKey, Encoding.UTF8));
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AzureTableGrainDirectory"/> class.
+        /// </summary>
+        /// <param name="directoryOptions">The directory options.</param>
+        /// <param name="clusterOptions">The cluster options.</param>
+        /// <param name="loggerFactory">The logger factory.</param>
         public AzureTableGrainDirectory(
             AzureTableGrainDirectoryOptions directoryOptions,
             IOptions<ClusterOptions> clusterOptions,
@@ -65,6 +74,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             this.clusterId = clusterOptions.Value.ClusterId;
         }
 
+        /// <inheritdoc />
         public async Task<GrainAddress> Lookup(GrainId grainId)
         {
             var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(grainId));
@@ -77,6 +87,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             return result.Item1.ToGrainAddress();
         }
 
+        /// <inheritdoc />
         public async Task<GrainAddress> Register(GrainAddress address)
         {
             var entry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, address);
@@ -85,6 +96,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             return result.isSuccess ? address : await Lookup(address.GrainId);
         }
 
+        /// <inheritdoc />
         public async Task Unregister(GrainAddress address)
         {
             var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(address.GrainId));
@@ -101,6 +113,10 @@ namespace Orleans.GrainDirectory.AzureStorage
                 await this.tableDataManager.DeleteTableEntryAsync(GrainDirectoryEntity.FromGrainAddress(this.clusterId, address), entity.ETag.ToString());
         }
 
+        /// <summary>
+        /// Unregisters multiple grain addresses.
+        /// </summary>
+        /// <param name="addresses">The addresses.</param>
         public async Task UnregisterMany(List<GrainAddress> addresses)
         {
             if (addresses.Count <= this.tableDataManager.StoragePolicyOptions.MaxBulkUpdateRows)
@@ -118,6 +134,7 @@ namespace Orleans.GrainDirectory.AzureStorage
             }
         }
 
+        /// <inheritdoc />
         public Task UnregisterSilos(List<SiloAddress> siloAddresses)
         {
             // Too costly to implement using Azure Table
@@ -150,8 +167,14 @@ namespace Orleans.GrainDirectory.AzureStorage
             await this.tableDataManager.DeleteTableEntriesAsync(entities);
         }
 
-        // Called by lifecycle, should not be called explicitely, except for tests
-        public async Task InitializeIfNeeded(CancellationToken ct = default)
+        /// <summary>
+        /// Initializes this instance, if necessary
+        /// </summary>
+        /// <param name="ct">The cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>        
+        /// Called by lifecycle, should not be called explicitely, except for tests        
+        /// </remarks>        
+         public async Task InitializeIfNeeded(CancellationToken ct = default)
         {
             await this.tableDataManager.InitTableAsync();
         }
