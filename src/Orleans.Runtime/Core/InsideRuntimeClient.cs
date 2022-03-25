@@ -1,44 +1,39 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using Orleans.Storage;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Threading;
 using Orleans.Configuration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Serialization.Invocation;
 using Orleans.Runtime.Messaging;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Internal class for system grains to get access to runtime object
     /// </summary>
-    internal class InsideRuntimeClient : IRuntimeClient, ILifecycleParticipant<ISiloLifecycle>
+    internal class InsideRuntimeClient : IRuntimeClient, IDisposable
     {
         private readonly ILogger logger;
         private readonly ILogger invokeExceptionLogger;
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
-        private readonly List<IDisposable> disposables;
         private readonly ConcurrentDictionary<(GrainId, CorrelationId), CallbackData> callbacks;
         private readonly SharedCallbackData sharedCallbackData;
         private readonly SharedCallbackData systemSharedCallbackData;
-        private SafeTimer callbackTimer;
+        private readonly SafeTimer callbackTimer;
 
         private GrainLocator grainLocator;
-        private Catalog catalog;
         private MessageCenter messageCenter;
         private List<IIncomingGrainCallFilter> grainCallFilters;
         private DeepCopier _deepCopier;
@@ -69,7 +64,6 @@ namespace Orleans.Runtime
             this._deepCopier = deepCopier;
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
-            this.disposables = new List<IDisposable>();
             this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>();
             this.messageFactory = messageFactory;
             this.ConcreteGrainFactory = new GrainFactory(this, referenceActivator, interfaceIdResolver, interfaceToTypeResolver);
@@ -94,6 +88,9 @@ namespace Orleans.Runtime
                 this.messagingOptions,
                 this.appRequestStatistics,
                 this.messagingOptions.SystemResponseTimeout);
+
+            var callbackTimerPeriod = TimeSpan.FromTicks(Math.Min(this.messagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks));
+            this.callbackTimer = new SafeTimer(logger, static (object state) => ((InsideRuntimeClient)state).OnCallbackExpiryTick(), this, callbackTimerPeriod, callbackTimerPeriod);
         }
 
         public IServiceProvider ServiceProvider { get; }
@@ -104,8 +101,6 @@ namespace Orleans.Runtime
 
         public GrainFactory ConcreteGrainFactory { get; }
         
-        private Catalog Catalog => this.catalog ?? (this.catalog = this.ServiceProvider.GetRequiredService<Catalog>());
-
         private GrainLocator GrainLocator
             => this.grainLocator ?? (this.grainLocator = this.ServiceProvider.GetRequiredService<GrainLocator>());
 
@@ -355,50 +350,12 @@ namespace Orleans.Runtime
             }
         }
 
-        private static readonly Lazy<Func<Exception, Exception>> prepForRemotingLazy =
-            new Lazy<Func<Exception, Exception>>(CreateExceptionPrepForRemotingMethod);
-        
-        private static Func<Exception, Exception> CreateExceptionPrepForRemotingMethod()
-        {
-            var methodInfo = typeof(Exception).GetMethod(
-                "PrepForRemoting",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-
-            //This was added to avoid failure on .Net Core since Remoting APIs aren't available there.
-            if (methodInfo == null)
-                return exc => exc;
-
-            var method = new DynamicMethod(
-                "PrepForRemoting",
-                typeof(Exception),
-                new[] { typeof(Exception) },
-                typeof(InsideRuntimeClient).Module,
-                true);
-            var il = method.GetILGenerator();
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Call, methodInfo);
-            il.Emit(OpCodes.Ret);
-            return (Func<Exception, Exception>)method.CreateDelegate(typeof(Func<Exception, Exception>));
-        }
-
-        private static Exception PrepareForRemoting(Exception exception)
-        {
-            // Call the Exception.PrepForRemoting internal method, which preserves the original stack when the exception
-            // is rethrown at the remote site (and appends the call site stacktrace). If this is not done, then when the
-            // exception is rethrown the original stacktrace is entire replaced.
-            // Note: another commonly used approach since .NET 4.5 is to use ExceptionDispatchInfo.Capture(ex).Throw()
-            // but that involves rethrowing the exception in-place, which is not what we want here, but could in theory
-            // be done at the receiving end with some rework (could be tackled when we reopen #875 Avoid unnecessary use of TCS).
-            prepForRemotingLazy.Value.Invoke(exception);
-            return exception;
-        }
-
         private void SafeSendExceptionResponse(Message message, Exception ex)
         {
             try
             {
-                var copiedException = PrepareForRemoting((Exception)this._deepCopier.Copy(ex));
-                SendResponse(message, Response.FromException(copiedException));
+                var copiedException = _deepCopier.Copy(ex);
+                SendResponse(message, Response.FromException(ex));
             }
             catch (Exception exc1)
             {
@@ -526,56 +483,18 @@ namespace Orleans.Runtime
             }
         }
 
-        private Task OnRuntimeInitializeStop(CancellationToken tc)
-        {
-            lock (disposables)
-            {
-                foreach (var disposable in disposables)
-                {
-                    try
-                    {
-                        disposable?.Dispose();
-                    }
-                    catch (Exception e)
-                    {
-                        this.logger.Warn(ErrorCode.IGC_DisposeError, "Exception while disposing: " + e.Message, e);
-                    }
-                }
-            }
-            return Task.CompletedTask;
-        }
-
-        private Task OnRuntimeInitializeStart(CancellationToken tc)
-        {
-            var stopWatch = Stopwatch.StartNew();
-            var timerLogger = this.loggerFactory.CreateLogger<SafeTimer>();
-            var minTicks = Math.Min(this.messagingOptions.ResponseTimeout.Ticks, TimeSpan.FromSeconds(1).Ticks);
-            var period = TimeSpan.FromTicks(minTicks);
-            this.callbackTimer = new SafeTimer(timerLogger, this.OnCallbackExpiryTick, null, period, period);
-            this.disposables.Add(this.callbackTimer);
-
-            stopWatch.Stop();
-            this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Start InsideRuntimeClient took {stopWatch.ElapsedMilliseconds} Milliseconds");
-            return Task.CompletedTask;
-        }
-
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
         {
-            foreach (var callback in callbacks)
+            foreach (var (_, callbackData) in callbacks)
             {
-                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
+                if (deadSilo.Equals(callbackData.Message.TargetSilo))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    callbackData.OnTargetSiloFail();
                 }
             }
         }
 
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
-        }
-
-        private void OnCallbackExpiryTick(object state)
+        private void OnCallbackExpiryTick()
         {
             var currentStopwatchTicks = Stopwatch.GetTimestamp();
             var responseTimeout = this.messagingOptions.ResponseTimeout;
@@ -585,6 +504,11 @@ namespace Orleans.Runtime
                 if (callback.IsCompleted) continue;
                 if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(responseTimeout);
             }
+        }
+
+        public void Dispose()
+        {
+            callbackTimer.Dispose();
         }
     }
 }

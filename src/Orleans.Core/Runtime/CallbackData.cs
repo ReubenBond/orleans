@@ -66,7 +66,6 @@ namespace Orleans.Runtime
 
             var error = Message.CreatePromptExceptionResponse(msg, new TimeoutException(errorMsg));
             ResponseCallback(error, this.context);
-            //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
         public void OnTargetSiloFail()
@@ -93,7 +92,6 @@ namespace Orleans.Runtime
             this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
             var error = Message.CreatePromptExceptionResponse(msg, new SiloUnavailableException(errorMsg));
             ResponseCallback(error, this.context);
-            //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
         public void DoCallback(Message response)
@@ -114,7 +112,6 @@ namespace Orleans.Runtime
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);
-            //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
         public static void ResponseCallback(Message message, IResponseCompletionSource context)

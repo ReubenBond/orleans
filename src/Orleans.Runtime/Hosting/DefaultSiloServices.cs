@@ -138,7 +138,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<InternalGrainRuntime>();
             services.TryAddSingleton<InsideRuntimeClient>();
             services.TryAddFromExisting<IRuntimeClient, InsideRuntimeClient>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InsideRuntimeClient>();
             services.TryAddSingleton<IGrainServiceFactory, GrainServiceFactory>();
 
             services.TryAddSingleton<IFatalErrorHandler, FatalErrorHandler>();
