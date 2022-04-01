@@ -111,7 +111,10 @@ namespace Orleans.Runtime.Providers
         }
 
         /// <inheritdoc />
-        public string ExecutingEntityIdentity() => runtimeClient.CurrentActivationIdentity;
+        public string ExecutingEntityIdentity()
+        {
+            return this.grainContextAccessor.GrainContext.ActivationId.ToString();
+        }
 
         /// <inheritdoc />
         public StreamDirectory GetStreamDirectory()

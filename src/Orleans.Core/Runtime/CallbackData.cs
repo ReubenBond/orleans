@@ -38,14 +38,15 @@ namespace Orleans.Runtime
             return duration > shared.ResponseTimeoutStopwatchTicks;
         }
 
-        public void OnTimeout(TimeSpan timeout)
+        /// <summary>
+        /// Called when a request times out.
+        /// </summary>
+        public void OnTimeout()
         {
             if (Interlocked.CompareExchange(ref completed, 1, 0) != 0)
             {
                 return;
             }
-
-            this.shared.Unregister(this.Message);
 
             var requestStatistics = this.shared.RequestStatistics;
             if (requestStatistics.CollectApplicationRequestsStats)
@@ -61,12 +62,11 @@ namespace Orleans.Runtime
 
             string messageHistory = msg.GetTargetHistory();
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
-            string errorMsg = $"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}Target History is: {messageHistory}.";
+            string errorMsg = $"Response did not arrive on time in {stopwatch.Elapsed} for message: {msg}. {statusMessage}Target History is: {messageHistory}.";
             this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
 
             var error = Message.CreatePromptExceptionResponse(msg, new TimeoutException(errorMsg));
             ResponseCallback(error, this.context);
-            //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
         public void OnTargetSiloFail()
@@ -76,7 +76,6 @@ namespace Orleans.Runtime
                 return;
             }
 
-            this.shared.Unregister(this.Message);
             var requestStatistics = this.shared.RequestStatistics;
             if (requestStatistics.CollectApplicationRequestsStats)
             {
@@ -93,7 +92,6 @@ namespace Orleans.Runtime
             this.shared.Logger.Warn(ErrorCode.Runtime_Error_100157, "{0} About to break its promise.", errorMsg);
             var error = Message.CreatePromptExceptionResponse(msg, new SiloUnavailableException(errorMsg));
             ResponseCallback(error, this.context);
-            //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
         public void DoCallback(Message response)
@@ -114,7 +112,6 @@ namespace Orleans.Runtime
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);
-            //(this.Message.BodyObject as IDisposable)?.Dispose();
         }
 
         public static void ResponseCallback(Message message, IResponseCompletionSource context)

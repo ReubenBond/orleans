@@ -17,12 +17,6 @@ namespace Orleans.Runtime
         IInternalGrainFactory InternalGrainFactory { get; }
 
         /// <summary>
-        /// A unique identifier for the current client.
-        /// There is no semantic content to this string, but it may be useful for logging.
-        /// </summary>
-        string CurrentActivationIdentity { get; }
-
-        /// <summary>
         /// Gets the service provider.
         /// </summary>
         IServiceProvider ServiceProvider { get; }

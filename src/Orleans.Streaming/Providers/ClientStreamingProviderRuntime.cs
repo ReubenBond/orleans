@@ -13,6 +13,7 @@ namespace Orleans.Providers
         private IStreamPubSub implicitPubSub;
         private IStreamPubSub combinedGrainBasedAndImplicitPubSub;
         private StreamDirectory streamDirectory;
+        private readonly IGrainContextAccessor grainContextAccessor;
         private readonly IInternalGrainFactory grainFactory;
         private readonly ImplicitStreamSubscriberTable implicitSubscriberTable;
         private readonly ClientGrainContext clientContext;
@@ -20,12 +21,14 @@ namespace Orleans.Providers
         private readonly ILogger timerLogger;
 
         public ClientStreamingProviderRuntime(
+            IGrainContextAccessor grainContextAccessor,
             IInternalGrainFactory grainFactory,
             IServiceProvider serviceProvider,
             ILoggerFactory loggerFactory,
             ImplicitStreamSubscriberTable implicitSubscriberTable,
             ClientGrainContext clientContext)
         {
+            this.grainContextAccessor = grainContextAccessor;
             this.grainFactory = grainFactory;
             this.ServiceProvider = serviceProvider;
             this.implicitSubscriberTable = implicitSubscriberTable;
@@ -63,7 +66,7 @@ namespace Orleans.Providers
 
         public string ExecutingEntityIdentity()
         {
-            return this.runtimeClient.CurrentActivationIdentity;
+            return this.grainContextAccessor.GrainContext.ActivationId.ToString();
         }
 
         public (TExtension, TExtensionInterface) BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)

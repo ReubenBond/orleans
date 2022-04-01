@@ -54,11 +54,6 @@ namespace Orleans
         }
         public ClientGatewayObserver gatewayObserver { get; private set; }
 
-        public string CurrentActivationIdentity
-        {
-            get { return CurrentActivationAddress.ToString(); }
-        }
-
         public IGrainReferenceRuntime GrainReferenceRuntime { get; private set; }
 
         internal ClientMessageCenter MessageCenter { get; private set; }
@@ -516,7 +511,10 @@ namespace Orleans
             {
                 var callback = pair.Value;
                 if (callback.IsCompleted) continue;
-                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(this.clientMessagingOptions.ResponseTimeout);
+                if (callback.IsExpired(currentStopwatchTicks))
+                {
+                    callback.OnTimeout();
+                }
             }
         }
 

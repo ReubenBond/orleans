@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using Orleans.Storage;
 using System.Diagnostics;
@@ -500,8 +499,6 @@ namespace Orleans.Runtime
             }
         }
 
-        public string CurrentActivationIdentity => RuntimeContext.Current?.Address.ToString() ?? this.HostedClient.ToString();
-
         /// <inheritdoc />
         public TimeSpan GetResponseTimeout() => this.sharedCallbackData.ResponseTimeout;
 
@@ -578,12 +575,160 @@ namespace Orleans.Runtime
         private void OnCallbackExpiryTick(object state)
         {
             var currentStopwatchTicks = Stopwatch.GetTimestamp();
-            var responseTimeout = this.messagingOptions.ResponseTimeout;
             foreach (var pair in callbacks)
             {
                 var callback = pair.Value;
                 if (callback.IsCompleted) continue;
-                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout(responseTimeout);
+                if (callback.IsExpired(currentStopwatchTicks))
+                {
+                    callback.OnTimeout();
+                }
+            }
+        }
+    }
+
+    internal class CallbackCollection
+    {
+        private readonly object _lock = new ();
+        private readonly List<CallbackData> _callbacks = new();
+
+        public void RecordOutboundRequest(CallbackData callback)
+        {
+            lock (_lock)
+            {
+                _callbacks.Add(callback);
+            }
+        }
+
+        public void OnStatusUpdate(Message response)
+        {
+            var status = (StatusResponse)response.BodyObject;
+            lock (_lock)
+            {
+                foreach (var callback in _callbacks)
+                {
+                    var request = callback.Message;
+                    if (request.Id == response.Id && response.TargetGrain == request.TargetGrain)
+                    {
+                        callback.OnStatusUpdate(status);
+                        return;
+                    }
+                }
+            }
+        }
+
+        public void OnCompleted(Message response)
+        {
+            var i = 0;
+            lock (_lock)
+            {
+                while (i < _callbacks.Count)
+                {
+                    var callback = _callbacks[i];
+                    if (callback is null) continue;
+                    if (callback.IsCompleted)
+                    {
+                        i++;
+                        continue;
+                    }
+
+                    var request = callback.Message;
+                    if (request.Id == response.Id && response.TargetGrain == request.TargetGrain)
+                    {
+                        RemoveAt(i);
+                        callback.DoCallback(response);
+
+                        return;
+                    }
+
+                    i++;
+                }
+
+                // Not found!
+                // Not found!
+                // Not found!
+                // Not found!
+            }
+
+            void RemoveAt(int i)
+            {
+                // Order is not important. A simple RemoveAt would 
+                _callbacks[i] = _callbacks[_callbacks.Count - 1];
+                _callbacks.RemoveAt(_callbacks.Count - 1);
+            }
+        }
+
+        public int OnTimeoutTick(long currentStopwatchTicks)
+        {
+            var i = 0;
+            lock (_lock)
+            {
+                while (i < _callbacks.Count)
+                {
+                    var callback = _callbacks[i];
+                    if (callback is null) continue;
+                    if (callback.IsCompleted)
+                    {
+                        i++;
+                        continue;
+                    }
+
+                    if (callback.IsExpired(currentStopwatchTicks))
+                    {
+                        RemoveAt(i);
+                        callback.OnTimeout();
+
+                        // Since a callback was removed, do not increment the index.
+                        continue;
+                    }
+
+                    i++;
+                }
+
+                return _callbacks.Count;
+            }
+
+            void RemoveAt(int i)
+            {
+                // Order is not important. A simple RemoveAt would 
+                _callbacks[i] = _callbacks[_callbacks.Count - 1];
+                _callbacks.RemoveAt(_callbacks.Count - 1);
+            }
+        }
+
+        public void OnTargetSiloFailure(SiloAddress targetAddress)
+        {
+            var i = 0;
+            lock (_lock)
+            {
+                while (i < _callbacks.Count)
+                {
+                    var callback = _callbacks[i];
+                    if (callback is null) continue;
+                    if (callback.IsCompleted)
+                    {
+                        i++;
+                        continue;
+                    }
+
+                    if (targetAddress.Equals(callback.Message.TargetSilo))
+                    {
+                        RemoveAt(i);
+                        callback.OnTargetSiloFail();
+
+                        // Since a callback was removed, do not increment the index.
+                        continue;
+                    }
+
+                    i++;
+                }
+            }
+
+            void RemoveAt(int i)
+            {
+                // Order is not important. A simple RemoveAt would 
+                _callbacks[i] = _callbacks[_callbacks.Count - 1];
+                _callbacks.RemoveAt(_callbacks.Count - 1);
             }
         }
     }

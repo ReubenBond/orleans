@@ -69,6 +69,14 @@ namespace Orleans.Runtime
         /// <param name="message">The message.</param>
         void ReceiveMessage(object message);
 
+        /*
+        /// <summary>
+        /// Submits an outgoing message to this instance.
+        /// </summary>
+        /// <param name="message">The message.</param>
+        //void OnSendMessage(object message);
+        */
+
         /// <summary>
         /// Start activating this instance.
         /// </summary>
