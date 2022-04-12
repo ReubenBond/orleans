@@ -67,9 +67,10 @@ namespace Orleans.CodeGenerator
 
         private void PopulateOverrides(InvokableInterfaceDescription containingType, IMethodSymbol method)
         {
+            AttributeData[] attrs;
             foreach (var methodAttr in method.GetAttributes())
             {
-                if (methodAttr.AttributeClass.GetAttributes(containingType.CodeGenerator.LibraryTypes.InvokableBaseTypeAttribute, out var attrs))
+                if (methodAttr.AttributeClass.GetAttributes(containingType.CodeGenerator.LibraryTypes.InvokableBaseTypeAttribute, out attrs))
                 {
                     foreach (var attr in attrs)
                     {
@@ -121,6 +122,26 @@ namespace Orleans.CodeGenerator
 
                         CustomInitializerMethods.Add((methodName, methodArgument));
                     }
+                }
+            }
+
+            // Support custom return types on grain interfaces.
+            // This may be the wrong place to do this: it may be more efficient to centralize it so that it's computed once per type.
+            if (method.ReturnType.GetAttributes(containingType.CodeGenerator.LibraryTypes.InvokableBaseTypeAttribute, out attrs))
+            {
+                foreach (var attr in attrs)
+                {
+                    var ctorArgs = attr.ConstructorArguments;
+                    var proxyBaseType = (INamedTypeSymbol)ctorArgs[0].Value;
+                    var returnType = (INamedTypeSymbol)ctorArgs[1].Value;
+                    var invokableBaseType = (INamedTypeSymbol)ctorArgs[2].Value;
+                    if (!SymbolEqualityComparer.Default.Equals(containingType.ProxyBaseType, proxyBaseType))
+                    {
+                        // This attribute does not apply to this particular invoker, since it is for a different proxy base type.
+                        continue;
+                    }
+
+                    InvokableBaseTypes[returnType] = invokableBaseType;
                 }
             }
 

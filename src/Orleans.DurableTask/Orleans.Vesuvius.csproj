@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Don't ship like this, obviously!!! It's just for giggles -->
+    <OutputType>Exe</OutputType>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Orleans.Transactions\Orleans.Transactions.csproj" />
+  </ItemGroup>
+
+</Project>
