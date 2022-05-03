@@ -70,8 +70,6 @@ namespace UnitTests.MembershipTests
 
         public IGrainFactory GrainFactory => this.environment.GrainFactory;
 
-        public GrainReferenceKeyStringConverter GrainReferenceConverter => this.environment.Services.GetRequiredService<GrainReferenceKeyStringConverter>();
-
         public IServiceProvider Services => this.environment.Services;
 
         public void Dispose()
