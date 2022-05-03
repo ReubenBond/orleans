@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
@@ -22,6 +23,9 @@ namespace Orleans.Serialization
         public Func<Type, bool> SupportedExceptionTypeFilter { get; set; } = _ => false;
     }
 
+    /// <summary>
+    /// Serializer for <see cref="Exception"/> types.
+    /// </summary>
     [RegisterSerializer]
     [RegisterCopier]
     [WellKnownAlias("Exception")]
@@ -378,11 +382,28 @@ namespace Orleans.Serialization
             }
             else if (typeof(Exception).IsAssignableFrom(type))
             {
-                result = (Exception)Activator.CreateInstance(type);
+                try
+                {
+                    if (type.GetConstructor(Array.Empty<Type>()) is not null)
+                    {
+                        result = (Exception)Activator.CreateInstance(type);
+                    }
+                    else
+                    {
+                        result = (Exception)FormatterServices.GetUninitializedObject(type);
+                    }
+                }
+                catch (Exception constructorException)
+                {
+                    result = new UnavailableExceptionFallbackException($"Failed to construct exception of type \"{type}\"", constructorException)
+                    {
+                        ExceptionType = typeName
+                    };
+                }
             }
             else
             {
-                throw new NotSupportedException("Type {type} is not supported");
+                throw new NotSupportedException($"Type {type} is not supported");
             }
 
             SetBaseProperties(result, message, stackTrace, innerException, hResult, data);
