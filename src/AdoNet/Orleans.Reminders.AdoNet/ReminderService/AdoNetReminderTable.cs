@@ -47,6 +47,11 @@ namespace Orleans.Runtime.ReminderService
         
         public Task<string> UpsertRow(ReminderEntry entry)
         {
+            if (entry.StartAt.Kind is DateTimeKind.Unspecified)
+            {
+                entry.StartAt = new DateTime(entry.StartAt.Ticks, DateTimeKind.Utc);
+            }
+
             return this.orleansQueries.UpsertReminderRowAsync(this.serviceId, entry.GrainRef, entry.ReminderName, entry.StartAt, entry.Period);            
         }
 
