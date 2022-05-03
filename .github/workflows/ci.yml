@@ -82,7 +82,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
     - name: Test
-      run: dotnet test --filter "Category=Redis"
+      run: dotnet test --filter "Category=Redis" --filter "Category=PostgreSql" --filter "Category=SqlServer" --filter "Category=MySql" --filter "Category=ZooKeeper" --filter "Category=Consul"
       env:
         REDIS_HOST: redis
         REDIS_PORT: ${{ job.services.redis.ports[6379] }}
@@ -90,5 +90,6 @@ jobs:
         POSTGRES_PORT: 5432
         ORLEANSREDISCONNECTIONSTRING: localhost:6379,ssl=False,abortConnect=False
         ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Integrated Security=true;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
+        ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;"
         ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
 
