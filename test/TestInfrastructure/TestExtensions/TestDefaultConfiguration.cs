@@ -42,7 +42,17 @@ namespace TestExtensions
         public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
         public static string EventHubFullyQualifiedNamespace => defaultConfiguration[nameof(EventHubFullyQualifiedNamespace)];
         public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
+        public static string ConsulConnectionString => defaultConfiguration[nameof(ConsulConnectionString)] ?? "http://localhost:8500";
         public static string RedisConnectionString => defaultConfiguration[nameof(RedisConnectionString)];
+
+        private const string DefaultPostgresConnectionString = @"Server=127.0.0.1;Port=5432;Integrated Security=true;Pooling=false;User ID=postgres;Password=postgres";
+        public static string PostgresConnectionString => defaultConfiguration[nameof(PostgresConnectionString)] ?? DefaultPostgresConnectionString;
+
+        private const string DefaultMySqlConnectionString = "Server=127.0.0.1;Database=sys; Uid=root;Pwd=root;";
+        public static string MySqlConnectionString => defaultConfiguration[nameof(MySqlConnectionString)] ?? DefaultMySqlConnectionString;
+
+        private const string DefaultMsSqlConnectionString = @"Data Source = (localdb)\MSSQLLocalDB; Database = Master; Integrated Security = True; Max Pool Size = 200; MultipleActiveResultSets = True";
+        public static string MsSqlConnectionString => defaultConfiguration[nameof(MsSqlConnectionString)] ?? DefaultMsSqlConnectionString;
 
         public static bool GetValue(string key, out string value)
         {

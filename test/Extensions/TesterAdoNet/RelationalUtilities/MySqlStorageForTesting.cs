@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Orleans.Tests.SqlUtils;
+using TestExtensions;
 
 namespace UnitTests.General
 {
@@ -33,9 +34,7 @@ namespace UnitTests.General
         }
 
         public override string DefaultConnectionString
-        {
-            get { return "Server=127.0.0.1;Database=sys; Uid=root;Pwd=root;"; }
-        }
+            => TestDefaultConfiguration.MySqlConnectionString;
 
         protected override string[] SetupSqlScriptFileNames
         {
