@@ -3,10 +3,13 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -27,3 +30,216 @@ jobs:
       uses: actions/setup-dotnet@v1
     - name: Build
       run: dotnet build
+  test-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+        - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Setup .NET 5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+    - name: Test
+      run: dotnet test --filter "Category=PostgreSql"
+      env:
+        ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Integrated Security=true;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
+  test-redis:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis
+        ports:
+        - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Setup .NET 5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+    - name: Redis Test
+      run: dotnet test --filter "Category=Redis"
+      env:
+        ORLEANSREDISCONNECTIONSTRING: localhost:6379,ssl=False,abortConnect=False
+  test-mariadb:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb
+        ports:
+          - 3306:3306
+        env:
+          MARIADB_ROOT_PASSWORD: "mariadb"
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Setup .NET 5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+    - name: Test
+      run: dotnet test --filter "Category=MySql"
+      env:
+        ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
+  test-sqlserver:
+    runs-on: ubuntu-latest
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:latest
+        ports:
+          - 1433:1433
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_PID: "Developer"
+          SA_PASSWORD: "yourWeak(!)Password"
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Setup .NET 5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+    - name: Test
+      run: dotnet test --filter "Category=SqlServer"
+      env:
+        ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;"
+  test-azure-storage:
+    runs-on: ubuntu-latest
+    services:
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite
+        ports:
+          - 10000:10000
+          - 10001:10001
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Setup .NET 5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+    - name: Test
+      run: dotnet test --filter "Category=AzureStorage"
+      env:
+        ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+  test-consul:
+    runs-on: ubuntu-latest
+    services:
+      consul:
+        image: hashicorp/consul
+        ports:
+          - 8500:8500
+          - 8600:8600/tcp
+          - 8600:8600/udp
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Setup .NET 5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+    - name: Test
+      run: dotnet test --filter "Category=Consul"
+      env:
+        ORLEANSCONSULCONNECTIONSTRING: "http://localhost:8500"
+  test-zookeeper:
+    runs-on: ubuntu-latest
+    services:
+      consul:
+        image: bitnami/zookeeper
+        ports:
+          - 2181:2181
+        env:
+          ALLOW_ANONYMOUS_LOGIN: "yes"
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Setup .NET 5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+    - name: Test
+      run: dotnet test --filter "Category=ZooKeeper"
+      env:
+        ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
+  test-dynamodb:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: amazon/dynamodb-local:latest
+        ports:
+        - 8000:8000
+        env:
+          AWS_ACCESS_KEY_ID: root
+          AWS_SECRET_ACCESS_KEY: pass
+          AWS_REGION: us-east-1
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.x'
+    - name: Setup .NET 5.0
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '5.x'
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+    - name: Test
+      run: dotnet test --filter "Category=DynamoDB"
+      env:
+        ORLEANSDYNAMODBSERVICE: "http://127.0.0.1:8000"
+        ORLEANSDYNAMODBACCESSKEY: "root"
+        ORLEANSDYNAMODBSECRETKEY: "pass"
