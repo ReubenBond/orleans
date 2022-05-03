@@ -14,7 +14,7 @@ using Xunit.Abstractions;
 namespace Tester.AdoNet.Persistence
 {
     [TestCategory("Persistence"), TestCategory("SqlServer")]
-    public class PersistenceGrainTests_Sql : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_Sql.Fixture>
+    public class PersistenceGrainTests_SqlServer : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_SqlServer.Fixture>
     {
         public const string TestDatabaseName = "OrleansTest";
         public static string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
@@ -45,6 +45,11 @@ namespace Tester.AdoNet.Persistence
                     hostBuilder.UseOrleans((ctx, siloBuilder) =>
                     {
                         siloBuilder
+                            .UseAdoNetClustering(options =>
+                            {
+                                options.ConnectionString = connectionString;
+                                options.Invariant = AdoInvariant;
+                            })
                             .AddAdoNetGrainStorage("GrainStorageForTest", options =>
                             {
                                 options.ConnectionString = (string)connectionString;
@@ -58,7 +63,7 @@ namespace Tester.AdoNet.Persistence
 
         private Fixture fixture;
 
-        public PersistenceGrainTests_Sql(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
+        public PersistenceGrainTests_SqlServer(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
         {
             this.fixture = fixture;
             this.fixture.EnsurePreconditionsMet();
