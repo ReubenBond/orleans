@@ -38,11 +38,21 @@ namespace TestExtensions
         public static Uri TableEndpoint => new Uri(defaultConfiguration[nameof(TableEndpoint)]);
         public static Uri DataBlobUri => new Uri(defaultConfiguration[nameof(DataBlobUri)]);
         public static Uri DataQueueUri => new Uri(defaultConfiguration[nameof(DataQueueUri)]);
-        public static string DataConnectionString => defaultConfiguration[nameof(DataConnectionString)];
+        public static string DataConnectionString => defaultConfiguration[nameof(DataConnectionString)] ?? "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;";
         public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
         public static string EventHubFullyQualifiedNamespace => defaultConfiguration[nameof(EventHubFullyQualifiedNamespace)];
         public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
+        public static string ConsulConnectionString => defaultConfiguration[nameof(ConsulConnectionString)] ?? "http://localhost:8500";
         public static string RedisConnectionString => defaultConfiguration[nameof(RedisConnectionString)];
+
+        private const string DefaultPostgresConnectionString = @"Server=127.0.0.1;Port=5432;Integrated Security=true;Pooling=false;User ID=postgres;Password=postgres";
+        public static string PostgresConnectionString => defaultConfiguration[nameof(PostgresConnectionString)] ?? DefaultPostgresConnectionString;
+
+        private const string DefaultMySqlConnectionString = "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;";
+        public static string MySqlConnectionString => defaultConfiguration[nameof(MySqlConnectionString)] ?? DefaultMySqlConnectionString;
+
+        private const string DefaultMsSqlConnectionString = @"Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;";
+        public static string MsSqlConnectionString => defaultConfiguration[nameof(MsSqlConnectionString)] ?? DefaultMsSqlConnectionString;
 
         public static bool GetValue(string key, out string value)
         {
