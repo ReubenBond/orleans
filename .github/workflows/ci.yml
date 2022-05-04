@@ -213,7 +213,7 @@ jobs:
     - name: Test
       run: dotnet test --filter "Category=ZooKeeper"
       env:
-        ORLEANSZOOKEEPERCONNECTIONSTRING: "http://localhost:2181"
+        ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
 
   test-cosmos:
     runs-on: ubuntu-latest
