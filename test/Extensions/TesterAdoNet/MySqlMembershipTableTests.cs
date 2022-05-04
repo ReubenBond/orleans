@@ -23,6 +23,8 @@ namespace UnitTests.MembershipTests
         {
         }
 
+        protected override string GetAdoInvariant() => AdoNetInvariants.InvariantNameMySql;
+
         private static LoggerFilterOptions CreateFilters()
         {
             var filters = new LoggerFilterOptions();
@@ -48,11 +50,6 @@ namespace UnitTests.MembershipTests
                 Invariant = GetAdoInvariant()
             };
             return new AdoNetGatewayListProvider(loggerFactory.CreateLogger<AdoNetGatewayListProvider>(), this.Services, Options.Create(options), this.gatewayOptions, this.clusterOptions);
-        }
-
-        protected override string GetAdoInvariant()
-        {
-            return AdoNetInvariants.InvariantNameMySql;
         }
 
         protected override async Task<string> GetConnectionString()
