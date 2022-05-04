@@ -16,7 +16,7 @@ namespace Tester.AdoNet.Persistence
     [TestCategory("Persistence"), TestCategory("SqlServer")]
     public class PersistenceGrainTests_SqlServer : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_SqlServer.Fixture>
     {
-        public const string TestDatabaseName = "OrleansTest";
+        public const string TestDatabaseName = "OrleansTest_SqlServer_Storage";
         public static string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
         public static Guid ServiceId = Guid.NewGuid();
         public static string ConnectionStringKey = "AdoNetConnectionString";

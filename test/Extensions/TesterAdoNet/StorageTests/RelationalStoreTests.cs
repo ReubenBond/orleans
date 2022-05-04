@@ -20,7 +20,6 @@ namespace UnitTests.StorageTests.AdoNet
         public byte[] StreamData { get; set; }
     }
 
-
     public class RelationalStoreTests : IClassFixture<RelationalStoreTests.Fixture>
     {
         private const string testDatabaseName = "OrleansStreamTest";

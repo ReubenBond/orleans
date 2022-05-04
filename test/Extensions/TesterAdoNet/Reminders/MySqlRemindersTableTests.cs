@@ -23,6 +23,7 @@ namespace UnitTests.RemindersTest
         public MySqlRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
         }
+
         private static LoggerFilterOptions CreateFilters()
         {
             var filters = new LoggerFilterOptions();
@@ -58,7 +59,6 @@ namespace UnitTests.RemindersTest
         public void RemindersTable_MySql_Init()
         {
         }
-
 
         [SkippableFact]
         public async Task RemindersTable_MySql_RemindersRange()

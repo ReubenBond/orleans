@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -14,12 +14,13 @@ using Xunit.Abstractions;
 namespace Tester.AdoNet.Persistence
 {
     [TestCategory("Persistence"), TestCategory("MySql")]
-    public class PersistenceGrainTests_MySql : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_SqlServer.Fixture>
+    public class PersistenceGrainTests_MySql : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_MySql.Fixture>
     {
-        public const string TestDatabaseName = "OrleansTest";
-        public static string AdoInvariant = AdoNetInvariants.InvariantNameMySql;
-        public static Guid ServiceId = Guid.NewGuid();
-        public static string ConnectionStringKey = "AdoNetConnectionString";
+        public const string TestDatabaseName = "OrleansTest_MySql_Storage";
+        public const string AdoInvariant = AdoNetInvariants.InvariantNameMySql;
+        public const string ConnectionStringKey = "AdoNetConnectionString";
+        public static readonly Guid ServiceId = Guid.NewGuid();
+
         public class Fixture : BaseTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)

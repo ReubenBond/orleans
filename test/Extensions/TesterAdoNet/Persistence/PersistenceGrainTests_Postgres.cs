@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -14,12 +14,13 @@ using Xunit.Abstractions;
 namespace Tester.AdoNet.Persistence
 {
     [TestCategory("Persistence"), TestCategory("PostgreSql")]
-    public class PersistenceGrainTests_Postgres : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_SqlServer.Fixture>
+    public class PersistenceGrainTests_Postgres : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_Postgres.Fixture>
     {
-        public const string TestDatabaseName = "OrleansTest";
+        public const string TestDatabaseName = "OrleansTest_Postgres_Storage";
         public static string AdoInvariant = AdoNetInvariants.InvariantNamePostgreSql;
         public static Guid ServiceId = Guid.NewGuid();
         public static string ConnectionStringKey = "AdoNetConnectionString";
+
         public class Fixture : BaseTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
