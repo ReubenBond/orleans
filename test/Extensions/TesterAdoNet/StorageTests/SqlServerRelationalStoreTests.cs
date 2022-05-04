@@ -12,7 +12,7 @@ namespace UnitTests.StorageTests.AdoNet
     public class SqlServerRelationalStoreTests : RelationalStoreTestsBase, IClassFixture<SqlServerRelationalStoreTests.Fixture>
     {
         private const string TestDatabaseName = "OrleansStreamTest";
-        private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameMySql;
+        private const string AdoNetInvariantName = AdoNetInvariants.InvariantNameSqlServer;
         private readonly RelationalStorageForTesting _storage;
 
         public class Fixture
