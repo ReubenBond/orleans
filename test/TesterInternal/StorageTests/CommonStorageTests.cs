@@ -51,7 +51,9 @@ namespace UnitTests.StorageTests.Relational
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0022")]
         internal (GrainReference GrainReference, GrainState<TestState1> GrainState)  GetTestReferenceAndState(long grainId, string version)
         {
-            return ((GrainReference)this._grainFactory.GetGrain(LegacyGrainId.GetGrainId(UniqueKey.NewKey(grainId, UniqueKey.Category.Grain))), new GrainState<TestState1> { State = new TestState1(), ETag = version });
+            var grainReference = (GrainReference)_grainFactory.GetGrain(GrainId.Create("my-grain-type", grainId.ToString("X")));
+            var grainState = new GrainState<TestState1> { State = new TestState1(), ETag = version };
+            return (grainReference, grainState);
         }
 
         /// <summary>
@@ -62,7 +64,9 @@ namespace UnitTests.StorageTests.Relational
         /// <returns>A grain reference and a state pair.</returns>
         internal (GrainReference GrainReference, GrainState<TestState1> GrainState) GetTestReferenceAndState(string grainId, string version)
         {
-            return ((GrainReference)_grainFactory.GetGrain(GrainId.Create("my-grain-type", grainId)), new GrainState<TestState1> { State = new TestState1(), ETag = version });
+            var grainReference = (GrainReference)_grainFactory.GetGrain(GrainId.Create("my-grain-type", grainId));
+            var grainState = new GrainState<TestState1> { State = new TestState1(), ETag = version };
+            return (grainReference, grainState);
         }
 
         /// <summary>
