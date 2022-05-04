@@ -22,7 +22,7 @@ namespace UnitTests.StorageTests.AdoNet
     public abstract class RelationalStoreTestsBase
     {
         //This timeout limit should be clearly less than that defined in RelationalStorageForTesting.CancellationTestQuery. 
-        protected readonly TimeSpan CancellationTestTimeoutLimit = TimeSpan.FromSeconds(1);
+        protected readonly TimeSpan CancellationTestTimeoutLimit = TimeSpan.FromSeconds(5);
         protected readonly TimeSpan StreamCancellationTimeoutLimit = TimeSpan.FromSeconds(15);
         protected const int MiB = 1048576;
         protected const int StreamSizeToBeInsertedInBytes = MiB * 2;
@@ -113,7 +113,7 @@ namespace UnitTests.StorageTests.AdoNet
                     //Here one second is added to the task timeout limit in order to account for the delays.
                     //The delays are mainly in the underlying ADO.NET libraries and database.
                     var task = sut.Storage.ReadAsync<int>(sut.CancellationTestQuery, tokenSource.Token);
-                    if(!task.Wait(timeoutLimit.Add(TimeSpan.FromSeconds(1))))
+                    if(!task.Wait(timeoutLimit.Add(TimeSpan.FromSeconds(2))))
                     {
                         Assert.True(false, string.Format("Timeout limit {0} ms exceeded.", timeoutLimit.TotalMilliseconds));
                     }
