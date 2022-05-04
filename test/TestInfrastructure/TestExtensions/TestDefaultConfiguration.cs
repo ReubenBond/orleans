@@ -41,7 +41,7 @@ namespace TestExtensions
         public static string DataConnectionString => defaultConfiguration[nameof(DataConnectionString)] ?? "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;";
         public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
         public static string EventHubFullyQualifiedNamespace => defaultConfiguration[nameof(EventHubFullyQualifiedNamespace)];
-        public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
+        public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)] ?? "127.0.0.1:2181";
         public static string ConsulConnectionString => defaultConfiguration[nameof(ConsulConnectionString)] ?? "http://localhost:8500";
         public static string RedisConnectionString => defaultConfiguration[nameof(RedisConnectionString)];
 
