@@ -13,6 +13,8 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
     /// <typeparam name="TStateData">The type of <see cref="TestStateGeneric1{T}"/>.</typeparam>
     internal class StorageDataSet2CyrillicIdsAndGrainNames<TStateData>: IEnumerable<object[]>
     {
+        private const int NumCases = 3;
+
         /// <summary>
         /// The symbol set this data set uses.
         /// </summary>
@@ -25,9 +27,9 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         
         public record TestData(string GrainType, Func<IInternalGrainFactory, GrainReference> GrainGetter, GrainState<TestStateGeneric1<TStateData>> GrainState);
 
-        public static TestData[] Data { get; } = new List<TestData>()
+        public static TestData GetTestData(int testNum) => testNum switch
         {
-            new TestData(
+            0 => new TestData(
                 GrainTypeGenerator.GetGrainType<string>(),
                 grainFactory => RandomUtilities.GetRandomGrainReference<string, int>(grainFactory, Symbols, StringLength, keyExtension: false),
                 new GrainState<TestStateGeneric1<TStateData>>
@@ -39,9 +41,8 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
                         B = 1,
                         C = 4
                     }
-                }
-            ),
-            new TestData(
+                }),
+            1 => new TestData(
                 GrainTypeGenerator.GetGrainType<string>(),
                 grainFactory => RandomUtilities.GetRandomGrainReference<string, int>(grainFactory, Symbols, StringLength, true),
                 new GrainState<TestStateGeneric1<TStateData>>
@@ -53,9 +54,8 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
                         B = 2,
                         C = 5
                     }
-                }
-            ),
-            new TestData(
+                }),
+            2 => new TestData(
                 GrainTypeGenerator.GetGrainType<string>(),
                 grainFactory => RandomUtilities.GetRandomGrainReference<string, int>(grainFactory, Symbols, StringLength, true),
                 new GrainState<TestStateGeneric1<TStateData>>
@@ -67,11 +67,11 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
                         B = 3,
                         C = 6
                     }
-                }
-            )
-        }.ToArray();
+                }),
+            _ => throw new IndexOutOfRangeException()
+        };
 
-        public IEnumerator<object[]> GetEnumerator() => Enumerable.Range(0, Data.Length).Select(n => new object[] { n }).GetEnumerator();
+        public IEnumerator<object[]> GetEnumerator() => Enumerable.Range(0, NumCases).Select(n => new object[] { n }).GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

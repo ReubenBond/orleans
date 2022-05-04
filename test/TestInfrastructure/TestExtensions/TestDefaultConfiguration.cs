@@ -48,7 +48,7 @@ namespace TestExtensions
         private const string DefaultPostgresConnectionString = @"Server=127.0.0.1;Port=5432;Integrated Security=true;Pooling=false;User ID=postgres;Password=postgres";
         public static string PostgresConnectionString => defaultConfiguration[nameof(PostgresConnectionString)] ?? DefaultPostgresConnectionString;
 
-        private const string DefaultMySqlConnectionString = "Server=127.0.0.1;Database=sys; Uid=root;Pwd=root;";
+        private const string DefaultMySqlConnectionString = "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;";
         public static string MySqlConnectionString => defaultConfiguration[nameof(MySqlConnectionString)] ?? DefaultMySqlConnectionString;
 
         private const string DefaultMsSqlConnectionString = @"Data Source = (localdb)\MSSQLLocalDB; Database = Master; Integrated Security = True; Max Pool Size = 200; MultipleActiveResultSets = True";

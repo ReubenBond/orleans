@@ -28,9 +28,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="Data\TestDb.mdf">
+    <Content Include="Data\TestDb.mdf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    </Content>
+    <Content Include="Data\TestDb_log.ldf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
@@ -46,6 +49,10 @@
     <None Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\*.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Data\TestDb_log.ldf" />
   </ItemGroup>
 
 </Project>
