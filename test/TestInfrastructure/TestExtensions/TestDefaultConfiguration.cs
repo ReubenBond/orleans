@@ -51,7 +51,7 @@ namespace TestExtensions
         private const string DefaultMySqlConnectionString = "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;";
         public static string MySqlConnectionString => defaultConfiguration[nameof(MySqlConnectionString)] ?? DefaultMySqlConnectionString;
 
-        private const string DefaultMsSqlConnectionString = @"Data Source = (localdb)\MSSQLLocalDB; Database = Master; Integrated Security = True; Max Pool Size = 200; MultipleActiveResultSets = True";
+        private const string DefaultMsSqlConnectionString = @"Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;";
         public static string MsSqlConnectionString => defaultConfiguration[nameof(MsSqlConnectionString)] ?? DefaultMsSqlConnectionString;
 
         public static bool GetValue(string key, out string value)

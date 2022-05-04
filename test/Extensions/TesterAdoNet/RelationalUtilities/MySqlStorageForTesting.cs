@@ -16,7 +16,6 @@ namespace UnitTests.General
 
         public override string CreateStreamTestTable { get { return "CREATE TABLE StreamingTest(Id INT NOT NULL, StreamData LONGBLOB NOT NULL);"; } }
         
-
         public IEnumerable<string> SplitScript(string setupScript)
         {
             return setupScript.Replace("END$$", "END;")
@@ -33,8 +32,7 @@ namespace UnitTests.General
             get { return @"DROP DATABASE `{0}`"; }
         }
 
-        public override string DefaultConnectionString
-            => TestDefaultConfiguration.MySqlConnectionString;
+        public override string DefaultConnectionString => TestDefaultConfiguration.MySqlConnectionString;
 
         protected override string[] SetupSqlScriptFileNames
         {

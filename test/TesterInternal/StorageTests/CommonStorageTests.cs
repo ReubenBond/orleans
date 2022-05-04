@@ -135,7 +135,7 @@ namespace UnitTests.StorageTests.Relational
             var grainTypeName = GrainTypeGenerator.GetGrainType<Guid>();
             int StartOfRange = 33900;
             int CountOfRange = countOfGrains;
-            string grainIdTemplate = $"{prefix}-{{0}}";
+            string grainIdTemplate = $"{prefix}-{Guid.NewGuid().ToString("N")}-{{0}}";
 
             //Since the version is NULL, storage provider tries to insert this data
             //as new state. If there is already data with this class, the writing fails
