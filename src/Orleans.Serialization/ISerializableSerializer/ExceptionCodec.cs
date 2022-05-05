@@ -50,6 +50,7 @@ namespace Orleans.Serialization
         /// <param name="dictionaryCodec">The dictionary codec.</param>
         /// <param name="dictionaryCopier">The dictionary copier.</param>
         /// <param name="exceptionCopier">The exception copier.</param>
+        /// <param name="exceptionSerializationOptions">The exception serialization options.</param>
         public ExceptionCodec(
             IServiceProvider serviceProvider,
             TypeConverter typeConverter,
