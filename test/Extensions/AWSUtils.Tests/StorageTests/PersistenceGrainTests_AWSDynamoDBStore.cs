@@ -36,6 +36,8 @@ namespace AWSUtils.Tests.StorageTests
                 public void Configure(ISiloBuilder hostBuilder)
                 {
                     hostBuilder.AddMemoryGrainStorage("MemoryStore");
+                    hostBuilder.AddMemoryGrainStorage("test1");
+                    hostBuilder.AddDynamoDBGrainStorage("DDBStore", options => options.Service = AWSTestConstants.Service);
                 }
             }
         }
@@ -124,7 +126,7 @@ namespace AWSUtils.Tests.StorageTests
         [SkippableFact, TestCategory("Functional")]
         public Task Persistence_Silo_StorageProvider_AWSDynamoDBStore()
         {
-            return base.Persistence_Silo_StorageProvider_AWS(typeof(DynamoDBGrainStorage));
+            return base.Persistence_Silo_StorageProvider_AWS("DDBStore");
         }
 
         [SkippableFact, TestCategory("Functional")]
