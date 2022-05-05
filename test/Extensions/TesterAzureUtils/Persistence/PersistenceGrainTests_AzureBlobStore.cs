@@ -45,6 +45,7 @@ namespace Tester.AzureUtils.Persistence
                     {
                         options.ConfigureTestDefaults();
                     })
+                    .AddMemoryGrainStorage("test1")
                     .AddMemoryGrainStorage("MemoryStore");
                 }
             }
