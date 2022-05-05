@@ -214,49 +214,17 @@ jobs:
       run: dotnet test --filter "Category=ZooKeeper"
       env:
         ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
-
-  test-cosmos:
+  test-dynamodb:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres
+        image: amazon/dynamodb-local:latest
+        ports:
+        - 8000:8000
         env:
-          POSTGRES_PASSWORD: postgres
-        ports:
-        - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis
-        ports:
-        - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      azurite:
-        image: mcr.microsoft.com/azure-storage/azurite
-        ports:
-          - 10000:10000
-          - 10001:10001
-      mssql:
-        image: mcr.microsoft.com/mssql/server:latest
-        ports:
-          - 1433:1433
-        env:
-          ACCEPT_EULA: "Y"
-          MSSQL_PID: "Developer"
-          SA_PASSWORD: "yourWeak(!)Password"
-      mariadb:
-        image: mariadb
-        ports:
-          - 3306:3306
-        env:
-          MARIADB_ROOT_PASSWORD: "mariadb"
+          AWS_ACCESS_KEY_ID: root
+          AWS_SECRET_ACCESS_KEY: pass
+          AWS_REGION: us-east-1
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET Core 3.1
@@ -270,15 +238,6 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
     - name: Test
-      run: dotnet test --filter "Category=Redis" --filter "Category=PostgreSql" --filter "Category=SqlServer" --filter "Category=MySql" # --filter "Category=ZooKeeper" --filter "Category=Consul"
+      run: dotnet test --filter "Category=DynamoDB"
       env:
-        REDIS_HOST: redis
-        REDIS_PORT: ${{ job.services.redis.ports[6379] }}
-        POSTGRES_HOST: postgres
-        POSTGRES_PORT: 5432
-        ORLEANSREDISCONNECTIONSTRING: localhost:6379,ssl=False,abortConnect=False
-        ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Integrated Security=true;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
-        ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;"
-        ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
-        ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
-
+        ORLEANSDYNAMODBCONNECTIONSTRING: "http://127.0.0.1:8000"
