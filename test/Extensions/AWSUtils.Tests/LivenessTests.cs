@@ -1,6 +1,7 @@
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
+using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;
@@ -26,7 +27,7 @@ namespace AWSUtils.Tests.Liveness
                 Orleans.AWSUtils.Tests.DynamoDBStorage storage;
                 try
                 {
-                    storage = new Orleans.AWSUtils.Tests.DynamoDBStorage(NullLoggerFactory.Instance.CreateLogger("DynamoDBStorage"), "http://localhost:8000");
+                    storage = new Orleans.AWSUtils.Tests.DynamoDBStorage(NullLoggerFactory.Instance.CreateLogger("DynamoDBStorage"), AWSTestConstants.Service);
                 }
                 catch (AmazonServiceException)
                 {
@@ -52,8 +53,6 @@ namespace AWSUtils.Tests.Liveness
         {
         }
 
-        public static string Service = "http://localhost:8000";
-
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             if (!isDynamoDbAvailable.Value)
@@ -66,7 +65,7 @@ namespace AWSUtils.Tests.Liveness
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
-                hostBuilder.UseDynamoDBClustering(options => { options.Service = Service; });
+                hostBuilder.UseDynamoDBClustering(options => { options.Service = AWSTestConstants.Service; });
             }
         }
 
@@ -76,7 +75,7 @@ namespace AWSUtils.Tests.Liveness
             {
                 clientBuilder.UseDynamoDBClustering(ob => ob.Configure(gatewayOptions => 
                 {
-                    gatewayOptions.Service = $"Service={Service}";
+                    gatewayOptions.Service = AWSTestConstants.Service;
                 }));
             }
         }

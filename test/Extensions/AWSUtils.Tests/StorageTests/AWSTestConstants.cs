@@ -24,11 +24,15 @@ namespace AWSUtils.Tests.StorageTests
                 {
                     return false;
                 }
-                storage.InitializeTable("TestTable", new List<KeySchemaElement> {
-                    new KeySchemaElement { AttributeName = "PartitionKey", KeyType = KeyType.HASH }
-                }, new List<AttributeDefinition> {
-                    new AttributeDefinition { AttributeName = "PartitionKey", AttributeType = ScalarAttributeType.S }
-                }).WithTimeout(TimeSpan.FromSeconds(2)).Wait();
+                storage.InitializeTable(
+                    "TestTable",
+                    new List<KeySchemaElement> {
+                        new KeySchemaElement { AttributeName = "PartitionKey", KeyType = KeyType.HASH }
+                    },
+                    new List<AttributeDefinition> {
+                        new AttributeDefinition { AttributeName = "PartitionKey", AttributeType = ScalarAttributeType.S }
+                    })
+                .WithTimeout(TimeSpan.FromSeconds(2)).Wait();
                 return true;
             }
             catch (Exception exc)
@@ -42,9 +46,9 @@ namespace AWSUtils.Tests.StorageTests
 
         public static string DefaultSQSConnectionString = "";
 
-        public static string AccessKey { get; set; }
-        public static string SecretKey { get; set; }
-        public static string Service { get; set; } = "http://localhost:8000";
+        public static string AccessKey { get; set; } = "root";
+        public static string SecretKey { get; set; } = "pass";
+        public static string Service { get; set; } = "http://127.0.0.1:8000";
 
         public static bool IsDynamoDbAvailable => _isDynamoDbAvailable.Value;
         public static bool IsSqsAvailable => !string.IsNullOrWhiteSpace(DefaultSQSConnectionString);

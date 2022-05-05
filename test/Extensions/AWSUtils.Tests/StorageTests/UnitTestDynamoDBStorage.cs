@@ -56,7 +56,7 @@ namespace AWSUtils.Tests.StorageTests
 
             if (fields.ContainsKey("BinaryData"))
             {
-                BinaryData = fields["BinaryData"].B.ToArray();
+                BinaryData = fields["BinaryData"].B?.ToArray();
             }
         }
 

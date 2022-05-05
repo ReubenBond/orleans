@@ -141,7 +141,7 @@ namespace Orleans.Storage
                         GrainType = fields[GRAIN_TYPE_PROPERTY_NAME].S,
                         GrainReference = fields[GRAIN_REFERENCE_PROPERTY_NAME].S,
                         ETag = int.Parse(fields[ETAG_PROPERTY_NAME].N),
-                        BinaryState = fields.ContainsKey(BINARY_STATE_PROPERTY_NAME) ? fields[BINARY_STATE_PROPERTY_NAME].B.ToArray() : null,
+                        BinaryState = fields.ContainsKey(BINARY_STATE_PROPERTY_NAME) ? fields[BINARY_STATE_PROPERTY_NAME].B?.ToArray() : null,
                         StringState = fields.ContainsKey(STRING_STATE_PROPERTY_NAME) ? fields[STRING_STATE_PROPERTY_NAME].S : string.Empty
                     };
                 }).ConfigureAwait(false);
@@ -175,7 +175,7 @@ namespace Orleans.Storage
             }
             catch (ConditionalCheckFailedException exc)
             {
-                throw new InconsistentStateException("Invalid grain state", exc);
+                throw new InconsistentStateException($"Inconsistent grain state: {exc}");
             }
             catch (Exception exc)
             {
@@ -198,9 +198,18 @@ namespace Orleans.Storage
             {
                 fields.Add(BINARY_STATE_PROPERTY_NAME, new AttributeValue { B = new MemoryStream(record.BinaryState) });
             }
-            else if (!string.IsNullOrWhiteSpace(record.StringState))
+            else
+            {
+                fields.Add(BINARY_STATE_PROPERTY_NAME, new AttributeValue { NULL = true });
+            }
+
+            if (!string.IsNullOrWhiteSpace(record.StringState))
             {
                 fields.Add(STRING_STATE_PROPERTY_NAME, new AttributeValue(record.StringState));
+            }
+            else
+            {
+                fields.Add(STRING_STATE_PROPERTY_NAME, new AttributeValue { NULL = true });
             }
 
             int newEtag = 0;
@@ -212,7 +221,8 @@ namespace Orleans.Storage
                 int currentEtag;
                 int.TryParse(grainState.ETag, out currentEtag);
                 newEtag = currentEtag;
-                fields.Add(ETAG_PROPERTY_NAME, new AttributeValue { N = newEtag++.ToString() });
+                newEtag++;
+                fields.Add(ETAG_PROPERTY_NAME, new AttributeValue { N = newEtag.ToString() });
 
                 await this.storage.PutEntryAsync(this.options.TableName, fields).ConfigureAwait(false);
             }
@@ -278,7 +288,7 @@ namespace Orleans.Storage
                     keys.Add(GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType));
 
                     await this.storage.DeleteEntryAsync(this.options.TableName, keys).ConfigureAwait(false);
-                    grainState.ETag = string.Empty;
+                    grainState.ETag = null;
                 }
                 else
                 {
@@ -316,7 +326,7 @@ namespace Orleans.Storage
             T dataValue = default;
             try
             {
-                if (binaryData?.Length > 0)
+                if (binaryData is { Length: > 0 })
                 {
                     // Rehydrate
                     dataValue = this.serializer.Deserialize<T>(binaryData);
@@ -331,7 +341,7 @@ namespace Orleans.Storage
             catch (Exception exc)
             {
                 var sb = new StringBuilder();
-                if (binaryData?.Length > 0)
+                if (binaryData is { Length: > 0 })
                 {
                     sb.AppendFormat("Unable to convert from storage format GrainStateEntity.Data={0}", binaryData);
                 }
@@ -358,6 +368,7 @@ namespace Orleans.Storage
             {
                 // http://james.newtonking.com/json/help/index.html?topic=html/T_Newtonsoft_Json_JsonConvert.htm
                 entity.StringState = JsonConvert.SerializeObject(grainState, this.jsonSettings);
+                entity.BinaryState = null;
                 dataSize = STRING_STATE_PROPERTY_NAME.Length + entity.StringState.Length;
 
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("Writing JSON data size = {0} for grain id = Partition={1} / Row={2}",
@@ -367,6 +378,7 @@ namespace Orleans.Storage
             {
                 // Convert to binary format
                 entity.BinaryState = this.serializer.SerializeToArray(grainState);
+                entity.StringState = null;
                 dataSize = BINARY_STATE_PROPERTY_NAME.Length + entity.BinaryState.Length;
 
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.Trace("Writing binary data size = {0} for grain id = Partition={1} / Row={2}",
