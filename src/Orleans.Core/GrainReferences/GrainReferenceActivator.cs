@@ -132,6 +132,9 @@ namespace Orleans.GrainReferences
         /// Initializes a new instance of the <see cref="UntypedGrainReferenceActivatorProvider"/> class.
         /// </summary>
         /// <param name="manifest">The grain version manifest.</param>
+        /// <param name="copyContextPool">The copy context pool.</param>
+        /// <param name="codecProvider">The serialization codec provider.</param>
+        /// <param name="deepCopier">The deep copier.</param>
         /// <param name="serviceProvider">The service provider.</param>
         public UntypedGrainReferenceActivatorProvider(
             GrainVersionManifest manifest,
@@ -310,6 +313,9 @@ namespace Orleans.GrainReferences
         /// <param name="serviceProvider">The service provider.</param>
         /// <param name="propertiesResolver">The grain property resolver.</param>
         /// <param name="rpcProvider">The proxy object type provider.</param>
+        /// <param name="copyContextPool">The copy context pool.</param>
+        /// <param name="codecProvider">The serialization codec provider.</param>
+        /// <param name="deepCopier">The deep copier.</param>
         /// <param name="grainVersionManifest">The grain version manifest.</param>
         public GrainReferenceActivatorProvider(
             IServiceProvider serviceProvider,

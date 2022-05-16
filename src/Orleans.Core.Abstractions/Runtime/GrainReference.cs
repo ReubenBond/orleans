@@ -60,7 +60,15 @@ namespace Orleans.Runtime
         /// Gets the common invocation options.
         /// </summary>
         public InvokeMethodOptions InvokeMethodOptions { get; }
+
+        /// <summary>
+        /// Gets the serialization codec provider.
+        /// </summary>
         public CodecProvider CodecProvider { get; }
+
+        /// <summary>
+        /// Gets the serialization copy context pool.
+        /// </summary>
         public CopyContextPool CopyContextPool { get; }
 
         /// <summary>
@@ -72,6 +80,10 @@ namespace Orleans.Runtime
         /// Gets the interface version.
         /// </summary>
         public ushort InterfaceVersion { get; }
+
+        /// <summary>
+        /// Gets the deep copier.
+        /// </summary>
         public DeepCopier DeepCopier { get; }
     }
 
@@ -316,19 +328,10 @@ namespace Orleans.Runtime
             _key = key;
         }
 
-        internal static GrainReference FromGrainId(GrainReferenceShared shared, GrainId grainId) => new GrainReference(shared, grainId.Key);
-        /// <summary>Initializes a new instance of the <see cref="GrainReference"/> class.</summary>
-        /// <param name="shared">
-        /// The grain reference functionality which is shared by all grain references of a given type.
-        /// </param>
-        /// <param name="grainId">
-        /// The grain id.
-        /// </param>
-        /// <returns>
-        /// A new <see cref="GrainReference"/> instance.
-        /// </returns>
-
-        public virtual TGrainInterface Cast<TGrainInterface>() where TGrainInterface : IAddressable => (TGrainInterface)Runtime.Cast(this, typeof(TGrainInterface));
+        /// <summary>
+        /// Creates a new <see cref="GrainReference"/> instance for the specified <paramref name="grainId"/>.
+        /// </summary>
+        internal static GrainReference FromGrainId(GrainReferenceShared shared, GrainId grainId) => new(shared, grainId.Key);
 
         /// <summary>
         /// Creates a new grain reference which implements the specified grain interface.
