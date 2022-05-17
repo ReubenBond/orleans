@@ -63,8 +63,10 @@ namespace Orleans.CodeGenerator
             var fields = new List<GeneratedFieldDescription>();
 
             // Add a codec field for any method parameter which does not have a static codec.
-            var allTypes = interfaceDescription.Methods.SelectMany(method => metadataModel.GeneratedInvokables[method].Members);
-            fields.AddRange(CopierGenerator.GetCopierFieldDescriptions(allTypes, libraryTypes));
+            var allTypes = interfaceDescription.Methods
+                .Where(method => method.MethodTypeParameters.Count == 0)
+                .SelectMany(method => metadataModel.GeneratedInvokables[method].Members);
+            fields.AddRange(GetCopierFieldDescriptions(allTypes, libraryTypes));
             return fields;
         }
 
