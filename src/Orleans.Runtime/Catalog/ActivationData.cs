@@ -28,7 +28,7 @@ namespace Orleans.Runtime
         private readonly IServiceScope serviceScope;
         private readonly WorkItemGroup _workItemGroup;
         private readonly List<(Message Message, CoarseStopwatch QueuedTime)> _waitingRequests = new();
-        private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new(ReferenceEqualsComparer<Message>.Instance);
+        private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new(ReferenceEqualsComparer<Message>.Default);
         private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = false };
         private readonly GrainLifecycle lifecycle;
         private List<object> _pendingOperations;
@@ -309,7 +309,7 @@ namespace Orleans.Runtime
                     this,
                     maxRequestsHardLimit);
 
-                var limitName = IsStatelessWorker ? LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS_STATELESS_WORKER : LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS;
+                var limitName = IsStatelessWorker ? nameof(SiloMessagingOptions.MaxEnqueuedRequestsHardLimit_StatelessWorker) : nameof(SiloMessagingOptions.MaxEnqueuedRequestsHardLimit);
                 return new LimitExceededException(limitName, count, maxRequestsHardLimit, ToString());
             }
 
