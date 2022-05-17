@@ -31,6 +31,8 @@ namespace Orleans.Serialization.UnitTests
         protected ValueTask InvokeAsync(IInvokable body) => default;
 
         protected CopyContextPool CopyContextPool { get; }
+
+        protected CodecProvider CodecProvider { get; }
     }
 
     [DefaultInvokableBaseType(typeof(ValueTask<>), typeof(UnitTestRequest<>))]

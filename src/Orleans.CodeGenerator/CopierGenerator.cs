@@ -238,12 +238,13 @@ namespace Orleans.CodeGenerator
                 .Distinct(MemberDescriptionTypeComparer.Default)
                 .Where(t => !libraryTypes.StaticCopiers.Any(c => SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t.Type)));
 
+            var fieldIndex = 0;
             foreach (var member in filteredMembers)
             {
-                yield return GetCopierDescription(member, libraryTypes);
+                yield return GetCopierDescription(member, fieldIndex++, libraryTypes);
             }
 
-            static CopierFieldDescription GetCopierDescription(IMemberDescription member, LibraryTypes libraryTypes)
+            static CopierFieldDescription GetCopierDescription(IMemberDescription member, int fieldIndex, LibraryTypes libraryTypes)
             {
                 TypeSyntax copierType = null;
                 var t = member.Type;
@@ -280,7 +281,7 @@ namespace Orleans.CodeGenerator
                     copierType = libraryTypes.DeepCopier_1.ToTypeSyntax(member.TypeSyntax);
                 }
 
-                var fieldName = '_' + ToLowerCamelCase(member.TypeNameIdentifier) + "Copier";
+                var fieldName = '_' + ToLowerCamelCase(member.TypeNameIdentifier) + "Copier" + fieldIndex;
                 return new CopierFieldDescription(copierType, fieldName, t);
             }
 
