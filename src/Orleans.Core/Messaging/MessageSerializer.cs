@@ -415,6 +415,8 @@ namespace Orleans.Runtime.Messaging
             {
                 result.RequestContextData = ReadRequestContext(ref reader);
             }
+
+            return result;
         }
 
         private List<GrainAddress> ReadCacheInvalidationHeaders<TInput>(ref Reader<TInput> reader)
