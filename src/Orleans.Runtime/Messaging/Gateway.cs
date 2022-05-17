@@ -261,8 +261,9 @@ namespace Orleans.Runtime.Messaging
         /// See if this message is intended for a grain we're proxying, and queue it for delivery if so.
         /// </summary>
         /// <param name="msg"></param>
+        /// <param name="targetReference"></param>
         /// <returns>true if the message should be delivered to a proxied grain, false if not.</returns>
-        internal bool TryDeliverToProxy(Message msg)
+        internal bool TryDeliverToProxy(Message msg, GrainReference targetReference = null)
         {
             // See if it's a grain we're proxying.
             var targetGrain = msg.TargetGrain;
@@ -292,11 +293,16 @@ namespace Orleans.Runtime.Messaging
                 msg.SendingSilo = gatewayAddress;
             }
 
-            client.Send(msg);
+            if (targetReference is not null)
+            {
+                targetReference.CachedHandler = client;
+            }
+
+            client.SendMessage(msg);
             return true;
         }
 
-        private class ClientState
+        private class ClientState : ICachedMessageHandler
         {
             private readonly Gateway _gateway;
             private readonly Queue<Message> _pendingToSend = new();
@@ -362,7 +368,7 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-            internal void Send(Message msg)
+            internal void SendMessage(Message msg)
             {
                 lock (_pendingToSend)
                 {
@@ -388,6 +394,14 @@ namespace Orleans.Runtime.Messaging
                         if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.Trace("Sent message {0} to client {1}", msg, msg.TargetGrain);
                     }
                 }
+            }
+
+            public bool SendMessage(object message)
+            {
+                if (_dropped) return false;
+
+                SendMessage((Message)message);
+                return true;
             }
 
             private bool TrySend(Message message)
