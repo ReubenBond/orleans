@@ -786,6 +786,7 @@ namespace Orleans
         Ser_AssemblyLoadErrorDetails            = SerializationBase + 3,
         Ser_AssemblyLoadSuccess                 = SerializationBase + 4,
         Ser_LargeObjectAllocated                = SerializationBase + 5,
+        Ser_FallbackSerializerRegistered        = SerializationBase + 6,
 
         LoaderBase                              = Runtime + 1700,
         Loader_NotGrainAssembly                 = Runtime_Error_100047, // Backward compatability

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Configuration
 {
@@ -25,5 +26,21 @@ namespace Orleans.Configuration
         /// This should reflect the expected object graph size for messages.
         /// </remarks>
         public int MaxSustainedSerializationContextCapacity { get; set; } = 64;
+
+        /// <summary>
+        /// The <see cref="LogLevel"/> to use when logging types serialized by the <see cref="FallbackSerializationProvider"/>.
+        /// </summary>
+        /// <remarks>
+        /// The default value is <see cref="LogLevel.Information"/>.
+        /// </remarks>
+        public LogLevel FallbackSerializationLogLevel { get; set; } = LogLevel.Information;
+
+        /// <summary>
+        /// The <see cref="LogLevel"/> to use when logging <see cref="Exception"/> types serialized by the <see cref="FallbackSerializationProvider"/>.
+        /// </summary>
+        /// <remarks>
+        /// The default value is <see cref="LogLevel.Debug"/>.
+        /// </remarks>
+        public LogLevel ExceptionFallbackSerializationLogLevel { get; set; } = LogLevel.Debug;
     }
 }

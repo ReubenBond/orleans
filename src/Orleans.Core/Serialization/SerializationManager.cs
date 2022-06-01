@@ -7,6 +7,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,13 +32,14 @@ namespace Orleans.Serialization
         private readonly Dictionary<KeyedSerializerId, IKeyedSerializer> keyedSerializers = new Dictionary<KeyedSerializerId, IKeyedSerializer>();
         private readonly List<IKeyedSerializer> orderedKeyedSerializers = new List<IKeyedSerializer>();
         private readonly ConcurrentDictionary<Type, IExternalSerializer> typeToExternalSerializerDictionary;
+        private readonly ConcurrentDictionary<Type, string> serializerMapping = new();
         private readonly CachedReadConcurrentDictionary<string, Type> types;
         private readonly Dictionary<string, string> typeKeysToQualifiedNames = new Dictionary<string, string>();
         private readonly Dictionary<Type, DeepCopier> copiers;
         private readonly Dictionary<Type, Serializer> serializers;
 
-        private readonly CachedReadConcurrentDictionary<Type, IKeyedSerializer> typeToKeyedSerializer =
-            new CachedReadConcurrentDictionary<Type, IKeyedSerializer>();
+        private readonly CachedReadConcurrentDictionary<(Type Type, bool IsFallback), IKeyedSerializer> typeToKeyedSerializer =
+            new CachedReadConcurrentDictionary<(Type Type, bool IsFallback), IKeyedSerializer>();
         private readonly Dictionary<Type, Deserializer> deserializers;
         private readonly ConcurrentDictionary<Type, Func<GrainReference, GrainReference>> grainRefConstructorDictionary;
 
@@ -1630,6 +1632,11 @@ namespace Orleans.Serialization
                 Register(t, serializer.DeepCopy, serializer.Serialize, serializer.Deserialize, true);
             }
 
+            if (serializer != null)
+            {
+                serializerMapping[t] = RuntimeTypeNameFormatter.Format(serializer.GetType());
+            }
+
             return serializer != null;
         }
 
@@ -1641,14 +1648,15 @@ namespace Orleans.Serialization
                 return false;
             }
 
-            if (this.typeToKeyedSerializer.TryGetValue(type, out serializer)) return true;
+            if (this.typeToKeyedSerializer.TryGetValue((type, fallback), out serializer)) return true;
 
             foreach (var keyedSerializer in this.orderedKeyedSerializers)
             {
                 if (keyedSerializer.IsSupportedType(type, isFallback: fallback))
                 {
-                    this.typeToKeyedSerializer[type] = keyedSerializer;
+                    this.typeToKeyedSerializer[(type, fallback)] = keyedSerializer;
                     serializer = keyedSerializer;
+                    serializerMapping[type] = RuntimeTypeNameFormatter.Format(serializer.GetType());
                     return true;
                 }
             }
@@ -1666,6 +1674,13 @@ namespace Orleans.Serialization
                 serializationStatistics.FallbackSerializations.Increment();
             }
 
+            var type = raw.GetType();
+            if (!serializerMapping.ContainsKey(type))
+            {
+                serializerMapping[type] = RuntimeTypeNameFormatter.Format(fallbackSerializer.GetType());
+                LogFallbackSerializerMessage(type);
+            }
+
             context.StreamWriter.Write(SerializationTokenType.Fallback);
             fallbackSerializer.Serialize(raw, context, t);
 
@@ -1673,6 +1688,26 @@ namespace Orleans.Serialization
             {
                 timer.Stop();
                 serializationStatistics.FallbackSerTimeStatistic.IncrementBy(timer.ElapsedTicks);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void LogFallbackSerializerMessage(Type type)
+        {
+            var logLevel = typeof(Exception).IsAssignableFrom(type) switch
+            {
+                true => this.SerializationProviderOptions.ExceptionFallbackSerializationLogLevel,
+                _ => this.SerializationProviderOptions.FallbackSerializationLogLevel
+            };
+
+            if (logger.IsEnabled(logLevel))
+            {
+                logger.Log(
+                    logLevel,
+                    (int)ErrorCode.Ser_FallbackSerializerRegistered,
+                    "Fallback serializer, {SerializerType}, is being used for type {Type}",
+                    fallbackSerializer.GetType(),
+                    type);
             }
         }
 
