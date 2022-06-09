@@ -31,7 +31,7 @@ namespace Orleans.Runtime
             StorageClearLatency = AverageTimeSpanStatistic.FindOrCreate(StatisticNames.STORAGE_CLEAR_LATENCY);
         }
 
-        internal static void OnStorageRead(string grainType, GrainReference grain, TimeSpan latency)
+        internal static void OnStorageRead(string stateName, GrainId grain, TimeSpan latency)
         {
             StorageReadTotal.Increment();
             if (latency > TimeSpan.Zero)
@@ -39,7 +39,8 @@ namespace Orleans.Runtime
                 StorageReadLatency.AddSample(latency);
             }
         }
-        internal static void OnStorageWrite(string grainType, GrainReference grain, TimeSpan latency)
+
+        internal static void OnStorageWrite(string stateName, GrainId grain, TimeSpan latency)
         {
             StorageWriteTotal.Increment();
             if (latency > TimeSpan.Zero)
@@ -47,7 +48,8 @@ namespace Orleans.Runtime
                 StorageWriteLatency.AddSample(latency);
             }
         }
-        internal static void OnStorageActivate(string grainType, TimeSpan latency)
+        
+        internal static void OnStorageActivate(string stateName, TimeSpan latency)
         {
             StorageActivateTotal.Increment();
             if (latency > TimeSpan.Zero)
@@ -55,19 +57,23 @@ namespace Orleans.Runtime
                 StorageReadLatency.AddSample(latency);
             }
         }
-        internal static void OnStorageReadError(string grainType, GrainReference grain)
+
+        internal static void OnStorageReadError(string stateName, GrainId grain)
         {
             StorageReadErrors.Increment();
         }
-        internal static void OnStorageWriteError(string grainType, GrainReference grain)
+        
+        internal static void OnStorageWriteError(string stateName, GrainId grain)
         {
             StorageWriteErrors.Increment();
         }
+
         internal static void OnStorageActivateError(string grainType)
         {
             StorageActivateErrors.Increment();
         }
-        internal static void OnStorageDelete(string grainType, GrainReference grain, TimeSpan latency)
+
+        internal static void OnStorageDelete(string grainType, GrainId grain, TimeSpan latency)
         {
             StorageClearTotal.Increment();
             if (latency > TimeSpan.Zero)
@@ -75,7 +81,8 @@ namespace Orleans.Runtime
                 StorageClearLatency.AddSample(latency);
             }
         }
-        internal static void OnStorageDeleteError(string grainType, GrainReference grain)
+
+        internal static void OnStorageDeleteError(string grainType, GrainId grain)
         {
             StorageClearErrors.Increment();
         }

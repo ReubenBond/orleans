@@ -1,4 +1,5 @@
 using System;
+using Orleans.Runtime;
 
 namespace Orleans
 {
@@ -10,6 +11,19 @@ namespace Orleans
     /// </typeparam>
     public interface IGrainState<T>
     {
+        /// <summary>
+        /// Gets or sets the identity of the grain which this state is associated with.
+        /// </summary>
+        GrainId GrainId { get; }
+
+        /// <summary>
+        /// Gets or sets the name of the state.
+        /// </summary>
+        /// <remarks>
+        /// A grain can have multiple state objects, each with a unique name, and load or persist them independently.
+        /// </remarks>
+        string Name { get; set; }
+
         /// <summary>
         /// Gets or sets the state.
         /// </summary>
@@ -33,15 +47,23 @@ namespace Orleans
     public class GrainState<T> : IGrainState<T>
     {
         /// <inheritdoc />
+        [Id(0)]
+        public GrainId GrainId { get; set; }
+
+        /// <inheritdoc />
         [Id(1)]
-        public T State { get; set; }
+        public string Name { get; set; }
 
         /// <inheritdoc />
         [Id(2)]
-        public string ETag { get; set; }
+        public T State { get; set; }
 
         /// <inheritdoc />
         [Id(3)]
+        public string ETag { get; set; }
+
+        /// <inheritdoc />
+        [Id(4)]
         public bool RecordExists { get; set; }
 
         /// <summary>

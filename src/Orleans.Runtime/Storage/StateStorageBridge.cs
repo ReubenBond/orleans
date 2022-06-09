@@ -17,7 +17,7 @@ namespace Orleans.Core
     public class StateStorageBridge<TState> : IStorage<TState>
     {
         private readonly string name;
-        private readonly GrainReference grainRef;
+        private readonly GrainId grainId;
         private readonly IGrainStorage store;
         private readonly GrainState<TState> grainState;
         private readonly ILogger logger;
@@ -44,16 +44,16 @@ namespace Orleans.Core
         /// <inheritdoc/>
         public bool RecordExists => grainState.RecordExists;
 
-        public StateStorageBridge(string name, GrainReference grainRef, IGrainStorage store, ILoggerFactory loggerFactory)
+        public StateStorageBridge(string name, GrainId grainId, IGrainStorage store, ILoggerFactory loggerFactory)
         {
             if (name == null) throw new ArgumentNullException(nameof(name));
-            if (grainRef == null) throw new ArgumentNullException(nameof(grainRef));
+            if (grainId == null) throw new ArgumentNullException(nameof(grainId));
             if (store == null) throw new ArgumentNullException(nameof(store));
             if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
 
             this.logger = loggerFactory.CreateLogger(store.GetType());
             this.name = name;
-            this.grainRef = grainRef;
+            this.grainId = grainId;
             this.store = store;
             this.grainState = new GrainState<TState>(Activator.CreateInstance<TState>());
         }
@@ -67,13 +67,13 @@ namespace Orleans.Core
             {
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
 
-                await store.ReadStateAsync(name, grainRef, grainState);
+                await store.ReadStateAsync(grainId, name, grainState);
 
-                StorageStatisticsGroup.OnStorageRead(name, grainRef, sw.Elapsed);
+                StorageStatisticsGroup.OnStorageRead(name, grainId, sw.Elapsed);
             }
             catch (Exception exc)
             {
-                StorageStatisticsGroup.OnStorageReadError(name, grainRef);
+                StorageStatisticsGroup.OnStorageReadError(name, grainId);
 
                 string errMsg = MakeErrorMsg(what, exc);
                 this.logger.Error((int)ErrorCode.StorageProvider_ReadFailed, errMsg, exc);
@@ -98,13 +98,13 @@ namespace Orleans.Core
                 GrainRuntime.CheckRuntimeContext(RuntimeContext.Current);
 
                 Stopwatch sw = Stopwatch.StartNew();
-                await store.WriteStateAsync(name, grainRef, grainState);
+                await store.WriteStateAsync(grainId, name, grainState);
                 sw.Stop();
-                StorageStatisticsGroup.OnStorageWrite(name, grainRef, sw.Elapsed);
+                StorageStatisticsGroup.OnStorageWrite(name, grainId, sw.Elapsed);
             }
             catch (Exception exc)
             {
-                StorageStatisticsGroup.OnStorageWriteError(name, grainRef);
+                StorageStatisticsGroup.OnStorageWriteError(name, grainId);
                 string errMsgToLog = MakeErrorMsg(what, exc);
                 this.logger.Error((int)ErrorCode.StorageProvider_WriteFailed, errMsgToLog, exc);
                 // If error is not specialization of OrleansException, wrap it
@@ -126,18 +126,18 @@ namespace Orleans.Core
 
                 Stopwatch sw = Stopwatch.StartNew();
                 // Clear (most likely Delete) state from external storage
-                await store.ClearStateAsync(name, grainRef, grainState);
+                await store.ClearStateAsync(grainId, name, grainState);
                 sw.Stop();
 
                 // Reset the in-memory copy of the state
                 grainState.State = Activator.CreateInstance<TState>();
 
                 // Update counters
-                StorageStatisticsGroup.OnStorageDelete(name, grainRef, sw.Elapsed);
+                StorageStatisticsGroup.OnStorageDelete(name, grainId, sw.Elapsed);
             }
             catch (Exception exc)
             {
-                StorageStatisticsGroup.OnStorageDeleteError(name, grainRef);
+                StorageStatisticsGroup.OnStorageDeleteError(name, grainId);
 
                 string errMsg = MakeErrorMsg(what, exc);
                 this.logger.Error((int)ErrorCode.StorageProvider_DeleteFailed, errMsg, exc);
@@ -157,7 +157,7 @@ namespace Orleans.Core
             decoder?.DecodeException(exc, out _, out errorCode, true);
 
             return string.Format("Error from storage provider {0} during {1} for grain Type={2} Pk={3} Id={4} Error={5}" + Environment.NewLine + " {6}",
-                $"{this.store.GetType().Name}.{this.name}", what, name, grainRef.GrainId.ToString(), grainRef, errorCode, LogFormatter.PrintException(exc));
+                $"{this.store.GetType().Name}.{this.name}", what, name, grainId.ToString(), grainId, errorCode, LogFormatter.PrintException(exc));
         }
     }
 }

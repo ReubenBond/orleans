@@ -12,9 +12,9 @@ namespace Orleans.EventSourcing
     public interface ILogConsistencyProtocolServices
     {
         /// <summary>
-        /// The untyped reference for this grain.
+        /// The identity for this grain.
         /// </summary>
-        GrainReference GrainReference { get;  }
+        GrainId GrainId { get;  }
 
         /// <summary>
         /// Copies the provided argument.
@@ -48,8 +48,6 @@ namespace Orleans.EventSourcing
         /// <summary> Output the specified message at the specified log level. </summary>
         void Log(LogLevel level, string format, params object[] args);
     }
-
-
 
     /// <summary>
     /// Exception thrown by protocol messaging layer.

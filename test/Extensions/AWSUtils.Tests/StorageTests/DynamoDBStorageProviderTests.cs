@@ -182,10 +182,10 @@ namespace AWSUtils.Tests.StorageTests
             return InitDynamoDBGrainStorage(options);
         }
 
-        private async Task Test_PersistenceProvider_Read(string grainTypeName, IGrainStorage store,
+        private async Task Test_PersistenceProvider_Read(string stateName, IGrainStorage store,
             GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
         {
-            var reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? GrainId.Create("test", Guid.NewGuid().ToString("N")) : grainId);
+            grainId = grainId.IsDefault ? GrainId.Create("test", Guid.NewGuid().ToString("N")) : grainId;
 
             if (grainState == null)
             {
@@ -196,7 +196,7 @@ namespace AWSUtils.Tests.StorageTests
             Stopwatch sw = new Stopwatch();
             sw.Start();
 
-            await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
+            await store.ReadStateAsync(grainId, stateName, storedGrainState);
 
             TimeSpan readTime = sw.Elapsed;
             this.output.WriteLine("{0} - Read time = {1}", store.GetType().FullName, readTime);
@@ -210,7 +210,7 @@ namespace AWSUtils.Tests.StorageTests
         private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteRead(string grainTypeName,
             IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
         {
-            GrainReference reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? GrainId.Create("test", Guid.NewGuid().ToString("N")) : grainId);
+            grainId = grainId.IsDefault ? GrainId.Create("test", Guid.NewGuid().ToString("N")) : grainId;
 
             if (grainState == null)
             {
@@ -220,7 +220,7 @@ namespace AWSUtils.Tests.StorageTests
             Stopwatch sw = new Stopwatch();
             sw.Start();
 
-            await store.WriteStateAsync(grainTypeName, reference, grainState);
+            await store.WriteStateAsync(grainId, grainTypeName, grainState);
 
             TimeSpan writeTime = sw.Elapsed;
             sw.Restart();
@@ -229,7 +229,7 @@ namespace AWSUtils.Tests.StorageTests
             {
                 State = new TestStoreGrainState()
             };
-            await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
+            await store.ReadStateAsync(grainId, grainTypeName, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
             this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             Assert.Equal(grainState.State.A, storedGrainState.State.A);
@@ -239,10 +239,10 @@ namespace AWSUtils.Tests.StorageTests
             return storedGrainState;
         }
 
-        private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteClearRead(string grainTypeName,
+        private async Task<GrainState<TestStoreGrainState>> Test_PersistenceProvider_WriteClearRead(string stateName,
             IGrainStorage store, GrainState<TestStoreGrainState> grainState = null, GrainId grainId = default)
         {
-            GrainReference reference = (GrainReference)this.fixture.InternalGrainFactory.GetGrain(grainId.IsDefault ? GrainId.Create("test", Guid.NewGuid().ToString("N")) : grainId);
+            grainId = grainId.IsDefault ? GrainId.Create("test", Guid.NewGuid().ToString("N")) : grainId;
 
             if (grainState == null)
             {
@@ -252,18 +252,18 @@ namespace AWSUtils.Tests.StorageTests
             Stopwatch sw = new Stopwatch();
             sw.Start();
 
-            await store.WriteStateAsync(grainTypeName, reference, grainState);
+            await store.WriteStateAsync(grainId, stateName, grainState);
 
             TimeSpan writeTime = sw.Elapsed;
             sw.Restart();
 
-            await store.ClearStateAsync(grainTypeName, reference, grainState);
+            await store.ClearStateAsync(grainId, stateName, grainState);
 
             var storedGrainState = new GrainState<TestStoreGrainState>
             {
                 State = new TestStoreGrainState()
             };
-            await store.ReadStateAsync(grainTypeName, reference, storedGrainState);
+            await store.ReadStateAsync(grainId, stateName, storedGrainState);
             TimeSpan readTime = sw.Elapsed;
             this.output.WriteLine("{0} - Write time = {1} Read time = {2}", store.GetType().FullName, writeTime, readTime);
             Assert.NotNull(storedGrainState.State);

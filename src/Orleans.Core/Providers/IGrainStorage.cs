@@ -12,28 +12,22 @@ namespace Orleans.Storage
     public interface IGrainStorage
     {
         /// <summary>Read data function for this storage instance.</summary>
-        /// <param name="grainType">Type of this grain [fully qualified class name]</param>
-        /// <param name="grainReference">Grain reference object for this grain.</param>
-        /// <param name="grainState">State data object to be populated for this grain.</param>
+        /// <param name="grainState">The grain state.</param>
         /// <typeparam name="T">The grain state type.</typeparam>
         /// <returns>Completion promise for the Read operation on the specified grain.</returns>
-        Task ReadStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState);
+        Task ReadStateAsync<T>(IGrainState<T> grainState);
 
         /// <summary>Write data function for this storage instance.</summary>
-        /// <param name="grainType">Type of this grain [fully qualified class name]</param>
-        /// <param name="grainReference">Grain reference object for this grain.</param>
-        /// <param name="grainState">State data object to be written for this grain.</param>
+        /// <param name="grainState">The grain state.</param>
         /// <typeparam name="T">The grain state type.</typeparam>
         /// <returns>Completion promise for the Write operation on the specified grain.</returns>
-        Task WriteStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState);
+        Task WriteStateAsync<T>(IGrainState<T> grainState);
 
         /// <summary>Delete / Clear data function for this storage instance.</summary>
-        /// <param name="grainType">Type of this grain [fully qualified class name]</param>
-        /// <param name="grainReference">Grain reference object for this grain.</param>
-        /// <param name="grainState">Copy of last-known state data object for this grain.</param>
+        /// <param name="grainState">The grain state.</param>
         /// <typeparam name="T">The grain state type.</typeparam>
         /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
-        Task ClearStateAsync<T>(string grainType, GrainReference grainReference, IGrainState<T> grainState);
+        Task ClearStateAsync<T>(IGrainState<T> grainState);
     }
 
     /// <summary>

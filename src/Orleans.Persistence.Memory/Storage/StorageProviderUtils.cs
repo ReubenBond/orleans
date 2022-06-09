@@ -40,27 +40,13 @@ namespace Orleans.Storage
             return data.ToString();
         }
 
-        public static string PrintResults(IList<IDictionary<string, object>> results)
-        {
-            if (results == null || results.Count == 0)
-                return "0 Results";
-            
-            var sb = new StringBuilder();
-            sb.Append(results.Count).Append(" Results= ( ").AppendLine();
-            foreach (var data in results)
-                sb.Append("[ ").Append(PrintData(data)).Append(" ] ").AppendLine();
-            
-            sb.Append(")");
-            return sb.ToString();
-        }
-
         public static string PrintOneWrite(
-            IEnumerable<Tuple<string, string>> keys,
+            string key,
             object data,
             string eTag)
         {
             var sb = new StringBuilder();
-            sb.Append("Keys=").Append(PrintKeys(keys));
+            sb.Append("Key=").Append(key);
             sb.Append(" Data=").Append(PrintData(data));
             sb.Append(" Etag=").Append(eTag ?? "null");
             return sb.ToString();

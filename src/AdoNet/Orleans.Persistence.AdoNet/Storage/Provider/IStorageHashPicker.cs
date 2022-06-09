@@ -18,11 +18,9 @@ namespace Orleans.Storage
         /// <summary>Picks a hasher using the given parameters.</summary>
         /// <param name="serviceId">The ID of the current service.</param>
         /// <param name="storageProviderInstanceName">The requesting storage provider.</param>
-        /// <param name="grainType">The type of grain.</param>
-        /// <param name="grainReference">The grain reference.</param>
         /// <param name="grainState">The grain state.</param>
         /// <param name="tag">An optional tag parameter that might be used by the storage parameter for "out-of-band" contracts.</param>
         /// <returns>A serializer or <em>null</em> if not match was found.</returns>
-        IHasher PickHasher<T>(string serviceId, string storageProviderInstanceName, string grainType, GrainReference grainReference, IGrainState<T> grainState, string tag = null);
+        IHasher PickHasher<T>(string serviceId, string storageProviderInstanceName, IGrainState<T> grainState, string tag = null);
     }
 }

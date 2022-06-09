@@ -54,7 +54,11 @@ namespace Orleans.EventSourcing.StateStorage
         /// <inheritdoc/>
         protected override void InitializeConfirmedView(TLogView initialstate)
         {
-            GlobalStateCache = new GrainStateWithMetaDataAndETag<TLogView>(initialstate);
+            GlobalStateCache = new GrainStateWithMetaDataAndETag<TLogView>(initialstate)
+            {
+                GrainId = Services.GrainId,
+                Name = grainTypeName
+            };
         }
 
         // no special tagging is required, thus we create a plain submission entry
@@ -78,7 +82,7 @@ namespace Orleans.EventSourcing.StateStorage
 
                     var readState = new GrainStateWithMetaDataAndETag<TLogView>();
 
-                    await globalGrainStorage.ReadStateAsync(grainTypeName, Services.GrainReference, readState);
+                    await globalGrainStorage.ReadStateAsync(Services.GrainId, grainTypeName, readState);
 
                     GlobalStateCache = readState;
 
@@ -123,7 +127,7 @@ namespace Orleans.EventSourcing.StateStorage
                 // for manual testing
                 //await Task.Delay(5000);
 
-                await globalGrainStorage.WriteStateAsync(grainTypeName, Services.GrainReference, nextglobalstate);
+                await globalGrainStorage.WriteStateAsync(Services.GrainId, grainTypeName, nextglobalstate);
 
                 batchsuccessfullywritten = true;
 
@@ -149,7 +153,7 @@ namespace Orleans.EventSourcing.StateStorage
 
                     try
                     {
-                        await globalGrainStorage.ReadStateAsync(grainTypeName, Services.GrainReference, GlobalStateCache);
+                        await globalGrainStorage.ReadStateAsync(Services.GrainId, grainTypeName, GlobalStateCache);
 
                         Services.Log(LogLevel.Debug, "read success {0}", GlobalStateCache);
 

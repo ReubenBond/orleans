@@ -32,7 +32,6 @@ namespace UnitTests.StorageTests
     {
         public class Fixture : BaseTestClusterFixture
         {
-
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 1;
@@ -1198,7 +1197,7 @@ namespace UnitTests.StorageTests
                 Val = newValue,
                 Name = "Field1",
                 GrainType = grainType,
-                GrainReference = (GrainReference) grain,
+                GrainId = (GrainReference) grain,
                 StateType = typeof(PersistenceTestGrainState)
             };
             mgmtGrain.SendControlCommandToProvider(providerTypeFullName,

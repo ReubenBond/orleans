@@ -1,4 +1,6 @@
-﻿namespace Orleans.Storage
+using System;
+
+namespace Orleans.Storage
 {
     /// <summary>
     /// An interface for all the hashing operations currently in Orleans Storage operations.
@@ -17,6 +19,6 @@
         /// </summary>
         /// <param name="data">The data to hash.</param>
         /// <returns>The given bytes hashed.</returns>
-        int Hash(byte[] data);
+        int Hash(ReadOnlySpan<byte> data);
     }
 }

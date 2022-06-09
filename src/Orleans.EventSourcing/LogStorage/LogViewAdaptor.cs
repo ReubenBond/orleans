@@ -28,7 +28,7 @@ namespace Orleans.EventSourcing.LogStorage
             : base(host, initialState, services)
         {
             this.globalGrainStorage = globalGrainStorage;
-            this.grainTypeName = grainTypeName;
+            this.grainStateName = grainTypeName;
         }
 
 
@@ -36,7 +36,7 @@ namespace Orleans.EventSourcing.LogStorage
 
 
         IGrainStorage globalGrainStorage;
-        string grainTypeName;   
+        string grainStateName;   
 
         // the object containing the entire log, as retrieved from / sent to storage
         LogStateWithMetaDataAndETag<TLogEntry> GlobalLog;
@@ -60,7 +60,11 @@ namespace Orleans.EventSourcing.LogStorage
         /// <inheritdoc/>
         protected override void InitializeConfirmedView(TLogView initialstate)
         {
-            GlobalLog = new LogStateWithMetaDataAndETag<TLogEntry>();
+            GlobalLog = new LogStateWithMetaDataAndETag<TLogEntry>()
+            {
+                GrainId = Services.GrainId,
+                Name = grainStateName,
+            };
             ConfirmedViewInternal = initialstate;
             ConfirmedVersionInternal = 0;
         }
@@ -112,7 +116,7 @@ namespace Orleans.EventSourcing.LogStorage
                     // for manual testing
                     //await Task.Delay(5000);
 
-                    await globalGrainStorage.ReadStateAsync(grainTypeName, Services.GrainReference, GlobalLog);
+                    await globalGrainStorage.ReadStateAsync(Services.GrainId, grainStateName, GlobalLog);
 
                     Services.Log(LogLevel.Debug, "read success {0}", GlobalLog);
 
@@ -153,7 +157,7 @@ namespace Orleans.EventSourcing.LogStorage
                 // for manual testing
                 //await Task.Delay(5000);
 
-                await globalGrainStorage.WriteStateAsync(grainTypeName, Services.GrainReference, GlobalLog);
+                await globalGrainStorage.WriteStateAsync(Services.GrainId, grainStateName, GlobalLog);
 
                 batchsuccessfullywritten = true;
 
@@ -179,7 +183,7 @@ namespace Orleans.EventSourcing.LogStorage
 
                     try
                     {
-                        await globalGrainStorage.ReadStateAsync(grainTypeName, Services.GrainReference, GlobalLog);
+                        await globalGrainStorage.ReadStateAsync(Services.GrainId, grainStateName, GlobalLog);
 
                         Services.Log(LogLevel.Debug, "read success {0}", GlobalLog);
 

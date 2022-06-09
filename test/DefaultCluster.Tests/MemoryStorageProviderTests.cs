@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.Storage.Internal;
 using TestExtensions;
@@ -141,6 +142,12 @@ namespace DefaultCluster.Tests.StorageTests
 
             [Id(2)]
             public bool RecordExists { get; set; }
+
+            [Id(3)]
+            public GrainId GrainId { get; set; }
+
+            [Id(4)]
+            public string Name { get; set; }
         }
     }
 }

@@ -1,4 +1,5 @@
 using Orleans.EventSourcing.Common;
+using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 
@@ -30,6 +31,12 @@ namespace Orleans.EventSourcing.LogStorage
 
         public LogStateWithMetaData<TEntry> State { get => StateAndMetaData; set => StateAndMetaData = value; }
 
+        [Id(3)]
+        public GrainId GrainId { get; set; }
+
+        [Id(4)]
+        public string Name { get; set; }
+
         /// <summary>
         /// Initializes a new instance of GrainStateWithMetaDataAndETag class
         /// </summary>
@@ -46,7 +53,6 @@ namespace Orleans.EventSourcing.LogStorage
             return string.Format("v{0} Flags={1} ETag={2} Data={3}", StateAndMetaData.GlobalVersion, StateAndMetaData.WriteVector, ETag, StateAndMetaData.Log);
         }
     }
-
 
     /// <summary>
     /// A class that extends grain state with versioning metadata, so that a log-consistent grain
