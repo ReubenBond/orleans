@@ -12,7 +12,7 @@ using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Runtime
 {
-    internal class StatelessServiceGrainContext : IGrainContext, IGrainExtensionBinder, IAsyncDisposable, IGrainManagementExtension, IWorkItemScheduler, IThreadPoolWorkItem
+    internal class SystemServiceGrainContext : IGrainContext, IGrainExtensionBinder, IAsyncDisposable, IGrainManagementExtension, IWorkItemScheduler, IThreadPoolWorkItem
     {
         private readonly GrainTypeSharedContext _shared;
         private readonly InsideRuntimeClient _runtimeClient;
@@ -46,8 +46,8 @@ namespace Orleans.Runtime
         private readonly Task _messageLoopTask;
 #pragma warning restore IDE0052 // Remove unread private members
 
-        public StatelessServiceGrainContext(
-            ActivationAddress addr,
+        public SystemServiceGrainContext(
+            GrainAddress addr,
             IServiceProvider applicationServices,
             GrainTypeSharedContext shared)
         {
@@ -58,7 +58,7 @@ namespace Orleans.Runtime
             _lifecycle = new(_shared.Logger);
             State = ActivationState.Create;
             _serviceScope = applicationServices.CreateScope();
-            _messageLoopTask = Task.Factory.StartNew(obj => ((StatelessServiceGrainContext)obj).RunMessageLoop(), this, TaskCreationOptions.DenyChildAttach);
+            _messageLoopTask = Task.Factory.StartNew(obj => ((SystemServiceGrainContext)obj).RunMessageLoop(), this, TaskCreationOptions.DenyChildAttach);
         }
 
         private int ConcurrentRequestCount => (int)(_stateBits & ConcurrentRequestsMask);
@@ -98,7 +98,7 @@ namespace Orleans.Runtime
 
         public object GrainInstance { get; private set; }
 
-        public ActivationAddress Address { get; }
+        public GrainAddress Address { get; }
 
         public GrainReference GrainReference => _selfReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
 
@@ -164,13 +164,13 @@ namespace Orleans.Runtime
 
         public IServiceProvider ActivationServices => _serviceScope.ServiceProvider;
 
-        public ActivationId ActivationId => Address.Activation;
+        public ActivationId ActivationId => Address.ActivationId;
 
         public IGrainLifecycle ObservableLifecycle => _lifecycle;
 
         private ILifecycleObserver Lifecycle => _lifecycle;
 
-        public GrainId GrainId => Address.Grain;
+        public GrainId GrainId => Address.GrainId;
 
         public Task Deactivated => GetDeactivationCompletionSource().Task;
 
@@ -331,10 +331,10 @@ namespace Orleans.Runtime
             await GetDeactivationCompletionSource().Task;
         }
 
-        public override string ToString() => $"[Activation: {Address.Silo}/{GrainId.ToString()}{ActivationId}{GetActivationInfoString()} State={State}]";
+        public override string ToString() => $"[Activation: {Address.SiloAddress}/{GrainId.ToString()}{ActivationId}{GetActivationInfoString()} State={State}]";
 
         private string ToDetailedString(bool includeExtraDetails = false) =>
-            $"[Activation: {Address.Silo.ToLongString()}/{GrainId.ToString()}{ActivationId} {GetActivationInfoString()} "
+            $"[Activation: {Address.SiloAddress.ToLongString()}/{GrainId.ToString()}{ActivationId} {GetActivationInfoString()} "
             + $"State={State} NumRunning={_stateBits}";
 
         private string GetActivationInfoString()

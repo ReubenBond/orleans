@@ -11,7 +11,6 @@ namespace Orleans.Runtime
         /// <summary>
         /// The thread-local context.
         /// </summary>
-        /// <summary>
         private readonly static AsyncLocal<IGrainContext> _threadLocalContext = new();
 
         /// <summary>

@@ -244,7 +244,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<GrainReferenceActivator>();
             services.AddSingleton<IGrainContextActivatorProvider, ActivationDataActivatorProvider>();
             services.AddSingleton<IGrainContextAccessor, GrainContextAccessor>();
-            services.AddSingleton<IGrainContextActivatorProvider, StatelessGrainActivatorProvider>();
+            services.AddSingleton<IGrainContextActivatorProvider, SystemServiceGrainActivatorProvider>();
             services.AddSingleton<IncomingRequestMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IncomingRequestMonitor>();
             services.AddFromExisting<IActivationWorkingSetObserver, IncomingRequestMonitor>();

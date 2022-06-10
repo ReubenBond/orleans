@@ -47,9 +47,9 @@ namespace Orleans
     }
 
     /// <summary>
-    /// Marker interface for stateless services.
+    /// Marker interface for system services.
     /// </summary>
-    public interface IStatelessService : IAddressable
+    public interface ISystemService : IAddressable
     {
     }
 }

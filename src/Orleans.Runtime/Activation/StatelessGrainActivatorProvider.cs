@@ -1,15 +1,15 @@
-﻿using System;
+using System;
 using Orleans.Metadata;
 
 namespace Orleans.Runtime
 {
-    internal class StatelessGrainActivatorProvider : IGrainContextActivatorProvider
+    internal class SystemServiceGrainActivatorProvider : IGrainContextActivatorProvider
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly GrainTypeSharedContextResolver _sharedComponentsResolver;
         private readonly GrainClassMap _grainClassMap;
 
-        public StatelessGrainActivatorProvider(
+        public SystemServiceGrainActivatorProvider(
             GrainClassMap grainClassMap,
             IServiceProvider serviceProvider,
             GrainTypeSharedContextResolver sharedComponentsResolver)
@@ -22,7 +22,7 @@ namespace Orleans.Runtime
         public bool TryGet(GrainType grainType, out IGrainContextActivator activator)
         {
             // TODO: this could be metadata-driven instead, eg driven by an attribute on the implementation
-            if (!_grainClassMap.TryGetGrainClass(grainType, out var serviceClass) || !typeof(IStatelessService).IsAssignableFrom(serviceClass))
+            if (!_grainClassMap.TryGetGrainClass(grainType, out var serviceClass) || !typeof(ISystemService).IsAssignableFrom(serviceClass))
             {
                 activator = null;
                 return false;
@@ -35,7 +35,7 @@ namespace Orleans.Runtime
                 throw new InvalidOperationException($"Could not find a suitable {nameof(IGrainActivator)} implementation for grain type {grainType}");
             }
 
-            activator = new StatelessGrainActivator(
+            activator = new SystemServiceGrainContextActivator(
                 instanceActivator,
                 _serviceProvider,
                 sharedContext);
@@ -43,13 +43,13 @@ namespace Orleans.Runtime
             return true;
         }
 
-        private class StatelessGrainActivator : IGrainContextActivator
+        private class SystemServiceGrainContextActivator : IGrainContextActivator
         {
             private readonly IGrainActivator _grainActivator;
             private readonly IServiceProvider _serviceProvider;
             private readonly GrainTypeSharedContext _sharedComponents;
 
-            public StatelessGrainActivator(
+            public SystemServiceGrainContextActivator(
                 IGrainActivator grainActivator,
                 IServiceProvider serviceProvider,
                 GrainTypeSharedContext sharedComponents)
@@ -59,9 +59,9 @@ namespace Orleans.Runtime
                 _sharedComponents = sharedComponents;
             }
 
-            public IGrainContext CreateContext(ActivationAddress activationAddress)
+            public IGrainContext CreateContext(GrainAddress activationAddress)
             {
-                var context = new StatelessGrainContext(
+                var context = new SystemServiceGrainContext(
                     activationAddress,
                     _serviceProvider,
                     _sharedComponents);
