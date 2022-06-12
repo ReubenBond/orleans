@@ -102,7 +102,6 @@ namespace Orleans.Serialization
             return tmp;
         }
 
-
         public void Serialize(object item, ISerializationContext outerContext, Type expectedType)
         {
             var outerWriter = outerContext.StreamWriter;

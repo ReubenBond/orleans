@@ -410,7 +410,7 @@ namespace Orleans.CodeGenerator
             }
 
             var isSerializable = this.compilationAnalyzer.IsSerializable(type);
-            if (isSerializable && this.compilationAnalyzer.IsFromKnownAssembly(type))
+            if (isSerializable && this.compilationAnalyzer.KnownTypes.Contains(type) || this.compilationAnalyzer.IsFromKnownAssembly(type))
             {
                 // Skip types which have fields whose types are inaccessible from generated code.
                 foreach (var field in type.GetInstanceMembers<IFieldSymbol>())

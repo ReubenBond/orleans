@@ -5,12 +5,13 @@ namespace Orleans.CodeGeneration
     /// <summary>
     /// The attribute which informs the code generator that code should be generated for this type.
     /// </summary>
+    [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
     public class ConsiderForCodeGenerationAttribute : Attribute
     {
         /// <summary>Initializes a new instance of <see cref="ConsiderForCodeGenerationAttribute"/>.</summary>
         /// <param name="type">The type that the generator should generate code for</param>
         /// <param name="throwOnFailure">When <see langword="true"/>, it will throw an exception if code cannot be generated for this type.</param>
-        protected ConsiderForCodeGenerationAttribute(Type type, bool throwOnFailure = false)
+        public ConsiderForCodeGenerationAttribute(Type type, bool throwOnFailure = false)
         {
             this.Type = type;
             this.ThrowOnFailure = throwOnFailure;

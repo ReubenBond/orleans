@@ -175,7 +175,11 @@ namespace Orleans.CodeGenerator.Analysis
             return result;
         }
 
-        public bool IsFromKnownAssembly(ITypeSymbol type) => this.KnownAssemblies.Contains(type.OriginalDefinition.ContainingAssembly);
+        public bool IsFromKnownAssembly(ITypeSymbol type)
+        {
+            var typeAsm = type.OriginalDefinition.ContainingAssembly;
+            return this.KnownAssemblies.Contains(typeAsm) || assembliesWithForcedSerializability.Contains(typeAsm);
+        }
 
         private void InspectGrainInterface(INamedTypeSymbol type)
         {
@@ -345,7 +349,7 @@ namespace Orleans.CodeGenerator.Analysis
                         this.KnownTypes.Add(type);
 
                         var throwOnFailure = false;
-                        var throwOnFailureParam = attr.ConstructorArguments.ElementAtOrDefault(2);
+                        var throwOnFailureParam = attr.ConstructorArguments.ElementAtOrDefault(1);
                         if (throwOnFailureParam.Type != null)
                         {
                             throwOnFailure = (bool)throwOnFailureParam.Value;
