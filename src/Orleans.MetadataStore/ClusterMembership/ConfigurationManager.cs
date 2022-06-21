@@ -44,7 +44,7 @@ namespace Orleans.MetadataStore
     {
         private delegate (bool ShouldUpdate, ClusterMembersUpdate Update) ConfigurationUpdater(ClusterConfiguration existingConfiguration, SiloAddress input);
         private readonly MetadataStoreOptions _options;
-
+        private readonly Guid _serverId;
         private readonly ConfigurationUpdater _addFunction;
         private readonly ConfigurationUpdater _removeFunction;
         private readonly AsyncEx.AsyncLock _updateLock = new();
@@ -63,13 +63,14 @@ namespace Orleans.MetadataStore
             _localSiloDetails = localSiloDetails;
             _log = loggerFactory.CreateLogger<ConfigurationManager>();
             _options = options.Value;
+            _serverId = Guid.NewGuid();
             _addFunction = AddServer;
             _removeFunction = RemoveServer;
 
             Acceptor = new(this);
             Proposer = new(
                 this,
-                localSiloDetails.SiloAddress,
+                _serverId,
                 log: loggerFactory.CreateLogger("MetadataStore.ConfigProposer"),
                 accepters);
             _learners = learners;
@@ -149,8 +150,8 @@ namespace Orleans.MetadataStore
 
                 // Assemble the new configuration.
                 var committedStamp = committedValue?.Stamp ?? default;
-                Proposer.Ballot = Proposer.Ballot.AdvanceTo(committedStamp);
-                var newStamp = Proposer.Ballot.Successor();
+                Proposer.NextBallot = Proposer.NextBallot.AdvancePast(committedStamp);
+                var newStamp = Proposer.NextBallot.Successor(_serverId);
 
                 var updatedConfig = new ClusterConfiguration(
                     stamp: newStamp,

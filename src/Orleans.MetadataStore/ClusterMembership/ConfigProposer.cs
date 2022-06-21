@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -31,108 +32,161 @@ namespace Orleans.MetadataStore
     {
         private readonly ILogger _log;
         private readonly IAcceptorRouter<TValue> _acceptors;
-        private bool _skipPrepare;
+        private readonly Guid _serverId;
+        private Ballot? _prepared;
         private TValue _cachedValue;
 
-        public Proposer(ILocalConfiguration localConfiguration, SiloAddress serverId, ILogger log, IAcceptorRouter<TValue> acceptors)
+        public Proposer(ILocalConfiguration localConfiguration, Guid serverId, ILogger log, IAcceptorRouter<TValue> acceptors)
         {
             LocalConfiguration = localConfiguration;
-            Ballot = new Ballot(0, serverId);
+            _serverId = serverId;
+            NextBallot = new Ballot(0, serverId);
             _log = log;
             _acceptors = acceptors;
         }
 
         protected ILocalConfiguration LocalConfiguration { get; }
 
-        internal Ballot Ballot { get; set; }
+        internal Ballot NextBallot { get; set; }
 
-        Ballot ITestAccessor.Ballot { get => Ballot; set => Ballot = value; }
-        bool ITestAccessor.SkipPrepare { get => _skipPrepare; set => _skipPrepare = value; }
+        Ballot ITestAccessor.Ballot { get => NextBallot; set => NextBallot = value; }
+        Ballot? ITestAccessor.Prepared { get => _prepared; set => _prepared = value; }
         TValue ITestAccessor.CachedValue { get => _cachedValue; set => _cachedValue = value; }
 
         protected abstract TValue ApplyOperation(TOperation operation, TValue current);
 
         protected abstract void OnCommittedValue(TValue committed);
 
-        protected async Task<(ReplicationStatus Status, TValue Value)> TryCommit(
+        protected async ValueTask<(ReplicationStatus Status, TValue Value)> TryCommit(
             TOperation operation,
             CancellationToken cancellationToken,
             int numRetries)
         {
-            // Configuration is observed once per attempt.
-            // If this server's configuration changes while this proposer is still attempting to commit a value, the commit will
-            // continue under the old configuration. If that configuration has already been observed by some of the acceptors,
-            // the commit may fail and in that case the proposer may retry.
-            var config = LocalConfiguration.CommittedConfiguration;
-
-            // Select a ballot number for this attempt. The ballot must be consistent between propose and accept for the attempt.
-            var prepareBallot = Ballot = Ballot.Successor();
-
-            TValue currentValue;
-            if (_skipPrepare)
+            var state = CommitState.Create(operation, cancellationToken, numRetries);
+            state.AcceptPreparesSuccessor = true;
+            do
             {
-                // If this node is leader, attempt to skip the prepare phase and at go straight to another accept
-                // phase, assuming that the value has not changed since this proposer last had a value accepted.
-                currentValue = _cachedValue;
+                (var status, state) = await TryCommitInternal(state);
+                if (status is ReplicationStatus.Success)
+                {
+                    return (status, state.CurrentValue);
+                }
+            } while (state.RemainingRetries >= 0);
 
-                LogSkippingPrepare(currentValue);
+            return (ReplicationStatus.Failed, state.CurrentValue);
+        }
+
+        private async Task<(ReplicationStatus Status, CommitState state)> TryCommitInternal(CommitState state)
+        {
+            --state.RemainingRetries;
+
+            if (state.Stage is CommitStage.Prepare)
+            {
+                // Configuration is observed once per attempt.
+                // If this server's configuration changes while this proposer is still attempting to commit a value, the commit will
+                // continue under the old configuration. If that configuration has already been observed by some of the acceptors,
+                // the commit may fail and in that case the proposer may retry.
+                state.Configuration = LocalConfiguration.CommittedConfiguration;
+
+                // Select a ballot number for this attempt. The ballot must be consistent between propose and accept for the attempt.
+                state.AttemptBallot = NextBallot = state.PrepareFastRound switch
+                {
+                    true => NextBallot.FastRoundSuccessor(),
+                    _ => NextBallot.Successor(_serverId),
+                };
+
+                if (_prepared.HasValue && _prepared.Value == state.AttemptBallot)
+                {
+                    // If this node is leader, attempt to skip the prepare phase and at go straight to another accept
+                    // phase, assuming that the value has not changed since this proposer last had a value accepted.
+                    state.CurrentValue = _cachedValue;
+
+                    LogSkippingPrepare(state.CurrentValue);
+                }
+                else
+                {
+                    // Try to obtain a quorum of promises from the acceptors and simultaneously learn the currently accepted value.
+                    bool prepareSuccess;
+                    (prepareSuccess, state.CurrentValue) = await TryPrepare(state.AttemptBallot, state.Configuration, state.CancellationToken);
+                    _cachedValue = state.CurrentValue;
+                    if (!prepareSuccess)
+                    {
+                        if (NextBallot > state.AttemptBallot)
+                        {
+                            // A conflict was encountered, so revert back to a regular
+                            state.PrepareFastRound = false;
+                        }
+
+                        // Allow the proposer to retry in order to hide harmless fast-forward events.
+                        if (state.RemainingRetries > 0)
+                        {
+                            LogPrepareFailed();
+                            return (ReplicationStatus.Failed, state);
+                        }
+
+                        LogPrepareFailedFinal();
+                        return (ReplicationStatus.Failed, state);
+                    }
+
+                    _prepared = state.AttemptBallot;
+                    LogPrepareSuccess(state.CurrentValue);
+                }
+
+                state.Stage = CommitStage.Accept;
+            }
+
+            if (state.Stage is CommitStage.Accept)
+            {
+                // Modify the currently accepted value and attempt to have it accepted on all acceptors.
+                var newValue = ApplyOperation(state.Operation, state.CurrentValue);
+                LogAcceptStarted(newValue);
+
+                var acceptSuccess = await TryAccept(
+                    state.AttemptBallot,
+                    newValue,
+                    state.Configuration,
+                    new AcceptOptions { PrepareSuccessor = state.AcceptPreparesSuccessor },
+                    state.CancellationToken);
+
+                if (acceptSuccess)
+                {
+                    // The accept succeeded, this proposer can attempt to use the current accept as a promise for a subsequent accept as an optimization.
+                    LogAcceptSucceded(newValue);
+
+                    _prepared = state.AcceptPreparesSuccessor switch
+                    {
+                        true => state.AttemptBallot.Successor(state.AttemptBallot.Proposer),
+                        _ => state.AttemptBallot
+                    };
+
+                    _cachedValue = newValue;
+                    state.CurrentValue = newValue;
+                    OnCommittedValue(newValue);
+                    return (ReplicationStatus.Success, state);
+                }
+
+                // Since the accept did not succeed, this proposer should issue a prepare before trying to have its next value accepted.
+                state.Stage = CommitStage.Prepare;
+
+                if (state.RemainingRetries > 0)
+                {
+                    // This attempt may have failed because another proposer interfered, so attempt again to have this value accepted.
+                    LogAcceptFailed();
+
+                    return (ReplicationStatus.Uncertain, state);
+                }
+
+                // It is possible that the value was committed successfully without this node receiving a quorum of acknowledgements,
+                // so the result is uncertain.
+                // For example, an acceptor's acknowledgement message may have been lost in transmission due to a transient network fault.
+                LogAcceptFailedFinal();
+
+                return (ReplicationStatus.Uncertain, state);
             }
             else
             {
-                // Try to obtain a quorum of promises from the acceptors and simultaneously learn the currently accepted value.
-                bool prepareSuccess;
-                (prepareSuccess, currentValue) = await TryPrepare(prepareBallot, config, cancellationToken);
-                _cachedValue = currentValue;
-                if (!prepareSuccess)
-                {
-                    // Allow the proposer to retry in order to hide harmless fast-forward events.
-                    if (numRetries > 0)
-                    {
-                        LogPrepareFailed();
-
-                        return await TryCommit(operation, cancellationToken, numRetries - 1);
-                    }
-
-                    LogPrepareFailedFinal();
-                    return (ReplicationStatus.Failed, currentValue);
-                }
-
-                LogPrepareSuccess(currentValue);
+                throw new InvalidOperationException($"Unexpected stage {state.Stage}");
             }
-
-            // Modify the currently accepted value and attempt to have it accepted on all acceptors.
-            var newValue = ApplyOperation(operation, currentValue);
-            LogAcceptStarted(newValue);
-
-            var acceptSuccess = await TryAccept(prepareBallot, newValue, config, cancellationToken);
-            if (acceptSuccess)
-            {
-                // The accept succeeded, this proposer can attempt to use the current accept as a promise for a subsequent accept as an optimization.
-                LogAcceptSucceded(newValue);
-
-                _skipPrepare = true;
-                _cachedValue = newValue;
-                OnCommittedValue(newValue);
-                return (ReplicationStatus.Success, newValue);
-            }
-
-            // Since the accept did not succeed, this proposer should issue a prepare before trying to have its next value accepted.
-            _skipPrepare = false;
-
-            if (numRetries > 0)
-            {
-                // This attempt may have failed because another proposer interfered, so attempt again to have this value accepted.
-                LogAcceptFailed();
-
-                return await TryCommit(operation, cancellationToken, numRetries - 1);
-            }
-
-            // It is possible that the value was committed successfully without this node receiving a quorum of acknowledgements,
-            // so the result is uncertain.
-            // For example, an acceptor's acknowledgement message may have been lost in transmission due to a transient network fault.
-            LogAcceptFailedFinal();
-
-            return (ReplicationStatus.Uncertain, currentValue);
         }
 
         private async Task<(bool, TValue)> TryPrepare(Ballot prepareBallot, ClusterConfiguration config, CancellationToken cancellationToken)
@@ -153,9 +207,11 @@ namespace Orleans.MetadataStore
             // of nodes which accept our new value.
             var requiredConfirmations = config.Members.Length / 2 + 1;
             var remainingAllowedFailures = prepareTasks.Count - requiredConfirmations;
-            var currentValue = default(TValue);
+            var selectedValue = default(TValue);
             var maxAccepted = Ballot.Zero;
             var maxConflict = Ballot.Zero;
+            var valueConflicts = default(List<(TValue Value, int Count)>);
+            var selectedValueCount = 0;
             while (prepareTasks.Count > 0 && requiredConfirmations > 0 && !cancellationToken.IsCancellationRequested)
             {
                 try
@@ -170,7 +226,40 @@ namespace Orleans.MetadataStore
                             if (accepted >= maxAccepted)
                             {
                                 maxAccepted = accepted;
-                                currentValue = value;
+                                selectedValue = value;
+                                valueConflicts?.Clear();
+                                selectedValueCount = 0;
+                            }
+                            else if (
+                                accepted == maxAccepted
+                                && maxAccepted.IsFastRoundBallot
+                                && (selectedValue is null && value is not null || selectedValue is not null && !selectedValue.Equals(value)))
+                            {
+                                if (valueConflicts is null)
+                                {
+                                    valueConflicts = new List<(TValue Value, int Count)>
+                                    {
+                                        (selectedValue, selectedValueCount),
+                                        (value, 1)
+                                    };
+                                }
+                                else
+                                {
+                                    var index = valueConflicts.FindIndex(entry => entry.Value.Equals(value));
+                                    if (index < 0)
+                                    {
+                                        valueConflicts.Add((value, 1));
+                                    }
+                                    else
+                                    {
+                                        valueConflicts[index] = (valueConflicts[index].Value, valueConflicts[index].Count + 1);
+                                    }
+                                }
+                            }
+
+                            if (selectedValue is not null && selectedValue.Equals(value))
+                            {
+                                ++selectedValueCount;
                             }
 
                             break;
@@ -201,24 +290,37 @@ namespace Orleans.MetadataStore
             }
 
             // Advance the ballot to the highest conflicting ballot to improve the likelihood of the next attempt succeeding.
-            if (maxConflict > Ballot)
+            if (maxConflict > prepareBallot)
             {
-                Ballot = Ballot.AdvanceTo(maxConflict);
+                NextBallot = prepareBallot.AdvancePast(maxConflict);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
 
             var achievedQuorum = requiredConfirmations == 0;
-            return (achievedQuorum, currentValue);
+            if (valueConflicts is { })
+            {
+                // Apply the Fast Paxos Coordinator's Rule by selecting the value with the highest occurrence.
+                foreach (var (value, count) in valueConflicts)
+                {
+                    if (count > selectedValueCount)
+                    {
+                        selectedValue = value;
+                        selectedValueCount = count;
+                    }
+                }
+            }
+
+            return (achievedQuorum, selectedValue);
         }
 
-        private async Task<bool> TryAccept(Ballot thisBallot, TValue newValue, ClusterConfiguration config, CancellationToken cancellationToken)
+        private async Task<bool> TryAccept(Ballot thisBallot, TValue newValue, ClusterConfiguration config, AcceptOptions options, CancellationToken cancellationToken)
         {
             // The prepare phase succeeded, proceed to propagate the new value to all acceptors.
             var acceptTasks = new List<Task<AcceptResponse>>(config.Members.Length);
             foreach (var server in config.Members)
             {
-                var acceptTask = _acceptors.Accept(server, config.Stamp, thisBallot, newValue).AsTask();
+                var acceptTask = _acceptors.Accept(server, config.Stamp, thisBallot, newValue, options).AsTask();
                 acceptTasks.Add(acceptTask);
             }
 
@@ -266,7 +368,7 @@ namespace Orleans.MetadataStore
             // Advance the ballot past the highest conflicting ballot to improve the likelihood of the next Prepare succeeding.
             if (maxConflict > thisBallot)
             {
-                Ballot = Ballot.AdvanceTo(maxConflict);
+                NextBallot = NextBallot.AdvancePast(maxConflict);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -366,8 +468,34 @@ namespace Orleans.MetadataStore
         public interface ITestAccessor
         {
             Ballot Ballot { get; set; }
-            bool SkipPrepare { get; set; }
+            Ballot? Prepared { get; set; }
             TValue CachedValue { get; set; }
+        }
+
+        private enum CommitStage
+        {
+            Prepare,
+            Accept
+        }
+
+        private record struct CommitState
+        {
+            public static CommitState Create(TOperation operation, CancellationToken cancellationToken, int remainingRetries) => new()
+            {
+                Operation = operation,
+                CancellationToken = cancellationToken,
+                RemainingRetries = remainingRetries,
+            };
+
+            public CommitStage Stage { get; set; }
+            public Ballot AttemptBallot { get; set; }
+            public TOperation Operation { get; init; }
+            public TValue CurrentValue { get; set; }
+            public CancellationToken CancellationToken { get; init; }
+            public ClusterConfiguration Configuration { get; set; }
+            public int RemainingRetries { get; set; }
+            public bool AcceptPreparesSuccessor { get; set; }
+            public bool PrepareFastRound { get; set; }
         }
     }
 
@@ -375,7 +503,7 @@ namespace Orleans.MetadataStore
     {
         private readonly AsyncEx.AsyncLock _lockObj;
 
-        public ConfigProposer(ILocalConfiguration localConfiguration, SiloAddress serverId, ILogger log, IAcceptorRouter<ClusterConfiguration> acceptors) : base(localConfiguration, serverId, log, acceptors)
+        public ConfigProposer(ILocalConfiguration localConfiguration, Guid serverId, ILogger log, IAcceptorRouter<ClusterConfiguration> acceptors) : base(localConfiguration, serverId, log, acceptors)
         {
             _lockObj = new AsyncEx.AsyncLock();
         }

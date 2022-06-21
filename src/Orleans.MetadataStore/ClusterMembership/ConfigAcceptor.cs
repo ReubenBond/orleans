@@ -5,10 +5,17 @@ using System.Threading.Tasks;
 
 namespace Orleans.MetadataStore
 {
+    [GenerateSerializer]
+    public readonly struct AcceptOptions
+    {
+        [Id(0)]
+        public bool PrepareSuccessor { get; init; }
+    }
+
     public interface IAcceptorRouter<TValue>
     {
         ValueTask<PrepareResponse<TValue>> Prepare(SiloAddress server, Ballot proposerConfig, Ballot ballot);
-        ValueTask<AcceptResponse> Accept(SiloAddress server, Ballot proposerConfig, Ballot ballot, TValue value);
+        ValueTask<AcceptResponse> Accept(SiloAddress server, Ballot proposerConfig, Ballot ballot, TValue value, AcceptOptions options);
     }
 
     public interface ILearnerRouter<TValue>
@@ -24,10 +31,10 @@ namespace Orleans.MetadataStore
         private readonly IGrainFactory _grainFactory;
         public ConfigurationManagerRouter(IGrainFactory grainFactory) => _grainFactory = grainFactory;
 
-        public ValueTask<AcceptResponse> Accept(SiloAddress server, Ballot proposerConfig, Ballot ballot, ClusterConfiguration value)
+        public ValueTask<AcceptResponse> Accept(SiloAddress server, Ballot proposerConfig, Ballot ballot, ClusterConfiguration value, AcceptOptions options)
         {
             var grain = GetConfigurationManagerReference(server);
-            return grain.Accept(proposerConfig, ballot, value);
+            return grain.Accept(proposerConfig, ballot, value, options);
         }
 
         public ValueTask<PrepareResponse<ClusterConfiguration>> Prepare(SiloAddress server, Ballot proposerConfig, Ballot ballot)
@@ -50,7 +57,7 @@ namespace Orleans.MetadataStore
     public interface IConfigurationManagerGrain : IGrain
     {
         ValueTask<PrepareResponse<ClusterConfiguration>> Prepare(Ballot proposerConfig, Ballot ballot);
-        ValueTask<AcceptResponse> Accept(Ballot proposerConfig, Ballot ballot, ClusterConfiguration value);
+        ValueTask<AcceptResponse> Accept(Ballot proposerConfig, Ballot ballot, ClusterConfiguration value, AcceptOptions options);
         ValueTask Committed(ClusterConfiguration value);
         ValueTask<ClusterConfiguration> GetCommittedConfiguration();
     }
@@ -72,7 +79,7 @@ namespace Orleans.MetadataStore
 
         public ValueTask<PrepareResponse<ClusterConfiguration>> Prepare(Ballot proposerConfig, Ballot ballot) => new(_configurationManager.Acceptor.Prepare(proposerConfig, ballot));
 
-        public ValueTask<AcceptResponse> Accept(Ballot proposerConfig, Ballot ballot, ClusterConfiguration value) => new(_configurationManager.Acceptor.Accept(proposerConfig, ballot, value));
+        public ValueTask<AcceptResponse> Accept(Ballot proposerConfig, Ballot ballot, ClusterConfiguration value, AcceptOptions options) => new(_configurationManager.Acceptor.Accept(proposerConfig, ballot, value, options));
 
         public ValueTask Committed(ClusterConfiguration value)
         {
@@ -108,7 +115,7 @@ namespace Orleans.MetadataStore
             return PrepareResponse<TValue>.Success(AcceptedBallot, AcceptedValue);
         }
 
-        public AcceptResponse Accept(Ballot ballot, TValue value)
+        public AcceptResponse Accept(Ballot ballot, TValue value, AcceptOptions options)
         {
             if (PromisedBallot > ballot)
             {
@@ -123,9 +130,13 @@ namespace Orleans.MetadataStore
             }
 
             // Dual-purpose this call as 1) an accept, 2) a prepare for the next accept.
-            // This is to support the "Distinguished Proposer" optimization, in which we piggy-back
+            // This is to support the "Distinguished Proposer" optimization and the Fast Paxos optimization, in which we piggy-back
             // the next prepare message off of the current accept message.
-            PromisedBallot = ballot.Successor();
+            if (options.PrepareSuccessor)
+            {
+                PromisedBallot = ballot.Successor(ballot.Proposer);
+            }
+
             AcceptedBallot = ballot;
             AcceptedValue = value;
             return AcceptResponse.Success();
@@ -164,7 +175,7 @@ namespace Orleans.MetadataStore
         }
 
 
-        public AcceptResponse Accept(Ballot proposerConfig, Ballot ballot, ClusterConfiguration value)
+        public AcceptResponse Accept(Ballot proposerConfig, Ballot ballot, ClusterConfiguration value, AcceptOptions options)
         {
             lock (this)
             {
@@ -177,7 +188,7 @@ namespace Orleans.MetadataStore
                     return AcceptResponse.ConfigConflict(activeConfiguration.Stamp);
                 }
 
-                return _register.Accept(ballot, value);
+                return _register.Accept(ballot, value, options);
             }
         }
 

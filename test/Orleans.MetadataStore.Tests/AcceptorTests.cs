@@ -1,4 +1,5 @@
 using Orleans.Runtime;
+using System;
 using System.Data;
 using Xunit;
 using Xunit.Abstractions;
@@ -37,9 +38,9 @@ namespace Orleans.MetadataStore.Tests
         {
             _committedConfigs = new[]
             {
-                new ClusterConfiguration(new Ballot(1, Silo(1)), new MembershipVersion(1), new[] { Silo(1), Silo(2), Silo(3) }),
-                new ClusterConfiguration(new Ballot(2, Silo(2)), new MembershipVersion(2), new[] { Silo(1), Silo(2), Silo(3), Silo(4) }),
-                new ClusterConfiguration(new Ballot(3, Silo(4)), new MembershipVersion(2), new[] { Silo(1), Silo(2), Silo(3), Silo(4), Silo(5) }),
+                new ClusterConfiguration(new Ballot(1, Guid.NewGuid()), new MembershipVersion(1), new[] { Silo(1), Silo(2), Silo(3) }),
+                new ClusterConfiguration(new Ballot(2, Guid.NewGuid()), new MembershipVersion(2), new[] { Silo(1), Silo(2), Silo(3), Silo(4) }),
+                new ClusterConfiguration(new Ballot(3, Guid.NewGuid()), new MembershipVersion(2), new[] { Silo(1), Silo(2), Silo(3), Silo(4), Silo(5) }),
             };
 
             _localConfig = new LocalConfiguration
@@ -57,7 +58,7 @@ namespace Orleans.MetadataStore.Tests
             _testAccessor.Value = _committedConfigs[2];
             _localConfig.CommittedConfiguration = _committedConfigs[2];
 
-            var response = _acceptor.Prepare(_committedConfigs[1].Stamp, new Ballot(10, Silo(3)));
+            var response = _acceptor.Prepare(_committedConfigs[1].Stamp, new Ballot(10, Guid.NewGuid()));
             Assert.Equal(PrepareStatus.ConfigConflict, response.Status);
             Assert.Equal(response.Ballot, _testAccessor.Value.Stamp);
 
@@ -71,8 +72,8 @@ namespace Orleans.MetadataStore.Tests
         public void PrepareRejectsSupersededBallot()
         {
             var committedBallot = _localConfig.CommittedConfiguration.Stamp;
-            var acceptedBallot = new Ballot(3, Silo(2));
-            var supersededBallot = new Ballot(2, Silo(3));
+            var acceptedBallot = new Ballot(3, Guid.NewGuid());
+            var supersededBallot = new Ballot(2, Guid.NewGuid());
             var initialValue = _testAccessor.Value;
 
             // Set an accepted ballot
@@ -107,7 +108,7 @@ namespace Orleans.MetadataStore.Tests
             _testAccessor.Accepted = committedValue.Stamp;
             _testAccessor.Value = committedValue;
 
-            var proposedBallot = new Ballot(4, Silo(2));
+            var proposedBallot = new Ballot(4, Guid.NewGuid());
             var response = _acceptor.Prepare(committedBallot, ballot: proposedBallot);
             Assert.Equal(PrepareStatus.Success, response.Status);
             Assert.Equal(committedValue, response.Value);
@@ -118,14 +119,14 @@ namespace Orleans.MetadataStore.Tests
         [Fact]
         public void AcceptRejectsSupersededParentBallot()
         {
-            var promisedBallot = _testAccessor.Promised = new Ballot(2, Silo(2));
+            var promisedBallot = _testAccessor.Promised = new Ballot(2, Guid.NewGuid());
             var committedBallot = _localConfig.CommittedConfiguration.Stamp;
             var committedValue = _localConfig.CommittedConfiguration;
             _testAccessor.Accepted = committedValue.Stamp;
             _testAccessor.Value = committedValue;
 
             // The acceptor has a higher parent ballot than the proposer
-            var response = _acceptor.Accept(proposerConfig: _committedConfigs[0].Stamp, ballot: committedBallot.Successor(), null);
+            var response = _acceptor.Accept(proposerConfig: _committedConfigs[0].Stamp, ballot: committedBallot.Successor(Guid.NewGuid()), null, default);
             Assert.Equal(AcceptStatus.ConfigConflict, response.Status);
             Assert.Equal(committedBallot, response.Ballot);
 
@@ -139,12 +140,12 @@ namespace Orleans.MetadataStore.Tests
         public void AcceptRejectsSupersededBallot()
         {
             _testAccessor.Promised = Ballot.Zero;
-            var acceptedBallot = new Ballot(10, Silo(1));
+            var acceptedBallot = new Ballot(10, Guid.NewGuid());
             _testAccessor.Accepted = acceptedBallot;
             _testAccessor.Value = _committedConfigs[1];
 
             // The acceptor has a higher accepted ballot than the proposer, which results in a rejection.
-            var response = _acceptor.Accept(proposerConfig: _committedConfigs[1].Stamp, ballot: new Ballot(9, Silo(2)), _committedConfigs[2]);
+            var response = _acceptor.Accept(proposerConfig: _committedConfigs[1].Stamp, ballot: new Ballot(9, Guid.NewGuid()), _committedConfigs[2], default);
             Assert.Equal(AcceptStatus.Conflict, response.Status);
             Assert.Equal(acceptedBallot, response.Ballot);
 
@@ -154,9 +155,9 @@ namespace Orleans.MetadataStore.Tests
             Assert.Equal(_committedConfigs[1], _testAccessor.Value);
 
             // The acceptor has a higher promised ballot than the proposer, which results in a rejection.
-            var promisedBallot = acceptedBallot.Successor();
+            var promisedBallot = acceptedBallot.Successor(Guid.NewGuid());
             _testAccessor.Promised = promisedBallot;
-            response = _acceptor.Accept(proposerConfig: _committedConfigs[1].Stamp, ballot: new Ballot(9, Silo(2)), _committedConfigs[2]);
+            response = _acceptor.Accept(proposerConfig: _committedConfigs[1].Stamp, ballot: new Ballot(9, Guid.NewGuid()), _committedConfigs[2], default);
             Assert.Equal(AcceptStatus.Conflict, response.Status);
             Assert.Equal(promisedBallot, response.Ballot);
 
@@ -170,15 +171,15 @@ namespace Orleans.MetadataStore.Tests
         public void AcceptAcceptsPromisedBallot()
         {
             var committedBallot = _localConfig.CommittedConfiguration.Stamp;
-            var promisedBallot = new Ballot(3, Silo(4));
+            var promisedBallot = new Ballot(3, Guid.NewGuid());
             _testAccessor.Promised = promisedBallot;
 
-            var response = _acceptor.Accept(committedBallot, promisedBallot, _committedConfigs[2]);
+            var response = _acceptor.Accept(committedBallot, promisedBallot, _committedConfigs[2], default);
             Assert.Equal(AcceptStatus.Success, response.Status);
 
             // The promised ballot is incremented to support the distinguished proposer optimization.
             // i.e, the next Prepare call is piggy-backed onto each Accept call.
-            Assert.Equal(promisedBallot.Successor(), _testAccessor.Promised);
+            Assert.Equal(promisedBallot, _testAccessor.Promised);
 
             Assert.Equal(promisedBallot, _testAccessor.Accepted);
             Assert.Equal(_committedConfigs[2], _testAccessor.Value);

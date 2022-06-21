@@ -11,34 +11,40 @@ namespace Orleans.MetadataStore
         /// The proposal number.
         /// </summary>
         [Id(0)]
-        public readonly int Counter;
+        public readonly int Round;
 
         /// <summary>
         /// The unique identifier of the proposer.
         /// </summary>
         [Id(1)]
-        public readonly SiloAddress Id;
+        public readonly Guid Proposer;
 
-        public Ballot(int counter, SiloAddress id)
+        public Ballot(int round, Guid proposer)
         {
-            Counter = counter;
-            Id = id;
+            Round = round;
+            Proposer = proposer;
         }
 
-        public Ballot Successor() => new(Counter + 1, Id);
+        public Ballot Successor(Guid proposer) => new(Round + 1, proposer);
 
-        public Ballot AdvanceTo(Ballot other) => new(Math.Max(Counter, other.Counter), Id);
+        public Ballot FastRoundSuccessor() => new(Round + 1, Guid.Empty);
+
+        public Ballot AdvancePast(Ballot other) => new(Math.Max(Round, other.Round), Proposer);
+
+        public bool IsFastRoundBallot => Guid.Empty.Equals(Proposer);
+
+        public bool IsClassicRoundBallot => !IsFastRoundBallot;
 
         public static Ballot Zero => default;
 
         public bool IsZero() => Equals(Zero);
 
         /// <inheritdoc />
-        public override string ToString() => IsZero() ? $"{nameof(Ballot)}(ø)" : $"{nameof(Ballot)}({Counter}.{Id})";
+        public override string ToString() => IsZero() ? $"{nameof(Ballot)}(ø)" : $"{nameof(Ballot)}({Round}.{Proposer})";
 
         public bool Equals(Ballot other)
         {
-            return Counter == other.Counter && Id == other.Id;
+            return Round == other.Round && Proposer == other.Proposer;
         }
 
         /// <inheritdoc />
@@ -47,51 +53,27 @@ namespace Orleans.MetadataStore
         /// <inheritdoc />
         public int CompareTo(Ballot other)
         {
-            var counterComparison = Counter - other.Counter;
+            var counterComparison = Round - other.Round;
             if (counterComparison != 0)
             {
                 return counterComparison;
             }
 
-            return (Id, other.Id) switch
-            {
-                (null, null) => 0,
-                (null, not null) => -1,
-                (not null, null) => 1,
-                _ => Id.CompareTo(other.Id)
-            };
+            return Proposer.CompareTo(other.Proposer);
         }
 
         public static bool operator ==(Ballot left, Ballot right) => left.Equals(right);
 
         public static bool operator !=(Ballot left, Ballot right) => !left.Equals(right);
 
-        public static bool operator <(Ballot left, Ballot right)
-        {
-            return left.CompareTo(right) < 0;
-        }
+        public static bool operator <(Ballot left, Ballot right) => left.CompareTo(right) < 0;
 
-        public static bool operator >(Ballot left, Ballot right)
-        {
-            return left.CompareTo(right) > 0;
-        }
+        public static bool operator >(Ballot left, Ballot right) => left.CompareTo(right) > 0;
 
-        public static bool operator <=(Ballot left, Ballot right)
-        {
-            return left.CompareTo(right) <= 0;
-        }
+        public static bool operator <=(Ballot left, Ballot right) => left.CompareTo(right) <= 0;
 
-        public static bool operator >=(Ballot left, Ballot right)
-        {
-            return left.CompareTo(right) >= 0;
-        }
+        public static bool operator >=(Ballot left, Ballot right) => left.CompareTo(right) >= 0;
 
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                return (Counter.GetHashCode() * 397) ^ (Id?.GetConsistentHashCode() ?? 0);
-            }
-        }
+        public override int GetHashCode() => HashCode.Combine(Round, Proposer);
     }
 }
