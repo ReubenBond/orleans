@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Threading;
+using Microsoft.Extensions.ObjectPool;
 
 namespace Orleans.Runtime
 {
@@ -42,7 +45,7 @@ namespace Orleans.Runtime
                     Remove(E2_E_TRACING_ACTIVITY_ID_HEADER);
                 }
                 else
-                { 
+                {
                     Set(E2_E_TRACING_ACTIVITY_ID_HEADER, value);
                 }
             }
@@ -167,5 +170,157 @@ namespace Orleans.Runtime
 
             public bool IsDefault => RequestObject is null && Values is null;
         }
+    }
+
+    /*
+    * Before executing a method, get a request context from the pool and assign:
+       * RuntimeContext
+       * RequestContext
+       * Root synchronization context
+    * When accessing RequestContext
+      * First check if SynchronizationContext.Current is an OrleansSyncrhonizationContext
+        * If so, use it to get the RequestContext
+        * Else, use the RequestContext from the async local (needed to support non-Grain callers efficiently)
+    * When accessing RuntimeContext
+      * Always check if SynchronizationContext.Current is an OrleansSyncrhonizationContext
+        * If so, use it to get the RuntimeContext
+        * Else, return null
+      * Setting runtime context directly is now invalid 
+    * After method execution, reset the OrleansSynchronizationContext and return it to the pool
+    * PROBLEM: RequestContext no longer has copy-on-write semantics, so changes made in nested calls will be visible to the caller.
+      * One solution is to always copy the RequestContext into a new OrleansSynchronizationContext whenever RequestContext is updated.
+      * This is likely no worse than the current solution, which performs a copy-on-write of the dictionary anyway.
+      * We can possibly detect the nesting based on calls to the SynchronizationContext methods, and only perform a copy-on-write if a
+        SynchronizationContext call has occurred betweeen the last update.
+    */
+
+    internal sealed class OrleansSynchronizationContext : SynchronizationContext, IDisposable
+    {
+        private static readonly OrleansSynchronizationContextPool Pool = new();
+
+        public static OrleansSynchronizationContext Get(SynchronizationContext rootSynchronizationContext, IGrainContext grainContext)
+        {
+            var context = Pool.Get();
+            context.RootSynchronizationContext = rootSynchronizationContext;
+            context.RuntimeContext = grainContext;
+            return context;
+        }
+
+        public static OrleansSynchronizationContext Fork(OrleansSynchronizationContext original)
+        {
+            var context = Pool.Get();
+            context.RootSynchronizationContext = original.RootSynchronizationContext;
+            context.RuntimeContext = original.RuntimeContext;
+            context.RequestContextProperties = original.RequestContextProperties;
+            return context;
+        }
+
+        public static void Return(OrleansSynchronizationContext original)
+        {
+            Pool.Return(original);
+        }
+
+        public RequestContext.ContextProperties RequestContextProperties { get; set; }
+        public IGrainContext RuntimeContext { get; set; }
+        public SynchronizationContext RootSynchronizationContext { get; set; }
+
+        public override void Send(SendOrPostCallback d, object state)
+        {
+            if (RootSynchronizationContext is null)
+            {
+                ThrowMissingSynchronizationContext();
+            }
+
+            RootSynchronizationContext.Send(d, state);
+        }
+
+        public override void Post(SendOrPostCallback d, object state)
+        {
+            if (RootSynchronizationContext is null)
+            {
+                ThrowMissingSynchronizationContext();
+            }
+
+            RootSynchronizationContext.Post(d, state);
+        }
+
+        [DoesNotReturn]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void ThrowMissingSynchronizationContext() => throw new InvalidOperationException("Missing synchronization context.");
+
+        private void Reset()
+        {
+            RequestContextProperties = default;
+            RuntimeContext = default;
+            RootSynchronizationContext = default;
+        }
+
+        public void Dispose() => Pool.Return(this);
+
+        internal readonly struct PoolPolicy : IPooledObjectPolicy<OrleansSynchronizationContext>
+        {
+            public OrleansSynchronizationContext Create() => new();
+
+            public bool Return(OrleansSynchronizationContext obj)
+            {
+                obj.Reset();
+                return true;
+            }
+        }
+
+        private sealed class OrleansSynchronizationContextPool : ConcurrentObjectPool<OrleansSynchronizationContext, PoolPolicy>
+        {
+            public OrleansSynchronizationContextPool() : base(default)
+            {
+            }
+        }
+    }
+
+    internal sealed class ConcurrentObjectPool<T> : ConcurrentObjectPool<T, DefaultConcurrentObjectPoolPolicy<T>> where T : class, new()
+    {
+        public ConcurrentObjectPool() : base(new())
+        {
+        }
+    }
+
+    internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T> where T : class where TPoolPolicy : IPooledObjectPolicy<T>
+    {
+        private readonly ThreadLocal<Stack<T>> _objects = new(() => new());
+
+        private readonly TPoolPolicy _policy;
+
+        public ConcurrentObjectPool(TPoolPolicy policy) => _policy = policy;
+
+        public int MaxPoolSize { get; set; } = int.MaxValue;
+
+        public override T Get()
+        {
+            var stack = _objects.Value;
+            if (stack.TryPop(out var result))
+            {
+                return result;
+            }
+
+            return _policy.Create();
+        }
+
+        public override void Return(T obj)
+        {
+            if (_policy.Return(obj))
+            {
+                var stack = _objects.Value;
+                if (stack.Count < MaxPoolSize)
+                {
+                    stack.Push(obj);
+                }
+            }
+        }
+    }
+
+    internal readonly struct DefaultConcurrentObjectPoolPolicy<T> : IPooledObjectPolicy<T> where T : class, new()
+    {
+        public T Create() => new();
+
+        public bool Return(T obj) => true;
     }
 }
