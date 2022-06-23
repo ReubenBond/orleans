@@ -51,7 +51,7 @@ namespace Orleans.Runtime
 
         public ActivationData(
             GrainAddress addr,
-            Func<IGrainContext, WorkItemGroup> createWorkItemGroup,
+            WorkItemGroupShared workItemGroupShared,
             IServiceProvider applicationServices,
             GrainTypeSharedContext shared)
         {
@@ -61,7 +61,7 @@ namespace Orleans.Runtime
             State = ActivationState.Create;
             serviceScope = applicationServices.CreateScope();
             isInWorkingSet = true;
-            _workItemGroup = createWorkItemGroup(this);
+            _workItemGroup = new WorkItemGroup(this, workItemGroupShared);
             _workItemGroup.QueueAction(static state =>
             {
                 var self = (ActivationData)state;

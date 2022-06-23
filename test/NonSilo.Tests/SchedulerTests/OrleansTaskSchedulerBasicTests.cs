@@ -73,7 +73,7 @@ namespace UnitTests.SchedulerTests
             var workItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(this.rootContext, this.loggerFactory);
             rootContext.Scheduler = workItemGroup;
 
-            taskScheduler = new(workItemGroup, loggerFactory.CreateLogger<ActivationTaskScheduler>());
+            taskScheduler = new(workItemGroup);
         }
         
         public void Dispose()
