@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -132,7 +133,8 @@ namespace Orleans.Runtime
                     _serviceProvider,
                     _sharedComponents);
 
-                RuntimeContext.SetExecutionContext(context, out var existingContext);
+                var previousContext = SynchronizationContext.Current;
+                SynchronizationContext.SetSynchronizationContext(context.SchedulingContext);
 
                 try
                 {
@@ -142,7 +144,10 @@ namespace Orleans.Runtime
                 }
                 finally
                 {
-                    RuntimeContext.SetExecutionContext(existingContext);
+                    if (previousContext is not null)
+                    {
+                        SynchronizationContext.SetSynchronizationContext(previousContext);
+                    }
                 }
 
                 return context;

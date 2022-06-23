@@ -314,11 +314,11 @@ namespace DefaultCluster.Tests.General
             clock.Start();
             var host = this.Fixture.HostedCluster.Primary.SiloAddress;
             var grain = this.GrainFactory.GetService<IEchoService>(host);
-            this.Logger.Info("CreateGrain took " + clock.Elapsed);
+            this.Logger.LogInformation("CreateGrain took {Elapsed}", clock.Elapsed);
 
             clock.Restart();
             string received = await grain.Echo(expectedEcho);
-            this.Logger.Info("EchoGrain.Echo took " + clock.Elapsed);
+            this.Logger.LogInformation("EchoGrain.Echo took {Elapsed}", clock.Elapsed);
 
             Assert.Equal(expectedEcho, received);
         }

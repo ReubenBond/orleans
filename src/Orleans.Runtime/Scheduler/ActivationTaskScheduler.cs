@@ -38,17 +38,25 @@ namespace Orleans.Runtime.Scheduler
 
         public void RunTask(Task task)
         {
-            RuntimeContext.SetExecutionContext(workerGroup.GrainContext);
-            bool done = TryExecuteTask(task);
-            if (!done)
-                logger.LogWarning(
-                    (int)ErrorCode.SchedulerTaskExecuteIncomplete4,
-                    "RunTask: Incomplete base.TryExecuteTask for Task Id={TaskId} with Status={TaskStatus}",
-                    task.Id,
-                    task.Status);
-            
-            //  Consider adding ResetExecutionContext() or even better:
-            //  Consider getting rid of ResetExecutionContext completely and just making sure we always call SetExecutionContext before TryExecuteTask.
+            var original = SynchronizationContext.Current;
+            try
+            {
+                SynchronizationContext.SetSynchronizationContext(workerGroup);
+                bool done = TryExecuteTask(task);
+                if (!done)
+                    logger.LogWarning(
+                        (int)ErrorCode.SchedulerTaskExecuteIncomplete4,
+                        "RunTask: Incomplete base.TryExecuteTask for Task Id={TaskId} with Status={TaskStatus}",
+                        task.Id,
+                        task.Status);
+
+                //  Consider adding ResetExecutionContext() or even better:
+                //  Consider getting rid of ResetExecutionContext completely and just making sure we always call SetExecutionContext before TryExecuteTask.
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(original);
+            }
         }
 
         /// <summary>Queues a task to the scheduler.</summary>

@@ -144,14 +144,18 @@ namespace Orleans.Runtime
 
         internal void HandleNewRequest(Message request)
         {
+            SynchronizationContext.SetSynchronizationContext(OrleansSynchronizationContext.Fork(WorkItemGroup));
             running = request;
             this.RuntimeClient.Invoke(this, request).Ignore();
+            SynchronizationContext.SetSynchronizationContext(WorkItemGroup);
         }
 
         internal void HandleResponse(Message response)
         {
+            SynchronizationContext.SetSynchronizationContext(OrleansSynchronizationContext.Fork(WorkItemGroup));
             running = response;
             this.RuntimeClient.ReceiveResponse(response);
+            SynchronizationContext.SetSynchronizationContext(WorkItemGroup);
         }
 
         /// <summary>

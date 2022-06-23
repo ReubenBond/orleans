@@ -14,7 +14,7 @@ using Orleans.Internal;
 namespace Orleans.Runtime.Scheduler
 {
     [DebuggerDisplay("WorkItemGroup Name={Name} State={state}")]
-    internal class WorkItemGroup : SynchronizationContext, IThreadPoolWorkItem, IDisposable, IWorkItemScheduler
+    internal sealed class WorkItemGroup : OrleansSynchronizationContext, IThreadPoolWorkItem, IDisposable, IWorkItemScheduler
     {
         private enum WorkGroupStatus
         {
@@ -75,9 +75,11 @@ namespace Orleans.Runtime.Scheduler
 
         internal ActivationTaskScheduler TaskScheduler { get; }
 
-        public IGrainContext GrainContext { get; set; }
+        public override IGrainContext GrainContext { get; }
 
         internal bool IsSystemGroup => this.GrainContext is ISystemTargetBase;
+
+        public override object CurrentRequest { get => default; set => throw new NotSupportedException(); }
 
         public string Name => GrainContext?.ToString() ?? "Unknown";
 
@@ -251,7 +253,6 @@ namespace Orleans.Runtime.Scheduler
             try
             {
                 SynchronizationContext.SetSynchronizationContext(this);
-                RuntimeContext.SetExecutionContext(this.GrainContext);
 
                 // Process multiple items -- drain the applicationMessageQueue (up to max items) for this physical activation
                 int count = 0;
@@ -352,7 +353,6 @@ namespace Orleans.Runtime.Scheduler
                     }
                 }
 
-                RuntimeContext.ResetExecutionContext();
                 SynchronizationContext.SetSynchronizationContext(outer);
             }
         }
@@ -428,7 +428,7 @@ namespace Orleans.Runtime.Scheduler
                 }
 
                 sb.AppendFormat("TaskRunner={0}; ", TaskScheduler);
-                if (GrainContext != null)
+                if (GrainContext is not null)
                 {
                     var detailedStatus = this.GrainContext switch
                     {

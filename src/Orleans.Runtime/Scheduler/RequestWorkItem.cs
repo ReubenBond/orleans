@@ -24,15 +24,7 @@ namespace Orleans.Runtime.Scheduler
 
         public override void Execute()
         {
-            try
-            {
-                RuntimeContext.SetExecutionContext(this.target);
-                target.HandleNewRequest(request);
-            }
-            finally
-            {
-                RuntimeContext.ResetExecutionContext();
-            }
+            target.HandleNewRequest(request);
         }
 
         public override string ToString()

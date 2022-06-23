@@ -32,7 +32,7 @@ namespace Orleans.Runtime
         internal const string E2_E_TRACING_ACTIVITY_ID_HEADER = "#RC_AI";
         internal const string PING_APPLICATION_HEADER = "Ping";
 
-        internal static readonly AsyncLocal<ContextProperties> CallContextData = new AsyncLocal<ContextProperties>();
+        internal static readonly AsyncLocal<Dictionary<string, object>> CallContextData = new();
 
         /// <summary>Gets or sets an activity ID that can be used for correlation.</summary>
         public static Guid ActivityId
@@ -60,8 +60,7 @@ namespace Orleans.Runtime
         /// </returns>
         public static object Get(string key)
         {
-            var properties = CallContextData.Value;
-            var values = properties.Values;
+            var values = CallContextData.Value;
 
             if (values != null && values.TryGetValue(key, out var result))
             {
@@ -78,8 +77,7 @@ namespace Orleans.Runtime
         /// <param name="value">The value to be stored into the request context.</param>
         public static void Set(string key, object value)
         {
-            var properties = CallContextData.Value;
-            var values = properties.Values;
+            var values = CallContextData.Value;
 
             if (values == null)
             {
@@ -101,11 +99,7 @@ namespace Orleans.Runtime
             }
 
             values[key] = value;
-            CallContextData.Value = new ContextProperties
-            {
-                RequestObject = properties.RequestObject,
-                Values = values
-            };
+            CallContextData.Value = values;
         }
 
         /// <summary>
@@ -115,8 +109,7 @@ namespace Orleans.Runtime
         /// <returns><see langword="true"/> if the value was previously in the request context and has now been removed, otherwise <see langword="false"/>.</returns>
         public static bool Remove(string key)
         {
-            var properties = CallContextData.Value;
-            var values = properties.Values;
+            var values = CallContextData.Value;
 
             if (values == null || values.Count == 0 || !values.ContainsKey(key))
             {
@@ -125,24 +118,16 @@ namespace Orleans.Runtime
 
             if (values.Count == 1)
             {
-                CallContextData.Value = new ContextProperties
-                {
-                    RequestObject = properties.RequestObject,
-                    Values = null
-                };
-                return true;
+                CallContextData.Value = null;
             }
             else
             {
                 var newValues = new Dictionary<string, object>(values);
                 newValues.Remove(key);
-                CallContextData.Value = new ContextProperties
-                {
-                    RequestObject = properties.RequestObject,
-                    Values = newValues
-                };
-                return true;
+                CallContextData.Value = newValues;
             }
+
+            return true;
         }
 
         /// <summary>
@@ -151,99 +136,91 @@ namespace Orleans.Runtime
         public static void Clear()
         {
             // Remove the key to prevent passing of its value from this point on
-            if (!CallContextData.Value.IsDefault)
+            CallContextData.Value = default;
+        }
+
+        internal static object CurrentRequest
+        {
+            get => OrleansSynchronizationContext.Current switch
             {
-                CallContextData.Value = default;
+                null or { IsRequestFlowSuppressed: true } => default,
+                { } context => context.CurrentRequest
+            };
+
+            set
+            {
+                var context = OrleansSynchronizationContext.Current;
+                if (context is not null)
+                {
+                    context.CurrentRequest = value;
+                }
             }
         }
 
-        /// <summary>
-        /// Gets the currently executing request.
-        /// </summary>
-        internal static object RequestObject => CallContextData.Value.RequestObject;
+        internal static void SetCurrentRequest(object requestMessage) => OrleansSynchronizationContext.Current.CurrentRequest = requestMessage;
 
-        internal readonly struct ContextProperties
+        internal static SuppressedCallChainFlow SuppressCallChainFlow()
         {
-            public object RequestObject { get; init; }
+            return OrleansSynchronizationContext.Current switch
+            {
+                { IsRequestFlowSuppressed: true } ctx => new SuppressedCallChainFlow(ctx),
+                _ => default
+            };
+        }
 
-            public Dictionary<string, object> Values { get; init; }
-
-            public bool IsDefault => RequestObject is null && Values is null;
+        internal static void RestoreCallChainFlow()
+        {
+            var context = OrleansSynchronizationContext.Current;
+            if (context is not null) context.IsRequestFlowSuppressed = false;
         }
     }
 
-    /*
-    * Before executing a method, get a request context from the pool and assign:
-       * RuntimeContext
-       * RequestContext
-       * Root synchronization context
-    * When accessing RequestContext
-      * First check if SynchronizationContext.Current is an OrleansSyncrhonizationContext
-        * If so, use it to get the RequestContext
-        * Else, use the RequestContext from the async local (needed to support non-Grain callers efficiently)
-    * When accessing RuntimeContext
-      * Always check if SynchronizationContext.Current is an OrleansSyncrhonizationContext
-        * If so, use it to get the RuntimeContext
-        * Else, return null
-      * Setting runtime context directly is now invalid 
-    * After method execution, reset the OrleansSynchronizationContext and return it to the pool
-    * PROBLEM: RequestContext no longer has copy-on-write semantics, so changes made in nested calls will be visible to the caller.
-      * One solution is to always copy the RequestContext into a new OrleansSynchronizationContext whenever RequestContext is updated.
-      * This is likely no worse than the current solution, which performs a copy-on-write of the dictionary anyway.
-      * We can possibly detect the nesting based on calls to the SynchronizationContext methods, and only perform a copy-on-write if a
-        SynchronizationContext call has occurred betweeen the last update.
-    */
-
-    internal sealed class OrleansSynchronizationContext : SynchronizationContext, IDisposable
+    internal readonly struct SuppressedCallChainFlow : IDisposable
     {
-        private static readonly OrleansSynchronizationContextPool Pool = new();
-
-        public static OrleansSynchronizationContext Get(SynchronizationContext rootSynchronizationContext, IGrainContext grainContext)
+        private readonly OrleansSynchronizationContext _context;
+        public SuppressedCallChainFlow(OrleansSynchronizationContext context) => _context = context;
+        public bool IsCallChainFlowSuppressed => _context is not null;
+        public void Dispose()
         {
-            var context = Pool.Get();
-            context.RootSynchronizationContext = rootSynchronizationContext;
-            context.RuntimeContext = grainContext;
-            return context;
+            if (_context is { } ctx) ctx.IsRequestFlowSuppressed = false;
         }
+    }
+
+    internal abstract class OrleansSynchronizationContext : SynchronizationContext
+        //, IDisposable
+    {
+        /*
+        private static readonly OrleansSynchronizationContextPool Pool = new();
+        */
+
+        public static new OrleansSynchronizationContext Current => SynchronizationContext.Current as OrleansSynchronizationContext;
 
         public static OrleansSynchronizationContext Fork(OrleansSynchronizationContext original)
         {
-            var context = Pool.Get();
-            context.RootSynchronizationContext = original.RootSynchronizationContext;
-            context.RuntimeContext = original.RuntimeContext;
-            context.RequestContextProperties = original.RequestContextProperties;
-            return context;
+            var innerContext = original switch
+            {
+                RequestSynchronizationContext wrapped => wrapped.InnerContext,
+                _ => original
+            };
+
+            return new RequestSynchronizationContext(innerContext)
+            {
+                CurrentRequest = original.CurrentRequest,
+            };
         }
 
+        /*
         public static void Return(OrleansSynchronizationContext original)
         {
             Pool.Return(original);
         }
+        */
 
-        public RequestContext.ContextProperties RequestContextProperties { get; set; }
-        public IGrainContext RuntimeContext { get; set; }
-        public SynchronizationContext RootSynchronizationContext { get; set; }
+        public abstract object CurrentRequest { get; set; }
+        public abstract IGrainContext GrainContext { get; }
+        public bool IsRequestFlowSuppressed { get; set; }
 
-        public override void Send(SendOrPostCallback d, object state)
-        {
-            if (RootSynchronizationContext is null)
-            {
-                ThrowMissingSynchronizationContext();
-            }
-
-            RootSynchronizationContext.Send(d, state);
-        }
-
-        public override void Post(SendOrPostCallback d, object state)
-        {
-            if (RootSynchronizationContext is null)
-            {
-                ThrowMissingSynchronizationContext();
-            }
-
-            RootSynchronizationContext.Post(d, state);
-        }
-
+        /*
         [DoesNotReturn]
         [MethodImpl(MethodImplOptions.NoInlining)]
         private void ThrowMissingSynchronizationContext() => throw new InvalidOperationException("Missing synchronization context.");
@@ -274,6 +251,7 @@ namespace Orleans.Runtime
             {
             }
         }
+        */
     }
 
     internal sealed class ConcurrentObjectPool<T> : ConcurrentObjectPool<T, DefaultConcurrentObjectPoolPolicy<T>> where T : class, new()
@@ -322,5 +300,46 @@ namespace Orleans.Runtime
         public T Create() => new();
 
         public bool Return(T obj) => true;
+    }
+
+    internal sealed class RequestSynchronizationContext : OrleansSynchronizationContext
+    {
+        public RequestSynchronizationContext(OrleansSynchronizationContext inner)
+        {
+            if (inner is RequestSynchronizationContext)
+            {
+                ThrowInvalidArgumentException();
+            }
+
+            InnerContext = inner;
+        }
+
+        public OrleansSynchronizationContext InnerContext { get; init; }
+
+        public override object CurrentRequest { get; set; }
+
+        public override IGrainContext GrainContext => InnerContext.GrainContext;
+
+        public override void Send(SendOrPostCallback callback, object state) => InnerContext.Send(callback, state);
+
+        public override void Post(SendOrPostCallback callback, object state) => InnerContext.Post(callback, state);
+
+        [DoesNotReturn]
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowInvalidArgumentException() => throw new ArgumentException();
+    }
+
+    internal sealed class ThreadPoolSynchronizationContext : OrleansSynchronizationContext
+    {
+        public ThreadPoolSynchronizationContext(IGrainContext grainContext)
+        {
+            GrainContext = grainContext;
+        }
+
+        public override IGrainContext GrainContext { get; }
+        public override object CurrentRequest { get => default; set => throw new NotSupportedException(); }
+        public override void Send(SendOrPostCallback callback, object state) => callback(state);
+
+        public override void Post(SendOrPostCallback callback, object state) => ThreadPool.UnsafeQueueUserWorkItem(s => callback(s), state, preferLocal: true);
     }
 }

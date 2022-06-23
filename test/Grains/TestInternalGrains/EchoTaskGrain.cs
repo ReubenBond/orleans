@@ -413,14 +413,14 @@ namespace UnitTests.Grains
 
         public Task<string> Echo(string data)
         {
-            _logger.Info("IEchoService.Echo=" + data);
+            _logger.LogInformation("IEchoService.Echo {Data}", data);
             _lastEcho = data;
             return Task.FromResult(data);
         }
 
         public Task<string> EchoError(string data)
         {
-            _logger.Info("IEchoService.EchoError=" + data);
+            _logger.LogInformation("IEchoService.Echo {Data}", data);
             _lastEcho = data;
             throw new Exception(data);
         }

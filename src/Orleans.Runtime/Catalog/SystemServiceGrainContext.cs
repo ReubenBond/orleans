@@ -53,6 +53,7 @@ namespace Orleans.Runtime
             _lifecycle = new(_shared.Logger);
             State = ActivationState.Create;
             _serviceScope = applicationServices.CreateScope();
+            SchedulingContext = new ThreadPoolSynchronizationContext(this);
             _messageLoopTask = Task.Factory.StartNew(obj => ((SystemServiceGrainContext)obj).RunMessageLoop(), this, TaskCreationOptions.DenyChildAttach);
         }
 
@@ -69,6 +70,8 @@ namespace Orleans.Runtime
                 return count;
             }
         }
+
+        public OrleansSynchronizationContext SchedulingContext { get; }
 
         public object GrainInstance { get; private set; }
 
@@ -321,7 +324,7 @@ namespace Orleans.Runtime
 
         private async Task RunMessageLoop()
         {
-            RuntimeContext.SetExecutionContext(this);
+            await Task.Yield();
 
             // Note that this loop never terminates. That might look strange, but there is a reason for it:
             // a grain must always accept and process any incoming messages. How a grain processes
@@ -333,6 +336,7 @@ namespace Orleans.Runtime
             // rooted references to it.
             while (true)
             {
+                System.Threading.SynchronizationContext.SetSynchronizationContext(SchedulingContext);
                 try
                 {
                     if (_pendingOperations.Count > 0)
@@ -428,6 +432,7 @@ namespace Orleans.Runtime
 
             try
             {
+                SynchronizationContext.SetSynchronizationContext(OrleansSynchronizationContext.Fork(SchedulingContext));
                 var task = _runtimeClient.Invoke(this, message);
 
                 // When the request completes (which may have happened synchronously), signal that completion.
@@ -445,6 +450,7 @@ namespace Orleans.Runtime
                 RecordRequestCompleted();
             }
 
+            SynchronizationContext.SetSynchronizationContext(SchedulingContext);
             return true;
         }
 
@@ -553,9 +559,11 @@ namespace Orleans.Runtime
                 if (msgs == null || msgs.Count <= 0) return;
 
                 if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                    _shared.Logger.Debug(
-                        ErrorCode.Catalog_RerouteAllQueuedMessages,
-                        string.Format("RejectAllQueuedMessages: {0} msgs from Invalid activation {1}.", msgs.Count, this));
+                    _shared.Logger.LogDebug(
+                        (int)ErrorCode.Catalog_RerouteAllQueuedMessages,
+                        "RejectAllQueuedMessages: {Count} msgs from Invalid activation {Activation}.",
+                        msgs.Count,
+                        this);
                 _shared.InternalRuntime.LocalGrainDirectory.InvalidateCacheEntry(Address);
                 _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(
                     msgs,
@@ -629,7 +637,7 @@ namespace Orleans.Runtime
 
                 if (_shared.Logger.IsEnabled(LogLevel.Debug))
                 {
-                    _shared.Logger.Debug("InitActivation is done: {0}", Address);
+                    _shared.Logger.LogDebug("InitActivation is done: {Address}", Address);
                 }
             }
             catch (Exception exception)

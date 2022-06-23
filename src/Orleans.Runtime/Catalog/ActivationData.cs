@@ -184,6 +184,8 @@ namespace Orleans.Runtime
 
         public TimeSpan CollectionAgeLimit => _shared.CollectionAgeLimit;
 
+        public WorkItemGroup SchedulingContext => _workItemGroup;
+
         public TTarget GetTarget<TTarget>() => (TTarget)GrainInstance;
 
         TComponent ITargetHolder.GetComponent<TComponent>()
@@ -953,6 +955,8 @@ namespace Orleans.Runtime
 
             try
             {
+                SynchronizationContext.SetSynchronizationContext(OrleansSynchronizationContext.Fork(SchedulingContext));
+
                 var task = _shared.InternalRuntime.RuntimeClient.Invoke(this, message);
 
                 // Note: This runs for all outcomes - both Success or Fault
@@ -969,6 +973,8 @@ namespace Orleans.Runtime
             {
                 OnCompletedRequest(message);
             }
+
+            SynchronizationContext.SetSynchronizationContext(SchedulingContext);
 
             static async ValueTask OnCompleteAsync(ActivationData activation, Message message, Task task)
             {
