@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.Extensions.ObjectPool;
@@ -187,12 +188,7 @@ namespace Orleans.Runtime
     }
 
     internal abstract class OrleansSynchronizationContext : SynchronizationContext
-        //, IDisposable
     {
-        /*
-        private static readonly OrleansSynchronizationContextPool Pool = new();
-        */
-
         public static new OrleansSynchronizationContext Current => SynchronizationContext.Current as OrleansSynchronizationContext;
 
         public static OrleansSynchronizationContext Fork(OrleansSynchronizationContext original)
@@ -209,97 +205,11 @@ namespace Orleans.Runtime
             };
         }
 
-        /*
-        public static void Return(OrleansSynchronizationContext original)
-        {
-            Pool.Return(original);
-        }
-        */
-
         public abstract object CurrentRequest { get; set; }
         public abstract IGrainContext GrainContext { get; }
         public bool IsRequestFlowSuppressed { get; set; }
 
-        /*
-        [DoesNotReturn]
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private void ThrowMissingSynchronizationContext() => throw new InvalidOperationException("Missing synchronization context.");
-
-        private void Reset()
-        {
-            RequestContextProperties = default;
-            RuntimeContext = default;
-            RootSynchronizationContext = default;
-        }
-
-        public void Dispose() => Pool.Return(this);
-
-        internal readonly struct PoolPolicy : IPooledObjectPolicy<OrleansSynchronizationContext>
-        {
-            public OrleansSynchronizationContext Create() => new();
-
-            public bool Return(OrleansSynchronizationContext obj)
-            {
-                obj.Reset();
-                return true;
-            }
-        }
-
-        private sealed class OrleansSynchronizationContextPool : ConcurrentObjectPool<OrleansSynchronizationContext, PoolPolicy>
-        {
-            public OrleansSynchronizationContextPool() : base(default)
-            {
-            }
-        }
-        */
-    }
-
-    internal sealed class ConcurrentObjectPool<T> : ConcurrentObjectPool<T, DefaultConcurrentObjectPoolPolicy<T>> where T : class, new()
-    {
-        public ConcurrentObjectPool() : base(new())
-        {
-        }
-    }
-
-    internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T> where T : class where TPoolPolicy : IPooledObjectPolicy<T>
-    {
-        private readonly ThreadLocal<Stack<T>> _objects = new(() => new());
-
-        private readonly TPoolPolicy _policy;
-
-        public ConcurrentObjectPool(TPoolPolicy policy) => _policy = policy;
-
-        public int MaxPoolSize { get; set; } = int.MaxValue;
-
-        public override T Get()
-        {
-            var stack = _objects.Value;
-            if (stack.TryPop(out var result))
-            {
-                return result;
-            }
-
-            return _policy.Create();
-        }
-
-        public override void Return(T obj)
-        {
-            if (_policy.Return(obj))
-            {
-                var stack = _objects.Value;
-                if (stack.Count < MaxPoolSize)
-                {
-                    stack.Push(obj);
-                }
-            }
-        }
-    }
-
-    internal readonly struct DefaultConcurrentObjectPoolPolicy<T> : IPooledObjectPolicy<T> where T : class, new()
-    {
-        public T Create() => new();
-
-        public bool Return(T obj) => true;
+        public override SynchronizationContext CreateCopy() => Fork(this);
     }
 
     internal sealed class RequestSynchronizationContext : OrleansSynchronizationContext
@@ -327,6 +237,15 @@ namespace Orleans.Runtime
         [DoesNotReturn]
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ThrowInvalidArgumentException() => throw new ArgumentException();
+
+        /// <inheritdoc/>
+        public override SynchronizationContext CreateCopy()
+        {
+            return new RequestSynchronizationContext(InnerContext)
+            {
+                CurrentRequest = CurrentRequest,
+            };
+        }
     }
 
     internal sealed class ThreadPoolSynchronizationContext : OrleansSynchronizationContext
