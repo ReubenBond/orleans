@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.Design;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
@@ -165,6 +166,20 @@ namespace Orleans
         /// A reference to the specified grain which implements the specified interface.
         /// </returns>
         TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable;
+
+        /// <summary>
+        /// Returns a reference to the specified grain which implements the specified interface.
+        /// </summary>
+        /// <param name="grainKey">
+        /// The key component of the grain id.
+        /// </param>
+        /// <typeparam name="TGrainInterface">
+        /// The grain interface type which the returned grain reference must implement.
+        /// </typeparam>
+        /// <returns>
+        /// A reference to the specified grain which implements the specified interface.
+        /// </returns>
+        TGrainInterface GetGrain<TGrainInterface>(IdSpan grainKey) where TGrainInterface : IAddressable;
 
         /// <summary>
         /// Returns an untyped reference for the provided grain id.

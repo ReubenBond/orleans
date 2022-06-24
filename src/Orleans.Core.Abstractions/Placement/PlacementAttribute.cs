@@ -97,4 +97,18 @@ namespace Orleans.Placement
             base(SiloRoleBasedPlacement.Singleton)
         { }
     }
+
+    /// <summary>
+    /// Marks a grain class as using the <see cref="SystemServicePlacement"/> policy.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class SystemServicePlacementAttribute : PlacementAttribute, IGrainPropertiesProviderAttribute
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SystemServicePlacementAttribute"/> class.
+        /// </summary>
+        public SystemServicePlacementAttribute() : base(SystemServicePlacement.Singleton)
+        {
+        }
+    }
 }

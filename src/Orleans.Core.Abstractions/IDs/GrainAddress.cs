@@ -1,7 +1,6 @@
 using System;
 using System.Text.Json.Serialization;
 using Orleans.GrainDirectory;
-using Orleans.Runtime;
 
 namespace Orleans.Runtime
 {
