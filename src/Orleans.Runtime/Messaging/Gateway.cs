@@ -374,11 +374,18 @@ namespace Orleans.Runtime.Messaging
 
             public void Send(Message msg)
             {
-                _pendingToSend.Enqueue(msg);
-                _signal.Signal();
+                if (Connection is { IsValid: true } connection)
+                {
+                    connection.Send(msg);
+                }
+                else
+                {
+                    _pendingToSend.Enqueue(msg);
+                    _signal.Signal();
 #if DEBUG
-                if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Queued message {Message} for client {TargetGrain}", msg, msg.TargetGrain);
+                    if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Queued message {Message} for client {TargetGrain}", msg, msg.TargetGrain);
 #endif
+                }
             }
 
             private async Task RunMessageLoop()
