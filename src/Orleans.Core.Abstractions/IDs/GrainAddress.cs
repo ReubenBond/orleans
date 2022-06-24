@@ -64,7 +64,7 @@ namespace Orleans.Runtime
         /// <returns> Returns <c>true</c> if the two <see cref="GrainAddress"/> are considered to match.</returns>
         public bool Matches(GrainAddress other)
         {
-            if (other is null || GrainId != other.GrainId || !SiloAddress.Equals(other)) return false;
+            if (other is null || GrainId != other.GrainId || !SiloAddress.Equals(other.SiloAddress)) return false;
 
             // If both activation ids are set, compare them, otherwise, ignore them.
             if (!ActivationId.IsDefault && !other.ActivationId.IsDefault)
