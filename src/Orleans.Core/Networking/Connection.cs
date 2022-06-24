@@ -33,7 +33,6 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionDelegate middleware;
         private readonly Channel<Message> outgoingMessages;
         private readonly ChannelWriter<Message> outgoingMessageWriter;
-        private readonly List<Message> inflight = new List<Message>(4);
         private readonly TaskCompletionSource<int> _transportConnectionClosed = new (TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<int> _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private IDuplexPipe _transport;
@@ -232,14 +231,6 @@ namespace Orleans.Runtime.Messaging
                 this.Log.LogWarning(abortException, "Exception terminating connection {Connection}", this);
             }
 
-            // Reject in-flight messages.
-            foreach (var message in this.inflight)
-            {
-                this.OnSendMessageFailure(message, "Connection terminated");
-            }
-
-            this.inflight.Clear();
-
             // Reroute enqueued messages.
             var i = 0;
             while (this.outgoingMessages.Reader.TryRead(out var message))
@@ -367,9 +358,8 @@ namespace Orleans.Runtime.Messaging
                     Message message = default;
                     try
                     {
-                        while (inflight.Count < inflight.Capacity && reader.TryRead(out message) && this.PrepareMessageForSend(message))
+                        while (reader.TryRead(out message) && this.PrepareMessageForSend(message))
                         {
-                            inflight.Add(message);
                             var (headerLength, bodyLength) = serializer.Write(ref output, message);
                             MessagingStatisticsGroup.OnMessageSend(this.MessageSentCounter, message, headerLength + bodyLength, headerLength, this.ConnectionDirection);
                         }
@@ -384,8 +374,6 @@ namespace Orleans.Runtime.Messaging
                     {
                         break;
                     }
-
-                    inflight.Clear();
                 }
             }
             catch (Exception exception)
