@@ -9,7 +9,6 @@ namespace Orleans.Runtime
     internal sealed class Message : ISpanFormattable
     {
         public const int LENGTH_HEADER_SIZE = 8;
-        public const int LENGTH_META_HEADER = 4;
 
         [NonSerialized]
         private short _retryCount;

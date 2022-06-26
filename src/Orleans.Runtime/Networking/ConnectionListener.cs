@@ -1,106 +1,97 @@
+#nullable enable
+
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Orleans.Connections.Transport;
+using Orleans.Connections;
 
 namespace Orleans.Runtime.Messaging
 {
     internal abstract class ConnectionListener
     {
-        private readonly IConnectionListenerFactory listenerFactory;
-        private readonly ConnectionManager connectionManager;
-        protected readonly ConcurrentDictionary<Connection, object> connections = new(ReferenceEqualsComparer.Default);
-        private readonly ConnectionCommon connectionShared;
-        private Task acceptLoopTask;
-        private IConnectionListener listener;
-        private ConnectionDelegate connectionDelegate;
+        private readonly ConnectionManager _connectionManager;
+        private readonly ConnectionCommon _connectionShared;
+        private readonly IMessageTransportListenerProvider[] _listenerProviders;
+        private readonly ConcurrentDictionary<Connection, object?> _connections = new(ReferenceEqualsComparer.Default);
+        private readonly CancellationTokenSource _shutdownCancellation = new();
+        private MessageTransportListener? _listener;
+        private Task? _acceptLoopTask;
 
         protected ConnectionListener(
-            IConnectionListenerFactory listenerFactory,
+            TransportListenerOptions listenerOptions,
+            IEnumerable<IMessageTransportListenerProvider> listenerProviders,
             IOptions<ConnectionOptions> connectionOptions,
             ConnectionManager connectionManager,
             ConnectionCommon connectionShared)
         {
-            this.listenerFactory = listenerFactory;
-            this.connectionManager = connectionManager;
-            this.ConnectionOptions = connectionOptions.Value;
-            this.connectionShared = connectionShared;
+            TransportListenerOptions = listenerOptions;
+            _listenerProviders = listenerProviders.Reverse().ToArray();
+            _connectionManager = connectionManager;
+            ConnectionOptions = connectionOptions.Value;
+            _connectionShared = connectionShared;
         }
 
-        public abstract EndPoint Endpoint { get; }
+        protected TransportListenerOptions TransportListenerOptions { get; }
 
-        protected IServiceProvider ServiceProvider => this.connectionShared.ServiceProvider;
+        protected IServiceProvider ServiceProvider => _connectionShared.ServiceProvider;
 
-        protected NetworkingTrace NetworkingTrace => this.connectionShared.NetworkingTrace;
+        protected ConnectionTrace TransportTrace => _connectionShared.ConnectionTrace;
 
         protected ConnectionOptions ConnectionOptions { get; }
 
-        protected abstract Connection CreateConnection(ConnectionContext context);
+        protected abstract Connection CreateConnection(MessageTransport transport);
 
-        protected ConnectionDelegate ConnectionDelegate
+        protected async Task BindAsync(CancellationToken cancellationToken)
         {
-            get
+            foreach (var provider in _listenerProviders)
             {
-                if (this.connectionDelegate != null) return this.connectionDelegate;
-
-                lock (this)
+                if (provider.TryGetMessageTransportListener(TransportListenerOptions, out _listener))
                 {
-                    if (this.connectionDelegate != null) return this.connectionDelegate;
-
-                    // Configure the connection builder using the user-defined options.
-                    var connectionBuilder = new ConnectionBuilder(this.ServiceProvider);
-                    connectionBuilder.Use(next =>
-                    {
-                        return context =>
-                        {
-                            context.Features.Set<IUnderlyingTransportFeature>(new UnderlyingConnectionTransportFeature { Transport = context.Transport });
-                            return next(context);
-                        };
-                    });
-                    this.ConfigureConnectionBuilder(connectionBuilder);
-                    Connection.ConfigureBuilder(connectionBuilder);
-                    return this.connectionDelegate = connectionBuilder.Build();
+                    break;
                 }
             }
-        }
 
-        protected virtual void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder) { }
+            if (_listener is null)
+            {
+                throw new OrleansConfigurationException($"None of the configured transport listeners were able to satisfy the demands.");
+            }
 
-        protected async Task BindAsync()
-        {
-            this.listener = await this.listenerFactory.BindAsync(this.Endpoint);
+            await _listener.BindAsync(cancellationToken);
         }
 
         protected void Start()
         {
-            if (this.listener is null) throw new InvalidOperationException("Listener is not bound");
-            acceptLoopTask = RunAcceptLoop();
+            if (_listener is null) throw new InvalidOperationException($"Listener is not bound, call {nameof(BindAsync)} first");
+            _acceptLoopTask = RunAcceptLoop();
         }
 
         private async Task RunAcceptLoop()
         {
             await Task.Yield();
+            var listener = _listener!;
             try
             {
                 while (true)
                 {
-                    var context = await this.listener.AcceptAsync();
+                    var context = await listener.AcceptAsync(_shutdownCancellation.Token);
                     if (context == null) break;
 
-                    var connection = this.CreateConnection(context);
-                    this.StartConnection(connection);
+                    var connection = CreateConnection(context);
+                    StartConnection(connection);
                 }
             }
             catch (Exception exception)
             {
-                this.NetworkingTrace.LogCritical(exception, "Exception in AcceptAsync");
+                TransportTrace.LogCritical(exception, "Exception in AcceptAsync");
             }
         }
 
@@ -108,15 +99,21 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                await listener.UnbindAsync(cancellationToken);
-
-                if (acceptLoopTask is not null)
+                if (_listener is null)
                 {
-                    await acceptLoopTask;
+                    return;
+                }
+
+                _shutdownCancellation.Cancel();
+                await _listener.UnbindAsync(cancellationToken);
+
+                if (_acceptLoopTask is not null)
+                {
+                    await _acceptLoopTask;
                 }
 
                 var closeTasks = new List<Task>();
-                foreach (var kv in connections)
+                foreach (var kv in _connections)
                 {
                     closeTasks.Add(kv.Key.CloseAsync(exception: null));
                 }
@@ -126,51 +123,51 @@ namespace Orleans.Runtime.Messaging
                     await Task.WhenAny(Task.WhenAll(closeTasks), cancellationToken.WhenCancelled());
                 }
 
-                await this.connectionManager.Closed;
-                await this.listener.DisposeAsync();
+                await _connectionManager.Closed;
+                await _listener.DisposeAsync();
             }
             catch (Exception exception)
             {
-                this.NetworkingTrace.LogWarning(exception, "Exception during shutdown");
+                TransportTrace.LogWarning(exception, "Exception during shutdown");
             }
         }
 
         private void StartConnection(Connection connection)
         {
-            connections.TryAdd(connection, null);
+            _connections.TryAdd(connection, null);
 
             ThreadPool.UnsafeQueueUserWorkItem(state =>
             {
-                var (t, connection) = ((ConnectionListener, Connection))state;
+                var (t, connection) = ((ConnectionListener, Connection))state!;
                 _ = t.RunConnectionAsync(connection);
             }, (this, connection));
         }
 
         private async Task RunConnectionAsync(Connection connection)
         {
-            using (this.BeginConnectionScope(connection))
+            using (BeginConnectionScope(connection))
             {
                 try
                 {
-                    await connection.Run();
-                    this.NetworkingTrace.LogInformation("Connection {Connection} terminated", connection);
+                    await connection.RunAsync();
+                    TransportTrace.LogInformation("Connection {Connection} terminated", connection);
                 }
                 catch (Exception exception)
                 {
-                    this.NetworkingTrace.LogInformation(exception, "Connection {Connection} terminated with an exception", connection);
+                    TransportTrace.LogInformation(exception, "Connection {Connection} terminated with an exception", connection);
                 }
                 finally
                 {
-                    this.connections.TryRemove(connection, out _);
+                    _connections.TryRemove(connection, out _);
                 }
             }
         }
 
-        private IDisposable BeginConnectionScope(Connection connection)
+        private IDisposable? BeginConnectionScope(Connection connection)
         {
-            if (this.NetworkingTrace.IsEnabled(LogLevel.Critical))
+            if (TransportTrace.IsEnabled(LogLevel.Critical))
             {
-                return this.NetworkingTrace.BeginScope(new ConnectionLogScope(connection));
+                return TransportTrace.BeginScope(new ConnectionLogScope(connection));
             }
 
             return null;

@@ -1,3 +1,4 @@
+/*
 using System;
 using System.Buffers;
 using System.IO.Pipelines;
@@ -6,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
-using Orleans.Networking.Shared;
+using Orleans.Connections.Shared;
 
 namespace Orleans.TestingHost.InMemoryTransport;
 
@@ -97,3 +98,4 @@ internal class InMemoryTransportConnection : TransportConnection
         _connectionClosedTokenSource.Dispose();
     }
 }
+*/

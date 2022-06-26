@@ -248,7 +248,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     /// The lifetime of the returned <see cref="BufferSlice"/> must be shorter than the lifetime of this instance.
     /// </remarks>
     /// <returns>A <see cref="BufferSlice"/> covering this entire buffer.</returns>
-    public BufferSlice Slice() => new(this, 0, Length);
+    public readonly BufferSlice Slice() => new(this, 0, Length);
 
     /// <summary>
     /// Returns a slice of this buffer, beginning at the specified offset.
@@ -257,7 +257,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     /// The lifetime of the returned <see cref="BufferSlice"/> must be shorter than the lifetime of this instance.
     /// </remarks>
     /// <returns>A slice representing a subset of this instance, beginning at the specified offset.</returns>
-    public BufferSlice Slice(int offset) => new(this, offset, Length - offset);
+    public readonly BufferSlice Slice(int offset) => new(this, offset, Length - offset);
 
     /// <summary>
     /// Returns a slice of this buffer, beginning at the specified offset and having the specified length.
@@ -266,7 +266,13 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     /// The lifetime of the returned <see cref="BufferSlice"/> must be shorter than the lifetime of this instance.
     /// </remarks>
     /// <returns>A slice representing a subset of this instance, beginning at the specified offset.</returns>
-    public BufferSlice Slice(int offset, int length) => new(this, offset, length);
+    public readonly BufferSlice Slice(int offset, int length) => new(this, offset, length);
+
+    /// <summary>
+    /// Returns an enumerator which can be used to enumerate the data referenced by this instance.
+    /// </summary>
+    /// <returns>An enumerator for the data contained in this instance.</returns>
+    public readonly BufferSlice.SpanEnumerator GetEnumerator() => new(Slice());
 
     /// <summary>
     /// Writes the provided sequence to this buffer.

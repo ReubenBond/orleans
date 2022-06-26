@@ -1,3 +1,4 @@
+/*
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -10,7 +11,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Networking.Shared;
+using Orleans.Connections.Shared;
 
 namespace Orleans.TestingHost.UnixSocketTransport;
 
@@ -45,3 +46,4 @@ internal class UnixSocketConnectionFactory : IConnectionFactory
         return connection;
     }
 }
+*/
