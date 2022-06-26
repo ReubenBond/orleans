@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Networking.Transport;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -46,11 +47,11 @@ namespace Orleans.Runtime.Messaging
 
         public override EndPoint Endpoint => this.endpointOptions.GetListeningSiloEndpoint();
 
-        protected override Connection CreateConnection(ConnectionContext context)
+        protected override Connection CreateConnection(MessageTransport transport)
         {
             return new SiloConnection(
                 default(SiloAddress),
-                context,
+                transport,
                 this.ConnectionDelegate,
                 this.messageCenter,
                 this.localSiloDetails,
@@ -77,7 +78,8 @@ namespace Orleans.Runtime.Messaging
 
         Task ILifecycleObserver.OnStart(CancellationToken ct) => Task.Run(async () =>
         {
-            await BindAsync();
+            await BindAsync(ct);
+
             // Start accepting connections immediately.
             Start();
         });

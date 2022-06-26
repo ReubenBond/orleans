@@ -26,12 +26,12 @@ namespace Orleans.Runtime.Messaging
 
                 if (index == 1)
                 {
-                    return new KeyValuePair<string, object>(nameof(Connection.LocalEndPoint), _connection.LocalEndPoint);
+                    return new KeyValuePair<string, object>(nameof(Connection.LocalEndpoint), _connection.LocalEndpoint);
                 }
 
                 if (index == 2)
                 {
-                    return new KeyValuePair<string, object>(nameof(Connection.RemoteEndPoint), _connection.RemoteEndPoint);
+                    return new KeyValuePair<string, object>(nameof(Connection.RemoteEndpoint), _connection.RemoteEndpoint);
                 }
 
                 throw new ArgumentOutOfRangeException(nameof(index));

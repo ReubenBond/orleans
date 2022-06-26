@@ -1,66 +1,87 @@
-using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
+using Orleans.Networking.Transport;
 
-namespace Orleans.Runtime.Messaging
+namespace Orleans.Runtime.Messaging;
+
+internal abstract class ConnectionFactory
 {
-    internal abstract class ConnectionFactory
-    {
-        private readonly IConnectionFactory connectionFactory;
-        private readonly IServiceProvider serviceProvider;
-        private ConnectionDelegate connectionDelegate;
+    private readonly EndpointConfigurationProvider _endpointProvider;
+    private readonly IMessageTransportFactoryProvider[] _transportFactoryProviders;
+    private readonly IOptionsMonitor<TransportFactoryOptions> _transportFactoryOptions;
 
-        protected ConnectionFactory(
-            IConnectionFactory connectionFactory,
-            IServiceProvider serviceProvider,
-            IOptions<ConnectionOptions> connectionOptions)
+    protected ConnectionFactory(
+        EndpointConfigurationProvider endpointConfigurationProvider,
+        IEnumerable<IMessageTransportFactoryProvider> transportFactoryProviders,
+        IOptionsMonitor<TransportFactoryOptions> transportFactoryOptions)
+    {
+        _endpointProvider = endpointConfigurationProvider;
+        _transportFactoryProviders = transportFactoryProviders.ToArray();
+        _transportFactoryOptions = transportFactoryOptions;
+    }
+
+    protected abstract Connection CreateConnection(SiloAddress address, MessageTransport context);
+
+    public virtual async ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
+    {
+        GetTransportFactory(address, out var endpointConfiguration, out var transportFactory);
+
+        // Connect to the endpoint.
+        var transport = await transportFactory.CreateAsync(endpointConfiguration, cancellationToken);
+
+        var options = _transportFactoryOptions.Get(endpointConfiguration.EndpointName);
+        foreach (var middleware in options.Middleware)
         {
-            this.connectionFactory = connectionFactory;
-            this.serviceProvider = serviceProvider;
-            this.ConnectionOptions = connectionOptions.Value;
+            transport = middleware(transport);
         }
 
-        protected ConnectionOptions ConnectionOptions { get; }
+        // Create a connection object to represent the connection.
+        var connection = CreateConnection(address, transport);
+        return connection;
+    }
 
-        protected ConnectionDelegate ConnectionDelegate
+    protected virtual void GetTransportFactory(SiloAddress address, out MessageTransportFactory transportFactory)
+    {
+        // Find an appropriate endpoint for the peer.
+        var endpoints = _endpointProvider.GetEndpoints(address).ToList();
+
+        if (endpoints is { Count: > 0 })
         {
-            get
+            throw new KeyNotFoundException($"Could not find an endpoint for peer {address}");
+        }
+
+        // Get the first endpoint which a registered transport factory claims to support.
+        endpointConfiguration = null;
+        transportFactory = null;
+        foreach (var endpoint in endpoints)
+        {
+            if (TryGetTransportFactory(endpoint, out transportFactory))
             {
-                if (this.connectionDelegate != null) return this.connectionDelegate;
-
-                lock (this)
-                {
-                    if (this.connectionDelegate != null) return this.connectionDelegate;
-
-                    // Configure the connection builder using the user-defined options.
-                    var connectionBuilder = new ConnectionBuilder(this.serviceProvider);
-                    connectionBuilder.Use(next =>
-                    {
-                        return async context =>
-                        {
-                            context.Features.Set<IUnderlyingTransportFeature>(new UnderlyingConnectionTransportFeature { Transport = context.Transport });
-                            await next(context);
-                        };
-                    });
-                    this.ConfigureConnectionBuilder(connectionBuilder);
-                    Connection.ConfigureBuilder(connectionBuilder);
-                    return this.connectionDelegate = connectionBuilder.Build();
-                }
+                endpointConfiguration = endpoint;
+                break;
             }
         }
 
-        protected virtual void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder) { }
-
-        protected abstract Connection CreateConnection(SiloAddress address, ConnectionContext context);
-
-        public virtual async ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
+        if (endpointConfiguration is null)
         {
-            var connectionContext = await this.connectionFactory.ConnectAsync(address.Endpoint, cancellationToken);
-            var connection = this.CreateConnection(address, connectionContext);
-            return connection;
+            throw new KeyNotFoundException($"Could not find an endpoint for peer {address}");
         }
+    }
+
+    protected virtual bool TryGetTransportFactory(EndpointInfo endpoint, out MessageTransportFactory transportFactory)
+    {
+        foreach (var provider in _transportFactoryProviders)
+        {
+            if (provider.TryGetMessageTransportFactory(endpoint, out transportFactory))
+            {
+                return true;
+            }
+        }
+
+        transportFactory = null;
+        return false;
     }
 }

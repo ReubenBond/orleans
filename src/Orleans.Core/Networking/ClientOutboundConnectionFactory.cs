@@ -1,8 +1,10 @@
-using Microsoft.AspNetCore.Connections;
+using System.Collections.Generic;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Networking.Transport;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -10,7 +12,7 @@ namespace Orleans.Runtime.Messaging
     {
         internal static readonly object ServicesKey = new object();
         private readonly ConnectionCommon connectionShared;
-        private readonly ClientConnectionOptions clientConnectionOptions;
+        private readonly ConnectionOptions connectionOptions;
         private readonly ClusterOptions clusterOptions;
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
         private readonly object initializationLock = new object();
@@ -20,38 +22,47 @@ namespace Orleans.Runtime.Messaging
 
         public ClientOutboundConnectionFactory(
             IOptions<ConnectionOptions> connectionOptions,
-            IOptions<ClientConnectionOptions> clientConnectionOptions,
             IOptions<ClusterOptions> clusterOptions,
+            EndpointConfigurationProvider endpointConfigurationProvider,
+            IEnumerable<IMessageTransportFactoryProvider> transportFactoryProviders,
             ConnectionCommon connectionShared,
-            ConnectionPreambleHelper connectionPreambleHelper)
-            : base(connectionShared.ServiceProvider.GetRequiredServiceByKey<object, IConnectionFactory>(ServicesKey), connectionShared.ServiceProvider, connectionOptions)
+            ConnectionPreambleHelper connectionPreambleHelper,
+            IOptionsMonitor<TransportFactoryOptions> transportFactoryOptions)
+            : base(endpointConfigurationProvider, transportFactoryProviders, transportFactoryOptions)
         {
+            this.connectionOptions = connectionOptions.Value;
             this.connectionShared = connectionShared;
-            this.clientConnectionOptions = clientConnectionOptions.Value;
             this.clusterOptions = clusterOptions.Value;
             this.connectionPreambleHelper = connectionPreambleHelper;
         }
 
-        protected override Connection CreateConnection(SiloAddress address, ConnectionContext context)
+        protected override Connection CreateConnection(SiloAddress address, MessageTransport transport)
         {
             EnsureInitialized();
 
             return new ClientOutboundConnection(
                 address,
-                context,
-                this.ConnectionDelegate,
+                transport,
                 this.messageCenter,
                 this.connectionManager,
-                this.ConnectionOptions,
                 this.connectionShared,
+                this.connectionOptions,
                 this.connectionPreambleHelper,
                 this.clusterOptions);
         }
 
-        protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
+        protected override bool TryGetTransportFactory(EndpointInfo endpointInfo, out MessageTransportFactory transportFactory)
         {
-            this.clientConnectionOptions.ConfigureConnectionBuilder(connectionBuilder);
-            base.ConfigureConnectionBuilder(connectionBuilder);
+            var gatewayEndpointOptions = new GatewayEndpointOptions();
+            endpointInfo.Configuration.Bind(gatewayEndpointOptions);
+
+            if (!gatewayEndpointOptions.IsProxy)
+            {
+                transportFactory = default;
+                return false;
+            }
+
+            return base.TryGetTransportFactory(endpointInfo, out transportFactory);
         }
 
         private void EnsureInitialized()

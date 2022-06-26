@@ -1,10 +1,10 @@
 using System;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Networking.Transport;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -19,8 +19,7 @@ namespace Orleans.Runtime.Messaging
         private readonly string myClusterId;
 
         public GatewayInboundConnection(
-            ConnectionContext connection,
-            ConnectionDelegate middleware,
+            MessageTransport transport,
             Gateway gateway,
             OverloadDetector overloadDetector,
             ILocalSiloDetails siloDetails,
@@ -28,7 +27,7 @@ namespace Orleans.Runtime.Messaging
             MessageCenter messageCenter,
             ConnectionCommon connectionShared,
             ConnectionPreambleHelper connectionPreambleHelper)
-            : base(connection, middleware, connectionShared)
+            : base(transport, connectionShared)
         {
             this.connectionOptions = connectionOptions;
             this.gateway = gateway;
@@ -41,21 +40,9 @@ namespace Orleans.Runtime.Messaging
 
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.GatewayToClient;
 
-        protected override IMessageCenter MessageCenter => this.messageCenter;
+        protected override MessageCenter MessageCenter => this.messageCenter;
 
-        protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
-        {
-            MessagingInstruments.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection);
-            GatewayInstruments.GatewayReceived.Add(1);
-        }
-
-        protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes)
-        {
-            MessagingInstruments.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection);
-            GatewayInstruments.GatewaySent.Add(1);
-        }
-
-        protected override void OnReceivedMessage(Message msg)
+        protected internal override void OnReceivedMessage(Message msg)
         {
             // Don't process messages that have already timed out
             if (msg.IsExpired)
@@ -105,7 +92,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected override async Task RunInternal()
+        protected override async Task RunAsyncCore()
         {
             var preamble = await connectionPreambleHelper.Read(this.Context);
 
@@ -132,7 +119,7 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 this.gateway.RecordOpenedConnection(this, clientId);
-                await base.RunInternal();
+                await base.RunAsyncCore();
             }
             finally
             {

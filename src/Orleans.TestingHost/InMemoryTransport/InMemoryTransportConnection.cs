@@ -1,3 +1,4 @@
+/*
 using System;
 using System.Buffers;
 using System.IO.Pipelines;
@@ -97,3 +98,4 @@ internal class InMemoryTransportConnection : TransportConnection
         _connectionClosedTokenSource.Dispose();
     }
 }
+*/

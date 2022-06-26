@@ -1,10 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Networking.Transport;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -15,9 +16,9 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionCommon connectionShared;
         private readonly ProbeRequestMonitor probeRequestMonitor;
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
+        private readonly ConnectionOptions _connectionOptions;
         private readonly IServiceProvider serviceProvider;
-        private readonly SiloConnectionOptions siloConnectionOptions;
-        private readonly object initializationLock = new object();
+        private readonly object initializationLock = new ();
         private bool isInitialized;
         private ConnectionManager connectionManager;
         private MessageCenter messageCenter;
@@ -26,15 +27,17 @@ namespace Orleans.Runtime.Messaging
         public SiloConnectionFactory(
             IServiceProvider serviceProvider,
             IOptions<ConnectionOptions> connectionOptions,
-            IOptions<SiloConnectionOptions> siloConnectionOptions,
+            IOptionsMonitor<TransportFactoryOptions> transportFactoryOptions,
+            EndpointConfigurationProvider addressToEndpointMapper,
+            IEnumerable<IMessageTransportFactoryProvider> transportFactoryProviders,
             ILocalSiloDetails localSiloDetails,
             ConnectionCommon connectionShared,
             ProbeRequestMonitor probeRequestMonitor,
             ConnectionPreambleHelper connectionPreambleHelper)
-            : base(serviceProvider.GetRequiredServiceByKey<object, IConnectionFactory>(ServicesKey), serviceProvider, connectionOptions)
+            : base(addressToEndpointMapper, transportFactoryProviders, transportFactoryOptions)
         {
+            _connectionOptions = connectionOptions.Value;
             this.serviceProvider = serviceProvider;
-            this.siloConnectionOptions = siloConnectionOptions.Value;
             this.localSiloDetails = localSiloDetails;
             this.connectionShared = connectionShared;
             this.probeRequestMonitor = probeRequestMonitor;
@@ -53,28 +56,20 @@ namespace Orleans.Runtime.Messaging
             return base.ConnectAsync(address, cancellationToken);
         }
 
-        protected override Connection CreateConnection(SiloAddress address, ConnectionContext context)
+        protected override Connection CreateConnection(SiloAddress address, MessageTransport transport)
         {
             EnsureInitialized();
 
             return new SiloConnection(
                 address,
-                context,
-                this.ConnectionDelegate,
+                transport,
                 this.messageCenter,
                 this.localSiloDetails,
                 this.connectionManager,
-                this.ConnectionOptions,
+                _connectionOptions,
                 this.connectionShared,
                 this.probeRequestMonitor,
                 this.connectionPreambleHelper);
-        }
-
-        protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
-        {
-            var configureDelegate = (SiloConnectionOptions.ISiloConnectionBuilderOptions)this.siloConnectionOptions;
-            configureDelegate.ConfigureSiloOutboundBuilder(connectionBuilder);
-            base.ConfigureConnectionBuilder(connectionBuilder);
         }
 
         private void EnsureInitialized()

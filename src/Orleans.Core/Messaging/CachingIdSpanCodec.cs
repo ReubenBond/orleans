@@ -126,7 +126,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            var innerWriter = Writer.Create(new PooledArrayBufferWriter(), null);
+            var innerWriter = Writer.Create(new PooledBuffer(), null);
             innerWriter.WriteInt32(value.GetHashCode());
             WriteRawInner(ref innerWriter, value);
             innerWriter.Commit();

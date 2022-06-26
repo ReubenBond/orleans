@@ -1,90 +1,77 @@
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO.Pipelines;
 using System.Net;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.ObjectPool;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Networking.Transport;
 
 namespace Orleans.Runtime.Messaging
 {
     internal abstract class Connection
     {
-        private static readonly Func<ConnectionContext, Task> OnConnectedDelegate = context => OnConnectedAsync(context);
-        private static readonly Action<object> OnConnectionClosedDelegate = state => ((Connection)state).OnTransportConnectionClosed();
-        private static readonly UnboundedChannelOptions OutgoingMessageChannelOptions = new UnboundedChannelOptions
+        private static readonly UnboundedChannelOptions OutgoingMessageChannelOptions = new()
         {
             SingleReader = true,
             SingleWriter = false,
             AllowSynchronousContinuations = false
         };
 
-        private static readonly ObjectPool<MessageHandler> MessageHandlerPool = ObjectPool.Create(new MessageHandlerPoolPolicy());
-        private readonly ConnectionCommon shared;
-        private readonly ConnectionDelegate middleware;
-        private readonly Channel<Message> outgoingMessages;
-        private readonly ChannelWriter<Message> outgoingMessageWriter;
-        private readonly List<Message> inflight = new List<Message>(4);
+        private readonly ConnectionCommon _shared;
+        private readonly Channel<MessageWriteRequest> _outboundMessages;
+        private readonly ChannelWriter<MessageWriteRequest> _outboundMessageWriter;
         private readonly TaskCompletionSource<int> _transportConnectionClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<int> _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private IDuplexPipe _transport;
+        private readonly string _id;
+        private MessageTransport _transport;
         private Task _processIncomingTask;
         private Task _processOutgoingTask;
         private Task _closeTask;
 
         protected Connection(
-            ConnectionContext connection,
-            ConnectionDelegate middleware,
+            MessageTransport transport,
             ConnectionCommon shared)
         {
-            this.Context = connection ?? throw new ArgumentNullException(nameof(connection));
-            this.middleware = middleware ?? throw new ArgumentNullException(nameof(middleware));
-            this.shared = shared;
-            this.outgoingMessages = Channel.CreateUnbounded<Message>(OutgoingMessageChannelOptions);
-            this.outgoingMessageWriter = this.outgoingMessages.Writer;
+            _id = CorrelationIdGenerator.GetNextId();
+            _transport = transport ?? throw new ArgumentNullException(nameof(transport));
+            _shared = shared;
+            _outboundMessages = Channel.CreateUnbounded<MessageWriteRequest>(OutgoingMessageChannelOptions);
+            _outboundMessageWriter = _outboundMessages.Writer;
 
-            // Set the connection on the connection context so that it can be retrieved by the middleware.
-            this.Context.Features.Set<Connection>(this);
+            _transport.Closed.Register(static state => ((Connection)state).OnTransportConnectionClosed(), this);
 
-            this.RemoteEndPoint = NormalizeEndpoint(this.Context.RemoteEndPoint);
-            this.LocalEndPoint = NormalizeEndpoint(this.Context.LocalEndPoint);
+            RemoteEndpoint = NormalizeEndpoint(Context.RemoteEndpoint);
+            LocalEndpoint = NormalizeEndpoint(Context.LocalEndpoint);
         }
 
-        public string ConnectionId => this.Context?.ConnectionId;
-        public virtual EndPoint RemoteEndPoint { get; }
-        public virtual EndPoint LocalEndPoint { get; }
-        protected ConnectionContext Context { get; }
-        protected NetworkingTrace Log => this.shared.NetworkingTrace;
-        protected MessagingTrace MessagingTrace => this.shared.MessagingTrace;
+        public string ConnectionId => _id;
+        public virtual EndPoint RemoteEndpoint { get; }
+        public virtual EndPoint LocalEndpoint { get; }
+        protected MessageTransport Context => _transport;
+        protected NetworkingTrace Log => _shared.NetworkingTrace;
+        protected MessagingTrace MessagingTrace => _shared.MessagingTrace;
         protected abstract ConnectionDirection ConnectionDirection { get; }
-        protected MessageFactory MessageFactory => this.shared.MessageFactory;
+        protected MessageFactory MessageFactory => _shared.MessageFactory;
         protected abstract IMessageCenter MessageCenter { get; }
 
         public bool IsValid => _closeTask is null;
 
         public Task Initialized => _initializationTcs.Task;
 
-        public static void ConfigureBuilder(ConnectionBuilder builder) => builder.Run(OnConnectedDelegate);
-
         /// <summary>
         /// Start processing this connection.
         /// </summary>
         /// <returns>A <see cref="Task"/> which completes when the connection terminates and has completed processing.</returns>
-        public async Task Run()
+        public async Task RunAsync()
         {
             Exception error = default;
             try
             {
-                // Eventually calls through to OnConnectedAsync (unless the connection delegate has been misconfigured)
-                await this.middleware(this.Context);
+                await RunAsyncCore();
             }
             catch (Exception exception)
             {
@@ -92,24 +79,14 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                await this.CloseAsync(error);
+                await CloseAsync(error);
             }
         }
 
-        private static Task OnConnectedAsync(ConnectionContext context)
+        protected virtual async Task RunAsyncCore()
         {
-            var connection = context.Features.Get<Connection>();
-            context.ConnectionClosed.Register(OnConnectionClosedDelegate, connection);
-
-            NetworkingInstruments.OnOpenedSocket(connection.ConnectionDirection);
-            return connection.RunInternal();
-        }
-
-        protected virtual async Task RunInternal()
-        {
-            _transport = this.Context.Transport;
-            _processIncomingTask = this.ProcessIncoming();
-            _processOutgoingTask = this.ProcessOutgoing();
+            _processIncomingTask = ProcessIncoming();
+            _processOutgoingTask = ProcessOutgoing();
             _initializationTcs.TrySetResult(0);
             await Task.WhenAll(_processIncomingTask, _processOutgoingTask);
         }
@@ -150,9 +127,9 @@ namespace Orleans.Runtime.Messaging
 
             _initializationTcs.TrySetException(exception ?? new ConnectionAbortedException("Connection initialization failed"));
 
-            if (this.Log.IsEnabled(LogLevel.Information))
+            if (Log.IsEnabled(LogLevel.Information))
             {
-                this.Log.LogInformation(
+                Log.LogInformation(
                     exception,
                     "Closing connection {Connection}",
                     this);
@@ -166,15 +143,13 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         private async Task CloseAsync()
         {
-            NetworkingInstruments.OnClosedSocket(this.ConnectionDirection);
+            NetworkingInstruments.OnClosedSocket(ConnectionDirection);
 
             // Signal the outgoing message processor to exit gracefully.
-            this.outgoingMessageWriter.TryComplete();
+            _outboundMessageWriter.TryComplete();
 
-            var transportFeature = Context.Features.Get<IUnderlyingTransportFeature>();
-            var transport = transportFeature?.Transport ?? _transport;
-            transport.Input.CancelPendingRead();
-            transport.Output.CancelPendingFlush();
+            // Close the underlying message transport
+            await _transport.CloseAsync(new ConnectionAbortedException());
 
             // Try to gracefully stop the reader/writer loops, if they are running.
             if (_processIncomingTask is { IsCompleted: false } incoming)
@@ -186,7 +161,7 @@ namespace Orleans.Runtime.Messaging
                 catch (Exception processIncomingException)
                 {
                     // Swallow any exceptions here.
-                    this.Log.LogWarning(processIncomingException, "Exception processing incoming messages on connection {Connection}", this);
+                    Log.LogWarning(processIncomingException, "Exception processing incoming messages on connection {Connection}", this);
                 }
             }
 
@@ -199,82 +174,75 @@ namespace Orleans.Runtime.Messaging
                 catch (Exception processOutgoingException)
                 {
                     // Swallow any exceptions here.
-                    this.Log.LogWarning(processOutgoingException, "Exception processing outgoing messages on connection {Connection}", this);
+                    Log.LogWarning(processOutgoingException, "Exception processing outgoing messages on connection {Connection}", this);
                 }
-            }
-
-            // Only wait for the transport to close if the connection actually started being processed.
-            if (_processIncomingTask is not null && _processOutgoingTask is not null)
-            {
-                // Abort the connection and wait for the transport to signal that it's closed before disposing it.
-                try
-                {
-                    this.Context.Abort();
-                }
-                catch (Exception exception)
-                {
-                    this.Log.LogWarning(exception, "Exception aborting connection {Connection}", this);
-                }
-
-                await _transportConnectionClosed.Task;
             }
 
             try
             {
-                await this.Context.DisposeAsync();
+                await _transport.DisposeAsync();
             }
             catch (Exception abortException)
             {
                 // Swallow any exceptions here.
-                this.Log.LogWarning(abortException, "Exception terminating connection {Connection}", this);
+                Log.LogWarning(abortException, "Exception terminating connection {Connection}", this);
             }
-
-            // Reject in-flight messages.
-            foreach (var message in this.inflight)
-            {
-                this.OnSendMessageFailure(message, "Connection terminated");
-            }
-
-            this.inflight.Clear();
 
             // Reroute enqueued messages.
             var i = 0;
-            while (this.outgoingMessages.Reader.TryRead(out var message))
+            while (_outboundMessages.Reader.TryRead(out var sendWorkItem))
             {
                 if (i == 0 && Log.IsEnabled(LogLevel.Information))
                 {
-                    this.Log.LogInformation(
+                    Log.LogInformation(
                         "Rerouting messages for remote endpoint {EndPoint}",
-                        this.RemoteEndPoint?.ToString() ?? "(never connected)");
+                        RemoteEndpoint?.ToString() ?? "(never connected)");
                 }
 
                 ++i;
-                this.RetryMessage(message);
+
+                var message = sendWorkItem.Message;
+                sendWorkItem.Reset();
+                RetryMessage(message);
             }
 
-            if (i > 0 && this.Log.IsEnabled(LogLevel.Information))
+            if (i > 0 && Log.IsEnabled(LogLevel.Information))
             {
-                this.Log.LogInformation(
+                Log.LogInformation(
                     "Rerouted {Count} messages for remote endpoint {EndPoint}",
                     i,
-                    this.RemoteEndPoint?.ToString() ?? "(never connected)");
+                    RemoteEndpoint?.ToString() ?? "(never connected)");
             }
         }
 
         public virtual void Send(Message message)
         {
-            if (!this.outgoingMessageWriter.TryWrite(message))
+            if (!PrepareMessageForSend(message))
             {
-                this.RerouteMessage(message);
+                return;
+            }
+
+            var handler = _shared.MessageHandlerPool.GetSendMessageHandler();
+            try
+            {
+                handler.Initialize(message);
+            }
+            catch (Exception exception)
+            {
+                OnMessageSerializationFailure(message, exception);
+                handler.Reset();
+            }
+
+            if (!_outboundMessageWriter.TryWrite(handler))
+            {
+                handler.Reset();
+                RerouteMessage(message);
             }
         }
 
-        public override string ToString() => $"[Local: {this.LocalEndPoint}, Remote: {this.RemoteEndPoint}, ConnectionId: {this.Context.ConnectionId}]";
+        public override string ToString() => $"[Local: {LocalEndpoint}, Remote: {RemoteEndpoint}, ConnectionId: {_id}]";
 
-        protected abstract void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes);
-        protected abstract void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes);
-
-        protected abstract void OnReceivedMessage(Message message);
+        internal protected abstract void OnReceivedMessage(Message message);
 
         protected abstract void OnSendMessageFailure(Message message, string error);
 
@@ -283,66 +251,67 @@ namespace Orleans.Runtime.Messaging
             await Task.Yield();
 
             Exception error = default;
-            var serializer = this.shared.ServiceProvider.GetRequiredService<IMessageSerializer>();
+            MessageReadRequest readRequest = RentHandler();
             try
             {
-                var input = this._transport.Input;
-                var requiredBytes = 0;
-                Message message = default;
+                MessageTransport transport = default;
                 while (true)
                 {
-                    var readResult = await input.ReadAsync();
-
-                    var buffer = readResult.Buffer;
-                    if (buffer.Length >= requiredBytes)
+                    if (!readRequest.Completed.IsCompleted)
                     {
-                        do
+                        if (!transport.ReadAsync(readRequest))
                         {
-                            try
-                            {
-                                int headerLength, bodyLength;
-                                (requiredBytes, headerLength, bodyLength) = serializer.TryRead(ref buffer, out message);
-                                if (requiredBytes == 0)
-                                {
-                                    Debug.Assert(message is not null);
-                                    RecordMessageReceive(message, bodyLength + headerLength, headerLength);
-                                    var handler = MessageHandlerPool.Get();
-                                    handler.Set(message, this);
-                                    ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
-                                    message = null;
-                                }
-                            }
-                            catch (Exception exception) when (this.HandleReceiveMessageFailure(message, exception))
-                            {
-                            }
-                        } while (requiredBytes == 0);
+                            // Connection closed.
+                            error = new ConnectionAbortedException();
+                            break;
+                        }
                     }
 
-                    if (readResult.IsCanceled || readResult.IsCompleted)
+                    await readRequest.Completed;
+
+                    if (readRequest.UnconsumedLength > 0)
                     {
-                        break;
-                    }
+                        // Copy the excess data for the next request.
+                        var excessBuffer = new PooledBuffer();
+                        readRequest.Unconsumed.CopyTo(ref excessBuffer);
 
-                    input.AdvanceTo(buffer.Start, buffer.End);
+                        // Dispatch the current request.
+                        ThreadPool.UnsafeQueueUserWorkItem(readRequest, preferLocal: true);
+
+                        // Assign the excess data to the next request.
+                        readRequest = RentHandler();
+                        readRequest.SetBuffer(in excessBuffer);
+                    }
+                    else
+                    {
+                        // Dispatch the request.
+                        ThreadPool.UnsafeQueueUserWorkItem(readRequest, preferLocal: true);
+                        readRequest = RentHandler();
+                    }
                 }
             }
             catch (Exception exception)
             {
-                if (IsValid)
-                {
-                    this.Log.LogWarning(
-                        exception,
-                        "Exception while processing messages from remote endpoint {EndPoint}",
-                        this.RemoteEndPoint);
-                }
-
                 error = exception;
             }
             finally
             {
-                _transport.Input.Complete();
-                (serializer as IDisposable)?.Dispose();
-                this.StartClosing(error);
+                if (error is { })
+                {
+                    Log.LogWarning(
+                        error,
+                        "Exception while processing messages from remote endpoint {EndPoint}",
+                        RemoteEndpoint);
+                }
+
+                StartClosing(error);
+            }
+
+            MessageReadRequest RentHandler()
+            {
+                MessageReadRequest readRequest = _shared.MessageHandlerPool.GetReceiveMessageHandler();
+                readRequest.SetConnection(this);
+                return readRequest;
             }
         }
 
@@ -350,73 +319,64 @@ namespace Orleans.Runtime.Messaging
         {
             await Task.Yield();
 
+            var outboundQueue = _outboundMessages.Reader;
             Exception error = default;
-            var serializer = this.shared.ServiceProvider.GetRequiredService<IMessageSerializer>();
+            MessageTransport transport = default;
             try
             {
-                var output = this._transport.Output;
-                var reader = this.outgoingMessages.Reader;
-
                 while (true)
                 {
-                    var more = await reader.WaitToReadAsync();
+                    var more = await outboundQueue.WaitToReadAsync();
                     if (!more)
                     {
                         break;
                     }
 
-                    Message message = default;
-                    try
+                    MessageWriteRequest message = default;
+                    while (outboundQueue.TryRead(out message))
                     {
-                        while (inflight.Count < inflight.Capacity && reader.TryRead(out message) && this.PrepareMessageForSend(message))
+                        if (!transport.WriteAsync(message))
                         {
-                            inflight.Add(message);
-                            var (headerLength, bodyLength) = serializer.Write(ref output, message);
-                            RecordMessageSend(message, headerLength + bodyLength, headerLength);
+                            error = new ConnectionAbortedException();
+                            break;
                         }
-                    }
-                    catch (Exception exception) when (message != default)
-                    {
-                        this.OnMessageSerializationFailure(message, exception);
+
+                        await message.Completed;
+                        message.Reset();
                     }
 
-                    var flushResult = await output.FlushAsync();
-                    if (flushResult.IsCompleted || flushResult.IsCanceled)
+                    if (error is not null)
                     {
                         break;
                     }
-
-                    inflight.Clear();
                 }
             }
             catch (Exception exception)
             {
                 if (IsValid)
                 {
-                    this.Log.LogWarning(
+                    Log.LogWarning(
                         exception,
                         "Exception while processing messages to remote endpoint {EndPoint}",
-                        this.RemoteEndPoint);
+                        RemoteEndpoint);
                 }
 
                 error = exception;
             }
             finally
             {
-                _transport.Output.Complete();
-                (serializer as IDisposable)?.Dispose();
-                this.StartClosing(error);
+                StartClosing(error);
             }
         }
 
         private void RerouteMessage(Message message)
         {
-            if (this.Log.IsEnabled(LogLevel.Information))
+            if (Log.IsEnabled(LogLevel.Information))
             {
-                this.Log.LogInformation(
+                Log.LogInformation(
                     "Rerouting message {Message} from remote endpoint {EndPoint}",
                     message,
-                    this.RemoteEndPoint?.ToString() ?? "(never connected)");
+                    RemoteEndpoint?.ToString() ?? "(never connected)");
             }
 
             ThreadPool.UnsafeQueueUserWorkItem(state =>
@@ -428,7 +388,7 @@ namespace Orleans.Runtime.Messaging
 
         private static EndPoint NormalizeEndpoint(EndPoint endpoint)
         {
-            if (!(endpoint is IPEndPoint ep)) return endpoint;
+            if (endpoint is not IPEndPoint ep) return endpoint;
 
             // Normalize endpoints
             if (ep.Address.IsIPv4MappedToIPv6)
@@ -439,60 +399,12 @@ namespace Orleans.Runtime.Messaging
             return ep;
         }
 
-        /// <summary>
-        /// Handles a message receive failure.
-        /// </summary>
-        /// <returns><see langword="true"/> if the exception should not be caught and <see langword="false"/> if it should be caught.</returns>
-        private bool HandleReceiveMessageFailure(Message message, Exception exception)
-        {
-            this.Log.LogWarning(
-                exception,
-                "Exception reading message {Message} from remote endpoint {Remote} to local endpoint {Local}",
-                message,
-                this.RemoteEndPoint,
-                this.LocalEndPoint);
-
-            // If deserialization completely failed, rethrow the exception so that it can be handled at another level.
-            if (message is null)
-            {
-                // Returning false here informs the caller that the exception should not be caught.
-                return false;
-            }
-
-            // The message body was not successfully decoded, but the headers were.
-            MessagingInstruments.OnRejectedMessage(message);
-
-            if (message.HasDirection)
-            {
-                if (message.Direction == Message.Directions.Request)
-                {
-                    // Send a fast fail to the caller.
-                    var response = this.MessageFactory.CreateResponseMessage(message);
-                    response.Result = Message.ResponseTypes.Error;
-                    response.BodyObject = Response.FromException(exception);
-
-                    // Send the error response and continue processing the next message.
-                    this.Send(response);
-                }
-                else if (message.Direction == Message.Directions.Response)
-                {
-                    // If the message was a response, propagate the exception to the intended recipient.
-                    message.Result = Message.ResponseTypes.Error;
-                    message.BodyObject = Response.FromException(exception);
-                    this.MessageCenter.DispatchLocalMessage(message);
-                }
-            }
-
-            // The exception has been handled by propagating it onwards.
-            return true;
-        }
-
         private void OnMessageSerializationFailure(Message message, Exception exception)
         {
             // we only get here if we failed to serialize the msg (or any other catastrophic failure).
             // Request msg fails to serialize on the sender, so we just enqueue a rejection msg.
             // Response msg fails to serialize on the responding silo, so we try to send an error response back.
-            this.Log.LogWarning(
+            Log.LogWarning(
                 (int)ErrorCode.Messaging_SerializationError,
                 exception,
                 "Unexpected error serializing message {Message}",
@@ -502,11 +414,11 @@ namespace Orleans.Runtime.Messaging
 
             if (message.Direction == Message.Directions.Request)
             {
-                var response = this.MessageFactory.CreateResponseMessage(message);
+                var response = MessageFactory.CreateResponseMessage(message);
                 response.Result = Message.ResponseTypes.Error;
                 response.BodyObject = Response.FromException(exception);
 
-                this.MessageCenter.DispatchLocalMessage(response);
+                MessageCenter.DispatchLocalMessage(response);
             }
             else if (message.Direction == Message.Directions.Response && message.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
@@ -516,52 +428,17 @@ namespace Orleans.Runtime.Messaging
                 message.BodyObject = Response.FromException(exception);
                 ++message.RetryCount;
 
-                this.Send(message);
+                Send(message);
             }
             else
             {
-                this.Log.LogWarning(
+                Log.LogWarning(
                     (int)ErrorCode.Messaging_OutgoingMS_DroppingMessage,
                     exception,
                     "Dropping message which failed during serialization: {Message}",
                     message);
 
                 MessagingInstruments.OnDroppedSentMessage(message);
-            }
-        }
-
-        private sealed class MessageHandlerPoolPolicy : PooledObjectPolicy<MessageHandler>
-        {
-            public override MessageHandler Create() => new MessageHandler();
-
-            public override bool Return(MessageHandler obj)
-            {
-                obj.Reset();
-                return true;
-            }
-        }
-
-        private sealed class MessageHandler : IThreadPoolWorkItem
-        {
-            private Message message;
-            private Connection connection;
-
-            public void Set(Message m, Connection c)
-            {
-                this.message = m;
-                this.connection = c;
-            }
-
-            public void Execute()
-            {
-                this.connection.OnReceivedMessage(this.message);
-                MessageHandlerPool.Return(this);
-            }
-
-            public void Reset()
-            {
-                this.message = null;
-                this.connection = null;
             }
         }
     }

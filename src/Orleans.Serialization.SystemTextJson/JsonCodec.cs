@@ -69,7 +69,7 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
         // Write the serialized payload
         // Note that the Utf8JsonWriter and PooledArrayBufferWriter could be pooled as long as they're correctly
         // reset at the end of each use.
-        var bufferWriter = new BufferWriterBox<PooledArrayBufferWriter>(new PooledArrayBufferWriter());
+        var bufferWriter = new BufferWriterBox<PooledBuffer>(new PooledBuffer());
         try
         {
             using var jsonWriter = new Utf8JsonWriter(bufferWriter);
@@ -131,7 +131,7 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
                     var length = reader.ReadVarUInt32();
 
                     // To possibly improve efficiency, this could be converted to read a ReadOnlySequence<byte> instead of a byte array.
-                    var tempBuffer = new PooledArrayBufferWriter();
+                    var tempBuffer = new PooledBuffer();
                     try
                     {
                         reader.ReadBytes(ref tempBuffer, (int)length);
@@ -184,7 +184,7 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
     {
         if (input is null) return null;
 
-        var bufferWriter = new BufferWriterBox<PooledArrayBufferWriter>(new PooledArrayBufferWriter());
+        var bufferWriter = new BufferWriterBox<PooledBuffer>(new PooledBuffer());
         using var jsonWriter = new Utf8JsonWriter(bufferWriter);
         JsonSerializer.Serialize(jsonWriter, input, _options.SerializerOptions);
         var sequence = bufferWriter.Value.AsReadOnlySequence();

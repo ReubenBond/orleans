@@ -62,7 +62,7 @@ namespace UnitTests.Serialization
             try
             {
                 // Create a ridiculously big RequestContext
-                var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize;
+                var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageSize;
                 RequestContext.Set("big_object", new byte[maxHeaderSize + 1]);
 
                 var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
@@ -95,7 +95,7 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_DeserializeHeaderTooBig()
         {
-            var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize;
+            var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageSize;
             var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize;
 
             DeserializeFakeMessage(maxHeaderSize + 1, maxBodySize - 1);
@@ -104,7 +104,7 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_DeserializeBodyTooBig()
         {
-            var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize;
+            var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageSize;
             var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize;
 
             DeserializeFakeMessage(maxHeaderSize - 1, maxBodySize + 1);

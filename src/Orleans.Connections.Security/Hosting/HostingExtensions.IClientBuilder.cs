@@ -1,7 +1,9 @@
 using System;
 using System.Security.Cryptography.X509Certificates;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Connections.Security;
+using Orleans.Networking.Transport;
 
 namespace Orleans.Hosting
 {
