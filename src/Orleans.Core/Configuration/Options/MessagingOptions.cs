@@ -43,17 +43,9 @@ namespace Orleans.Configuration
         internal const short DEFAULT_MAX_MESSAGE_SEND_RETRIES = 1;
 
         /// <summary>
-        /// The maximum size, in bytes, of the header for a message. The runtime will forcibly close the connection
-        /// if the header size is greater than this value.
+        /// The maximum size, in bytes, for a message. The runtime will forcibly close the connection if the message size is greater than this value.
         /// </summary>
-        /// <value>The maximum message header size is 10 MB by default.</value>
-        public int MaxMessageHeaderSize { get; set; } = 10 * 1024 * 1024;
-
-        /// <summary>
-        /// The maximum size, in bytes, of the body for a message. The runtime will forcibly close the connection
-        /// if the body size is greater than this value.
-        /// </summary>
-        /// <value>The maximum message body size is 100 MB by default.</value>
-        public int MaxMessageBodySize { get; set; } = 100 * 1024 * 1024;
+        /// <value>The maximum message size is 100 MB by default.</value>
+        public int MaxMessageSize { get; set; } = 100 * 1024 * 1024;
     }
 }

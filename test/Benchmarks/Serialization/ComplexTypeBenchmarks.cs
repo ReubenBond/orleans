@@ -85,10 +85,10 @@ namespace Benchmarks
         public void SerializeComplex()
         {
             var writer = Buffer.CreateWriter(_session);
-            _session.FullReset();
+            _session.Reset();
             _serializer.Serialize(_value, ref writer);
 
-            _session.FullReset();
+            _session.Reset();
             var reader = Reader.Create(writer.Output.GetReadOnlySpan(), _session);
             _ = _serializer.Deserialize(ref reader);
             Buffer.Reset();
@@ -111,10 +111,10 @@ namespace Benchmarks
         public SimpleStruct OrleansStructRoundTrip()
         {
             var writer = Buffer.CreateWriter(_session);
-            _session.FullReset();
+            _session.Reset();
             _structSerializer.Serialize(_structValue, ref writer);
 
-            _session.FullReset();
+            _session.Reset();
             var reader = Reader.Create(writer.Output.GetReadOnlySpan(), _session);
             var result = _structSerializer.Deserialize(ref reader);
             Buffer.Reset();
@@ -144,10 +144,10 @@ namespace Benchmarks
         public object OrleansClassRoundTrip()
         {
             var writer = Buffer.CreateWriter(_session);
-            _session.FullReset();
+            _session.Reset();
             _serializer.Serialize(_value, ref writer);
 
-            _session.FullReset();
+            _session.Reset();
             var reader = Reader.Create(writer.Output.GetReadOnlySpan(), _session);
             var result = _serializer.Deserialize(ref reader);
             Buffer.Reset();
@@ -177,7 +177,7 @@ namespace Benchmarks
         public object OrleansSerialize()
         {
             var writer = Buffer.CreateWriter(_session);
-            _session.FullReset();
+            _session.Reset();
             _serializer.Serialize(_value, ref writer);
             Buffer.Reset();
             return _session;
@@ -187,7 +187,7 @@ namespace Benchmarks
         //[Benchmark]
         public object OrleansDeserialize()
         {
-            _session.FullReset();
+            _session.Reset();
             var reader = Reader.Create(_serializedPayload, _session);
             return _serializer.Deserialize(ref reader);
         }
