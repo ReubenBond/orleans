@@ -37,6 +37,11 @@ namespace Orleans.Runtime
 
         public ValueTask<TResult> InvokeMethodAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
+            if (request is ICancellable cancellable && cancellable.CancellationToken.CanBeCanceled)
+            {
+                // TODO: subscribe cancellation token to callback data.
+            }
+
             // TODO: Remove expensive interface type check
             if (this.filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
@@ -53,6 +58,11 @@ namespace Orleans.Runtime
 
         public ValueTask InvokeMethodAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
+            if (request is ICancellable cancellable && cancellable.CancellationToken.CanBeCanceled)
+            {
+                // TODO: subscribe cancellation token to callback data.
+            }
+
             // TODO: Remove expensive interface type check
             if (filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {

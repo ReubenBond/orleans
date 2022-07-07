@@ -3,12 +3,14 @@ using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 
 namespace Orleans.CodeGenerator
 {
     internal class MethodDescription
     {
         private readonly InvokableInterfaceDescription _iface;
+        private LibraryTypes LibraryTypes => _iface.CodeGenerator.LibraryTypes;
 
         public MethodDescription(InvokableInterfaceDescription containingType, IMethodSymbol method, string name, bool hasCollision)
         {
@@ -53,8 +55,22 @@ namespace Orleans.CodeGenerator
                 InvokableBaseTypes[pair.Key] = pair.Value;
             }
 
+            foreach (var arg in method.Parameters)
+            {
+                if (SymbolEqualityComparer.Default.Equals(arg.Type, LibraryTypes.CancellationToken))
+                {
+                    if (HasCancellationToken)
+                    {
+                        throw new InvalidOperationException($"Method {method} has multiple {LibraryTypes.CancellationToken.Name} parameters");
+                    }
+
+                    HasCancellationToken = true;
+                    CancellationTokenParameterName = arg.Name;
+                }
+            }
+
             // Set overrides from user-defined attributes on the method.
-            PopulateOverrides(containingType, method);
+            PopulateOverrides(method);
 
             static string GetTypeParameterName(HashSet<string> names, ITypeParameterSymbol tp)
             {
@@ -70,11 +86,11 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private void PopulateOverrides(InvokableInterfaceDescription containingType, IMethodSymbol method)
+        private void PopulateOverrides(IMethodSymbol method)
         {
             foreach (var methodAttr in method.GetAttributes())
             {
-                if (methodAttr.AttributeClass.GetAttributes(containingType.CodeGenerator.LibraryTypes.InvokableBaseTypeAttribute, out var attrs))
+                if (methodAttr.AttributeClass.GetAttributes(LibraryTypes.InvokableBaseTypeAttribute, out var attrs))
                 {
                     foreach (var attr in attrs)
                     {
@@ -82,7 +98,7 @@ namespace Orleans.CodeGenerator
                         var proxyBaseType = (INamedTypeSymbol)ctorArgs[0].Value;
                         var returnType = (INamedTypeSymbol)ctorArgs[1].Value;
                         var invokableBaseType = (INamedTypeSymbol)ctorArgs[2].Value;
-                        if (!SymbolEqualityComparer.Default.Equals(containingType.ProxyBaseType, proxyBaseType))
+                        if (!SymbolEqualityComparer.Default.Equals(_iface.ProxyBaseType, proxyBaseType))
                         {
                             // This attribute does not apply to this particular invoker, since it is for a different proxy base type.
                             continue;
@@ -92,7 +108,7 @@ namespace Orleans.CodeGenerator
                     }
                 }
 
-                if (methodAttr.AttributeClass.GetAttributes(containingType.CodeGenerator.LibraryTypes.InvokableCustomInitializerAttribute, out attrs))
+                if (methodAttr.AttributeClass.GetAttributes(LibraryTypes.InvokableCustomInitializerAttribute, out attrs))
                 {
                     foreach (var attr in attrs)
                     {
@@ -148,6 +164,10 @@ namespace Orleans.CodeGenerator
         public string Name { get; }
 
         public IMethodSymbol Method { get; }
+
+        public bool HasCancellationToken { get; }
+
+        public string CancellationTokenParameterName { get; }
 
         public InvokableInterfaceDescription ContainingInterface => _iface;
 

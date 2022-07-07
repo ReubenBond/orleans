@@ -1,5 +1,7 @@
 #nullable enable
 
+using System.Threading;
+
 namespace Orleans.Serialization.Invocation
 {
     /// <summary>
@@ -11,5 +13,10 @@ namespace Orleans.Serialization.Invocation
         /// Cancels execution of this method.
         /// </summary>
         void Cancel();
+
+        /// <summary>
+        /// Gets the cancellation token representing cancellation of this method.
+        /// </summary>
+        CancellationToken CancellationToken { get; }
     }
 }

@@ -214,9 +214,9 @@ namespace Orleans
         /// <param name="invokableBaseType">Type of the invokable base.</param>
         public InvokableBaseTypeAttribute(Type proxyBaseClass, Type returnType, Type invokableBaseType)
         {
-            ProxyBaseClass = proxyBaseClass;
-            ReturnType = returnType;
-            InvokableBaseType = invokableBaseType;
+            ProxyBaseClass = proxyBaseClass ?? throw new ArgumentNullException(nameof(proxyBaseClass));
+            ReturnType = returnType ?? throw new ArgumentNullException(nameof(returnType));
+            InvokableBaseType = invokableBaseType ?? throw new ArgumentNullException(nameof(invokableBaseType));
         }
 
         /// <summary>

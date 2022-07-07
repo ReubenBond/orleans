@@ -11,6 +11,8 @@ using Orleans.CodeGeneration;
 using System.Text;
 using System.Diagnostics;
 using Orleans.Serialization;
+using System.Collections.Generic;
+using System.Threading;
 
 namespace Orleans.Runtime
 {
