@@ -31,7 +31,7 @@ namespace Orleans
         /// </summary>
         protected IGrainFactory GrainFactory
         {
-            get { return Runtime?.GrainFactory; }
+            get { return Runtime.GrainFactory; }
         }
 
         /// <summary>
@@ -39,7 +39,7 @@ namespace Orleans
         /// </summary>
         protected internal IServiceProvider ServiceProvider
         {
-            get { return GrainContext?.ActivationServices ?? Runtime?.ServiceProvider; }
+            get { return GrainContext.ActivationServices; }
         }
 
         internal GrainId GrainId => GrainContext.GrainId;

@@ -3,9 +3,11 @@ using System.Buffers.Binary;
 using System.Buffers.Text;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -30,7 +32,7 @@ namespace Orleans.Runtime
         private bool hashCodeSet = false;
 
         [NonSerialized]
-        private List<uint> uniformHashCache;
+        private List<uint>? uniformHashCache;
 
         /// <summary>
         /// Gets the endpoint.
@@ -45,7 +47,7 @@ namespace Orleans.Runtime
         public int Generation { get; private set; }
 
         [NonSerialized]
-        private byte[] utf8;
+        private byte[]? utf8;
 
         private const char SEPARATOR = '@';
 
@@ -59,12 +61,17 @@ namespace Orleans.Runtime
         /// <summary>
         /// Factory for creating new SiloAddresses with specified IP endpoint address and silo generation number.
         /// </summary>
-        /// <param name="ep">IP endpoint address of the silo.</param>
-        /// <param name="gen">Generation number of the silo.</param>
+        /// <param name="endpoint">IP endpoint address of the silo.</param>
+        /// <param name="generation">Generation number of the silo.</param>
         /// <returns>SiloAddress object initialized with specified address and silo generation.</returns>
-        public static SiloAddress New(IPEndPoint ep, int gen)
+        public static SiloAddress New(IPEndPoint endpoint, int generation)
         {
-            return siloAddressInterningCache.FindOrCreate(new Key(ep, gen), k => new SiloAddress(k.Endpoint, k.Generation));
+            if (endpoint is null) ThrowArgumentNullException();
+            return siloAddressInterningCache.FindOrCreate(new Key(endpoint, generation), k => new SiloAddress(k.Endpoint, k.Generation));
+
+            [DoesNotReturn]
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            static void ThrowArgumentNullException() => throw new ArgumentNullException(nameof(endpoint));
         }
 
         /// <summary>
@@ -205,6 +212,7 @@ namespace Orleans.Runtime
             return New(new IPEndPoint(host, port), generation);
         }
 
+        [DoesNotReturn]
         private static void ThrowInvalidUtf8SiloAddress(ReadOnlySpan<byte> addr)
             => throw new FormatException("Invalid string SiloAddress: " + addr.GetUtf8String());
 
@@ -256,7 +264,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public override bool Equals(object obj) => Equals(obj as SiloAddress);
+        public override bool Equals(object? obj) => Equals(obj as SiloAddress);
 
         /// <inheritdoc />
         public override int GetHashCode() => Endpoint.GetHashCode() ^ Generation;
@@ -344,14 +352,14 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="other"> The other SiloAddress to compare this one with. </param>
         /// <returns>Returns <c>true</c> if the two SiloAddresses are considered to match -- if they are equal or if one generation or the other is 0. </returns>
-        internal bool Matches(SiloAddress other)
+        internal bool Matches(SiloAddress? other)
         {
             return other != null && Endpoint.Address.Equals(other.Endpoint.Address) && (Endpoint.Port == other.Endpoint.Port) &&
                 ((Generation == other.Generation) || (Generation == 0) || (other.Generation == 0));
         }
 
         /// <inheritdoc/>
-        public bool Equals(SiloAddress other)
+        public bool Equals(SiloAddress? other)
         {
             return other != null && Generation == other.Generation && Endpoint.Address.Equals(other.Endpoint.Address) && Endpoint.Port == other.Endpoint.Port;
         }
@@ -365,7 +373,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// <see langword="true"/> if the provided value represents the same logical server as this value, otherwise <see langword="false"/>.
         /// </returns>
-        internal bool IsSameLogicalSilo(SiloAddress other)
+        internal bool IsSameLogicalSilo([NotNullWhen(true)] SiloAddress? other)
         {
             return other != null && this.Endpoint.Address.Equals(other.Endpoint.Address) && this.Endpoint.Port == other.Endpoint.Port;
         }
@@ -379,7 +387,7 @@ namespace Orleans.Runtime
         /// <returns>
         /// <see langword="true"/> if the provided value represents the same logical server as this value and is a successor to this server, otherwise <see langword="false"/>.
         /// </returns>
-        public bool IsSuccessorOf(SiloAddress other)
+        public bool IsSuccessorOf([NotNullWhen(true)] SiloAddress? other)
         {
             return IsSameLogicalSilo(other) && this.Generation != 0 && other.Generation != 0 && this.Generation > other.Generation;
         }
@@ -393,19 +401,19 @@ namespace Orleans.Runtime
         /// <returns>
         /// <see langword="true"/> if the provided value represents the same logical server as this value and is a predecessor to this server, otherwise <see langword="false"/>.
         /// </returns>
-        public bool IsPredecessorOf(SiloAddress other)
+        public bool IsPredecessorOf([NotNullWhen(true)] SiloAddress? other)
         {
             return IsSameLogicalSilo(other) && this.Generation != 0 && other.Generation != 0 && this.Generation < other.Generation;
         }
 
         /// <inheritdoc/>
-        public int CompareTo(object obj)
+        public int CompareTo(object? obj)
         {
-            return CompareTo((SiloAddress)obj);
+            return CompareTo(obj as SiloAddress);
         }
 
         /// <inheritdoc/>
-        public int CompareTo(SiloAddress other)
+        public int CompareTo(SiloAddress? other)
         {
             if (other == null) return 1;
             // Compare Generation first. It gives a cheap and fast way to compare, avoiding allocations 
@@ -459,7 +467,7 @@ namespace Orleans.Runtime
     public sealed class SiloAddressConverter : JsonConverter<SiloAddress>
     {
         /// <inheritdoc />
-        public override SiloAddress Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => SiloAddress.FromParsableString(reader.GetString());
+        public override SiloAddress Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => SiloAddress.FromParsableString(reader.GetString()!);
 
         /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, SiloAddress value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToUtf8String());

@@ -52,7 +52,7 @@ namespace Orleans.Runtime.Serialization
             ReferenceCodec.MarkValueField(reader.Session);
             int id = 0;
             Field header = default;
-            IPEndPoint endpoint = default;
+            IPEndPoint? endpoint = default;
             int generation = default;
             while (true)
             {
@@ -77,7 +77,7 @@ namespace Orleans.Runtime.Serialization
                 reader.ConsumeUnknownField(header);
             }
 
-            return SiloAddress.New(endpoint, generation);
+            return SiloAddress.New(endpoint!, generation);
         }
 
         /// <inheritdoc />

@@ -79,7 +79,7 @@ namespace Orleans
         /// <returns>A <see cref="IDisposable"/> instance which can be disposed to unsubscribe the observer from the lifecycle.</returns>
         public static IDisposable Subscribe<TObserver>(this ILifecycleObservable observable, int stage, Func<CancellationToken, Task> onStart, Func<CancellationToken, Task> onStop)
         {
-            return observable.Subscribe(typeof(TObserver).FullName, stage, onStart, onStop);
+            return observable.Subscribe(typeof(TObserver).FullName!, stage, onStart, onStop);
         }
 
         /// <summary>
