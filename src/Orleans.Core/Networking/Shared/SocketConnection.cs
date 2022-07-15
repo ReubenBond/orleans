@@ -61,8 +61,8 @@ namespace Orleans.Networking.Shared
             maxReadBufferSize = maxReadBufferSize ?? 0;
             maxWriteBufferSize = maxWriteBufferSize ?? 0;
 
-            var inputOptions = new PipeOptions(MemoryPool, PipeScheduler.ThreadPool, scheduler, maxReadBufferSize.Value, maxReadBufferSize.Value / 2, useSynchronizationContext: false);
-            var outputOptions = new PipeOptions(MemoryPool, scheduler, PipeScheduler.ThreadPool, maxWriteBufferSize.Value, maxWriteBufferSize.Value / 2, useSynchronizationContext: false);
+            var inputOptions = new PipeOptions(MemoryPool, PipeScheduler.Inline, PipeScheduler.Inline, maxReadBufferSize.Value, maxReadBufferSize.Value / 2, useSynchronizationContext: false);
+            var outputOptions = new PipeOptions(MemoryPool, PipeScheduler.Inline, PipeScheduler.Inline, maxWriteBufferSize.Value, maxWriteBufferSize.Value / 2, useSynchronizationContext: false);
 
             var pair = DuplexPipe.CreateConnectionPair(inputOptions, outputOptions);
 

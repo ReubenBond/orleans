@@ -1,23 +1,64 @@
 using System;
+using System.Buffers;
+using System.Buffers.Binary;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.ObjectPool;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Invocation;
+using Orleans.Utilities;
 
 namespace Orleans.Runtime.Messaging
 {
     internal abstract class Connection
     {
+        internal sealed class MessageHandlerPool
+        {
+            private IServiceProvider _services;
+            private ConcurrentQueue<ReceiveMessageHandler> _receivePool = new();
+            private ConcurrentQueue<SendMessageHandler> _sendPool = new();
+
+            public MessageHandlerPool(IServiceProvider services)
+            {
+                _services = services;
+            }
+
+            internal ReceiveMessageHandler GetReceiveMessageHandler()
+            {
+                if (_receivePool.TryDequeue(out var result)) return result;
+                return CreateReceiveMessageHandler();
+                ReceiveMessageHandler CreateReceiveMessageHandler() => new ReceiveMessageHandler(this, _services.GetRequiredService<MessageSerializer>());
+            }
+
+
+            internal void Return(ReceiveMessageHandler handler)
+            {
+                _receivePool.Enqueue(handler);
+            }
+
+            internal SendMessageHandler GetSendMessageHandler()
+            {
+                if (_sendPool.TryDequeue(out var result)) return result;
+                return CreateInstance();
+                SendMessageHandler CreateInstance() => new SendMessageHandler(this, _services.GetRequiredService<MessageSerializer>());
+            }
+
+            internal void Return(SendMessageHandler handler)
+            {
+                _sendPool.Enqueue(handler);
+            }
+        }
+
         private static readonly Func<ConnectionContext, Task> OnConnectedDelegate = context => OnConnectedAsync(context);
         private static readonly Action<object> OnConnectionClosedDelegate = state => ((Connection)state).OnTransportConnectionClosed();
         private static readonly UnboundedChannelOptions OutgoingMessageChannelOptions = new UnboundedChannelOptions
@@ -27,11 +68,10 @@ namespace Orleans.Runtime.Messaging
             AllowSynchronousContinuations = false
         };
 
-        private static readonly ObjectPool<MessageHandler> MessageHandlerPool = ObjectPool.Create(new MessageHandlerPoolPolicy());
         private readonly ConnectionCommon shared;
         private readonly ConnectionDelegate middleware;
-        private readonly Channel<Message> outgoingMessages;
-        private readonly ChannelWriter<Message> outgoingMessageWriter;
+        private readonly Channel<SendMessageHandler> outgoingMessages;
+        private readonly ChannelWriter<SendMessageHandler> outgoingMessageWriter;
         private readonly List<Message> inflight = new List<Message>(4);
         private readonly TaskCompletionSource<int> _transportConnectionClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<int> _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -48,7 +88,7 @@ namespace Orleans.Runtime.Messaging
             this.Context = connection ?? throw new ArgumentNullException(nameof(connection));
             this.middleware = middleware ?? throw new ArgumentNullException(nameof(middleware));
             this.shared = shared;
-            this.outgoingMessages = Channel.CreateUnbounded<Message>(OutgoingMessageChannelOptions);
+            this.outgoingMessages = Channel.CreateUnbounded<SendMessageHandler>(OutgoingMessageChannelOptions);
             this.outgoingMessageWriter = this.outgoingMessages.Writer;
 
             // Set the connection on the connection context so that it can be retrieved by the middleware.
@@ -239,7 +279,7 @@ namespace Orleans.Runtime.Messaging
 
             // Reroute enqueued messages.
             var i = 0;
-            while (this.outgoingMessages.Reader.TryRead(out var message))
+            while (this.outgoingMessages.Reader.TryRead(out var sendWorkItem))
             {
                 if (i == 0 && Log.IsEnabled(LogLevel.Information))
                 {
@@ -249,6 +289,9 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 ++i;
+
+                var message = sendWorkItem.Message;
+                sendWorkItem.Return();
                 this.RetryMessage(message);
             }
 
@@ -263,8 +306,25 @@ namespace Orleans.Runtime.Messaging
 
         public virtual void Send(Message message)
         {
-            if (!this.outgoingMessageWriter.TryWrite(message))
+            if (!this.PrepareMessageForSend(message))
             {
+                return;
+            }
+
+            var handler = this.shared.MessageHandlerPool.GetSendMessageHandler();
+            try
+            {
+                handler.Initialize(message);
+            }
+            catch (Exception exception)
+            {
+                this.OnMessageSerializationFailure(message, exception);
+                handler.Return();
+            }
+
+            if (!this.outgoingMessageWriter.TryWrite(handler))
+            {
+                handler.Return();
                 this.RerouteMessage(message);
             }
         }
@@ -283,39 +343,30 @@ namespace Orleans.Runtime.Messaging
             await Task.Yield();
 
             Exception error = default;
-            var serializer = this.shared.ServiceProvider.GetRequiredService<IMessageSerializer>();
             try
             {
                 var input = this._transport.Input;
                 var requiredBytes = 0;
-                Message message = default;
+                var handler = shared.MessageHandlerPool.GetReceiveMessageHandler();
                 while (true)
                 {
-                    var readResult = await input.ReadAsync();
+                    if (!input.TryRead(out var readResult))
+                    {
+                        readResult = await input.ReadAsync();
+                    }
 
                     var buffer = readResult.Buffer;
-                    if (buffer.Length >= requiredBytes)
+                    while (buffer.Length >= requiredBytes)
                     {
-                        do
+                        (var consumed, requiredBytes) = TryRead(in buffer, handler);
+                        if (requiredBytes == 0)
                         {
-                            try
-                            {
-                                int headerLength, bodyLength;
-                                (requiredBytes, headerLength, bodyLength) = serializer.TryRead(ref buffer, out message);
-                                if (requiredBytes == 0)
-                                {
-                                    Debug.Assert(message is not null);
-                                    RecordMessageReceive(message, bodyLength + headerLength, headerLength);
-                                    var handler = MessageHandlerPool.Get();
-                                    handler.Set(message, this);
-                                    ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
-                                    message = null;
-                                }
-                            }
-                            catch (Exception exception) when (this.HandleReceiveMessageFailure(message, exception))
-                            {
-                            }
-                        } while (requiredBytes == 0);
+                            handler.SetConnection(this);
+                            ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
+                            handler = shared.MessageHandlerPool.GetReceiveMessageHandler();
+
+                            buffer = buffer.Slice(consumed);
+                        }
                     }
 
                     if (readResult.IsCanceled || readResult.IsCompleted)
@@ -341,9 +392,58 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 _transport.Input.Complete();
-                (serializer as IDisposable)?.Dispose();
                 this.StartClosing(error);
             }
+        }
+
+        public (int ConsumedBytes, int RequiredBytes) TryRead(in ReadOnlySequence<byte> input, ReceiveMessageHandler buffer)
+        {
+            const int MaxMessageHeaderSize = 10 * 1024 * 1024;
+            const int MaxMessageBodySize = 100 * 1024 * 1024;
+            const int FramingLength = 8;
+            if (input.Length < FramingLength)
+            {
+                return (0, FramingLength);
+            }
+
+            Span<byte> lengthBytes = stackalloc byte[FramingLength];
+            if (input.FirstSpan is { Length: >= FramingLength } firstSpan)
+            {
+                firstSpan[..FramingLength].CopyTo(lengthBytes);
+            }
+            else
+            {
+                input.Slice(input.Start, FramingLength).CopyTo(lengthBytes);
+            }
+
+            var headerLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes);
+            var bodyLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes.Slice(4));
+
+            // Check lengths
+            if (headerLength <= 0 || headerLength > MaxMessageHeaderSize)
+            {
+                ThrowHeaderLengthInvalid(headerLength);
+            }
+
+            if (bodyLength < 0 || bodyLength > MaxMessageBodySize)
+            {
+                ThrowBodyLengthInvalid(bodyLength);
+            }
+
+            var requiredBytes = FramingLength + headerLength + bodyLength;
+            if (input.Length < requiredBytes)
+            {
+                return (0, requiredBytes);
+            }
+
+            buffer.Buffer.Write(input.Slice(FramingLength));
+            return (requiredBytes, 0);
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            static void ThrowHeaderLengthInvalid(int headerLength) => throw new OrleansException($"Invalid header size: {headerLength} (max configured value is {MaxMessageHeaderSize}, see {nameof(MaxMessageHeaderSize)})");
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            static void ThrowBodyLengthInvalid(int bodyLength) => throw new OrleansException($"Invalid body size: {bodyLength} (max configured value is {MaxMessageBodySize}, see {nameof(MaxMessageBodySize)})");
         }
 
         private async Task ProcessOutgoing()
@@ -351,7 +451,7 @@ namespace Orleans.Runtime.Messaging
             await Task.Yield();
 
             Exception error = default;
-            var serializer = this.shared.ServiceProvider.GetRequiredService<IMessageSerializer>();
+            var serializer = this.shared.ServiceProvider.GetRequiredService<MessageSerializer>();
             try
             {
                 var output = this._transport.Output;
@@ -365,19 +465,10 @@ namespace Orleans.Runtime.Messaging
                         break;
                     }
 
-                    Message message = default;
-                    try
+                    SendMessageHandler message = default;
+                    while (reader.TryRead(out message))
                     {
-                        while (inflight.Count < inflight.Capacity && reader.TryRead(out message) && this.PrepareMessageForSend(message))
-                        {
-                            inflight.Add(message);
-                            var (headerLength, bodyLength) = serializer.Write(ref output, message);
-                            RecordMessageSend(message, headerLength + bodyLength, headerLength);
-                        }
-                    }
-                    catch (Exception exception) when (message != default)
-                    {
-                        this.OnMessageSerializationFailure(message, exception);
+                        message.WriteTo(ref output);
                     }
 
                     var flushResult = await output.FlushAsync();
@@ -530,38 +621,83 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private sealed class MessageHandlerPoolPolicy : PooledObjectPolicy<MessageHandler>
+        internal sealed class SendMessageHandler
         {
-            public override MessageHandler Create() => new MessageHandler();
+            private readonly MessageSerializer _serializer;
+            private readonly MessageHandlerPool _pool;
+            public Message Message { get; private set; }
+            public PooledArrayBufferWriter Buffer = new();
+            private int _headerLength;
+            private int _bodyLength;
 
-            public override bool Return(MessageHandler obj)
+            public SendMessageHandler(MessageHandlerPool pool, MessageSerializer serializer)
             {
-                obj.Reset();
-                return true;
+                _serializer = serializer;
+                _pool = pool;
+            }
+
+            public void WriteTo<TBufferWriter>(ref TBufferWriter writer) where TBufferWriter : IBufferWriter<byte>
+            {
+                // Write length prefixes, first header length then body length.
+                var lengthFields = writer.GetSpan(8);
+                BinaryPrimitives.WriteInt32LittleEndian(lengthFields, _headerLength);
+                BinaryPrimitives.WriteInt32LittleEndian(lengthFields.Slice(4), _bodyLength);
+                writer.Advance(8);
+                Buffer.CopyTo(ref writer);
+                Return();
+            }
+
+            public void Initialize(Message message)
+            {
+                Message = message;
+                _serializer.Write(ref Buffer, message, out _headerLength, out _bodyLength);
+            }
+
+            public void Return()
+            {
+                Message = null;
+                Buffer.Dispose();
+                _headerLength = _bodyLength = 0;
+                _pool.Return(this);
             }
         }
 
-        private sealed class MessageHandler : IThreadPoolWorkItem
+        internal sealed class ReceiveMessageHandler : IThreadPoolWorkItem
         {
-            private Message message;
-            private Connection connection;
+            private readonly MessageSerializer _serializer;
+            private readonly MessageHandlerPool _pool;
+            private Connection _connection;
+            public PooledArrayBufferWriter Buffer = new();
 
-            public void Set(Message m, Connection c)
+            public ReceiveMessageHandler(MessageHandlerPool pool, MessageSerializer serializer)
             {
-                this.message = m;
-                this.connection = c;
+                _serializer = serializer;
+                _pool = pool;
+            }
+
+            public void SetConnection(Connection c)
+            {
+                _connection = c;
             }
 
             public void Execute()
             {
-                this.connection.OnReceivedMessage(this.message);
-                MessageHandlerPool.Return(this);
-            }
-
-            public void Reset()
-            {
-                this.message = null;
-                this.connection = null;
+                Message message = null;
+                try
+                {
+                    var buffer = Buffer.AsReadOnlySequence();
+                    _serializer.Read(in buffer, out message);
+                    _connection.OnReceivedMessage(message);
+                }
+                catch (Exception exception) when (_connection.HandleReceiveMessageFailure(message, exception))
+                {
+                }
+                finally
+                {
+                    Buffer.Dispose();
+                    _connection = null;
+                    _pool.Return(this);
+                }
             }
         }
     }

@@ -9,7 +9,6 @@ using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Networking.Shared;
-using static Orleans.Runtime.Message;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.Codecs;
@@ -17,9 +16,36 @@ using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Buffers;
 using System.Diagnostics;
+using Orleans.Serialization.Buffers.Adaptors;
+using static Orleans.Runtime.Message;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime.Messaging
 {
+    public sealed class MessageSendBuffer
+    {
+        public PooledArrayBufferWriter Buffer;
+    }
+
+    public sealed class MessageReceiveBuffer
+    {
+        public PooledArrayBufferWriter Buffer;
+    }
+
+    internal abstract class MessageTransport : IAsyncDisposable
+    {
+        public abstract bool IsValid { get; }
+
+        public abstract bool WriteMessage(MessageSendBuffer msg);
+        public abstract ValueTask<bool> WaitToWriteAsync();
+
+        public abstract bool ReadMessage(MessageReceiveBuffer msg, int minimumSize);
+        public abstract ValueTask<bool> WaitToReadAsync(int minimumSize);
+
+        public abstract void Stop();
+        public abstract ValueTask DisposeAsync();
+    }
+
     internal class MessageSerializer : IMessageSerializer
     {
         private const int FramingLength = Message.LENGTH_HEADER_SIZE;
@@ -64,6 +90,55 @@ namespace Orleans.Runtime.Messaging
             _maxBodyLength = maxBodySize;
             _sessionPool = sessionPool;
             _requestContextCodec = OrleansGeneratedCodeHelper.GetService<DictionaryCodec<string, object>>(this, codecProvider);
+        }
+
+        public void Read(in ReadOnlySequence<byte> buffer, out Message message)
+        {
+            try
+            {
+                var reader = Reader.Create(buffer, _deserializationSession);
+
+                // Decode header
+                message = new();
+                DeserializeFast(ref reader, message);
+
+                // Decode body
+                _deserializationSession.PartialReset();
+                reader = Reader.Create(buffer.Slice(reader.Position), _deserializationSession);
+                var fieldHeader = reader.ReadFieldHeader();
+                message.BodyObject = ObjectCodec.ReadValue(ref reader, fieldHeader);
+            }
+            finally
+            {
+                _deserializationSession.PartialReset();
+            }
+        }
+
+        public void Write(ref PooledArrayBufferWriter buffer, Message message, out int headerLength, out int bodyLength)
+        {
+            try
+            {
+                var writer = Writer.Create(buffer, _serializationSession);
+                SerializeFast(ref writer, message);
+                writer.Commit();
+
+                headerLength = (int)writer.Output.Length;
+
+                _serializationSession.PartialReset();
+                writer = Writer.Create(writer.Output, _serializationSession);
+                ObjectCodec.WriteField(ref writer, 0, typeof(object), message.BodyObject);
+                writer.Commit();
+                buffer = writer.Output;
+
+                bodyLength = (int)buffer.Length - headerLength;
+
+                // Before completing, check lengths
+                ThrowIfLengthsInvalid(headerLength, bodyLength);
+            }
+            finally
+            {
+                _serializationSession.PartialReset();
+            }
         }
 
         public (int RequiredBytes, int HeaderLength, int BodyLength) TryRead(ref ReadOnlySequence<byte> input, out Message? message)

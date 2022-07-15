@@ -17,7 +17,7 @@ public struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
     private SequenceSegment _first;
     private SequenceSegment _last;
     private SequenceSegment _current;
-    private long _totalLength;
+    private int _totalLength;
     private int _currentPosition;
 
     /// <summary>
@@ -32,7 +32,7 @@ public struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
     }
 
     /// <summary>Gets the total length which has been written.</summary>
-    public readonly long Length => _totalLength + _currentPosition;
+    public readonly int Length => _totalLength + _currentPosition;
 
     /// <summary>
     /// Returns the data which has been written as an array.
@@ -135,6 +135,23 @@ public struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
         }
     }
 
+    /// <summary>Copies the contents of this writer to another writer.</summary>
+    public readonly void CopyTo<TBufferWriter>(ref TBufferWriter writer) where TBufferWriter : IBufferWriter<byte>
+    {
+        var current = _first;
+        while (current != null)
+        {
+            var span = current.CommittedMemory.Span;
+            writer.Write(span);
+            current = current.Next as SequenceSegment;
+        }
+
+        if (_currentPosition > 0 && _current is not null)
+        {
+            writer.Write(_current.Array.AsSpan(0, _currentPosition));
+        }
+    }
+
     /// <summary>
     /// Returns a new <see cref="ReadOnlySequence{T}"/> which must not be accessed after disposing this instance.
     /// </summary>
@@ -194,7 +211,7 @@ public struct PooledArrayBufferWriter : IBufferWriter<byte>, IDisposable
     private sealed class SequenceSegmentPool
     {
         public static SequenceSegmentPool Shared { get; } = new();
-        public const int MinimumBlockSize = 4096;
+        public const int MinimumBlockSize = 4 * 1024;
         private readonly ConcurrentQueue<SequenceSegment> _blocks = new();
         private readonly ConcurrentQueue<SequenceSegment> _largeBlocks = new();
 
