@@ -19,6 +19,9 @@ using System.Diagnostics;
 using Orleans.Serialization.Buffers.Adaptors;
 using static Orleans.Runtime.Message;
 using System.Threading.Tasks;
+using System.IO;
+using Orleans.Runtime.Internal;
+using System.Threading;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -36,14 +39,57 @@ namespace Orleans.Runtime.Messaging
     {
         public abstract bool IsValid { get; }
 
-        public abstract bool WriteMessage(MessageSendBuffer msg);
-        public abstract ValueTask<bool> WaitToWriteAsync();
+        // Enqueues buffer to be written. Buffer is owned by the caller, and will be disposed after write.
+        public abstract void WriteMessage(MessageSendBuffer msg);
 
-        public abstract bool ReadMessage(MessageReceiveBuffer msg, int minimumSize);
-        public abstract ValueTask<bool> WaitToReadAsync(int minimumSize);
+        // Reads a message from the transport.
+        // Completes when the buffer read limit is satisfied
+        public abstract ValueTask ReadMessageAsync(MessageReceiveBuffer msg, int size);
 
         public abstract void Stop();
         public abstract ValueTask DisposeAsync();
+    }
+
+    internal sealed class StreamMessageTransport : MessageTransport
+    {
+        private readonly MessageTransport _transport;
+        private readonly Stream _stream;
+        private readonly Task _processWritesTask;
+        private readonly CancellationTokenSource _cancellation = new();
+
+        public StreamMessageTransport(MessageTransport inner)
+        {
+            _transport = inner;
+            _stream = new MemoryStream();
+
+            {
+                using var _ = new ExecutionContextSuppressor();
+                _processWritesTask = Task.Run(ProcessWrites);
+            }
+        }
+
+        public override bool IsValid => _transport.IsValid;
+
+        private async Task ProcessWrites()
+        {
+            while (!_cancellation.IsCancellationRequested)
+            {
+                try
+                {
+                    await _
+                }
+                catch (Exception exception)
+                {
+                    // TODO: handle
+                    _ = exception;
+                }
+            }
+        }
+
+        public override ValueTask ReadMessageAsync(MessageReceiveBuffer msg, int size) => _transport.ReadMessageAsync(msg, size);
+        public override void Stop() => _transport.Stop();
+        public override void WriteMessage(MessageSendBuffer msg) => _transport.WriteMessage(msg);
+        public override ValueTask DisposeAsync() => _transport.DisposeAsync();
     }
 
     internal class MessageSerializer : IMessageSerializer
