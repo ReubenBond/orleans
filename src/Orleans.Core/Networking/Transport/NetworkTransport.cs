@@ -29,7 +29,6 @@ public abstract class ReadRequest
     // returns true if the request is complete
     public abstract bool OnProgress(int bytesRead);
     public abstract void OnError(Exception error);
-
 }
 
 public abstract class WriteRequest
