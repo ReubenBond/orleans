@@ -36,6 +36,7 @@ using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
 using System.Runtime.InteropServices;
+using Orleans.Networking.Transport;
 
 namespace Orleans.Hosting
 {
@@ -365,9 +366,24 @@ namespace Orleans.Hosting
             services.AddSingleton<NetworkingTrace>();
             services.AddSingleton<RuntimeMessagingTrace>();
 
-            // Use Orleans server.
-            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionListener>();
-            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, GatewayConnectionListener>();
+            ConfigureMessageTransport(services);
+        }
+
+        private static void ConfigureMessageTransport(IServiceCollection services)
+        {
+            // Add default silo connection listener
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionListener>(sp => ActivatorUtilities.CreateInstance<SiloConnectionListener>(sp, SiloConnectionListener.DefaultListenerName));
+            services.AddOptions<TransportListenerOptions>(SiloConnectionListener.DefaultListenerName).Configure((TransportListenerOptions options, IOptions<EndpointOptions> endpointOptions) =>
+            {
+                options.Endpoint = endpointOptions.Value.GetListeningSiloEndpoint();
+            });
+
+            // Add default gateway connection listener
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, GatewayConnectionListener>(sp => ActivatorUtilities.CreateInstance<GatewayConnectionListener>(sp, GatewayConnectionListener.DefaultListenerName));
+            services.AddOptions<TransportListenerOptions>(GatewayConnectionListener.DefaultListenerName).Configure((TransportListenerOptions options, IOptions<EndpointOptions> endpointOptions) =>
+            {
+                options.Endpoint = endpointOptions.Value.GetListeningProxyEndpoint();
+            });
         }
 
         private class AllowOrleansTypes : ITypeNameFilter

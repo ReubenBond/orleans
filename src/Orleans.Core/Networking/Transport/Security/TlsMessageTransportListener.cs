@@ -1,5 +1,6 @@
-﻿#nullable enable
+#nullable enable
 
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,6 +13,7 @@ public class TlsMessageTransportListener : TcpMessageTransportListener
 {
     private readonly TlsOptions _options;
 
+    [SetsRequiredMembers]
     public TlsMessageTransportListener(IPEndPoint localEndpoint, TlsOptions options, ILoggerFactory loggerFactory) : base(localEndpoint, loggerFactory)
     {
         _options = options;

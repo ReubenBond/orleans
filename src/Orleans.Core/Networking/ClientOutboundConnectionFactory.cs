@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -23,12 +22,11 @@ namespace Orleans.Runtime.Messaging
         public ClientOutboundConnectionFactory(
             IOptions<ConnectionOptions> connectionOptions,
             IOptions<ClusterOptions> clusterOptions,
-            EndpointConfigurationProvider endpointConfigurationProvider,
             IEnumerable<IMessageTransportFactoryProvider> transportFactoryProviders,
             ConnectionCommon connectionShared,
             ConnectionPreambleHelper connectionPreambleHelper,
             IOptionsMonitor<TransportFactoryOptions> transportFactoryOptions)
-            : base(endpointConfigurationProvider, transportFactoryProviders, transportFactoryOptions)
+            : base(transportFactoryProviders, transportFactoryOptions)
         {
             this.connectionOptions = connectionOptions.Value;
             this.connectionShared = connectionShared;
@@ -49,20 +47,6 @@ namespace Orleans.Runtime.Messaging
                 this.connectionOptions,
                 this.connectionPreambleHelper,
                 this.clusterOptions);
-        }
-
-        protected override bool TryGetTransportFactory(EndpointInfo endpointInfo, out MessageTransportFactory transportFactory)
-        {
-            var gatewayEndpointOptions = new GatewayEndpointOptions();
-            endpointInfo.Configuration.Bind(gatewayEndpointOptions);
-
-            if (!gatewayEndpointOptions.IsProxy)
-            {
-                transportFactory = default;
-                return false;
-            }
-
-            return base.TryGetTransportFactory(endpointInfo, out transportFactory);
         }
 
         private void EnsureInitialized()

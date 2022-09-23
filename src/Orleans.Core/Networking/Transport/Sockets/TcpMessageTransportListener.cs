@@ -84,7 +84,7 @@ public class TcpMessageTransportListener : MessageTransportListener
         {
             try
             {
-                var acceptSocket = await _listenSocket!.AcceptAsync();
+                var acceptSocket = await _listenSocket!.AcceptAsync(cancellationToken);
                 OnAcceptSocket(acceptSocket);
 
                 var connection = new TcpMessageTransport(acceptSocket, Logger);

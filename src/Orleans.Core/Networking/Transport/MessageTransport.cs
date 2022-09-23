@@ -35,12 +35,40 @@ public abstract class MessageTransport : IAsyncDisposable
 
 public interface IMessageTransportFactoryProvider
 {
-    bool TryGetMessageTransportFactory(EndpointInfo endpoint, [NotNullWhen(true)] out MessageTransportFactory? factory);
+    bool TryGetMessageTransportFactory(EndPoint endpoint, [NotNullWhen(true)] out MessageTransportFactory? factory);
+}
+
+internal sealed class OrleansMessageTransportFactoryProvider : IMessageTransportFactoryProvider
+{
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly IOptionsMonitor<TlsOptions> _tlsOptions;
+
+    public OrleansMessageTransportFactoryProvider(ILoggerFactory loggerFactory, IOptionsMonitor<TlsOptions> tlsOptions)
+    {
+        _loggerFactory = loggerFactory;
+        _tlsOptions = tlsOptions;
+    }
+
+    public bool TryGetMessageTransportFactory(EndPoint endpoint, [NotNullWhen(true)] out MessageTransportFactory? factory)
+    {
+        var tlsOptions = _tlsOptions.CurrentValue;
+        if (tlsOptions.EnableTransportLayerSecurity)
+        {
+            var name = Options.DefaultName;
+            factory = new TlsMessageTransportFactory(name, _tlsOptions, _loggerFactory);
+            return true;
+        }
+        else
+        {
+            factory = new TcpMessageTransportFactory(_loggerFactory);
+            return true;
+        }
+    }
 }
 
 public abstract class MessageTransportFactory : IAsyncDisposable
 {
-    public abstract ValueTask<MessageTransport> CreateAsync(EndpointInfo endpoint, CancellationToken cancellationToken = default);
+    public abstract ValueTask<MessageTransport> CreateAsync(EndPoint endpoint, CancellationToken cancellationToken = default);
     public virtual ValueTask DisposeAsync()
     {
         GC.SuppressFinalize(this);
@@ -53,9 +81,32 @@ public interface IMessageTransportListenerProvider
     bool TryGetMessageTransportListener(TransportListenerOptions listenOptions, [NotNullWhen(true)] out MessageTransportListener? listener);
 }
 
-public interface IMessageTransportListenerMiddlewareProvider
+internal sealed class OrleansMessageTransportListenerProvider : IMessageTransportListenerProvider
 {
-    bool TryGetMiddleware(TransportListenerOptions listenOptions, [NotNullWhen(true)] out Func<MessageTransportListener, MessageTransportListener> middleware);
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly IOptionsMonitor<TlsOptions> _tlsOptions;
+
+    public OrleansMessageTransportListenerProvider(ILoggerFactory loggerFactory, IOptionsMonitor<TlsOptions> tlsOptions)
+    {
+        _loggerFactory = loggerFactory;
+        _tlsOptions = tlsOptions;
+    }
+
+    public bool TryGetMessageTransportListener(TransportListenerOptions listenOptions, [NotNullWhen(true)] out MessageTransportListener? listener)
+    {
+        var tlsOptions = _tlsOptions.CurrentValue;
+        var endpoint = (IPEndPoint)listenOptions.Endpoint!;
+        if (tlsOptions.EnableTransportLayerSecurity)
+        {
+            listener = new TlsMessageTransportListener(endpoint, _tlsOptions.CurrentValue, _loggerFactory);
+            return true;
+        }
+        else
+        {
+            listener = new TcpMessageTransportListener(endpoint, _loggerFactory);
+            return true;
+        }
+    }
 }
 
 public interface IMessageTransportBuilder
@@ -84,65 +135,6 @@ public abstract class MessageTransportListener : IAsyncDisposable
     }
 }
 
-public class TransportServerOptions
-{
-    private readonly IServiceProvider _applicationServices;
-    public TransportServerOptions(IServiceProvider applicationServices)
-    {
-        _applicationServices = applicationServices;
-    }
-
-    /// <summary>
-    /// A default configuration action for all endpoints. Use for Listen, configuration, the default url, and URLs.
-    /// </summary>
-    private Action<TransportListenerOptions> EndpointDefaults { get; set; } = _ => { };
-
-    internal List<TransportListenerOptions> CodeBackedListenOptions { get; } = new();
-
-    /// <summary>
-    /// Specifies a configuration Action to run for each newly created endpoint. Calling this again will replace
-    /// the prior action.
-    /// </summary>
-    public void ConfigureEndpointDefaults(Action<TransportListenerOptions> configureOptions)
-    {
-        EndpointDefaults = configureOptions ?? throw new ArgumentNullException(nameof(configureOptions));
-    }
-
-    /// <summary>
-    /// Bind to the given endpoint.
-    /// The callback configures endpoint-specific settings.
-    /// </summary>
-    public void AddTransportListener(string endpointName, EndPoint endpoint, Action<TransportListenerOptions> configure)
-    {
-        if (endpoint == null)
-        {
-            throw new ArgumentNullException(nameof(endpoint));
-        }
-        if (configure == null)
-        {
-            throw new ArgumentNullException(nameof(configure));
-        }
-
-        /*
-        var configurationBuilder = new ConfigurationBuilder();
-        var endpointInfo = new EndpointInfo
-        {
-            EndpointName = endpointName,
-            Endpoint = endpoint,
-            Configuration = configurationBuilder.Build()
-        };
-        */
-        var listenOptions = new TransportListenerOptions(_applicationServices);
-        ApplyEndpointDefaults(listenOptions);
-        configure(listenOptions);
-        CodeBackedListenOptions.Add(listenOptions);
-    }
-
-    internal void ApplyEndpointDefaults(TransportListenerOptions listenOptions)
-    {
-        EndpointDefaults(listenOptions);
-    }
-}
 
 /*
 

@@ -1,5 +1,6 @@
 #nullable enable
 
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -10,17 +11,20 @@ namespace Orleans.Networking.Transport.Security;
 
 public class TlsMessageTransportFactory : TcpMessageTransportFactory
 {
-    private readonly TlsOptions _options;
+    private readonly string _name;
+    private readonly IOptionsMonitor<TlsOptions> _tlsOptions;
 
-    public TlsMessageTransportFactory(string transportName, IOptionsMonitor<TlsOptions> options, ILoggerFactory loggerFactory) : base(loggerFactory)
+    public TlsMessageTransportFactory(string name, IOptionsMonitor<TlsOptions> tlsOptions, ILoggerFactory loggerFactory) : base(loggerFactory)
     {
-        _options = options.Get(transportName);
+        _name = name;
+        _tlsOptions = tlsOptions;
     }
 
-    public override async ValueTask<MessageTransport> CreateAsync(EndpointInfo endpointInfo, CancellationToken cancellationToken = default)
+    public override async ValueTask<MessageTransport> CreateAsync(EndPoint endpointInfo, CancellationToken cancellationToken = default)
     {
         var innerTransport = await base.CreateAsync(endpointInfo, cancellationToken);
-        var transport = new ClientTlsMessageTransport(innerTransport, _options, Logger);
+        var tlsOptions = _tlsOptions.Get(_name);
+        var transport = new ClientTlsMessageTransport(innerTransport, tlsOptions, Logger);
         transport.Start();
         return transport;
     }

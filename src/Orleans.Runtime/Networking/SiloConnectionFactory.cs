@@ -28,13 +28,12 @@ namespace Orleans.Runtime.Messaging
             IServiceProvider serviceProvider,
             IOptions<ConnectionOptions> connectionOptions,
             IOptionsMonitor<TransportFactoryOptions> transportFactoryOptions,
-            EndpointConfigurationProvider addressToEndpointMapper,
             IEnumerable<IMessageTransportFactoryProvider> transportFactoryProviders,
             ILocalSiloDetails localSiloDetails,
             ConnectionCommon connectionShared,
             ProbeRequestMonitor probeRequestMonitor,
             ConnectionPreambleHelper connectionPreambleHelper)
-            : base(addressToEndpointMapper, transportFactoryProviders, transportFactoryOptions)
+            : base(transportFactoryProviders, transportFactoryOptions)
         {
             _connectionOptions = connectionOptions.Value;
             this.serviceProvider = serviceProvider;

@@ -19,6 +19,11 @@ public class TlsOptions
     private TimeSpan _handshakeTimeout = TimeSpan.FromSeconds(10);
 
     /// <summary>
+    /// Gets or sets a value indicating whether TLS is enabled.
+    /// </summary>
+    public bool EnableTransportLayerSecurity { get; set; } = false;
+
+    /// <summary>
     /// <para>
     /// Specifies the local certificate used to authenticate TLS connections. This is ignored on server if LocalCertificateSelector is set.
     /// </para>

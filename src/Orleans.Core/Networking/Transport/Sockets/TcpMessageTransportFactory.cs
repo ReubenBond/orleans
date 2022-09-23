@@ -19,9 +19,8 @@ public class TcpMessageTransportFactory : MessageTransportFactory
 
     protected ILogger Logger { get; }
 
-    public override async ValueTask<MessageTransport> CreateAsync(EndpointInfo endpointInfo, CancellationToken cancellationToken = default)
+    public override async ValueTask<MessageTransport> CreateAsync(EndPoint endpoint, CancellationToken cancellationToken = default)
     {
-        var endpoint = endpointInfo.Endpoint;
         var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
         {
             LingerState = new LingerOption(true, 0),

@@ -19,26 +19,27 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly ConnectionManager _connectionManager;
         private readonly ConnectionCommon _connectionShared;
-        private readonly TransportListenerOptions _listenerOptions;
         private readonly IMessageTransportListenerProvider[] _listenerProviders;
-        private readonly ConcurrentDictionary<Connection, object> _connections = new(ReferenceEqualsComparer.Default);
+        private readonly ConcurrentDictionary<Connection, object?> _connections = new(ReferenceEqualsComparer.Default);
+        private readonly CancellationTokenSource _shutdownCancellation = new();
+        private MessageTransportListener? _listener;
         private Task? _acceptLoopTask;
 
         protected ConnectionListener(
-            IOptions<TransportListenerOptions> listenerOptions,
+            TransportListenerOptions listenerOptions,
             IEnumerable<IMessageTransportListenerProvider> listenerProviders,
             IOptions<ConnectionOptions> connectionOptions,
             ConnectionManager connectionManager,
             ConnectionCommon connectionShared)
         {
-            _listenerOptions = listenerOptions.Value;
+            TransportListenerOptions = listenerOptions;
             _listenerProviders = listenerProviders.ToArray();
             _connectionManager = connectionManager;
             ConnectionOptions = connectionOptions.Value;
             _connectionShared = connectionShared;
         }
 
-        public abstract EndPoint Endpoint { get; }
+        protected TransportListenerOptions TransportListenerOptions { get; }
 
         protected IServiceProvider ServiceProvider => _connectionShared.ServiceProvider;
 
@@ -48,46 +49,42 @@ namespace Orleans.Runtime.Messaging
 
         protected abstract Connection CreateConnection(MessageTransport transport);
 
-        protected virtual void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder) { }
-
         protected async Task BindAsync(CancellationToken cancellationToken)
         {
-            MessageTransportListener? listener = null;
             foreach (var provider in _listenerProviders)
             {
-                if (provider.TryGetMessageTransportListener(_listenerOptions, out listener))
+                if (provider.TryGetMessageTransportListener(TransportListenerOptions, out _listener))
                 {
                     break;
                 }
             }
 
-            if (listener is null)
+            if (_listener is null)
             {
                 throw new OrleansConfigurationException($"None of the configured transport listeners were able to satisfy the demands.");
             }
 
-            listener.LocalEndpoint = Endpoint;
-            await listener.BindAsync(cancellationToken);
-            this.listener = await this.listenerFactory.BindAsync(Endpoint);
+            await _listener.BindAsync(cancellationToken);
         }
 
         protected void Start()
         {
-            if (this.listener is null) throw new InvalidOperationException("Listener is not bound");
+            if (_listener is null) throw new InvalidOperationException($"Listener is not bound, call {nameof(BindAsync)} first");
             _acceptLoopTask = RunAcceptLoop();
         }
 
         private async Task RunAcceptLoop()
         {
             await Task.Yield();
+            var listener = _listener!;
             try
             {
                 while (true)
                 {
-                    var context = await this.listener.AcceptAsync();
+                    var context = await listener.AcceptAsync(_shutdownCancellation.Token);
                     if (context == null) break;
 
-                    var connection = this.CreateConnection(context);
+                    var connection = CreateConnection(context);
                     StartConnection(connection);
                 }
             }
@@ -101,7 +98,13 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                await listener.UnbindAsync(cancellationToken);
+                if (_listener is null)
+                {
+                    return;
+                }
+
+                _shutdownCancellation.Cancel();
+                await _listener.UnbindAsync(cancellationToken);
 
                 if (_acceptLoopTask is not null)
                 {
@@ -120,7 +123,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 await _connectionManager.Closed;
-                await this.listener.DisposeAsync();
+                await _listener.DisposeAsync();
             }
             catch (Exception exception)
             {
@@ -134,7 +137,7 @@ namespace Orleans.Runtime.Messaging
 
             ThreadPool.UnsafeQueueUserWorkItem(state =>
             {
-                var (t, connection) = ((ConnectionListener, Connection))state;
+                var (t, connection) = ((ConnectionListener, Connection))state!;
                 _ = t.RunConnectionAsync(connection);
             }, (this, connection));
         }
@@ -159,7 +162,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private IDisposable BeginConnectionScope(Connection connection)
+        private IDisposable? BeginConnectionScope(Connection connection)
         {
             if (NetworkingTrace.IsEnabled(LogLevel.Critical))
             {
