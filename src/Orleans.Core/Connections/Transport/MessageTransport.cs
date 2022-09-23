@@ -10,11 +10,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Networking.Transport.Security;
-using Orleans.Networking.Transport.Sockets;
+using Orleans.Connections.Transport.Security;
+using Orleans.Connections.Transport.Sockets;
 using Orleans.Runtime;
 
-namespace Orleans.Networking.Transport;
+namespace Orleans.Connections.Transport;
 
 public abstract class MessageTransport : IAsyncDisposable
 {

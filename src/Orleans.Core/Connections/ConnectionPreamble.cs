@@ -2,7 +2,7 @@ using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Threading.Tasks;
-using Orleans.Networking.Transport;
+using Orleans.Connections.Transport;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;

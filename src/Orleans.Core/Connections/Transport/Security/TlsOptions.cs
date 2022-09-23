@@ -7,7 +7,7 @@ using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 
-namespace Orleans.Networking.Transport.Security;
+namespace Orleans.Connections.Transport.Security;
 
 public delegate bool RemoteCertificateValidator(X509Certificate2 certificate, X509Chain? chain, SslPolicyErrors policyErrors);
 

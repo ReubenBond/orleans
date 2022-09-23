@@ -3,7 +3,7 @@ using System;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 
-namespace Orleans.Networking.Transport.Sockets;
+namespace Orleans.Connections.Transport.Sockets;
 
 public static class SocketExtensions
 {

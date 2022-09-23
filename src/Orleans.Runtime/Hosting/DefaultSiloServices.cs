@@ -36,7 +36,8 @@ using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
 using System.Runtime.InteropServices;
-using Orleans.Networking.Transport;
+using Orleans.Connections;
+using Orleans.Connections.Transport;
 
 namespace Orleans.Hosting
 {
@@ -363,7 +364,7 @@ namespace Orleans.Hosting
                 sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value.MaxMessageSize));
 
             services.TryAddSingleton<ConnectionFactory, SiloConnectionFactory>();
-            services.AddSingleton<TransportTrace>();
+            services.AddSingleton<ConnectionTrace>();
             services.AddSingleton<RuntimeMessagingTrace>();
 
             ConfigureMessageTransport(services);

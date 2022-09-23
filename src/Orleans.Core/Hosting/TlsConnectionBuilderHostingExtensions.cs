@@ -1,9 +1,9 @@
 using System;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Networking;
-using Orleans.Networking.Transport;
-using Orleans.Networking.Transport.Security;
+using Orleans.Connections;
+using Orleans.Connections.Transport;
+using Orleans.Connections.Transport.Security;
 
 namespace Orleans
 {
@@ -18,7 +18,7 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(getTlsOptions));
             }
 
-            var logger = builder.ApplicationServices.GetRequiredService<TransportTrace>();
+            var logger = builder.ApplicationServices.GetRequiredService<ConnectionTrace>();
             builder.AddMiddleware(originalTransport =>
             {
                 return new ServerTlsMessageTransport(originalTransport, getTlsOptions(), logger);
@@ -34,7 +34,7 @@ namespace Orleans
                 throw new ArgumentNullException(nameof(getTlsOptions));
             }
 
-            var logger = builder.ApplicationServices.GetRequiredService<TransportTrace>();
+            var logger = builder.ApplicationServices.GetRequiredService<ConnectionTrace>();
             builder.AddMiddleware(originalTransport =>
             {
                 return new ClientTlsMessageTransport(originalTransport, getTlsOptions(), logger);

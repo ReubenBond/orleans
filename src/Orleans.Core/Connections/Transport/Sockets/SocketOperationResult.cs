@@ -6,7 +6,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net.Sockets;
 
-namespace Orleans.Networking.Transport.Sockets;
+namespace Orleans.Connections.Transport.Sockets;
 
 internal readonly struct SocketOperationResult
 {

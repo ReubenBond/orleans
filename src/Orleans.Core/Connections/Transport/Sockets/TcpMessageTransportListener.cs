@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Diagnostics;
-using Orleans.Networking.Sockets;
+using Orleans.Connections.Sockets;
 using System.Diagnostics.CodeAnalysis;
 
-namespace Orleans.Networking.Transport.Sockets;
+namespace Orleans.Connections.Transport.Sockets;
 
 public class TcpMessageTransportListener : MessageTransportListener
 {
@@ -23,7 +23,7 @@ public class TcpMessageTransportListener : MessageTransportListener
         Debug.Assert(loggerFactory != null);
 
         LocalEndpoint = localEndpoint ?? throw new ArgumentNullException(nameof(localEndpoint));
-        Logger = loggerFactory.CreateLogger("Orleans.Networking.Transport.Sockets");
+        Logger = loggerFactory.CreateLogger("Orleans.Connections.Transport.Sockets");
     }
 
     protected ILogger Logger { get; }

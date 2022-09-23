@@ -1,9 +1,9 @@
-﻿#nullable enable
+#nullable enable
 
 using System;
 using System.Collections.Generic;
 
-namespace Orleans.Networking.Transport;
+namespace Orleans.Connections.Transport;
 
 /// <summary>
 /// Represents a collection of typed features.

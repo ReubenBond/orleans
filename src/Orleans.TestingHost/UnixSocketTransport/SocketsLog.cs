@@ -3,7 +3,7 @@
 
 using System;
 using Microsoft.Extensions.Logging;
-using Orleans.Networking.Transport.Sockets;
+using Orleans.Connections.Transport.Sockets;
 
 namespace Orleans.TestingHost.UnixSocketTransport;
 

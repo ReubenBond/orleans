@@ -5,10 +5,10 @@ using System.Buffers;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.Networking.Transport.Utilities;
-using Orleans.Networking.Transport;
+using Orleans.Connections.Transport.Utilities;
+using Orleans.Connections.Transport;
 
-namespace Orleans.Networking.Transport.Streams;
+namespace Orleans.Connections.Transport.Streams;
 
 public class NetworkTransportStream : Stream
 {

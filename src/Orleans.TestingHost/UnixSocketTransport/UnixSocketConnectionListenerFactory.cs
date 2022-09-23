@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Networking.Shared;
+using Orleans.Connections.Shared;
 
 namespace Orleans.TestingHost.UnixSocketTransport;
 

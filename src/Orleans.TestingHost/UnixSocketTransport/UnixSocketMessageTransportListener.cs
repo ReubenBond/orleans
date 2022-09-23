@@ -8,8 +8,8 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Networking.Transport;
-using Orleans.Networking.Transport.Sockets;
+using Orleans.Connections.Transport;
+using Orleans.Connections.Transport.Sockets;
 
 namespace Orleans.TestingHost.UnixSocketTransport;
 
@@ -23,7 +23,7 @@ internal class UnixSocketMessageTransportListener : MessageTransportListener
         Debug.Assert(loggerFactory != null);
 
         LocalEndpoint = localEndpoint;
-        Logger = loggerFactory.CreateLogger("Orleans.Networking.Transport.Sockets");
+        Logger = loggerFactory.CreateLogger("Orleans.Connections.Transport.Sockets");
     }
 
     protected ILogger Logger { get; }

@@ -1,4 +1,5 @@
 using System;
+using Orleans.Connections;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -8,19 +9,19 @@ namespace Orleans.Runtime.Messaging
             IServiceProvider serviceProvider,
             MessageFactory messageFactory,
             MessagingTrace messagingTrace,
-            NetworkingTrace networkingTrace,
+            ConnectionTrace networkingTrace,
             MessageHandlerShared messageHandlerPool)
         {
             this.ServiceProvider = serviceProvider;
             this.MessageFactory = messageFactory;
             this.MessagingTrace = messagingTrace;
-            this.NetworkingTrace = networkingTrace;
+            this.ConnectionTrace = networkingTrace;
             this.MessageHandlerPool = messageHandlerPool;
         }
 
         public MessageFactory MessageFactory { get; }
         public IServiceProvider ServiceProvider { get; }
-        public NetworkingTrace NetworkingTrace { get; }
+        public ConnectionTrace ConnectionTrace { get; }
         public MessagingTrace MessagingTrace { get; }
         public MessageHandlerShared MessageHandlerPool { get; }
     }

@@ -2,7 +2,7 @@
 using System;
 using System.Runtime.Serialization;
 
-namespace Orleans.Networking.Transport;
+namespace Orleans.Connections.Transport;
 
 [Serializable]
 public class ConnectionAbortedException : Exception

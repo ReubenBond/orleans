@@ -3,7 +3,7 @@ using System;
 using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 
-namespace Orleans.Networking.Transport.Security;
+namespace Orleans.Connections.Transport.Security;
 
 public static class CertificateLoader
 {

@@ -2,7 +2,7 @@
 
 using System;
 
-namespace Orleans.Networking.Transport;
+namespace Orleans.Connections.Transport;
 
 public abstract class ReadRequest
 {

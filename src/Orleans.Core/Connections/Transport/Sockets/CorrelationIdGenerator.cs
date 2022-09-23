@@ -7,7 +7,7 @@ using System;
 using System.Threading;
 using Orleans;
 
-namespace Orleans.Networking.Transport.Sockets;
+namespace Orleans.Connections.Transport.Sockets;
 
 internal static class CorrelationIdGenerator
 {

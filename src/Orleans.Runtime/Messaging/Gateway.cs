@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.ClientObservers;
 using Orleans.Configuration;
-using Orleans.Networking.Transport;
+using Orleans.Connections.Transport;
 using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.Messaging

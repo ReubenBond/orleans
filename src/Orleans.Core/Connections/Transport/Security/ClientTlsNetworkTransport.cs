@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace Orleans.Networking.Transport.Security;
+namespace Orleans.Connections.Transport.Security;
 
 public class ClientTlsMessageTransport : TlsMessageTransport
 {

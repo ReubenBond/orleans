@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
 
-namespace Orleans.Networking.Transport.Utilities;
+namespace Orleans.Connections.Transport.Utilities;
 
 internal sealed class SingleWaiterInlineSignal : IValueTaskSource
 {

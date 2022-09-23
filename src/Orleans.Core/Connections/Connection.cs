@@ -8,7 +8,8 @@ using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Buffers.Adaptors;
-using Orleans.Networking.Transport;
+using Orleans.Connections.Transport;
+using Orleans.Connections;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -52,7 +53,7 @@ namespace Orleans.Runtime.Messaging
         public virtual EndPoint RemoteEndpoint { get; }
         public virtual EndPoint LocalEndpoint { get; }
         protected MessageTransport Context => _transport;
-        protected NetworkingTrace Log => _shared.NetworkingTrace;
+        protected ConnectionTrace Log => _shared.ConnectionTrace;
         protected MessagingTrace MessagingTrace => _shared.MessagingTrace;
         protected abstract ConnectionDirection ConnectionDirection { get; }
         protected MessageFactory MessageFactory => _shared.MessageFactory;

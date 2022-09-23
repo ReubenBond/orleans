@@ -2,7 +2,7 @@
 using System;
 using System.Runtime.Serialization;
 
-namespace Orleans.Networking.Transport.Sockets;
+namespace Orleans.Connections.Transport.Sockets;
 
 [Serializable]
 public class AddressInUseException : Exception

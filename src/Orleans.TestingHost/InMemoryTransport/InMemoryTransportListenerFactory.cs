@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 using Orleans.Internal;
-using Orleans.Networking.Shared;
+using Orleans.Connections.Shared;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 

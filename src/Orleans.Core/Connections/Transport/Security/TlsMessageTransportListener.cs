@@ -5,9 +5,9 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Networking.Transport.Sockets;
+using Orleans.Connections.Transport.Sockets;
 
-namespace Orleans.Networking.Transport.Security;
+namespace Orleans.Connections.Transport.Security;
 
 public class TlsMessageTransportListener : TcpMessageTransportListener
 {

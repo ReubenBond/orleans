@@ -11,7 +11,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
-using Orleans.Networking.Transport;
+using Orleans.Connections.Transport;
+using Orleans.Connections;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -43,7 +44,7 @@ namespace Orleans.Runtime.Messaging
 
         protected IServiceProvider ServiceProvider => _connectionShared.ServiceProvider;
 
-        protected TransportTrace TransportTrace => _connectionShared.TransportTrace;
+        protected ConnectionTrace TransportTrace => _connectionShared.ConnectionTrace;
 
         protected ConnectionOptions ConnectionOptions { get; }
 

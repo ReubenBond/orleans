@@ -6,9 +6,9 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Networking.Transport.Streams;
+using Orleans.Connections.Transport.Streams;
 
-namespace Orleans.Networking.Transport.Security;
+namespace Orleans.Connections.Transport.Security;
 
 public abstract class TlsMessageTransport : StreamMessageTransport
 {

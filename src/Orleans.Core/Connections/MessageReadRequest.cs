@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Buffers.Adaptors;
 using System.Buffers.Binary;
-using Orleans.Networking.Transport;
+using Orleans.Connections.Transport;
 using System.Threading.Tasks.Sources;
 
 namespace Orleans.Runtime.Messaging

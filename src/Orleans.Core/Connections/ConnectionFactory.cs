@@ -4,7 +4,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
-using Orleans.Networking.Transport;
+using Orleans.Connections.Transport;
 
 namespace Orleans.Runtime.Messaging;
 

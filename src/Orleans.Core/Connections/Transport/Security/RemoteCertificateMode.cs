@@ -1,5 +1,5 @@
 #nullable enable
-namespace Orleans.Networking.Transport.Security;
+namespace Orleans.Connections.Transport.Security;
 
 /// <summary>
 /// Describes the remote certificate requirements for a TLS connection.

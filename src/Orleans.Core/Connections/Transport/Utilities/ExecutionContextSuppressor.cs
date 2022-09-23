@@ -1,7 +1,7 @@
 #nullable enable
 using System.Threading;
 
-namespace Orleans.Networking.Transport.Utilities;
+namespace Orleans.Connections.Transport.Utilities;
 
 /// <summary>
 /// Suppresses the flow of <see cref="ExecutionContext"/> until it is disposed.

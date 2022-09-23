@@ -5,7 +5,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Orleans.Networking.Transport;
+namespace Orleans.Connections.Transport;
 
 /// <summary>
 /// Default implementation for <see cref="IFeatureCollection"/>.

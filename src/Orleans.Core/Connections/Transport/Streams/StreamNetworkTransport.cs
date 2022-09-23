@@ -1,8 +1,8 @@
 #nullable enable
 
 using Microsoft.Extensions.Logging;
-using Orleans.Networking.Transport.Utilities;
-using Orleans.Networking.Transport;
+using Orleans.Connections.Transport.Utilities;
+using Orleans.Connections.Transport;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -10,7 +10,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Orleans.Networking.Transport.Streams;
+namespace Orleans.Connections.Transport.Streams;
 
 public abstract class StreamMessageTransport : MessageTransportBase
 {

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
-using Orleans.Networking.Transport;
+using Orleans.Connections.Transport;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging

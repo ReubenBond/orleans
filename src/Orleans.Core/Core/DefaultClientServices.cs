@@ -18,6 +18,7 @@ using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
 using Microsoft.Extensions.Hosting;
 using System.Runtime.InteropServices;
+using Orleans.Connections;
 
 namespace Orleans
 {
@@ -117,7 +118,7 @@ namespace Orleans
             services.TryAddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter);
             services.TryAddFromExisting<IMessageCenter, ClientMessageCenter>();
             services.AddSingleton<GatewayManager>();
-            services.AddSingleton<NetworkingTrace>();
+            services.AddSingleton<ConnectionTrace>();
             services.AddSingleton<MessagingTrace>();
 
             // Type metadata

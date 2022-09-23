@@ -8,13 +8,13 @@ using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
 using System.Net;
 
-namespace Orleans.Networking.Transport.Sockets;
+namespace Orleans.Connections.Transport.Sockets;
 
 public class TcpMessageTransportFactory : MessageTransportFactory
 {
     public TcpMessageTransportFactory(ILoggerFactory loggerFactory)
     {
-        Logger = loggerFactory.CreateLogger("Orleans.Networking.Transport.Sockets");
+        Logger = loggerFactory.CreateLogger("Orleans.Connections.Transport.Sockets");
     }
 
     protected ILogger Logger { get; }

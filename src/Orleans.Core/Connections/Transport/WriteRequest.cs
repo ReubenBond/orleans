@@ -3,7 +3,7 @@
 using System;
 using System.Buffers;
 
-namespace Orleans.Networking.Transport;
+namespace Orleans.Connections.Transport;
 
 public abstract class WriteRequest
 {
