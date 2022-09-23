@@ -284,7 +284,7 @@ public class TransportListenerOptions : IMessageTransportBuilder
 
     IServiceProvider IMessageTransportBuilder.ApplicationServices => _applicationServices;
     bool IMessageTransportBuilder.IsServer => true;
-    IMessageTransportBuilder IMessageTransportBuilder.AddMiddleware(Func<MessageTransport, MessageTransport> middleware)
+    public IMessageTransportBuilder AddMiddleware(Func<MessageTransport, MessageTransport> middleware)
     {
         _middleware.Add(middleware ?? throw new ArgumentNullException(nameof(middleware)));
         return this;

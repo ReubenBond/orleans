@@ -3,31 +3,31 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 
-namespace Orleans.Runtime.Messaging
+namespace Orleans.Networking.Transport
 {
-    internal sealed class NetworkingTrace : DiagnosticListener, ILogger
+    internal sealed class TransportTrace : DiagnosticListener, ILogger
     {
-        private readonly ILogger log;
+        private readonly ILogger _log;
 
-        public NetworkingTrace(ILoggerFactory loggerFactory) : base(typeof(NetworkingTrace).FullName)
+        public TransportTrace(ILoggerFactory loggerFactory) : base(typeof(TransportTrace).FullName)
         {
-            this.log = loggerFactory.CreateLogger(typeof(NetworkingTrace).FullName);
+            this._log = loggerFactory.CreateLogger("Orleans.Runtime.Messaging");
         }
 
         public IDisposable BeginScope<TState>(TState state)
         {
-            return this.log.BeginScope(state);
+            return this._log.BeginScope(state);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsEnabled(LogLevel logLevel)
         {
-            return this.log.IsEnabled(logLevel);
+            return this._log.IsEnabled(logLevel);
         }
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
         {
-            this.log.Log(logLevel, eventId, state, exception, formatter);
+            this._log.Log(logLevel, eventId, state, exception, formatter);
         }
     }
 }

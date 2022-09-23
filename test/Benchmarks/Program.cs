@@ -134,13 +134,6 @@ namespace Benchmarks
                     test.PingConcurrentHostedClient().GetAwaiter().GetResult();
                     test.Shutdown().GetAwaiter().GetResult();
                 }
-                GC.Collect();
-                {
-                    Console.WriteLine("## System Service ##");
-                    var test = new PingBenchmark(numSilos: 1, startClient: false);
-                    test.PingSystemService().GetAwaiter().GetResult();
-                    test.Shutdown().GetAwaiter().GetResult();
-                }
             },
             ["ConcurrentPing_OneSilo"] = _ =>
             {

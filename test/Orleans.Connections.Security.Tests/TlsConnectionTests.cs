@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Hosting;
+using Orleans.Networking.Transport.Security;
 using Orleans.TestingHost;
 using Xunit;
 

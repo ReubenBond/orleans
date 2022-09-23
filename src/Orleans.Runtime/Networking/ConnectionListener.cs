@@ -33,7 +33,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionCommon connectionShared)
         {
             TransportListenerOptions = listenerOptions;
-            _listenerProviders = listenerProviders.ToArray();
+            _listenerProviders = listenerProviders.Reverse().ToArray();
             _connectionManager = connectionManager;
             ConnectionOptions = connectionOptions.Value;
             _connectionShared = connectionShared;
@@ -43,7 +43,7 @@ namespace Orleans.Runtime.Messaging
 
         protected IServiceProvider ServiceProvider => _connectionShared.ServiceProvider;
 
-        protected NetworkingTrace NetworkingTrace => _connectionShared.NetworkingTrace;
+        protected TransportTrace TransportTrace => _connectionShared.TransportTrace;
 
         protected ConnectionOptions ConnectionOptions { get; }
 
@@ -90,7 +90,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exception)
             {
-                NetworkingTrace.LogCritical(exception, "Exception in AcceptAsync");
+                TransportTrace.LogCritical(exception, "Exception in AcceptAsync");
             }
         }
 
@@ -127,7 +127,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exception)
             {
-                NetworkingTrace.LogWarning(exception, "Exception during shutdown");
+                TransportTrace.LogWarning(exception, "Exception during shutdown");
             }
         }
 
@@ -149,11 +149,11 @@ namespace Orleans.Runtime.Messaging
                 try
                 {
                     await connection.RunAsync();
-                    NetworkingTrace.LogInformation("Connection {Connection} terminated", connection);
+                    TransportTrace.LogInformation("Connection {Connection} terminated", connection);
                 }
                 catch (Exception exception)
                 {
-                    NetworkingTrace.LogInformation(exception, "Connection {Connection} terminated with an exception", connection);
+                    TransportTrace.LogInformation(exception, "Connection {Connection} terminated with an exception", connection);
                 }
                 finally
                 {
@@ -164,9 +164,9 @@ namespace Orleans.Runtime.Messaging
 
         private IDisposable? BeginConnectionScope(Connection connection)
         {
-            if (NetworkingTrace.IsEnabled(LogLevel.Critical))
+            if (TransportTrace.IsEnabled(LogLevel.Critical))
             {
-                return NetworkingTrace.BeginScope(new ConnectionLogScope(connection));
+                return TransportTrace.BeginScope(new ConnectionLogScope(connection));
             }
 
             return null;

@@ -11,6 +11,7 @@ using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
+using Orleans.Serialization.Buffers.Adaptors;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -23,14 +24,14 @@ namespace UnitTests.Serialization
         private readonly ITestOutputHelper output;
         private readonly TestEnvironmentFixture fixture;
         private readonly MessageFactory messageFactory;
-        private readonly IMessageSerializer messageSerializer;
+        private readonly MessageSerializer messageSerializer;
 
         public MessageSerializerTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
             this.fixture = fixture;
             this.messageFactory = this.fixture.Services.GetRequiredService<MessageFactory>();
-            this.messageSerializer = this.fixture.Services.GetRequiredService<IMessageSerializer>();
+            this.messageSerializer = this.fixture.Services.GetRequiredService<MessageSerializer>();
         }
 
         [Fact, TestCategory("Functional")]
@@ -59,6 +60,7 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_SerializeHeaderTooBig()
         {
+            var buffer = new PooledBuffer();
             try
             {
                 // Create a ridiculously big RequestContext
@@ -67,12 +69,11 @@ namespace UnitTests.Serialization
 
                 var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
 
-                var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-                var writer = pipe.Writer;
-                Assert.Throws<OrleansException>(() => this.messageSerializer.Write(ref writer, message));
+                Assert.Throws<OrleansException>(() => this.messageSerializer.Write(ref buffer, message));
             }
             finally
             {
+                buffer.Dispose();
                 RequestContext.Clear();
             }
         }
@@ -80,64 +81,76 @@ namespace UnitTests.Serialization
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_SerializeBodyTooBig()
         {
-            var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize;
+            var buffer = new PooledBuffer();
+            try
+            {
+                var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageSize;
 
-            // Create a request with a ridiculously big argument
-            var arg = new byte[maxBodySize + 1];
-            var request = new[] { arg };
-            var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
+                // Create a request with a ridiculously big argument
+                var arg = new byte[maxBodySize + 1];
+                var request = new[] { arg };
+                var message = this.messageFactory.CreateMessage(request, InvokeMethodOptions.None);
 
-            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-            var writer = pipe.Writer;
-            Assert.Throws<OrleansException>(() => this.messageSerializer.Write(ref writer, message));
+                Assert.Throws<OrleansException>(() => this.messageSerializer.Write(ref buffer, message));
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_DeserializeHeaderTooBig()
         {
-            var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageSize;
-            var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize;
+            var maxSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageSize;
 
-            DeserializeFakeMessage(maxHeaderSize + 1, maxBodySize - 1);
+            DeserializeFakeMessage(maxSize + 1, 0);
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_DeserializeBodyTooBig()
         {
-            var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageSize;
-            var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize;
+            var maxSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageSize;
 
-            DeserializeFakeMessage(maxHeaderSize - 1, maxBodySize + 1);
+            DeserializeFakeMessage(0, maxSize + 1);
         }
 
         private void DeserializeFakeMessage(int headerSize, int bodySize)
         {
-            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-            var writer = pipe.Writer;
+            var buffer = new PooledBuffer();
 
-            Span<byte> lengthFields = stackalloc byte[8];
-            BinaryPrimitives.WriteInt32LittleEndian(lengthFields, headerSize);
-            BinaryPrimitives.WriteInt32LittleEndian(lengthFields.Slice(4), bodySize);
-            writer.Write(lengthFields);
-            writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+            try
+            {
+                Span<byte> lengthFields = stackalloc byte[8];
+                BinaryPrimitives.WriteInt32LittleEndian(lengthFields, headerSize);
+                BinaryPrimitives.WriteInt32LittleEndian(lengthFields.Slice(4), bodySize);
+                buffer.Write(lengthFields);
 
-            pipe.Reader.TryRead(out var readResult);
-            var reader = readResult.Buffer;
-            Assert.Throws<OrleansException>(() => this.messageSerializer.TryRead(ref reader, out var message));
+                var reader = buffer.Slice(0);
+                Assert.Throws<OrleansException>(() => this.messageSerializer.Read(in reader, out var message));
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
         }
 
         private Message RoundTripMessage(Message message)
         {
-            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
-            var writer = pipe.Writer;
-            this.messageSerializer.Write(ref writer, message);
-            writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+            var buffer = new PooledBuffer();
 
-            pipe.Reader.TryRead(out var readResult);
-            var reader = readResult.Buffer;
-            var (requiredBytes, _, _) = this.messageSerializer.TryRead(ref reader, out var deserializedMessage);
-            Assert.Equal(0, requiredBytes);
-            return deserializedMessage;
+            try
+            {
+                this.messageSerializer.Write(ref buffer, message);
+
+                var reader = buffer.Slice(0);
+                this.messageSerializer.Read(in reader, out var deserializedMessage);
+                return deserializedMessage;
+            }
+            finally
+            {
+                buffer.Dispose();
+            }
         }
     }
 }
