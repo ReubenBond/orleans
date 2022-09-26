@@ -269,18 +269,17 @@ public class TransportFactoryOptions : IMessageTransportBuilder
 
 public class TransportListenerOptions : IMessageTransportBuilder
 {
-    private readonly IServiceProvider _applicationServices;
     private readonly List<Func<MessageTransport, MessageTransport>> _middleware = new();
+    private readonly IServiceProvider _applicationServices;
 
-    public TransportListenerOptions(IServiceProvider applicationServices)
+    public TransportListenerOptions(IServiceProvider serviceProvider)
     {
-        _applicationServices = applicationServices;
-        Configuration = new ConfigurationBuilder();
+        _applicationServices = serviceProvider;
     }
 
     public string? TransportName { get; set; }
     public EndPoint? Endpoint { get; set; }
-    public IConfigurationBuilder Configuration { get; }
+    public IConfigurationBuilder Configuration { get; } = new ConfigurationBuilder();
 
     IServiceProvider IMessageTransportBuilder.ApplicationServices => _applicationServices;
     bool IMessageTransportBuilder.IsServer => true;
@@ -289,4 +288,36 @@ public class TransportListenerOptions : IMessageTransportBuilder
         _middleware.Add(middleware ?? throw new ArgumentNullException(nameof(middleware)));
         return this;
     }
+}
+
+internal abstract class ServiceProviderOptionsFactory<T> : OptionsFactory<T> where T : class
+{
+    private readonly IServiceProvider _serviceProvider;
+
+    public ServiceProviderOptionsFactory(IServiceProvider serviceProvider, IEnumerable<IConfigureOptions<T>> setups, IEnumerable<IPostConfigureOptions<T>> postConfigures) : base(setups, postConfigures)
+    {
+        _serviceProvider = serviceProvider;
+    }
+
+    protected override T CreateInstance(string name) => CreateInstanceInner(name, _serviceProvider);
+
+    public abstract T CreateInstanceInner(string name, IServiceProvider serviceProvider);
+}
+
+internal sealed class TransportListenerOptionsFactory : ServiceProviderOptionsFactory<TransportListenerOptions>
+{
+    public TransportListenerOptionsFactory(IServiceProvider serviceProvider, IEnumerable<IConfigureOptions<TransportListenerOptions>> setups, IEnumerable<IPostConfigureOptions<TransportListenerOptions>> postConfigures) : base(serviceProvider, setups, postConfigures)
+    {
+    }
+
+    public override TransportListenerOptions CreateInstanceInner(string name, IServiceProvider serviceProvider) => new TransportListenerOptions(serviceProvider);
+}
+
+internal sealed class TransportFactoryOptionsFactory : ServiceProviderOptionsFactory<TransportFactoryOptions>
+{
+    public TransportFactoryOptionsFactory(IServiceProvider serviceProvider, IEnumerable<IConfigureOptions<TransportFactoryOptions>> setups, IEnumerable<IPostConfigureOptions<TransportFactoryOptions>> postConfigures) : base(serviceProvider, setups, postConfigures)
+    {
+    }
+
+    public override TransportFactoryOptions CreateInstanceInner(string name, IServiceProvider serviceProvider) => new TransportFactoryOptions(serviceProvider);
 }

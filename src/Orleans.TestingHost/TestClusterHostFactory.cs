@@ -40,7 +40,6 @@ namespace Orleans.TestingHost
             hostBuilder.UseEnvironment(Environments.Development);
             hostBuilder.Properties["Configuration"] = configuration;
             hostBuilder.ConfigureHostConfiguration(cb => cb.AddConfiguration(configuration));
-
             hostBuilder.UseOrleans((ctx, siloBuilder) =>
             {
                 siloBuilder

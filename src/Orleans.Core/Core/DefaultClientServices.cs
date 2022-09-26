@@ -19,6 +19,7 @@ using Orleans.Serialization.Cloning;
 using Microsoft.Extensions.Hosting;
 using System.Runtime.InteropServices;
 using Orleans.Connections;
+using Orleans.Connections.Transport;
 
 namespace Orleans
 {
@@ -115,7 +116,7 @@ namespace Orleans
                 sp,
                 sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value.MaxMessageSize));
             services.TryAddSingleton<ConnectionFactory, ClientOutboundConnectionFactory>();
-            services.TryAddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter);
+            services.AddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter);
             services.TryAddFromExisting<IMessageCenter, ClientMessageCenter>();
             services.AddSingleton<GatewayManager>();
             services.AddSingleton<ConnectionTrace>();
@@ -136,6 +137,13 @@ namespace Orleans
             services.AddSingleton<IGrainInterfacePropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, ImplementedInterfaceProvider>();
+            ConfigureMessageTransport(services);
+        }
+
+        private static void ConfigureMessageTransport(IServiceCollection services)
+        {
+            services.AddSingleton<IOptionsFactory<TransportFactoryOptions>, TransportFactoryOptionsFactory>();
+            services.AddSingleton<IMessageTransportFactoryProvider, OrleansMessageTransportFactoryProvider>();
         }
 
         /// <summary>

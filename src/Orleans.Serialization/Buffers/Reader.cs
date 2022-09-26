@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 #if NETCOREAPP3_1_OR_GREATER
 using System.Numerics;
@@ -9,7 +10,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Session;
-using static Orleans.Serialization.Buffers.Adaptors.PooledBuffer;
+using static Orleans.Serialization.Buffers.PooledBuffer;
 #if !NETCOREAPP3_1_OR_GREATER
 using Orleans.Serialization.Utilities;
 #endif
@@ -421,6 +422,10 @@ namespace Orleans.Serialization.Buffers
                 {
                     return Unsafe.As<TInput, ReadOnlySequence<byte>>(ref _input).Length;
                 }
+                else if (IsBufferSliceInput)
+                {
+                    return Unsafe.As<TInput, BufferSliceReaderInput>(ref _input).Length;
+                }
                 else if (IsSpanInput)
                 {
                     return _currentSpan.Length;
@@ -442,7 +447,7 @@ namespace Orleans.Serialization.Buffers
         /// <param name="count">The number of bytes to skip.</param>
         public void Skip(long count)
         {
-            if (IsReadOnlySequenceInput)
+            if (IsReadOnlySequenceInput || IsBufferSliceInput)
             {
                 var end = Position + count;
                 while (Position < end)
@@ -488,9 +493,20 @@ namespace Orleans.Serialization.Buffers
         {
             if (IsReadOnlySequenceInput)
             {
-                ref var sequence = ref Unsafe.As<TInput, ReadOnlySequence<byte>>(ref _input);
-                var slicedSequence = sequence.Slice(position - _sequenceOffset);
+                ref var input = ref Unsafe.As<TInput, ReadOnlySequence<byte>>(ref _input);
+                var slicedSequence = input.Slice(position - _sequenceOffset);
                 forked = new Reader<TInput>(Unsafe.As<ReadOnlySequence<byte>, TInput>(ref slicedSequence), Session, position);
+
+                if (forked.Position != position)
+                {
+                    ThrowInvalidPosition(position, forked.Position);
+                }
+            }
+            else if (IsBufferSliceInput)
+            {
+                ref var input = ref Unsafe.As<TInput, BufferSliceReaderInput>(ref _input);
+                var newInput = input.ForkFrom(checked((int)position));
+                forked = new Reader<TInput>(Unsafe.As<BufferSliceReaderInput, TInput>(ref newInput), Session, position);
 
                 if (forked.Position != position)
                 {
@@ -535,6 +551,10 @@ namespace Orleans.Serialization.Buffers
         public void ResumeFrom(long position)
         {
             if (IsReadOnlySequenceInput)
+            {
+                // Nothing is required.
+            }
+            else if (IsBufferSliceInput)
             {
                 // Nothing is required.
             }
@@ -735,6 +755,7 @@ namespace Orleans.Serialization.Buffers
             }
         }
 
+        [DoesNotReturn]
         private static void ThrowInsufficientData() => throw new InvalidOperationException("Insufficient data present in buffer.");
 
         /// <summary>

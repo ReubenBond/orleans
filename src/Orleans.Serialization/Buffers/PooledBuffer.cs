@@ -7,7 +7,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace Orleans.Serialization.Buffers.Adaptors;
+namespace Orleans.Serialization.Buffers;
 
 /// <summary>
 /// A <see cref="IBufferWriter{T}"/> implementation implemented using pooled arrays which is specialized for creating <see cref="ReadOnlySequence{T}"/> instances.
@@ -169,7 +169,49 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 
         if (_currentPosition > 0 && _writeHead is not null)
         {
-            writer.Write(_writeHead.Array.AsSpan(0, _currentPosition));
+            Write(ref writer, _writeHead.Array.AsSpan(0, _currentPosition));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Write(ref TBufferWriter writer, ReadOnlySpan<byte> value)
+        {
+            Span<byte> destination = writer.GetSpan();
+
+            // Fast path, try copying to the available memory directly
+            if (value.Length <= destination.Length)
+            {
+                value.CopyTo(destination);
+                writer.Advance(value.Length);
+            }
+            else
+            {
+                WriteMultiSegment(ref writer, value, destination);
+            }
+        }
+
+        static void WriteMultiSegment(ref TBufferWriter writer, in ReadOnlySpan<byte> source, Span<byte> destination)
+        {
+            ReadOnlySpan<byte> input = source;
+            while (true)
+            {
+                int writeSize = Math.Min(destination.Length, input.Length);
+                input.Slice(0, writeSize).CopyTo(destination);
+                writer.Advance(writeSize);
+                input = input.Slice(writeSize);
+                if (input.Length > 0)
+                {
+                    destination = writer.GetSpan();
+
+                    if (destination.IsEmpty)
+                    {
+                        throw new ArgumentOutOfRangeException(nameof(writer));
+                    }
+
+                    continue;
+                }
+
+                return;
+            }
         }
     }
 
@@ -273,6 +315,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         }
         else
         {
+
             Debug.Assert(_last is not null);
             _last.SetNext(_writeHead);
             _last = _writeHead;
@@ -315,9 +358,10 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             var copied = 0;
             foreach (var span in this)
             {
-                span.CopyTo(output);
-                output = output[span.Length..];
-                copied += span.Length;
+                var slice = span[..Math.Min(span.Length, output.Length)];
+                slice.CopyTo(output);
+                output = output[slice.Length..];
+                copied += slice.Length;
             }
 
             return copied;
@@ -348,13 +392,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         public readonly byte[] ToArray()
         {
             var result = new byte[_length];
-            Span<byte> resultSpan = result;
-            foreach (var span in this)
-            {
-                span.CopyTo(resultSpan);
-                resultSpan = resultSpan[span.Length..];
-            }
-
+            CopyTo(result);
             return result;
         }
 
@@ -366,14 +404,14 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 
         public readonly ref struct MemorySequence
         {
-            private readonly ref BufferSlice _slice;
+            private readonly BufferSlice _slice;
             public MemorySequence(in BufferSlice slice) => _slice = slice;
             public MemoryEnumerator GetEnumerator() => new(in _slice);
         }
 
         public readonly ref struct SpanSequence
         {
-            private readonly ref BufferSlice _slice;
+            private readonly BufferSlice _slice;
             public SpanSequence(in BufferSlice slice) => _slice = slice;
             public SpanEnumerator GetEnumerator() => new(in _slice);
         }
@@ -393,7 +431,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                 Current = Span<byte>.Empty;
             }
 
-            internal readonly PooledBuffer Writer => _slice._buffer;
+            internal readonly PooledBuffer Buffer => _slice._buffer;
             internal readonly int Offset => _slice._offset;
             internal readonly int Length => _slice._length;
 
@@ -425,7 +463,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                         else
                         {
                             // Start is in this segment
-                            segmentOffset = Offset - _position;
+                            segmentOffset = Offset;
                         }
                     }
                     else
@@ -433,16 +471,34 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                         segmentOffset = 0;
                     }
 
-                    Current = segment[segmentOffset..Math.Min(segment.Length - segmentOffset, endPosition - (_position + segmentOffset))];
-                    _position += Current.Length;
+                    var segmentLength = Math.Min(segment.Length - segmentOffset, endPosition - (_position + segmentOffset));
+                    if (segmentLength == 0)
+                    {
+                        Current = Span<byte>.Empty;
+                        _segment = FinalSegmentSentinel;
+                        return false;
+                    }
+
+                    Current = segment.Slice(segmentOffset, segmentLength);
+                    _position += segmentOffset + segmentLength;
                     _segment = _segment.Next as SequenceSegment;
                     return true;
                 }
 
-                if (_segment != FinalSegmentSentinel && Writer._currentPosition > 0 && Writer._writeHead is { } head && _position < endPosition)
+                if (_segment != FinalSegmentSentinel && Buffer._currentPosition > 0 && Buffer._writeHead is { } head && _position < endPosition)
                 {
-                    var offset = Math.Max(Offset - _position, 0);
-                    Current = head.Array.AsSpan(offset, Math.Min(Writer._currentPosition, endPosition - (_position + offset)));
+                    var finalOffset = Math.Max(Offset - _position, 0);
+                    var finalLength = Math.Min(Buffer._currentPosition, endPosition - (_position + finalOffset));
+                    if (finalLength == 0)
+                    {
+                        Current = Span<byte>.Empty;
+                        _segment = FinalSegmentSentinel;
+                        return false;
+                    }
+
+                    Current = head.Array.AsSpan(finalOffset, finalLength);
+                    _position += finalLength;
+                    Debug.Assert(_position == endPosition);
                     _segment = FinalSegmentSentinel;
                     return true;
                 }
@@ -455,18 +511,18 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         {
             private static readonly SequenceSegment InitialSegmentSentinel = new();
             private static readonly SequenceSegment FinalSegmentSentinel = new();
-            private readonly BufferSlice _slice;
+            private readonly ref BufferSlice _slice;
             private int _position;
             private SequenceSegment _segment;
 
             public MemoryEnumerator(in BufferSlice slice)
             {
-                _slice = slice;
+                _slice = ref Unsafe.AsRef(in slice);
                 _segment = InitialSegmentSentinel;
                 Current = Memory<byte>.Empty;
             }
 
-            internal readonly PooledBuffer Writer => _slice._buffer;
+            internal readonly PooledBuffer Buffer => _slice._buffer;
             internal readonly int Offset => _slice._offset;
             internal readonly int Length => _slice._length;
 
@@ -480,7 +536,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                 }
 
                 var endPosition = Offset + Length;
-                while (_segment != null)
+                while (_segment != null && _segment != FinalSegmentSentinel)
                 {
                     var segment = _segment.CommittedMemory;
 
@@ -498,7 +554,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                         else
                         {
                             // Start is in this segment
-                            segmentOffset = Offset - _position;
+                            segmentOffset = Offset;
                         }
                     }
                     else
@@ -506,16 +562,32 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                         segmentOffset = 0;
                     }
 
-                    Current = segment[segmentOffset..Math.Min(segment.Length - segmentOffset, endPosition - (_position + segmentOffset))];
-                    _position += Current.Length;
+                    var segmentLength = Math.Min(segment.Length - segmentOffset, endPosition - (_position + segmentOffset));
+                    if (segmentLength == 0)
+                    {
+                        Current = Memory<byte>.Empty;
+                        return false;
+                    }
+
+                    Current = segment.Slice(segmentOffset, segmentLength);
+                    _position += segmentOffset + segmentLength;
                     _segment = _segment.Next as SequenceSegment;
                     return true;
                 }
 
-                if (_segment != FinalSegmentSentinel && Writer._currentPosition > 0 && Writer._writeHead is { } head)
+                if (_segment != FinalSegmentSentinel && Buffer._currentPosition > 0 && Buffer._writeHead is { } head && _position < endPosition)
                 {
-                    var offset = Math.Max(Offset - _position, 0);
-                    Current = head.Array.AsMemory(offset, Math.Min(Writer._currentPosition, endPosition - (_position + offset)));
+                    var finalOffset = Math.Max(Offset - _position, 0);
+                    var finalLength = Math.Min(Buffer._currentPosition, endPosition - (_position + finalOffset));
+                    if (finalLength == 0)
+                    {
+                        Current = Memory<byte>.Empty;
+                        return false;
+                    }
+
+                    Current = head.Array.AsMemory(finalOffset, finalLength);
+                    _position += finalLength;
+                    Debug.Assert(_position == endPosition);
                     _segment = FinalSegmentSentinel;
                     return true;
                 }
@@ -555,6 +627,8 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 
         internal void Return(SequenceSegment block)
         {
+            return;
+            /*
             Debug.Assert(block.IsValid);
             if (block.IsMinimumSize)
             {
@@ -564,6 +638,22 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             {
                 _largeBlocks.Enqueue(block);
             }
+
+            CheckPool();
+            void CheckPool()
+            {
+                var uniqueBlocks = new HashSet<SequenceSegment>(ReferenceEqualityComparer.Instance);
+                foreach (var block in _blocks)
+                {
+                    Debug.Assert(uniqueBlocks.Add(block));
+                }
+
+                foreach (var block in _largeBlocks)
+                {
+                    Debug.Assert(uniqueBlocks.Add(block));
+                }
+            }
+            */
         }
     }
 

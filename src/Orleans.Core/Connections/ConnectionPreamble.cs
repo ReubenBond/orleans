@@ -161,6 +161,7 @@ namespace Orleans.Runtime.Messaging
 
                     // Limit the maximum amount of data which can be read to the specified preamble length.
                     _buffer = _preambleBuffer.AsMemory(sizeof(int), _preambleLength);
+                    return false;
                 }
 
                 if (_totalBytesRead == _preambleLength + sizeof(int))

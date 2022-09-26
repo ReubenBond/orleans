@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Serialization.Invocation;
-using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Buffers;
 using Orleans.Connections.Transport;
 using Orleans.Connections;
 
@@ -28,7 +28,7 @@ namespace Orleans.Runtime.Messaging
         private readonly TaskCompletionSource<int> _transportConnectionClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<int> _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly string _id;
-        private MessageTransport _transport;
+        private readonly MessageTransport _transport;
         private Task _processIncomingTask;
         private Task _processOutgoingTask;
         private Task _closeTask;
@@ -223,15 +223,16 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            var handler = _shared.MessageHandlerPool.GetSendMessageHandler();
+            var handler = _shared.MessageHandlerShared.GetSendMessageHandler();
             try
             {
                 handler.Initialize(message);
             }
             catch (Exception exception)
             {
-                OnMessageSerializationFailure(message, exception);
                 handler.Reset();
+                OnMessageSerializationFailure(message, exception);
+                return;
             }
 
             if (!_outboundMessageWriter.TryWrite(handler))
@@ -255,12 +256,11 @@ namespace Orleans.Runtime.Messaging
             MessageReadRequest readRequest = RentHandler();
             try
             {
-                MessageTransport transport = default;
                 while (true)
                 {
                     if (!readRequest.Completed.IsCompleted)
                     {
-                        if (!transport.ReadAsync(readRequest))
+                        if (!_transport.ReadAsync(readRequest))
                         {
                             // Connection closed.
                             error = new ConnectionAbortedException();
@@ -310,7 +310,7 @@ namespace Orleans.Runtime.Messaging
 
             MessageReadRequest RentHandler()
             {
-                MessageReadRequest readRequest = _shared.MessageHandlerPool.GetReceiveMessageHandler();
+                MessageReadRequest readRequest = _shared.MessageHandlerShared.GetReceiveMessageHandler();
                 readRequest.SetConnection(this);
                 return readRequest;
             }
@@ -322,7 +322,6 @@ namespace Orleans.Runtime.Messaging
 
             var outboundQueue = _outboundMessages.Reader;
             Exception error = default;
-            MessageTransport transport = default;
             try
             {
                 while (true)
@@ -336,7 +335,7 @@ namespace Orleans.Runtime.Messaging
                     MessageWriteRequest message = default;
                     while (outboundQueue.TryRead(out message))
                     {
-                        if (!transport.WriteAsync(message))
+                        if (!_transport.WriteAsync(message))
                         {
                             error = new ConnectionAbortedException();
                             break;

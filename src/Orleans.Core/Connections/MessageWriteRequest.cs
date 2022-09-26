@@ -1,7 +1,7 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Threading.Tasks;
-using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Buffers;
 using System.Buffers.Binary;
 using Orleans.Connections.Transport;
 using System.Threading.Tasks.Sources;
@@ -30,7 +30,9 @@ namespace Orleans.Runtime.Messaging
             _buffer.Advance(4);
 
             // Serialize the message in full
-            _shared.MessageSerializer.Write(ref _buffer, message);
+            var messageSerializer = _shared.GetMessageSerializer();
+            messageSerializer.Write(ref _buffer, message);
+            _shared.Return(messageSerializer);
 
             // Write the framing
             var length = _buffer.Length - sizeof(int);

@@ -361,18 +361,22 @@ namespace Orleans.Hosting
 
             services.TryAddTransient<MessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
                 sp,
-                sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value.MaxMessageSize));
+                sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.MaxMessageSize));
 
             services.TryAddSingleton<ConnectionFactory, SiloConnectionFactory>();
             services.AddSingleton<ConnectionTrace>();
             services.AddSingleton<RuntimeMessagingTrace>();
+            services.AddFromExisting<MessagingTrace, RuntimeMessagingTrace>();
 
             ConfigureMessageTransport(services);
         }
 
         private static void ConfigureMessageTransport(IServiceCollection services)
         {
+            services.AddSingleton<IOptionsFactory<TransportListenerOptions>, TransportListenerOptionsFactory>();
+            services.AddSingleton<IOptionsFactory<TransportFactoryOptions>, TransportFactoryOptionsFactory>();
             services.AddSingleton<IMessageTransportListenerProvider, OrleansMessageTransportListenerProvider>();
+            services.AddSingleton<IMessageTransportFactoryProvider, OrleansMessageTransportFactoryProvider>();
             
             // Add default silo connection listener
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionListener>(sp => ActivatorUtilities.CreateInstance<SiloConnectionListener>(sp, SiloConnectionListener.DefaultListenerName));

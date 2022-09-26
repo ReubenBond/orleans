@@ -34,8 +34,23 @@ namespace Orleans.Runtime.Serialization
             writer.WriteStartObject(fieldIdDelta, expectedType, _codecFieldType);
             IPAddressCodec.WriteField(ref writer, 0, IPAddressCodec.CodecFieldType, value.Endpoint.Address);
             uint delta = 2;
-            if (value.Endpoint.Port != 0) UInt16Codec.WriteField(ref writer, delta = 1, UInt16Codec.CodecFieldType, (ushort)value.Endpoint.Port);
-            if (value.Generation != 0) Int32Codec.WriteField(ref writer, delta, Int32Codec.CodecFieldType, value.Generation);
+            if (value.Endpoint.Port != 0)
+            {
+                UInt16Codec.WriteField(ref writer, delta = 1, UInt16Codec.CodecFieldType, (ushort)value.Endpoint.Port);
+            }
+            else
+            {
+                Console.WriteLine("Port is 0");
+            }
+
+            if (value.Generation != 0)
+            {
+                Int32Codec.WriteField(ref writer, delta, Int32Codec.CodecFieldType, value.Generation);
+            }
+            else
+            {
+                Console.WriteLine("Gen is zero");
+            }
             writer.WriteEndObject();
         }
 

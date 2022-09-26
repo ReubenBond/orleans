@@ -62,7 +62,7 @@ namespace Orleans.Serialization.Session
 
             public bool Return(SerializerSession obj)
             {
-                obj.FullReset();
+                obj.Reset();
                 return true;
             }
         }

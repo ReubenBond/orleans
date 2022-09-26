@@ -1,28 +1,62 @@
-﻿using System.Collections.Concurrent;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.Messaging
 {
     internal sealed class MessageHandlerShared
     {
-        private ConcurrentQueue<MessageReadRequest> _receivePool = new();
-        private ConcurrentQueue<MessageWriteRequest> _sendPool = new();
+        private readonly IServiceProvider _serviceProvider;
+        private readonly ConcurrentQueue<MessageReadRequest> _receivePool = new();
+        private readonly ConcurrentQueue<MessageWriteRequest> _sendPool = new();
+        private readonly ConcurrentQueue<MessageSerializer> _serializerPool = new();
 
         public MessageHandlerShared(
             MessagingTrace messagingTrace,
-            MessageSerializer messageSerializer,
+            IServiceProvider serviceProvider,
             MessageFactory messageFactory,
             IMessageCenter messageCenter)
         {
             MessagingTrace = messagingTrace;
-            MessageSerializer = messageSerializer;
             MessageFactory = messageFactory;
             MessageCenter = messageCenter;
+            _serviceProvider = serviceProvider;
         }
 
         public MessagingTrace MessagingTrace { get; }
-        public MessageSerializer MessageSerializer { get; }
         public MessageFactory MessageFactory { get; }
         public IMessageCenter MessageCenter { get; }
+
+        internal MessageSerializer GetMessageSerializer()
+        {
+            if (_serializerPool.TryDequeue(out var result))
+            {
+                return result;
+            }
+
+            return CreateMessageSerializer(this);
+            static MessageSerializer CreateMessageSerializer(MessageHandlerShared self) => self._serviceProvider.GetRequiredService<MessageSerializer>();
+        }
+
+        internal void Return(MessageSerializer serializer)
+        {
+            return;
+            /*
+            _serializerPool.Enqueue(serializer);
+
+            CheckPool();
+            void CheckPool()
+            {
+                var uniqueBlocks = new HashSet<object>(ReferenceEqualityComparer.Instance);
+                foreach (var block in _serializerPool)
+                {
+                    Debug.Assert(uniqueBlocks.Add(block));
+                }
+            }
+            */
+        }
 
         internal MessageReadRequest GetReceiveMessageHandler()
         {
@@ -36,7 +70,20 @@ namespace Orleans.Runtime.Messaging
 
         internal void Return(MessageReadRequest handler)
         {
+            return;
+            /*
             _receivePool.Enqueue(handler);
+
+            CheckPool();
+            void CheckPool()
+            {
+                var uniqueBlocks = new HashSet<object>(ReferenceEqualityComparer.Instance);
+                foreach (var block in _receivePool)
+                {
+                    Debug.Assert(uniqueBlocks.Add(block));
+                }
+            }
+            */
         }
 
         internal MessageWriteRequest GetSendMessageHandler()
@@ -51,7 +98,20 @@ namespace Orleans.Runtime.Messaging
 
         internal void Return(MessageWriteRequest handler)
         {
+            return;
+            /*
             _sendPool.Enqueue(handler);
+
+            CheckPool();
+            void CheckPool()
+            {
+                var uniqueBlocks = new HashSet<object>(ReferenceEqualityComparer.Instance);
+                foreach (var block in _sendPool)
+                {
+                    Debug.Assert(uniqueBlocks.Add(block));
+                }
+            }
+            */
         }
     }
 }

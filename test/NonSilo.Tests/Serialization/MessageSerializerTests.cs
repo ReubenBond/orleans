@@ -1,8 +1,6 @@
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.Collections.Generic;
-using System.IO.Pipelines;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,7 +9,7 @@ using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
-using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Buffers;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -25,6 +23,7 @@ namespace UnitTests.Serialization
         private readonly TestEnvironmentFixture fixture;
         private readonly MessageFactory messageFactory;
         private readonly MessageSerializer messageSerializer;
+        private readonly MessageHandlerShared messageHandlerShared;
 
         public MessageSerializerTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
@@ -32,6 +31,7 @@ namespace UnitTests.Serialization
             this.fixture = fixture;
             this.messageFactory = this.fixture.Services.GetRequiredService<MessageFactory>();
             this.messageSerializer = this.fixture.Services.GetRequiredService<MessageSerializer>();
+            this.messageHandlerShared = this.fixture.Services.GetRequiredService<MessageHandlerShared>();
         }
 
         [Fact, TestCategory("Functional")]
@@ -55,6 +55,113 @@ namespace UnitTests.Serialization
 
             Assert.NotNull(deserializedMessage.TimeToLive);
             Assert.InRange(message.TimeToLive.Value, TimeSpan.FromMilliseconds(-1000), TimeSpan.FromMilliseconds(900));
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Message_Serialize_RoundTrip_Buffer()
+        {
+            for (var i = 0; i < 10; i++)
+            {
+                var writeBuffer = new PooledBuffer();
+                var readBuffer = new PooledBuffer();
+                try
+                {
+                    // Create a ridiculously big RequestContext
+                    var maxHeaderSize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageSize;
+
+                    var message = CreateTestMessage();
+                    this.messageSerializer.Write(ref writeBuffer, message);
+
+                    writeBuffer.CopyTo(ref readBuffer);
+                    var bufferSlice = readBuffer.Slice();
+                    this.messageSerializer.Read(in bufferSlice, out var deserializedMessage);
+
+                    CheckMessage(message, deserializedMessage);
+                }
+                finally
+                {
+                    writeBuffer.Dispose();
+                    readBuffer.Dispose();
+                    RequestContext.Clear();
+                }
+            }
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Message_Serialize_RoundTrip_Request()
+        {
+            for (var i = 0; i < 10; i++)
+            {
+                var writeRequest = this.messageHandlerShared.GetSendMessageHandler();
+                var message = CreateTestMessage();
+                writeRequest.Initialize(message);
+
+                var readRequest = messageHandlerShared.GetReceiveMessageHandler();
+
+                var writeBuffers = writeRequest.Buffers;
+                int writeLength;
+                do
+                {
+                    writeLength = (int)Math.Min(writeBuffers.Length, readRequest.Buffer.Length);
+                    writeBuffers.Slice(0, writeLength).CopyTo(readRequest.Buffer.Span);
+                    writeBuffers = writeBuffers.Slice(writeLength);
+                } while (!readRequest.OnProgress(writeLength));
+
+                var deserializedMessage = readRequest.TestReadMessage();
+                CheckMessage(message, deserializedMessage);
+            }
+        }
+
+        private static void CheckMessage(Message message, Message deserializedMessage)
+        {
+            Assert.Equal(message.Id, deserializedMessage.Id);
+            Assert.Equal(message.CallChainId, deserializedMessage.CallChainId);
+            Assert.Equal(message.BodyObject, deserializedMessage.BodyObject);
+            Assert.Equal(message.SendingGrain, deserializedMessage.SendingGrain);
+            Assert.Equal(message.SendingSilo, deserializedMessage.SendingSilo);
+            Assert.Equal(message.TargetGrain, deserializedMessage.TargetGrain);
+            Assert.Equal(message.TargetSilo, deserializedMessage.TargetSilo);
+            Assert.Equal(message.CacheInvalidationHeader.Count, deserializedMessage.CacheInvalidationHeader.Count);
+            foreach (var header in message.CacheInvalidationHeader)
+            {
+                Assert.Contains(header, deserializedMessage.CacheInvalidationHeader);
+            }
+
+            Assert.Equal(message.BodyObject, deserializedMessage.BodyObject);
+        }
+
+        private Message CreateTestMessage()
+        {
+            try
+            {
+                RequestContext.Set("fancy_feet", "yes");
+                var message = this.messageFactory.CreateMessage("ladida", InvokeMethodOptions.None);
+                message.SendingGrain = GrainId.Create("test", "foo");
+                message.TargetGrain = GrainId.Create("test2", "foo2");
+                message.SendingSilo = SiloAddress.New(IPAddress.Loopback, 12345, 543212345);
+                message.TargetSilo = SiloAddress.New(IPAddress.Parse("100.200.1.2"), 12345, 543212345);
+                message.CacheInvalidationHeader = new()
+                {
+                    new GrainAddress
+                    {
+                        GrainId = GrainId.Create("test", "foo"),
+                        ActivationId = ActivationId.NewId(),
+                        SiloAddress = SiloAddress.New(IPAddress.Parse("1.2.3.4"), 8285, 11)
+                    },
+
+                    new GrainAddress
+                    {
+                        GrainId = GrainId.Create("cow", "gertrude"),
+                        ActivationId = ActivationId.NewId(),
+                        SiloAddress = SiloAddress.New(IPAddress.Parse("2.2.2.22"), 1, 123456)
+                    }
+                };
+                return message;
+            }
+            finally
+            {
+                RequestContext.Clear();
+            }
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]

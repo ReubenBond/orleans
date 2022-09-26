@@ -1,35 +1,26 @@
 using Orleans.Serialization.Cloning;
-using Orleans.Serialization.Serializers;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
-    /// Serializer for <see cref="ImmutableDictionary{TKey, TValue}"/>.
+    /// Surrogate converter for <see cref="ImmutableDictionary{TKey, TValue}"/>.
     /// </summary>
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
-    [RegisterSerializer]
-    public sealed class ImmutableDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<ImmutableDictionary<TKey, TValue>, ImmutableDictionarySurrogate<TKey, TValue>>
+    [RegisterConverter]
+    public sealed class ImmutableDictionarySurrogateConverter<TKey, TValue> : IConverter<ImmutableDictionary<TKey, TValue>, ImmutableDictionarySurrogate<TKey, TValue>>
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ImmutableDictionaryCodec{TKey, TValue}"/> class.
-        /// </summary>
-        /// <param name="surrogateSerializer">The surrogate serializer.</param>
-        public ImmutableDictionaryCodec(IValueSerializer<ImmutableDictionarySurrogate<TKey, TValue>> surrogateSerializer) : base(surrogateSerializer)
-        {
-        }
-
         /// <inheritdoc/>
-        public override ImmutableDictionary<TKey, TValue> ConvertFromSurrogate(ref ImmutableDictionarySurrogate<TKey, TValue> surrogate) => surrogate.Values switch
+        public ImmutableDictionary<TKey, TValue> ConvertFromSurrogate(in ImmutableDictionarySurrogate<TKey, TValue> surrogate) => surrogate.Values switch
         {
             null => default,
             object => ImmutableDictionary.CreateRange(surrogate.Values)
         };
 
         /// <inheritdoc/>
-        public override void ConvertToSurrogate(ImmutableDictionary<TKey, TValue> value, ref ImmutableDictionarySurrogate<TKey, TValue> surrogate) => surrogate = value switch
+        public ImmutableDictionarySurrogate<TKey, TValue> ConvertToSurrogate(in ImmutableDictionary<TKey, TValue> value) => value switch
         {
             null => default,
             _ => new ImmutableDictionarySurrogate<TKey, TValue>
@@ -40,7 +31,7 @@ namespace Orleans.Serialization.Codecs
     }
 
     /// <summary>
-    /// Surrogate type used by <see cref="ImmutableDictionaryCodec{TKey, TValue}"/>.
+    /// Surrogate type used by <see cref="ImmutableDictionarySurrogateConverter{TKey, TValue}"/>.
     /// </summary>
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>

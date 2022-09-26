@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Invocation;
-using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Buffers;
 using System.Buffers.Binary;
 using Orleans.Connections.Transport;
 using System.Threading.Tasks.Sources;
@@ -86,13 +86,30 @@ namespace Orleans.Runtime.Messaging
             return TryDeframeMessage();
         }
 
-        void IThreadPoolWorkItem.Execute()
+        internal Message TestReadMessage()
         {
-            Message message = null;
+            var messageSerializer = _shared.GetMessageSerializer();
             try
             {
                 var buffer = Payload;
-                _shared.MessageSerializer.Read(in buffer, out message);
+                messageSerializer.Read(in buffer, out var message);
+                return message;
+            }
+            finally
+            {
+                _shared.Return(messageSerializer);
+                Reset();
+            }
+        }
+
+        void IThreadPoolWorkItem.Execute()
+        {
+            Message message = null;
+            var messageSerializer = _shared.GetMessageSerializer();
+            try
+            {
+                var buffer = Payload;
+                messageSerializer.Read(in buffer, out message);
                 _connection.OnReceivedMessage(message);
             }
             catch (Exception exception) when (HandleReceiveMessageFailure(message, exception))
@@ -100,6 +117,7 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
+                _shared.Return(messageSerializer);
                 Reset();
             }
 

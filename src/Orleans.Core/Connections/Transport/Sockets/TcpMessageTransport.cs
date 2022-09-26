@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Connections.Transport.Utilities;
 using Orleans.Connections.Sockets;
+using System.Diagnostics;
 
 namespace Orleans.Connections.Transport.Sockets;
 
@@ -107,7 +108,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
                 _socketDisposed = true;
 
                 // shutdownReason should only be null if the output was completed gracefully, so no one should ever
-                // ever observe the nondescript ConnectionAbortedException except for connection middleware attempting
+                // ever observe the nondescript ConnectionAbortedException except for  && request.Buffer.Lengthconnection middleware attempting
                 // to half close the connection which is currently unsupported.
                 _shutdownReason ??= new ConnectionAbortedException("The Socket transport's send loop completed gracefully.");
                 SocketsLog.ConnectionWriteFin(_logger, this, _shutdownReason.Message);
@@ -212,6 +213,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
                     // Process the request to completion.
                     while (true)
                     {
+                        Debug.Assert(request.Buffer.Length > 0);
                         await _socketReceiver.ReceiveAsync(_socket, request.Buffer);
 
                         if (_socketReceiver.HasError)
@@ -328,6 +330,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
                 // Handle each request.
                 while (TryDequeue(out request))
                 {
+                    _socketSender.Reset();
                     if (request.IsSingleBuffer)
                     {
                         await _socketSender.SendAsync(_socket, request.Buffer);

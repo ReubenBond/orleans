@@ -3,10 +3,8 @@ using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
@@ -14,11 +12,10 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Buffers.Adaptors;
-using System.Runtime.InteropServices;
 using static Orleans.Runtime.Message;
-using static Orleans.Serialization.Buffers.Adaptors.PooledBuffer;
+using static Orleans.Serialization.Buffers.PooledBuffer;
 using System.Diagnostics;
+using Orleans.Serialization.Utilities;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -40,8 +37,8 @@ namespace Orleans.Runtime.Messaging
 
         public MessageSerializer(
             Serializer<object> bodySerializer,
+            Serializer serializer,
             SerializerSessionPool sessionPool,
-            IServiceProvider services,
             Serializer<GrainAddress> activationAddressSerializer,
             ICodecProvider codecProvider,
             int maxHeaderSize)
@@ -50,7 +47,7 @@ namespace Orleans.Runtime.Messaging
             _writerSiloAddressCachingCodec = new CachingSiloAddressCodec();
             _readerIdSpanCachingCodec = new CachingIdSpanCodec();
             _writerIdSpanCachingCodec = new CachingIdSpanCodec();
-            _serializer = ActivatorUtilities.CreateInstance<Serializer>(services);
+            _serializer = serializer;
             _activationAddressCodec = activationAddressSerializer;
             _serializationSession = sessionPool.GetSession();
             _deserializationSession = sessionPool.GetSession();
@@ -68,7 +65,7 @@ namespace Orleans.Runtime.Messaging
 
                 // Decode header
                 message = new();
-                Deserialize(ref reader, message);
+                ReadMessageHeader(ref reader, message);
 
                 // TODO: DEFER BODY DECODING UNTIL LATER
                 // TODO: DEFER BODY DECODING UNTIL LATER
@@ -80,15 +77,39 @@ namespace Orleans.Runtime.Messaging
                 // TODO: DEFER BODY DECODING UNTIL LATER
                 // TODO: DEFER BODY DECODING UNTIL LATER
                 // Decode body
-                _deserializationSession.PartialReset();
-                reader = Reader.Create(buffer.Slice((int)reader.Position), _deserializationSession);
+                _deserializationSession.Reset();
+                var bodySlice = buffer.Slice((int)reader.Position);
+
+                var formatted = BitStreamFormatter.Format(bodySlice, _deserializationSession);
+                _deserializationSession.Reset();
+                Debug.WriteLine($"== START {message.Id} ==\n{formatted}\n== END {message.Id} ==");
+
+                reader = Reader.Create(bodySlice, _deserializationSession);
                 var fieldHeader = reader.ReadFieldHeader();
                 message.BodyObject = ObjectCodec.ReadValue(ref reader, fieldHeader);
             }
             finally
             {
-                _deserializationSession.PartialReset();
+                _deserializationSession.Reset();
             }
+        }
+
+        public void ReadHeader(in BufferSlice buffer, out Message message)
+        {
+            using var session = _sessionPool.GetSession();
+            var reader = Reader.Create(buffer, session);
+
+            // Decode header
+            message = new();
+            ReadMessageHeader(ref reader, message);
+        }
+
+        public void ReadBody(in BufferSlice buffer, Message message)
+        {
+            using var session = _sessionPool.GetSession();
+            var reader = Reader.Create(buffer, session);
+            var fieldHeader = reader.ReadFieldHeader();
+            message.BodyObject = ObjectCodec.ReadValue(ref reader, fieldHeader);
         }
 
         public void Write(ref PooledBuffer buffer, Message message)
@@ -96,30 +117,37 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 // Write the header and the payload
+                var start = buffer.Length;
                 var writer = Writer.Create(buffer, _serializationSession);
-                Serialize(ref writer, message);
+                WriteMessageHeader(ref writer, message);
                 writer.Commit();
+                var length = writer.Position;
+                _serializationSession.Reset();
 
-                _serializationSession.PartialReset();
+                var headerSlice = writer.Output.Slice(start, length);
+                ReadHeader(in headerSlice, out var readMsg);
 
-                writer = Writer.Create(writer.Output, _serializationSession);
+                // Reset the writer, since the header and body are deserialized separately.
+                var bodyBuffer = writer.Output;
+                writer = Writer.Create(bodyBuffer, _serializationSession);
                 ObjectCodec.WriteField(ref writer, 0, typeof(object), message.BodyObject);
                 writer.Commit();
 
+                ReadBody(writer.Output.Slice(start + length), readMsg);
+
                 // Copy the modified writer output struct back (we may be able to avoid this once ref structs can hold ref fields)
+                length += writer.Position;
                 buffer = writer.Output;
 
                 // Before completing, check lengths
-                var length = writer.Position;
-                ThrowIfLengthInvalid(length);
+                ThrowIfLengthInvalid(buffer.Length);
             }
             finally
             {
-                _serializationSession.PartialReset();
+                _serializationSession.Reset();
             }
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         private void ThrowIfLengthInvalid(int length)
         {
             if (length <= 0 || length > _maxMessageLength)
@@ -128,7 +156,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private Message Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Message value) where TBufferWriter : IBufferWriter<byte>
+        private Message WriteMessageHeader<TBufferWriter>(ref Writer<TBufferWriter> writer, Message value) where TBufferWriter : IBufferWriter<byte>
         {
             var headers = value.Headers;
             writer.WriteUInt32((uint)headers);
@@ -173,7 +201,7 @@ namespace Orleans.Runtime.Messaging
             return value;
         }
 
-        private void Deserialize<TInput>(ref Reader<TInput> reader, Message result)
+        private void ReadMessageHeader<TInput>(ref Reader<TInput> reader, Message result)
         {
             var headers = (PackedHeaders)reader.ReadUInt32();
 

@@ -1,7 +1,10 @@
 using System;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Net.NetworkInformation;
 
 namespace Orleans.Serialization.Buffers.Adaptors;
-using static Orleans.Serialization.Buffers.Adaptors.PooledBuffer;
+using static Orleans.Serialization.Buffers.PooledBuffer;
 
 public struct BufferSliceReaderInput
 {
@@ -9,6 +12,7 @@ public struct BufferSliceReaderInput
     private static readonly SequenceSegment FinalSegmentSentinel = new();
     private readonly BufferSlice _slice;
     private SequenceSegment _segment;
+    private int _position;
 
     public BufferSliceReaderInput(in BufferSlice slice)
     {
@@ -16,10 +20,16 @@ public struct BufferSliceReaderInput
         _segment = InitialSegmentSentinel;
     }
 
-    internal readonly PooledBuffer Writer => _slice._buffer;
-    internal int Position { get; private set; }
+    internal readonly PooledBuffer Buffer => _slice._buffer;
+    internal readonly int Position => _position;
     internal readonly int Offset => _slice._offset;
     internal readonly int Length => _slice._length;
+
+    public BufferSliceReaderInput ForkFrom(int position)
+    {
+        var sliced = _slice.Slice(position);
+        return new BufferSliceReaderInput(in sliced);
+    }
 
     public ReadOnlySpan<byte> GetNext()
     {
@@ -35,19 +45,19 @@ public struct BufferSliceReaderInput
 
             // Find the starting segment and the offset to copy from.
             int segmentOffset;
-            if (Position < Offset)
+            if (_position < Offset)
             {
-                if (Position + segment.Length <= Offset)
+                if (_position + segment.Length <= Offset)
                 {
                     // Start is in a subsequent segment
-                    Position += segment.Length;
+                    _position += segment.Length;
                     _segment = _segment.Next as SequenceSegment;
                     continue;
                 }
                 else
                 {
                     // Start is in this segment
-                    segmentOffset = Offset - Position;
+                    segmentOffset = Offset;
                 }
             }
             else
@@ -55,21 +65,40 @@ public struct BufferSliceReaderInput
                 segmentOffset = 0;
             }
 
-            var result = segment[segmentOffset..Math.Min(segment.Length - segmentOffset, endPosition - (Position + segmentOffset))];
-            Position += result.Length;
+            var segmentLength = Math.Min(segment.Length - segmentOffset, endPosition - (_position + segmentOffset));
+            if (segmentLength == 0)
+            {
+                ThrowInsufficientData();
+                return ReadOnlySpan<byte>.Empty;
+            }
+
+            var result = segment.Slice(segmentOffset, segmentLength);
+            _position += segmentOffset + segmentLength;
             _segment = _segment.Next as SequenceSegment;
             return result;
         }
 
-        if (_segment != FinalSegmentSentinel && Writer._currentPosition > 0 && Writer._writeHead is { } head && Position < endPosition)
+        if (_segment != FinalSegmentSentinel && Buffer._currentPosition > 0 && Buffer._writeHead is { } head && _position < endPosition)
         {
-            var offset = Math.Max(Offset - Position, 0);
-            var result = head.Array.AsSpan(offset, Math.Min(Writer._currentPosition, endPosition - (Position + offset)));
+            var finalOffset = Math.Max(Offset - _position, 0);
+            var finalLength = Math.Min(Buffer._currentPosition, endPosition - (_position + finalOffset));
+            if (finalLength == 0)
+            {
+                ThrowInsufficientData();
+                return ReadOnlySpan<byte>.Empty;
+            }
+
+            var result = head.Array.AsSpan(finalOffset, finalLength);
+            _position += finalLength;
+            Debug.Assert(_position == endPosition);
             _segment = FinalSegmentSentinel;
-            Position = endPosition;
             return result;
         }
 
+        ThrowInsufficientData();
         return ReadOnlySpan<byte>.Empty;
     }
+
+    [DoesNotReturn]
+    private static void ThrowInsufficientData() => throw new InvalidOperationException("Insufficient data present in buffer.");
 }
