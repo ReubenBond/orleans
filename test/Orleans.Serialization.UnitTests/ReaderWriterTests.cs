@@ -1,4 +1,4 @@
-﻿using CsCheck;
+using CsCheck;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Session;
@@ -14,14 +14,14 @@ using Xunit.Abstractions;
 namespace Orleans.Serialization.UnitTests
 {
     [Trait("Category", "BVT")]
-    public sealed class ReaderWriterPoolingStreamTest : ReaderWriterTestBase<Stream, PoolingStreamBufferWriter, ReaderInput>
+    public sealed class ReaderWriterPoolingStreamTest : ReaderWriterTestBase<Stream, PoolingStreamBufferWriter, StreamReaderInput>
     {
         public ReaderWriterPoolingStreamTest(ITestOutputHelper output) : base(output)
         {
         }
 
         protected override Stream CreateBuffer() => new MemoryStream();
-        protected override Reader<ReaderInput> CreateReader(Stream buffer, SerializerSession session)
+        protected override Reader<StreamReaderInput> CreateReader(Stream buffer, SerializerSession session)
         {
             buffer.Position = 0;
             return Reader.Create(buffer, session);
@@ -58,14 +58,14 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [Trait("Category", "BVT")]
-    public sealed class ReaderWriterStreamTest : ReaderWriterTestBase<Stream, ArrayStreamBufferWriter, ReaderInput>
+    public sealed class ReaderWriterStreamTest : ReaderWriterTestBase<Stream, ArrayStreamBufferWriter, StreamReaderInput>
     {
         public ReaderWriterStreamTest(ITestOutputHelper output) : base(output)
         {
         }
 
         protected override Stream CreateBuffer() => new MemoryStream();
-        protected override Reader<ReaderInput> CreateReader(Stream buffer, SerializerSession session)
+        protected override Reader<StreamReaderInput> CreateReader(Stream buffer, SerializerSession session)
         {
             buffer.Position = 0;
             return Reader.Create(buffer, session);
@@ -98,14 +98,14 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [Trait("Category", "BVT")]
-    public sealed class ReaderWriterMemoryStreamTest : ReaderWriterTestBase<MemoryStream, MemoryStreamBufferWriter, ReaderInput>
+    public sealed class ReaderWriterMemoryStreamTest : ReaderWriterTestBase<MemoryStream, MemoryStreamBufferWriter, StreamReaderInput>
     {
         public ReaderWriterMemoryStreamTest(ITestOutputHelper output) : base(output)
         {
         }
 
         protected override MemoryStream CreateBuffer() => new();
-        protected override Reader<ReaderInput> CreateReader(MemoryStream buffer, SerializerSession session)
+        protected override Reader<StreamReaderInput> CreateReader(MemoryStream buffer, SerializerSession session)
         {
             buffer.Position = 0;
             return Reader.Create(buffer, session);
@@ -175,14 +175,14 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [Trait("Category", "BVT")]
-    public sealed class ReaderWriterSegmentWriterTest : ReaderWriterTestBase<TestMultiSegmentBufferWriter, TestMultiSegmentBufferWriter, ReadOnlySequence<byte>>
+    public sealed class ReaderWriterSegmentWriterTest : ReaderWriterTestBase<TestMultiSegmentBufferWriter, TestMultiSegmentBufferWriter, ReadOnlySequenceReaderInput>
     {
         public ReaderWriterSegmentWriterTest(ITestOutputHelper output) : base(output)
         {
         }
 
         protected override TestMultiSegmentBufferWriter CreateBuffer() => new(maxAllocationSize: 10);
-        protected override Reader<ReadOnlySequence<byte>> CreateReader(TestMultiSegmentBufferWriter buffer, SerializerSession session) => Reader.Create(buffer.GetReadOnlySequence(maxSegmentSize: 8), session);
+        protected override Reader<ReadOnlySequenceReaderInput> CreateReader(TestMultiSegmentBufferWriter buffer, SerializerSession session) => Reader.Create(buffer.GetReadOnlySequence(maxSegmentSize: 8), session);
         protected override Writer<TestMultiSegmentBufferWriter> CreateWriter(TestMultiSegmentBufferWriter buffer, SerializerSession session) => Writer.Create(buffer, session);
         protected override TestMultiSegmentBufferWriter GetBuffer(TestMultiSegmentBufferWriter originalBuffer, TestMultiSegmentBufferWriter output) => output;
         protected override void DisposeBuffer(TestMultiSegmentBufferWriter buffer, TestMultiSegmentBufferWriter output)

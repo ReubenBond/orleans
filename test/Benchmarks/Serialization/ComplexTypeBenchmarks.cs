@@ -36,6 +36,7 @@ namespace Benchmarks
         private readonly SimpleStruct _structValue;
         private readonly Message _message;
         private readonly Message _structMessage;
+        private PooledBuffer.BufferSlice _orleansPooledBufferSlice;
 
         public ComplexTypeBenchmarks()
         {
@@ -79,6 +80,10 @@ namespace Benchmarks
 
             _pipe = new Pipe(new PipeOptions(readerScheduler: PipeScheduler.Inline, writerScheduler: PipeScheduler.Inline, pauseWriterThreshold: 0));
             _messageSerializer = new(_sessionPool, new SharedMemoryPool(), new SiloMessagingOptions());
+
+            var pooledBuffer = new PooledBuffer();
+            pooledBuffer.Write(_serializedPayload);
+            _orleansPooledBufferSlice = pooledBuffer.Slice();
         }
 
         [Fact]
@@ -140,7 +145,7 @@ namespace Benchmarks
         }
 
         [Fact]
-        //[Benchmark]
+        [Benchmark]
         public object OrleansClassRoundTrip()
         {
             var writer = Buffer.CreateWriter(_session);
@@ -155,7 +160,7 @@ namespace Benchmarks
         }
 
         [Fact]
-        //[Benchmark]
+        [Benchmark]
         public void OrleansMessageSerializerClassRoundTrip()
         {
             _messageSerializer.Write(_pipe.Writer, _message);
@@ -173,7 +178,7 @@ namespace Benchmarks
         }
 
         [Fact]
-        //[Benchmark]
+        [Benchmark]
         public object OrleansSerialize()
         {
             var writer = Buffer.CreateWriter(_session);
@@ -184,7 +189,7 @@ namespace Benchmarks
         }
 
         [Fact]
-        //[Benchmark]
+        [Benchmark]
         public object OrleansDeserialize()
         {
             _session.FullReset();
@@ -193,7 +198,16 @@ namespace Benchmarks
         }
 
         [Fact]
-        //[Benchmark]
+        [Benchmark]
+        public object OrleansDeserialize_PooledBuffer()
+        {
+            _session.FullReset();
+            var reader = Reader.Create(_orleansPooledBufferSlice, _session);
+            return _serializer.Deserialize(ref reader);
+        }
+
+        [Fact]
+        [Benchmark]
         public int OrleansReadEachByte()
         {
             var sum = 0;

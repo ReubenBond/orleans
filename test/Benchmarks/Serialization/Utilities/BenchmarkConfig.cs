@@ -12,6 +12,7 @@ namespace Benchmarks.Utilities
             ArtifactsPath = ".\\BenchmarkDotNet.Aritfacts." + DateTime.Now.ToString("u").Replace(' ', '_').Replace(':', '-');
             AddExporter(MarkdownExporter.GitHub);
             AddDiagnoser(MemoryDiagnoser.Default);
+            AddDiagnoser(new DisassemblyDiagnoser(new DisassemblyDiagnoserConfig(maxDepth: 20, printSource: true)));
             Options |= ConfigOptions.KeepBenchmarkFiles;
         }
     }

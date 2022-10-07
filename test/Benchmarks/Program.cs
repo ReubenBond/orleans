@@ -250,6 +250,16 @@ namespace Benchmarks
             {
                 _ = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
             }
+            // Temp
+            , 
+            ["ctdl"] = _ =>
+            {
+                var benchmark = new ComplexTypeBenchmarks();
+                while (true)
+                {
+                    benchmark.OrleansDeserialize_PooledBuffer();
+                }
+            },
         };
 
         // requires benchmark name or 'All' word as first parameter
