@@ -727,6 +727,19 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="source">The source buffer.</param>
         /// <returns>The deserialized value.</returns>
+        public T Deserialize(PooledBuffer.BufferSlice source)
+        {
+            using var session = _sessionPool.GetSession();
+            var reader = Reader.Create(source, session);
+            var field = reader.ReadFieldHeader();
+            return _codec.ReadValue(ref reader, field);
+        }
+
+        /// <summary>
+        /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <returns>The deserialized value.</returns>
         public T Deserialize(Stream source)
         {
             using var session = _sessionPool.GetSession();

@@ -1,6 +1,7 @@
 using System;
 using System.Buffers;
 using System.IO;
+using System.IO.Pipelines;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -11,6 +12,8 @@ using Benchmarks.Utilities;
 using MessagePack;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
+using Xunit;
 
 namespace Benchmarks.Serialization.Comparison;
 
@@ -25,6 +28,8 @@ public class ArrayDeserializeBenchmark
     private static readonly byte[] _protobufPayload;
     private static readonly byte[] _orleansPayload;
     private static readonly byte[] _messagePackPayload;
+    private static readonly ReadOnlySequence<byte> _orleansReadOnlySequencePayload;
+    private static PooledBuffer.BufferSlice _orleansPooledBufferPayload;
 
     static ArrayDeserializeBenchmark()
     {
@@ -43,6 +48,20 @@ public class ArrayDeserializeBenchmark
         stream.Position = 0;
         _protobufPayload = stream.ToArray();
         _stjPayload = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(_value));
+
+        {
+            var pipe = new Pipe();
+            pipe.Writer.Write(_orleansPayload);
+            pipe.Writer.FlushAsync().GetAwaiter().GetResult();
+            var res = pipe.Reader.ReadAsync().GetAwaiter().GetResult();
+            _orleansReadOnlySequencePayload = res.Buffer;
+        }
+
+        {
+            var buffer = new PooledBuffer();
+            buffer.Write(_orleansPayload);
+            _orleansPooledBufferPayload = buffer.Slice();
+        }
     }
 
     [Benchmark(Baseline = true)]
@@ -56,5 +75,11 @@ public class ArrayDeserializeBenchmark
 
     [Benchmark]
     public MyVector3[] OrleansDeserialize() => _orleansSerializer.Deserialize(_orleansPayload);
+
+    [Benchmark]
+    public MyVector3[] OrleansPipeDeserialize() => _orleansSerializer.Deserialize(_orleansReadOnlySequencePayload);
+
+    [Benchmark]
+    public MyVector3[] OrleansPooledBufferDeserialize() => _orleansSerializer.Deserialize(_orleansPooledBufferPayload);
 }
 #pragma warning restore IDE1006 // Naming Styles

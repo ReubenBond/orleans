@@ -1,13 +1,17 @@
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 #if NETCOREAPP3_1_OR_GREATER
 using System.Numerics;
 #endif
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Session;
+using static Orleans.Serialization.Buffers.PooledBuffer;
 #if !NETCOREAPP3_1_OR_GREATER
 using Orleans.Serialization.Utilities;
 #endif
@@ -15,85 +19,27 @@ using Orleans.Serialization.Utilities;
 namespace Orleans.Serialization.Buffers
 {
     /// <summary>
-    /// Functionality for reading binary data.
+    /// An input type for <see cref="Reader{T}"/> which reads from a stream.
     /// </summary>
-    public abstract class ReaderInput
+    public struct StreamReaderInput
     {
+        [ThreadStatic]
+        private static byte[] Scratch;
+        private readonly Stream _stream;
+        private readonly ArrayPool<byte> _memoryPool;
+        internal long GlobalOffset;
+
         /// <summary>
         /// Gets the position.
         /// </summary>
         /// <value>The position.</value>
-        public abstract long Position { get; }
+        public long Position => _stream.Position;
 
         /// <summary>
         /// Gets the length.
         /// </summary>
         /// <value>The length.</value>
-        public abstract long Length { get; }
-
-        /// <summary>
-        /// Skips the specified number of bytes.
-        /// </summary>
-        /// <param name="count">The number of bytes to skip.</param>
-        public abstract void Skip(long count);
-
-        /// <summary>
-        /// Seeks to the specified position.
-        /// </summary>
-        /// <param name="position">The position.</param>
-        public abstract void Seek(long position);
-
-        /// <summary>
-        /// Reads a byte from the input.
-        /// </summary>
-        /// <returns>The byte which was read.</returns>
-        public abstract byte ReadByte();
-
-        /// <summary>
-        /// Reads a <see cref="uint"/> from the input.
-        /// </summary>
-        /// <returns>The <see cref="uint"/> which was read.</returns>
-        public abstract uint ReadUInt32();
-
-        /// <summary>
-        /// Reads a <see cref="ulong"/> from the input.
-        /// </summary>
-        /// <returns>The <see cref="ulong"/> which was read.</returns>
-        public abstract ulong ReadUInt64();
-
-        /// <summary>
-        /// Fills the destination span with data from the input.
-        /// </summary>
-        /// <param name="destination">The destination.</param>
-        public abstract void ReadBytes(Span<byte> destination);
-
-        /// <summary>
-        /// Reads bytes from the input into the destination array.
-        /// </summary>
-        /// <param name="destination">The destination array.</param>
-        /// <param name="offset">The offset into the destination to start writing bytes.</param>
-        /// <param name="length">The number of bytes to copy into destination.</param>
-        public abstract void ReadBytes(byte[] destination, int offset, int length);
-
-        /// <summary>
-        /// Tries to read the specified number of bytes from the input.
-        /// </summary>
-        /// <param name="length">The number of bytes to read..</param>
-        /// <param name="bytes">The bytes which were read..</param>
-        /// <returns><see langword="true"/> if the number of bytes were successfully read, <see langword="false"/> otherwise.</returns>
-        public abstract bool TryReadBytes(int length, out ReadOnlySpan<byte> bytes);
-    }
-
-    internal sealed class StreamReaderInput : ReaderInput
-    {
-        [ThreadStatic]
-        private static byte[] Scratch;
-
-        private readonly Stream _stream;
-        private readonly ArrayPool<byte> _memoryPool;
-
-        public override long Position => _stream.Position;
-        public override long Length => _stream.Length;
+        public long Length => _stream.Length;
 
         public StreamReaderInput(Stream stream, ArrayPool<byte> memoryPool)
         {
@@ -101,7 +47,11 @@ namespace Orleans.Serialization.Buffers
             _memoryPool = memoryPool;
         }
 
-        public override byte ReadByte()
+        /// <summary>
+        /// Reads a byte from the input.
+        /// </summary>
+        /// <returns>The byte which was read.</returns>
+        public byte ReadByte()
         {
             var c = _stream.ReadByte();
             if (c < 0)
@@ -112,8 +62,12 @@ namespace Orleans.Serialization.Buffers
             return (byte)c;
         }
 
+        /// <summary>
+        /// Fills the destination span with data from the input.
+        /// </summary>
+        /// <param name="destination">The destination.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override void ReadBytes(Span<byte> destination)
+        public void ReadBytes(Span<byte> destination)
         {
             var count = _stream.Read(destination);
             if (count < destination.Length)
@@ -122,7 +76,13 @@ namespace Orleans.Serialization.Buffers
             }
         }
 
-        public override void ReadBytes(byte[] destination, int offset, int length)
+        /// <summary>
+        /// Reads bytes from the input into the destination array.
+        /// </summary>
+        /// <param name="destination">The destination array.</param>
+        /// <param name="offset">The offset into the destination to start writing bytes.</param>
+        /// <param name="length">The number of bytes to copy into destination.</param>
+        public void ReadBytes(byte[] destination, int offset, int length)
         {
             var count = _stream.Read(destination, offset, length);
             if (count < length)
@@ -131,31 +91,53 @@ namespace Orleans.Serialization.Buffers
             }
         }
 
+        /// <summary>
+        /// Reads a <see cref="uint"/> from the input.
+        /// </summary>
+        /// <returns>The <see cref="uint"/> which was read.</returns>
 #if NET5_0_OR_GREATER
         [SkipLocalsInit]
 #endif
-        public override uint ReadUInt32()
+        public uint ReadUInt32()
         {
             Span<byte> buffer = stackalloc byte[sizeof(uint)];
             ReadBytes(buffer);
             return BinaryPrimitives.ReadUInt32LittleEndian(buffer);
         }
 
+        /// <summary>
+        /// Reads a <see cref="ulong"/> from the input.
+        /// </summary>
+        /// <returns>The <see cref="ulong"/> which was read.</returns>
 #if NET5_0_OR_GREATER
         [SkipLocalsInit]
 #endif
-        public override ulong ReadUInt64()
+        public ulong ReadUInt64()
         {
             Span<byte> buffer = stackalloc byte[sizeof(ulong)];
             ReadBytes(buffer);
             return BinaryPrimitives.ReadUInt64LittleEndian(buffer);
         }
 
-        public override void Skip(long count) => _ = _stream.Seek(count, SeekOrigin.Current);
+        /// <summary>
+        /// Skips the specified number of bytes.
+        /// </summary>
+        /// <param name="count">The number of bytes to skip.</param>
+        public void Skip(long count) => _ = _stream.Seek(count, SeekOrigin.Current);
 
-        public override void Seek(long position) => _ = _stream.Seek(position, SeekOrigin.Begin);
+        /// <summary>
+        /// Seeks to the specified position.
+        /// </summary>
+        /// <param name="position">The position.</param>
+        public void Seek(long position) => _ = _stream.Seek(position, SeekOrigin.Begin);
 
-        public override bool TryReadBytes(int length, out ReadOnlySpan<byte> destination)
+        /// <summary>
+        /// Tries to read the specified number of bytes from the input.
+        /// </summary>
+        /// <param name="length">The number of bytes to read..</param>
+        /// <param name="destination">The bytes which were read..</param>
+        /// <returns><see langword="true"/> if the number of bytes were successfully read, <see langword="false"/> otherwise.</returns>
+        public bool TryReadBytes(int length, out ReadOnlySpan<byte> destination)
         {
             // Cannot get a span pointing to a stream's internal buffer.
             destination = default;
@@ -175,11 +157,38 @@ namespace Orleans.Serialization.Buffers
         /// <summary>
         /// Creates a reader for the provided input stream.
         /// </summary>
+        /// <param name="input">The input.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Reader<BufferSliceReaderInput> Create(PooledBuffer input, SerializerSession session) => Create(input.Slice(), session);
+
+        /// <summary>
+        /// Creates a reader for the provided input stream.
+        /// </summary>
+        /// <param name="input">The input.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Reader<BufferSliceReaderInput> Create(BufferSlice input, SerializerSession session) => Create(new BufferSliceReaderInput(input), session);
+
+        /// <summary>
+        /// Creates a reader for the provided input stream.
+        /// </summary>
+        /// <param name="input">The input.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Reader<BufferSliceReaderInput> Create(BufferSliceReaderInput input, SerializerSession session) => new Reader<BufferSliceReaderInput>(input, session, 0);
+
+        /// <summary>
+        /// Creates a reader for the provided input stream.
+        /// </summary>
         /// <param name="stream">The stream.</param>
         /// <param name="session">The session.</param>
         /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Reader<ReaderInput> Create(Stream stream, SerializerSession session) => new Reader<ReaderInput>(new StreamReaderInput(stream, ArrayPool<byte>.Shared), session, 0);
+        public static Reader<StreamReaderInput> Create(Stream stream, SerializerSession session) => new Reader<StreamReaderInput>(new StreamReaderInput(stream, ArrayPool<byte>.Shared), session, 0);
 
         /// <summary>
         /// Creates a reader for the provided input data.
@@ -188,7 +197,7 @@ namespace Orleans.Serialization.Buffers
         /// <param name="session">The session.</param>
         /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Reader<ReadOnlySequence<byte>> Create(ReadOnlySequence<byte> sequence, SerializerSession session) => new Reader<ReadOnlySequence<byte>>(sequence, session, 0);
+        public static Reader<ReadOnlySequenceReaderInput> Create(ReadOnlySequence<byte> sequence, SerializerSession session) => new(new ReadOnlySequenceReaderInput(sequence), session, 0);
 
         /// <summary>
         /// Creates a reader for the provided input data.
@@ -221,8 +230,25 @@ namespace Orleans.Serialization.Buffers
     /// <summary>
     /// Marker type for <see cref="Reader{TInput}"/> objects which operate over <see cref="ReadOnlySpan{Byte}"/> buffers.
     /// </summary>
-    public readonly struct SpanReaderInput
+    public struct SpanReaderInput
     {
+        internal long Length;
+    }
+
+    /// <summary>
+    /// <see cref="Reader{TInput}"/> provider which operates over <see cref="ReadOnlySequence{Byte}"/> buffers.
+    /// </summary>
+    public struct ReadOnlySequenceReaderInput
+    {
+        internal readonly ReadOnlySequence<byte> Sequence;
+        internal SequencePosition NextSequencePosition;
+        internal long VisitedBuffersLength;
+
+        public ReadOnlySequenceReaderInput(ReadOnlySequence<byte> sequence)
+        {
+            Sequence = sequence;
+            NextSequencePosition = sequence.Start;
+        }
     }
 
     /// <summary>
@@ -232,8 +258,9 @@ namespace Orleans.Serialization.Buffers
     public ref struct Reader<TInput>
     {
         private readonly static bool IsSpanInput = typeof(TInput) == typeof(SpanReaderInput);
-        private readonly static bool IsReadOnlySequenceInput = typeof(TInput) == typeof(ReadOnlySequence<byte>);
-        private readonly static bool IsReaderInput = typeof(ReaderInput).IsAssignableFrom(typeof(TInput));
+        private readonly static bool IsReadOnlySequenceInput = typeof(TInput) == typeof(ReadOnlySequenceReaderInput);
+        private readonly static bool IsStreamReaderInput = typeof(TInput) == typeof(StreamReaderInput);
+        private readonly static bool IsBufferSliceInput = typeof(TInput) == typeof(BufferSliceReaderInput);
         
         private ReadOnlySpan<byte> _currentSpan;
         private SequencePosition _nextSequencePosition;

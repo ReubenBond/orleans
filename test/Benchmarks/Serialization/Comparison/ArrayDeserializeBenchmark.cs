@@ -148,8 +148,8 @@ public class ArraySerializeBenchmark
     }
 
     [Fact]
-    [Benchmark]
-    public void OrleansPipeWriter()
+    [Benchmark, BenchmarkCategory("PipeWriter")]
+    public void OrleansSerialize_PipeWriter()
     {
         var writer = _pipe.Writer.CreateWriter(_session);
         _orleansSerializer.Serialize(_value, ref writer);
@@ -158,5 +158,15 @@ public class ArraySerializeBenchmark
         _pipe.Writer.Complete();
         _pipe.Reader.Complete();
         _pipe.Reset();
+    }
+
+    [Fact]
+    [Benchmark, BenchmarkCategory("PooledBuffer")]
+    public void OrleansSerialize_PooledBuffer()
+    {
+        var writer = Writer.CreatePooled(_session);
+        _orleansSerializer.Serialize(_value, ref writer);
+        _session.FullReset();
+        writer.Output.Reset();
     }
 }

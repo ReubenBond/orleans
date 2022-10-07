@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Codecs;
 
 namespace Orleans.Runtime.Messaging
@@ -131,7 +130,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            var innerWriter = Writer.Create(new PooledArrayBufferWriter(), null);
+            var innerWriter = Writer.Create(new PooledBuffer(), null);
             innerWriter.WriteInt32(value.GetConsistentHashCode());
             WriteSiloAddressInner(ref innerWriter, value);
             innerWriter.Commit();
