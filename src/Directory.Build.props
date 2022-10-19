@@ -7,8 +7,13 @@
 
   <PropertyGroup>
     <WarningLevel>3</WarningLevel>
-    <AnalysisLevel>preview</AnalysisLevel>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>All</AnalysisMode>
     <Features>strict</Features>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
+    <WarnAsError>$(WarnAsError);1591</WarnAsError>
   </PropertyGroup>
 
   <PropertyGroup>
