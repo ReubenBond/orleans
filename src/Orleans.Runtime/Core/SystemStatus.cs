@@ -21,35 +21,27 @@ namespace Orleans.Runtime
         };
 
         /// <summary>Status = Unknown</summary>
-        [SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         public static readonly SystemStatus Unknown = new SystemStatus(InternalSystemStatus.Unknown);
 
         /// <summary>Status = Creating</summary>
-        [SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         public static readonly SystemStatus Creating = new SystemStatus(InternalSystemStatus.Creating);
 
         /// <summary>Status = Created</summary>
-        [SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         public static readonly SystemStatus Created = new SystemStatus(InternalSystemStatus.Created);
 
         /// <summary>Status = Starting</summary>
-        [SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         public static readonly SystemStatus Starting = new SystemStatus(InternalSystemStatus.Starting);
-        
+
         /// <summary>Status = Running</summary>
-        [SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         public static readonly SystemStatus Running = new SystemStatus(InternalSystemStatus.Running);
-        
+
         /// <summary>Status = Stopping</summary>
-        [SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         public static readonly SystemStatus Stopping = new SystemStatus(InternalSystemStatus.Stopping);
-        
+
         /// <summary>Status = ShuttingDown</summary>
-        [SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         public static readonly SystemStatus ShuttingDown = new SystemStatus(InternalSystemStatus.ShuttingDown);
 
         /// <summary>Status = Terminated</summary>
-        [SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         public static readonly SystemStatus Terminated = new SystemStatus(InternalSystemStatus.Terminated);
 
         private readonly InternalSystemStatus value;

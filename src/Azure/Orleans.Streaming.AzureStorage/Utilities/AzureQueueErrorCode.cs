@@ -2,7 +2,6 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.AzureUtils.Utilities
 {
-    [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal enum AzureQueueErrorCode
     {
         Runtime = 100000,

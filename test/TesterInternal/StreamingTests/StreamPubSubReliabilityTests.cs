@@ -119,7 +119,7 @@ namespace UnitTests.StreamingTests
 
             await producer.SendItem(1);
 
-            int received1 = 0;
+            int received1;
             var cts = new CancellationTokenSource(1000);
             do
             {

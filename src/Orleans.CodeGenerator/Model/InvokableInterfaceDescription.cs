@@ -67,9 +67,7 @@ namespace Orleans.CodeGenerator
 
         private List<MethodDescription> GetMethods(INamedTypeSymbol symbol)
         {
-#pragma warning disable RS1024 // Compare symbols correctly
             var methods = new Dictionary<IMethodSymbol, bool>(MethodSignatureComparer.Default);
-#pragma warning restore RS1024 // Compare symbols correctly
             foreach (var iface in GetAllInterfaces(symbol))
             {
                 foreach (var method in iface.GetDeclaredInstanceMembers<IMethodSymbol>())

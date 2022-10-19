@@ -46,9 +46,7 @@ namespace Orleans.Runtime
 
         // The task representing this activation's message loop.
         // This field is assigned and never read and exists only for debugging purposes (eg, in memory dumps, to associate a loop task with an activation).
-#pragma warning disable IDE0052 // Remove unread private members
         private readonly Task _messageLoopTask;
-#pragma warning restore IDE0052 // Remove unread private members
 
         public ActivationData(
             GrainAddress addr,

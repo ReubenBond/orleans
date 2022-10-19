@@ -51,7 +51,6 @@ namespace Orleans.AzureUtils
         /// <summary> Name of the table queue instance is managing. </summary>
         public string QueueName { get; private set; }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         private readonly ILogger logger;
         private readonly TimeSpan? messageVisibilityTimeout;
         private readonly AzureQueueOptions options;

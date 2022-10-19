@@ -39,7 +39,6 @@
   <!-- Common compile parameters -->
   <PropertyGroup>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <NoWarn>$(NoWarn);1591;2003</NoWarn>
   </PropertyGroup>
 
   <!-- FSharp SDK overrides -->
@@ -61,7 +60,7 @@
     <!-- Microsoft packages -->
     <MicrosoftBuildVersion>17.3.2</MicrosoftBuildVersion>
     <MicrosoftCodeAnalysisVersion>4.4.0-2.final</MicrosoftCodeAnalysisVersion>
-    <MicrosoftCodeAnalysisAnalyzersVersion>3.3.4-beta1.22403.2</MicrosoftCodeAnalysisAnalyzersVersion>
+    <MicrosoftCodeAnalysisAnalyzersVersion>3.3.4-beta1.22464.1</MicrosoftCodeAnalysisAnalyzersVersion>
     <MicrosoftCSharpVersion>4.7.0</MicrosoftCSharpVersion>
 
     <MicrosoftAspNetCoreConnectionsAbstractionsVersion>7.0.0-rc.2.22476.2</MicrosoftAspNetCoreConnectionsAbstractionsVersion>

@@ -105,12 +105,10 @@ namespace Orleans.Serialization.Buffers
         private static readonly bool IsMemoryStreamOutput = typeof(TBufferWriter) == typeof(MemoryStreamBufferWriter);
         private static readonly bool IsArrayStreamOutput = typeof(TBufferWriter) == typeof(ArrayStreamBufferWriter);
 
-#pragma warning disable IDE0044 // Add readonly modifier        
         /// <summary>
         /// The output buffer writer.
         /// </summary>
         private TBufferWriter _output;
-#pragma warning restore IDE0044 // Add readonly modifier
 
         /// <summary>
         /// The current write span.

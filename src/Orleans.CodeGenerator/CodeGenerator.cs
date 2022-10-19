@@ -133,12 +133,8 @@ namespace Orleans.CodeGenerator
         private MetadataModel GenerateMetadataModel(CancellationToken cancellationToken)
         {
             var metadataModel = new MetadataModel();
-
-#pragma warning disable RS1024 // Compare symbols correctly
             var referencedAssemblies = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
             var assembliesToExamine = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
-#pragma warning restore RS1024 // Compare symbols correctly
-
             var compilationAsm = LibraryTypes.Compilation.Assembly;
             ComputeAssembliesToExamine(compilationAsm, assembliesToExamine);
 
@@ -168,10 +164,7 @@ namespace Orleans.CodeGenerator
             }
 
             // The mapping of proxy base types to a mapping of return types to invokable base types. Used to set default invokable base types for each proxy base type.
-#pragma warning disable RS1024 // Compare symbols correctly
             var proxyBaseTypeInvokableBaseTypes = new Dictionary<INamedTypeSymbol, Dictionary<INamedTypeSymbol, INamedTypeSymbol>>(SymbolEqualityComparer.Default);
-#pragma warning restore RS1024 // Compare symbols correctly
-
             foreach (var asm in assembliesToExamine)
             {
                 foreach (var symbol in asm.GetDeclaredTypes())
@@ -405,10 +398,7 @@ namespace Orleans.CodeGenerator
                 // Set the base invokable types which are used if attributes on individual methods do not override them.
                 if (!proxyBaseTypeInvokableBaseTypes.TryGetValue(baseClass, out var invokableBaseTypes))
                 {
-#pragma warning disable RS1024 // Compare symbols correctly
                     invokableBaseTypes = new Dictionary<INamedTypeSymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
-#pragma warning restore RS1024 // Compare symbols correctly
-
                     if (baseClass.GetAttributes(LibraryTypes.DefaultInvokableBaseTypeAttribute, out var invokableBaseTypeAttributes))
                     {
                         foreach (var attr in invokableBaseTypeAttributes)

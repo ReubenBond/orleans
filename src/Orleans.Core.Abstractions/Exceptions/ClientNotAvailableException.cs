@@ -8,9 +8,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [GenerateSerializer]
-#pragma warning disable RCS1194 // Implement exception constructors.
     public sealed class ClientNotAvailableException : OrleansException
-#pragma warning restore RCS1194 // Implement exception constructors.
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ClientNotAvailableException"/> class.

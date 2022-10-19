@@ -43,9 +43,7 @@ namespace Orleans.Serialization.Invocation
         }
 
         /// <inheritdoc />
-#pragma warning disable CA1816 // Dispose methods should call SuppressFinalize
         public override void Dispose()
-#pragma warning restore CA1816 // Dispose methods should call SuppressFinalize
         {
             TypedResult = default;
             ResponsePool.Return(this);

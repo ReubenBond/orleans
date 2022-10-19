@@ -29,7 +29,6 @@ namespace Orleans.Serialization
         private readonly FormatterConverter _formatterConverter;
         private readonly Func<Type, Action<object, SerializationInfo, StreamingContext>> _createConstructorDelegate;
         private readonly Action<object, SerializationInfo, StreamingContext> _baseExceptionConstructor;
-        private readonly IServiceProvider _serviceProvider;
         private readonly TypeConverter _typeConverter;
         private readonly IFieldCodec<Dictionary<object, object>> _dictionaryCodec;
         private readonly IDeepCopier<Dictionary<object, object>> _dictionaryCopier;
@@ -39,14 +38,12 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="ExceptionCodec"/> class.
         /// </summary>
-        /// <param name="serviceProvider">The service provider.</param>
         /// <param name="typeConverter">The type converter.</param>
         /// <param name="dictionaryCodec">The dictionary codec.</param>
         /// <param name="dictionaryCopier">The dictionary copier.</param>
         /// <param name="exceptionCopier">The exception copier.</param>
         /// <param name="exceptionSerializationOptions">The exception serialization options.</param>
         public ExceptionCodec(
-            IServiceProvider serviceProvider,
             TypeConverter typeConverter,
             IFieldCodec<Dictionary<object, object>> dictionaryCodec,
             IDeepCopier<Dictionary<object, object>> dictionaryCopier,
@@ -58,7 +55,6 @@ namespace Orleans.Serialization
             var constructorFactory = new SerializationConstructorFactory();
             _createConstructorDelegate = constructorFactory.GetSerializationConstructorDelegate;
             _baseExceptionConstructor = _createConstructorDelegate(typeof(Exception));
-            _serviceProvider = serviceProvider;
             _typeConverter = typeConverter;
             _dictionaryCodec = dictionaryCodec;
             _dictionaryCopier = dictionaryCopier;
