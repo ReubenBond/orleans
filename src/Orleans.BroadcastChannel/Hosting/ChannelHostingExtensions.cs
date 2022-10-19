@@ -6,7 +6,6 @@ using Microsoft.Extensions.Options;
 using Orleans.BroadcastChannel;
 using Orleans.BroadcastChannel.SubscriberTable;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Runtime;
 
 namespace Orleans.Hosting
@@ -38,7 +37,7 @@ namespace Orleans.Hosting
             return @this;
         }
 
-        public static IBroadcastChannelProvider GetBroadcaseChannelProvider(this IClusterClient @this, string name)
+        public static IBroadcastChannelProvider GetBroadcastChannelProvider(this IClusterClient @this, string name)
             => @this.ServiceProvider.GetRequiredServiceByName<IBroadcastChannelProvider>(name);
 
         private static void AddBroadcastChannel(this IServiceCollection services, string name, Action<OptionsBuilder<BroadcastChannelOptions>> configureOptions)
