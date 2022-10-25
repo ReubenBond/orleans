@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Buffers;
 using Xunit;
+using System.Linq;
 
 namespace Benchmarks
 {
@@ -17,6 +18,7 @@ namespace Benchmarks
     public class ComplexTypeBenchmarks
     {
         private static SingleSegmentBuffer Buffer = new(new byte[1000]);
+        private static byte[] _buffer = new byte[1000];
         private readonly Serializer<SimpleStruct> _structSerializer;
         private readonly DeepCopier<SimpleStruct> _structCopier;
         private readonly Serializer<ComplexClass> _serializer;
@@ -24,8 +26,8 @@ namespace Benchmarks
         private readonly SerializerSessionPool _sessionPool;
         private readonly ComplexClass _value;
         private readonly SerializerSession _session;
-        private readonly ReadOnlySequence<byte> _serializedPayload;
-        private readonly long _readBytesLength;
+        private readonly byte[] _serializedPayload;
+        private readonly byte[] _structSerializedPayload;
         private SimpleStruct _structValue;
 
         public ComplexTypeBenchmarks()
@@ -44,8 +46,8 @@ namespace Benchmarks
                 BaseInt = 192,
                 Int = 501,
                 String = "bananas",
-                //Array = Enumerable.Range(0, 60).ToArray(),
-                //MultiDimensionalArray = new[,] {{0, 2, 4}, {1, 5, 6}}
+                Array = Enumerable.Range(0, 60).ToArray(),
+                MultiDimensionalArray = new[,] {{0, 2, 4}, {1, 5, 6}}
             };
             _value.AlsoSelf = _value.BaseSelf = _value.Self = _value;
 
@@ -56,18 +58,14 @@ namespace Benchmarks
                 Guid = Guid.NewGuid()
             };
             _session = _sessionPool.GetSession();
-            var writer = Buffer.CreateWriter(_session);
 
-            _serializer.Serialize(_value, ref writer);
-            var bytes = new byte[writer.Output.GetMemory().Length];
-            writer.Output.GetReadOnlySequence().CopyTo(bytes);
-            _serializedPayload = new ReadOnlySequence<byte>(bytes);
-            Buffer.Reset();
-            _readBytesLength = _serializedPayload.Length;
+            _serializedPayload = _serializer.SerializeToArray(_value);
+            _structSerializedPayload  = _structSerializer.SerializeToArray(_structValue);
         }
 
         [Fact]
-        public void SerializeComplex()
+        [Benchmark]
+        public void RoundTripComplexClass()
         {
             var writer = Buffer.CreateWriter(_session);
             _session.FullReset();
@@ -80,20 +78,14 @@ namespace Benchmarks
         }
 
         [Fact]
-        public void CopyComplex()
-        {
-            _copier.Copy(_value); 
-        }
+        public void CopyComplexClass() => _copier.Copy(_value); 
 
         [Fact]
-        public void CopyComplexStruct()
-        {
-            _structCopier.Copy(_structValue); 
-        }
+        public void CopySimpleStruct() => _structCopier.Copy(_structValue);
 
         [Fact]
         [Benchmark]
-        public SimpleStruct OrleansStructRoundTrip()
+        public SimpleStruct RoundTripSimpleStruct()
         {
             var writer = Buffer.CreateWriter(_session);
             _session.FullReset();
@@ -107,52 +99,19 @@ namespace Benchmarks
         }
 
         [Fact]
-        //[Benchmark]
-        public object OrleansClassRoundTrip()
-        {
-            var writer = Buffer.CreateWriter(_session);
-            _session.FullReset();
-            _serializer.Serialize(_value, ref writer);
-
-            _session.FullReset();
-            var reader = Reader.Create(writer.Output.GetReadOnlySequence(), _session);
-            var result = _serializer.Deserialize(ref reader);
-            Buffer.Reset();
-            return result;
-        }
+        [Benchmark]
+        public long SerializeComplexClass() => _serializer.Serialize(_value, _buffer);
 
         [Fact]
-        //[Benchmark]
-        public object OrleansSerialize()
-        {
-            var writer = Buffer.CreateWriter(_session);
-            _session.FullReset();
-            _serializer.Serialize(_value, ref writer);
-            Buffer.Reset();
-            return _session;
-        }
+        [Benchmark]
+        public object DeserializeComplexClass() => _serializer.Deserialize(_serializedPayload);
 
         [Fact]
-        //[Benchmark]
-        public object OrleansDeserialize()
-        {
-            _session.FullReset();
-            var reader = Reader.Create(_serializedPayload, _session);
-            return _serializer.Deserialize(ref reader);
-        }
+        [Benchmark]
+        public long SerializeSimpleStruct() => _structSerializer.Serialize(_structValue, _buffer);
 
         [Fact]
-        //[Benchmark]
-        public int OrleansReadEachByte()
-        {
-            var sum = 0;
-            var reader = Reader.Create(_serializedPayload, _session);
-            for (var i = 0; i < _readBytesLength; i++)
-            {
-                sum ^= reader.ReadByte();
-            }
-
-            return sum;
-        }
+        [Benchmark]
+        public SimpleStruct DeserializeSimpleStruct() => _structSerializer.Deserialize(_structSerializedPayload);
     }
 }
