@@ -1,8 +1,13 @@
-using Orleans.Hosting;
 using GPSTracker;
+using GPSTracker.Common;
+using Orleans.TestingHost.Logging;
+using System.Diagnostics;
 using System.Net;
+
+
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddLogging(logging => logging.ClearProviders().AddFile($"silo-{Stopwatch.GetTimestamp()}.log").SetMinimumLevel(LogLevel.Information));
 builder.Host.UseOrleans((ctx, siloBuilder) => {
 
     // In order to support multiple hosts forming a cluster, they must listen on different ports.
@@ -34,8 +39,17 @@ app.UseRouting();
 
 app.UseAuthorization();
 
-app.UseEndpoints(endpoints =>
-{
-    endpoints.MapHub<LocationHub>("/locationHub");
-});
-app.Run();
+app.MapHub<LocationHub>("/locationHub");
+
+var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Program.Main");
+AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
+AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
+TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
+
+await app.RunAsync();
+
+void CurrentDomain_FirstChanceException(object? sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e) => logger.LogError(e.Exception, "First chance exception!");
+
+void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e) => logger.LogError(e.ExceptionObject as Exception, "Unhandled exception!");
+
+void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e) => logger.LogError(e.Exception, "Unobserved Task exception!");

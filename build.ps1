@@ -14,7 +14,7 @@ if ($null -eq $env:BUILD_FLAGS)
 }
 if ($null -eq $env:BuildConfiguration)
 {
-    $env:BuildConfiguration = "Debug"
+    $env:BuildConfiguration = "Release"
 }
 
 # Clear the 'Platform' env variable for this session, as it's a per-project setting within the build, and
@@ -27,7 +27,7 @@ $Platform = $null
 $BuildProperties = "/p:Configuration=$env:BuildConfiguration";
 
  # Set DateTime suffix for debug builds
- if ($env:BuildConfiguration -eq "Debug")
+ if ($env:BuildConfiguration -eq "Release")
  {
     $dateSuffix = Get-Date -Format "yyyyMMddHHmm"
     $BuildProperties = $BuildProperties + " /p:VersionDateSuffix=$dateSuffix"

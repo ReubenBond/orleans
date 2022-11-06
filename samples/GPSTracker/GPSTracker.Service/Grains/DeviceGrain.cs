@@ -9,13 +9,17 @@ namespace GPSTracker.GrainImplementation;
 public class DeviceGrain : Grain, IDeviceGrain
 {
     private DeviceMessage _lastMessage = null!;
+    private readonly IPushNotifierGrain _pushNotifier;
+    public DeviceGrain()
+    {
+        _pushNotifier = GrainFactory.GetGrain<IPushNotifierGrain>(0);
+    }
 
-    public async Task ProcessMessage(DeviceMessage message)
+    public async ValueTask ProcessMessage(DeviceMessage message)
     {
         if (_lastMessage is null || _lastMessage.Latitude != message.Latitude || _lastMessage.Longitude != message.Longitude)
         {
             // Only sent a notification if the position has changed
-            var notifier = GrainFactory.GetGrain<IPushNotifierGrain>(0);
             var speed = GetSpeed(_lastMessage, message);
 
             // Record the last message
@@ -23,7 +27,7 @@ public class DeviceGrain : Grain, IDeviceGrain
 
             // Forward the message to the notifier grain
             var velocityMessage = new VelocityMessage(message, speed);
-            await notifier.SendMessage(velocityMessage);
+            await _pushNotifier.SendMessage(velocityMessage);
         }
         else
         {

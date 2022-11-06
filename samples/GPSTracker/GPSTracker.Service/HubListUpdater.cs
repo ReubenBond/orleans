@@ -31,7 +31,7 @@ internal class HubListUpdater : BackgroundService
     {
         var hubListGrain = _grainFactory.GetGrain<IHubListGrain>(Guid.Empty);
         var localSiloAddress = _localSiloDetails.SiloAddress;
-        var selfReference = await _grainFactory.CreateObjectReference<IRemoteLocationHub>(_locationBroadcaster);
+        var selfReference = _grainFactory.CreateObjectReference<IRemoteLocationHub>(_locationBroadcaster);
 
         // This runs in a loop because the HubListGrain does not use any form of persistence, so if the
         // host which it is activated on stops, then it will lose any internal state.

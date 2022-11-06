@@ -1,8 +1,10 @@
 using Orleans;
+using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace GPSTracker.GrainImplementation;
 
+[Reentrant]
 public class HubListGrain : Grain, IHubListGrain
 {
     private readonly IClusterMembershipService _clusterMembership;
