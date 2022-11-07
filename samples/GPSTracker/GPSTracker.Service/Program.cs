@@ -1,13 +1,39 @@
+using Azure.Monitor.OpenTelemetry.Exporter;
 using GPSTracker;
-using GPSTracker.Common;
-using Orleans.TestingHost.Logging;
-using System.Diagnostics;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using System.Net;
 
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddLogging(logging => logging.ClearProviders().AddFile($"silo-{Stopwatch.GetTimestamp()}.log").SetMinimumLevel(LogLevel.Information));
+builder.Services.AddOpenTelemetryMetrics(metrics =>
+{
+    metrics
+        .AddPrometheusExporter()
+        .AddMeter("Microsoft.Orleans")
+        .AddMeter("System.Runtime");
+
+    // Uncomment this to export metrics to Azure Monitor
+    //metrics.AddAzureMonitorMetricExporter(config => config.ConnectionString = Environment.GetEnvironmentVariable("AZMONCS"))
+});
+
+builder.Services.AddOpenTelemetryTracing(tracing =>
+{
+    // Set a service name
+    tracing.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(serviceName: "GPSTracker", serviceVersion: "1.0"));
+
+    tracing.AddAspNetCoreInstrumentation();
+    tracing.AddSource("Microsoft.Orleans.Runtime");
+    tracing.AddSource("Microsoft.Orleans.Application");
+
+    tracing.AddZipkinExporter(zipkin =>
+    {
+        zipkin.Endpoint = new Uri("http://localhost:9411/api/v2/spans");
+    });
+});
+
 builder.Host.UseOrleans((ctx, siloBuilder) => {
 
     // In order to support multiple hosts forming a cluster, they must listen on different ports.
@@ -17,6 +43,8 @@ builder.Host.UseOrleans((ctx, siloBuilder) => {
         siloPort: 11111 + instanceId,
         gatewayPort: 30000 + instanceId,
         primarySiloEndpoint: new IPEndPoint(IPAddress.Loopback, 11111));
+
+    siloBuilder.AddActivityPropagation();
 
 });
 builder.WebHost.ConfigureKestrel((ctx, kestrelOptions) =>
@@ -40,16 +68,6 @@ app.UseRouting();
 app.UseAuthorization();
 
 app.MapHub<LocationHub>("/locationHub");
-
-var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Program.Main");
-AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
-AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
-TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
+app.MapPrometheusScrapingEndpoint();
 
 await app.RunAsync();
-
-void CurrentDomain_FirstChanceException(object? sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e) => logger.LogError(e.Exception, "First chance exception!");
-
-void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e) => logger.LogError(e.ExceptionObject as Exception, "Unhandled exception!");
-
-void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e) => logger.LogError(e.Exception, "Unobserved Task exception!");

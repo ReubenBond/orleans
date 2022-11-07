@@ -8,7 +8,7 @@ using Orleans.Runtime;
 namespace GPSTracker.GrainImplementation;
 
 [Reentrant]
-[StatelessWorker]
+[StatelessWorker(maxLocalWorkers: 12)]
 public class PushNotifierGrain : Grain, IPushNotifierGrain
 {
     private readonly Queue<VelocityMessage> _messageQueue = new();
