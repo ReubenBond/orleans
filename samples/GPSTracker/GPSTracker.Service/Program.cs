@@ -1,4 +1,3 @@
-using Azure.Monitor.OpenTelemetry.Exporter;
 using GPSTracker;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -12,8 +11,7 @@ builder.Services.AddOpenTelemetryMetrics(metrics =>
 {
     metrics
         .AddPrometheusExporter()
-        .AddMeter("Microsoft.Orleans")
-        .AddMeter("System.Runtime");
+        .AddMeter("Microsoft.Orleans");
 
     // Uncomment this to export metrics to Azure Monitor
     //metrics.AddAzureMonitorMetricExporter(config => config.ConnectionString = Environment.GetEnvironmentVariable("AZMONCS"))

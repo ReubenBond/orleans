@@ -6,6 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Sdk" Version="7.0.0-dev-202211061706" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" Version="7.0.0-dev-202211071900" />
   </ItemGroup>
 </Project>
