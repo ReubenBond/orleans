@@ -50,7 +50,8 @@ public class ScheduledTaskContext
 
     public static void Clear() => _context.Value = null;
 
-    public T GetOrAddInTransaction<T>(string key, TransactionOption transactionOptions, Func<ValueTask<T>> transactionDelegate)
+    public async ValueTask<T> GetOrAddInTransaction<T>(string key, TransactionOption transactionOptions, Func<ValueTask<T>> transactionDelegate)
     {
+        return await transactionDelegate();
     }
 }

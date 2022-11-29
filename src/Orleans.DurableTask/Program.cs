@@ -56,17 +56,24 @@ public class Program
 
 public interface ITransferGrain : IGrain
 {
+#pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
     DurableTask<bool> Transfer(IAccountGrain source, IAccountGrain destination, int amount);
+#pragma warning restore ORLEANS0009 // Grain interfaces methods must return a compatible type
 }
 
 public interface IAccountGrain : IGrain
 {
+#pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
     DurableTask Credit(int amount);
+#pragma warning restore ORLEANS0009 // Grain interfaces methods must return a compatible type
 
     // Deducting funds might fail and return false if the account would be overdrawn
+#pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
     DurableTask<bool> TryDebit(int amount);
+#pragma warning restore ORLEANS0009 // Grain interfaces methods must return a compatible type
 }
 
+/*
 public class TransferGrain : ITransferGrain
 {
     public interface ITransactionContext : IAsyncDisposable, IDisposable
@@ -164,6 +171,7 @@ public class AccountGrain : IAccountGrain
     }
 }
 
+*/
 
 public static class TransactionalStateExtensions
 {
