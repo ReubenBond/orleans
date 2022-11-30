@@ -8,12 +8,12 @@ namespace Orleans.Vesuvius;
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
 public abstract class DurableTask
 {
-    public ValueTask<ScheduledTask> ScheduleAsync() => ScheduleAsyncCore(new SchedulingOptions());
-    public ValueTask<ScheduledTask> ScheduleAsync(SchedulingOptions options) => ScheduleAsyncCore(options);
-    public ValueTask<ScheduledTask> ScheduleAsync(ScheduledTaskId id) => ScheduleAsyncCore(new SchedulingOptions());
-    public ValueTask<ScheduledTask> ScheduleAsync(ScheduledTaskId id, SchedulingOptions options) => ScheduleAsyncCore(options);
+    public ValueTask<ScheduledTask> ScheduleAsync() => ScheduleAsyncCore(ScheduledTaskId.None, options: null);
+    public ValueTask<ScheduledTask> ScheduleAsync(SchedulingOptions options) => ScheduleAsyncCore(ScheduledTaskId.None, options);
+    public ValueTask<ScheduledTask> ScheduleAsync(ScheduledTaskId taskId) => ScheduleAsyncCore(taskId, options: null);
+    public ValueTask<ScheduledTask> ScheduleAsync(ScheduledTaskId taskId, SchedulingOptions options) => ScheduleAsyncCore(taskId, options);
 
-    protected abstract ValueTask<ScheduledTask> ScheduleAsyncCore(SchedulingOptions options);
+    protected abstract ValueTask<ScheduledTask> ScheduleAsyncCore(ScheduledTaskId taskId, SchedulingOptions? options);
 
     // Schedules the durable task with default options and awaits the scheduled task.
     // Equivalent to `await (await durableTask.ScheduleAsync())`
@@ -24,17 +24,17 @@ public abstract class DurableTask
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder<>))]
 public abstract class DurableTask<TResult> : DurableTask
 {
-    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync() => ScheduleAsyncTypedCore(new SchedulingOptions());
-    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(SchedulingOptions options) => ScheduleAsyncTypedCore(options);
-    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(ScheduledTaskId id) => ScheduleAsyncTypedCore(new SchedulingOptions());
-    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(ScheduledTaskId id, SchedulingOptions options) => ScheduleAsyncTypedCore(options);
+    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync() => ScheduleAsyncTypedCore(ScheduledTaskId.None, options: null);
+    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(SchedulingOptions options) => ScheduleAsyncTypedCore(ScheduledTaskId.None, options);
+    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(ScheduledTaskId taskId) => ScheduleAsyncTypedCore(taskId, options: null);
+    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(ScheduledTaskId taskId, SchedulingOptions options) => ScheduleAsyncTypedCore(taskId, options);
 
-    protected override async ValueTask<ScheduledTask> ScheduleAsyncCore(SchedulingOptions options)
+    protected override async ValueTask<ScheduledTask> ScheduleAsyncCore(ScheduledTaskId taskId, SchedulingOptions? options)
     {
-        return await ScheduleAsyncTypedCore(options).ConfigureAwait(false);
+        return await ScheduleAsyncTypedCore(taskId, options).ConfigureAwait(false);
     }
 
-    protected abstract ValueTask<ScheduledTask<TResult>> ScheduleAsyncTypedCore(SchedulingOptions options);
+    protected abstract ValueTask<ScheduledTask<TResult>> ScheduleAsyncTypedCore(ScheduledTaskId taskId, SchedulingOptions? options);
 
     public new DurableTaskAwaiter<TResult> GetAwaiter() => new(this);
 }
@@ -50,4 +50,8 @@ public static class DurableTaskExtensions
     {
         await await taskDefinition.ScheduleAsync(taskId).ConfigureAwait(false);
     }
+}
+
+public static class DurableTaskWorkflowExtensions
+{
 }

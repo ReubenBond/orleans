@@ -9,7 +9,7 @@ internal sealed class DurableTaskMethodInvocation : DurableTask, IValueTaskSourc
 {
     private ManualResetValueTaskSourceCore<VoidTaskResult> _taskSource = new();
 
-    protected override ValueTask<ScheduledTask> ScheduleAsyncCore(SchedulingOptions options) => new(new UntypedDurableTaskInvocation(this));
+    protected override ValueTask<ScheduledTask> ScheduleAsyncCore(ScheduledTaskId taskId, SchedulingOptions? options) => new(new UntypedDurableTaskInvocation(taskId, this));
 
     public ValueTask AsUntypedValueTask() => new ValueTask(this, _taskSource.Version);
 
@@ -28,7 +28,7 @@ internal sealed class DurableTaskMethodInvocation<TResult> : DurableTask<TResult
 {
     private ManualResetValueTaskSourceCore<TResult> _taskSource = new();
 
-    protected override ValueTask<ScheduledTask<TResult>> ScheduleAsyncTypedCore(SchedulingOptions options) => new(new ScheduledTask<TResult>(this));
+    protected override ValueTask<ScheduledTask<TResult>> ScheduleAsyncTypedCore(ScheduledTaskId taskId, SchedulingOptions? options) => new(new ScheduledTask<TResult>(taskId, this));
 
     public ValueTask<TResult> AsValueTask() => new ValueTask<TResult>(this, _taskSource.Version);
     public ValueTask AsUntypedValueTask() => new ValueTask(this, _taskSource.Version);

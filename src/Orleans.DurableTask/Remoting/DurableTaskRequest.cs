@@ -20,9 +20,9 @@ public abstract class DurableTaskRequestBase : RequestBase, IOutgoingGrainCallFi
     public ScheduledTaskContext? Context { get; set; }
 
     [GeneratedActivatorConstructor]
-    protected DurableTaskRequestBase(IServiceProvider serviceProvider)
+    protected DurableTaskRequestBase(IScheduledTaskRuntime runtime)
     {
-        _runtime = serviceProvider.GetService<IScheduledTaskRuntime>();
+        _runtime = runtime;
     }
 
     async Task IOutgoingGrainCallFilter.Invoke(IOutgoingGrainCallContext context)
@@ -111,7 +111,7 @@ public sealed class DurableTaskResponse : Response
 public abstract class DurableTaskRequest : DurableTaskRequestBase 
 {
     [GeneratedActivatorConstructor]
-    protected DurableTaskRequest(IServiceProvider serviceProvider) : base(serviceProvider)
+    protected DurableTaskRequest(IScheduledTaskRuntime runtime) : base(runtime)
     {
     }
 
@@ -136,7 +136,7 @@ public abstract class DurableTaskRequest : DurableTaskRequestBase
 public abstract class DurableTaskRequest<TResult> : DurableTaskRequestBase
 {
     [GeneratedActivatorConstructor]
-    protected DurableTaskRequest(IServiceProvider serviceProvider) : base(serviceProvider)
+    protected DurableTaskRequest(IScheduledTaskRuntime runtime) : base(runtime)
     {
     }
 

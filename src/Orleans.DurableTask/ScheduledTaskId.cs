@@ -2,6 +2,8 @@ namespace Orleans.Vesuvius;
 
 public readonly struct ScheduledTaskId
 {
+    public static readonly ScheduledTaskId None = default;
+
     public ScheduledTaskId(string value)
     {
         Value = value;
