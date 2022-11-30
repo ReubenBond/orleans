@@ -81,12 +81,14 @@ public abstract class ScheduledTask
 {
     internal abstract DurableTask DurableTask { get; }
 
-    protected ScheduledTask(ScheduledTaskId taskId)
+    protected ScheduledTask(ScheduledTaskId taskId, SchedulingOptions? options)
     {
         Id = taskId;
+        Options = options;
     }
 
     public ScheduledTaskId Id { get; }
+    public SchedulingOptions? Options { get; }
 
     public ValueTask RescheduleAsync(DateTimeOffset dueTime)
     {
@@ -110,7 +112,7 @@ public class ScheduledTask<TResult> : ScheduledTask, IValueTaskSource<TResult>, 
     private readonly DurableTask<TResult> _durableTaskDefinition;
     private ManualResetValueTaskSourceCore<TResult> _taskSource;
 
-    internal ScheduledTask(ScheduledTaskId taskId, DurableTask<TResult> durableTask) : base(taskId)
+    internal ScheduledTask(ScheduledTaskId taskId, SchedulingOptions? options, DurableTask<TResult> durableTask) : base(taskId, options)
     {
         _durableTaskDefinition = durableTask;
     }

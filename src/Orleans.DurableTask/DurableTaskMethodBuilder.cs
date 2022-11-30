@@ -64,24 +64,21 @@ public readonly struct DurableTaskMethodBuilder
 /// <summary>
 /// Async method builder for methods which return <see cref="DurableTask{TResult}"/>.
 /// </summary>
-public readonly struct DurableTaskMethodBuilder<TResult>
+public struct DurableTaskMethodBuilder<TResult>
 {
-    private readonly DurableTaskMethodInvocation<TResult> _taskSource;
-
-    private DurableTaskMethodBuilder(DurableTaskMethodInvocation<TResult> taskSource) : this()
-    {
-        _taskSource = taskSource;
-    }
+    private DurableTaskMethodInvocation<TResult> _taskSource;
 
     public DurableTask<TResult> Task => _taskSource;
 
-    public static DurableTaskMethodBuilder<TResult> Create() => new DurableTaskMethodBuilder<TResult>(new DurableTaskMethodInvocation<TResult>());
+    public static DurableTaskMethodBuilder<TResult> Create() => new DurableTaskMethodBuilder<TResult>();
 
     public void Start<TStateMachine>(ref TStateMachine stateMachine)
         where TStateMachine : IAsyncStateMachine
     {
         Console.WriteLine($"Start {stateMachine}");
-        //stateMachine.MoveNext();
+        // Box the state machine and do not start it.
+        // Instead, the state machine will be started once the resulting task is awaited (not when the method is called directly)
+        _taskSource = DurableTaskMethodInvocation<TResult, TStateMachine>.Create(ref stateMachine);
     }
 
     public void SetStateMachine(IAsyncStateMachine stateMachine)

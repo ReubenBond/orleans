@@ -31,11 +31,26 @@ public class Program
         DurableTask<int> taskDefinition = prog.GoBeDurable("Bob", 47);
 
         // Schedule the task. This would write the definition above to storage, alongside the options specified here (retry, identity, etc)
-        ScheduledTask<int> scheduledResult = await taskDefinition.ScheduleAsync(new SchedulingOptions());
+        ScheduledTask<int> scheduledResult = await taskDefinition.ScheduleAsync(
+            "foo",
+            new SchedulingOptions
+            {
+                DueTime = DateTimeOffset.UtcNow,
+                RetryOptions = new RetryOptions
+                {
+                    MaximumNumberOfAttempts = 3,
+                    RetryFilter = RetryFilter
+                }
+            });
 
         // Await the completion of the scheduled task and print the result
         int finalResult = await scheduledResult;
         Console.WriteLine(finalResult);
+
+        static bool RetryFilter(Exception exception)
+        {
+            return true;
+        }
     }
 
     public async DurableTask<int> GoBeDurable(string name, int bestNumber)
@@ -187,19 +202,19 @@ public static class TransactionalStateExtensions
 
 public class SchedulingOptions
 {
-    public DateTimeOffset? DueTime { get; set; }
-    public RetryOptions? RetryOptions { get; set; }
-    public string? RetryPolicy { get; set; }
+    public DateTimeOffset? DueTime { get; init; }
+    public RetryOptions? RetryOptions { get; init; }
+    public string? RetryPolicy { get; init; }
 }
 
 public class RetryOptions
 {
-    public double BackoffCoefficient { get; set; } = 2;
-    public TimeSpan FirstRetryInterval { get; set; } = TimeSpan.FromSeconds(1);
-    public TimeSpan MaximumRetryInterval { get; set; } = TimeSpan.FromMinutes(5);
-    public int MaximumNumberOfAttempts { get; set; }
+    public double BackoffCoefficient { get; init; } = 2;
+    public TimeSpan FirstRetryInterval { get; init; } = TimeSpan.FromSeconds(1);
+    public TimeSpan MaximumRetryInterval { get; init; } = TimeSpan.FromMinutes(5);
+    public int MaximumNumberOfAttempts { get; init; }
 
     // NOTE: this is inherently not serializable. Would it therefore likely be better to specify retry using a named policy, rather than serializing the entire policy?
     // Question is, what implications would that have on xplat? 
-    public Func<Exception, bool>? RetryFilter { get; set; }
+    public Func<Exception, bool>? RetryFilter { get; init; }
 }

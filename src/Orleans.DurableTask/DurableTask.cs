@@ -29,13 +29,10 @@ public abstract class DurableTask<TResult> : DurableTask
     public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(ScheduledTaskId taskId) => ScheduleAsyncTypedCore(taskId, options: null);
     public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(ScheduledTaskId taskId, SchedulingOptions options) => ScheduleAsyncTypedCore(taskId, options);
 
-    protected override async ValueTask<ScheduledTask> ScheduleAsyncCore(ScheduledTaskId taskId, SchedulingOptions? options)
-    {
-        return await ScheduleAsyncTypedCore(taskId, options).ConfigureAwait(false);
-    }
-
     protected abstract ValueTask<ScheduledTask<TResult>> ScheduleAsyncTypedCore(ScheduledTaskId taskId, SchedulingOptions? options);
 
+    // Schedules the durable task with default options and awaits the scheduled task.
+    // Equivalent to `await (await durableTask.ScheduleAsync())`
     public new DurableTaskAwaiter<TResult> GetAwaiter() => new(this);
 }
 
@@ -49,5 +46,22 @@ public static class DurableTaskExtensions
     public static async ValueTask InvokeAsync(this DurableTask taskDefinition, ScheduledTaskId taskId)
     {
         await await taskDefinition.ScheduleAsync(taskId).ConfigureAwait(false);
+    }
+
+    public static async ValueTask<TResult> AsStep<TResult>(this DurableTask<TResult> taskDefinition, string stepId)
+    {
+        // Check the current durable task context
+        // If it does not exist, throw:
+        //   * Steps can only exist within a durable execution context
+
+        // Check to see if this step has been completed already.
+        // If the step has been completed during the current RunId (the invocation, which should be incremented each time the task is started), throw:
+        //   * This might be a loop or a duplicate step id. Give an informative error.
+        // If the step was completed during a previous RunId, return the result from the previous invocation.
+
+        // -- up until this point, this method should execute synchronously --
+        // If the step has not completed, create a new nested durable execution context and invoke the task.
+
+        // Once the task completes, return the result to the caller.
     }
 }
