@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Orleans.Vesuvius.Remoting;
 using Orleans.Runtime;
+using System.Runtime.InteropServices;
 
 namespace Orleans.Vesuvius;
 
@@ -61,7 +62,42 @@ public static class DurableTaskExtensions
 
         // -- up until this point, this method should execute synchronously --
         // If the step has not completed, create a new nested durable execution context and invoke the task.
+        // When the task completes, replace its entry with the completed result and persist the current state.
 
-        // Once the task completes, return the result to the caller.
+        // Return the result to the caller.
     }
+}
+
+public class DurableTaskState
+{
+}
+
+internal class DurableTaskStateNode
+{
+    public DurableTaskStateNode? Parent { get; init; }
+    public required string Id { get; init; }
+    public Dictionary<string, DurableTaskStateNode>? Children { get; private set; }
+    public DurableTaskStateNode CreateChildNode(string childId)
+    {
+        Children ??= new();
+        ref var childNode = CollectionsMarshal.GetValueRefOrAddDefault(Children, childId, out var exists);
+        if (exists)
+        {
+            throw new InvalidOperationException("Child node already exists");
+        }
+
+        return childNode = new DurableTaskStateNode { Id = childId, Parent = this };
+    }
+
+    public DurableTaskStatus Status { get; private set; }
+    public object? Result { get; set; }
+    public void ClearChildren() => Children = null;
+}
+
+public enum DurableTaskStatus
+{
+    NotStarted,
+    InProgress,
+    Success,
+    Faulted
 }
