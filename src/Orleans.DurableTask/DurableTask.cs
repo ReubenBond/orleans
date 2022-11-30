@@ -51,7 +51,3 @@ public static class DurableTaskExtensions
         await await taskDefinition.ScheduleAsync(taskId).ConfigureAwait(false);
     }
 }
-
-public static class DurableTaskWorkflowExtensions
-{
-}

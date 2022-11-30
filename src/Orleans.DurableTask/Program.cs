@@ -20,8 +20,10 @@ public class Program
     {
         var prog = new Program();
 
+        /*
         var result = await prog.GoBeDurable("Bob", 47);
         Console.WriteLine(result);
+        */
 
         // The above is shorthand for the following.
 

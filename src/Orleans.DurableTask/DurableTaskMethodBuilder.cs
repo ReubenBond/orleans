@@ -22,7 +22,7 @@ public readonly struct DurableTaskMethodBuilder
         where TStateMachine : IAsyncStateMachine
     {
         Console.WriteLine($"Start {stateMachine}");
-        stateMachine.MoveNext();
+        //stateMachine.MoveNext();
     }
 
     public void SetStateMachine(IAsyncStateMachine stateMachine)
@@ -81,7 +81,7 @@ public readonly struct DurableTaskMethodBuilder<TResult>
         where TStateMachine : IAsyncStateMachine
     {
         Console.WriteLine($"Start {stateMachine}");
-        stateMachine.MoveNext();
+        //stateMachine.MoveNext();
     }
 
     public void SetStateMachine(IAsyncStateMachine stateMachine)
