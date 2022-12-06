@@ -6,9 +6,9 @@ namespace Orleans.Vesuvius.Remoting;
 [GenerateSerializer]
 public class ScheduledTaskContext
 {
-    private static readonly AsyncLocal<ScheduledTaskContext?> _context = new();
+    private static readonly AsyncLocal<ScheduledTaskContext?> CurrentContext = new();
 
-    public static ScheduledTaskContext? Current => _context.Value;
+    public static ScheduledTaskContext? Current => CurrentContext.Value;
 
     private readonly Serializer _serializer;
     private readonly ITransactionClient _transactionClient;
@@ -27,7 +27,7 @@ public class ScheduledTaskContext
 
     public static void SetCurrentContext(ScheduledTaskContext? value)
     {
-        _context.Value = value;
+        CurrentContext.Value = value;
     }
 
     public bool TryGetValue<T>(string key, [NotNullWhen(true)] out T? value)
@@ -48,7 +48,7 @@ public class ScheduledTaskContext
         return result;
     }
 
-    public static void Clear() => _context.Value = null;
+    public static void Clear() => CurrentContext.Value = null;
 
     public async ValueTask<T> GetOrAddInTransaction<T>(string key, TransactionOption transactionOptions, Func<ValueTask<T>> transactionDelegate)
     {

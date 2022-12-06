@@ -1,0 +1,197 @@
+
+### Overview
+
+* *Durable tasks* allow you to express reliable, long-running processes using Orleans.
+* Grain methods can return `DurableTask` and `DurableTask<T>` methods in addition to the non-durable variants such as `Task` and `Task<T>`.
+* `DurableTask` methods are different from their non-durable counterparts in several ways:
+  * For the caller:
+    * Callers can durably *schedule* invocations of these methods, allowing them to receive acknowledgement once a method call is scheduled rather than only knowing once a method call has completed.
+    * Callers can identify invocations of a method using a user-defined identifier string.
+    * Callers can poll for completion of the invocation and can retrieve the results of the invocation using the invocation's identifier.
+  * For the implementation:
+    * Durable task invocations have persistent state which can be used to save and restore their execution progress.
+      * This state is expressed as a collection of key-value pairs where the keys are strings and the values are any value.
+    * Durable tasks can be expressed as a set of steps and the result of individual steps can be stored and restored using the above mentioned state.
+    * Durable task invocations can be retried after a failure. When a durable task is retried, it is executed again from the beginning and the implementation can examine its persistent state to resume execution from the first incomplete step.
+
+```csharp
+class UserGrain : Grain, IUserGrain
+{
+  IStateManager _state;
+  IPersistentState<UserState> _userState; // Assume these are injected in via the constructor.
+  IDurableTaskManager _taskManager;
+  ITransactionClient _transactionClient;
+
+  public async DurableTask SoftDelete()
+  {
+    if (_userState.Value is null) return;
+    
+    _userState.Value.IsSoftDelete = true;
+
+    // Schedule hard deletion.
+    // Since we've specified a task id, if the task exists already, it will not be re-scheduled.
+    await _taskManager.ScheduleAsync<IUserGrain>(
+      id: "delete",
+      due: TimeSpan.FromDays(30),
+      task: self => self.HardDelete());
+  }
+
+  public async DurableTask Undelete()
+  {
+    if (_userState.Value is null) return;
+
+    // Step is transactional.
+    // Same behavior as .AsStep()?
+    // Problem: It's not clear why Step(...) is needed here instead of just calling the body directly.
+    await Step("undelete", async () =>
+    {
+      _userState.Value.IsSoftDeleted = false;
+      await _taskManager.CancelTaskAsync("delete");
+    });
+
+// Using the Step API
+    var id = await Step("id", () => Guid.NewGuid().ToString("N"));
+    await Step("issuePayment", () => _paymentGateway.CreatePaymentAsync(id, details));
+    
+// Using the .AsStep() API
+// Benefits: looks cleaner. Can clear up intermediate state ("id") once it's no longer needed, easier to nest.
+    await IssuePayment(orderDetails).AsStep("issuePayment");
+
+// Using the .AsTransactionalStep API.
+    await PerformTransfer(from, to, amount).AsTransactionalStep("performTransfer");
+  }
+
+  private async DurableTask IssuePayment(OrderDetails details)
+  {
+    var id = DurableTaskContext.GetOrAdd("id", () => Guid.NewGuid().ToString("N"));
+    await _paymentGateway.CreatePaymentAsync(id, details);
+  }
+
+  private async DurableTask PerformTransfer(IAccountGrain from, IAccountGrain to, int amount)
+  {
+    await myTransactionalState.PerformUpdate(state => state.TotalTransferred += amount);
+    await from.WithdrawAsync(amount);
+    await to.DepositAsync(amount);
+  }
+
+  public async DurableTask HardDelete()
+  {
+    _userState.Value = null;
+    // Value is implicitly saved upon exiting the method.
+  }
+}
+```
+
+* A `DurableTask` method can:
+  * Access state via `DurableTaskContext.Current`
+  * Update grain state
+
+
+### Lifecycle of a durable task
+
+* Initial scheduling: client calling a durable task method on a grain
+  * 4 scheduling alternatives (with/without specified id, with/without specified options):
+     * `await grain.MyDurableTaskMethod().ScheduleAsync();`
+       * Schedules a durable task method with no id (no deduplication).
+       * This might never complete, just like any other method, but exacerbated because durable tasks are generally long-running.
+     * `await grain.MyDurableTaskMethod().ScheduleAsync("my-task-id");`
+       * Schedules a durable task method with an id.
+       * If a task was previously scheduled with this id and has not been cleaned up, this is equivalent to no operation.
+       * If the task has not been scheduled, this will schedule it and the 
+     * `await grain.MyDurableTaskMethod().ScheduleAsync("my-task-id", options);`
+       * Schedules a durable task method with a specified id and options.
+       * If a task was previously scheduled with this id and has not been cleaned up, this is equivalent to no operation.
+         * This means that the options will be ignored if the task has already been scheduled.
+     * `await grain.MyDurableTaskMethod().ScheduleAsync(options);`
+       * Schedules a durable task method with a random id and options.
+* Kinds of `DurableTask`/`DurableTask<T>`
+  * Broadly speaking, 2 kinds:
+    * `DurableTask` instances returned from a *grain call*
+      * Implemented internally by `DurableTaskRequest`/`DurableTaskRequest<T>` (TBD)
+      * `ScheduleAsync(...)` schedules the task on the remote grain
+    * (async) `DurableTask` methods
+      * Implemented internally by `DurableTaskMethodInvocation`/`DurableTaskMethodInvocation<T>`
+      * Compiler uses `DurableTaskMethodBuilder`, which returns the implementation type.
+      * `ScheduleAsync(...)` is not allowed?
+        * Could it schedule the callback in the context of the current workflow?
+        * `DurableTask.Delay(TimeSpan).AsStep("foo")` and `DurableTask.DelayUntil(DateTimeOffset).AsStep("bar")`
+
+
+Thoughts:
+* We should keep the semantics of `DurableTaskMethodBuilder` which result in it not executing the method immediately, but instead returning the instance, since that allows us to:
+  * Configure execution, allowing us to provide context to the execution (such as a TaskId which can be sent along with requests for idempotency); and
+  * Prevent execution when the method has previously completed, returning the result immediately instead.
+* We should remove `SchedulingOptions` (retries, delayed scheduling, etc) from `DurableTask` APIs and keep things simpler:
+  * You have a task and can configure it
+  * Why? Because it seems that we cannot apply the semantics everywhere:
+    * Retries, specifically are difficult with method calls, because (I think) we would need to create an in-memory copy of the state machine.
+    * Delayed scheduling are ok, but delays are well served by `await Task.Delay(...)` and delayed scheduling is usually meant for delays in the order of minutes to years, not seconds, so they may not be 
+* Outside of a `DurableTask` method, should awaiting the result of a `DurableTask` be blocked?
+  * Allowing it may result in unresponsive programs
+  * It may be too easy to accidentally do.
+* Instead, should we allow long-polling? `(ScheduledTask).WaitAsync(TimeSpan)` which returns some value (not a `TimeoutException`!) if the task did not complete in time? At least this is very clear as to the semantics and it's clear that the method may be unresponsive for the specified amount of time.
+
+Flow:
+* Call a DurableTask method on a grain:
+  * Internally, the generated proxy constructs a `DurableTaskGrainMethodInvocation` instance and returns it.
+    * This is a special implementation of `DurableTask` which synchronously captures the `IInvokable` which represents the grain call but does not submit it to the runtime immediately.
+    * Instead, it allows `DurableTask` extension methods to be invoked first, to configure the `DurableTask`/`IInvokable` 
+  * Upon awaiting the `DurableTask`, the corresponding `IInvokable` is submitted to the runtime (along with its configuration)
+    * Note: Why not use the regular `DurableTaskMethodInvocation` implementation? Because, if we did, it would not synchronously copy the method arguments, so they might mutate by the time the task is submitted. Maybe this is fine, but it's better to be safe than sorry.
+  * The generated `IInvokable` uses a base class: `DurableTaskRequestBase`, which is responsible for invoking the request on the target grain instance.
+  * `DurableTaskRequestBase` has a property to hold the configured `ScheduledTaskContext` (rename?) which holds information such as the scheduled task's *id* and other options.
+  * `DurableTaskRequestBase.Invoke()` sets the context via an `AsyncLocal`, `ScheduledTaskContext.Current` and calls and awaits the grain method.
+  * The awaiter for the method sees the context (task id) and uses it to fetch any previous state....
+
+
+* Schedule a `DurableTask` method on a grain:
+  * The caller calls a `DurableTask`-returning method.
+  * The caller calls and awaits `.ScheduleAsync()` to schedule the call.
+  * A `ScheduledTask` is returned.
+  * The caller polls the resulting `ScheduledTask` in a loop using the `.WaitAsync(TimeSpan)` method.
+* Calling `ScheduleAsync()` on a durable task invokes a grain extension method on the grain:
+  * `IDurableTaskManagerGrainExtension.ScheduleAsync(ScheduledTaskId id, IInvokable task)`
+* The call returns once the task has been scheduled durably (not once it has executed to completion).
+* Calls to `WaitAsync(TimeSpan)` are implemented via the same grain extension, but a different method:
+  * `IDurableTaskManagerGrainExtension.WaitAsync(ScheduledTaskId id, TimeSpan maximumWaitDuration)`
+* `IDurableTaskManagerGrainExtension` is responsible for invoking tasks on the grain itself.
+* Once a task has completed, its result is stored so that calls to `WaitAsync(...)` can propagate the result back to the caller.
+* To prevent storage costs from growing unbounded due to many task results which are no longer needed by the application, these values will expire after some configurable period of time.
+  * These values can be more eagerly cleaned up in the case that a task result is known to not be needed outside of some scope. For example, if the task is called as a step within another task, its result can be discarded once the caller has acknowledged the result.
+  * This is facilitated by a `IDurableTaskManagerGrainExtension.RemoveAsync(ScheduledTaskId id)` method call, called implicitly by the caller after it has made the results of the `ScheduledTask` call durable from within a `.AsStep(id)` call.
+
+* Handling loops
+  * When using the step-based programming model (where workflows are expressed as `DurableTask`-returning methods on `Grains` which are defined as a partially-ordered set of named steps), there must be some way to identify iterations of a loop, so that behavior matches what a user might reasonably expect.
+    * With no knowledge of loops and no care taken by a user, the loop body will be executed multiple times, invoking tasks with the same identifier.
+    * These tasks, upon being invoked for a subsequent time, will either be skipped (since a task with that id has already completed), or they will throw an error (since a task with that id has already been started during this attempt), depending on what we decide the semantics should be.
+
+* Persistence and atomicity within durable tasks
+  * It is natural for a durable task on a grain to affect the state of that grain
+  * It would be difficult for developers to reason about the correctness of a durable task method if updates to different components of the grain did not proceed as atomic steps.
+  * Since durable task methods are intended to proceed in steps, perhaps it makes good sense for updates to the state of a grain to proceed in atomic steps.
+  * To do this, we can implicitly hold the state changes made to a grain in-memory for the duration of a DurableTask method and only apply them once the method exits.
+  * Should these state changes be made to a copy of the grain's state? If the `DurableTask` invocation fails, operating on a copy makes it easier to roll-back the changes, which is something that is required for atomicity in the ACID sense.
+    * It is possible to make reasonably understandable systems without this guarantee, but it is difficult.
+    * Without operating on a copy, the grain's state could be re-sync'd from storage after an exception escapes a `DurableTask` method.
+  * An alternative is to have an `UpdateAsync` method which accepts an async delegate which updates multiple components within the grain atomically.
+
+* Transactional steps
+  * Without transactional steps, side effects of operations may occur multiple times, affecting the correctness of the durable task.
+  * When an operation crosses grain boundaries, a transaction can be used and the durable task state can be enlisted in the transaction.
+  ```csharp
+  IPersistentState<int> _balance;
+
+  DurableTask MyMethod(IAccountGrain otherAccount)
+  {
+    // The transfer will be performed exactly once
+    await DurableTaskContext.RunTransactionalStep(
+      "transfer",
+      () => otherAccount.Withdraw(100));
+  }
+  ```
+
+
+  * The `DurableTask` methods which allow specifying a task id modify the `DurableTaskGrainMethodInvocation` instance so that when it is submitted to the runtime, the id, etc, are carried with it.
+  * When awaited, the `IInvokable` is submitted to the runtime to send to the remote grain.
+  * The 
+
