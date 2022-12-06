@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Serialization;
 
-namespace Orleans.Vesuvius.Remoting;
+namespace Orleans.DurableTasks.Remoting;
 
 [GenerateSerializer]
 public class ScheduledTaskContext

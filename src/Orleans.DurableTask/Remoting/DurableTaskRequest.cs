@@ -8,7 +8,7 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
-namespace Orleans.Vesuvius.Remoting;
+namespace Orleans.DurableTasks.Remoting;
 
 [GenerateSerializer]
 public abstract class DurableTaskRequestBase : RequestBase, IOutgoingGrainCallFilter, IOnDeserialized

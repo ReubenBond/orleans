@@ -1,4 +1,4 @@
-namespace Orleans.Vesuvius.Remoting;
+namespace Orleans.DurableTasks.Remoting;
 
 public interface IScheduledTaskRuntime
 {

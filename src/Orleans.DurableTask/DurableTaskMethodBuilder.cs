@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace Orleans.Vesuvius;
+namespace Orleans.DurableTasks;
 
 /// <summary>
 /// Async method builder for methods which return <see cref="DurableTask"/>.

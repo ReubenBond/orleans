@@ -164,6 +164,12 @@ Flow:
   * When using the step-based programming model (where workflows are expressed as `DurableTask`-returning methods on `Grains` which are defined as a partially-ordered set of named steps), there must be some way to identify iterations of a loop, so that behavior matches what a user might reasonably expect.
     * With no knowledge of loops and no care taken by a user, the loop body will be executed multiple times, invoking tasks with the same identifier.
     * These tasks, upon being invoked for a subsequent time, will either be skipped (since a task with that id has already completed), or they will throw an error (since a task with that id has already been started during this attempt), depending on what we decide the semantics should be.
+  * Perhaps we should have some method for entering a new scope for a loop iteration.
+    * How would we restore the loop variable to the correct state?
+    * If we don't, then an unbounded number of loop iterations could cause an unbounded storage growth for the `DurableTask`-returning method.
+  * `IDisposable DurableTask.UsingLoopIteration(object loopVariable)`
+    * Creates a new scope, just as a *step* creates a new scope.
+  * It does not seem ergonomic and it would probably not be clear to a user why they should use it.
 
 * Persistence and atomicity within durable tasks
   * It is natural for a durable task on a grain to affect the state of that grain
@@ -174,6 +180,11 @@ Flow:
     * It is possible to make reasonably understandable systems without this guarantee, but it is difficult.
     * Without operating on a copy, the grain's state could be re-sync'd from storage after an exception escapes a `DurableTask` method.
   * An alternative is to have an `UpdateAsync` method which accepts an async delegate which updates multiple components within the grain atomically.
+  * Another alternative is to have no effects become persisted until a `WriteStateAsync` call. This leaves the developer to clean up in-memory changes.
+  * If we disallow in-memory mutations, then changes can be queued up and applied or discarded as needed without necessarily needing to take a copy of the underlying data.
+  * Note: Orleans.Transactions takes a full copy today
+  * Given we do not expect to need to roll-back often, perhaps re-syncing from storage is best.
+  * **DECISION** Reload state from storage upon failure to prevent needing to take an in-memory copy for each operation.
 
 * Transactional steps
   * Without transactional steps, side effects of operations may occur multiple times, affecting the correctness of the durable task.

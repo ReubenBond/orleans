@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Sources;
 
-namespace Orleans.Vesuvius;
+namespace Orleans.DurableTasks;
 
 /// <summary>
 /// Represents a locally-executing <see cref="DurableTask"/> method.

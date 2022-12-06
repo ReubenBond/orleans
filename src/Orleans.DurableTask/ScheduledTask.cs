@@ -2,7 +2,7 @@ using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Sources;
 
-namespace Orleans.Vesuvius;
+namespace Orleans.DurableTasks;
 
 public interface IStateMachineManager
 {

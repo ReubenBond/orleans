@@ -1,11 +1,11 @@
 using System.Runtime.CompilerServices;
-using Orleans.Vesuvius.Remoting;
+using Orleans.DurableTasks.Remoting;
 using Orleans.Runtime;
 using System.Runtime.InteropServices;
 using System.Runtime.ExceptionServices;
 using System.Diagnostics;
 
-namespace Orleans.Vesuvius;
+namespace Orleans.DurableTasks;
 
 [InvokableBaseType(typeof(GrainReference), typeof(DurableTask), typeof(DurableTaskRequest))]
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
@@ -54,7 +54,7 @@ public static class DurableTaskExtensions
     // Return a "DurableTaskStepAwaitable<TResult>" which sets the appropriate context around the invocation.
     public static async ValueTask<TResult> AsStep<TResult>(this DurableTask<TResult> taskDefinition, string stepId)
     {
-        await Task.Delay().ConfigureAwait(false);
+        await Task.Delay(1).ConfigureAwait(false);
         // Check the current durable task context
         // If it does not exist, throw:
         //   * Steps can only exist within a durable execution context

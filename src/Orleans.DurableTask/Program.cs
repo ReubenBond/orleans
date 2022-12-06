@@ -9,10 +9,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Text;
 using System.Threading.Tasks.Sources;
-using Orleans.Vesuvius.Remoting;
+using Orleans.DurableTasks.Remoting;
 using Orleans.Transactions.Abstractions;
 
-namespace Orleans.Vesuvius;
+namespace Orleans.DurableTasks;
 
 public class Program
 {

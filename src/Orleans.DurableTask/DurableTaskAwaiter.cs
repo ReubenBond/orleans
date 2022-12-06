@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace Orleans.Vesuvius;
+namespace Orleans.DurableTasks;
 
 /// <summary>
 /// Provides an awaiter for <see cref="DurableTask"/> instances.

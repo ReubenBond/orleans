@@ -196,7 +196,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DistributedTests.Server", "
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.SystemTextJson", "src\Orleans.Serialization.SystemTextJson\Orleans.Serialization.SystemTextJson.csproj", "{5CFBC7AC-C9AE-4C6C-943C-4A157396E427}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Vesuvius", "src\Orleans.DurableTask\Orleans.Vesuvius.csproj", "{FD582453-4F44-4E91-8F77-6816B51B2982}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.DurableTasks", "src\Orleans.DurableTask\Orleans.DurableTasks.csproj", "{FD582453-4F44-4E91-8F77-6816B51B2982}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.BroadcastChannel", "src\Orleans.BroadcastChannel\Orleans.BroadcastChannel.csproj", "{497D472A-0BA8-4306-A110-C4D871FD5918}"
 EndProject

@@ -1,4 +1,4 @@
-namespace Orleans.Vesuvius;
+namespace Orleans.DurableTasks;
 
 public readonly struct ScheduledTaskId
 {
