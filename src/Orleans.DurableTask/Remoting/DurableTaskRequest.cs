@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -14,13 +9,13 @@ namespace Orleans.DurableTasks.Remoting;
 public abstract class DurableTaskRequestBase : RequestBase, IOutgoingGrainCallFilter, IOnDeserialized
 {
     [NonSerialized]
-    private IScheduledTaskRuntime? _runtime;
+    private IDurableTaskRuntime? _runtime;
 
     [Id(0)]
-    public ScheduledTaskContext? Context { get; set; }
+    public DurableTaskCallContext? Context { get; set; }
 
     [GeneratedActivatorConstructor]
-    protected DurableTaskRequestBase(IScheduledTaskRuntime runtime)
+    protected DurableTaskRequestBase(IDurableTaskRuntime runtime)
     {
         _runtime = runtime;
     }
@@ -33,10 +28,10 @@ public abstract class DurableTaskRequestBase : RequestBase, IOutgoingGrainCallFi
 
     private void SetScheduledTaskContext()
     {
-        var taskContext = ScheduledTaskContext.Current;
+        var taskContext = DurableTaskCallContext.Current;
         if (taskContext == null)
         {
-            ScheduledTaskContext.Clear();
+            DurableTaskCallContext.Clear();
         }
         else
         {
@@ -50,7 +45,7 @@ public abstract class DurableTaskRequestBase : RequestBase, IOutgoingGrainCallFi
         var taskContext = this.Context;
         try
         {
-            ScheduledTaskContext.SetCurrentContext(taskContext);
+            DurableTaskCallContext.SetCurrentContext(taskContext);
             response = await InvokeWrapped();
         }
         catch (Exception exception)
@@ -59,7 +54,7 @@ public abstract class DurableTaskRequestBase : RequestBase, IOutgoingGrainCallFi
         }
         finally
         {
-            ScheduledTaskContext.Clear();
+            DurableTaskCallContext.Clear();
         }
 
         return response;
@@ -74,7 +69,7 @@ public abstract class DurableTaskRequestBase : RequestBase, IOutgoingGrainCallFi
 
     void IOnDeserialized.OnDeserialized(DeserializationContext context)
     {
-        _runtime = context.ServiceProvider.GetRequiredService<IScheduledTaskRuntime>();
+        _runtime = context.ServiceProvider.GetRequiredService<IDurableTaskRuntime>();
     }
 }
 
@@ -85,9 +80,9 @@ public sealed class DurableTaskResponse : Response
     private Response? _response;
 
     [Id(1)]
-    public ScheduledTaskContext? Context { get; set; }
+    public DurableTaskCallContext? Context { get; set; }
 
-    public static DurableTaskResponse Create(Response response, ScheduledTaskContext context)
+    public static DurableTaskResponse Create(Response response, DurableTaskCallContext context)
     {
         return new DurableTaskResponse
         {
@@ -111,7 +106,7 @@ public sealed class DurableTaskResponse : Response
 public abstract class DurableTaskRequest : DurableTaskRequestBase 
 {
     [GeneratedActivatorConstructor]
-    protected DurableTaskRequest(IScheduledTaskRuntime runtime) : base(runtime)
+    protected DurableTaskRequest(IDurableTaskRuntime runtime) : base(runtime)
     {
     }
 
@@ -136,7 +131,7 @@ public abstract class DurableTaskRequest : DurableTaskRequestBase
 public abstract class DurableTaskRequest<TResult> : DurableTaskRequestBase
 {
     [GeneratedActivatorConstructor]
-    protected DurableTaskRequest(IScheduledTaskRuntime runtime) : base(runtime)
+    protected DurableTaskRequest(IDurableTaskRuntime runtime) : base(runtime)
     {
     }
 

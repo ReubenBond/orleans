@@ -4,6 +4,8 @@ using Orleans.Runtime;
 using System.Runtime.InteropServices;
 using System.Runtime.ExceptionServices;
 using System.Diagnostics;
+using Orleans.Serialization;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.DurableTasks;
 
@@ -15,6 +17,7 @@ public abstract class DurableTask
     public ValueTask<ScheduledTask> ScheduleAsync(SchedulingOptions options) => ScheduleAsyncCore(ScheduledTaskId.None, options);
     public ValueTask<ScheduledTask> ScheduleAsync(ScheduledTaskId taskId) => ScheduleAsyncCore(taskId, options: null);
     public ValueTask<ScheduledTask> ScheduleAsync(ScheduledTaskId taskId, SchedulingOptions options) => ScheduleAsyncCore(taskId, options);
+    public ValueTask<ScheduledTask> ScheduleAsync(ScheduledTaskId taskId, DateTimeOffset dueTime) => ScheduleAsyncCore(taskId, new SchedulingOptions { DueTime = dueTime });
 
     protected abstract ValueTask<ScheduledTask> ScheduleAsyncCore(ScheduledTaskId taskId, SchedulingOptions? options);
 
@@ -31,6 +34,7 @@ public abstract class DurableTask<TResult> : DurableTask
     public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(SchedulingOptions options) => ScheduleAsyncTypedCore(ScheduledTaskId.None, options);
     public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(ScheduledTaskId taskId) => ScheduleAsyncTypedCore(taskId, options: null);
     public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(ScheduledTaskId taskId, SchedulingOptions options) => ScheduleAsyncTypedCore(taskId, options);
+    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(ScheduledTaskId taskId, DateTimeOffset dueTime) => ScheduleAsyncTypedCore(taskId, new SchedulingOptions { DueTime = dueTime });
 
     protected abstract ValueTask<ScheduledTask<TResult>> ScheduleAsyncTypedCore(ScheduledTaskId taskId, SchedulingOptions? options);
 
@@ -71,17 +75,41 @@ public static class DurableTaskExtensions
         // Return the result to the caller.
         return default;
     }
+
+    // See above
+    public static ValueTask AsStep(this DurableTask taskDefinition, string stepId)
+    {
+        return default;
+    }
+}
+
+public interface IDurableTaskState<T>
+{
+    public T Value { get; set; }
+    public ValueTask WriteStateAsync();
 }
 
 public class DurableTaskContext
 {
-    private static readonly AsyncLocal<DurableTaskStateNode?> _current = new();
-    internal void Enter(string id)
+    private static readonly AsyncLocal<DurableTaskContext?> _current = new();
+
+    public static DurableTaskContext? CurrentTask => _current.Value;
+   
+    private readonly Serializer _serializer;
+
+    public bool IsCancellationRequested => Status is DurableTaskStatus.Canceled;
+
+    // Get state associated with a workflow
+    public IDurableTaskState<T> GetState<T>(string key) => default!;
+    public ValueTask<IDurableTaskState<T>> GetOrAddStateAsync<T>(string key, T defaultValue) => default!;
+    public ValueTask<IDurableTaskState<T>> GetOrAddStateAsync<T>(string key, Func<T> createDefaultValue) => default!;
+
+    internal void Enter(Serializer serializer, string id)
     {
         _current.Value = _current.Value switch
         {
-            { } parent => parent.GetOrCreateChildNode(id),
-            _ => new DurableTaskStateNode { Id = id },
+            { } parent => parent.GetOrCreateChildNode(serializer, id),
+            _ => new DurableTaskContext(serializer) { Id = id },
         };
     }
     
@@ -89,20 +117,17 @@ public class DurableTaskContext
     {
         _current.Value = null;
     }
-}
 
-public interface IScheduledTaskManager
-{
-    ValueTask<ScheduledTask> ScheduleAsync<TGrain>(TGrain grain, Func<TGrain, DurableTask> task, DateTimeOffset dueTime);
-}
-
-internal class DurableTaskStateNode
-{
     private object? _result;
 
-    public DurableTaskStateNode? Parent { get; init; }
+    public DurableTaskContext? Parent { get; init; }
     public required string Id { get; init; }
-    public Dictionary<string, DurableTaskStateNode>? Children { get; private set; }
+    public Dictionary<string, DurableTaskContext>? Children { get; private set; }
+
+    internal DurableTaskContext(Serializer serializer)
+    {
+        _serializer = serializer;
+    }
 
     public DurableTaskStatus Status { get; private set; }
     public ExceptionDispatchInfo? Exception => _result switch { DurableTaskStatus.Faulted => (ExceptionDispatchInfo)_result!, _ => null };
@@ -124,19 +149,19 @@ internal class DurableTaskStateNode
         _result = ExceptionDispatchInfo.Capture(exception);
     }
 
-    internal DurableTaskStateNode GetOrCreateChildNode(string childId)
+    internal DurableTaskContext GetOrCreateChildNode(Serializer serializer, string childId)
     {
         Children ??= new();
         ref var childNode = ref CollectionsMarshal.GetValueRefOrAddDefault(Children, childId, out _);
         if (childNode is null)
         {
-            childNode = new DurableTaskStateNode { Id = childId, Parent = this };
+            childNode = new DurableTaskContext(serializer) { Id = childId, Parent = this };
         }
 
         return childNode;
     }
 
-    internal DurableTaskStateNode CreateChildNode(string childId)
+    internal DurableTaskContext CreateChildNode(Serializer serializer, string childId)
     {
         Children ??= new();
         ref var childNode = ref CollectionsMarshal.GetValueRefOrAddDefault(Children, childId, out var exists);
@@ -145,10 +170,15 @@ internal class DurableTaskStateNode
             throw new InvalidOperationException("Child node already exists");
         }
 
-        return childNode = new DurableTaskStateNode { Id = childId, Parent = this };
+        return childNode = new DurableTaskContext(serializer) { Id = childId, Parent = this };
     }
 
     internal void ClearChildren() => Children = null;
+}
+
+public interface IScheduledTaskManager
+{
+    ValueTask<ScheduledTask> ScheduleAsync<TGrain>(TGrain grain, Func<TGrain, DurableTask> task, DateTimeOffset dueTime);
 }
 
 public enum DurableTaskStatus
@@ -156,5 +186,6 @@ public enum DurableTaskStatus
     NotStarted,
     InProgress,
     Success,
-    Faulted
+    Faulted,
+    Canceled
 }

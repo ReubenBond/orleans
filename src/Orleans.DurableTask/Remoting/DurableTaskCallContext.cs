@@ -4,28 +4,26 @@ using Orleans.Serialization;
 namespace Orleans.DurableTasks.Remoting;
 
 [GenerateSerializer]
-public class ScheduledTaskContext
+public class DurableTaskCallContext
 {
-    private static readonly AsyncLocal<ScheduledTaskContext?> CurrentContext = new();
+    private static readonly AsyncLocal<DurableTaskCallContext?> CurrentContext = new();
 
-    public static ScheduledTaskContext? Current => CurrentContext.Value;
+    public static DurableTaskCallContext? Current => CurrentContext.Value;
 
     private readonly Serializer _serializer;
-    private readonly ITransactionClient _transactionClient;
 
-    internal ScheduledTaskContext(Serializer serializer, ITransactionClient transactionClient)
+    internal DurableTaskCallContext(Serializer serializer)
     {
         _serializer = serializer;
-        _transactionClient = transactionClient;
     }
 
     [Id(0)]
     public ScheduledTaskId Id { get; internal set; }
 
-    [Id(0)]
+    [Id(1)]
     internal Dictionary<string, byte[]> Values { get; } = new();
 
-    public static void SetCurrentContext(ScheduledTaskContext? value)
+    public static void SetCurrentContext(DurableTaskCallContext? value)
     {
         CurrentContext.Value = value;
     }
@@ -49,9 +47,4 @@ public class ScheduledTaskContext
     }
 
     public static void Clear() => CurrentContext.Value = null;
-
-    public async ValueTask<T> GetOrAddInTransaction<T>(string key, TransactionOption transactionOptions, Func<ValueTask<T>> transactionDelegate)
-    {
-        return await transactionDelegate();
-    }
 }

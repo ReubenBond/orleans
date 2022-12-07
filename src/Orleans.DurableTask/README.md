@@ -14,6 +14,28 @@
     * Durable tasks can be expressed as a set of steps and the result of individual steps can be stored and restored using the above mentioned state.
     * Durable task invocations can be retried after a failure. When a durable task is retried, it is executed again from the beginning and the implementation can examine its persistent state to resume execution from the first incomplete step.
 
+* Workflows are methods on grains which return a value of type `DurableTask` or `DurableTask<T>`.
+* Methods which describe workflows are called workflows.
+* When a request is made to schedule a workflow for execution, that is called a workflow *invocation*.
+* Each workflow invocation has a unique identifier which can be specified at scheduling time.
+* Each time a workflow is *executed*, that is called a workflow *run*.
+  * Each *run* has a unique identifier.
+* Workflows are logically a sequence of steps to be executed
+  * Each step is uniquely named by the developer
+* Each workflow *run* involves executing the workflow method from the beginning
+  * Workflow methods use their private state to determine the last completed step and continue from there.
+* Workflow invocations have access to private, persistent key-value storage.
+* Workflows can access and update the state of the grain which defines them.
+* Updates to grain state and workflow state are guaranteed to occur atomically
+  * If the developer specifies that both are to be updated simultaneously, there is no possibility for only one or the other to be updated.
+* 
+
+* A grain is a unit of atomicity: developers should be able to read & modify the state of a grain and the state of a workflow atomically. This includes:
+  * Enqueuing requests to be sent (outbox)
+  * Modifying grain state and the state of components of the grain (scheduling tasks)
+  * Marking incoming requests as handled
+
+
 ```csharp
 class UserGrain : Grain, IUserGrain
 {
@@ -201,8 +223,42 @@ Flow:
   }
   ```
 
-
   * The `DurableTask` methods which allow specifying a task id modify the `DurableTaskGrainMethodInvocation` instance so that when it is submitted to the runtime, the id, etc, are carried with it.
   * When awaited, the `IInvokable` is submitted to the runtime to send to the remote grain.
   * The 
 
+
+Questions:
+* Should workflows be expressed as methods on state*ful* objects, or as functions on state*less* objects?
+  * Methods on stateful objects (grains):
+    * Allow for more complex interaction patterns, rather than just a single invocation
+        * Eg, consider cancellation or modification of the workflow instructions after the workflow is initiated.
+        * For example, a monthly subscription renewal workflow has the subscription details changed.
+    * Give the workflow context and allow it to potentially atomically update the state of the object
+    * If a workflow is long-running, then the workflow execution might prevent other requests from running
+  * Functions on stateless objects:
+    * Are conceptually simpler
+    * Need some external mechanism for signaling and querying the workflow (eg, see Temporal and Azure Durable Functions, which use this approach.)
+
+---
+Characteristics of a good solution:
+
+* Transactions for performing atomic operations which cross entity boundaries
+* A facility to schedule work to be performed in the future
+  * Including repeated work
+* Ability to atomically update state of the workflow and the entity which it is attached to simultaneously
+
+
+TODO:
+
+* An API for rescheduling a task which is currently running.
+  * Do we require that each invocation has a unique name? That sounds reasonable.
+  * In that case, the invocation id can be stored in the grain's state so that methods can be created to cancel the task and check its progress, for example, and to ensure singleton scheduling.
+  * In this case, perhaps `ScheduleAsync` should throw or return a status (instead of a ScheduledTask?) so that we can determine when a durable task has already been scheduled before.
+    * Currently, it is idempotent, *get or schedule*, which seems more appropriate than making it throw.
+* An API/model for atomically updating grain state, cancelling & scheduling tasks on the grain, and scheduling calls to other grains (i.e, outbox pattern), etc.
+    * Should all APIs which manipulate a grain (state, tasks, outbox, etc) be synchronous with a single `WriteStateAsync()` API to commit the updates to storage?
+* Add `GetTask(DurableTaskId)` API to grain/etc to get a task with a given name
+* Add `GetTasks()` API to grain to list tasks. Do we need separate APIs for active vs completed tasks?
+* Should `ScheduleAsync()`, etc, support Orleans Transactions?
+  * How should transactions work with this in general?
