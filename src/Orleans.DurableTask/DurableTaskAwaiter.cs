@@ -20,6 +20,10 @@ public readonly struct DurableTaskAwaiter : INotifyCompletion, ICriticalNotifyCo
                 // This handles the cases where a DurableTask<T> method is cast to an untyped DurableTask.
                 _awaiter = methodInvocation.AsUntypedValueTask().GetAwaiter();
                 break;
+            case ICompletedDurableTask:
+                // This handles the cases where a CompletedDurableTask<T> method is cast to an untyped DurableTask.
+                _awaiter = default(ValueTask).GetAwaiter();
+                break;
             default:
                 _awaiter = ScheduleAndAwaitAsync(durableTask).GetAwaiter();
                 break;
@@ -51,6 +55,9 @@ public readonly struct DurableTaskAwaiter<TResult> : INotifyCompletion, ICritica
         {
             case DurableTaskMethodInvocation<TResult> methodInvocation:
                 _awaiter = methodInvocation.AsValueTask().GetAwaiter();
+                break;
+            case CompletedDurableTask<TResult> completedTask:
+                _awaiter = new ValueTask<TResult>(completedTask.Result).GetAwaiter();
                 break;
             default:
                 _awaiter = ScheduleAndAwaitAsync(durableTask).GetAwaiter();

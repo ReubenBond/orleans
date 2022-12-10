@@ -6,6 +6,7 @@ using System.Runtime.ExceptionServices;
 using System.Diagnostics;
 using Orleans.Serialization;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading.Tasks.Sources;
 
 namespace Orleans.DurableTasks;
 
@@ -24,6 +25,8 @@ public abstract class DurableTask
     // Schedules the durable task with default options and awaits the scheduled task.
     // Equivalent to `await (await durableTask.ScheduleAsync())`
     public DurableTaskAwaiter GetAwaiter() => new (this);
+
+    public static DurableTask<T> FromResult<T>(T value) => new CompletedDurableTask<T>(value);
 }
 
 [InvokableBaseType(typeof(GrainReference), typeof(DurableTask<>), typeof(DurableTaskRequest<>))]
@@ -41,6 +44,29 @@ public abstract class DurableTask<TResult> : DurableTask
     // Schedules the durable task with default options and awaits the scheduled task.
     // Equivalent to `await (await durableTask.ScheduleAsync())`
     public new DurableTaskAwaiter<TResult> GetAwaiter() => new(this);
+}
+
+internal interface ICompletedDurableTask
+{
+}
+
+/// <summary>
+/// Represents a completed <see cref="DurableTask{TResult}"/> instance.
+/// </summary>
+internal abstract class CompletedDurableTask<TResult> : DurableTask<TResult>, ICompletedDurableTask
+{
+    public CompletedDurableTask(TResult value) => Result = value;
+
+    public TResult Result { get; }
+
+    protected override ValueTask<ScheduledTask> ScheduleAsyncCore(ScheduledTaskId taskId, SchedulingOptions? options) => new(new ScheduledTask<TResult>(taskId, options, this));
+    protected override ValueTask<ScheduledTask<TResult>> ScheduleAsyncTypedCore(ScheduledTaskId taskId, SchedulingOptions? options)
+    {
+        // If inside a durable execution context, use the runtime to schedule a 
+        return new(new ScheduledTask<TResult>(taskId, options, this));
+    }
+
+    public virtual ValueTask<TResult> AsValueTask() => new ValueTask<TResult>(Result);
 }
 
 public static class DurableTaskExtensions

@@ -108,7 +108,6 @@ class UserGrain : Grain, IUserGrain
   * Access state via `DurableTaskContext.Current`
   * Update grain state
 
-
 ### Lifecycle of a durable task
 
 * Initial scheduling: client calling a durable task method on a grain
@@ -262,3 +261,80 @@ TODO:
 * Add `GetTasks()` API to grain to list tasks. Do we need separate APIs for active vs completed tasks?
 * Should `ScheduleAsync()`, etc, support Orleans Transactions?
   * How should transactions work with this in general?
+
+Stepwise Task APIs for use within `DurableTask` methods:
+* `await (DurableTask).AsStepAsync("foo")` - invoke some durable task as a named step in the workflow, skipping the invocation if a step with that name has already been completed and had its result (if any) stored.
+* `await DurableTaskContext.CurrentTask.RunStepAsync("foo", async () => {...})` - invoke some (async) lambda as a durable step, skipping it if it has already been completed and its result (if any) stored.
+* `await (DurableTask).AsTransactionalStep("foo")` - as above, but creates a transaction scope and runs the step and updates the task state transactionally. This is useful for cases where one or more grains are being called. It provides atomicity for cross-grain calls.
+  * Question: why not always make steps transactional? Is it just practical concerns? Could developers get themselves into trouble?
+  * Question: are there things which a user cannot do within a transaction (transactionally), such as write to a stream?
+    * If so, how do we make it clear to a user that some actions are not transactional despite being executed within a transactional scope?
+
+* Separate orchestration from actions?
+  * This is what Temporal and Azure Durable Functions do.
+  * Downsides:
+    * Added ceremony, since splitting side-effects from coordination requires some boundary (eg, a separate class/function)
+      * But there needs to be some way to demarcate idempotent steps anyway. In the above proposal, it's usually `SomeThing(foo).AsStep("foo-step")`
+  * Upsides:
+    * ?
+
+
+* Create a durable task from a delegate:
+  * APIs:
+    * `DurableTask DurableTask.Run(Action)`
+    * `DurableTask DurableTask.Run(Func<Task>)`
+    * `DurableTask<T> DurableTask.Run(Func<Task<T>>)`
+    * `DurableTask<T> DurableTask.Run(Func<T>)`
+  * Usage:
+    ```csharp
+    var id = await DurableTask.Run(() => Guid.NewGuid()).AsStep("generate-id")` 
+    ```
+    Equivalent to:
+    ``` csharp
+    var id = await GenerateId().AsStep("generate-id");
+
+    async DurableTask<Guid> GenerateId() => Guid.NewGuid();
+    ```
+* Create a durable task from a value:
+  * `DurableTask<T> DurableTask.FromResult<T>(T value)`
+
+* Deduplicate invocation of a durable task from within another durable task, returning the result of invocation:
+  * Overview:
+    * Durable tasks may be arbitrarily long-running. To help ensure that tasks make progress despite the presence of system crashes, we have a mechanism for storing progress. Progress can be stored for individual *steps* which make up the task. Each *step* is a task itself, so these steps naturally form a tree. When recovering from a crash, we need to do our best to restore the state of a previous execution so that the task can continue from some point and make progress. The **Procedure** section describes how this process works.
+  * Procedure:
+    * Associate an identifier (*task id*) with each task (*step*) using APIs defined below.
+    * Check the current, in-scope *durable task context*'s step storage to see if this task has already completed.
+      * If so, **return** the previously stored result.
+      * If there is an existing context but it has not been marked as complete, **continue**.
+      * If there is no existing context, create a new *durable task context* for the task and add it to the current context using the defined *task id*.
+    * Make the task context the current context.
+    * Invoke the task.
+    * Set the result of the task and mark the context as complete.
+    * **Return** the result of the task to the caller.
+  * APIs
+    * `DurableTaskStep AsStep(this DurableTask task, string taskId)` (extension method)
+    * `DurableTaskStep<T> AsStep<T>(this DurableTask<T> task, string taskId)` (extension method)
+  * Usage:
+    ``` csharp
+    var callback = await DurableTaskCompletionSource.Create<Response>().AsStep("payment-task");
+    var paymentRequest = 
+    ```
+
+
+  * `DurableTaskCompletionSource`
+    * Overview:
+      * Some patterns cannot be satisfied by request/response. In these 
+      * `DurableTaskCompletionSource`/`DurableTaskCompletionSource<T>` instances can be used within grains to create globally identifiable, named, distributed, fault-tolerant, awaitable tasks.
+    * Usages:
+      * To implement the *idempotency key* pattern, a new `DurableTaskCompletionSource<T>` can be created per-
+    * Implementation:
+      * `DurableTaskCompletionSource<T>` a
+    * APIs
+      *
+      ```csharp
+      public class DurableTaskCompletionSource<T>
+      {
+        DurableTask<T> Task { get; }
+        DurableTaskId Id { get; } // Should this be a property on DurableTask? Should it be a string?
+      }
+      ```

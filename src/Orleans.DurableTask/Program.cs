@@ -319,6 +319,25 @@ public class SubscriptionGrain : Grain<SubscriptionGrainState>, ISubscriptionGra
     }
 }
 
+// Experiment - using a different base class for orchestrators
+public abstract class DurableTaskOrchestrator
+{
+}
+
+public interface ISubscriptionProcessor
+{
+    Task CreateSubscription();
+    Task PauseSubscription(DateTimeOffset until);
+    Task ResumeSubscription();
+    Task UpdateBillingInformation();
+    Task GetCurrentStatus();
+}
+
+public class SubscriptionProcessor : DurableTaskOrchestrator
+{
+    DurableTask Run(DurableTaskContext context);
+}
+
 // Example: eShop order process
 public interface IBuyerAccount : IGrain { }
 public interface IPaymentService { }
@@ -377,6 +396,11 @@ public class OrderProcessorGrain : Grain<OrderState>, IOrderProcessor
         }
     }
 
+    public async DurableTask<Guid> GenerateId()
+    {
+        return Guid.NewGuid();
+    }
+
     public async DurableTask ProcessOrderAsync(IBuyerAccount buyer, Order order)
     {
         var status = await DurableTaskContext.CurrentTask!.GetOrAddStateAsync("status", OrderStatus.None);
@@ -399,7 +423,7 @@ public class OrderProcessorGrain : Grain<OrderState>, IOrderProcessor
             await WriteStateAsync();
         }
 
-        if (status.Value is OrderStatus.Confimed)
+        if (status.Value is OrderStatus.Confirmed)
         {
             await _catalogService.CheckStock(order);
             State.Status = status.Value = OrderStatus.Created;
