@@ -261,6 +261,10 @@ TODO:
 * Add `GetTasks()` API to grain to list tasks. Do we need separate APIs for active vs completed tasks?
 * Should `ScheduleAsync()`, etc, support Orleans Transactions?
   * How should transactions work with this in general?
+* How can external services integrate with this pattern?
+  * Send "idempotency-key" to external service
+* How can we support the idempotency-key pattern so that we can create Web services which others can integrate with?
+  * Schedule a DurableTask with the specified 
 
 Stepwise Task APIs for use within `DurableTask` methods:
 * `await (DurableTask).AsStepAsync("foo")` - invoke some durable task as a named step in the workflow, skipping the invocation if a step with that name has already been completed and had its result (if any) stored.
@@ -317,24 +321,50 @@ Stepwise Task APIs for use within `DurableTask` methods:
   * Usage:
     ``` csharp
     var callback = await DurableTaskCompletionSource.Create<Response>().AsStep("payment-task");
-    var paymentRequest = 
+    var paymentRequest = StripeClient.SubmitChargeRequestAsync(charge, idempotencyKey: callback.Id);
+    var paymentResult = await callback.Task;
     ```
-
 
   * `DurableTaskCompletionSource`
     * Overview:
-      * Some patterns cannot be satisfied by request/response. In these 
+      * When integrating with external systems, 
       * `DurableTaskCompletionSource`/`DurableTaskCompletionSource<T>` instances can be used within grains to create globally identifiable, named, distributed, fault-tolerant, awaitable tasks.
     * Usages:
       * To implement the *idempotency key* pattern, a new `DurableTaskCompletionSource<T>` can be created per-
     * Implementation:
       * `DurableTaskCompletionSource<T>` a
     * APIs
-      *
+      * Key members on class:
       ```csharp
       public class DurableTaskCompletionSource<T>
       {
         DurableTask<T> Task { get; }
         DurableTaskId Id { get; } // Should this be a property on DurableTask? Should it be a string?
+        ValueTask SetResultAsync(T value);
+        ValueTask<bool> TrySetResultAsync(T value);
+        ValueTask SetExceptionAsync(Exception exception);
+        ValueTask<bool> TrySetExceptionAsync(Exception exception);
+        ValueTask SetCanceledAsync();
+        ValueTask<bool> TrySetCanceledAsync();
+      }
+
+      public class DurableTaskCompletionSource
+      {
+        static DurableTaskCompletionSource<T> Create<T>(); // The DurableTaskCompletionSource
+        static DurableTaskCompletionSource Create(); // The DurableTaskCompletionSource
+        static DurableTaskCompletionSource<T> Get<T>(string id);
+        static DurableTaskCompletionSource Get(string id);
+
+        DurableTask Task { get; }
+        DurableTaskId Id { get; }
+        ValueTask SetResultAsync();
+        ValueTask<bool> TrySetResultAsync();
+        ValueTask SetExceptionAsync(Exception exception);
+        ValueTask<bool> TrySetExceptionAsync(Exception exception);
+        ValueTask SetCanceledAsync();
+        ValueTask<bool> TrySetCanceledAsync();
       }
       ```
+    * Notes:
+      * `DurableTaskCompletionSource` instances can be serialized and sent across the wire. Since these instances are globally-addressable, each instance is a proxy. This allows instances to be sent to other instances, for example as a kind of callback mechanism for long-polling.
+
