@@ -414,29 +414,43 @@ Stepwise Task APIs for use within `DurableTask` methods:
         * The caller can first check whether the task has been completed and only complete it if it hasn't already.
         * This leaves the door open for transactional workflows and transactional steps.
 
+---
+
+# (DurableTask vs Workflow vs WorkflowStep is a good distinction, so lets try again)
+
+---
+
+# Workflow programming in Orleans
 
 * Durable tasks are a building block for reliable, long-running operations, commonly known as *workflows*.
-* Workflows are expressed using grain methods with a return type of `DurableTask` or `DurableTask<T>`. These methods can be invoked as a *workflow* or as a *step* within a workflow.
-* Workflows separate scheduling from invocation. This is useful for long-running operations because invocation of a workflow can often take an arbitrarily long period of time, such as multiple days. Applications typically want to return control back to the user as soon as such an operation has been scheduled, rather than waiting until the operation has completed.
+* Workflows are expressed using grain methods with a return type of `DurableTask` or `DurableTask<T>`.
+* Workflows separate scheduling from invocation. This is useful for long-running operations because invocation of a workflow can often take an arbitrarily long period of time, such as multiple days and applications typically want to return control back to the user as soon as such an operation has been scheduled, rather than waiting until the operation has completed.
 * Once a workflow has been scheduled, the system is responsible for ensuring that it is *eventually* executed to completion. This promise must hold even in the presence of failures, such as temporary power outages, network faults, and system restarts.
 * Each workflow is given a unique identifier at creation time. This identifier can be provided by the application or generated automatically.
 * The status and result of a workflow can be queried using the workflow's identifier.
-* Workflows consist of one or more *workflow steps*. The `DurableTask` which defines the workflow is the top-level workflow step and each step can itself be composed from multiple other workflow steps. Therefore, every workflow step except for the top one has a parent and potentially multiple children.
+* Workflows consist of one or more *workflow steps*. The `DurableTask` which defines the workflow is also a workflow step and each step can itself be composed from multiple other workflow steps. Therefore, every workflow step except for the top one has a parent and potentially multiple children.
 * Each *workflow step* has an identifier which is unique within the context of the parent step.
 * When a workflow step completes, its result is stored, allowing future executions of the workflow to see the result and skip invocation of the step.
 * If the execution of a workflow encounters a step which has already been completed by a previous execution of that workflow, the step is not executed again. Instead, the stored result from the previous execution is returned so that the workflow can continue. This allows the workflow to continue to make progress when there are faults which occur part-way through an execution.
+* Workflow steps can involve loops and other constructs. In these cases, *step state* allows variables, such as loop variables, to be persisted so that progress can resume from the a recent iteration instead of always starting the loop from the beginning. This requires some care on the part of the application developer since the method which defines the step must be able to recover to a consistent point using that state when it is restarted after a fault.
 
 ## Workflows
-  * Can be created from an instance of `DurableTask`/`DurableTask<T>` using the `task.AsWorkflow(id)` extension method.
+  * Created from an instance of `DurableTask`/`DurableTask<T>` using the `task.AsWorkflow(id)` extension method.
   * Separate scheduling and invocation/completion: callers can receive a notification when the workflow is durably scheduled and can receive a subsequent notification when the workflow has completed.
     * `workflow.ScheduleAsync()` durably schedules a workflow for immediate invocation.
     * `workflow.ScheduleAsync(DateTimeOffset)` and `workflow.ScheduleAsync(TimeSpan)` schedule the workflow for execution at a later time.
 ## Workflow steps
+  * Created from an instance of `DurableTask`/`DurableTask<T>` using the `task.AsStep(id)` extension method.
   * Can only be created from within the context of a workflow.
-  * Can be created from an instance of `DurableTask`/`DurableTask<T>` using the `task.AsStep(id)` extension method.
-  * Have identities which are scoped to their parent
+  * Have identities which are unique with respect to their parent.
+
 ## `DurableTask` and `DurableTask<T>`
+
 ## `DurableTaskCompletionSource` and `DurableTaskCompletionSource<T>`
+
+## Workflow Step State
+  * For more advanced scenarios, such as loops
+  * Allows access to persistent key-value state which is scoped to the current step
 
 ```csharp
 // Create a workflow from a durable task
