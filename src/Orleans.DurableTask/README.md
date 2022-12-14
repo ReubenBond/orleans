@@ -325,14 +325,14 @@ Stepwise Task APIs for use within `DurableTask` methods:
     var paymentResult = await callback.Task;
     ```
 
-  * `DurableTaskCompletionSource`
+  * `DurableTaskCompletionSource` (DCTS)
     * Overview:
       * When integrating with external systems, 
       * `DurableTaskCompletionSource`/`DurableTaskCompletionSource<T>` instances can be used within grains to create globally identifiable, named, distributed, fault-tolerant, awaitable tasks.
-    * Usages:
-      * To implement the *idempotency key* pattern, a new `DurableTaskCompletionSource<T>` can be created per-
+    * Uses:
+      * To implement the *idempotency key* pattern, a new DCTS can be created with either an automatically generated identifier (Eg, `Guid.NewGuid().ToString("N")`) or a specified identifier.
+      * DCTS identity is global: any caller can get a reference to a DCTS by its identifier.
     * Implementation:
-      * `DurableTaskCompletionSource<T>` a
     * APIs
       * Key members on class:
       ```csharp
@@ -346,6 +346,7 @@ Stepwise Task APIs for use within `DurableTask` methods:
         ValueTask<bool> TrySetExceptionAsync(Exception exception);
         ValueTask SetCanceledAsync();
         ValueTask<bool> TrySetCanceledAsync();
+        ValueTask<(bool IsCompleted, T Result, > IsCompletedAsync();
       }
 
       public class DurableTaskCompletionSource
@@ -363,8 +364,102 @@ Stepwise Task APIs for use within `DurableTask` methods:
         ValueTask<bool> TrySetExceptionAsync(Exception exception);
         ValueTask SetCanceledAsync();
         ValueTask<bool> TrySetCanceledAsync();
+        ValueTask<bool> IsCompletedAsync();
       }
+      ```
+    * Usage:
+      * Using a `DurableTaskCompletionSource<T>` from an ASP.NET Controller:
+      ```csharp
+      // In an ASP.NET Controller method:
+      var completion = DurableTaskCompletionSource.Create<MyResponse>(idempotencyId);
+      
+      // Optimization: if the task has already been completed, there is no need to issue the operation again.
+      var (isCompleted, result) await completion.Task.TryGetResultAsync();
+      if (isCompleted) 
+      {
+        return result;
+      }
+
+      // Issue the request, passing the completion
+      await grain.PerformWork(request, completion);
+
+      // Wait for the operation to complete, with a cancellation to timeout the request if it takes too long.
+      return await completion.Task.WaitAsync(cancellationToken);
       ```
     * Notes:
       * `DurableTaskCompletionSource` instances can be serialized and sent across the wire. Since these instances are globally-addressable, each instance is a proxy. This allows instances to be sent to other instances, for example as a kind of callback mechanism for long-polling.
+    * Open Questions:
+      * How should storage for DCTS work? Should the default DCTS id point to the grain which created it and use it for storage?
+        * DCTS could be implemented as a grain extension and there could be two main cases:
+          * DCTS created with an explicit identifier
+            * This would be a global DCTS and would implicitly be 
+          * DCTS created with no explicit identifier
+            * If the DCTS is created within a grain, the DCTS.Id would point to the grain, eg:
+              * `grain:` + *GrainId* + `:` + *RandomId*
+      * Does DCTS support transactions?
+        * I say, yes: you can transactionally create or complete a DCTS
+        * In practice, this currently means that the DCTS state must be transactional.
+      * Does DCTS support metadata?
+        * We should probably support associating K/V metadata with a DCTS
+          * Motivation: the stripe API stores the incoming *request* as well as the response. This allows validating the request before returning the response. It helps them to catch programming errors (accidentally reusing an `idempotencyKey` within a 24h window)
+      * Do DCTS values expire?
+        * Yes, but how? Stripe API keeps values around for 24h.
+        * If DCTS is stored on grain state, could lazily expire them.
+        * If DCTS is stored independently (eg, in dedicated storage), we could periodically scan storage, similar to reminders, and expire completed ones after some configurable period of time (similar to defunct silo membership table cleanup)
+      * Would there be a need to have different expiry policies for different DCTS? What about different storage depending on the type, or should there be one global DCTS store?
+      * Should there be an easy way to create a DCTS for any `DurableTask<T>`?
+        * Eg, imagine an extension method `task.AsWorkflow(id)`
+          * This is similar to `task.AsStep(id)` *within* a workflow, but *AsWorkflow* signifies that this is not a step but rather a standalone workflow and therefore the `id` is global.
+        * Under the covers, this will set a `ReplyTo:` address, the address of a `DurableTaskCompletionSource<T>` backing grain. Most likely, we should make this `ReplyTo` a data structure which can contain both a grain/service address and a *task id*. This will allows flexibility.
+        * The caller can first check whether the task has been completed and only complete it if it hasn't already.
+        * This leaves the door open for transactional workflows and transactional steps.
 
+
+* Durable tasks are a building block for reliable, long-running operations, commonly known as *workflows*.
+* Workflows are expressed using grain methods with a return type of `DurableTask` or `DurableTask<T>`. These methods can be invoked as a *workflow* or as a *step* within a workflow.
+* Workflows separate scheduling from invocation. This is useful for long-running operations because invocation of a workflow can often take an arbitrarily long period of time, such as multiple days. Applications typically want to return control back to the user as soon as such an operation has been scheduled, rather than waiting until the operation has completed.
+* Once a workflow has been scheduled, the system is responsible for ensuring that it is *eventually* executed to completion. This promise must hold even in the presence of failures, such as temporary power outages, network faults, and system restarts.
+* Each workflow is given a unique identifier at creation time. This identifier can be provided by the application or generated automatically.
+* The status and result of a workflow can be queried using the workflow's identifier.
+* Workflows consist of one or more *workflow steps*. The `DurableTask` which defines the workflow is the top-level workflow step and each step can itself be composed from multiple other workflow steps. Therefore, every workflow step except for the top one has a parent and potentially multiple children.
+* Each *workflow step* has an identifier which is unique within the context of the parent step.
+* When a workflow step completes, its result is stored, allowing future executions of the workflow to see the result and skip invocation of the step.
+* If the execution of a workflow encounters a step which has already been completed by a previous execution of that workflow, the step is not executed again. Instead, the stored result from the previous execution is returned so that the workflow can continue. This allows the workflow to continue to make progress when there are faults which occur part-way through an execution.
+
+## Workflows
+  * Can be created from an instance of `DurableTask`/`DurableTask<T>` using the `task.AsWorkflow(id)` extension method.
+  * Separate scheduling and invocation/completion: callers can receive a notification when the workflow is durably scheduled and can receive a subsequent notification when the workflow has completed.
+    * `workflow.ScheduleAsync()` durably schedules a workflow for immediate invocation.
+    * `workflow.ScheduleAsync(DateTimeOffset)` and `workflow.ScheduleAsync(TimeSpan)` schedule the workflow for execution at a later time.
+## Workflow steps
+  * Can only be created from within the context of a workflow.
+  * Can be created from an instance of `DurableTask`/`DurableTask<T>` using the `task.AsStep(id)` extension method.
+  * Have identities which are scoped to their parent
+## `DurableTask` and `DurableTask<T>`
+## `DurableTaskCompletionSource` and `DurableTaskCompletionSource<T>`
+
+```csharp
+// Create a workflow from a durable task
+public static Workflow AsWorkflow(this DurableTask task, WorkflowId id);
+public static Workflow<T> AsWorkflow(this DurableTask<T> task, WorkflowId id);
+
+// Create a workflow step from a durable task
+public static WorkflowStep AsWorkflowStep(this DurableTask task, WorkflowStepId id);
+public static WorkflowStep<T> AsWorkflowStep<T>(this DurableTask<T> task, WorkflowStepId id);
+```
+
+## Creating reliable workflows using Orleans Durable Tasks
+
+1. Express your workflow using grain methods which return `DurableTask` & `DurableTask<T>`
+```csharp
+public interface IMyTeamGrain : IGrain
+{
+ DurableTask<JoinTeamResponse> CreateJoinTeamRequest(JoinTeamRequest request);
+}
+
+... // TODO: more code, eg implementation
+```
+
+* Workflows
+* Workflow *Steps*
+* DurableTaskCompletionSource<T>
