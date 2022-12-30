@@ -196,7 +196,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DistributedTests.Server", "
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.SystemTextJson", "src\Orleans.Serialization.SystemTextJson\Orleans.Serialization.SystemTextJson.csproj", "{5CFBC7AC-C9AE-4C6C-943C-4A157396E427}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.DurableTasks", "src\Orleans.DurableTask\Orleans.DurableTasks.csproj", "{FD582453-4F44-4E91-8F77-6816B51B2982}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.DurableTasks", "src\Orleans.DurableTasks\Orleans.DurableTasks.csproj", "{FD582453-4F44-4E91-8F77-6816B51B2982}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.BroadcastChannel", "src\Orleans.BroadcastChannel\Orleans.BroadcastChannel.csproj", "{497D472A-0BA8-4306-A110-C4D871FD5918}"
 EndProject
@@ -215,6 +215,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.Redis", "test\Extensions\Tester.Redis\Tester.Redis.csproj", "{F13247A0-70C9-4200-9CB1-2002CB8105E0}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.Protobuf", "src\Serializers\Orleans.Serialization.Protobuf\Orleans.Serialization.Protobuf.csproj", "{A073C0EE-8732-42F9-A22E-D47034E25076}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.DurableTasks.Tests", "test\Orleans.DurableTasks.Tests\Orleans.DurableTasks.Tests.csproj", "{CE97AF79-7107-4639-A491-9B2D3BEBBF0F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -554,6 +556,10 @@ Global
 		{671AE42C-974A-467B-BE89-0A3F706B5B21}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{671AE42C-974A-467B-BE89-0A3F706B5B21}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{671AE42C-974A-467B-BE89-0A3F706B5B21}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CE97AF79-7107-4639-A491-9B2D3BEBBF0F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE97AF79-7107-4639-A491-9B2D3BEBBF0F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE97AF79-7107-4639-A491-9B2D3BEBBF0F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE97AF79-7107-4639-A491-9B2D3BEBBF0F}.Release|Any CPU.Build.0 = Release|Any CPU
 		{28B35216-0C6E-4CF1-8C14-7D9A4BE161A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{28B35216-0C6E-4CF1-8C14-7D9A4BE161A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{28B35216-0C6E-4CF1-8C14-7D9A4BE161A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
