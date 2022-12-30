@@ -17,6 +17,10 @@ namespace Orleans.DurableTasks;
 
 public class Program
 {
+    static void Main(string[] args)
+    {
+    }
+#if false
     public static async Task Main(string[] args)
     {
         var prog = new Program();
@@ -70,8 +74,10 @@ public class Program
     {
         await Task.Yield();
     }
+#endif
 }
 
+#if false
 public interface ITransferGrain : IGrain
 {
 #pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
@@ -541,6 +547,8 @@ public static class TransactionalStateExtensions
         return default;
     }
 }
+
+#endif
 
 public class SchedulingOptions
 {

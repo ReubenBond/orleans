@@ -10,7 +10,7 @@ internal class DurableTaskMethodInvocation : DurableTask, IValueTaskSource, IDur
 {
     private ManualResetValueTaskSourceCore<VoidTaskResult> _taskSource = new();
 
-    protected override ValueTask<ScheduledTask> ScheduleAsyncCore(ScheduledTaskId taskId, SchedulingOptions? options) => new(new UntypedDurableTaskInvocation(taskId, this));
+    protected override ValueTask<ScheduledTask> ScheduleAsyncCore(ScheduledTaskId taskId, SchedulingOptions? options) => new(new UntypedDurableTaskInvocation(taskId, options, this));
 
     public ValueTask AsUntypedValueTask() => new ValueTask(this, _taskSource.Version);
 

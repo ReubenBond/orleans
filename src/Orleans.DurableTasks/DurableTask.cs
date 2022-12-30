@@ -53,7 +53,7 @@ internal interface ICompletedDurableTask
 /// <summary>
 /// Represents a completed <see cref="DurableTask{TResult}"/> instance.
 /// </summary>
-internal abstract class CompletedDurableTask<TResult> : DurableTask<TResult>, ICompletedDurableTask
+internal sealed class CompletedDurableTask<TResult> : DurableTask<TResult>, ICompletedDurableTask
 {
     public CompletedDurableTask(TResult value) => Result = value;
 
@@ -66,7 +66,7 @@ internal abstract class CompletedDurableTask<TResult> : DurableTask<TResult>, IC
         return new(new ScheduledTask<TResult>(taskId, options, this));
     }
 
-    public virtual ValueTask<TResult> AsValueTask() => new ValueTask<TResult>(Result);
+    public ValueTask<TResult> AsValueTask() => new ValueTask<TResult>(Result);
 }
 
 public static class DurableTaskExtensions
@@ -99,7 +99,7 @@ public static class DurableTaskExtensions
         // When the task completes, replace its entry with the completed result and persist the current state.
 
         // Return the result to the caller.
-        return default;
+        return default!;
     }
 
     // See above

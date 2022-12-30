@@ -143,7 +143,7 @@ internal sealed class UntypedDurableTaskInvocation : ScheduledTask, IValueTaskSo
     private readonly DurableTask _durableTaskDefiniton;
     private ManualResetValueTaskSourceCore<VoidTaskResult> _taskSource;
 
-    internal UntypedDurableTaskInvocation(ScheduledTaskId taskId, DurableTask durableTaskDefinition) : base(taskId)
+    internal UntypedDurableTaskInvocation(ScheduledTaskId taskId, SchedulingOptions? options, DurableTask durableTaskDefinition) : base(taskId, options)
     {
         _durableTaskDefiniton = durableTaskDefinition;
     }
