@@ -1,11 +1,9 @@
 using System.Buffers;
-using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.Contracts;
-using System.IO.Hashing;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
-using Orleans.Serialization.Buffers;
+using System.Transactions;
 
 namespace Orleans.DurableTasks;
 
@@ -24,26 +22,64 @@ public readonly struct ScheduledTaskId
     public string Value { get; }
 }
 
-internal class TaskIdSegment : ISpanFormattable
+internal class TaskId : ISpanFormattable
 {
     public const char SegmentSeparator = '/';
     private static ReadOnlySpan<char> SegmentSeparatorSpan => "/";
-    private readonly TaskIdSegment? _parent;
+    private readonly TaskId? _parent;
     private readonly string _value;
 
-    public TaskIdSegment(string value)
+    public TaskId(string value)
     {
         ArgumentException.ThrowIfNullOrEmpty(value);
+        if (!IsValid(value))
+        {
+            throw new ArgumentException("Value must not contain empty segments", nameof(value));
+        }
+
         _value = value; 
     }
 
-    public TaskIdSegment(TaskIdSegment? parent, string value) : this(value)
+    public TaskId(TaskId? parent, string value) : this(value)
     {
         _parent = parent;
     }
 
+    private bool IsValid(string value)
+    {
+        var isEscaped = false;
+        var segmentLength = 0;
+        var consumed = 0;
+        foreach (var c in value)
+        {
+            ++segmentLength;
+            ++consumed;
+            if (c == '\\')
+            {
+                isEscaped = !isEscaped;
+            }
+            else if (c == SegmentSeparator && !isEscaped)
+            {
+                if (segmentLength == 1)
+                {
+                    // Empty segment (only an segment separator)
+                    return false;
+                }
+
+                segmentLength = 0;
+                isEscaped = false;
+            }
+            else
+            {
+                isEscaped = false;
+            }
+        }
+
+        return !isEscaped && segmentLength > 0;
+    }
+
     [Pure]
-    public TaskIdSegment CreateChild(string value) => new (this, value);
+    public TaskId CreateChild(string value) => new (this, value);
 
     public override string ToString() => _parent is null ? _value : $"{this}";
     public ReadOnlySpan<char> Value => ToString();
@@ -53,96 +89,45 @@ internal class TaskIdSegment : ISpanFormattable
         get
         {
             var length = 0;
-            var c = this;
-            while (c is not null)
+            foreach (var segment in this)
             {
-                length += c._value.Length;
-                c = c._parent;
-                if (c is not null)
+                // Account for segment separators.
+                if (length > 0)
                 {
                     ++length;
                 }
+
+                length += segment.Length;
             }
 
             return length;
         }
     }
 
-    public SpanEnumerator GetEnumerator() => new(this);
-
     public override bool Equals(object? obj)
     {
-        if (obj is not TaskIdSegment other) return false;
+        if (obj is not TaskId other) return false;
 
-        var a = this;
-        var aSeg = a._value.AsSpan();
-        var aAddSeparator = true;
-        var b = other;
-        var bSeg = b._value.AsSpan();
-        var bAddSeparator = true;
+        var left = GetEnumerator();
+        var right = other.GetEnumerator();
         while (true)
         {
-            if (aSeg.Length == 0 && a is not null)
+            var leftValid = left.MoveNext();
+            var rightValid = right.MoveNext();
+            if (!leftValid && !rightValid)
             {
-                if (a._parent is not null)
-                {
-                    if (aAddSeparator)
-                    {
-                        // Add a separator
-                        aSeg = SegmentSeparatorSpan;
-                        aAddSeparator = false;
-                    }
-                    else
-                    {
-                        // Navigate to the parent
-                        a = a._parent;
-                        aSeg = a._value;
-                        aAddSeparator = true;
-                    }
-                }
-                else
-                {
-                    a = null;
-                }
+                // Completed enumeration.
+                return true;
             }
-
-            if (bSeg.Length == 0 && b is not null)
+            else if (leftValid ^ rightValid)
             {
-                if (b._parent is not null)
-                {
-                    if (bAddSeparator)
-                    {
-                        // Add a separator
-                        bSeg = SegmentSeparatorSpan;
-                        bAddSeparator = false;
-                    }
-                    else
-                    {
-                        // Navigate to the parent
-                        b = b._parent;
-                        bSeg = b._value;
-                        bAddSeparator = true;
-                    }
-                }
-                else
-                {
-                    b = null;
-                }
-            }
-
-            var len = Math.Min(aSeg.Length, bSeg.Length);
-            if (!aSeg[^len..].SequenceEqual(bSeg[^len..]))
-            {
+                // One side is complete and the other is not.
                 return false;
             }
-
-            // Skip the bytes which were just compared.
-            aSeg = aSeg[..^len];
-            bSeg = bSeg[..^len];
-
-            if (a is null && b is null)
+            else if (!left.Current.SequenceEqual(right.Current))
             {
-                return aSeg.Length == 0 && bSeg.Length == 0;
+                // Some segment is not equal.
+                return false;
             }
         }
     }
@@ -209,30 +194,103 @@ internal class TaskIdSegment : ISpanFormattable
 
     public string ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
-    public struct SpanEnumerator
+    public SegmentEnumerator GetEnumerator() => new(this);
+
+    public ref struct SegmentEnumerator
     {
-        private readonly TaskIdSegment? _segment;
+        private RawValueEnumerator _enumerator;
+        private ReadOnlySpan<char> _buffer;
+
+        public SegmentEnumerator(TaskId id)
+        {
+            _enumerator = new RawValueEnumerator(id);
+            _buffer = ReadOnlySpan<char>.Empty;
+        }
+
+        public ReadOnlySpan<char> Current { get; private set; }
+
+        public bool MoveNext()
+        {
+            if (_buffer.Length == 0)
+            {
+                if (!_enumerator.MoveNext())
+                {
+                    return false;
+                }
+
+                _buffer = _enumerator.Current;
+            }
+
+            Current = GetNextSegment();
+            _buffer = _buffer[Current.Length..];
+
+            if (_buffer.Length > 0 && _buffer[0] == SegmentSeparator)
+            {
+                _buffer = _buffer[1..];
+            }
+
+            while (Current.Length == 0)
+            {
+                // Advance
+                if (!MoveNext())
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private ReadOnlySpan<char> GetNextSegment()
+        {
+            var buffer = _buffer;
+            var isEscaped = false;
+            var length = 0;
+            foreach (var c in buffer)
+            {
+                ++length;
+                if (c == '\\')
+                {
+                    isEscaped = !isEscaped;
+                    continue;
+                }
+                else if (c == SegmentSeparator && !isEscaped)
+                {
+                    --length;
+                    break;
+                }
+
+                isEscaped = false;
+            }
+
+            return buffer[..length];
+        }
+    }
+
+    private struct RawValueEnumerator
+    {
+        private readonly TaskId? _current;
         private int _remaining = -2;
 
-        public SpanEnumerator(TaskIdSegment segment)
+        public RawValueEnumerator(TaskId value)
         {
-            _segment = segment;
+            _current = value;
         }
 
         public ReadOnlySpan<char> Current => _remaining switch
         {
             -2 => throw new InvalidOperationException($"{nameof(MoveNext)} must be called before accessing {nameof(Current)}"),
             -1 => throw new InvalidOperationException("No remaining elements"),
-            int depth => GetElement(_segment, depth),
+            int depth => GetElement(_current, depth),
         };
 
-        private static int GetElementCount(TaskIdSegment? id)
+        private static int GetElementCount(TaskId? current)
         {
             var elements = 0;
-            while (id is not null)
+            while (current is not null)
             {
                 ++elements;
-                id = id._parent;
+                current = current._parent;
             }
 
             // If there is more than one segment, insert a separator segment between each.
@@ -244,17 +302,17 @@ internal class TaskIdSegment : ISpanFormattable
             return elements;
         }
 
-        private static ReadOnlySpan<char> GetElement(TaskIdSegment? id, int depth)
+        private static ReadOnlySpan<char> GetElement(TaskId? current, int depth)
         {
             // Add a separator between each segment
             if (depth % 2 == 1) return SegmentSeparatorSpan;
             depth /= 2;
             while (depth-- > 0)
             {
-                id = id!._parent;
+                current = current!._parent;
             }
 
-            return id!._value;
+            return current!._value;
         }
 
         public bool MoveNext()
@@ -262,7 +320,7 @@ internal class TaskIdSegment : ISpanFormattable
             // Start: calculate the number of elements
             if (_remaining == -2)
             {
-                _remaining = GetElementCount(_segment);
+                _remaining = GetElementCount(_current);
             }
 
             // If there are no elements remaining 
