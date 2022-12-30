@@ -11,29 +11,17 @@ namespace Orleans.DurableTasks.Tests
     public class TaskIdSegmentTests
     {
         [Fact]
-        public void SegmentsAreEqual()
+        public void RepresentationIsInconsequential()
         {
             var aParent = new TaskIdSegment("foo/bar");
             var a = aParent.CreateChild("baz");
             var b = new TaskIdSegment("foo/bar/baz");
-            var aL = new List<string>();
-            var bL = new List<string>();
-            Console.WriteLine(a);
-            Console.WriteLine(b);
-            foreach (var seg in a)
-            {
-                var str = new string(seg);
-                aL.Add(str);
-                Console.WriteLine(str);
-            }
-            foreach (var seg in b)
-            {
-                var str = new string(seg);
-                bL.Add(str);
-                Console.WriteLine(str);
-            }
             Assert.Equal(a, b);
+            Assert.Equal(b.ToString(), b.ToString());
             Assert.Equal(a.GetHashCode(), b.GetHashCode());
+            Assert.Equal(a.ToString().Length, a.Length);
+            Assert.Equal(b.ToString().Length, b.Length);
+            Assert.Equal(a.Length, b.Length);
         }
     }
 }

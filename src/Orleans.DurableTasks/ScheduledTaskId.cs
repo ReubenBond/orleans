@@ -28,13 +28,12 @@ internal class TaskIdSegment : ISpanFormattable
 {
     public const char SegmentSeparator = '/';
     private static ReadOnlySpan<char> SegmentSeparatorSpan => "/";
-    private TaskIdSegment? _parent;
-    private string _value;
+    private readonly TaskIdSegment? _parent;
+    private readonly string _value;
 
     public TaskIdSegment(string value)
     {
         ArgumentException.ThrowIfNullOrEmpty(value);
-        // TODO: escape value.
         _value = value; 
     }
 
@@ -48,6 +47,7 @@ internal class TaskIdSegment : ISpanFormattable
 
     public override string ToString() => _parent is null ? _value : $"{this}";
     public ReadOnlySpan<char> Value => ToString();
+
     public int Length
     {
         get
@@ -58,6 +58,10 @@ internal class TaskIdSegment : ISpanFormattable
             {
                 length += c._value.Length;
                 c = c._parent;
+                if (c is not null)
+                {
+                    ++length;
+                }
             }
 
             return length;
@@ -70,29 +74,59 @@ internal class TaskIdSegment : ISpanFormattable
     {
         if (obj is not TaskIdSegment other) return false;
 
-        var a = new ReverseSpanEnumerator(this);
-        var aSeg = ReadOnlySpan<char>.Empty;
-        var aComplete = false;
-        var b = new ReverseSpanEnumerator(other);
-        var bSeg = ReadOnlySpan<char>.Empty;
-        var bComplete = false;
+        var a = this;
+        var aSeg = a._value.AsSpan();
+        var aAddSeparator = true;
+        var b = other;
+        var bSeg = b._value.AsSpan();
+        var bAddSeparator = true;
         while (true)
         {
-            if (aSeg.Length == 0 && !aComplete)
+            if (aSeg.Length == 0 && a is not null)
             {
-                aComplete = !a.MoveNext();
-                if (!aComplete)
+                if (a._parent is not null)
                 {
-                    aSeg = a.Current;
+                    if (aAddSeparator)
+                    {
+                        // Add a separator
+                        aSeg = SegmentSeparatorSpan;
+                        aAddSeparator = false;
+                    }
+                    else
+                    {
+                        // Navigate to the parent
+                        a = a._parent;
+                        aSeg = a._value;
+                        aAddSeparator = true;
+                    }
+                }
+                else
+                {
+                    a = null;
                 }
             }
 
-            if (bSeg.Length == 0 && !bComplete)
+            if (bSeg.Length == 0 && b is not null)
             {
-                bComplete = !b.MoveNext();
-                if (!bComplete)
+                if (b._parent is not null)
                 {
-                    bSeg = b.Current;
+                    if (bAddSeparator)
+                    {
+                        // Add a separator
+                        bSeg = SegmentSeparatorSpan;
+                        bAddSeparator = false;
+                    }
+                    else
+                    {
+                        // Navigate to the parent
+                        b = b._parent;
+                        bSeg = b._value;
+                        bAddSeparator = true;
+                    }
+                }
+                else
+                {
+                    b = null;
                 }
             }
 
@@ -106,7 +140,7 @@ internal class TaskIdSegment : ISpanFormattable
             aSeg = aSeg[..^len];
             bSeg = bSeg[..^len];
 
-            if (aComplete && bComplete)
+            if (a is null && b is null)
             {
                 return aSeg.Length == 0 && bSeg.Length == 0;
             }
@@ -239,69 +273,6 @@ internal class TaskIdSegment : ISpanFormattable
 
             --_remaining;
             return true;
-        }
-    }
-
-    public struct ReverseSpanEnumerator
-    {
-        private TaskIdSegment? _segment;
-        private int _status;
-
-        public ReverseSpanEnumerator(TaskIdSegment segment)
-        {
-            _segment = segment;
-        }
-
-        public ReadOnlySpan<char> Current => _status switch
-        {
-            0 => throw new InvalidOperationException($"{nameof(MoveNext)} must be called before accessing {nameof(Current)}"),
-            1 => _segment!._value,
-            2 => SegmentSeparatorSpan,
-            3 => _segment!.Value,
-            _ => throw new InvalidOperationException("No remaining values")
-        };
-
-        public bool MoveNext()
-        {
-            // Not started
-            if (_status == 0)
-            {
-                if (_segment is null)
-                {
-                    // Completed
-                    _status = 9;
-                    return false;
-                }
-
-                // Return the current value from Current
-                _status = 1;
-                return true;
-            }
-
-            if (_status == 1)
-            {
-                if (_segment!._parent is null)
-                {
-                    // Completed
-                    _status = 9;
-                    return false;
-                }
-
-                // Return a path separator from Current
-                _status = 2;
-                return true;
-            }
-
-            if (_status == 2)
-            {
-                // Navigate to the parent and return the current value from Current
-                _segment = _segment!._parent;
-
-                _status = 1;
-                return true;
-            }
-
-            return false;
         }
     }
 }
