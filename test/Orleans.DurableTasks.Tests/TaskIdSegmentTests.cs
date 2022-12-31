@@ -8,14 +8,14 @@ using Xunit;
 namespace Orleans.DurableTasks.Tests
 {
     [Trait("Category", "BVT")]
-    public class TaskIdSegmentTests
+    public class HierarchicalKeyTests
     {
         [Fact]
         public void RepresentationIsInconsequential()
         {
-            var aParent = new TaskId("foo/bar");
-            var a = aParent.CreateChild("baz");
-            var b = new TaskId("foo/bar/baz");
+            var aParent = new HierarchicalKey("foo/bar");
+            var a = aParent.CreateChildKey("baz");
+            var b = new HierarchicalKey("foo/bar/baz");
             Assert.Equal(a, b);
             Assert.Equal(b.ToString(), b.ToString());
             Assert.Equal(a.GetHashCode(), b.GetHashCode());
@@ -43,10 +43,9 @@ namespace Orleans.DurableTasks.Tests
         [Fact]
         public void SegmentsCanBeEscaped()
         {
-            var aParent = new TaskId("foo/bar\\/");
-            var a = aParent.CreateChild("baz");
-            var b = new TaskId("foo/bar\\//baz");
-            var c = new TaskId("foo/bar\\//baz");
+            var aParent = new HierarchicalKey("foo/bar\\/");
+            var a = aParent.CreateChildKey("baz");
+            var b = new HierarchicalKey("foo/bar\\//baz");
             Assert.Equal(a, b);
             Assert.Equal(b.ToString(), b.ToString());
             Assert.Equal(a.GetHashCode(), b.GetHashCode());
@@ -74,21 +73,21 @@ namespace Orleans.DurableTasks.Tests
         [Fact]
         public void OnlyValidValuesAreAllowed()
         {
-            Assert.Throws<ArgumentNullException>(() => new TaskId(null));
-            Assert.Throws<ArgumentException>(() => new TaskId(""));
-            Assert.Throws<ArgumentException>(() => new TaskId("/"));
-            Assert.Throws<ArgumentException>(() => new TaskId("//"));
-            Assert.Throws<ArgumentException>(() => new TaskId("a//"));
-            Assert.Throws<ArgumentException>(() => new TaskId("//a"));
-            Assert.Throws<ArgumentException>(() => new TaskId("\\//"));
-            Assert.Throws<ArgumentException>(() => new TaskId("a/b//c/d"));
-            Assert.Throws<ArgumentException>(() => new TaskId("aaa/bbb//ccc/ddd"));
-            Assert.Throws<ArgumentException>(() => new TaskId("a/b/c/d//"));
-            Assert.Throws<ArgumentException>(() => new TaskId("//a/b/c/d//"));
-            _ = new TaskId("\\/\\/");
-            _ = new TaskId("aaa/bbb/ccc/ddd");
-            _ = new TaskId("a/b/c/d");
-            _ = new TaskId("\\/\\/a/b/c/d\\/\\/");
+            Assert.Throws<ArgumentNullException>(() => new HierarchicalKey(null));
+            Assert.Throws<ArgumentException>(() => new HierarchicalKey(""));
+            Assert.Throws<ArgumentException>(() => new HierarchicalKey("/"));
+            Assert.Throws<ArgumentException>(() => new HierarchicalKey("//"));
+            Assert.Throws<ArgumentException>(() => new HierarchicalKey("a//"));
+            Assert.Throws<ArgumentException>(() => new HierarchicalKey("//a"));
+            Assert.Throws<ArgumentException>(() => new HierarchicalKey("\\//"));
+            Assert.Throws<ArgumentException>(() => new HierarchicalKey("a/b//c/d"));
+            Assert.Throws<ArgumentException>(() => new HierarchicalKey("aaa/bbb//ccc/ddd"));
+            Assert.Throws<ArgumentException>(() => new HierarchicalKey("a/b/c/d//"));
+            Assert.Throws<ArgumentException>(() => new HierarchicalKey("//a/b/c/d//"));
+            _ = new HierarchicalKey("\\/\\/");
+            _ = new HierarchicalKey("aaa/bbb/ccc/ddd");
+            _ = new HierarchicalKey("a/b/c/d");
+            _ = new HierarchicalKey("\\/\\/a/b/c/d\\/\\/");
         }
     }
 }

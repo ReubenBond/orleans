@@ -11,17 +11,17 @@ namespace Orleans.DurableTasks.Runtime;
 public interface IDurableTaskCaller
 {
     // Notify this instance that a task has completed
-    Task OnCompleted(ScheduledTaskId taskId, Response response);
+    Task OnCompleted(TaskId taskId, Response response);
 }
 
 public interface IDurableTaskGrainExtension : IGrainExtension
 {
-    Task Ping(GrainId caller, ScheduledTaskId callback);
+    Task Ping(GrainId caller, TaskId callback);
 
     /// <summary>
     /// Queries the status of the specified task or schedules a new task if the task is unknown.
     /// </summary> 
-    Task QueryOrScheduleTask(GrainId caller, ScheduledTaskId taskId, IInvokable request);
+    Task QueryOrScheduleTask(GrainId caller, TaskId taskId, IInvokable request);
 }
 
 internal interface IDurableTaskGrainRuntime
@@ -36,7 +36,7 @@ internal class DurableTaskGrainExtension
 
 public class WorkflowStep
 {
-    public ScheduledTaskId TaskId { get; }
+    public TaskId TaskId { get; }
     public ReadOnlySpan<char> TaskName => ReadOnlySpan<char>.Empty;
 }
 

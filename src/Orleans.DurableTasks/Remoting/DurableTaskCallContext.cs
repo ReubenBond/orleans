@@ -18,7 +18,7 @@ public class DurableTaskCallContext
     }
 
     [Id(0)]
-    public ScheduledTaskId Id { get; internal set; }
+    public TaskId Id { get; internal set; }
 
     [Id(1)]
     internal Dictionary<string, byte[]> Values { get; } = new();

@@ -14,13 +14,13 @@ namespace Orleans.DurableTasks;
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
 public abstract class DurableTask
 {
-    public ValueTask<ScheduledTask> ScheduleAsync() => ScheduleAsyncCore(ScheduledTaskId.None, options: null);
-    public ValueTask<ScheduledTask> ScheduleAsync(SchedulingOptions options) => ScheduleAsyncCore(ScheduledTaskId.None, options);
-    public ValueTask<ScheduledTask> ScheduleAsync(ScheduledTaskId taskId) => ScheduleAsyncCore(taskId, options: null);
-    public ValueTask<ScheduledTask> ScheduleAsync(ScheduledTaskId taskId, SchedulingOptions options) => ScheduleAsyncCore(taskId, options);
-    public ValueTask<ScheduledTask> ScheduleAsync(ScheduledTaskId taskId, DateTimeOffset dueTime) => ScheduleAsyncCore(taskId, new SchedulingOptions { DueTime = dueTime });
+    public ValueTask<ScheduledTask> ScheduleAsync() => ScheduleAsyncCore(TaskId.None, options: null);
+    public ValueTask<ScheduledTask> ScheduleAsync(SchedulingOptions options) => ScheduleAsyncCore(TaskId.None, options);
+    public ValueTask<ScheduledTask> ScheduleAsync(TaskId taskId) => ScheduleAsyncCore(taskId, options: null);
+    public ValueTask<ScheduledTask> ScheduleAsync(TaskId taskId, SchedulingOptions options) => ScheduleAsyncCore(taskId, options);
+    public ValueTask<ScheduledTask> ScheduleAsync(TaskId taskId, DateTimeOffset dueTime) => ScheduleAsyncCore(taskId, new SchedulingOptions { DueTime = dueTime });
 
-    protected abstract ValueTask<ScheduledTask> ScheduleAsyncCore(ScheduledTaskId taskId, SchedulingOptions? options);
+    protected abstract ValueTask<ScheduledTask> ScheduleAsyncCore(TaskId taskId, SchedulingOptions? options);
 
     // Schedules the durable task with default options and awaits the scheduled task.
     // Equivalent to `await (await durableTask.ScheduleAsync())`
@@ -33,13 +33,13 @@ public abstract class DurableTask
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder<>))]
 public abstract class DurableTask<TResult> : DurableTask
 {
-    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync() => ScheduleAsyncTypedCore(ScheduledTaskId.None, options: null);
-    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(SchedulingOptions options) => ScheduleAsyncTypedCore(ScheduledTaskId.None, options);
-    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(ScheduledTaskId taskId) => ScheduleAsyncTypedCore(taskId, options: null);
-    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(ScheduledTaskId taskId, SchedulingOptions options) => ScheduleAsyncTypedCore(taskId, options);
-    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(ScheduledTaskId taskId, DateTimeOffset dueTime) => ScheduleAsyncTypedCore(taskId, new SchedulingOptions { DueTime = dueTime });
+    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync() => ScheduleAsyncTypedCore(TaskId.None, options: null);
+    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(SchedulingOptions options) => ScheduleAsyncTypedCore(TaskId.None, options);
+    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(TaskId taskId) => ScheduleAsyncTypedCore(taskId, options: null);
+    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(TaskId taskId, SchedulingOptions options) => ScheduleAsyncTypedCore(taskId, options);
+    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(TaskId taskId, DateTimeOffset dueTime) => ScheduleAsyncTypedCore(taskId, new SchedulingOptions { DueTime = dueTime });
 
-    protected abstract ValueTask<ScheduledTask<TResult>> ScheduleAsyncTypedCore(ScheduledTaskId taskId, SchedulingOptions? options);
+    protected abstract ValueTask<ScheduledTask<TResult>> ScheduleAsyncTypedCore(TaskId taskId, SchedulingOptions? options);
 
     // Schedules the durable task with default options and awaits the scheduled task.
     // Equivalent to `await (await durableTask.ScheduleAsync())`
@@ -59,8 +59,8 @@ internal sealed class CompletedDurableTask<TResult> : DurableTask<TResult>, ICom
 
     public TResult Result { get; }
 
-    protected override ValueTask<ScheduledTask> ScheduleAsyncCore(ScheduledTaskId taskId, SchedulingOptions? options) => new(new ScheduledTask<TResult>(taskId, options, this));
-    protected override ValueTask<ScheduledTask<TResult>> ScheduleAsyncTypedCore(ScheduledTaskId taskId, SchedulingOptions? options)
+    protected override ValueTask<ScheduledTask> ScheduleAsyncCore(TaskId taskId, SchedulingOptions? options) => new(new ScheduledTask<TResult>(taskId, options, this));
+    protected override ValueTask<ScheduledTask<TResult>> ScheduleAsyncTypedCore(TaskId taskId, SchedulingOptions? options)
     {
         // If inside a durable execution context, use the runtime to schedule a 
         return new(new ScheduledTask<TResult>(taskId, options, this));
@@ -71,12 +71,12 @@ internal sealed class CompletedDurableTask<TResult> : DurableTask<TResult>, ICom
 
 public static class DurableTaskExtensions
 {
-    public static async ValueTask<TResult> InvokeAsync<TResult>(this DurableTask<TResult> taskDefinition, ScheduledTaskId taskId)
+    public static async ValueTask<TResult> InvokeAsync<TResult>(this DurableTask<TResult> taskDefinition, TaskId taskId)
     {
         return await await taskDefinition.ScheduleAsync(taskId).ConfigureAwait(false);
     }
 
-    public static async ValueTask InvokeAsync(this DurableTask taskDefinition, ScheduledTaskId taskId)
+    public static async ValueTask InvokeAsync(this DurableTask taskDefinition, TaskId taskId)
     {
         await await taskDefinition.ScheduleAsync(taskId).ConfigureAwait(false);
     }

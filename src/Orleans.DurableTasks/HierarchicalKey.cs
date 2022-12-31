@@ -1,89 +1,163 @@
 using System.Buffers;
 using System.Diagnostics;
-using System.Diagnostics.Contracts;
-using System.Runtime.CompilerServices;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
-using System.Transactions;
 
 namespace Orleans.DurableTasks;
 
-public readonly struct ScheduledTaskId
+[GenerateSerializer]
+internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalKey>, IParsable<HierarchicalKey>
 {
-    public static readonly ScheduledTaskId None = default;
-    
-    public ScheduledTaskId(string value)
-    {
-        Value = value;
-    }
-
-    public static implicit operator string(ScheduledTaskId id) => id.Value;
-    public static implicit operator ScheduledTaskId(string value) => new (value);
-
-    public string Value { get; }
-}
-
-internal class TaskId : ISpanFormattable
-{
+    public const char EscapeCharacter = '\\';
     public const char SegmentSeparator = '/';
     private static ReadOnlySpan<char> SegmentSeparatorSpan => "/";
-    private readonly TaskId? _parent;
+
+    [Id(0)]
+    private readonly HierarchicalKey? _parent;
+
+    [Id(1)]
     private readonly string _value;
 
-    public TaskId(string value)
+    // Private constructor used to skip re-validation in parsing cases.
+    private HierarchicalKey(string value, bool ignored)
+    { 
+        _value = value;
+    }
+
+    public HierarchicalKey(string value)
     {
         ArgumentException.ThrowIfNullOrEmpty(value);
-        if (!IsValid(value))
+        if (!IsSegmentationValid(value))
         {
             throw new ArgumentException("Value must not contain empty segments", nameof(value));
         }
 
-        _value = value; 
+        _value = value;
     }
 
-    public TaskId(TaskId? parent, string value) : this(value)
+    public HierarchicalKey(HierarchicalKey? parent, string value) : this(value)
     {
         _parent = parent;
     }
 
-    private bool IsValid(string value)
+    public static HierarchicalKey Parse(string s, IFormatProvider? provider) => new (s);
+
+    public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, [MaybeNullWhen(false)] out HierarchicalKey result)
+    {
+        if (s is { Length: > 0 } && IsSegmentationValid(s))
+        {
+            // Avoid re-validating the key.
+            result = new HierarchicalKey(s, false);
+            return true;
+        }
+
+        result = null;
+        return false;
+    }
+
+    private static bool IsSegmentationValid(string value)
     {
         var isEscaped = false;
         var segmentLength = 0;
-        var consumed = 0;
         foreach (var c in value)
         {
             ++segmentLength;
-            ++consumed;
-            if (c == '\\')
+
+            if (isEscaped && c != SegmentSeparator && c != EscapeCharacter)
             {
+                // The only characters which can be escaped are the escape character itself and the segment separator.
+                return false;
+            }
+
+            if (c == EscapeCharacter)
+            {
+                // The escape character is allowed and can be used to escape itself.
                 isEscaped = !isEscaped;
             }
-            else if (c == SegmentSeparator && !isEscaped)
+            else if (c == SegmentSeparator)
             {
-                if (segmentLength == 1)
+                // Check if this is the start of a new segment.
+                if (!isEscaped)
                 {
-                    // Empty segment (only an segment separator)
-                    return false;
+                    if (segmentLength <= 1)
+                    {
+                        // Empty segments are not allowed (the segment contains only an segment separator)
+                        return false;
+                    }
+
+                    segmentLength = 0;
                 }
 
-                segmentLength = 0;
-                isEscaped = false;
-            }
-            else
-            {
                 isEscaped = false;
             }
         }
 
-        return !isEscaped && segmentLength > 0;
+        // The sequence must not end with an incomplete escape sequence.
+        if (isEscaped)
+        {
+            return false;
+        }
+
+        // Empty segments are not valid
+        if (segmentLength == 0)
+        {
+            return false;
+        }
+
+        return true;
     }
 
-    [Pure]
-    public TaskId CreateChild(string value) => new (this, value);
+    /// <summary>
+    /// Returns <value>true</value> if this key is a prefix of the provided key, <value>false</value> otherwise.
+    /// </summary>
+    /// <param name="other">The key to check this key against.</param>
+    /// <returns><value>true</value> if this key is a prefix of <paramref name="other"/>, <value>false</value> otherwise.</returns>
+    public bool IsPrefixOf(HierarchicalKey? other)
+    {
+        if (other is null) return false;
+        var left = GetEnumerator();
+        var right = other.GetEnumerator();
+        while (true)
+        {
+            var leftValid = left.MoveNext();
+            var rightValid = right.MoveNext();
+            if (!leftValid && !rightValid)
+            {
+                // Completed enumeration, both keys are equal and therefore prefixes of each other.
+                return true;
+            }
+            else if (leftValid && !rightValid)
+            {
+                // The left key is longer than the right key, so it is not a prefix of it.
+                return false;
+            }
+            else if (!leftValid && rightValid)
+            {
+                // The right key is longer than the left key, and all common components are equal,
+                // so the left is a prefix of the right.
+                return true;
+            }
+            else if (!left.Current.SequenceEqual(right.Current))
+            {
+                // Some segment is not equal and therefore neither is a prefix of the other.
+                return false;
+            }
+        }
+    }
 
+    /// <summary>
+    /// Creates a key which is a child of this key and returns it.
+    /// </summary>
+    /// <param name="value">The value for the child segments.</param>
+    /// <returns></returns>
+    public HierarchicalKey CreateChildKey(string value) => new(this, value);
+
+    /// <inheritdoc/>
     public override string ToString() => _parent is null ? _value : $"{this}";
-    public ReadOnlySpan<char> Value => ToString();
 
+    /// <summary>
+    /// Gets the number of characters which comprise the key.
+    /// </summary>
     public int Length
     {
         get
@@ -104,34 +178,14 @@ internal class TaskId : ISpanFormattable
         }
     }
 
+    /// <inheritdoc/>
     public override bool Equals(object? obj)
     {
-        if (obj is not TaskId other) return false;
-
-        var left = GetEnumerator();
-        var right = other.GetEnumerator();
-        while (true)
-        {
-            var leftValid = left.MoveNext();
-            var rightValid = right.MoveNext();
-            if (!leftValid && !rightValid)
-            {
-                // Completed enumeration.
-                return true;
-            }
-            else if (leftValid ^ rightValid)
-            {
-                // One side is complete and the other is not.
-                return false;
-            }
-            else if (!left.Current.SequenceEqual(right.Current))
-            {
-                // Some segment is not equal.
-                return false;
-            }
-        }
+        if (obj is not HierarchicalKey other) return false;
+        return Equals(other);
     }
 
+    /// <inheritdoc/>
     public override int GetHashCode()
     {
         // Note that we want to ensure that GetHashCode returns equal values for semantically equivalent
@@ -159,6 +213,7 @@ internal class TaskId : ISpanFormattable
         return hashCode.ToHashCode();
     }
 
+    /// <inheritdoc/>
     public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
     {
         if (_parent is not null)
@@ -195,13 +250,40 @@ internal class TaskId : ISpanFormattable
     public string ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
     public SegmentEnumerator GetEnumerator() => new(this);
+    public bool Equals(HierarchicalKey? other)
+    {
+        if (other is null) return false;
+
+        var left = GetEnumerator();
+        var right = other.GetEnumerator();
+        while (true)
+        {
+            var leftValid = left.MoveNext();
+            var rightValid = right.MoveNext();
+            if (!leftValid && !rightValid)
+            {
+                // Completed enumeration.
+                return true;
+            }
+            else if (leftValid ^ rightValid)
+            {
+                // One side is complete and the other is not.
+                return false;
+            }
+            else if (!left.Current.SequenceEqual(right.Current))
+            {
+                // Some segment is not equal.
+                return false;
+            }
+        }
+    }
 
     public ref struct SegmentEnumerator
     {
         private RawValueEnumerator _enumerator;
         private ReadOnlySpan<char> _buffer;
 
-        public SegmentEnumerator(TaskId id)
+        public SegmentEnumerator(HierarchicalKey id)
         {
             _enumerator = new RawValueEnumerator(id);
             _buffer = ReadOnlySpan<char>.Empty;
@@ -249,7 +331,7 @@ internal class TaskId : ISpanFormattable
             foreach (var c in buffer)
             {
                 ++length;
-                if (c == '\\')
+                if (c == EscapeCharacter)
                 {
                     isEscaped = !isEscaped;
                     continue;
@@ -269,10 +351,10 @@ internal class TaskId : ISpanFormattable
 
     private struct RawValueEnumerator
     {
-        private readonly TaskId? _current;
+        private readonly HierarchicalKey? _current;
         private int _remaining = -2;
 
-        public RawValueEnumerator(TaskId value)
+        public RawValueEnumerator(HierarchicalKey value)
         {
             _current = value;
         }
@@ -284,7 +366,7 @@ internal class TaskId : ISpanFormattable
             int depth => GetElement(_current, depth),
         };
 
-        private static int GetElementCount(TaskId? current)
+        private static int GetElementCount(HierarchicalKey? current)
         {
             var elements = 0;
             while (current is not null)
@@ -302,7 +384,7 @@ internal class TaskId : ISpanFormattable
             return elements;
         }
 
-        private static ReadOnlySpan<char> GetElement(TaskId? current, int depth)
+        private static ReadOnlySpan<char> GetElement(HierarchicalKey? current, int depth)
         {
             // Add a separator between each segment
             if (depth % 2 == 1) return SegmentSeparatorSpan;
@@ -334,3 +416,4 @@ internal class TaskId : ISpanFormattable
         }
     }
 }
+

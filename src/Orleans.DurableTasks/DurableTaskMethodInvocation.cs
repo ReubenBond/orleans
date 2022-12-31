@@ -10,7 +10,7 @@ internal class DurableTaskMethodInvocation : DurableTask, IValueTaskSource, IDur
 {
     private ManualResetValueTaskSourceCore<VoidTaskResult> _taskSource = new();
 
-    protected override ValueTask<ScheduledTask> ScheduleAsyncCore(ScheduledTaskId taskId, SchedulingOptions? options) => new(new UntypedDurableTaskInvocation(taskId, options, this));
+    protected override ValueTask<ScheduledTask> ScheduleAsyncCore(TaskId taskId, SchedulingOptions? options) => new(new UntypedDurableTaskInvocation(taskId, options, this));
 
     public ValueTask AsUntypedValueTask() => new ValueTask(this, _taskSource.Version);
 
@@ -29,8 +29,8 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
 {
     private ManualResetValueTaskSourceCore<TResult> _taskSource = new();
 
-    protected override ValueTask<ScheduledTask> ScheduleAsyncCore(ScheduledTaskId taskId, SchedulingOptions? options) => new(new ScheduledTask<TResult>(taskId, options, this));
-    protected override ValueTask<ScheduledTask<TResult>> ScheduleAsyncTypedCore(ScheduledTaskId taskId, SchedulingOptions? options)
+    protected override ValueTask<ScheduledTask> ScheduleAsyncCore(TaskId taskId, SchedulingOptions? options) => new(new ScheduledTask<TResult>(taskId, options, this));
+    protected override ValueTask<ScheduledTask<TResult>> ScheduleAsyncTypedCore(TaskId taskId, SchedulingOptions? options)
     {
         // If inside a durable execution context, use the runtime to schedule a 
         return new(new ScheduledTask<TResult>(taskId, options, this));
