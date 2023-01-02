@@ -40,6 +40,12 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         _parent = parent;
     }
 
+    public HierarchicalKey? GetParent() => WithoutLastSegment(_value) switch
+    {
+        { Length: > 0 } value => new(_parent, value),
+        _ => _parent,
+    };
+
     public static HierarchicalKey Parse(string s, IFormatProvider? provider) => new (s);
 
     public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, [MaybeNullWhen(false)] out HierarchicalKey result)
@@ -53,6 +59,74 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
 
         result = null;
         return false;
+    }
+
+    private static bool HasSegments(string value)
+    {
+        var isEscaped = false;
+        foreach (var c in value)
+        {
+            if (!isEscaped && c == SegmentSeparator)
+            {
+                return true;
+            }
+
+            if (c == EscapeCharacter)
+            {
+                isEscaped = !isEscaped;
+            }
+        }
+
+        return false;
+    }
+
+    private static string? WithoutLastSegment(string value)
+    {
+        // Find the last segment in the value string by searching for the last unescaped segment separator
+        var isEscaped = false;
+        var lastSegmentStart = 0;
+        for (var i = 0; i < value.Length; i++)
+        {
+            var c = value[i];
+            if (c == SegmentSeparator)
+            {
+                if (!isEscaped)
+                {
+                    lastSegmentStart = i + 1;
+                }
+
+                isEscaped = false;
+            }
+
+            if (c == EscapeCharacter)
+            {
+                isEscaped = !isEscaped;
+            }
+        }
+
+        return lastSegmentStart == 0 ? null : value[..(lastSegmentStart - 1)];
+    }
+
+    private static string GetLastSegment(string value)
+    {
+        // Find the last segment in the value string by searching for the last unescaped segment separator
+        var isEscaped = false;
+        var lastSegmentStart = 0;
+        for (var i = 0; i < value.Length; i++)
+        {
+            var c = value[i];
+            if (!isEscaped && c == SegmentSeparator)
+            {
+                lastSegmentStart = i + 1;
+            }
+
+            if (c == EscapeCharacter)
+            {
+                isEscaped = !isEscaped;
+            }
+        }
+
+        return value[lastSegmentStart..];
     }
 
     private static bool IsSegmentationValid(string value)

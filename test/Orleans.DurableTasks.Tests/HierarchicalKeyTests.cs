@@ -89,5 +89,21 @@ namespace Orleans.DurableTasks.Tests
             _ = new HierarchicalKey("a/b/c/d");
             _ = new HierarchicalKey("\\/\\/a/b/c/d\\/\\/");
         }
+
+        [Fact]
+        public void GetParentTest()
+        {
+            var aKey = new HierarchicalKey("aaa");
+            Assert.Null(aKey.GetParent());
+            
+            Assert.Same(aKey, new HierarchicalKey(aKey, "bbb").GetParent());
+            Assert.Equal(new HierarchicalKey(aKey, "bbb"), new HierarchicalKey("aaa/bbb/ccc").GetParent());
+            Assert.Equal(new HierarchicalKey("aaa/bbb"), new HierarchicalKey("aaa/bbb/ccc").GetParent());
+
+            Assert.Null(new HierarchicalKey("\\/\\/").GetParent());
+            Assert.Null(new HierarchicalKey("\\/").GetParent());
+            Assert.Equal(new HierarchicalKey("\\/\\/"), new HierarchicalKey("\\/\\//aaa").GetParent());
+            Assert.Equal(new HierarchicalKey("\\/"), new HierarchicalKey("\\//\\/").GetParent());
+        }
     }
 }

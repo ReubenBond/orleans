@@ -42,7 +42,7 @@ public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<
     }
 
     public string ToString(string? format, IFormatProvider? formatProvider) => _key is null ? "" : _key.ToString(format, formatProvider);
-    public override bool Equals(object? obj) => obj is TaskId && Equals((TaskId)obj);
+    public override bool Equals(object? obj) => obj is TaskId id && Equals(id);
     public bool Equals(TaskId other) => _key is null && other._key is null || _key is not null && _key.Equals(other._key);
 
     public static TaskId Parse(string s, IFormatProvider? provider) => new(HierarchicalKey.Parse(s, provider));
@@ -61,5 +61,7 @@ public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<
 
     public static bool operator ==(TaskId left, TaskId right) => left.Equals(right);
     public static bool operator !=(TaskId left, TaskId right) => !left.Equals(right);
+    public bool IsParentOf(TaskId other) => _key is not null && _key.IsPrefixOf(other._key);
+    public bool IsChildOf(TaskId other) => other._key is not null && other._key.IsPrefixOf(_key);
 }
 
