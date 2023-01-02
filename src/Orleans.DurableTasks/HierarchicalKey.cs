@@ -61,7 +61,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         return false;
     }
 
-    private static bool HasSegments(string value)
+    private static bool HasOwnSegments(string value)
     {
         var isEscaped = false;
         foreach (var c in value)
@@ -179,6 +179,51 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Returns <value>true</value> if this key is direct descendant of the provided key, <value>false</value> otherwise.
+    /// </summary>
+    /// <param name="other">The key to check this key against.</param>
+    /// <returns><value>true</value> if this key is a direct descendant of <paramref name="other"/>, <value>false</value> otherwise.</returns>
+    public bool IsChildOf(HierarchicalKey? other) => other is not null && other.IsParentOf(this);
+
+    /// <summary>
+    /// Returns <value>true</value> if this key is a direct ancestor of provided key, <value>false</value> otherwise.
+    /// </summary>
+    /// <param name="other">The key to check this key against.</param>
+    /// <returns><value>true</value> if this key is a direct ancestor of <paramref name="other"/>, <value>false</value> otherwise.</returns>
+    public bool IsParentOf(HierarchicalKey? other)
+    {
+        if (other is null) return false;
+        var left = GetEnumerator();
+        var right = other.GetEnumerator();
+        while (true)
+        {
+            var leftValid = left.MoveNext();
+            var rightValid = right.MoveNext();
+            if (!leftValid && !rightValid)
+            {
+                // Completed enumeration, both keys are equal and there is no parent/child relationship between them.
+                return false;
+            }
+            else if (leftValid && !rightValid)
+            {
+                // The left key is longer than the right key, so it is not a prefix of it.
+                return false;
+            }
+            else if (!leftValid && rightValid)
+            {
+                // The right key is longer than the left key, and all common components are equal,
+                // so the left is the parent of the right if the right has one more segment.
+                return !right.MoveNext();
+            }
+            else if (!left.Current.SequenceEqual(right.Current))
+            {
+                // Some segment is not equal and therefore neither is a prefix of the other.
+                return false;
+            }
+        }
     }
 
     /// <summary>
@@ -354,12 +399,12 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
 
     public ref struct SegmentEnumerator
     {
-        private RawValueEnumerator _enumerator;
+        private StructureEnumerator _enumerator;
         private ReadOnlySpan<char> _buffer;
 
         public SegmentEnumerator(HierarchicalKey id)
         {
-            _enumerator = new RawValueEnumerator(id);
+            _enumerator = new StructureEnumerator(id);
             _buffer = ReadOnlySpan<char>.Empty;
         }
 
@@ -423,12 +468,12 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         }
     }
 
-    private struct RawValueEnumerator
+    private struct StructureEnumerator
     {
         private readonly HierarchicalKey? _current;
         private int _remaining = -2;
 
-        public RawValueEnumerator(HierarchicalKey value)
+        public StructureEnumerator(HierarchicalKey value)
         {
             _current = value;
         }

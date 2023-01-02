@@ -94,10 +94,25 @@ namespace Orleans.DurableTasks.Tests
         public void GetParentTest()
         {
             var aKey = new HierarchicalKey("aaa");
+
+            Assert.True(aKey.IsParentOf(new HierarchicalKey(aKey, "bbb")));
+            Assert.True(aKey.IsPrefixOf(new HierarchicalKey("aaa/bbb/ccc")));
+            Assert.True(aKey.IsParentOf(new HierarchicalKey("aaa/bbb")));
+            Assert.False(aKey.IsParentOf(new HierarchicalKey("aaa/bbb/ccc")));
+            Assert.False(aKey.IsPrefixOf(new HierarchicalKey("bbb/ccc")));
+            Assert.False(new HierarchicalKey("a").IsPrefixOf(new HierarchicalKey("aa")));
+
+            Assert.True(aKey.IsPrefixOf(aKey));
+            Assert.False(aKey.IsParentOf(aKey));
+            Assert.False(aKey.IsParentOf(new HierarchicalKey("aaa")));
+            Assert.False(aKey.IsParentOf(new HierarchicalKey("bbb")));
+
             Assert.Null(aKey.GetParent());
-            
             Assert.Same(aKey, new HierarchicalKey(aKey, "bbb").GetParent());
+            Assert.True(new HierarchicalKey("aaa/bbb").IsChildOf(aKey));
+            Assert.False(new HierarchicalKey("aaa/bbb/ccc").IsChildOf(aKey));
             Assert.Equal(new HierarchicalKey(aKey, "bbb"), new HierarchicalKey("aaa/bbb/ccc").GetParent());
+            Assert.True(new HierarchicalKey("aaa/bbb").IsParentOf(new HierarchicalKey("aaa/bbb/ccc")));
             Assert.Equal(new HierarchicalKey("aaa/bbb"), new HierarchicalKey("aaa/bbb/ccc").GetParent());
 
             Assert.Null(new HierarchicalKey("\\/\\/").GetParent());
