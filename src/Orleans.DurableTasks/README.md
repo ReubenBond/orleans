@@ -325,13 +325,13 @@ Stepwise Task APIs for use within `DurableTask` methods:
     var paymentResult = await callback.Task;
     ```
 
-  * `DurableTaskCompletionSource` (DCTS)
+  * `DurableTaskCompletionSource` (DTCS)
     * Overview:
       * When integrating with external systems, 
       * `DurableTaskCompletionSource`/`DurableTaskCompletionSource<T>` instances can be used within grains to create globally identifiable, named, distributed, fault-tolerant, awaitable tasks.
     * Uses:
-      * To implement the *idempotency key* pattern, a new DCTS can be created with either an automatically generated identifier (Eg, `Guid.NewGuid().ToString("N")`) or a specified identifier.
-      * DCTS identity is global: any caller can get a reference to a DCTS by its identifier.
+      * To implement the *idempotency key* pattern, a new DTCS can be created with either an automatically generated identifier (Eg, `Guid.NewGuid().ToString("N")`) or a specified identifier.
+      * DTCS identity is global: any caller can get a reference to a DTCS by its identifier.
     * Implementation:
     * APIs
       * Key members on class:
@@ -389,25 +389,25 @@ Stepwise Task APIs for use within `DurableTask` methods:
     * Notes:
       * `DurableTaskCompletionSource` instances can be serialized and sent across the wire. Since these instances are globally-addressable, each instance is a proxy. This allows instances to be sent to other instances, for example as a kind of callback mechanism for long-polling.
     * Open Questions:
-      * How should storage for DCTS work? Should the default DCTS id point to the grain which created it and use it for storage?
-        * DCTS could be implemented as a grain extension and there could be two main cases:
-          * DCTS created with an explicit identifier
-            * This would be a global DCTS and would implicitly be 
-          * DCTS created with no explicit identifier
-            * If the DCTS is created within a grain, the DCTS.Id would point to the grain, eg:
+      * How should storage for DTCS work? Should the default DTCS id point to the grain which created it and use it for storage?
+        * DTCS could be implemented as a grain extension and there could be two main cases:
+          * DTCS created with an explicit identifier
+            * This would be a global DTCS and would implicitly be 
+          * DTCS created with no explicit identifier
+            * If the DTCS is created within a grain, the DTCS.Id would point to the grain, eg:
               * `grain:` + *GrainId* + `:` + *RandomId*
-      * Does DCTS support transactions?
-        * I say, yes: you can transactionally create or complete a DCTS
-        * In practice, this currently means that the DCTS state must be transactional.
-      * Does DCTS support metadata?
-        * We should probably support associating K/V metadata with a DCTS
+      * Does DTCS support transactions?
+        * I say, yes: you can transactionally create or complete a DTCS
+        * In practice, this currently means that the DTCS state must be transactional.
+      * Does DTCS support metadata?
+        * We should probably support associating K/V metadata with a DTCS
           * Motivation: the stripe API stores the incoming *request* as well as the response. This allows validating the request before returning the response. It helps them to catch programming errors (accidentally reusing an `idempotencyKey` within a 24h window)
-      * Do DCTS values expire?
+      * Do DTCS values expire?
         * Yes, but how? Stripe API keeps values around for 24h.
-        * If DCTS is stored on grain state, could lazily expire them.
-        * If DCTS is stored independently (eg, in dedicated storage), we could periodically scan storage, similar to reminders, and expire completed ones after some configurable period of time (similar to defunct silo membership table cleanup)
-      * Would there be a need to have different expiry policies for different DCTS? What about different storage depending on the type, or should there be one global DCTS store?
-      * Should there be an easy way to create a DCTS for any `DurableTask<T>`?
+        * If DTCS is stored on grain state, could lazily expire them.
+        * If DTCS is stored independently (eg, in dedicated storage), we could periodically scan storage, similar to reminders, and expire completed ones after some configurable period of time (similar to defunct silo membership table cleanup)
+      * Would there be a need to have different expiry policies for different DTCS? What about different storage depending on the type, or should there be one global DTCS store?
+      * Should there be an easy way to create a DTCS for any `DurableTask<T>`?
         * Eg, imagine an extension method `task.AsWorkflow(id)`
           * This is similar to `task.AsStep(id)` *within* a workflow, but *AsWorkflow* signifies that this is not a step but rather a standalone workflow and therefore the `id` is global.
         * Under the covers, this will set a `ReplyTo:` address, the address of a `DurableTaskCompletionSource<T>` backing grain. Most likely, we should make this `ReplyTo` a data structure which can contain both a grain/service address and a *task id*. This will allows flexibility.

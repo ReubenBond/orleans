@@ -1,11 +1,6 @@
 using System.Runtime.CompilerServices;
 using Orleans.DurableTasks.Remoting;
 using Orleans.Runtime;
-using System.Runtime.InteropServices;
-using System.Runtime.ExceptionServices;
-using System.Diagnostics;
-using Orleans.Serialization;
-using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks.Sources;
 
 namespace Orleans.DurableTasks;
@@ -82,8 +77,23 @@ public static class DurableTaskExtensions
     }
 
     // Return a "DurableTaskStepAwaitable<TResult>" which sets the appropriate context around the invocation.
-    public static async ValueTask<TResult> AsStep<TResult>(this DurableTask<TResult> taskDefinition, string stepId)
+    public static async ValueTask<TResult> AsWorkflowStep<TResult>(this DurableTask<TResult> taskDefinition, string stepId)
     {
+        var currentContext = DurableTaskContext.GetCurrentContextOrThrow();
+
+        // See if a child node exists for this context already.
+        // If so, there are two cases:
+        // - the task has completed, in which case return the result.
+        // - the task is incomplete, in which case we will need to execute it.
+        // If not, create a new child node and invoke the task.
+        var childContext = currentContext.GetOrCreateChildNode(stepId, out var exists);
+        if (exists)
+        {
+            if (childContext.IsCompleted)
+            {
+            }
+        }
+
         await Task.Delay(1).ConfigureAwait(false);
         // Check the current durable task context
         // If it does not exist, throw:
@@ -103,7 +113,7 @@ public static class DurableTaskExtensions
     }
 
     // See above
-    public static ValueTask AsStep(this DurableTask taskDefinition, string stepId)
+    public static ValueTask AsWorfklowStep(this DurableTask taskDefinition, string stepId)
     {
         return default;
     }
@@ -115,103 +125,7 @@ public interface IDurableTaskState<T>
     public ValueTask WriteStateAsync();
 }
 
-public class DurableTaskContext
-{
-    private static readonly AsyncLocal<DurableTaskContext?> _current = new();
-
-    public static DurableTaskContext? CurrentTask => _current.Value;
-   
-    private readonly Serializer _serializer;
-
-    public bool IsCancellationRequested => Status is DurableTaskStatus.Canceled;
-
-    // Get state associated with a workflow
-    public IDurableTaskState<T> GetState<T>(string key) => default!;
-    public ValueTask<IDurableTaskState<T>> GetOrAddStateAsync<T>(string key, T defaultValue) => default!;
-    public ValueTask<IDurableTaskState<T>> GetOrAddStateAsync<T>(string key, Func<T> createDefaultValue) => default!;
-
-    internal void Enter(Serializer serializer, string id)
-    {
-        _current.Value = _current.Value switch
-        {
-            { } parent => parent.GetOrCreateChildNode(serializer, id),
-            _ => new DurableTaskContext(serializer) { Id = id },
-        };
-    }
-    
-    internal void Clear()
-    {
-        _current.Value = null;
-    }
-
-    private object? _result;
-
-    public DurableTaskContext? Parent { get; init; }
-    public required string Id { get; init; }
-    public Dictionary<string, DurableTaskContext>? Children { get; private set; }
-
-    internal DurableTaskContext(Serializer serializer)
-    {
-        _serializer = serializer;
-    }
-
-    public DurableTaskStatus Status { get; private set; }
-    public ExceptionDispatchInfo? Exception => _result switch { DurableTaskStatus.Faulted => (ExceptionDispatchInfo)_result!, _ => null };
-    public object? Result => _result switch { DurableTaskStatus.Success => _result, _ => null };
-
-    internal void SetResult(object? result)
-    {
-        Debug.Assert(Status is DurableTaskStatus.NotStarted or DurableTaskStatus.InProgress);
-        ClearChildren();
-        Status = DurableTaskStatus.Success;
-        _result = result;
-    }
-
-    internal void SetException(Exception exception)
-    {
-        Debug.Assert(Status is DurableTaskStatus.NotStarted or DurableTaskStatus.InProgress);
-        ClearChildren();
-        Status = DurableTaskStatus.Faulted;
-        _result = ExceptionDispatchInfo.Capture(exception);
-    }
-
-    internal DurableTaskContext GetOrCreateChildNode(Serializer serializer, string childId)
-    {
-        Children ??= new();
-        ref var childNode = ref CollectionsMarshal.GetValueRefOrAddDefault(Children, childId, out _);
-        if (childNode is null)
-        {
-            childNode = new DurableTaskContext(serializer) { Id = childId, Parent = this };
-        }
-
-        return childNode;
-    }
-
-    internal DurableTaskContext CreateChildNode(Serializer serializer, string childId)
-    {
-        Children ??= new();
-        ref var childNode = ref CollectionsMarshal.GetValueRefOrAddDefault(Children, childId, out var exists);
-        if (exists)
-        {
-            throw new InvalidOperationException("Child node already exists");
-        }
-
-        return childNode = new DurableTaskContext(serializer) { Id = childId, Parent = this };
-    }
-
-    internal void ClearChildren() => Children = null;
-}
-
 public interface IScheduledTaskManager
 {
     ValueTask<ScheduledTask> ScheduleAsync<TGrain>(TGrain grain, Func<TGrain, DurableTask> task, DateTimeOffset dueTime);
-}
-
-public enum DurableTaskStatus
-{
-    NotStarted,
-    InProgress,
-    Success,
-    Faulted,
-    Canceled
 }
