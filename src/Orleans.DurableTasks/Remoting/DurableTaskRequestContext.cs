@@ -1,18 +1,20 @@
 using System.Diagnostics.CodeAnalysis;
+using Orleans.Runtime;
 using Orleans.Serialization;
 
 namespace Orleans.DurableTasks.Remoting;
 
 [GenerateSerializer]
-public class DurableTaskCallContext
+public class DurableTaskRequestContext
 {
-    private static readonly AsyncLocal<DurableTaskCallContext?> CurrentContext = new();
+    private static readonly AsyncLocal<DurableTaskRequestContext?> CurrentContext = new();
 
-    public static DurableTaskCallContext? Current => CurrentContext.Value;
+    public static DurableTaskRequestContext? Current => CurrentContext.Value;
 
+    [NonSerialized]
     private readonly Serializer _serializer;
 
-    internal DurableTaskCallContext(Serializer serializer)
+    internal DurableTaskRequestContext(Serializer serializer)
     {
         _serializer = serializer;
     }
@@ -21,9 +23,15 @@ public class DurableTaskCallContext
     public TaskId Id { get; internal set; }
 
     [Id(1)]
+    public GrainId CallerId { get; internal set; }
+
+    [Id(2)]
+    public SchedulingOptions? SchedulingOptions { get; internal set; }
+
+    [Id(3)]
     internal Dictionary<string, byte[]> Values { get; } = new();
 
-    public static void SetCurrentContext(DurableTaskCallContext? value)
+    public static void SetCurrentContext(DurableTaskRequestContext? value)
     {
         CurrentContext.Value = value;
     }

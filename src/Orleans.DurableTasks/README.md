@@ -477,3 +477,17 @@ public interface IMyTeamGrain : IGrain
 * Workflows
 * Workflow *Steps*
 * DurableTaskCompletionSource<T>
+
+* A workflow step is a sub-workflow. Should we use `AsSubworkflow(...)` as the extension method? `AsNestedWorkflow(...)`
+
+* Calling `AsWorkflowStep` on a `DurableTask<T>` creates a `WorkflowStep<T>` which hold a `DurableTaskContext<T>`.
+* `DurableTaskContext<T>` has a `TaskCompletionSource<T>` within it.
+* `IGrainContext` exposes `IDurableTaskGrainRuntime` which contains the collection of active `DurableTaskExecutionContext` instances, allowing querying, management, and completion of durable tasks by remote callers.
+* `DurableTaskRequest`, the base class for requests made to `DurableTask`-returning methods, includes a `DurableTaskRequestContext`.
+* `DurableTaskRequestContext` includes:
+  * `TaskId` — the fully-qualified identifier for the request.
+  * `SchedulingOptions` — which include retry options and scheduling delays.
+  * `CallerId` - the identity of the caller to send the response to.
+  * `RequestContext` - a `Dictionary<string, object>` for other properties
+* `DurableTaskRequest.Invoke`, the method called on the target instance when a request is issued, fetches the `IDurableTaskGrainRuntime` component from the `IGrainContext` using the `GetComponent<T>()` method and calls `ScheduleRequestAsync(DurableTaskRequest)` to ensure that the request is durably scheduled. Once it has been scheduled, a `DurableTaskResponse` is returned to the caller to indicate that it has been scheduled or, if the task has already been completed, the result of invocation.
+* `IDurableTaskGrainRuntime`

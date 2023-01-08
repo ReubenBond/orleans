@@ -1,52 +1,57 @@
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks.Remoting;
 
 [GenerateSerializer]
-public abstract class DurableTaskRequestBase : RequestBase, IOutgoingGrainCallFilter, IOnDeserialized
+public abstract class DurableTaskRequest : RequestBase, IOutgoingGrainCallFilter
 {
+    // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
+    // For now, we're not doing that, just to make sure that we can get far without needing it, demonstrating the extensibility of Orleans.
+    // It might be worthwhile making RuntimeContext public at some point, even if it is not the recommended approach.
     [NonSerialized]
-    private IDurableTaskRuntime? _runtime;
+    private readonly IGrainContextAccessor _grainContextAccessor;
 
     [Id(0)]
-    public DurableTaskCallContext? Context { get; set; }
+    public DurableTaskRequestContext? Context { get; set; }
 
     [GeneratedActivatorConstructor]
-    protected DurableTaskRequestBase(IDurableTaskRuntime runtime)
+    protected DurableTaskRequest(IGrainContextAccessor grainContextAccessor)
     {
-        _runtime = runtime;
+        _grainContextAccessor = grainContextAccessor;
     }
 
-    async Task IOutgoingGrainCallFilter.Invoke(IOutgoingGrainCallContext context)
+    Task IOutgoingGrainCallFilter.Invoke(IOutgoingGrainCallContext context)
     {
-        SetScheduledTaskContext();
-        await context.Invoke();
-    }
-
-    private void SetScheduledTaskContext()
-    {
-        var taskContext = DurableTaskCallContext.Current;
-        if (taskContext == null)
-        {
-            DurableTaskCallContext.Clear();
-        }
-        else
-        {
-            Context = taskContext;
-        }
+        Context = DurableTaskRequestContext.Current ?? throw new InvalidOperationException($"Attempt to call a {nameof(DurableTask)} method without an ambient {nameof(DurableTaskRequestContext)}");
+        return context.Invoke();
     }
 
     public override async ValueTask<Response> Invoke()
     {
+        // Get the durable task grain runtime.
+        var grainContext = _grainContextAccessor.GrainContext;
+        var runtime = grainContext.GetComponent<IDurableTaskGrainRuntime>();
+
+        // Ensure that the task is durably scheduled.
+        // If the request has already completed, this will return the result of invocation.
+        // If the request has not already completed, this will return an in-progress response.
+        var response = await runtime.ScheduleOrPollAsync(this);
+
+        return response;
+    }
+
+    /// <summary>
+    /// Invoke the method on the target.
+    /// </summary>
+    /// <returns></returns>
+    public async ValueTask<Response> InvokeImplementation()
+    {
         Response response;
-        var taskContext = this.Context;
         try
         {
-            DurableTaskCallContext.SetCurrentContext(taskContext);
-            response = await InvokeWrapped();
+            DurableTaskRequestContext.SetCurrentContext(Context);
+            response = await InvokeImplementationCore();
         }
         catch (Exception exception)
         {
@@ -54,22 +59,17 @@ public abstract class DurableTaskRequestBase : RequestBase, IOutgoingGrainCallFi
         }
         finally
         {
-            DurableTaskCallContext.Clear();
+            DurableTaskRequestContext.Clear();
         }
 
         return response;
     }
 
-    protected abstract ValueTask<Response> InvokeWrapped();
+    protected abstract ValueTask<Response> InvokeImplementationCore();
 
     public override void Dispose()
     {
        Context = null;
-    }
-
-    void IOnDeserialized.OnDeserialized(DeserializationContext context)
-    {
-        _runtime = context.ServiceProvider.GetRequiredService<IDurableTaskRuntime>();
     }
 }
 
@@ -80,9 +80,9 @@ public sealed class DurableTaskResponse : Response
     private Response? _response;
 
     [Id(1)]
-    public DurableTaskCallContext? Context { get; set; }
+    public DurableTaskRequestContext? Context { get; set; }
 
-    public static DurableTaskResponse Create(Response response, DurableTaskCallContext context)
+    public static DurableTaskResponse Create(Response response, DurableTaskRequestContext context)
     {
         return new DurableTaskResponse
         {
@@ -102,15 +102,18 @@ public sealed class DurableTaskResponse : Response
     public override T GetResult<T>() => _response!.GetResult<T>();
 }
 
+/// <summary>
+/// Represents a request to schedule a <see cref="DurableTask"/>-returning method.
+/// </summary>
 [GenerateSerializer]
-public abstract class DurableTaskRequest : DurableTaskRequestBase 
+public abstract class VoidDurableTaskRequest : DurableTaskRequest 
 {
     [GeneratedActivatorConstructor]
-    protected DurableTaskRequest(IDurableTaskRuntime runtime) : base(runtime)
+    protected VoidDurableTaskRequest(IGrainContextAccessor grainContextAccessor) : base(grainContextAccessor)
     {
     }
 
-    protected override async ValueTask<Response> InvokeWrapped()
+    protected override async ValueTask<Response> InvokeImplementationCore()
     {
         try
         {
@@ -127,15 +130,18 @@ public abstract class DurableTaskRequest : DurableTaskRequestBase
     protected abstract DurableTask InvokeInner();
 }
 
+/// <summary>
+/// Represents a request to schedule a <see cref="DurableTask{TResult}"/>-returning method.
+/// </summary>
 [GenerateSerializer]
-public abstract class DurableTaskRequest<TResult> : DurableTaskRequestBase
+public abstract class DurableTaskRequest<TResult> : DurableTaskRequest
 {
     [GeneratedActivatorConstructor]
-    protected DurableTaskRequest(IDurableTaskRuntime runtime) : base(runtime)
+    protected DurableTaskRequest(IGrainContextAccessor grainContextAccessor) : base(grainContextAccessor)
     {
     }
 
-    protected override async ValueTask<Response> InvokeWrapped()
+    protected override async ValueTask<Response> InvokeImplementationCore()
     {
         try
         {
