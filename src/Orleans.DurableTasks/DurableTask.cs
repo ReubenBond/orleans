@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using Orleans.DurableTasks.Remoting;
 using Orleans.Runtime;
-using System.Threading.Tasks.Sources;
 
 namespace Orleans.DurableTasks;
 
@@ -9,36 +8,23 @@ namespace Orleans.DurableTasks;
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
 public abstract class DurableTask
 {
-    public ValueTask<ScheduledTask> ScheduleAsync() => ScheduleAsyncCore(TaskId.None, options: null);
-    public ValueTask<ScheduledTask> ScheduleAsync(SchedulingOptions options) => ScheduleAsyncCore(TaskId.None, options);
-    public ValueTask<ScheduledTask> ScheduleAsync(TaskId taskId) => ScheduleAsyncCore(taskId, options: null);
-    public ValueTask<ScheduledTask> ScheduleAsync(TaskId taskId, SchedulingOptions options) => ScheduleAsyncCore(taskId, options);
-    public ValueTask<ScheduledTask> ScheduleAsync(TaskId taskId, DateTimeOffset dueTime) => ScheduleAsyncCore(taskId, new SchedulingOptions { DueTime = dueTime });
-
-    protected abstract ValueTask<ScheduledTask> ScheduleAsyncCore(TaskId taskId, SchedulingOptions? options);
-
-    // Schedules the durable task with default options and awaits the scheduled task.
-    // Equivalent to `await (await durableTask.ScheduleAsync())`
-    public DurableTaskAwaiter GetAwaiter() => new (this);
-
     public static DurableTask<T> FromResult<T>(T value) => new CompletedDurableTask<T>(value);
+
+    public static DurableTask Run(Action func) => new DelegateDurableTask(func);
+    public static DurableTask<T> Run<T>(Func<T> func) => new DelegateDurableTask<T>(func);
+    public static DurableTask Run(Func<ValueTask> func) => new AsyncDelegateDurableTask(func);
+    public static DurableTask<T> Run<T>(Func<ValueTask<T>> func) => new AsyncDelegateDurableTask<T>(func);
+
+    internal ValueTask InvokeAsync(DurableTaskExecutionContext executionContext) => InvokeAsyncUntypedCore(executionContext);
+    protected internal abstract ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext);
 }
 
 [InvokableBaseType(typeof(GrainReference), typeof(DurableTask<>), typeof(DurableTaskRequest<>))]
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder<>))]
 public abstract class DurableTask<TResult> : DurableTask
 {
-    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync() => ScheduleAsyncTypedCore(TaskId.None, options: null);
-    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(SchedulingOptions options) => ScheduleAsyncTypedCore(TaskId.None, options);
-    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(TaskId taskId) => ScheduleAsyncTypedCore(taskId, options: null);
-    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(TaskId taskId, SchedulingOptions options) => ScheduleAsyncTypedCore(taskId, options);
-    public new ValueTask<ScheduledTask<TResult>> ScheduleAsync(TaskId taskId, DateTimeOffset dueTime) => ScheduleAsyncTypedCore(taskId, new SchedulingOptions { DueTime = dueTime });
-
-    protected abstract ValueTask<ScheduledTask<TResult>> ScheduleAsyncTypedCore(TaskId taskId, SchedulingOptions? options);
-
-    // Schedules the durable task with default options and awaits the scheduled task.
-    // Equivalent to `await (await durableTask.ScheduleAsync())`
-    public new DurableTaskAwaiter<TResult> GetAwaiter() => new(this);
+    internal new ValueTask<TResult> InvokeAsync(DurableTaskExecutionContext executionContext) => InvokeAsyncTypedCore(executionContext);
+    protected internal abstract ValueTask<TResult> InvokeAsyncTypedCore(DurableTaskExecutionContext executionContext);
 }
 
 internal interface ICompletedDurableTask
@@ -54,23 +40,113 @@ internal sealed class CompletedDurableTask<TResult> : DurableTask<TResult>, ICom
 
     public TResult Result { get; }
 
-    protected override ValueTask<ScheduledTask> ScheduleAsyncCore(TaskId taskId, SchedulingOptions? options) => new(new ScheduledTask<TResult>(taskId, options, this));
-    protected override ValueTask<ScheduledTask<TResult>> ScheduleAsyncTypedCore(TaskId taskId, SchedulingOptions? options)
+    protected internal override ValueTask<TResult> InvokeAsyncTypedCore(DurableTaskExecutionContext executionContext) => new(Result);
+    protected internal override ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext) => default;
+}
+
+/// <summary>
+/// Represents a <see cref="DurableTask{TResult}"/> instance which invokes a delegate.
+/// </summary>
+internal sealed class AsyncDelegateDurableTask<TResult> : DurableTask<TResult>
+{
+    private readonly Func<ValueTask<TResult>> _func;
+    public AsyncDelegateDurableTask(Func<ValueTask<TResult>> func) => _func = func;
+
+    protected internal override async ValueTask<TResult> InvokeAsyncTypedCore(DurableTaskExecutionContext executionContext)
     {
-        // If inside a durable execution context, use the runtime to schedule a 
-        return new(new ScheduledTask<TResult>(taskId, options, this));
+        DurableTaskExecutionContext.SetCurrentContext(executionContext);
+        return await _func();
     }
 
-    public ValueTask<TResult> AsValueTask() => new ValueTask<TResult>(Result);
+    protected internal override async ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext) 
+    {
+        DurableTaskExecutionContext.SetCurrentContext(executionContext);
+        _ = await _func();
+    }
 }
 
-public interface IDurableTaskState<T>
+/// <summary>
+/// Represents a <see cref="DurableTask{TResult}"/> instance which invokes a delegate.
+/// </summary>
+internal sealed class AsyncDelegateDurableTask : DurableTask
 {
-    public T Value { get; set; }
-    public ValueTask WriteStateAsync();
+    private readonly Func<ValueTask> _func;
+    public AsyncDelegateDurableTask(Func<ValueTask> func) => _func = func;
+
+    protected internal override async ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext) 
+    {
+        DurableTaskExecutionContext.SetCurrentContext(executionContext);
+        await _func();
+    }
 }
 
-public interface IScheduledTaskManager
+/// <summary>
+/// Represents a <see cref="DurableTask{TResult}"/> instance which invokes a delegate.
+/// </summary>
+internal sealed class DelegateDurableTask<TResult> : DurableTask<TResult>
 {
-    ValueTask<ScheduledTask> ScheduleAsync<TGrain>(TGrain grain, Func<TGrain, DurableTask> task, DateTimeOffset dueTime);
+    private readonly Func<TResult> _func;
+    public DelegateDurableTask(Func<TResult> func) => _func = func;
+
+    protected internal override ValueTask<TResult> InvokeAsyncTypedCore(DurableTaskExecutionContext executionContext)
+    {
+        DurableTaskExecutionContext.SetCurrentContext(executionContext, out var previous);
+        try
+        {
+            return new(_func());
+        }
+        catch (Exception exception)
+        {
+            return ValueTask.FromException<TResult>(exception);
+        }
+        finally
+        {
+            DurableTaskExecutionContext.SetCurrentContext(previous);
+        }
+    }
+
+    protected internal override ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext) 
+    {
+        DurableTaskExecutionContext.SetCurrentContext(executionContext, out var previous);
+        try
+        {
+            _ = _func();
+            return default;
+        }
+        catch (Exception exception)
+        {
+            return ValueTask.FromException(exception);
+        }
+        finally
+        {
+            DurableTaskExecutionContext.SetCurrentContext(previous);
+        }
+    }
+}
+
+/// <summary>
+/// Represents a <see cref="DurableTask{TResult}"/> instance which invokes a delegate.
+/// </summary>
+internal sealed class DelegateDurableTask : DurableTask
+{
+    private readonly Action _func;
+    public DelegateDurableTask(Action func) => _func = func;
+
+    protected internal override ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext) 
+    {
+        DurableTaskExecutionContext.SetCurrentContext(executionContext, out var previous);
+        try
+        {
+            _func();
+            return default;
+        }
+        catch (Exception exception)
+        {
+            return ValueTask.FromException(exception);
+        }
+        finally
+        {
+            DurableTaskExecutionContext.SetCurrentContext(previous);
+        }
+    }
 }

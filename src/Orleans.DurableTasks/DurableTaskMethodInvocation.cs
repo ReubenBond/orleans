@@ -1,66 +1,95 @@
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks.Sources;
 
 namespace Orleans.DurableTasks;
+
+internal static class DurableTaskMethodInvocation
+{
+    public static UntypedDurableTaskMethodInvocation<TStateMachine> Create<TStateMachine>(scoped ref TStateMachine stateMachine) where TStateMachine : IAsyncStateMachine => UntypedDurableTaskMethodInvocation<TStateMachine>.Create(ref stateMachine);
+    public static DurableTaskMethodInvocation<TResult, TStateMachine> Create<TResult, TStateMachine>(scoped ref TStateMachine stateMachine) where TStateMachine : IAsyncStateMachine => DurableTaskMethodInvocation<TResult, TStateMachine>.Create(ref stateMachine);
+}
+
+internal abstract class UntypedDurableTaskMethodInvocation : DurableTask, IDurableTaskMethodInvocation
+{
+    public abstract void SetResult();
+
+    public abstract void SetException(Exception exception);
+}
 
 /// <summary>
 /// Represents a locally-executing <see cref="DurableTask"/> method.
 /// </summary>
-internal class DurableTaskMethodInvocation : DurableTask, IValueTaskSource, IDurableTaskMethodInvocation
-{
-    private ManualResetValueTaskSourceCore<VoidTaskResult> _taskSource = new();
-
-    protected override ValueTask<ScheduledTask> ScheduleAsyncCore(TaskId taskId, SchedulingOptions? options) => new(new UntypedDurableTaskInvocation(taskId, options, this));
-
-    public ValueTask AsUntypedValueTask() => new ValueTask(this, _taskSource.Version);
-
-    void IValueTaskSource.GetResult(short token) => _taskSource.GetResult(token);
-    ValueTaskSourceStatus IValueTaskSource.GetStatus(short token) => _taskSource.GetStatus(token);
-    void IValueTaskSource.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _taskSource.OnCompleted(continuation, state, token, flags);
-
-    public void SetResult() => _taskSource.SetResult(default);
-    public void SetException(Exception exception) => _taskSource.SetException(exception);
-}
-
-/// <summary>
-/// Represents a locally-executing <see cref="DurableTask{TResult}"/> method.
-/// </summary>
-internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResult>, IValueTaskSource<TResult>, IValueTaskSource, IDurableTaskMethodInvocation
-{
-    private ManualResetValueTaskSourceCore<TResult> _taskSource = new();
-
-    protected override ValueTask<ScheduledTask> ScheduleAsyncCore(TaskId taskId, SchedulingOptions? options) => new(new ScheduledTask<TResult>(taskId, options, this));
-    protected override ValueTask<ScheduledTask<TResult>> ScheduleAsyncTypedCore(TaskId taskId, SchedulingOptions? options)
-    {
-        // If inside a durable execution context, use the runtime to schedule a 
-        return new(new ScheduledTask<TResult>(taskId, options, this));
-    }
-
-    public virtual ValueTask<TResult> AsValueTask() => new ValueTask<TResult>(this, _taskSource.Version);
-    public virtual ValueTask AsUntypedValueTask() => new ValueTask(this, _taskSource.Version);
-
-    TResult IValueTaskSource<TResult>.GetResult(short token) => _taskSource.GetResult(token);
-    ValueTaskSourceStatus IValueTaskSource<TResult>.GetStatus(short token) => _taskSource.GetStatus(token);
-    void IValueTaskSource<TResult>.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _taskSource.OnCompleted(continuation, state, token, flags);
-
-    void IValueTaskSource.GetResult(short token) => _taskSource.GetResult(token);
-    ValueTaskSourceStatus IValueTaskSource.GetStatus(short token) => _taskSource.GetStatus(token);
-    void IValueTaskSource.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _taskSource.OnCompleted(continuation, state, token, flags);
-
-    public void SetResult(TResult result) => _taskSource.SetResult(result);
-    public void SetException(Exception exception) => _taskSource.SetException(exception);
-
-    public abstract void StartInvocation();
-}
-
-/// <summary>
-/// Represents a locally-executing <see cref="DurableTask{TResult}"/> method.
-/// </summary>
-internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : DurableTaskMethodInvocation<TResult>, IValueTaskSource<TResult>, IValueTaskSource, IDurableTaskMethodInvocation, IAsyncStateMachine
+internal sealed class UntypedDurableTaskMethodInvocation<TStateMachine> : UntypedDurableTaskMethodInvocation, IAsyncStateMachine
     where TStateMachine : IAsyncStateMachine
 {
-    private ManualResetValueTaskSourceCore<TResult> _taskSource = new();
+    private DurableTaskExecutionContext? _executionContext;
+
+#pragma warning disable IDE0044 // Add readonly modifier
     private TStateMachine _stateMachine;
+#pragma warning restore IDE0044 // Add readonly modifier
+
+    private UntypedDurableTaskMethodInvocation(TStateMachine stateMachine)
+    {
+        _stateMachine = stateMachine;
+    }
+
+    public static UntypedDurableTaskMethodInvocation<TStateMachine> Create(scoped ref TStateMachine stateMachine)
+    {
+        var result = new UntypedDurableTaskMethodInvocation<TStateMachine>(stateMachine);
+        stateMachine.SetStateMachine(result);
+        return result;
+    }
+
+    private void StartInvocation() => ((IAsyncStateMachine)this).MoveNext();
+    void IAsyncStateMachine.MoveNext()
+    {
+        // TODO: is this the best & most efficient way to propagate the context? It seems like it would be costly to do this for every await point.
+        DurableTaskExecutionContext.SetCurrentContext(_executionContext, out var previousContext);
+        try
+        {
+            _stateMachine.MoveNext();
+        }
+        finally
+        {
+            DurableTaskExecutionContext.SetCurrentContext(previousContext);
+        }
+    }
+
+    void IAsyncStateMachine.SetStateMachine(IAsyncStateMachine stateMachine) => _stateMachine.SetStateMachine(stateMachine);
+
+    protected internal override ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext) 
+    {
+        _executionContext = executionContext;
+        StartInvocation();
+        return executionContext.AsUntypedValueTask();
+    }
+
+    public override void SetResult() => _executionContext!.SetResult(null);
+
+    public override void SetException(Exception exception) => _executionContext!.SetException(exception);
+}
+
+/// <summary>
+/// Represents a locally-executing <see cref="DurableTask{TResult}"/> method.
+/// </summary>
+internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResult>, IDurableTaskMethodInvocation
+{
+    public abstract void SetResult(TResult result);
+
+    public abstract void SetException(Exception exception);
+}
+
+/// <summary>
+/// Represents a locally-executing <see cref="DurableTask{TResult}"/> method.
+/// </summary>
+internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : DurableTaskMethodInvocation<TResult>, IAsyncStateMachine
+    where TStateMachine : IAsyncStateMachine
+{
+    private DurableTaskExecutionContext? _executionContext;
+
+#pragma warning disable IDE0044 // Add readonly modifier
+    private TStateMachine _stateMachine;
+#pragma warning restore IDE0044 // Add readonly modifier
+
     private DurableTaskMethodInvocation(TStateMachine stateMachine)
     {
         _stateMachine = stateMachine;
@@ -73,16 +102,40 @@ internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : Dura
         return result;
     }
 
-    TResult IValueTaskSource<TResult>.GetResult(short token) => _taskSource.GetResult(token);
-    ValueTaskSourceStatus IValueTaskSource<TResult>.GetStatus(short token) => _taskSource.GetStatus(token);
-    void IValueTaskSource<TResult>.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _taskSource.OnCompleted(continuation, state, token, flags);
+    private void StartInvocation() => ((IAsyncStateMachine)this).MoveNext();
+    void IAsyncStateMachine.MoveNext()
+    {
+        // TODO: is this the best & most efficient way to propagate the context? It seems like it would be costly to do this for every await point.
+        DurableTaskExecutionContext.SetCurrentContext(_executionContext, out var previousContext);
+        try
+        {
+            _stateMachine.MoveNext();
+        }
+        finally
+        {
+            DurableTaskExecutionContext.SetCurrentContext(previousContext);
+        }
+    }
 
-    void IValueTaskSource.GetResult(short token) => _taskSource.GetResult(token);
-    ValueTaskSourceStatus IValueTaskSource.GetStatus(short token) => _taskSource.GetStatus(token);
-    void IValueTaskSource.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _taskSource.OnCompleted(continuation, state, token, flags);
-    public override void StartInvocation() => MoveNext();
-    public void MoveNext() => _stateMachine.MoveNext();
-    public void SetStateMachine(IAsyncStateMachine stateMachine) => _stateMachine.SetStateMachine(stateMachine);
+    void IAsyncStateMachine.SetStateMachine(IAsyncStateMachine stateMachine) => _stateMachine.SetStateMachine(stateMachine);
+
+    protected internal override ValueTask<TResult> InvokeAsyncTypedCore(DurableTaskExecutionContext executionContext)
+    {
+        _executionContext = executionContext;
+        StartInvocation();
+        return executionContext.AsValueTask<TResult>();
+    }
+
+    protected internal override ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext) 
+    {
+        _executionContext = executionContext;
+        StartInvocation();
+        return executionContext.AsUntypedValueTask();
+    }
+
+    public override void SetResult(TResult result) => _executionContext!.SetResult(result);
+
+    public override void SetException(Exception exception) => _executionContext!.SetException(exception);
 }
 
 /// <summary>
@@ -90,5 +143,4 @@ internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : Dura
 /// </summary>
 internal interface IDurableTaskMethodInvocation
 {
-    ValueTask AsUntypedValueTask();
 }

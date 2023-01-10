@@ -120,5 +120,37 @@ namespace Orleans.DurableTasks.Tests
             Assert.Equal(new HierarchicalKey("\\/\\/"), new HierarchicalKey("\\/\\//aaa").GetParent());
             Assert.Equal(new HierarchicalKey("\\/"), new HierarchicalKey("\\//\\/").GetParent());
         }
+
+        [Fact]
+        public void CreateEscapedChildKeyTest()
+        {
+            var aParent = new HierarchicalKey("foo/bar\\/");
+            var a = aParent.CreateEscapedChildKey("baz/boz");
+            var b = aParent.CreateEscapedChildKey("baz\\/boz");
+            Assert.Equal(a, b);
+
+            Assert.Equal(a, b);
+            Assert.Equal(b.ToString(), b.ToString());
+            Assert.Equal(a.GetHashCode(), b.GetHashCode());
+            Assert.Equal(a.ToString().Length, a.Length);
+            Assert.Equal(b.ToString().Length, b.Length);
+            Assert.Equal(a.Length, b.Length);
+
+            var aSegments = new List<string>();
+            foreach (var segment in a)
+            {
+                aSegments.Add(segment.ToString());
+            }
+
+            var bSegments = new List<string>();
+            foreach (var segment in b)
+            {
+                bSegments.Add(segment.ToString());
+            }
+
+            Assert.Equal(aSegments.Count, bSegments.Count);
+
+            Assert.Equal(aSegments, bSegments);
+        }
     }
 }

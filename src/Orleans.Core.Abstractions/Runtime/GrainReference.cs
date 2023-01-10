@@ -409,7 +409,7 @@ namespace Orleans.Runtime
         /// <returns>The result of the invocation.</returns>
         protected ValueTask<T> InvokeAsync<T>(IInvokable methodDescription)
         {
-            var request = (RequestBase)methodDescription;
+            var request = (IRequest)methodDescription;
             return this.Runtime.InvokeMethodAsync<T>(this, methodDescription, request.Options);
         }
 
@@ -420,9 +420,25 @@ namespace Orleans.Runtime
         /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
         protected ValueTask InvokeAsync(IInvokable methodDescription)
         {
-            var request = (RequestBase)methodDescription;
+            var request = (IRequest)methodDescription;
             return this.Runtime.InvokeMethodAsync(this, methodDescription, request.Options);
         }
+    }
+
+    public interface IRequest : IInvokable
+    {
+        /// <summary>
+        /// Gets the invocation options.
+        /// </summary>
+        InvokeMethodOptions Options { get; }
+
+        /// <summary>
+        /// Incorporates the provided invocation options.
+        /// </summary>
+        /// <param name="options">
+        /// The options.
+        /// </param>
+        void AddInvokeMethodOptions(InvokeMethodOptions options);
     }
 
     /// <summary>
@@ -430,7 +446,7 @@ namespace Orleans.Runtime
     /// </summary>
     [SuppressReferenceTracking]
     [SerializerTransparent]
-    public abstract class RequestBase : IInvokable
+    public abstract class RequestBase : IRequest
     {
         /// <summary>
         /// Gets the invocation options.

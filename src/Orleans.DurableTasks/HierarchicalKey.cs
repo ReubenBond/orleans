@@ -61,14 +61,53 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         return false;
     }
 
-    private static bool HasOwnSegments(string value)
+    public static HierarchicalKey CreateEscaped(HierarchicalKey? parent, string value)
+    {
+        var unescapedChars = UnescapedCharCount(value);
+        if (unescapedChars == 0)
+        {
+            return new HierarchicalKey(parent, value);
+        }
+
+        return new HierarchicalKey(parent, Escape(value, unescapedChars));
+    }
+
+    private static string Escape(string value, int unescapedChars)
+    {
+        var resultArray = ArrayPool<char>.Shared.Rent(value.Length + unescapedChars);
+        var isEscaped = false;
+        var insertions = 0;
+        for (var i = 0; i < value.Length; i++)
+        {
+            var c = value[i];
+            if (!isEscaped && c == SegmentSeparator)
+            {
+                resultArray[i + insertions] = EscapeCharacter;
+                ++insertions;
+                isEscaped = false;
+            }
+
+            if (c == EscapeCharacter)
+            {
+                isEscaped = !isEscaped;
+            }
+
+            resultArray[i + insertions] = c;
+        }
+
+        return new string(resultArray.AsSpan(0, value.Length + unescapedChars));
+    }
+
+    private static int UnescapedCharCount(string value)
     {
         var isEscaped = false;
+        var result = 0;
         foreach (var c in value)
         {
             if (!isEscaped && c == SegmentSeparator)
             {
-                return true;
+                ++result;
+                isEscaped = false;
             }
 
             if (c == EscapeCharacter)
@@ -77,7 +116,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
             }
         }
 
-        return false;
+        return result;
     }
 
     private static string? WithoutLastSegment(string value)
@@ -263,6 +302,13 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
             }
         }
     }
+
+    /// <summary>
+    /// Creates a key which is a child of this key, escaping any unescaped segment separators in <paramref name="value"/>, and returns it.
+    /// </summary>
+    /// <param name="value">The value for the child segments.</param>
+    /// <returns></returns>
+    public HierarchicalKey CreateEscapedChildKey(string value) => CreateEscaped(this, value);
 
     /// <summary>
     /// Creates a key which is a child of this key and returns it.

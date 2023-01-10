@@ -6,7 +6,7 @@ namespace Orleans.DurableTasks.Remoting;
 public interface IDurableTaskGrainExtension : IGrainExtension
 {
     // Called by DurableTaskRequest.Invoke to ensure that a task is scheduled
-    ValueTask<Response> ScheduleOrPollAsync(DurableTaskRequest request);
+    ValueTask<Response> ScheduleOrPollAsync(IDurableTaskRequest request);
 
     // Called when a remotely scheduled request completes
     ValueTask OnResponse(TaskId taskId, Response response);
@@ -18,7 +18,7 @@ public interface IDurableTaskGrainRuntime : IDurableTaskGrainExtension
     // It is intended for local `DurableTask` methods (steps) versus remotely issued requests
     // The DurableTaskRequest is not 
     // It blocks until the response has been completed.
-    ValueTask<Response> InvokeAsync(DurableTaskRequest request);
+    ValueTask<Response> InvokeAsync(IDurableTaskRequest request);
 }
 
 /*

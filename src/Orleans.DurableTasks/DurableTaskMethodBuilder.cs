@@ -5,24 +5,21 @@ namespace Orleans.DurableTasks;
 /// <summary>
 /// Async method builder for methods which return <see cref="DurableTask"/>.
 /// </summary>
-public readonly struct DurableTaskMethodBuilder
+public struct DurableTaskMethodBuilder
 {
-    private readonly DurableTaskMethodInvocation _taskSource;
-
-    private DurableTaskMethodBuilder(DurableTaskMethodInvocation taskSource)
-    {
-        _taskSource = taskSource;
-    }
+    private UntypedDurableTaskMethodInvocation _taskSource;
 
     public DurableTask Task => _taskSource;
 
-    public static DurableTaskMethodBuilder Create() => new DurableTaskMethodBuilder(new DurableTaskMethodInvocation());
+    public static DurableTaskMethodBuilder Create() => new ();
 
     public void Start<TStateMachine>(ref TStateMachine stateMachine)
         where TStateMachine : IAsyncStateMachine
     {
         Console.WriteLine($"Start {stateMachine}");
-        //stateMachine.MoveNext();
+        // Box the state machine and do not start it.
+        // Instead, the state machine will be started once the resulting task is awaited (not when the method is called directly)
+        _taskSource = DurableTaskMethodInvocation.Create(ref stateMachine);
     }
 
     public void SetStateMachine(IAsyncStateMachine stateMachine)
@@ -70,7 +67,7 @@ public struct DurableTaskMethodBuilder<TResult>
 
     public DurableTask<TResult> Task => _taskSource;
 
-    public static DurableTaskMethodBuilder<TResult> Create() => new DurableTaskMethodBuilder<TResult>();
+    public static DurableTaskMethodBuilder<TResult> Create() => new();
 
     public void Start<TStateMachine>(ref TStateMachine stateMachine)
         where TStateMachine : IAsyncStateMachine
@@ -78,7 +75,7 @@ public struct DurableTaskMethodBuilder<TResult>
         Console.WriteLine($"Start {stateMachine}");
         // Box the state machine and do not start it.
         // Instead, the state machine will be started once the resulting task is awaited (not when the method is called directly)
-        _taskSource = DurableTaskMethodInvocation<TResult, TStateMachine>.Create(ref stateMachine);
+        _taskSource = DurableTaskMethodInvocation.Create<TResult, TStateMachine>(ref stateMachine);
     }
 
     public void SetStateMachine(IAsyncStateMachine stateMachine)

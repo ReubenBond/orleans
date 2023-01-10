@@ -1,10 +1,19 @@
+using System.Diagnostics;
+using System.Reflection;
+using System.Text;
+using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks.Remoting;
 
+public interface IDurableTaskRequest : IRequest
+{
+    DurableTaskRequestContext? Context { get; set; }
+}
+
 [GenerateSerializer]
-public abstract class DurableTaskRequest : RequestBase, IOutgoingGrainCallFilter
+public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, IOutgoingGrainCallFilter
 {
     // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
     // For now, we're not doing that, just to make sure that we can get far without needing it, demonstrating the extensibility of Orleans.
@@ -14,6 +23,92 @@ public abstract class DurableTaskRequest : RequestBase, IOutgoingGrainCallFilter
 
     [Id(0)]
     public DurableTaskRequestContext? Context { get; set; }
+
+    /// <summary>
+    /// Gets the invocation options.
+    /// </summary>
+    [field: NonSerialized]
+    public InvokeMethodOptions Options { get; private set; }
+
+    /// <inheritdoc/>
+    public virtual int GetArgumentCount() => 0;
+
+    /// <summary>
+    /// Incorporates the provided invocation options.
+    /// </summary>
+    /// <param name="options">
+    /// The options.
+    /// </param>
+    public void AddInvokeMethodOptions(InvokeMethodOptions options)
+    {
+        Options |= options;
+    }
+
+    /// <inheritdoc/>
+    public abstract object GetTarget();
+
+    /// <inheritdoc/>
+    public abstract void SetTarget(ITargetHolder holder);
+
+    /// <inheritdoc/>
+    public virtual object GetArgument(int index) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
+
+    /// <inheritdoc/>
+    public virtual void SetArgument(int index, object value) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
+
+    /// <inheritdoc/>
+    public abstract void Dispose();
+
+    /// <inheritdoc/>
+    public abstract string GetMethodName();
+
+    /// <inheritdoc/>
+    public abstract string GetInterfaceName();
+
+    /// <inheritdoc/>
+    public abstract string GetActivityName();
+
+    /// <inheritdoc/>
+    public abstract Type GetInterfaceType();
+
+    /// <inheritdoc/>
+    public abstract MethodInfo GetMethod();
+
+    /// <inheritdoc/>
+    public override string ToString()
+    {
+        var result = new StringBuilder();
+        result.Append(GetInterfaceName());
+        if (GetTarget() is { } target)
+        {
+            result.Append("[(");
+            result.Append(GetInterfaceName());
+            result.Append(')');
+            result.Append(target.ToString());
+            result.Append(']');
+        }
+        else
+        {
+            result.Append(GetInterfaceName());
+        }
+
+        result.Append('.');
+        result.Append(GetMethodName());
+        result.Append('(');
+        var argumentCount = GetArgumentCount();
+        for (var n = 0; n < argumentCount; n++)
+        {
+            if (n > 0)
+            {
+                result.Append(", ");
+            }
+
+            result.Append(GetArgument(n));
+        }
+
+        result.Append(')');
+        return result.ToString();
+    }
 
     [GeneratedActivatorConstructor]
     protected DurableTaskRequest(IGrainContextAccessor grainContextAccessor)
@@ -27,8 +122,12 @@ public abstract class DurableTaskRequest : RequestBase, IOutgoingGrainCallFilter
         return context.Invoke();
     }
 
-    public override async ValueTask<Response> Invoke()
+    [DebuggerHidden]
+    public async ValueTask<Response> Invoke()
     {
+        // Called by Orleans RPC system to schedule a call on the grain locally.
+        // This must ensure that the request is made durable (persisted).
+
         // Get the durable task grain runtime.
         var grainContext = _grainContextAccessor.GrainContext;
         var runtime = grainContext.GetComponent<IDurableTaskGrainRuntime>();
@@ -45,31 +144,34 @@ public abstract class DurableTaskRequest : RequestBase, IOutgoingGrainCallFilter
     /// Invoke the method on the target.
     /// </summary>
     /// <returns></returns>
-    public async ValueTask<Response> InvokeImplementation()
+    public async ValueTask<Response> InvokeImplementation(DurableTaskExecutionContext executionContext)
     {
-        Response response;
+        // The IDurableTaskGrainRuntime calls this method to execute the method body on the implementation.
+        // By this stage, it must already have been made durable.
         try
         {
-            DurableTaskRequestContext.SetCurrentContext(Context);
-            response = await InvokeImplementationCore();
+            await InvokeInner().InvokeAsync(executionContext);
+            return Response.Completed;
         }
         catch (Exception exception)
         {
-            response = Response.FromException(exception);
+            return Response.FromException(exception);
         }
-        finally
-        {
-            DurableTaskRequestContext.Clear();
-        }
-
-        return response;
     }
 
-    protected abstract ValueTask<Response> InvokeImplementationCore();
+    // Generated
+    protected abstract DurableTask InvokeInner();
 
-    public override void Dispose()
+    protected internal override ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext)
     {
-       Context = null;
+        // This is invoked by the `DurableTask<T>.AsWorkflow(stepId, options)` method, so it is the first method called after the instance is constructed and its arguments populated (by generated code).
+
+        // Take the execution context, propagate it to `DurableTaskRequestContext`
+        // Submit it to the runtime to send to the remote instance.
+
+        // Wait for the execution context to be completed.
+        // This means that it must be propagated either to the currently executing grain or (external) the HostedClient for completion.
+        throw new NotImplementedException();
     }
 }
 
@@ -103,49 +205,147 @@ public sealed class DurableTaskResponse : Response
 }
 
 /// <summary>
-/// Represents a request to schedule a <see cref="DurableTask"/>-returning method.
-/// </summary>
-[GenerateSerializer]
-public abstract class VoidDurableTaskRequest : DurableTaskRequest 
-{
-    [GeneratedActivatorConstructor]
-    protected VoidDurableTaskRequest(IGrainContextAccessor grainContextAccessor) : base(grainContextAccessor)
-    {
-    }
-
-    protected override async ValueTask<Response> InvokeImplementationCore()
-    {
-        try
-        {
-            await InvokeInner();
-            return Response.Completed;
-        }
-        catch (Exception exception)
-        {
-            return Response.FromException(exception);
-        }
-    }
-
-    // Generated
-    protected abstract DurableTask InvokeInner();
-}
-
-/// <summary>
 /// Represents a request to schedule a <see cref="DurableTask{TResult}"/>-returning method.
 /// </summary>
 [GenerateSerializer]
-public abstract class DurableTaskRequest<TResult> : DurableTaskRequest
+public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurableTaskRequest, IOutgoingGrainCallFilter
 {
-    [GeneratedActivatorConstructor]
-    protected DurableTaskRequest(IGrainContextAccessor grainContextAccessor) : base(grainContextAccessor)
+    // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
+    // For now, we're not doing that, just to make sure that we can get far without needing it, demonstrating the extensibility of Orleans.
+    // It might be worthwhile making RuntimeContext public at some point, even if it is not the recommended approach.
+    [NonSerialized]
+    private readonly IGrainContextAccessor _grainContextAccessor;
+
+    [Id(0)]
+    public DurableTaskRequestContext? Context { get; set; }
+
+    /// <summary>
+    /// Gets the invocation options.
+    /// </summary>
+    [field: NonSerialized]
+    public InvokeMethodOptions Options { get; private set; }
+
+    /// <inheritdoc/>
+    public virtual int GetArgumentCount() => 0;
+
+    /// <summary>
+    /// Incorporates the provided invocation options.
+    /// </summary>
+    /// <param name="options">
+    /// The options.
+    /// </param>
+    public void AddInvokeMethodOptions(InvokeMethodOptions options)
     {
+        Options |= options;
     }
 
-    protected override async ValueTask<Response> InvokeImplementationCore()
+    /// <inheritdoc/>
+    public abstract object GetTarget();
+
+    /// <inheritdoc/>
+    public abstract void SetTarget(ITargetHolder holder);
+
+    /// <inheritdoc/>
+    public virtual object GetArgument(int index) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
+
+    /// <inheritdoc/>
+    public virtual void SetArgument(int index, object value) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
+
+    /// <inheritdoc/>
+    public abstract void Dispose();
+
+    /// <inheritdoc/>
+    public abstract string GetMethodName();
+
+    /// <inheritdoc/>
+    public abstract string GetInterfaceName();
+
+    /// <inheritdoc/>
+    public abstract string GetActivityName();
+
+    /// <inheritdoc/>
+    public abstract Type GetInterfaceType();
+
+    /// <inheritdoc/>
+    public abstract MethodInfo GetMethod();
+
+    /// <inheritdoc/>
+    public override string ToString()
     {
+        var result = new StringBuilder();
+        result.Append(GetInterfaceName());
+        if (GetTarget() is { } target)
+        {
+            result.Append("[(");
+            result.Append(GetInterfaceName());
+            result.Append(')');
+            result.Append(target.ToString());
+            result.Append(']');
+        }
+        else
+        {
+            result.Append(GetInterfaceName());
+        }
+
+        result.Append('.');
+        result.Append(GetMethodName());
+        result.Append('(');
+        var argumentCount = GetArgumentCount();
+        for (var n = 0; n < argumentCount; n++)
+        {
+            if (n > 0)
+            {
+                result.Append(", ");
+            }
+
+            result.Append(GetArgument(n));
+        }
+
+        result.Append(')');
+        return result.ToString();
+    }
+
+    [GeneratedActivatorConstructor]
+    protected DurableTaskRequest(IGrainContextAccessor grainContextAccessor)
+    {
+        _grainContextAccessor = grainContextAccessor;
+    }
+
+    Task IOutgoingGrainCallFilter.Invoke(IOutgoingGrainCallContext context)
+    {
+        Context = DurableTaskRequestContext.Current ?? throw new InvalidOperationException($"Attempt to call a {nameof(DurableTask)} method without an ambient {nameof(DurableTaskRequestContext)}");
+        return context.Invoke();
+    }
+
+    [DebuggerHidden]
+    public async ValueTask<Response> Invoke()
+    {
+        // Called by Orleans RPC system to schedule a call on the grain locally.
+        // This must ensure that the request is made durable (persisted).
+
+        // Get the durable task grain runtime.
+        var grainContext = _grainContextAccessor.GrainContext;
+        var runtime = grainContext.GetComponent<IDurableTaskGrainRuntime>();
+
+        // Ensure that the task is durably scheduled.
+        // If the request has already completed, this will return the result of invocation.
+        // If the request has not already completed, this will return an in-progress response.
+        var response = await runtime.ScheduleOrPollAsync(this);
+
+        return response;
+    }
+
+    /// <summary>
+    /// Invoke the method on the target.
+    /// </summary>
+    /// <returns></returns>
+    public async ValueTask<Response> InvokeImplementation(DurableTaskExecutionContext executionContext)
+    {
+        // The IDurableTaskGrainRuntime calls this method to execute the method body on the implementation.
+        // By this stage, it must already have been made durable.
         try
         {
-            var result = await InvokeInner();
+            var result = await InvokeInner().InvokeAsync(executionContext);
             return Response.FromResult(result);
         }
         catch (Exception exception)
@@ -156,4 +356,16 @@ public abstract class DurableTaskRequest<TResult> : DurableTaskRequest
 
     // Generated
     protected abstract DurableTask<TResult> InvokeInner();
+
+    protected internal override ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext)
+    {
+        // This is invoked by the `DurableTask<T>.AsWorkflow(stepId, options)` method, so it is the first method called after the instance is constructed and its arguments populated (by generated code).
+
+        // Take the execution context, propagate it to `DurableTaskRequestContext`
+        // Submit it to the runtime to send to the remote instance.
+
+        // Wait for the execution context to be completed.
+        // This means that it must be propagated either to the currently executing grain or (external) the HostedClient for completion.
+        throw new NotImplementedException();
+    }
 }

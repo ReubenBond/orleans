@@ -1,81 +1,9 @@
+/*
 using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Sources;
 
 namespace Orleans.DurableTasks;
-
-public interface IStateMachineManager
-{
-    void RegisterStateMachine(string name, IStateMachine stateMachine);
-    ValueTask SnapshotAsync();
-    ValueTask WriteStateAsync();
-}
-
-public interface IStateMachineStorage
-{
-    MemoryPool<byte> MemoryPool { get; }
-    void AppendEntry(LogEntry entry);
-    void AppendEntries(ICollection<LogEntry> entry);
-    ValueTask WaitForCommit(StateMachineVersion minVersion);
-    void RequestSnapshot();
-}
-
-public interface IStateMachine
-{
-    string Name { get; }
-    void OnInitialize(IStateMachineStorage storage);
-    ValueTask OnRestoreSnapshotAsync(Snapshot snapshot);
-    ValueTask OnReplayLogEntryAsync(LogEntry logEntry);
-    Snapshot CreateSnapshot();
-}
-
-public readonly struct LogEntry
-{
-    public string StateMachineName { get; init; }
-    public StateMachineVersion Version { get; init; }
-    public ReadOnlySequence<byte> Data { get; init; }
-}
-
-public readonly struct Snapshot
-{
-    public string StateMachineName { get; init; }
-    public StateMachineVersion Version { get; init; }
-    public ReadOnlySequence<byte> Data { get; init; }
-}
-
-public readonly struct StateMachineVersion
-{
-    public StateMachineVersion(long version) { Value = version; }
-    public long Value { get; init; }
-}
-
-/*public readonly struct StateMachineVersion : IComparable<StateMachineVersion>, IEquatable<StateMachineVersion>
-{
-    public static StateMachineVersion MinValue => long.MinValue;
-    public static StateMachineVersion MaxValue => long.MaxValue;
-
-    public StateMachineVersion(long version) { Value = version; }
-    public long Value { get; init; }
-    public static implicit operator long (StateMachineVersion id) => id.Value;
-    public static implicit operator StateMachineVersion(long value) => new (value);
-    public int CompareTo(StateMachineVersion other) => Value.CompareTo(other.Value);
-    public bool Equals(StateMachineVersion other) => Value == other.Value;
-    public override bool Equals(object? obj) => obj switch
-    {
-        StateMachineVersion other => Equals(other),
-        _ => false
-    };
-
-    public override int GetHashCode() => Value.GetHashCode();
-    public static bool operator ==(StateMachineVersion left, StateMachineVersion right) => left.Equals(right);
-    public static bool operator !=(StateMachineVersion left, StateMachineVersion right) => !(left == right);
-    public static bool operator <(StateMachineVersion left, StateMachineVersion right) => left.CompareTo(right) < 0;
-    public static bool operator <=(StateMachineVersion left, StateMachineVersion right) => left.CompareTo(right) <= 0;
-    public static bool operator >(StateMachineVersion left, StateMachineVersion right) => left.CompareTo(right) > 0;
-    public static bool operator >=(StateMachineVersion left, StateMachineVersion right) => left.CompareTo(right) >= 0;
-}
-*/
-
 
 public abstract class ScheduledTask
 {
@@ -197,3 +125,4 @@ public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
     public void OnCompleted(Action continuation) => _awaiter.OnCompleted(continuation);
     public void UnsafeOnCompleted(Action continuation) => _awaiter.UnsafeOnCompleted(continuation);
 }
+*/

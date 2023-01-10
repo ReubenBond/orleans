@@ -66,6 +66,6 @@ public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<
     public bool IsParentOf(TaskId other) => _key is not null && _key.IsParentOf(other._key);
     public bool IsChildOf(TaskId other) => _key is not null && _key.IsChildOf(other._key);
     public TaskId GetParent() => _key?.GetParent() is { } parent ? new(parent) : None;
-    public TaskId CreateChild(string value) => _key is { } key ? new(_key.CreateChildKey(value)) : new(value);
+    public TaskId CreateChild(string value) => _key is { } key ? new(_key.CreateEscapedChildKey(value)) : new(value);
 }
 
