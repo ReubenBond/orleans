@@ -98,7 +98,14 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest
     {
         // This is invoked by the `DurableTask<T>.AsWorkflow(stepId, options)` method, so it is the first method called after the instance is constructed and its arguments populated (by generated code).
 
-        // Take the execution context, propagate it to `DurableTaskRequestContext`
+        // Take the execution context, propagate it to a new `DurableTaskRequestContext`
+        var callerContext = _grainContextAccessor.GrainContext;
+        if (callerContext.GetComponent<IDurableTaskGrainRuntime>() is null)
+        {
+            // TODO: ensure this is not possible
+            throw new InvalidOperationException($"The current grain or client context, {callerContext} does not support calling durable tasks");
+        }
+
         // Submit it to the runtime to send to the remote instance.
 
         // Wait for the execution context to be completed.
