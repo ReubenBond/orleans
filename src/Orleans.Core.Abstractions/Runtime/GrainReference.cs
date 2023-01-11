@@ -439,6 +439,45 @@ namespace Orleans.Runtime
         /// The options.
         /// </param>
         void AddInvokeMethodOptions(InvokeMethodOptions options);
+
+        /// <summary>
+        /// Returns a string representation of the request.
+        /// </summary>
+        /// <returns>A string representation of the request.</returns>
+        public string ToString()
+        {
+            var result = new StringBuilder();
+            result.Append(GetInterfaceName());
+            if (GetTarget() is { } target)
+            {
+                result.Append("[(");
+                result.Append(GetInterfaceName());
+                result.Append(')');
+                result.Append(target.ToString());
+                result.Append(']');
+            }
+            else
+            {
+                result.Append(GetInterfaceName());
+            }
+
+            result.Append('.');
+            result.Append(GetMethodName());
+            result.Append('(');
+            var argumentCount = GetArgumentCount();
+            for (var n = 0; n < argumentCount; n++)
+            {
+                if (n > 0)
+                {
+                    result.Append(", ");
+                }
+
+                result.Append(GetArgument(n));
+            }
+
+            result.Append(')');
+            return result.ToString();
+        }
     }
 
     /// <summary>
