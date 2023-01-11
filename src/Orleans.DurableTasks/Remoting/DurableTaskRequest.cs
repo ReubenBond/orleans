@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using Orleans.Invocation;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks.Remoting;
@@ -13,6 +14,7 @@ public interface IDurableTaskRequest : IRequest
 }
 
 [GenerateSerializer]
+[SelfInvokingReturnType]
 public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, IOutgoingGrainCallFilter
 {
     // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
@@ -208,6 +210,7 @@ public sealed class DurableTaskResponse : Response
 /// Represents a request to schedule a <see cref="DurableTask{TResult}"/>-returning method.
 /// </summary>
 [GenerateSerializer]
+[SelfInvokingReturnType]
 public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurableTaskRequest, IOutgoingGrainCallFilter
 {
     // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
@@ -358,6 +361,18 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
     protected abstract DurableTask<TResult> InvokeInner();
 
     protected internal override ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext)
+    {
+        // This is invoked by the `DurableTask<T>.AsWorkflow(stepId, options)` method, so it is the first method called after the instance is constructed and its arguments populated (by generated code).
+
+        // Take the execution context, propagate it to `DurableTaskRequestContext`
+        // Submit it to the runtime to send to the remote instance.
+
+        // Wait for the execution context to be completed.
+        // This means that it must be propagated either to the currently executing grain or (external) the HostedClient for completion.
+        throw new NotImplementedException();
+    }
+
+    protected internal override ValueTask<TResult> InvokeAsyncTypedCore(DurableTaskExecutionContext executionContext)
     {
         // This is invoked by the `DurableTask<T>.AsWorkflow(stepId, options)` method, so it is the first method called after the instance is constructed and its arguments populated (by generated code).
 

@@ -568,3 +568,12 @@ public class RetryOptions
     // Question is, what implications would that have on xplat? 
     public Func<Exception, bool>? RetryFilter { get; init; }
 }
+
+public interface IMyGrainWithDurableTasks : IGrain
+{
+#pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
+    DurableTask MyDurableTaskMethod(int a, string b);
+    DurableTask<string> MyDurableTaskMethod2(int a, string b);
+    DurableTask<T> MyDurableTaskMethod3<T>(T a);
+#pragma warning restore ORLEANS0009 // Grain interfaces methods must return a compatible type
+}

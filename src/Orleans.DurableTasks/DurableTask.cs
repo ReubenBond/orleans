@@ -4,7 +4,7 @@ using Orleans.Runtime;
 
 namespace Orleans.DurableTasks;
 
-[InvokableBaseType(typeof(GrainReference), typeof(DurableTask), typeof(VoidDurableTaskRequest))]
+[InvokableBaseType(typeof(GrainReference), typeof(DurableTask), typeof(DurableTaskRequest))]
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
 public abstract class DurableTask
 {

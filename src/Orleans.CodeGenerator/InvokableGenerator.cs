@@ -77,6 +77,8 @@ namespace Orleans.CodeGenerator
                 }
             }
 
+            var isSelfInvoking = baseClassType.HasAttribute(libraryTypes.SelfInvokingReturnTypeAttribute);
+
             while (baseClassType.HasAttribute(libraryTypes.SerializerTransparentAttribute))
                 baseClassType = baseClassType.BaseType;
 
@@ -89,7 +91,8 @@ namespace Orleans.CodeGenerator
                 serializationHooks,
                 baseClassType,
                 ctorArgs,
-                compoundTypeAliasArgs);
+                compoundTypeAliasArgs,
+                isSelfInvoking);
             return (classDeclaration, invokerDescription);
 
             static Accessibility GetAccessibility(InvokableInterfaceDescription interfaceDescription)

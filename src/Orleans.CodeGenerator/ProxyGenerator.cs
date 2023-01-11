@@ -268,6 +268,12 @@ namespace Orleans.CodeGenerator
                 statements.Add(ReturnStatement(invocationExpression));
                 isAsync = false;
             }
+            else if (requestDescription.IsSelfInvoking)
+            {
+                // C#: return request;
+                statements.Add(ReturnStatement(requestVar));
+                isAsync = false;
+            }
             else if (rt.Arity == 0)
             {
                 // C#: await <invocation>

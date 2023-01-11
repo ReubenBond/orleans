@@ -556,3 +556,17 @@ namespace Orleans
         void Populate(in TSurrogate surrogate, TValue value);
     }
 }
+
+namespace Orleans.Invocation
+{
+    /// <summary>
+    /// Applied to invokable base types to indicate that instances of this type should be returned directly from generated proxy methods rather than being passed to the proxy invoke method.
+    /// </summary>
+    /// <remarks>
+    /// This is used for types which should not be submitted to the remote target immediately, such as durable tasks, possibly async enumerables, and other types which do not follow the typical request-response pattern.
+    /// </remarks>
+    [AttributeUsage(AttributeTargets.Class)]
+    public sealed class SelfInvokingReturnTypeAttribute : Attribute
+    {
+    }
+}
