@@ -55,10 +55,7 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest
     /// <param name="options">
     /// The options.
     /// </param>
-    public void AddInvokeMethodOptions(InvokeMethodOptions options)
-    {
-        Options |= options;
-    }
+    public void AddInvokeMethodOptions(InvokeMethodOptions options) => Options |= options;
 
     /// <inheritdoc/>
     public abstract object GetTarget();
@@ -189,10 +186,7 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
     /// <param name="options">
     /// The options.
     /// </param>
-    public void AddInvokeMethodOptions(InvokeMethodOptions options)
-    {
-        Options |= options;
-    }
+    public void AddInvokeMethodOptions(InvokeMethodOptions options) => Options |= options;
 
     /// <inheritdoc/>
     public abstract object GetTarget();
