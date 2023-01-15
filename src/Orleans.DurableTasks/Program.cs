@@ -17,8 +17,32 @@ namespace Orleans.DurableTasks;
 
 public class Program
 {
-    static void Main(string[] args)
+    interface IBankGrain : IGrain
     {
+        DurableTask<bool> Transfer(IAccountGrain source, IAccountGrain destination, int amount);
+    }
+    interface IAccountGrain : IGrain
+    {
+        DurableTask<bool> Withdraw(int amount);
+        DurableTask Deposit(int amount);
+    }
+
+    class BankGrain : Grain, IBankGrain
+    {
+        public async DurableTask<bool> Transfer(IAccountGrain source, IAccountGrain destination, int amount)
+        {
+            bool success = await source.Withdraw(amount).AsWorkflowStep("withdraw");
+            if (!success) return false;
+            await destination.Deposit(amount).AsWorkflowStep("deposit");
+        }
+    }
+    public static async Task Main(string[] args)
+    {
+        var bankGrain = default(IBankGrain);
+        var billGates = default(IAccountGrain);
+        var me = default(IAccountGrain);
+
+        await bankGrain.Transfer(billGates, me, 1_000_000_000).AsWorkflow("transfer123");
     }
 #if false
     public static async Task Main(string[] args)

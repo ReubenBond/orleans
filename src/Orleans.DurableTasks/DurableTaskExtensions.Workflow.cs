@@ -74,7 +74,7 @@ public static class DurableTaskExtensions
     }
 
     // See above
-    public static ValueTask AsWorfklowStep(this DurableTask taskDefinition, string stepId)
+    public static ValueTask AsWorkflowStep(this DurableTask taskDefinition, string stepId)
     {
         var currentContext = DurableTaskExecutionContext.GetCurrentContextOrThrow();
 
