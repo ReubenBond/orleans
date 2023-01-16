@@ -1,4 +1,3 @@
-/*
 using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Sources;
@@ -66,12 +65,12 @@ public class ScheduledTask<TResult> : ScheduledTask, IValueTaskSource<TResult>, 
     internal void SetException(Exception exception) => _taskSource.SetException(exception);
 }
 
-internal sealed class UntypedDurableTaskInvocation : ScheduledTask, IValueTaskSource
+internal sealed class UntypedScheduledTaskInvocation : ScheduledTask, IValueTaskSource
 {
     private readonly DurableTask _durableTaskDefiniton;
     private ManualResetValueTaskSourceCore<VoidTaskResult> _taskSource;
 
-    internal UntypedDurableTaskInvocation(TaskId taskId, SchedulingOptions? options, DurableTask durableTaskDefinition) : base(taskId, options)
+    internal UntypedScheduledTaskInvocation(TaskId taskId, SchedulingOptions? options, DurableTask durableTaskDefinition) : base(taskId, options)
     {
         _durableTaskDefiniton = durableTaskDefinition;
     }
@@ -125,4 +124,3 @@ public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
     public void OnCompleted(Action continuation) => _awaiter.OnCompleted(continuation);
     public void UnsafeOnCompleted(Action continuation) => _awaiter.UnsafeOnCompleted(continuation);
 }
-*/

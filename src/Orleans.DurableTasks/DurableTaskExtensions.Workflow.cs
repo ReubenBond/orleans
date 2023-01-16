@@ -2,8 +2,14 @@ namespace Orleans.DurableTasks;
 
 public static class DurableTaskExtensions
 {
-    // Return a "DurableTaskStepAwaitable<TResult>" which sets the appropriate context around the invocation.
-    public static ValueTask<TResult> AsWorkflow<TResult>(this DurableTask<TResult> taskDefinition, string workflowId)   
+    /// <summary>
+    /// Schedules the provided <see cref="DurableTask{TResult}"/> as a workflow using the provided identifier.
+    /// </summary>
+    /// <typeparam name="TResult">The task result type.</typeparam>
+    /// <param name="taskDefinition">The task.</param>
+    /// <param name="taskId">The task identifier.</param>
+    /// <returns>A handle for the scheduled task.</returns>
+    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> taskDefinition, string taskId)   
     {
         throw new NotImplementedException();
         /*
@@ -27,7 +33,13 @@ public static class DurableTaskExtensions
         */
     }
 
-    public static ValueTask AsWorfklow(this DurableTask taskDefinition, string workflowId)
+    /// <summary>
+    /// Schedules the provided <see cref="DurableTask"/> as a workflow using the provided identifier.
+    /// </summary>
+    /// <param name="taskDefinition">The task.</param>
+    /// <param name="taskId">The task identifier.</param>
+    /// <returns>A handle for the scheduled task.</returns>
+    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition, string taskId)
     {
         throw new NotImplementedException();
         /*
@@ -51,8 +63,14 @@ public static class DurableTaskExtensions
         */
     }
 
-    // Return a "DurableTaskStepAwaitable<TResult>" which sets the appropriate context around the invocation.
-    public static ValueTask<TResult> AsWorkflowStep<TResult>(this DurableTask<TResult> taskDefinition, string stepId)
+    /// <summary>
+    /// Schedules the provided <see cref="DurableTask{TResult}" /> as a named step within the current workflow.
+    /// </summary>
+    /// <typeparam name="TResult">The task result type.</typeparam>
+    /// <param name="taskDefinition">The task.</param>
+    /// <param name="stepId">The step identifier, which must be unique within the current context.</param>
+    /// <returns>The result of invoking the task.</returns>
+    public static ValueTask<TResult> AsStep<TResult>(this DurableTask<TResult> taskDefinition, string stepId)
     {
         var currentContext = DurableTaskExecutionContext.GetCurrentContextOrThrow();
 
@@ -73,8 +91,13 @@ public static class DurableTaskExtensions
         return taskDefinition.InvokeAsync(childContext);
     }
 
-    // See above
-    public static ValueTask AsWorkflowStep(this DurableTask taskDefinition, string stepId)
+    /// <summary>
+    /// Schedules the provided <see cref="DurableTask" /> as a named step within the current workflow.
+    /// </summary>
+    /// <param name="taskDefinition">The task.</param>
+    /// <param name="stepId">The step identifier, which must be unique within the current context.</param>
+    /// <returns>A <see cref="ValueTask"/> representing the work performed.</returns>
+    public static ValueTask AsStep(this DurableTask taskDefinition, string stepId)
     {
         var currentContext = DurableTaskExecutionContext.GetCurrentContextOrThrow();
 

@@ -11,10 +11,19 @@ public sealed partial class DurableTaskExecutionContext : IValueTaskSource<objec
         RunContinuationsAsynchronously = true
     };
 
-    internal ValueTask AsUntypedValueTask() => new (this, _tcs.Version);
-    internal ValueTask<object?> AsValueTask() => new (this, _tcs.Version);
+    private CancellationTokenSource _cancellationTokenSource = new();
+
+    public CancellationToken CancellationToken => _cancellationTokenSource.Token;
+
+    internal ValueTask AsUntypedValueTask() => new(this, _tcs.Version);
+    internal ValueTask<object?> AsValueTask() => new(this, _tcs.Version);
     internal ValueTask<TResult> AsValueTask<TResult>() => new ConvertingValueTaskSource<TResult>(this).AsValueTask();
-    internal void SetCanceled(CancellationToken cancellationToken) => _tcs.SetException(new OperationCanceledException(cancellationToken));
+    internal void SetCanceled()
+    {
+        _cancellationTokenSource.Cancel();
+        _tcs.SetException(new OperationCanceledException(_cancellationTokenSource.Token));
+    }
+
     internal void SetException(Exception exception) => _tcs.SetException(exception);
     internal void SetResult(object? result) => _tcs.SetResult(result);
 

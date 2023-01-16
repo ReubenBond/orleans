@@ -15,35 +15,40 @@ using Orleans.Runtime;
 
 namespace Orleans.DurableTasks;
 
+#pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
 public class Program
 {
-    interface IBankGrain : IGrain
+    public interface IBankGrain : IGrain
     {
         DurableTask<bool> Transfer(IAccountGrain source, IAccountGrain destination, int amount);
     }
-    interface IAccountGrain : IGrain
+    public interface IAccountGrain : IGrain
     {
         DurableTask<bool> Withdraw(int amount);
         DurableTask Deposit(int amount);
     }
-
-    class BankGrain : Grain, IBankGrain
+    public class BankGrain : Grain, IBankGrain
     {
         public async DurableTask<bool> Transfer(IAccountGrain source, IAccountGrain destination, int amount)
         {
-            bool success = await source.Withdraw(amount).AsWorkflowStep("withdraw");
+            bool success = await source.Withdraw(amount).AsStep("withdraw");
             if (!success) return false;
-            await destination.Deposit(amount).AsWorkflowStep("deposit");
+            await destination.Deposit(amount).AsStep("deposit");
+            return success;
         }
     }
     public static async Task Main(string[] args)
     {
-        var bankGrain = default(IBankGrain);
-        var billGates = default(IAccountGrain);
-        var me = default(IAccountGrain);
+        var bankGrain = default(IBankGrain)!;
+        var billGates = default(IAccountGrain)!;
+        var me = default(IAccountGrain)!;
 
-        await bankGrain.Transfer(billGates, me, 1_000_000_000).AsWorkflow("transfer123");
+        var scheduledTask = await bankGrain.Transfer(billGates, me, 1_000_000_000).ScheduleAsync("transfer123");
+
+        var success = await scheduledTask;
+        Console.WriteLine(success ? "Success!" : "Fail :(");
     }
+
 #if false
     public static async Task Main(string[] args)
     {
@@ -101,33 +106,23 @@ public class Program
 #endif
 }
 
-#if false
 public interface ITransferGrain : IGrain
 {
-#pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
     DurableTask<bool> Transfer(IAccountGrain source, IAccountGrain destination, int amount);
-#pragma warning restore ORLEANS0009 // Grain interfaces methods must return a compatible type
 }
 
 public interface IAccountGrain : IGrain
 {
-#pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
     DurableTask Credit(int amount);
-#pragma warning restore ORLEANS0009 // Grain interfaces methods must return a compatible type
 
     // Deducting funds might fail and return false if the account would be overdrawn
-#pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
     DurableTask<bool> TryDebit(int amount);
-#pragma warning restore ORLEANS0009 // Grain interfaces methods must return a compatible type
 }
 
 internal interface ICopyProcessorGrain : IGrain
 {
-#pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
     DurableTask Copy(string source, string destination, string startRowId, string endRowId);
-#pragma warning restore ORLEANS0009 // Grain interfaces methods must return a compatible type
 }
-
 
 internal interface IDbServiceFactory
 {
@@ -140,6 +135,7 @@ internal interface IDbService
     ValueTask InsertOrUpdateRowAsync(string key, string value);
 }
 
+#if false
 // Example: ETL - load data from one database and store it into another.
 // This example uses a fake Database API for simplicity.
 // 
@@ -190,7 +186,9 @@ internal class CopyProcessorGrain : Grain, ICopyProcessorGrain
         }
     }
 }
+#endif
 
+#if false
 public interface IStateManager
 {
     IPersistentState<T> GetState<T>(string name);
@@ -207,10 +205,8 @@ public interface ISubscriptionGrain : IGrain
 
 interface ISubscriptionGrainInternal : IGrain
 {
-#pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
     DurableTask ProcessSubscription();
     DurableTask ProcessCancellation();
-#pragma warning restore ORLEANS0009 // Grain interfaces methods must return a compatible type
 }
 
 [GenerateSerializer]
@@ -367,22 +363,46 @@ public class SubscriptionProcessor : DurableTaskOrchestrator
 {
     DurableTask Run(DurableTaskContext context);
 }
+#endif
 
 // Example: eShop order process
 public interface IBuyerAccount : IGrain { }
-public interface IPaymentService { }
+
+[GenerateSerializer]
+public record class Invoice();
+
+[GenerateSerializer]
+public record class PaymentResult()
+{
+    public bool IsSuccess { get; internal set; }
+}
+
+public interface IPaymentService
+{
+    DurableTask<Invoice> CreateInvoice(IBuyerAccount buyer, Order order);
+    DurableTask<PaymentResult> WaitForPayment(Invoice invoice);
+}
+
+[GenerateSerializer]
+public record class StockCheckResult(bool HasStock);
+
+[GenerateSerializer]
+public record class CreateShipmentResult(bool IsSuccess);
+
 public interface ICatalogService
 {
-    Task CheckStock(.......)
+    DurableTask<List<StockCheckResult>> CheckOrderStock(Order order);
 }
-public interface ILogisticsService { }
+public interface ILogisticsService
+{
+    DurableTask<CreateShipmentResult> CreateShipment(Order order);
+    DurableTask WaitForDelivery(CreateShipmentResult shipmentDetails);
+}
 [GenerateSerializer]
 public record class Order();
 public interface IOrderProcessor : IGrain
 {
-#pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
     DurableTask ProcessOrderAsync(IBuyerAccount buyer, Order order);
-#pragma warning restore ORLEANS0009 // Grain interfaces methods must return a compatible type
 }
 
 [GenerateSerializer]
@@ -395,6 +415,9 @@ public enum OrderStatus
     Paid,
     Shipped,
     Delivered,
+    InsufficientStock,
+    PaymentFailed,
+    ShipmentFailed,
 }
 
 [GenerateSerializer]
@@ -417,47 +440,55 @@ public class OrderProcessorGrain : Grain<OrderState>, IOrderProcessor
         _logisticsService = logisticsService;
     }
 
-    public async DurableTask CancelOrder()
-    {
-        if (State.Status is OrderStatus.None or OrderStatus.Created)
-        {
-            State.Status = OrderStatus.Canceled;
-            await WriteStateAsync();
-        }
-    }
-
-    public async DurableTask<Guid> GenerateId()
-    {
-        return Guid.NewGuid();
-    }
-
     public async DurableTask ProcessOrderAsync(IBuyerAccount buyer, Order order)
     {
-        var status = await DurableTaskContext.CurrentTask!.GetOrAddStateAsync("status", OrderStatus.None);
-        if (status.Value is OrderStatus.None)
+        try
         {
-            State.Status = status.Value = OrderStatus.Created;
-            await WriteStateAsync();
-        }
-
-        if (status.Value is OrderStatus.Created)
-        {
-            await DurableTask.Delay(TimeSpan.FromMinutes(1)).AsStep("wait-for-confirmation");
-            if (State.Status is OrderStatus.Canceled)
+            var confirmed = await DurableTask.Delay(TimeSpan.FromMinutes(1)).AsStep("wait-for-confirmation");
+            if (!confirmed)
             {
-                // The order was canceled during the grace period.
+                // The order was canceled using task management APIs within the grace period.
+                State.Status = OrderStatus.Canceled;
                 return;
             }
 
-            State.Status = status.Value = OrderStatus.Confirmed;
-            await WriteStateAsync();
-        }
+            var stockLevelResult = await _catalogService.CheckOrderStock(order).AsStep("check-stock");
+            if (stockLevelResult.Any(item => !item.HasStock))
+            {
+                // There is insufficient stock. No charge has been made yet, but we would likely need to notify the user before terminating.
+                State.Status = OrderStatus.InsufficientStock;
+                return;
+            }
 
-        if (status.Value is OrderStatus.Confirmed)
+            var invoice = await _paymentService.CreateInvoice(buyer, order).AsStep("create-invoice");
+
+            // This might take a very long time (hours, days, indefinite)
+            var paymentResult = await _paymentService.WaitForPayment(invoice).AsStep("get-that-bag");
+            if (!paymentResult.IsSuccess)
+            {
+                State.Status = OrderStatus.PaymentFailed;
+                return;
+            }
+
+            State.Status = OrderStatus.Paid;
+            var shipmentDetails = await _logisticsService.CreateShipment(order).AsStep("create-shipment");
+            if (!shipmentDetails.IsSuccess)
+            {
+                State.Status = OrderStatus.ShipmentFailed;
+                return;
+            }
+
+            await _logisticsService.WaitForDelivery(shipmentDetails).AsStep("wait-for-delivery");
+            State.Status = OrderStatus.Delivered;
+
+            // Done...
+        }
+        catch (OperationCanceledException)
         {
-            await _catalogService.CheckStock(order);
-            State.Status = status.Value = OrderStatus.Created;
-            await WriteStateAsync();
+            // Perform any cancellation cleanup. 
+            // TODO: properly design cancellation. Eg, when a durable task is canceled, cancellation propagates to all pending steps in the task.
+            // Note that it's important to allow cleanup code (catch/finally blocks, for ex) to execute for any method, so cancellation is cooperative
+            // and upon recovery, the runtime must wait for a precondition set of tasks to have been started before triggering cancellation.
         }
     }
 }
@@ -595,9 +626,8 @@ public class RetryOptions
 
 public interface IMyGrainWithDurableTasks : IGrain
 {
-#pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
     DurableTask MyDurableTaskMethod(int a, string b);
     DurableTask<string> MyDurableTaskMethod2(int a, string b);
     DurableTask<T> MyDurableTaskMethod3<T>(T a);
-#pragma warning restore ORLEANS0009 // Grain interfaces methods must return a compatible type
 }
+#pragma warning restore ORLEANS0009 // Grain interfaces methods must return a compatible type

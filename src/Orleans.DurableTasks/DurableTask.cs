@@ -6,7 +6,7 @@ namespace Orleans.DurableTasks;
 
 [InvokableBaseType(typeof(GrainReference), typeof(DurableTask), typeof(DurableTaskRequest))]
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
-public abstract class DurableTask
+public abstract partial class DurableTask
 {
     public static DurableTask<T> FromResult<T>(T value) => new CompletedDurableTask<T>(value);
 
