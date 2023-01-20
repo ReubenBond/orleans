@@ -22,13 +22,8 @@ public class DurableTaskRequestContext
     [Id(0)]
     public TaskId Id { get; internal set; }
 
-    [Id(1)]
-    public GrainId CallerId { get; internal set; }
-
-    [Id(2)]
     public SchedulingOptions? SchedulingOptions { get; internal set; }
 
-    [Id(3)]
     internal Dictionary<string, byte[]> Values { get; } = new();
 
     public static void SetCurrentContext(DurableTaskRequestContext? value)

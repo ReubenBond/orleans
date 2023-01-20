@@ -2,7 +2,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Tracing;
 using System.Reflection;
 using System.Threading;
@@ -16,20 +15,26 @@ using Orleans.Runtime;
 namespace Orleans.DurableTasks;
 
 #pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
 public class Program
 {
     public interface IBankGrain : IGrain
     {
         DurableTask<bool> Transfer(IAccountGrain source, IAccountGrain destination, int amount);
     }
+
     public interface IAccountGrain : IGrain
     {
         DurableTask<bool> Withdraw(int amount);
         DurableTask Deposit(int amount);
     }
-    public class BankGrain : Grain, IBankGrain
+
+    public class BankGrain : IBankGrain
     {
-        public async DurableTask<bool> Transfer(IAccountGrain source, IAccountGrain destination, int amount)
+        public async DurableTask<bool> Transfer(
+            IAccountGrain source,
+            IAccountGrain destination,
+            int amount)
         {
             bool success = await source.Withdraw(amount).AsStep("withdraw");
             if (!success) return false;
@@ -37,13 +42,32 @@ public class Program
             return success;
         }
     }
+
+    public class AccountGrain : Grain<int>, IAccountGrain
+    {
+        public async DurableTask Deposit(int amount) => State += amount;
+
+        public async DurableTask<bool> Withdraw(int amount)
+        {
+            if (State >= amount)
+            {
+                State -= amount;
+                return true;
+            }
+
+            return false;
+        }
+    }
+
     public static async Task Main(string[] args)
     {
         var bankGrain = default(IBankGrain)!;
         var billGates = default(IAccountGrain)!;
         var me = default(IAccountGrain)!;
 
-        var scheduledTask = await bankGrain.Transfer(billGates, me, 1_000_000_000).ScheduleAsync("transfer123");
+        var scheduledTask = await bankGrain
+            .Transfer(billGates, me, 1_000_000_000)
+            .ScheduleAsync("transfer123");
 
         var success = await scheduledTask;
         Console.WriteLine(success ? "Success!" : "Fail :(");
@@ -591,7 +615,6 @@ public class AccountGrain : IAccountGrain
     }
 }
 
-*/
 
 public static class TransactionalStateExtensions
 {
@@ -604,25 +627,8 @@ public static class TransactionalStateExtensions
 }
 
 #endif
+*/
 
-public class SchedulingOptions
-{
-    public DateTimeOffset? DueTime { get; init; }
-    public RetryOptions? RetryOptions { get; init; }
-    public string? RetryPolicy { get; init; }
-}
-
-public class RetryOptions
-{
-    public double BackoffCoefficient { get; init; } = 2;
-    public TimeSpan FirstRetryInterval { get; init; } = TimeSpan.FromSeconds(1);
-    public TimeSpan MaximumRetryInterval { get; init; } = TimeSpan.FromMinutes(5);
-    public int MaximumNumberOfAttempts { get; init; }
-
-    // NOTE: this is inherently not serializable. Would it therefore likely be better to specify retry using a named policy, rather than serializing the entire policy?
-    // Question is, what implications would that have on xplat? 
-    public Func<Exception, bool>? RetryFilter { get; init; }
-}
 
 public interface IMyGrainWithDurableTasks : IGrain
 {
@@ -630,4 +636,6 @@ public interface IMyGrainWithDurableTasks : IGrain
     DurableTask<string> MyDurableTaskMethod2(int a, string b);
     DurableTask<T> MyDurableTaskMethod3<T>(T a);
 }
+
+#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
 #pragma warning restore ORLEANS0009 // Grain interfaces methods must return a compatible type
