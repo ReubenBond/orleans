@@ -1,5 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
-using Orleans.Serialization;
+using Orleans.DurableTasks.Remoting;
 
 namespace Orleans.DurableTasks;
 
@@ -17,8 +18,6 @@ public sealed partial class DurableTaskExecutionContext
         Current.Value = context;
     }
 
-    private readonly Serializer _serializer;
-
     public bool IsCancellationRequested => AsValueTask().IsCanceled;
     public bool IsCompleted => AsValueTask().IsCompleted;
 
@@ -29,27 +28,29 @@ public sealed partial class DurableTaskExecutionContext
 
     public DurableTaskExecutionContext? Parent { get; init; }
     public required TaskId Id { get; init; }
+    internal DurableTaskState State { get; }
 
     // Child nodes. Each child is a workflow step (subworkflow)
-    public Dictionary<string, DurableTaskExecutionContext>? Children { get; private set; }
+    public Dictionary<TaskId, DurableTaskExecutionContext>? Children { get; private set; }
 
-    internal DurableTask Task { get; }
-
-    internal DurableTaskExecutionContext(Serializer serializer, DurableTask task)
+    [SetsRequiredMembers]
+    internal DurableTaskExecutionContext(TaskId taskId, DurableTaskState state)
     {
-        _serializer = serializer;
-        Task = task;
+        Id = taskId;
+        State = state;
     }
 
-    internal DurableTaskExecutionContext GetOrCreateChildNode(string childId, DurableTask task, out bool exists)
+    internal DurableTaskExecutionContext GetOrCreateChildNode(string childId, DurableTaskState state, out bool exists) => GetOrCreateChildNode(Id.CreateChild(childId), state, out exists);
+    internal DurableTaskExecutionContext GetOrCreateChildNode(TaskId childId, DurableTaskState state, out bool exists)
     {
         Children ??= new();
         ref var childNode = ref CollectionsMarshal.GetValueRefOrAddDefault(Children, childId, out exists);
-        childNode ??= new DurableTaskExecutionContext(_serializer, task) { Id = Id.CreateChild(childId), Parent = this };
+        childNode ??= new DurableTaskExecutionContext(childId, state) { Parent = this };
         return childNode;
     }
 
-    internal DurableTaskExecutionContext CreateChildNode(string childId, DurableTask task)
+    internal DurableTaskExecutionContext CreateChildNode(string childId, DurableTaskState state) => CreateChildNode(Id.CreateChild(childId), state);
+    internal DurableTaskExecutionContext CreateChildNode(TaskId childId, DurableTaskState state)
     {
         Children ??= new();
         ref var childNode = ref CollectionsMarshal.GetValueRefOrAddDefault(Children, childId, out var exists);
@@ -58,7 +59,7 @@ public sealed partial class DurableTaskExecutionContext
             throw new InvalidOperationException("Child node already exists");
         }
 
-        return childNode = new DurableTaskExecutionContext(_serializer, task) { Id = Id.CreateChild(childId), Parent = this };
+        return childNode = new DurableTaskExecutionContext(childId, state) { Parent = this };
     }
 
     internal void ClearChildren() => Children = null;

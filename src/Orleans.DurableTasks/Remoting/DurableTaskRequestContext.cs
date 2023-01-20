@@ -20,7 +20,7 @@ public class DurableTaskRequestContext
     }
 
     [Id(0)]
-    public TaskId Id { get; internal set; }
+    public TaskId TaskId { get; internal set; }
 
     public SchedulingOptions? SchedulingOptions { get; internal set; }
 

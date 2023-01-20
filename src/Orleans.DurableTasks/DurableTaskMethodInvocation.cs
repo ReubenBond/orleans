@@ -63,7 +63,7 @@ internal sealed class UntypedDurableTaskMethodInvocation<TStateMachine> : Untype
         return executionContext.AsUntypedValueTask();
     }
 
-    public override void SetResult() => _executionContext!.SetResult(null);
+    public override void SetResult() => _executionContext!.SetResponse(null);
 
     public override void SetException(Exception exception) => _executionContext!.SetException(exception);
 }

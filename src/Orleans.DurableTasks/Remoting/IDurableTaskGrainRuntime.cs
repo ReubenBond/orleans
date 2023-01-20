@@ -1,8 +1,11 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
+using Orleans.Transactions;
 
 namespace Orleans.DurableTasks.Remoting;
 
@@ -60,19 +63,28 @@ public class DurableTaskState
     public HashSet<IDurableTaskClient>? Clients { get; set; }
 
     /// <summary>
-    /// Gets or sets the request context for this request.
+    /// Gets or sets the invokable request.
     /// </summary>
     [Id(2)]
-    public Dictionary<string, object>? RequestContext { get; set; }
+    public IDurableTaskRequest? Request { get; set; }
+
+    /// <summary>
+    /// Gets or sets the time that the task completed.
+    /// </summary>
+    [Id(3)]
+    public DateTime? CompletedAt { get; set; }
 }
 
+// TODO: In designing this interface, perhaps we should model mutations in a finer-grained manner to facilitate efficient log-based storage approach.
+// Eg: Separate AddRequest, Add/RemoveClient, SetResponse methods.
 internal interface IDurableTaskGrainStorage
 {
-    bool TryGetRequest(TaskId taskId, [NotNullWhen(true)] IDurableTaskRequest? request);
+    IEnumerable<(TaskId Id, DurableTaskState State)> Tasks { get; }
+    void AddOrUpdateTask(TaskId taskId, DurableTaskState state);
+    bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out DurableTaskState? state);
 
-    void AddOrUpdateState(TaskId taskId, DurableTaskState state);
-    bool TryGetState(TaskId taskId, [NotNullWhen(true)] out DurableTaskState? state);
-    bool Remove(TaskId taskId);
+    // Removes a request and its state
+    bool RemoveTask(TaskId taskId);
     
     ValueTask WriteAsync();
     ValueTask ReadAsync();
@@ -82,80 +94,346 @@ internal class DurableTaskGrainStorage : IDurableTaskGrainStorage
 {
     private Dictionary<TaskId, DurableTaskState> _workingCopy = new();
     private Dictionary<TaskId, DurableTaskState> _persistedCopy = new();
-    private DeepCopier<Dictionary<TaskId, DurableTaskState>> _copier;
+    private readonly DeepCopier<Dictionary<TaskId, DurableTaskState>> _storageCopier;
+    private readonly DeepCopier<DurableTaskState> _stateCopier;
 
-    public DurableTaskGrainStorage(DeepCopier<Dictionary<TaskId, DurableTaskState>> copier)
+    public IEnumerable<(TaskId Id, DurableTaskState State)> Tasks => _workingCopy.Select(static pair => (pair.Key, pair.Value));
+
+    public DurableTaskGrainStorage(DeepCopier<Dictionary<TaskId, DurableTaskState>> storageCopier, DeepCopier<DurableTaskState> stateCopier)
     {
-        _copier = copier;
+        _storageCopier = storageCopier;
+        _stateCopier = stateCopier;
     }
 
-    public void AddOrUpdate(TaskId taskId, DurableTaskState state) => _workingCopy[taskId] = state;
-    public bool Remove(TaskId taskId) => _workingCopy.Remove(taskId);
-    public bool TryGet(TaskId taskId, [NotNullWhen(true)] out DurableTaskState? state) => _workingCopy.TryGetValue(taskId, out state);
+    public void AddOrUpdateTask(TaskId taskId, DurableTaskState state) => _workingCopy[taskId] = _stateCopier.Copy(state);
+    public bool RemoveTask(TaskId taskId) => _workingCopy.Remove(taskId);
+    public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out DurableTaskState? state)
+    {
+        if (_workingCopy.TryGetValue(taskId, out var internalState))
+        {
+            state = _stateCopier.Copy(internalState);
+            return true;
+        }
+
+        state = null;
+        return false;
+    }
 
     public ValueTask ReadAsync()
     {
-        _workingCopy = _copier.Copy(_persistedCopy);
+        _workingCopy = _storageCopier.Copy(_persistedCopy);
         return default;
     }
 
     public ValueTask WriteAsync()
     {
-        _persistedCopy = _copier.Copy(_workingCopy);
+        _persistedCopy = _storageCopier.Copy(_workingCopy);
         return default;
     }
 }
 
-
-internal class DurableTaskGrainExtension : IDurableTaskGrainExtension
+internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime
 {
-    private readonly Dictionary<TaskId, DurableTaskExecutionContext> _activeTasks = new();
+    private readonly Dictionary<TaskId, DurableTaskExecutionContext> _pendingTasks = new();
+    private readonly Dictionary<TaskId, Task> _runningTasks = new();
     private readonly ILogger<DurableTaskGrainExtension> _logger;
     private readonly IDurableTaskGrainStorage _storage;
+    private readonly ISystemClock _systemClock;
+    private readonly CleanupPolicy _defaultCleanupPolicy = new CleanupPolicy { CleanupAge = TimeSpan.FromDays(1) };
 
-    public DurableTaskGrainExtension(ILogger<DurableTaskGrainExtension> logger, IDurableTaskGrainStorage storage)
+    public DurableTaskGrainExtension(ILogger<DurableTaskGrainExtension> logger, IDurableTaskGrainStorage storage, ISystemClock systemClock)
     {
         _logger = logger;
         _storage = storage;
+        _systemClock = systemClock;
+    }
+
+    private DurableTaskExecutionContext CreateExecutionContext(TaskId taskId, DurableTaskState state) => _pendingTasks[taskId] = new DurableTaskExecutionContext(taskId, state);
+
+    private bool TryGetExecutionContext(TaskId taskId, [NotNullWhen(true)] out DurableTaskExecutionContext? executionContext)
+    {
+        // Is an active method already waiting for this?
+        if (_pendingTasks.TryGetValue(taskId, out executionContext))
+        {
+            return true;
+        }
+
+        if (_storage.TryGetTask(taskId, out var state))
+        {
+            // Rehydrate the task from its persisted state. There are two options here.
+            var parentId = taskId.GetParent();
+
+            // This may return false if there is no parent or the parent does not belong to this grain.
+            // TODO: Is this accounting (linking parents and children) worthwhile? Maybe just a flat dictionary is more appropriate.
+            if (parentId != TaskId.None && TryGetExecutionContext(taskId, out var parent))
+            {
+                executionContext = parent.GetOrCreateChildNode(taskId, state, out _);
+            }
+            else
+            {
+                executionContext = new DurableTaskExecutionContext(taskId, state);
+            }
+
+            // If the task has completed, set the result now.
+            if (state.Result is { } response)
+            {
+                executionContext.SetResponse(response);
+            }
+
+            // Move the task into the list of active tasks.
+            _pendingTasks[taskId] = executionContext;
+            return true;
+        }
+
+        return false;
     }
 
     public async ValueTask OnResponse(TaskId taskId, Response response)
     {
-        // Is a method already waiting for this?
-        if (!_activeTasks.TryGetValue(taskId, out var executionContext))
+        if (!TryGetExecutionContext(taskId, out var executionContext))
         {
-            
+            // No such task. This may be because this client has already received a response for this task and removed its entry for it.
+            // TODO: Perhaps this should log at a lower level since it is likely not the symptom of a bug or exceptional condition.
             _logger.LogWarning("Received response for unknown task {TaskId}: {Response}", taskId, response);
             return;
         }
 
-        _storage.
-
         // Persist the response before responding to the caller.
+        // TODO: If this write (or just about any state write) fails, then we need to undo the update to the task state.
+        // The most straightforward way to do that might be to take a copy before mutating it.
+        executionContext.State.Result = response;
+        executionContext.State.CompletedAt = _systemClock.GetUtcNow();
+        _storage.AddOrUpdateTask(taskId, executionContext.State);
         await _storage.WriteAsync();
 
         // Propagate the response to the application.
         executionContext.SetResponse(response);
     }
 
-    public async ValueTask<Response> ScheduleOrPollAsync(IDurableTaskRequest request)
+    public ValueTask<Response> ScheduleOrPollAsync(IDurableTaskRequest request, IDurableTaskClient? client)
     {
-        
+        if (request.Context is not { } requestContext)
+        {
+            throw new InvalidOperationException($"No context for durable task request {request}");
+        }
 
+        if (TryGetExecutionContext(requestContext.TaskId, out var executionContext))
+        {
+            // If the task is not yet completed, resturn 
+            var responseTask = executionContext.AsValueTask();
+            if (responseTask.IsCompleted)
+            {
+                return responseTask;
+            }
+
+            if (client is not null)
+            {
+                var existingClients = executionContext.State!.Clients;
+                if (existingClients is null || !existingClients.Contains(client))
+                {
+                    return AddClientAsync(requestContext.TaskId, executionContext, client);
+                }
+            }
+
+            return new ValueTask<Response>(PendingResponse.Instance);
+        }
+
+        // Schedule the task
+        return ScheduleNewTaskAsync(request, client);
     }
-}
 
-internal static class DurableTaskExecutionContextExtensions
-{
-    public static void SetResponse(this DurableTaskExecutionContext context, Response response)
+    private async ValueTask<Response> AddClientAsync(TaskId taskId, DurableTaskExecutionContext executionContext,  IDurableTaskClient client)
     {
-        if (response.Exception is { } exception)
+        var state = executionContext.State!;
+
+        // Add the client to the persisted task state.
+        state.Clients ??= new();
+        state.Clients.Add(client);
+        _storage.AddOrUpdateTask(taskId, state);
+        await _storage.WriteAsync();
+
+        return PendingResponse.Instance;
+    }
+
+    private async ValueTask<Response> ScheduleNewTaskAsync(IDurableTaskRequest request, IDurableTaskClient? client)
+    {
+        var taskId = request.Context!.TaskId;
+        var newTaskState = new DurableTaskState
         {
-            context.SetException(exception);
-        }
-        else
+            Request = request,
+        };
+
+        if (client is not null)
         {
-            context.SetResult(response.Result);
+            newTaskState.Clients = new HashSet<IDurableTaskClient> { client };
         }
+
+        _storage.AddOrUpdateTask(taskId, newTaskState);
+        await _storage.WriteAsync();
+
+        // Schedule the task with the runtime.
+        var executionContext = CreateExecutionContext(taskId, newTaskState);
+        InvokeExistingAsync(taskId, request, executionContext);
+
+        return PendingResponse.Instance;
+    }
+
+    public ValueTask<Response> InvokeAsync(IDurableTaskRequest request)
+    {
+        return new ValueTask<Response>(PendingResponse.Instance);
+    }
+
+    private void InvokeExistingAsync(TaskId taskId, IDurableTaskRequest request, DurableTaskExecutionContext context)
+    {
+        _runningTasks.Add(taskId, InvokeTaskAsyncInternal(taskId, request, context));
+    }
+
+    private async Task InvokeTaskAsyncInternal(TaskId taskId, IDurableTaskRequest request, DurableTaskExecutionContext context)
+    {
+        await Task.Yield();
+
+        try
+        {
+            var response = await request.InvokeImplementation(context);
+            await CompleteRequestWithResponse(taskId, response, context);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Error invoking durable task request {Request}", request);
+            await CompleteRequestWithResponse(taskId, Response.FromException(exception), context);
+        }
+    }
+
+    private async Task CompleteRequestWithResponse(TaskId taskId, Response response, DurableTaskExecutionContext executionContext)
+    {
+        var state = executionContext.State;
+        if (state.Result is null)
+        {
+            Debug.Assert(state.Result is null);
+
+            // Store the result.
+            // Note that this and the next call to notify callers may result in two writes in quick succession.
+            // That is ok: we want to ensure that every client always sees the same result for a task, so it is important to persist the task before notifying the first client.
+            state.Result = response;
+            state.CompletedAt = _systemClock.GetUtcNow();
+            _storage.AddOrUpdateTask(taskId, state);
+            await _storage.WriteAsync();
+        }
+
+        await NotifyClientsAndCleanupTask(taskId, executionContext);
+    }
+
+    private async Task NotifyClientsAndCleanupTask(TaskId taskId, DurableTaskExecutionContext executionContext)
+    {
+        Debug.Assert(executionContext.State.Result is not null);
+        while (true)
+        {
+            try
+            {
+                var clientTasks = new List<Task>();
+                var clientCount = 0;
+                
+                var state = executionContext.State;
+                if (state.Clients is { } clients)
+                {
+                    clientCount = clients.Count;
+                    if (_logger.IsEnabled(LogLevel.Trace))
+                    {
+                        _logger.LogTrace("Notifying {ClientsCount} clients for completion of task {TaskId}", clientCount, taskId);
+                    }
+
+                    var response = state.Result;
+                    foreach (var client in clients)
+                    {
+                        clientTasks.Add(client.OnResponse(taskId, response).AsTask());
+                    }
+                }
+
+                await Task.WhenAll(clientTasks);
+
+                state.Clients = null;
+                _storage.AddOrUpdateTask(taskId, state);
+
+                PruneCompletedTasks();
+                await _storage.WriteAsync();
+                _logger.LogTrace("Notified {ClientsCount} clients for completion of task {TaskId}", clientCount, taskId);
+
+                // Success, no more work to be done right now.
+                break;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception, "Exception while notifying clients of completion for durable task {TaskId}", taskId);
+            }
+
+            // TODO: Make this configurable and probably use exponential backoff, potentially with some coordination with other tasks.
+            await Task.Delay(TimeSpan.FromSeconds(10));
+        }
+    }
+
+    private bool PruneCompletedTasks()
+    {
+        // Prune all tasks which:
+        // * Have a response
+        // * Have no remaining clients to notify
+        // * Have no parents waiting on them within this context
+        // * Have been completed for more than a configured period of time
+        var allTasks = _storage.Tasks.ToDictionary(static task => task.Id, static task => task.State);
+        HashSet<TaskId>? completedTaskIds = default;
+        Dictionary<TaskId, HashSet<TaskId>>? waitingOnParent = default;
+        var now = _systemClock.GetUtcNow();
+        foreach (var (taskId, state) in allTasks)
+        {
+            if (state.Result is null)
+            {
+                // The task is incomplete.
+                continue;
+            }
+
+            if (state.Clients is { Count: > 0 })
+            {
+                // There are still unacknowledged clients.
+                continue;
+            }
+
+            if (state.CompletedAt is not { } completedAt || now.Subtract(completedAt) < _defaultCleanupPolicy.CleanupAge)
+            {
+                // The task is being retained for at least the specified period of time.
+                continue;
+            }
+
+            if (taskId.GetParent() is { } parent && parent != TaskId.None && allTasks.ContainsKey(parent))
+            {
+                // There is a local parent task which this task is waiting on, and that is the last thing keeping this task alive.
+                waitingOnParent ??= new();
+                ref var waiters = ref CollectionsMarshal.GetValueRefOrAddDefault(waitingOnParent, parent, out var exists);
+                waiters ??= new();
+                waiters.Add(taskId);
+                continue;
+            }
+
+            completedTaskIds ??= new();
+            completedTaskIds.Add(taskId);
+        }
+
+        if (completedTaskIds is not null)
+        {
+            foreach (var taskId in completedTaskIds)
+            {
+                // Prune all otherwise-completed children.
+                if (waitingOnParent is not null && waitingOnParent.TryGetValue(taskId, out var childTaskIds))
+                {
+                    foreach (var childTaskId in childTaskIds)
+                    {
+                        _storage.RemoveTask(childTaskId);
+                    }
+                }
+
+                // Prune the task.
+                _storage.RemoveTask(taskId);
+            }
+        }
+
+        return completedTaskIds is not null;
     }
 }

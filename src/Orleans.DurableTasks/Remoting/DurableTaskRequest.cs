@@ -3,6 +3,7 @@ using Orleans.CodeGeneration;
 using Orleans.Runtime;
 using Orleans.Invocation;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Activators;
 
 namespace Orleans.DurableTasks.Remoting;
 
@@ -20,7 +21,7 @@ public interface IDurableTaskRequest : IRequest
     ValueTask<Response> InvokeImplementation(DurableTaskExecutionContext executionContext);
 }
 
-[GenerateSerializer]
+[GenerateSerializer] // Do not make this serializer transparent. We want the option to include information here in future and this is not nearly as perf-critical as regular method calls.
 [SelfInvokingReturnType]
 public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest
 {
@@ -283,6 +284,43 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
 
     // Generated
     protected abstract DurableTask<TResult> InvokeInner();
+}
+
+/// <summary>
+/// Represents a pending result for a <see cref="DurableTask"/> or <see cref="DurableTask{TResult}"/> method.
+/// </summary>
+[GenerateSerializer, Immutable, UseActivator, SuppressReferenceTracking]
+public sealed class PendingResponse : Response
+{
+    /// <summary>
+    /// Gets the singleton instance of this class.
+    /// </summary>
+    public static PendingResponse Instance { get; } = new PendingResponse();
+
+    /// <inheritdoc/>
+    public override object? Result { get => null; set => throw new InvalidOperationException($"Type {nameof(PendingResponse)} is read-only"); } 
+
+    /// <inheritdoc/>
+    public override Exception? Exception { get => null; set => throw new InvalidOperationException($"Type {nameof(PendingResponse)} is read-only"); }
+
+    /// <inheritdoc/>
+    public override T GetResult<T>() => default!;
+
+    /// <inheritdoc/>
+    public override void Dispose() { }
+
+    /// <inheritdoc/>
+    public override string ToString() => "[Pending]";
+}
+
+/// <summary>
+/// Activator for <see cref="PendingResponse"/>.
+/// </summary>
+[RegisterActivator]
+internal sealed class DurableTaskPendingResponseActivator : IActivator<PendingResponse>
+{
+    /// <inheritdoc/>
+    public PendingResponse Create() => PendingResponse.Instance;
 }
 
 [GenerateSerializer]

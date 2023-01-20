@@ -15,6 +15,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
     [Id(0)]
     private readonly HierarchicalKey? _parent;
 
+    // TODO: Operations on this (eg, GetParent()) might be cheaper if it were a ReadOnlyMemory<char>
     [Id(1)]
     private readonly string _value;
 
