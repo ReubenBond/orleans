@@ -29,6 +29,7 @@ namespace Orleans.Runtime
         private readonly MessagingTrace messagingTrace;
         private readonly ConcurrentDictionary<Type, (object Implementation, IAddressable Reference)> _extensions = new ConcurrentDictionary<Type, (object, IAddressable)>();
         private readonly ConcurrentDictionary<Type, object> _components = new();
+        private readonly IServiceScope _serviceProviderScope;
         private bool disposing;
         private Task messagePump;
 
@@ -66,6 +67,7 @@ namespace Orleans.Runtime
             this.ClientId = CreateHostedClientGrainId(siloDetails.SiloAddress);
             this.Address = Gateway.GetClientActivationAddress(this.ClientId.GrainId, siloDetails.SiloAddress);
             this.GrainReference = referenceActivator.CreateReference(this.ClientId.GrainId, default);
+            _serviceProviderScope = runtimeClient.ServiceProvider.CreateScope();
         }
 
         public static ClientGrainId CreateHostedClientGrainId(SiloAddress siloAddress) => ClientGrainId.Create($"hosted-{siloAddress.ToParsableString()}");
@@ -83,7 +85,7 @@ namespace Orleans.Runtime
 
         public GrainAddress Address { get; }
 
-        public IServiceProvider ActivationServices => this.runtimeClient.ServiceProvider;
+        public IServiceProvider ActivationServices => _serviceProviderScope.ServiceProvider;
 
         public IGrainLifecycle ObservableLifecycle => throw new NotImplementedException();
 
@@ -213,6 +215,7 @@ namespace Orleans.Runtime
         {
             if (this.disposing) return;
             this.disposing = true;
+            _serviceProviderScope.Dispose();
             Utils.SafeExecute(() => this.siloMessageCenter.SetHostedClient(null));
             Utils.SafeExecute(() => this.incomingMessages.Writer.TryComplete());
             Utils.SafeExecute(() => this.messagePump?.GetAwaiter().GetResult());

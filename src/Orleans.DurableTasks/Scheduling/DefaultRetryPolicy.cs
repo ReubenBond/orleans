@@ -13,7 +13,7 @@ public class DefaultRetryPolicy : RetryPolicy
 
     public override bool ShouldRetry(ExecutionAttemptSummary executionAttemptSummary)
     {
-        if (executionAttemptSummary.AttemptCount > _options.MaximumAttemptCount)
+        if (executionAttemptSummary.AttemptCount > _options.MaximumAttemptCount && _options.MaximumAttemptCount > 0)
         {
             return false;
         }

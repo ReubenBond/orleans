@@ -114,7 +114,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         }
 
         var taskId = requestContext.TaskId;
-        var client = requestContext.Caller?.Cast<IDurableTaskClient>();
+        var client = requestContext.Caller?.Cast<IDurableTaskGrainExtension>();
         if (TryGetExecutionContext(taskId, out var executionContext))
         {
             // Ensure the client is subscribed to the existing task.

@@ -11,19 +11,41 @@ using System.Threading.Tasks.Sources;
 using Orleans.DurableTasks.Remoting;
 using Orleans.Transactions.Abstractions;
 using Orleans.Runtime;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration.Internal;
+using Microsoft.Extensions.Hosting;
 
 namespace Orleans.DurableTasks;
+
+public static class DurableTaskHostingExtensions
+{
+    public static ISiloBuilder AddDurableTasks(this ISiloBuilder siloBuilder)
+    {
+        siloBuilder.Services.AddSingleton<VolatileDurableTaskGrainStorage>();
+        siloBuilder.Services.AddFromExisting<IDurableTaskGrainStorage, VolatileDurableTaskGrainStorage>();
+
+        siloBuilder.Services.AddScoped<DurableTaskGrainExtension>();
+        siloBuilder.Services.AddFromExisting<IDurableTaskGrainRuntime, DurableTaskGrainExtension>();
+        siloBuilder.Services.AddTransientKeyedService<Type, IGrainExtension>(typeof(IDurableTaskGrainExtension), (sp, _) => sp.GetRequiredService<DurableTaskGrainExtension>());
+        siloBuilder.Services.AddTransientKeyedService<Type, IGrainExtension>(typeof(IDurableTaskServer), (sp, _) => sp.GetRequiredService<DurableTaskGrainExtension>());
+        siloBuilder.Services.AddTransientKeyedService<Type, IGrainExtension>(typeof(IDurableTaskClient), (sp, _) => sp.GetRequiredService<DurableTaskGrainExtension>());
+
+        siloBuilder.Services.AddSingleton<DefaultRetryPolicy>();
+        siloBuilder.Services.AddSingleton<ISystemClock, SystemClock>();
+        return siloBuilder;
+    }
+}
 
 #pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
 public class Program
 {
-    public interface IBankGrain : IGrain
+    public interface IBankGrain : IGrainWithStringKey
     {
         DurableTask<bool> Transfer(IAccountGrain source, IAccountGrain destination, int amount);
     }
 
-    public interface IAccountGrain : IGrain
+    public interface IAccountGrain : IGrainWithStringKey
     {
         DurableTask<bool> Withdraw(int amount);
         DurableTask Deposit(int amount);
@@ -59,18 +81,44 @@ public class Program
         }
     }
 
+    public interface IClientGrain : IGrainWithStringKey
+    {
+        Task Run();
+    }
+    public class ClientGrain : Grain, IClientGrain
+    {
+        public async Task Run()
+        {
+            var client = this.GrainFactory;
+            var bankGrain = client.GetGrain<IBankGrain>("first-tech");
+            var billGates = client.GetGrain<IAccountGrain>("billg");
+            var me = client.GetGrain<IAccountGrain>("rebond");
+
+            var scheduledTask = await bankGrain
+                .Transfer(billGates, me, 1_000_000_000)
+                .ScheduleAsync("transfer123");
+
+            var success = await scheduledTask;
+            Console.WriteLine(success ? "Success!" : "Fail :(");
+        }
+    }
+
     public static async Task Main(string[] args)
     {
-        var bankGrain = default(IBankGrain)!;
-        var billGates = default(IAccountGrain)!;
-        var me = default(IAccountGrain)!;
+        var hostBuilder = Host.CreateDefaultBuilder(args)
+            .UseOrleans(siloBuilder =>
+            {
+                siloBuilder.UseLocalhostClustering();
+                siloBuilder.AddDurableTasks();
+            })
+            .UseConsoleLifetime();
+        using var host = hostBuilder.Build();
+        await host.StartAsync();
 
-        var scheduledTask = await bankGrain
-            .Transfer(billGates, me, 1_000_000_000)
-            .ScheduleAsync("transfer123");
-
-        var success = await scheduledTask;
-        Console.WriteLine(success ? "Success!" : "Fail :(");
+        var client = host.Services.GetRequiredService<IClusterClient>();
+        var clientGrain = client.GetGrain<IClientGrain>("client");
+        await clientGrain.Run();
+        await host.WaitForShutdownAsync();
     }
 
 #if false

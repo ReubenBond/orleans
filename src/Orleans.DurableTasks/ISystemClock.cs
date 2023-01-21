@@ -10,3 +10,8 @@ public interface ISystemClock
     /// </summary>
     DateTime GetUtcNow();
 }
+
+internal sealed class SystemClock : ISystemClock
+{
+    public DateTime GetUtcNow() => DateTime.UtcNow;
+}

@@ -1,6 +1,5 @@
 using System;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
@@ -10,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using System.Text;
 using System.Diagnostics;
-using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
@@ -444,27 +442,27 @@ namespace Orleans.Runtime
         /// Returns a string representation of the request.
         /// </summary>
         /// <returns>A string representation of the request.</returns>
-        public string ToString()
+        public static string ToString(IRequest request)
         {
             var result = new StringBuilder();
-            result.Append(GetInterfaceName());
-            if (GetTarget() is { } target)
+            result.Append(request.GetInterfaceName());
+            if (request.GetTarget() is { } target)
             {
                 result.Append("[(");
-                result.Append(GetInterfaceName());
+                result.Append(request.GetInterfaceName());
                 result.Append(')');
                 result.Append(target.ToString());
                 result.Append(']');
             }
             else
             {
-                result.Append(GetInterfaceName());
+                result.Append(request.GetInterfaceName());
             }
 
             result.Append('.');
-            result.Append(GetMethodName());
+            result.Append(request.GetMethodName());
             result.Append('(');
-            var argumentCount = GetArgumentCount();
+            var argumentCount = request.GetArgumentCount();
             for (var n = 0; n < argumentCount; n++)
             {
                 if (n > 0)
@@ -472,7 +470,7 @@ namespace Orleans.Runtime
                     result.Append(", ");
                 }
 
-                result.Append(GetArgument(n));
+                result.Append(request.GetArgument(n));
             }
 
             result.Append(')');
@@ -542,40 +540,7 @@ namespace Orleans.Runtime
         public abstract MethodInfo GetMethod();
 
         /// <inheritdoc/>
-        public override string ToString()
-        {
-            var result = new StringBuilder();
-            result.Append(GetInterfaceName());
-            if (GetTarget() is { } target)
-            {
-                result.Append("[(");
-                result.Append(GetInterfaceName());
-                result.Append(')');
-                result.Append(target.ToString());
-                result.Append(']');
-            }
-            else
-            {
-                result.Append(GetInterfaceName());
-            }
-
-            result.Append('.');
-            result.Append(GetMethodName());
-            result.Append('(');
-            var argumentCount = GetArgumentCount();
-            for (var n = 0; n < argumentCount; n++)
-            {
-                if (n > 0)
-                {
-                    result.Append(", ");
-                }
-
-                result.Append(GetArgument(n));
-            }
-
-            result.Append(')');
-            return result.ToString();
-        }
+        public override string ToString() => IRequest.ToString(this);
     }
 
     /// <summary>

@@ -38,10 +38,6 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
     [NonSerialized]
     private readonly IGrainContextAccessor _grainContextAccessor;
 
-    /// <inheritdoc />
-    [field: NonSerialized]
-    public DurableTaskRequestContext? Context { get; private set; }
-
     [NonSerialized]
     private readonly Serializer _serializer;
 
@@ -51,6 +47,10 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
         _grainContextAccessor = grainContextAccessor;
         _serializer = serializer;
     }
+
+    /// <inheritdoc />
+    [Id(0)]
+    public DurableTaskRequestContext? Context { get; private set; }
 
     /// <summary>
     /// Gets the invocation options.
@@ -100,7 +100,7 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
     public abstract MethodInfo GetMethod();
 
     /// <inheritdoc/>
-    public override string ToString() => ((IRequest)this).ToString();
+    public override string ToString() => IRequest.ToString(this);
 
     // Called upon creation in generated code by the creating grain reference by virtue of the [SelfInvokingReturnType(nameof(InitializeRequest))] atttribute on this class.
     public DurableTask InitializeRequest(GrainReference targetGrainReference)
@@ -198,14 +198,10 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
     [NonSerialized]
     private readonly IGrainContextAccessor _grainContextAccessor;
 
-    [NonSerialized]
-    private readonly IRuntimeClient _runtimeClient;
-
     [GeneratedActivatorConstructor]
-    protected DurableTaskRequest(IGrainContextAccessor grainContextAccessor, IServiceProvider services)
+    protected DurableTaskRequest(IGrainContextAccessor grainContextAccessor)
     {
         _grainContextAccessor = grainContextAccessor;
-        _runtimeClient = services.GetRequiredService<IRuntimeClient>();
     }
 
     /// <inheritdoc/>
@@ -260,7 +256,7 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
     public abstract MethodInfo GetMethod();
 
     /// <inheritdoc/>
-    public override string ToString() => ((IRequest)this).ToString();
+    public override string ToString() => IRequest.ToString(this);
 
     // Called upon creation in generated code by the creating grain reference by virtue of the [SelfInvokingReturnType(nameof(InitializeRequest))] atttribute on this class.
     public DurableTask<TResult> InitializeRequest(GrainReference targetGrainReference)
