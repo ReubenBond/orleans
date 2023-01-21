@@ -9,7 +9,7 @@ public class DurableTaskRequestContext
     public TaskId TaskId { get; set; }
 
     [Id(1)]
-    public GrainId? CallerId { get; set; }
+    public IAddressable? Caller { get; set; }
 
     [Id(2)]
     public GrainId TargetId { get; set; }

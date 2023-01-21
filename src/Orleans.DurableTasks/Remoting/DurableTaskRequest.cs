@@ -121,7 +121,7 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
 
         // Set the caller id now, not at creation time, since the value may have been passed around before eventually being scheduled.
         Context.TaskId = taskId;
-        Context.CallerId = callerContext.GrainId;
+        Context.Caller = callerContext.GrainId;
         Context.SchedulingOptions = options;
         return await localRuntime.OnScheduleAsync(this);
     }
@@ -129,21 +129,6 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
     /// <inheritdoc/>
     protected internal override ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext)
     {
-        // This is invoked by the `DurableTask<T>.ScheduleAsync(stepId, options)` method, so it is the first method called after the instance is constructed and its arguments populated (by generated code).
-
-        // Take the execution context, propagate it to a new `DurableTaskRequestContext`
-        /*
-        var callerContext = _grainContextAccessor.GrainContext;
-        var localRuntime = GetRuntime(callerContext);
-
-        // If the caller is a grain, create grain-local storage for the remote call so that it can be notified upon completion.
-        await localRuntime.Schedule
-        */
-
-        // Submit it to the runtime to send to the remote instance.
-
-        // Wait for the execution context to be completed.
-        // This means that it must be propagated either to the currently executing grain or (external) the HostedClient for completion.
         throw new NotImplementedException();
     }
 
@@ -294,7 +279,7 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
 
         // Set the caller id now, not at creation time, since the value may have been passed around before eventually being scheduled.
         Context.TaskId = taskId;
-        Context.CallerId = callerContext.GrainId;
+        Context.Caller = callerContext.GrainId;
         Context.SchedulingOptions = options;
         return await localRuntime.OnScheduleAsync(this);
     }
@@ -308,7 +293,7 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
 
         // Set the caller id now, not at creation time, since the value may have been passed around before eventually being scheduled.
         Context.TaskId = taskId;
-        Context.CallerId = callerContext.GrainId;
+        Context.Caller = callerContext.GrainId;
         Context.SchedulingOptions = options;
         return await localRuntime.OnScheduleAsync(this);
     }

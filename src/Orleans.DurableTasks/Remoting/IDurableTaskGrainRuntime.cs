@@ -17,7 +17,7 @@ public interface IDurableTaskClient
 public interface IDurableTaskServer
 {
     // Called by DurableTaskRequest.Invoke to ensure that a task is scheduled
-    ValueTask<Response> ScheduleOrPollAsync(IDurableTaskRequest request, IDurableTaskClient? caller);
+    ValueTask<Response> ScheduleOrPollAsync(IDurableTaskRequest request);
 
     // API used by ScheduledTask/<T> to check for a result for a task.
     // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
@@ -211,13 +211,14 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime
         executionContext.SetResponse(response);
     }
 
-    public ValueTask<Response> ScheduleOrPollAsync(IDurableTaskRequest request, IDurableTaskClient? client)
+    public ValueTask<Response> ScheduleOrPollAsync(IDurableTaskRequest request)
     {
         if (request.Context is not { } requestContext)
         {
             throw new InvalidOperationException($"No context for durable task request {request}");
         }
 
+        var client = requestContext.Caller?.Cast<IDurableTaskClient>();
         if (TryGetExecutionContext(requestContext.TaskId, out var executionContext))
         {
             return SubscribeAsync(requestContext.TaskId, executionContext, client);
@@ -280,7 +281,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime
 
         // Schedule the task with the runtime.
         var executionContext = CreateExecutionContext(taskId, newTaskState);
-        InvokeExistingAsync(taskId, request, executionContext);
+        InvokeRequestMethod(taskId, request, executionContext);
 
         return PendingResponse.Instance;
     }
@@ -353,7 +354,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime
         return CreateExecutionContext(taskId, newTaskState);
     }
 
-    private void InvokeExistingAsync(TaskId taskId, IDurableTaskRequest request, DurableTaskExecutionContext context)
+    private void InvokeRequestMethod(TaskId taskId, IDurableTaskRequest request, DurableTaskExecutionContext context)
     {
         _runningTasks.Add(taskId, InvokeTaskAsyncInternal(taskId, request, context));
     }
