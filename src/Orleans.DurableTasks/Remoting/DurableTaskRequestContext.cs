@@ -12,7 +12,7 @@ public class DurableTaskRequestContext
     public IAddressable? Caller { get; set; }
 
     [Id(2)]
-    public GrainId TargetId { get; set; }
+    public IAddressable? Target { get; set; }
 
     [Id(3)]
     public SchedulingOptions? SchedulingOptions { get; set; }

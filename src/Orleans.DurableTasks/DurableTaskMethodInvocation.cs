@@ -72,12 +72,10 @@ internal sealed class UntypedDurableTaskMethodInvocation<TStateMachine> : Untype
 /// <summary>
 /// Represents a locally-executing <see cref="DurableTask{TResult}"/> method.
 /// </summary>
-internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResult>, IDurableTaskMethodInvocation<TResult>
+internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResult>, IDurableTaskMethodInvocation
 {
     public abstract void SetResult(TResult result);
     public abstract void SetException(Exception exception);
-    ValueTask<TResult> IDurableTaskMethodInvocation<TResult>.InvokeAsyncTypedCore(DurableTaskExecutionContext executionContext) => InvokeAsyncTypedCore(executionContext);
-    ValueTask IDurableTaskMethodInvocation.InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext) => InvokeAsyncUntypedCore(executionContext);
 }
 
 /// <summary>
@@ -146,10 +144,4 @@ internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : Dura
 /// </summary>
 internal interface IDurableTaskMethodInvocation
 {
-    ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext);
-}
-
-internal interface IDurableTaskMethodInvocation<TResult> : IDurableTaskMethodInvocation
-{
-    ValueTask<TResult> InvokeAsyncTypedCore(DurableTaskExecutionContext executionContext);
 }

@@ -3,7 +3,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
-using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks.Remoting;
@@ -14,10 +13,10 @@ public interface IDurableTaskClient
     ValueTask OnResponse(TaskId taskId, Response response);
 }
 
-public interface IDurableTaskServer
+public interface IDurableTaskServer 
 {
     // Called by DurableTaskRequest.Invoke to ensure that a task is scheduled
-    ValueTask<Response> ScheduleOrPollAsync(IDurableTaskRequest request);
+    ValueTask ScheduleAsync(IDurableTaskRequest request);
 
     // API used by ScheduledTask/<T> to check for a result for a task.
     // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
@@ -28,7 +27,7 @@ public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServe
 {
 }
 
-public interface IDurableTaskGrainRuntime : IDurableTaskGrainExtension
+public interface IDurableTaskGrainRuntime
 {
     // Similar to `ScheduleOrPollAsync`, except that:
     // It is intended for local `DurableTask` methods (steps) versus remotely issued requests
@@ -36,115 +35,11 @@ public interface IDurableTaskGrainRuntime : IDurableTaskGrainExtension
     // It blocks until the response has been completed, rather than returning a pending result.
     ValueTask EvaluateStepAsync(TaskId taskId, DurableTask taskDefinition);
     ValueTask<TResult> EvaluateStepAsync<TResult>(TaskId taskId, DurableTask<TResult> taskDefinition);
-    ValueTask<ScheduledTask> OnScheduleAsync(DurableTaskRequest durableTaskRequest);
-    ValueTask<ScheduledTask<TResult>> OnScheduleAsync<TResult>(DurableTaskRequest<TResult> durableTaskRequest);
+    ValueTask<ScheduledTask> ScheduleLocallyAsync(DurableTaskRequest durableTaskRequest);
+    ValueTask<ScheduledTask<TResult>> ScheduleLocallyAsync<TResult>(DurableTaskRequest<TResult> durableTaskRequest);
 }
 
-/*
- * Grain activates
- * Grain enumerates stored pending tasks and re-invokes any which are not completed.
- *   * Some tasks will not be directly invokable, since they represent local methods on a grain (not remote requests to the grain)
-     * Those tasks do not need to be invoked.
- */
-
-[GenerateSerializer]
-public class DurableTaskState
-{
-    /// <summary>
-    /// Gets or sets the result of this task.
-    /// </summary>
-    [Id(0)]
-    public Response? Result { get; set; }
-
-    /// <summary>
-    /// Gets or sets the set of clients which are interested in the result of this task.
-    /// </summary>
-    /// <remarks>
-    /// This task cannot be retired until all clients have acknowledged the task's result.
-    /// If the task has a parent task (determined using the task's hierarchical identifier), then the result will not be retired until that
-    /// In the case of nested tasks (eg, defined by local methods), there will typically be no clients.
-    /// In that case, the result will not be 
-    /// </remarks>
-    [Id(1)]
-    public HashSet<IDurableTaskClient>? Clients { get; set; }
-
-    /// <summary>
-    /// Gets or sets the invokable request.
-    /// </summary>
-    [Id(2)]
-    public IDurableTaskRequest? Request { get; set; }
-
-    /// <summary>
-    /// Gets or sets the time that the task completed.
-    /// </summary>
-    [Id(3)]
-    public DateTime? CompletedAt { get; set; }
-
-    /// <summary>
-    /// Gets or sets the time that the task was created.
-    /// </summary>
-    [Id(4)]
-    public DateTime CreatedAt { get; set; }
-}
-
-// TODO: In designing this interface, perhaps we should model mutations in a finer-grained manner to facilitate efficient log-based storage approach.
-// Eg: Separate AddRequest, Add/RemoveClient, SetResponse methods.
-internal interface IDurableTaskGrainStorage
-{
-    IEnumerable<(TaskId Id, DurableTaskState State)> Tasks { get; }
-    void AddOrUpdateTask(TaskId taskId, DurableTaskState state);
-    bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out DurableTaskState? state);
-
-    // Removes a request and its state
-    bool RemoveTask(TaskId taskId);
-    
-    ValueTask WriteAsync();
-    ValueTask ReadAsync();
-}
-
-internal class DurableTaskGrainStorage : IDurableTaskGrainStorage
-{
-    private Dictionary<TaskId, DurableTaskState> _workingCopy = new();
-    private Dictionary<TaskId, DurableTaskState> _persistedCopy = new();
-    private readonly DeepCopier<Dictionary<TaskId, DurableTaskState>> _storageCopier;
-    private readonly DeepCopier<DurableTaskState> _stateCopier;
-
-    public IEnumerable<(TaskId Id, DurableTaskState State)> Tasks => _workingCopy.Select(static pair => (pair.Key, pair.Value));
-
-    public DurableTaskGrainStorage(DeepCopier<Dictionary<TaskId, DurableTaskState>> storageCopier, DeepCopier<DurableTaskState> stateCopier)
-    {
-        _storageCopier = storageCopier;
-        _stateCopier = stateCopier;
-    }
-
-    public void AddOrUpdateTask(TaskId taskId, DurableTaskState state) => _workingCopy[taskId] = _stateCopier.Copy(state);
-    public bool RemoveTask(TaskId taskId) => _workingCopy.Remove(taskId);
-    public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out DurableTaskState? state)
-    {
-        if (_workingCopy.TryGetValue(taskId, out var internalState))
-        {
-            state = _stateCopier.Copy(internalState);
-            return true;
-        }
-
-        state = null;
-        return false;
-    }
-
-    public ValueTask ReadAsync()
-    {
-        _workingCopy = _storageCopier.Copy(_persistedCopy);
-        return default;
-    }
-
-    public ValueTask WriteAsync()
-    {
-        _persistedCopy = _storageCopier.Copy(_workingCopy);
-        return default;
-    }
-}
-
-internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime
+internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTaskGrainExtension
 {
     private readonly Dictionary<TaskId, DurableTaskExecutionContext> _pendingTasks = new();
     private readonly Dictionary<TaskId, Task> _runningTasks = new();
@@ -211,60 +106,48 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime
         executionContext.SetResponse(response);
     }
 
-    public ValueTask<Response> ScheduleOrPollAsync(IDurableTaskRequest request)
+    async ValueTask IDurableTaskServer.ScheduleAsync(IDurableTaskRequest request)
     {
         if (request.Context is not { } requestContext)
         {
             throw new InvalidOperationException($"No context for durable task request {request}");
         }
 
+        var taskId = requestContext.TaskId;
         var client = requestContext.Caller?.Cast<IDurableTaskClient>();
-        if (TryGetExecutionContext(requestContext.TaskId, out var executionContext))
+        if (TryGetExecutionContext(taskId, out var executionContext))
         {
-            return SubscribeAsync(requestContext.TaskId, executionContext, client);
+            // Ensure the client is subscribed to the existing task.
+            await SubscribeClientAsync(taskId, executionContext, client);
+            return;
         }
 
         // Schedule the task
-        return ScheduleNewTaskRequestAsync(request, client);
+        await ScheduleNewTaskRequestAsync(request, client);
     }
 
-    private ValueTask<Response> SubscribeAsync(TaskId taskId, DurableTaskExecutionContext executionContext, IDurableTaskClient? client)
+    private async ValueTask SubscribeClientAsync(TaskId taskId, DurableTaskExecutionContext executionContext, IDurableTaskClient? client)
     {
-        // If the task is not yet completed, return.
-        var responseTask = executionContext.AsValueTask();
-        if (responseTask.IsCompleted)
-        {
-            return responseTask;
-        }
-
         if (client is not null)
         {
             var existingClients = executionContext.State.Clients;
             if (existingClients is null || !existingClients.Contains(client))
             {
-                return AddClientAsync(taskId, executionContext, client);
+                var state = executionContext.State;
+
+                // Add the client to the persisted task state.
+                state.Clients ??= new();
+                state.Clients.Add(client);
+                _storage.AddOrUpdateTask(taskId, state);
+                await _storage.WriteAsync();
             }
         }
-
-        return new ValueTask<Response>(PendingResponse.Instance);
     }
 
-    private async ValueTask<Response> AddClientAsync(TaskId taskId, DurableTaskExecutionContext executionContext, IDurableTaskClient client)
-    {
-        var state = executionContext.State;
-
-        // Add the client to the persisted task state.
-        state.Clients ??= new();
-        state.Clients.Add(client);
-        _storage.AddOrUpdateTask(taskId, state);
-        await _storage.WriteAsync();
-
-        return PendingResponse.Instance;
-    }
-
-    private async ValueTask<Response> ScheduleNewTaskRequestAsync(IDurableTaskRequest request, IDurableTaskClient? client)
+    private async ValueTask ScheduleNewTaskRequestAsync(IDurableTaskRequest request, IDurableTaskClient? client)
     {
         var taskId = request.Context!.TaskId;
+        Debug.Assert(!_pendingTasks.ContainsKey(taskId));
         var newTaskState = new DurableTaskState
         {
             Request = request,
@@ -282,8 +165,6 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime
         // Schedule the task with the runtime.
         var executionContext = CreateExecutionContext(taskId, newTaskState);
         InvokeRequestMethod(taskId, request, executionContext);
-
-        return PendingResponse.Instance;
     }
 
     public async ValueTask EvaluateStepAsync(TaskId taskId, DurableTask durableTask)
@@ -508,7 +389,11 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime
         return completedTaskIds is not null;
     }
 
-    public async ValueTask<ScheduledTask> OnScheduleAsync(DurableTaskRequest durableTaskRequest)
+    public async ValueTask<ScheduledTask> ScheduleLocallyAsync(DurableTaskRequest durableTaskRequest) => new UntypedScheduledTask(await ScheduleLocallyAsyncCore(durableTaskRequest));
+
+    public async ValueTask<ScheduledTask<TResult>> ScheduleLocallyAsync<TResult>(DurableTaskRequest<TResult> durableTaskRequest) => new ScheduledTask<TResult>(await ScheduleLocallyAsyncCore(durableTaskRequest));
+
+    private async ValueTask<DurableTaskExecutionContext> ScheduleLocallyAsyncCore(IDurableTaskRequest durableTaskRequest)
     {
         var context = durableTaskRequest.Context;
         Debug.Assert(context is not null);
@@ -520,25 +405,20 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime
             executionContext = await CreateExecutionContextAsync(taskId);
         }
 
-        var responseTask = executionContext.AsValueTask();
+        // Invoke the task to submit it to the remote host.
+        // If the task has already been submitted, then this will submit it again, which is an idempotent operation if:
+        // * The task is semantically identical (same implementation and arguments).
+        // * The task did not complete already and was subsequently cleaned up.
+        // We can be sure that the task was not already cleaned up if we are calling from a grain which has a stable identifier, since
+        // the caller must acknowledge completion before the task is eligible for garbage collection.
+        // For the first point (identical implementation and arguments), we could store the task locally and verify it against its already-stored copy.
+        // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
+        await durableTaskRequest.ScheduleRemoteAsync();
 
-        // If the task has already completed, do not start it again.
-        if (!responseTask.IsCompleted)
-        {
-            // Submit the request to the remote service.
-            // Submit the request to the remote service.
-            // Submit the request to the remote service.
-            // Submit the request to the remote service.
-            // Submit the request to the remote service.
-            // Submit the request to the remote service.
-            // Submit the request to the remote service.
-            throw new NotImplementedException();
-        }
-
-        return new UntypedScheduledTask(executionContext);
+        // Return a scheduled task, which can be awaited to retrieve the result once it has been locally persisted.
+        // For non-persistent contexts (such as an external client or hosted client), this can be implemented via polling instead, for example.
+        return executionContext;
     }
-
-    public ValueTask<ScheduledTask<TResult>> OnScheduleAsync<TResult>(DurableTaskRequest<TResult> durableTaskRequest) => throw new NotImplementedException();
 
     public ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskClient? client)
     {
@@ -553,12 +433,19 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime
             return new(response);
         }
 
-        if (client is not null)
+        var subscribeTask = SubscribeClientAsync(taskId, executionContext, client);
+        if (!subscribeTask.IsCompleted)
         {
             // Subscribe the client and return
-            return SubscribeAsync(taskId, executionContext, client);
+            return AwaitSubscribeClientAsync(subscribeTask);
         }
 
         return new(PendingResponse.Instance);
+
+        static async ValueTask<Response> AwaitSubscribeClientAsync(ValueTask subscribeTask)
+        {
+            await subscribeTask;
+            return PendingResponse.Instance;
+        }
     }
 }
