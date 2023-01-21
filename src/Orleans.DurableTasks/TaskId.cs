@@ -10,14 +10,9 @@ public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<
     [Id(0)]
     private readonly HierarchicalKey? _key;
     
-    public TaskId(string value)
+    private TaskId(string value)
     {
-        _key = new HierarchicalKey(value);
-    }
-    
-    public TaskId(TaskId parent, string value)
-    {
-        _key = new HierarchicalKey(parent._key, value);
+        _key = HierarchicalKey.CreateEscaped(value);
     }
     
     private TaskId(HierarchicalKey key)
@@ -65,7 +60,8 @@ public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<
     public bool IsDecendantOf(TaskId other) => other._key is not null && other._key.IsPrefixOf(_key);
     public bool IsParentOf(TaskId other) => _key is not null && _key.IsParentOf(other._key);
     public bool IsChildOf(TaskId other) => _key is not null && _key.IsChildOf(other._key);
-    public TaskId GetParent() => _key?.GetParent() is { } parent ? new(parent) : None;
-    public TaskId CreateChild(string value) => _key is { } key ? new(_key.CreateEscapedChildKey(value)) : new(value);
+    public TaskId Parent() => _key?.GetParent() is { } parent ? new(parent) : None;
+    public TaskId Child(string value) => _key is { } key ? new(_key.CreateEscapedChildKey(value)) : new(value);
+    public static TaskId Create(string value) => new(HierarchicalKey.CreateEscaped(value));
 }
 

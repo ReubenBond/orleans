@@ -77,7 +77,15 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            var isSelfInvoking = baseClassType.HasAttribute(libraryTypes.SelfInvokingReturnTypeAttribute);
+            string selfInvokeMethodName;
+            if (baseClassType.GetAttribute(libraryTypes.SelfInvokingReturnTypeAttribute) is { } attribute)
+            {
+                selfInvokeMethodName = (string)attribute.ConstructorArguments[0].Value;
+            }
+            else
+            {
+                selfInvokeMethodName = null;
+            }
 
             while (baseClassType.HasAttribute(libraryTypes.SerializerTransparentAttribute))
                 baseClassType = baseClassType.BaseType;
@@ -92,7 +100,7 @@ namespace Orleans.CodeGenerator
                 baseClassType,
                 ctorArgs,
                 compoundTypeAliasArgs,
-                isSelfInvoking);
+                selfInvokeMethodName);
             return (classDeclaration, invokerDescription);
 
             static Accessibility GetAccessibility(InvokableInterfaceDescription interfaceDescription)

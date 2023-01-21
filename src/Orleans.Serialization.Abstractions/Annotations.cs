@@ -568,5 +568,11 @@ namespace Orleans.Invocation
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class SelfInvokingReturnTypeAttribute : Attribute
     {
+        public SelfInvokingReturnTypeAttribute(string invokeMethodName)
+        {
+            InvokeMethodName = invokeMethodName;
+        }
+
+        public string InvokeMethodName { get; }
     }
 }

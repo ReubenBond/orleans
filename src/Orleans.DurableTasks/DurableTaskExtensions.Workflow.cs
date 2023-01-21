@@ -1,3 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
+using Orleans.DurableTasks.Remoting;
+
 namespace Orleans.DurableTasks;
 
 public static class DurableTaskExtensions
@@ -9,28 +12,25 @@ public static class DurableTaskExtensions
     /// <param name="taskDefinition">The task.</param>
     /// <param name="taskId">The task identifier.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> taskDefinition, string taskId)   
-    {
-        throw new NotImplementedException();
-        /*
-        var currentContext = DurableTaskExecutionContext.GetCurrentContextOrThrow();
+    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> taskDefinition, string taskId) => ScheduleAsync(taskDefinition, taskId, options: null);
 
-        // See if a child node exists for this context already.
-        var childContext = currentContext.GetOrCreateChildNode(workflowId, taskDefinition, out var exists);
-        if (exists)
+    /// <summary>
+    /// Schedules the provided <see cref="DurableTask{TResult}"/> as a workflow using the provided identifier.
+    /// </summary>
+    /// <typeparam name="TResult">The task result type.</typeparam>
+    /// <param name="taskDefinition">The task.</param>
+    /// <param name="taskId">The task identifier.</param>
+    /// <param name="options">The task scheduling options.</param>
+    /// <returns>A handle for the scheduled task.</returns>
+    public static async ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> taskDefinition, string taskId, SchedulingOptions? options)
+    {
+        var typedTaskId = TaskId.Create(taskId);
+        if (taskDefinition is not ISchedulableTask<TResult> schedulableTask)
         {
-            // The child already existed. If it is complete, return the result here.
-            var resultTask = childContext.AsValueTask<TResult>();
-            if (resultTask.IsCompleted)
-            {
-                return resultTask;
-            }
+            throw GetNonSchedulableTaskException();
         }
 
-        // The child task is either in-progress or not yet started. Either way,
-        // use the (potentially in-progress) execution context to invoke it and attempt to complete it.
-        return taskDefinition.InvokeAsync(childContext);
-        */
+        return await schedulableTask.ScheduleTypedAsync(typedTaskId, options);
     }
 
     /// <summary>
@@ -39,28 +39,24 @@ public static class DurableTaskExtensions
     /// <param name="taskDefinition">The task.</param>
     /// <param name="taskId">The task identifier.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition, string taskId)
-    {
-        throw new NotImplementedException();
-        /*
-        var currentContext = DurableTaskExecutionContext.GetCurrentContextOrThrow();
+    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition, string taskId) => ScheduleAsync(taskDefinition, taskId);
 
-        // See if a child node exists for this context already.
-        var childContext = currentContext.GetOrCreateChildNode(workflowId, taskDefinition, out var exists);
-        if (exists)
+    /// <summary>
+    /// Schedules the provided <see cref="DurableTask"/> as a workflow using the provided identifier.
+    /// </summary>
+    /// <param name="taskDefinition">The task.</param>
+    /// <param name="taskId">The task identifier.</param>
+    /// <param name="options">The task scheduling options.</param>
+    /// <returns>A handle for the scheduled task.</returns>
+    public static async ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition, string taskId, SchedulingOptions? options)
+    {
+        var typedTaskId = TaskId.Create(taskId);
+        if (taskDefinition is not ISchedulableTask schedulableTask)
         {
-            // The child already existed. If it is complete, return the result here.
-            var resultTask = childContext.AsUntypedValueTask();
-            if (resultTask.IsCompleted)
-            {
-                return resultTask;
-            }
+            throw GetNonSchedulableTaskException();
         }
 
-        // The child task is either in-progress or not yet started. Either way,
-        // use the (potentially in-progress) execution context to invoke it and attempt to complete it.
-        return taskDefinition.InvokeAsync(childContext);
-        */
+        return await schedulableTask.ScheduleUntypedAsync(typedTaskId, options);
     }
 
     /// <summary>
@@ -72,23 +68,14 @@ public static class DurableTaskExtensions
     /// <returns>The result of invoking the task.</returns>
     public static ValueTask<TResult> AsStep<TResult>(this DurableTask<TResult> taskDefinition, string stepId)
     {
+        // Steps are only applicable nested within other durable tasks, so if we do not have an ambient context
+        // then something has gone awry.
         var currentContext = DurableTaskExecutionContext.GetCurrentContextOrThrow();
 
-        // See if a child node exists for this context already.
-        var childContext = currentContext.GetOrCreateChildNode(stepId, taskDefinition, out var exists);
-        if (exists)
-        {
-            // The child already existed. If it is complete, return the result here.
-            var resultTask = childContext.AsValueTask<TResult>();
-            if (resultTask.IsCompleted)
-            {
-                return resultTask;
-            }
-        }
+        // Create a new, nested task id for the step
+        var taskId = currentContext.TaskId.Child(stepId);
 
-        // The child task is either in-progress or not yet started. Either way,
-        // use the (potentially in-progress) execution context to invoke it and attempt to complete it.
-        return taskDefinition.InvokeAsync(childContext);
+        return currentContext.Runtime.EvaluateStepAsync(taskId, taskDefinition);
     }
 
     /// <summary>
@@ -99,22 +86,13 @@ public static class DurableTaskExtensions
     /// <returns>A <see cref="ValueTask"/> representing the work performed.</returns>
     public static ValueTask AsStep(this DurableTask taskDefinition, string stepId)
     {
+        // Steps are only applicable nested within other durable tasks, so if we do not have an ambient context
+        // then something has gone awry.
         var currentContext = DurableTaskExecutionContext.GetCurrentContextOrThrow();
-
-        // See if a child node exists for this context already.
-        var childContext = currentContext.GetOrCreateChildNode(stepId, taskDefinition, out var exists);
-        if (exists)
-        {
-            // The child already existed. If it is complete, return the result here.
-            var resultTask = childContext.AsUntypedValueTask();
-            if (resultTask.IsCompleted)
-            {
-                return resultTask;
-            }
-        }
-
-        // The child task is either in-progress or not yet started. Either way,
-        // use the (potentially in-progress) execution context to invoke it and attempt to complete it.
-        return taskDefinition.InvokeAsync(childContext);
+        var taskId = currentContext.TaskId.Child(stepId);
+        var runtime = currentContext.Runtime;
+        return runtime.EvaluateStepAsync(taskId, taskDefinition);
     }
+
+    private static InvalidOperationException GetNonSchedulableTaskException() => new ("The provided task does not support scheduling. This may be because it is a local method or another non-serializable task type.");
 }

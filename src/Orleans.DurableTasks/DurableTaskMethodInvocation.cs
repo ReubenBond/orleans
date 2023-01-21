@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;
 
@@ -63,7 +64,7 @@ internal sealed class UntypedDurableTaskMethodInvocation<TStateMachine> : Untype
         return executionContext.AsUntypedValueTask();
     }
 
-    public override void SetResult() => _executionContext!.SetResponse(null);
+    public override void SetResult() => _executionContext!.SetResponse(Response.Completed);
 
     public override void SetException(Exception exception) => _executionContext!.SetException(exception);
 }
@@ -71,11 +72,12 @@ internal sealed class UntypedDurableTaskMethodInvocation<TStateMachine> : Untype
 /// <summary>
 /// Represents a locally-executing <see cref="DurableTask{TResult}"/> method.
 /// </summary>
-internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResult>, IDurableTaskMethodInvocation
+internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResult>, IDurableTaskMethodInvocation<TResult>
 {
     public abstract void SetResult(TResult result);
-
     public abstract void SetException(Exception exception);
+    ValueTask<TResult> IDurableTaskMethodInvocation<TResult>.InvokeAsyncTypedCore(DurableTaskExecutionContext executionContext) => InvokeAsyncTypedCore(executionContext);
+    ValueTask IDurableTaskMethodInvocation.InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext) => InvokeAsyncUntypedCore(executionContext);
 }
 
 /// <summary>
@@ -106,6 +108,7 @@ internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : Dura
     void IAsyncStateMachine.MoveNext()
     {
         // TODO: is this the best & most efficient way to propagate the context? It seems like it would be costly to do this for every await point.
+        // Maybe a cheaper alternative would be to use a thread-local in addition to the async-local? Possibly ask Toub about ExecutionContext APIs, etc...
         DurableTaskExecutionContext.SetCurrentContext(_executionContext, out var previousContext);
         try
         {
@@ -133,7 +136,7 @@ internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : Dura
         return executionContext.AsUntypedValueTask();
     }
 
-    public override void SetResult(TResult result) => _executionContext!.SetResult(result);
+    public override void SetResult(TResult result) => _executionContext!.SetResponse(Response.FromResult(result));
 
     public override void SetException(Exception exception) => _executionContext!.SetException(exception);
 }
@@ -143,4 +146,10 @@ internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : Dura
 /// </summary>
 internal interface IDurableTaskMethodInvocation
 {
+    ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext);
+}
+
+internal interface IDurableTaskMethodInvocation<TResult> : IDurableTaskMethodInvocation
+{
+    ValueTask<TResult> InvokeAsyncTypedCore(DurableTaskExecutionContext executionContext);
 }

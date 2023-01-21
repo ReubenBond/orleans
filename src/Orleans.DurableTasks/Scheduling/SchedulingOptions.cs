@@ -7,5 +7,5 @@ public class SchedulingOptions
     public DateTime? DueTime { get; init; }
 
     [Id(1)]
-    public string? RetryPolicy { get; init; }
+    public string? PolicyId { get; init; }
 }

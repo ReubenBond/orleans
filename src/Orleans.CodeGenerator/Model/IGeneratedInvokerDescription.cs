@@ -24,7 +24,7 @@ namespace Orleans.CodeGenerator
             INamedTypeSymbol baseType,
             List<TypeSyntax> constructorArguments,
             CompoundTypeAliasComponent[] compoundTypeAliasArguments,
-            bool isSelfInvoking)
+            string selfInvokeMethodName)
         {
             InterfaceDescription = interfaceDescription;
             _methodDescription = methodDescription;
@@ -36,7 +36,7 @@ namespace Orleans.CodeGenerator
             SerializationHooks = serializationHooks;
             ActivatorConstructorParameters = constructorArguments;
             CompoundTypeAliasArguments = compoundTypeAliasArguments;
-            IsSelfInvoking = isSelfInvoking;
+            SelfInvokeMethodName = selfInvokeMethodName;
         }
 
         public Accessibility Accessibility { get; }
@@ -70,7 +70,7 @@ namespace Orleans.CodeGenerator
         public List<TypeSyntax> ActivatorConstructorParameters { get; }
         public bool HasActivatorConstructor => UseActivator;
         public CompoundTypeAliasComponent[] CompoundTypeAliasArguments {get;}
-        public bool IsSelfInvoking { get; }
+        public string SelfInvokeMethodName { get; }
 
         public ExpressionSyntax GetObjectCreationExpression(LibraryTypes libraryTypes) => ObjectCreationExpression(TypeSyntax, ArgumentList(), null);
 

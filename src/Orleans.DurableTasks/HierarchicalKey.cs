@@ -305,10 +305,15 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
     }
 
     /// <summary>
+    /// Creates a new key, escaping any unescaped segment separators in <paramref name="value"/>, and returns it.
+    /// </summary>
+    /// <param name="value">The value.</param>
+    public static HierarchicalKey CreateEscaped(string value) => CreateEscaped(null, value);
+
+    /// <summary>
     /// Creates a key which is a child of this key, escaping any unescaped segment separators in <paramref name="value"/>, and returns it.
     /// </summary>
     /// <param name="value">The value for the child segments.</param>
-    /// <returns></returns>
     public HierarchicalKey CreateEscapedChildKey(string value) => CreateEscaped(this, value);
 
     /// <summary>

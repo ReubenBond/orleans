@@ -268,10 +268,10 @@ namespace Orleans.CodeGenerator
                 statements.Add(ReturnStatement(invocationExpression));
                 isAsync = false;
             }
-            else if (requestDescription.IsSelfInvoking)
+            else if (requestDescription.SelfInvokeMethodName is { } selfInvokeMethodName)
             {
-                // C#: return request;
-                statements.Add(ReturnStatement(requestVar));
+                // C#: return request.<selfInvokeMethodName>(this);
+                statements.Add(ReturnStatement(InvocationExpression(requestVar.Member(selfInvokeMethodName), ArgumentList(SingletonSeparatedList(Argument(ThisExpression()))))));
                 isAsync = false;
             }
             else if (rt.Arity == 0)

@@ -1,94 +1,50 @@
-using System.Buffers;
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks.Sources;
 
 namespace Orleans.DurableTasks;
 
 public abstract class ScheduledTask
 {
-    internal abstract DurableTask DurableTask { get; }
-
-    protected ScheduledTask(TaskId taskId, SchedulingOptions? options)
-    {
-        Id = taskId;
-        Options = options;
-    }
-
-    public TaskId Id { get; }
-    public SchedulingOptions? Options { get; }
-
-    public ValueTask RescheduleAsync(DateTimeOffset dueTime)
-    {
-        return default;
-    }
+    public abstract TaskId Id { get; }
 
     public ValueTask CancelAsync()
     {
-        return default;
+        throw new NotImplementedException();
     }
 
     public abstract Task AsTask();
-
-    public ScheduledTaskAwaiter GetAwaiter() => new (this);
-
+    public ScheduledTaskAwaiter GetAwaiter() => new(this);
     protected internal abstract ValueTask AsUntypedValueTask();
 }
 
-public class ScheduledTask<TResult> : ScheduledTask, IValueTaskSource<TResult>, IValueTaskSource
+public class ScheduledTask<TResult> : ScheduledTask
 {
-    private readonly DurableTask<TResult> _durableTaskDefinition;
-    private ManualResetValueTaskSourceCore<TResult> _taskSource;
+    private readonly DurableTaskExecutionContext _executionContext;
 
-    internal ScheduledTask(TaskId taskId, SchedulingOptions? options, DurableTask<TResult> durableTask) : base(taskId, options)
+    internal ScheduledTask(DurableTaskExecutionContext executionContext)
     {
-        _durableTaskDefinition = durableTask;
+        _executionContext = executionContext;
     }
 
-    internal override DurableTask<TResult> DurableTask => _durableTaskDefinition;
-
+    public override TaskId Id => _executionContext.TaskId;
     public override async Task<TResult> AsTask() => await this;
-
     public new ScheduledTaskAwaiter<TResult> GetAwaiter() => new(this);
-
-    protected internal override ValueTask AsUntypedValueTask() => new(this, _taskSource.Version);
-    internal ValueTask<TResult> AsValueTask() => new(this, _taskSource.Version);
-
-    TResult IValueTaskSource<TResult>.GetResult(short token) => _taskSource.GetResult(token);
-    ValueTaskSourceStatus IValueTaskSource<TResult>.GetStatus(short token) => _taskSource.GetStatus(token);
-    void IValueTaskSource<TResult>.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _taskSource.OnCompleted(continuation, state, token, flags);
-
-    void IValueTaskSource.GetResult(short token) => _taskSource.GetResult(token);
-    ValueTaskSourceStatus IValueTaskSource.GetStatus(short token) => _taskSource.GetStatus(token);
-    void IValueTaskSource.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _taskSource.OnCompleted(continuation, state, token, flags);
-
-    internal void SetResult(TResult result) => _taskSource.SetResult(result);
-    internal void SetException(Exception exception) => _taskSource.SetException(exception);
+    protected internal override ValueTask AsUntypedValueTask() => _executionContext.AsUntypedValueTask();
+    internal ValueTask<TResult> AsValueTask() => _executionContext.AsValueTask<TResult>();
 }
 
-internal sealed class UntypedScheduledTaskInvocation : ScheduledTask, IValueTaskSource
+internal sealed class UntypedScheduledTask : ScheduledTask
 {
-    private readonly DurableTask _durableTaskDefiniton;
-    private ManualResetValueTaskSourceCore<VoidTaskResult> _taskSource;
+    private readonly DurableTaskExecutionContext _executionContext;
 
-    internal UntypedScheduledTaskInvocation(TaskId taskId, SchedulingOptions? options, DurableTask durableTaskDefinition) : base(taskId, options)
+    internal UntypedScheduledTask(DurableTaskExecutionContext executionContext)
     {
-        _durableTaskDefiniton = durableTaskDefinition;
+        _executionContext = executionContext;
     }
 
-    internal override DurableTask DurableTask => _durableTaskDefiniton;
-
+    public override TaskId Id => _executionContext.TaskId;
+    public override Task AsTask() => _executionContext.AsUntypedValueTask().AsTask();
     public new ScheduledTaskAwaiter GetAwaiter() => new(this);
-
-    public override async Task AsTask() => await this;
-
-    protected internal override ValueTask AsUntypedValueTask() => new(this, _taskSource.Version);
-
-    void IValueTaskSource.GetResult(short token) => _taskSource.GetResult(token);
-    ValueTaskSourceStatus IValueTaskSource.GetStatus(short token) => _taskSource.GetStatus(token);
-    void IValueTaskSource.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _taskSource.OnCompleted(continuation, state, token, flags);
-
-    internal void SetResult() => _taskSource.SetResult(default);
-    internal void SetException(Exception exception) => _taskSource.SetException(exception);
+    protected internal override ValueTask AsUntypedValueTask() => _executionContext.AsUntypedValueTask();
 }
 
 public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
