@@ -45,13 +45,13 @@ public class Program
 {
     public interface IBankGrain : IGrainWithStringKey
     {
-        DurableTask<bool> Transfer(IAccountGrain source, IAccountGrain destination, int amount);
+        DurableTask<bool> Transfer(IAccountGrain source, IAccountGrain destination, long amount);
     }
 
     public interface IAccountGrain : IGrainWithStringKey
     {
-        DurableTask<bool> Withdraw(int amount);
-        DurableTask Deposit(int amount);
+        DurableTask<bool> Withdraw(long amount);
+        DurableTask Deposit(long amount);
     }
 
     public class BankGrain : IBankGrain
@@ -59,7 +59,7 @@ public class Program
         public async DurableTask<bool> Transfer(
             IAccountGrain source,
             IAccountGrain destination,
-            int amount)
+            long amount)
         {
             bool success = await source.Withdraw(amount).AsStep("withdraw");
             if (!success) return false;
@@ -68,11 +68,11 @@ public class Program
         }
     }
 
-    public class AccountGrain : Grain<int>, IAccountGrain
+    public class AccountGrain : Grain<long>, IAccountGrain
     {
-        public async DurableTask Deposit(int amount) => State += amount;
+        public async DurableTask Deposit(long amount) => State += amount;
 
-        public async DurableTask<bool> Withdraw(int amount)
+        public async DurableTask<bool> Withdraw(long amount)
         {
             if (State >= amount)
             {
@@ -129,8 +129,11 @@ public class Program
         var billGates = client.GetGrain<IAccountGrain>("billg");
         var me = client.GetGrain<IAccountGrain>("rebond");
 
+        // await await?!
+        await await billGates.Deposit(120_000_000_000).ScheduleAsync("create-pc-industry");
+
         var scheduledTask = await bankGrain
-            .Transfer(billGates, me, 1_000_000_000)
+            .Transfer(billGates, me, 20)
             .ScheduleAsync("transfer123");
 
         var success = await scheduledTask;

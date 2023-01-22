@@ -42,7 +42,7 @@ public static class DurableTaskExtensions
     /// <param name="taskDefinition">The task.</param>
     /// <param name="taskId">The task identifier.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition, string taskId) => ScheduleAsync(taskDefinition, taskId);
+    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition, string taskId) => ScheduleAsync(taskDefinition, taskId, options: null);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask"/> as a workflow using the provided identifier.
