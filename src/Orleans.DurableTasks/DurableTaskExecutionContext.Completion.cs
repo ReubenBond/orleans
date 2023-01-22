@@ -27,7 +27,7 @@ public sealed partial class DurableTaskExecutionContext : IValueTaskSource<Respo
     internal void SetResponse(Response response) => _tcs.SetResult(response);
 
     Response IValueTaskSource<Response>.GetResult(short token) => _tcs.GetResult(token);
-    void IValueTaskSource.GetResult(short token) => _tcs.GetResult(token);
+    void IValueTaskSource.GetResult(short token) => _tcs.GetResult(token).ThrowIfExceptionResponse();
     ValueTaskSourceStatus IValueTaskSource<Response>.GetStatus(short token) => _tcs.GetStatus(token);
     ValueTaskSourceStatus IValueTaskSource.GetStatus(short token) => _tcs.GetStatus(token);
     void IValueTaskSource<Response>.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _tcs.OnCompleted(continuation, state, token, flags);

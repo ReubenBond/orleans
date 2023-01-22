@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
+using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
 
@@ -10,6 +11,7 @@ namespace Orleans.DurableTasks.Remoting;
 public interface IDurableTaskClient
 {
     // Called when a remotely scheduled request completes
+    [AlwaysInterleave]
     ValueTask OnResponse(TaskId taskId, Response response);
 }
 
