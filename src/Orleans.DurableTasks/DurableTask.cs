@@ -5,6 +5,11 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;
 
+public interface IPollableTask
+{
+    ValueTask<Response> PollAsync();
+}
+
 [InvokableBaseType(typeof(GrainReference), typeof(DurableTask), typeof(DurableTaskRequest))]
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
 [GenerateSerializer, SerializerTransparent]

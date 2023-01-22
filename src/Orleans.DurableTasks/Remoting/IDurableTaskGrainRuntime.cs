@@ -23,7 +23,7 @@ public interface IDurableTaskServer
 
     // API used by ScheduledTask/<T> to check for a result for a task.
     // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
-    //ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskClient? client);
+    ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskClient? client);
 }
 
 public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServer, IDurableTaskClient
@@ -72,8 +72,20 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
 
     private GrainId GrainId => _shared.GrainContextAccessor.GrainContext.GrainId;
 
+    /// <summary>
+    /// Creates a new execution context, registering it in the local collection of execution contexts.
+    /// </summary>
+    /// <param name="taskId">The task id.</param>
+    /// <param name="state">The task state.</param>
+    /// <returns>The new execution context.</returns>
     private DurableTaskExecutionContext CreateExecutionContext(TaskId taskId, DurableTaskState state) => _pendingTasks[taskId] = new DurableTaskExecutionContext(taskId, this, state);
 
+    /// <summary>
+    /// Gets the execution context corresponding to the provided task, if it exists, and returns it.
+    /// </summary>
+    /// <param name="taskId">The task to get an execution context from.</param>
+    /// <param name="executionContext">The execution context.</param>
+    /// <returns><see langword="true"/> if the execution context was found, <see langword="false"/> otherwise.</returns>
     private bool TryGetExecutionContext(TaskId taskId, [NotNullWhen(true)] out DurableTaskExecutionContext? executionContext)
     {
         // Is an active method already waiting for this?
@@ -101,6 +113,11 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         return false;
     }
 
+    /// <summary>
+    /// Gets a reference to the caller if the caller supports durable task notification callbacks.
+    /// </summary>
+    /// <param name="requestContext">The request context.</param>
+    /// <returns>A reference to the caller if the caller supports notifications callbacks, otherwise <see langword="null"/>.</returns>
     private IDurableTaskGrainExtension? GetCallerClientReference(DurableTaskRequestContext requestContext)
     {
         var caller = requestContext.Caller;
@@ -121,6 +138,12 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         return null;
     }
 
+    /// <summary>
+    /// Called upon completion of a task. The receiver must persist consume the response as the caller may clear task state after this method returns.
+    /// </summary>
+    /// <param name="taskId">The task id.</param>
+    /// <param name="response">The task result.</param>
+    /// <returns>A <see cref="ValueTask"/> representing the work performed.</returns>
     async ValueTask IDurableTaskClient.OnResponse(TaskId taskId, Response response)
     {
         if (!TryGetExecutionContext(taskId, out var executionContext))
@@ -143,6 +166,12 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         executionContext.SetResponse(response);
     }
 
+    /// <summary>
+    /// Durably schedules a request for invocation against this instance.
+    /// </summary>
+    /// <param name="request">The request.</param>
+    /// <returns>A <see cref="Response"/> indicating the status of the request. A response of type <see cref="PendingResponse"/> indicates that the caller can call this method again to poll for completion.</returns>
+    /// <exception cref="InvalidOperationException"></exception>
     async ValueTask<Response> IDurableTaskServer.ScheduleAsync(IDurableTaskRequest request)
     {
         if (request.Context is not { } requestContext)
@@ -256,12 +285,24 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
                     // Ensure that the request is being polled in the background so that the response can be propagated to the caller.
                     _ = Task.Run(async () =>
                     {
+                        var pollable = durableTask as IPollableTask;
                         while (true)
                         {
                             await Task.Delay(1_000);
                             try
                             {
-                                var response = await durableTask.InvokeAsync(executionContext);
+                                Response response;
+                                if (pollable is not null)
+                                {
+                                    // Poll the task, which is cheaper than sending the initial request again.
+                                    response = await pollable.PollAsync();
+                                }
+                                else
+                                {
+                                    // Resubmit the request, relying on idempotency.
+                                    response = await durableTask.InvokeAsync(executionContext);
+                                }
+
                                 if (response is not PendingResponse)
                                 {
                                     await CompleteRequestWithResponse(taskId, response, executionContext);
@@ -359,6 +400,12 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         await NotifyClientsAndCleanupTask(taskId, executionContext);
     }
 
+    /// <summary>
+    /// Notifies all subscribed clients that the task has completed and performs any necessary cleanup operations.
+    /// </summary>
+    /// <param name="taskId">The task which has completed.</param>
+    /// <param name="executionContext">The task execution context, containing the result.</param>
+    /// <returns>A <see cref="Task"/> representing the work performed.</returns>
     private async Task NotifyClientsAndCleanupTask(TaskId taskId, DurableTaskExecutionContext executionContext)
     {
         Debug.Assert(executionContext.State.Result is not null);
@@ -486,9 +533,13 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         return completedTaskIds is not null;
     }
 
-    /*
     public ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskClient? client)
     {
+        if (_shared.Logger.IsEnabled(LogLevel.Trace))
+        {
+            _shared.Logger.LogTrace("{Id} received polling request for task {TaskId}", GrainId, taskId);
+        }
+
         if (!TryGetExecutionContext(taskId, out var executionContext))
         {
             return new(UnknownTaskResponse.Instance);
@@ -498,6 +549,11 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         if (response is not null)
         {
             return new(response);
+        }
+
+        if (client is null)
+        {
+            return new(PendingResponse.Instance);
         }
 
         var subscribeTask = SubscribeClientAsync(taskId, executionContext, client);
@@ -512,8 +568,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         static async ValueTask<Response> AwaitSubscribeClientAsync(ValueTask subscribeTask)
         {
             await subscribeTask;
-            return PendingResponse.Instance;
+            return SubscribedResponse.Instance;
         }
     }
-    */
 }

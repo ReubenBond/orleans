@@ -27,7 +27,7 @@ public interface IDurableTaskRequest : IRequest
 
 [GenerateSerializer] // Do not make this serializer transparent. We want the option to include information here in future and this is not nearly as perf-critical as regular method calls.
 [SelfInvokingReturnType(nameof(InitializeRequest))]
-public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISchedulableTask
+public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISchedulableTask, IPollableTask
 {
     // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
     // For now, we're not doing that, just to make sure that we can get far without needing it, demonstrating the extensibility of Orleans.
@@ -137,6 +137,15 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
     }
 
     /// <inheritdoc/>
+    ValueTask<Response> IPollableTask.PollAsync()
+    {
+        Debug.Assert(Context is not null);
+        Debug.Assert(Context.TaskId != TaskId.None);
+        var remote = Context.Target.Cast<IDurableTaskGrainExtension>();
+        return remote.SubscribeOrPollAsync(Context.TaskId, null);
+    }
+
+    /// <inheritdoc/>
     ValueTask<Response> IInvokable.Invoke() => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
@@ -166,7 +175,7 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
 /// </summary>
 [GenerateSerializer]
 [SelfInvokingReturnType(nameof(InitializeRequest))]
-public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurableTaskRequest, ISchedulableTask
+public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurableTaskRequest, ISchedulableTask, IPollableTask
 {
     // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
     // For now, we're not doing that, just to make sure that we can get far without needing it, demonstrating the extensibility of Orleans.
@@ -246,6 +255,7 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
         return this;
     }
 
+    /// <inheritdoc/>
     public async ValueTask<DurableTaskExecutionContext> ScheduleAsync(TaskId taskId, SchedulingOptions? options)
     {
         Debug.Assert(Context is not null);
@@ -273,6 +283,15 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
         Context.Caller = _grainContextAccessor.GrainContext?.GrainReference;
         var remote = Context.Target.Cast<IDurableTaskGrainExtension>();
         return await remote.ScheduleAsync(this);
+    }
+
+    /// <inheritdoc/>
+    ValueTask<Response> IPollableTask.PollAsync()
+    {
+        Debug.Assert(Context is not null);
+        Debug.Assert(Context.TaskId != TaskId.None);
+        var remote = Context.Target.Cast<IDurableTaskGrainExtension>();
+        return remote.SubscribeOrPollAsync(Context.TaskId, null);
     }
 
     /// <inheritdoc/>
