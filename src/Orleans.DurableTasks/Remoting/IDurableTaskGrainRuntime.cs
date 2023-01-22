@@ -190,6 +190,18 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
 
         if (TryGetExecutionContext(taskId, out var executionContext))
         {
+/*
+            // Checking equivalence like this is fraught with danger. It might be better to compare serialized or stringified versions of the requests instead of
+            // Using object.Equals(left, right) on the arguments
+            // Alternatively/optionally, we could support configurable equality comparer implementations per argument type.
+            var existingRequest = executionContext.State.Request;
+            if (!AreRequestsEquivalent(existingRequest!, request))
+            {
+                var message = $"Attempt to schedule a duplicate task, non-equivalent tasks with id {taskId}.\nExisting: {existingRequest?.ToMethodCallString()}.\nIncoming: {request.ToMethodCallString()}";
+                throw new InvalidOperationException(message);
+            }
+*/
+
             // This is not a new request, so either poll it or subscribe the client to receive a notification once it has completed.
             var responseTask = executionContext.AsValueTask();
             if (client is not null)
@@ -548,6 +560,42 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         return completedTaskIds is not null;
     }
 
+    private bool AreRequestsEquivalent(IDurableTaskRequest left, IDurableTaskRequest right)
+    {
+        if (!string.Equals(left.GetInterfaceName(), right.GetInterfaceName(), StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (!string.Equals(left.GetMethodName(), right.GetMethodName(), StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (left.GetArgumentCount() != right.GetArgumentCount())
+        {
+            return false;
+        }
+
+        for (var arg = 0; arg < left.GetArgumentCount(); arg++)
+        {
+            var leftValue = left.GetArgument(arg);
+            var rightValue = right.GetArgument(arg);
+            if (leftValue is null ^ rightValue is null)
+            {
+                return false;
+            }
+
+            if (!Equals(left, right))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <inheritdoc/>
     public ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskClient? client)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))

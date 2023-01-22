@@ -454,11 +454,33 @@ namespace Orleans.Runtime
                 result.Append(target.ToString());
                 result.Append(']');
             }
-            else
+
+            result.Append('.');
+            result.Append(request.GetMethodName());
+            result.Append('(');
+            var argumentCount = request.GetArgumentCount();
+            for (var n = 0; n < argumentCount; n++)
             {
-                result.Append(request.GetInterfaceName());
+                if (n > 0)
+                {
+                    result.Append(", ");
+                }
+
+                result.Append(request.GetArgument(n));
             }
 
+            result.Append(')');
+            return result.ToString();
+        }
+
+        /// <summary>
+        /// Returns a string representation of the request.
+        /// </summary>
+        /// <returns>A string representation of the request.</returns>
+        public static string ToMethodCallString(IRequest request)
+        {
+            var result = new StringBuilder();
+            result.Append(request.GetInterfaceName());
             result.Append('.');
             result.Append(request.GetMethodName());
             result.Append('(');

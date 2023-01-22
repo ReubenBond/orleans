@@ -148,7 +148,7 @@ public class Program
             })
             .ConfigureLogging(logging =>
             {
-                //logging.AddFilter((category, level) => category is not null && category.StartsWith("Orleans.DurableTasks"));
+                logging.AddFilter((category, level) => category is not null && category.StartsWith("Orleans.DurableTasks"));
             })
             .UseConsoleLifetime();
         using var host = hostBuilder.Build();

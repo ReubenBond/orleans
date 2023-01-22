@@ -23,6 +23,8 @@ public interface IDurableTaskRequest : IRequest
     /// </summary>
     /// <returns>The result of invocation.</returns>
     ValueTask<Response> InvokeImplementation(DurableTaskExecutionContext executionContext);
+
+    public string ToMethodCallString() => IRequest.ToMethodCallString(this);
 }
 
 [GenerateSerializer] // Do not make this serializer transparent. We want the option to include information here in future and this is not nearly as perf-critical as regular method calls.
@@ -94,6 +96,8 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
 
     /// <inheritdoc/>
     public override string ToString() => IRequest.ToString(this);
+
+    public string ToMethodCallString() => IRequest.ToMethodCallString(this);
 
     // Called upon creation in generated code by the creating grain reference by virtue of the [SelfInvokingReturnType(nameof(InitializeRequest))] atttribute on this class.
     public DurableTask InitializeRequest(GrainReference targetGrainReference)
