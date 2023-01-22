@@ -244,11 +244,22 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
             {
                 var state = executionContext.State;
 
-                // Add the client to the persisted task state.
-                state.Clients ??= new();
-                state.Clients.Add(client);
-                _storage.AddOrUpdateTask(taskId, state);
-                await _storage.WriteAsync();
+                if (state.Result is { } response)
+                {
+                    // The client has already completed, so notify the client immediately instead of performing a storage write.
+                    // TODO: Would it be better/simpler to convert such calls into polling responses?
+                    // This implementation means that the call to SubscribeAsync returns a 'SubscribedResponse' even though the client
+                    // has already received the final response via 'OnResponse'.
+                    await client.OnResponse(taskId, response);
+                }
+                else
+                {
+                    // Add the client to the persisted task state.
+                    state.Clients ??= new();
+                    state.Clients.Add(client);
+                    _storage.AddOrUpdateTask(taskId, state);
+                    await _storage.WriteAsync();
+                }
             }
         }
     }
@@ -382,6 +393,10 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
             _shared.Logger.LogTrace("{Id} task {TaskId} completed with result {Result}", GrainId, taskId, response);
         }
 
+        // Only update the result if an existing result has not been set. If this were to overwrite an already-persisted result,
+        // that could cause the result to appear to change after it has already been observed.
+        // This condition guards against the case where a scheduling call fails after the response has already been received via an OnResponse callback,
+        // which could occur due to a recovery retry or concurrency (multiple clients scheduling the same workflow).
         var state = executionContext.State;
         if (state.Result is null)
         {

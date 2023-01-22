@@ -52,6 +52,7 @@ public class Program
     {
         DurableTask<bool> Withdraw(long amount);
         DurableTask Deposit(long amount);
+        ValueTask<long> GetBalance();
     }
 
     public class BankGrain : IBankGrain
@@ -82,12 +83,16 @@ public class Program
 
             return false;
         }
+
+        public ValueTask<long> GetBalance() => new(State);
     }
 
     public interface IClientGrain : IGrainWithStringKey
     {
         Task Run();
+        DurableTask RunWorkflow();
     }
+
     public class ClientGrain : Grain, IClientGrain
     {
         public async Task Run()
@@ -103,6 +108,32 @@ public class Program
 
             var success = await scheduledTask;
             Console.WriteLine(success ? "Success!" : "Fail :(");
+            Console.WriteLine("BillG balance: " + await billGates.GetBalance());
+            Console.WriteLine("Me balance: " + await me.GetBalance());
+        }
+
+        public async DurableTask RunWorkflow()
+        {
+            var client = this.GrainFactory;
+            var bankGrain = client.GetGrain<IBankGrain>("first-tech");
+            var billGates = client.GetGrain<IAccountGrain>("billg");
+            var me = client.GetGrain<IAccountGrain>("rebond");
+
+            var randomId = await DurableTask.Run(Guid.NewGuid).AsStep("generate-random-id");
+            Console.WriteLine(randomId);
+
+            // If the task is interrupted (eg, power outage) and is retried, it will only sleep for the remaining time.
+            var slept = await DurableTask.Delay(TimeSpan.FromSeconds(1)).AsStep("wait-for-confirmation");
+            Console.WriteLine("slept? " + slept);
+
+            var scheduledTask = await bankGrain
+                .Transfer(billGates, me, 1_000_000_000)
+                .ScheduleAsync("transfer123");
+
+            var success = await scheduledTask;
+            Console.WriteLine(success ? "Success!" : "Fail :(");
+            Console.WriteLine("BillG balance: " + await billGates.GetBalance());
+            Console.WriteLine("Me balance: " + await me.GetBalance());
         }
     }
 
@@ -117,7 +148,7 @@ public class Program
             })
             .ConfigureLogging(logging =>
             {
-                logging.AddFilter((category, level) => category is not null && category.StartsWith("Orleans.DurableTasks"));
+                //logging.AddFilter((category, level) => category is not null && category.StartsWith("Orleans.DurableTasks"));
             })
             .UseConsoleLifetime();
         using var host = hostBuilder.Build();
@@ -138,10 +169,17 @@ public class Program
 
         var success = await scheduledTask;
         Console.WriteLine(success ? "Success!" : "Fail :(");
-        /*
+        Console.WriteLine("BillG balance: " + await billGates.GetBalance());
+        Console.WriteLine("Me balance: " + await me.GetBalance());
+
         var clientGrain = client.GetGrain<IClientGrain>("client");
+        Console.WriteLine("Now to do the same thing via a regular grain call");
         await clientGrain.Run();
-        */
+        Console.WriteLine("Now to do a similar thing via a grain workflow call");
+        await await clientGrain.RunWorkflow().ScheduleAsync("my-client-wf");
+
+        Console.WriteLine("Done!");
+
         await host.WaitForShutdownAsync();
     }
 
