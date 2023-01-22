@@ -1,4 +1,7 @@
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Sources;
+using Orleans.DurableTasks.Remoting;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;
@@ -10,21 +13,15 @@ public sealed partial class DurableTaskExecutionContext : IValueTaskSource<Respo
         RunContinuationsAsynchronously = true
     };
 
-    private CancellationTokenSource _cancellationTokenSource = new();
-
-    public CancellationToken CancellationToken => _cancellationTokenSource.Token;
-
     internal ValueTask AsUntypedValueTask() => new(this, _tcs.Version);
     internal ValueTask<Response> AsValueTask() => new(this, _tcs.Version);
-    internal ValueTask<TResult> AsValueTask<TResult>() => new ConvertingValueTaskSource<TResult>(this).AsValueTask();
-    internal void SetCanceled()
-    {
-        _cancellationTokenSource.Cancel();
-        _tcs.SetException(new OperationCanceledException(_cancellationTokenSource.Token));
-    }
+    internal DurableTaskResultAwaitable<TResult> GetResultAsync<TResult>() => new(this);
 
-    internal void SetException(Exception exception) => _tcs.SetException(exception);
-    internal void SetResponse(Response response) => _tcs.SetResult(response);
+    internal void SetResponse(Response response)
+    {
+        Debug.Assert(response is not PendingResponse);
+        _tcs.SetResult(response);
+    }
 
     Response IValueTaskSource<Response>.GetResult(short token) => _tcs.GetResult(token);
     void IValueTaskSource.GetResult(short token) => _tcs.GetResult(token).ThrowIfExceptionResponse();
@@ -32,18 +29,26 @@ public sealed partial class DurableTaskExecutionContext : IValueTaskSource<Respo
     ValueTaskSourceStatus IValueTaskSource.GetStatus(short token) => _tcs.GetStatus(token);
     void IValueTaskSource<Response>.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _tcs.OnCompleted(continuation, state, token, flags);
     void IValueTaskSource.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _tcs.OnCompleted(continuation, state, token, flags);
+}
 
-    private sealed class ConvertingValueTaskSource<TResult> : IValueTaskSource<TResult>
+public readonly struct DurableTaskResultAwaitable<TResult>
+{
+    private readonly DurableTaskExecutionContext _executionContext;
+    public DurableTaskResultAwaitable(DurableTaskExecutionContext executionContext) => _executionContext = executionContext;
+    public DurableTaskResultAwaiter<TResult> GetAwaiter() => new(_executionContext.AsValueTask());
+}
+
+public readonly struct DurableTaskResultAwaiter<TResult> : INotifyCompletion, ICriticalNotifyCompletion
+{
+    private readonly ValueTaskAwaiter<Response> _awaiter;
+
+    internal DurableTaskResultAwaiter(ValueTask<Response> responseTask)
     {
-        private readonly DurableTaskExecutionContext _context;
-        public ConvertingValueTaskSource(DurableTaskExecutionContext context)
-        {
-            _context = context;
-        }
-
-        public ValueTask<TResult> AsValueTask() => new (this, _context._tcs.Version);
-        public TResult GetResult(short token) => _context._tcs.GetResult(token)!.GetResult<TResult>();
-        public ValueTaskSourceStatus GetStatus(short token) => _context._tcs.GetStatus(token);
-        public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _context._tcs.OnCompleted(continuation, state, token, flags);
+        _awaiter = responseTask.GetAwaiter();
     }
+
+    public TResult GetResult() => _awaiter.GetResult().GetResult<TResult>();
+    public bool IsCompleted => _awaiter.IsCompleted;
+    public void OnCompleted(Action continuation) => _awaiter.OnCompleted(continuation);
+    public void UnsafeOnCompleted(Action continuation) => _awaiter.UnsafeOnCompleted(continuation);
 }

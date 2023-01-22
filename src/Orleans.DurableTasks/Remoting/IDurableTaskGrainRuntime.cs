@@ -22,7 +22,7 @@ public interface IDurableTaskServer
 
     // API used by ScheduledTask/<T> to check for a result for a task.
     // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
-    ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskClient? client);
+    //ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskClient? client);
 }
 
 public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServer, IDurableTaskClient
@@ -31,10 +31,6 @@ public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServe
 
 public interface IDurableTaskGrainRuntime
 {
-    // Similar to `ScheduleOrPollAsync`, except that:
-    // It is intended for local `DurableTask` methods (steps) versus remotely issued requests
-    // The DurableTaskRequest is not serializable to storage.
-    // It blocks until the response has been completed, rather than returning a pending result.
     ValueTask<DurableTaskExecutionContext> EvaluateStepAsync(TaskId taskId, DurableTask taskDefinition);
 }
 
@@ -194,7 +190,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
 
         var storedResponse = executionContext.AsValueTask();
 
-        // If the task has already completed, so there is no need to start it again.
+        // If the task has already completed, there is no need to start it again.
         if (!storedResponse.IsCompleted)
         {
             try
@@ -235,10 +231,10 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
 
     private void InvokeRequestMethod(TaskId taskId, IDurableTaskRequest request, DurableTaskExecutionContext context)
     {
-        _runningTasks.Add(taskId, InvokeTaskAsyncInternal(taskId, request, context));
+        _runningTasks.Add(taskId, InvokeRequestMethodCore(taskId, request, context));
     }
 
-    private async Task InvokeTaskAsyncInternal(TaskId taskId, IDurableTaskRequest request, DurableTaskExecutionContext context)
+    private async Task InvokeRequestMethodCore(TaskId taskId, IDurableTaskRequest request, DurableTaskExecutionContext context)
     {
         await Task.Yield();
 
@@ -388,6 +384,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         return completedTaskIds is not null;
     }
 
+    /*
     public ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskClient? client)
     {
         if (!TryGetExecutionContext(taskId, out var executionContext))
@@ -416,4 +413,5 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
             return PendingResponse.Instance;
         }
     }
+    */
 }

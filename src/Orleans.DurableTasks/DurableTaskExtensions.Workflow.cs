@@ -79,7 +79,7 @@ public static class DurableTaskExtensions
         var taskId = parentContext.TaskId.Child(stepId);
 
         var executionContext = await parentContext.Runtime.EvaluateStepAsync(taskId, taskDefinition);
-        return await executionContext.AsValueTask<TResult>();
+        return await executionContext.GetResultAsync<TResult>();
     }
 
     /// <summary>

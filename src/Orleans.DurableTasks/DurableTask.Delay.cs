@@ -8,9 +8,8 @@ public abstract partial class DurableTask
         // although it's immutable and therefore "steps" offer little downside.
         var until = await DurableTask.Run(() => DateTimeOffset.UtcNow.Add(duration)).AsStep("until");
 
-        var taskContext = DurableTaskExecutionContext.GetCurrentContextOrThrow();
         var delay = until.Subtract(DateTimeOffset.UtcNow);
-        var cancellationToken = taskContext.CancellationToken;
+        var cancellationToken = CancellationToken.None;
         var maxDelay = TimeSpan.FromMilliseconds(int.MaxValue);
         while (delay > maxDelay)
         {
@@ -29,9 +28,8 @@ public abstract partial class DurableTask
     public static DurableTask<bool> DelayUntil(DateTime dateTime) => DelayUntil(new DateTimeOffset(dateTime));
     public static async DurableTask<bool> DelayUntil(DateTimeOffset dateTime)
     {
-        var taskContext = DurableTaskExecutionContext.GetCurrentContextOrThrow();
         var delay = dateTime.Subtract(DateTimeOffset.UtcNow);
-        var cancellationToken = taskContext.CancellationToken;
+        var cancellationToken = CancellationToken.None;
         var maxDelay = TimeSpan.FromMilliseconds(int.MaxValue);
         while (delay > maxDelay)
         {
