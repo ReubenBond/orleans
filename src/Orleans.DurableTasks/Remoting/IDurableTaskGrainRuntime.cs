@@ -36,8 +36,6 @@ public interface IDurableTaskGrainRuntime
     // The DurableTaskRequest is not serializable to storage.
     // It blocks until the response has been completed, rather than returning a pending result.
     ValueTask<DurableTaskExecutionContext> EvaluateStepAsync(TaskId taskId, DurableTask taskDefinition);
-
-    //ValueTask<DurableTaskExecutionContext> ScheduleLocallyAsync(IDurableTaskRequest durableTaskRequest);
 }
 
 internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTaskGrainExtension
@@ -389,35 +387,6 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
 
         return completedTaskIds is not null;
     }
-
-    /*
-    public async ValueTask<DurableTaskExecutionContext> ScheduleLocallyAsync(IDurableTaskRequest durableTaskRequest)
-    {
-        var context = durableTaskRequest.Context;
-        Debug.Assert(context is not null);
-        var taskId = context.TaskId;
-
-        // Create a context locally, returning if it is already completed.
-        if (!TryGetExecutionContext(taskId, out var executionContext))
-        {
-            executionContext = await CreateExecutionContextAsync(taskId);
-        }
-
-        // Invoke the task to submit it to the remote host.
-        // If the task has already been submitted, then this will submit it again, which is an idempotent operation if:
-        // * The task is semantically identical (same implementation and arguments).
-        // * The task did not complete already and was subsequently cleaned up.
-        // We can be sure that the task was not already cleaned up if we are calling from a grain which has a stable identifier, since
-        // the caller must acknowledge completion before the task is eligible for garbage collection.
-        // For the first point (identical implementation and arguments), we could store the task locally and verify it against its already-stored copy.
-        // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
-        await durableTaskRequest.ScheduleRemoteAsync();
-
-        // Return a scheduled task, which can be awaited to retrieve the result once it has been locally persisted.
-        // For non-persistent contexts (such as an external client or hosted client), this can be implemented via polling instead, for example.
-        return executionContext;
-    }
-    */
 
     public ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskClient? client)
     {

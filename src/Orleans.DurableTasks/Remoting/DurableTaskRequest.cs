@@ -4,7 +4,6 @@ using Orleans.Runtime;
 using Orleans.Invocation;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Activators;
-using Orleans.Serialization;
 using System.Diagnostics;
 
 namespace Orleans.DurableTasks.Remoting;
@@ -24,8 +23,6 @@ public interface IDurableTaskRequest : IRequest
     /// </summary>
     /// <returns>The result of invocation.</returns>
     ValueTask<Response> InvokeImplementation(DurableTaskExecutionContext executionContext);
-
-    //Task ScheduleRemoteAsync();
 }
 
 [GenerateSerializer] // Do not make this serializer transparent. We want the option to include information here in future and this is not nearly as perf-critical as regular method calls.
@@ -38,14 +35,10 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
     [NonSerialized]
     private readonly IGrainContextAccessor _grainContextAccessor;
 
-    [NonSerialized]
-    private readonly Serializer _serializer;
-
     [GeneratedActivatorConstructor]
-    protected DurableTaskRequest(IGrainContextAccessor grainContextAccessor, Serializer serializer)
+    protected DurableTaskRequest(IGrainContextAccessor grainContextAccessor)
     {
         _grainContextAccessor = grainContextAccessor;
-        _serializer = serializer;
     }
 
     /// <inheritdoc />
@@ -125,29 +118,26 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
         return await runtime.EvaluateStepAsync(taskId, this);
     }
 
-    /*
-    async Task IDurableTaskRequest.ScheduleRemoteAsync()
+    /// <inheritdoc/>
+    internal override async ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext)
     {
-        // Submit this request to the remote service.
+        // Schedule this request with the remote service.
+        // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
+        // * The task is semantically identical (same implementation and arguments).
+        // * The task did not complete already and was subsequently cleaned up.
+        // We can be sure that the task was not already cleaned up if we are calling from a grain which has a stable identifier, since
+        // the caller must acknowledge completion before the task is eligible for garbage collection.
+        // For the first point (identical implementation and arguments), we could store the task locally and verify it against its already-stored copy.
+        // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
         Debug.Assert(Context is not null);
-        Debug.Assert(Context.Target is not null);
-        Debug.Assert(Context.Target is GrainReference);
+        Context.TaskId = executionContext.TaskId;
+        Context.Caller = _grainContextAccessor.GrainContext?.GrainReference;
         var remote = Context.Target.Cast<IDurableTaskGrainExtension>();
-        await remote.ScheduleAsync(this);
-    }
-    */
-
-    /// <inheritdoc/>
-    internal override ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext)
-    {
-        throw new NotImplementedException("Durable task requests can not be invoked directly");
+        return await remote.ScheduleAsync(this);
     }
 
     /// <inheritdoc/>
-    ValueTask<Response> IInvokable.Invoke()
-    {
-        throw new NotImplementedException("Durable task requests can not be invoked directly");
-    }
+    ValueTask<Response> IInvokable.Invoke() => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
     ValueTask<Response> IDurableTaskRequest.InvokeImplementation(DurableTaskExecutionContext executionContext) => InvokeInner().InvokeAsync(executionContext);
@@ -155,7 +145,7 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
     // Generated
     protected abstract DurableTask InvokeInner();
 
-    private static IDurableTaskGrainRuntime GetRuntime(IGrainContext callerContext)
+    internal static IDurableTaskGrainRuntime GetRuntime(IGrainContext callerContext)
     {
         if (callerContext is null)
         {
@@ -262,28 +252,22 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
         Context.SchedulingOptions = options;
 
         var callerContext = _grainContextAccessor.GrainContext;
-        var runtime = GetRuntime(callerContext);
+        var runtime = DurableTaskRequest.GetRuntime(callerContext);
 
         return await runtime.EvaluateStepAsync(taskId, this);
     }
 
-    /*
-    public async Task ScheduleRemoteAsync()
-    {
-        // Submit this request to the remote service.
-        Debug.Assert(Context is not null);
-        Debug.Assert(Context.Target is not null);
-        Debug.Assert(Context.Target is GrainReference);
-        var remote = Context.Target.Cast<IDurableTaskGrainExtension>();
-        await remote.ScheduleAsync(this);
-    }
-    */
-
     /// <inheritdoc/>
     internal override async ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext)
     {
-        // Schedule this request with the remote service and return a pending respone, since the remote service
-        // will call back into this
+        // Schedule this request with the remote service.
+        // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
+        // * The task is semantically identical (same implementation and arguments).
+        // * The task did not complete already and was subsequently cleaned up.
+        // We can be sure that the task was not already cleaned up if we are calling from a grain which has a stable identifier, since
+        // the caller must acknowledge completion before the task is eligible for garbage collection.
+        // For the first point (identical implementation and arguments), we could store the task locally and verify it against its already-stored copy.
+        // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
         Debug.Assert(Context is not null);
         Context.TaskId = executionContext.TaskId;
         Context.Caller = _grainContextAccessor.GrainContext?.GrainReference;
@@ -299,21 +283,6 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
 
     // Generated
     protected abstract DurableTask<TResult> InvokeInner();
-
-    private static IDurableTaskGrainRuntime GetRuntime(IGrainContext callerContext)
-    {
-        if (callerContext is null)
-        {
-            throw new InvalidOperationException($"No {nameof(IGrainContext)} is in context");
-        }
-
-        if (callerContext.GetComponent<IDurableTaskGrainRuntime>() is not { } localRuntime)
-        {
-            throw new InvalidOperationException($"The current grain or client context, {callerContext} does not support calling durable tasks");
-        }
-
-        return localRuntime;
-    }
 }
 
 /// <summary>
@@ -347,7 +316,7 @@ public sealed class PendingResponse : Response
 /// Activator for <see cref="PendingResponse"/>.
 /// </summary>
 [RegisterActivator]
-internal sealed class DurableTaskPendingResponseActivator : IActivator<PendingResponse>
+internal sealed class PendingResponseActivator : IActivator<PendingResponse>
 {
     /// <inheritdoc/>
     public PendingResponse Create() => PendingResponse.Instance;
@@ -365,10 +334,18 @@ public sealed class UnknownTaskResponse : Response
     public static UnknownTaskResponse Instance { get; } = new UnknownTaskResponse();
 
     /// <inheritdoc/>
-    public override object? Result { get => null; set => throw new InvalidOperationException($"Type {nameof(UnknownTaskResponse)} is read-only"); } 
+    public override object? Result
+    {
+        get => throw GetKeyNotFoundException();
+        set => throw new InvalidOperationException($"Type {nameof(UnknownTaskResponse)} is read-only");
+    } 
 
     /// <inheritdoc/>
-    public override Exception? Exception { get => null; set => throw new InvalidOperationException($"Type {nameof(UnknownTaskResponse)} is read-only"); }
+    public override Exception? Exception
+    {
+        get => throw GetKeyNotFoundException();
+        set => throw new InvalidOperationException($"Type {nameof(UnknownTaskResponse)} is read-only");
+    }
 
     /// <inheritdoc/>
     public override T GetResult<T>() => default!;
@@ -378,43 +355,16 @@ public sealed class UnknownTaskResponse : Response
 
     /// <inheritdoc/>
     public override string ToString() => "[UnknownTask]";
+
+    private static Exception GetKeyNotFoundException() => new KeyNotFoundException("A task with the specified identifier was not found.");
 }
 
 /// <summary>
 /// Activator for <see cref="UnknownTaskResponse"/>.
 /// </summary>
 [RegisterActivator]
-internal sealed class DurableTaskUnknownTaskResponseActivator : IActivator<UnknownTaskResponse>
+internal sealed class UnknownTaskResponseActivator : IActivator<UnknownTaskResponse>
 {
     /// <inheritdoc/>
     public UnknownTaskResponse Create() => UnknownTaskResponse.Instance;
-}
-
-[GenerateSerializer]
-public sealed class DurableTaskResponse : Response
-{
-    [Id(0)]
-    private Response? _response;
-
-    [Id(1)]
-    public DurableTaskRequestContext? Context { get; set; }
-
-    public static DurableTaskResponse Create(Response response, DurableTaskRequestContext context)
-    {
-        return new DurableTaskResponse
-        {
-            _response = response,
-            Context = context
-        };
-    }
-
-    public override object? Result { get => _response!.Result; set => _response!.Result = value; }
-    public override Exception? Exception { get => _response!.Exception; set => _response!.Exception = value; }
-    public override void Dispose()
-    {
-        Context = null;
-        _response!.Dispose();
-    }
-
-    public override T GetResult<T>() => _response!.GetResult<T>();
 }
