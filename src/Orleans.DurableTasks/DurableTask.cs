@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Orleans.DurableTasks.Remoting;
 using Orleans.Runtime;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;
 
@@ -16,8 +17,7 @@ public abstract partial class DurableTask
     public static DurableTask Run(Func<ValueTask> func) => new AsyncDelegateDurableTask(func);
     public static DurableTask<T> Run<T>(Func<ValueTask<T>> func) => new AsyncDelegateDurableTask<T>(func);
 
-    internal ValueTask InvokeAsync(DurableTaskExecutionContext executionContext) => InvokeAsyncUntypedCore(executionContext);
-    protected internal abstract ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext);
+    internal abstract ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext);
 }
 
 [InvokableBaseType(typeof(GrainReference), typeof(DurableTask<>), typeof(DurableTaskRequest<>))]
@@ -25,8 +25,6 @@ public abstract partial class DurableTask
 [GenerateSerializer, SerializerTransparent]
 public abstract class DurableTask<TResult> : DurableTask
 {
-    internal new ValueTask<TResult> InvokeAsync(DurableTaskExecutionContext executionContext) => InvokeAsyncTypedCore(executionContext);
-    protected internal abstract ValueTask<TResult> InvokeAsyncTypedCore(DurableTaskExecutionContext executionContext);
 }
 
 internal interface ICompletedDurableTask
@@ -42,8 +40,7 @@ internal sealed class CompletedDurableTask<TResult> : DurableTask<TResult>, ICom
 
     public TResult Result { get; }
 
-    protected internal override ValueTask<TResult> InvokeAsyncTypedCore(DurableTaskExecutionContext executionContext) => new(Result);
-    protected internal override ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext) => default;
+    internal override ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext) => new(Response.Completed);
 }
 
 /// <summary>
@@ -54,16 +51,17 @@ internal sealed class AsyncDelegateDurableTask<TResult> : DurableTask<TResult>
     private readonly Func<ValueTask<TResult>> _func;
     public AsyncDelegateDurableTask(Func<ValueTask<TResult>> func) => _func = func;
 
-    protected internal override async ValueTask<TResult> InvokeAsyncTypedCore(DurableTaskExecutionContext executionContext)
+    internal override async ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext)
     {
-        DurableTaskExecutionContext.SetCurrentContext(executionContext);
-        return await _func();
-    }
-
-    protected internal override async ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext) 
-    {
-        DurableTaskExecutionContext.SetCurrentContext(executionContext);
-        _ = await _func();
+        try
+        {
+            DurableTaskExecutionContext.SetCurrentContext(executionContext);
+            return Response.FromResult(await _func());
+        }
+        catch (Exception exception)
+        {
+            return Response.FromException(exception);
+        }
     }
 }
 
@@ -75,10 +73,18 @@ internal sealed class AsyncDelegateDurableTask : DurableTask
     private readonly Func<ValueTask> _func;
     public AsyncDelegateDurableTask(Func<ValueTask> func) => _func = func;
 
-    protected internal override async ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext) 
+    internal override async ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext)
     {
-        DurableTaskExecutionContext.SetCurrentContext(executionContext);
-        await _func();
+        try
+        {
+            DurableTaskExecutionContext.SetCurrentContext(executionContext);
+            await _func();
+            return Response.Completed;
+        }
+        catch (Exception exception)
+        {
+            return Response.FromException(exception);
+        }
     }
 }
 
@@ -90,38 +96,16 @@ internal sealed class DelegateDurableTask<TResult> : DurableTask<TResult>
     private readonly Func<TResult> _func;
     public DelegateDurableTask(Func<TResult> func) => _func = func;
 
-    protected internal override ValueTask<TResult> InvokeAsyncTypedCore(DurableTaskExecutionContext executionContext)
+    internal override ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext)
     {
-        DurableTaskExecutionContext.SetCurrentContext(executionContext, out var previous);
         try
         {
-            return new(_func());
+            DurableTaskExecutionContext.SetCurrentContext(executionContext);
+            return new(Response.FromResult(_func()));
         }
         catch (Exception exception)
         {
-            return ValueTask.FromException<TResult>(exception);
-        }
-        finally
-        {
-            DurableTaskExecutionContext.SetCurrentContext(previous);
-        }
-    }
-
-    protected internal override ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext) 
-    {
-        DurableTaskExecutionContext.SetCurrentContext(executionContext, out var previous);
-        try
-        {
-            _ = _func();
-            return default;
-        }
-        catch (Exception exception)
-        {
-            return ValueTask.FromException(exception);
-        }
-        finally
-        {
-            DurableTaskExecutionContext.SetCurrentContext(previous);
+            return new(Response.FromException(exception));
         }
     }
 }
@@ -134,21 +118,17 @@ internal sealed class DelegateDurableTask : DurableTask
     private readonly Action _func;
     public DelegateDurableTask(Action func) => _func = func;
 
-    protected internal override ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext) 
+    internal override ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext)
     {
-        DurableTaskExecutionContext.SetCurrentContext(executionContext, out var previous);
         try
         {
+            DurableTaskExecutionContext.SetCurrentContext(executionContext);
             _func();
-            return default;
+            return new(Response.Completed);
         }
         catch (Exception exception)
         {
-            return ValueTask.FromException(exception);
-        }
-        finally
-        {
-            DurableTaskExecutionContext.SetCurrentContext(previous);
+            return new(Response.FromException(exception));
         }
     }
 }

@@ -74,7 +74,7 @@ namespace Orleans.Serialization.Invocation
         public static CompletedResponse Instance { get; } = new CompletedResponse();
 
         /// <inheritdoc/>
-        public override object? Result { get => null; set => throw new InvalidOperationException($"Type {nameof(CompletedResponse)} is read-only"); } 
+        public override object? Result { get => null; set => throw new InvalidOperationException($"Type {nameof(CompletedResponse)} is read-only"); }
 
         /// <inheritdoc/>
         public override Exception? Exception { get => null; set => throw new InvalidOperationException($"Type {nameof(CompletedResponse)} is read-only"); }
@@ -277,5 +277,16 @@ namespace Orleans.Serialization.Invocation
     internal sealed class PooledResponseActivator<TResult> : IActivator<Response<TResult>>
     {
         public Response<TResult> Create() => ResponsePool.Get<TResult>();
+    }
+
+    public static class ResponseExtensions
+    {
+        public static void ThrowIfExceptionResponse(this Response response)
+        {
+            if (response.Exception is { } exception)
+            {
+                ExceptionDispatchInfo.Capture(exception).Throw();
+            }
+        }
     }
 }

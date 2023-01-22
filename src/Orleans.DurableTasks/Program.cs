@@ -21,7 +21,7 @@ public static class DurableTaskHostingExtensions
 {
     public static ISiloBuilder AddDurableTasks(this ISiloBuilder siloBuilder)
     {
-        siloBuilder.Services.AddSingleton<VolatileDurableTaskGrainStorage>();
+        siloBuilder.Services.AddTransient<VolatileDurableTaskGrainStorage>();
         siloBuilder.Services.AddFromExisting<IDurableTaskGrainStorage, VolatileDurableTaskGrainStorage>();
 
         siloBuilder.Services.AddScoped<DurableTaskGrainExtension>();
@@ -109,6 +109,7 @@ public class Program
             .UseOrleans(siloBuilder =>
             {
                 siloBuilder.UseLocalhostClustering();
+                siloBuilder.AddMemoryGrainStorageAsDefault();
                 siloBuilder.AddDurableTasks();
             })
             .UseConsoleLifetime();

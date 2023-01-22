@@ -6,7 +6,6 @@ using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization;
 using System.Diagnostics;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.DurableTasks.Remoting;
 
@@ -25,7 +24,8 @@ public interface IDurableTaskRequest : IRequest
     /// </summary>
     /// <returns>The result of invocation.</returns>
     ValueTask<Response> InvokeImplementation(DurableTaskExecutionContext executionContext);
-    Task ScheduleRemoteAsync();
+
+    //Task ScheduleRemoteAsync();
 }
 
 [GenerateSerializer] // Do not make this serializer transparent. We want the option to include information here in future and this is not nearly as perf-critical as regular method calls.
@@ -114,20 +114,18 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
         return this;
     }
 
-    async ValueTask<ScheduledTask> ISchedulableTask.ScheduleUntypedAsync(TaskId taskId, SchedulingOptions? options)
+    async ValueTask<DurableTaskExecutionContext> ISchedulableTask.ScheduleAsync(TaskId taskId, SchedulingOptions? options)
     {
         Debug.Assert(Context is not null);
+        Context.SchedulingOptions = options;
 
         var callerContext = _grainContextAccessor.GrainContext;
-        var localRuntime = GetRuntime(callerContext);
+        var runtime = GetRuntime(callerContext);
 
-        // Set the caller id now, not at creation time, since the value may have been passed around before eventually being scheduled.
-        Context.TaskId = taskId;
-        Context.Caller = callerContext.GrainReference;
-        Context.SchedulingOptions = options;
-        return await localRuntime.ScheduleLocallyAsync(this);
+        return await runtime.EvaluateStepAsync(taskId, this);
     }
 
+    /*
     async Task IDurableTaskRequest.ScheduleRemoteAsync()
     {
         // Submit this request to the remote service.
@@ -137,9 +135,10 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
         var remote = Context.Target.Cast<IDurableTaskGrainExtension>();
         await remote.ScheduleAsync(this);
     }
+    */
 
     /// <inheritdoc/>
-    protected internal override ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext)
+    internal override ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext)
     {
         throw new NotImplementedException("Durable task requests can not be invoked directly");
     }
@@ -151,20 +150,7 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
     }
 
     /// <inheritdoc/>
-    async ValueTask<Response> IDurableTaskRequest.InvokeImplementation(DurableTaskExecutionContext executionContext)
-    {
-        // The IDurableTaskGrainRuntime calls this method to execute the method body on the implementation.
-        // By this stage, it must already have been made durable.
-        try
-        {
-            await InvokeInner().InvokeAsync(executionContext);
-            return Response.Completed;
-        }
-        catch (Exception exception)
-        {
-            return Response.FromException(exception);
-        }
-    }
+    ValueTask<Response> IDurableTaskRequest.InvokeImplementation(DurableTaskExecutionContext executionContext) => InvokeInner().InvokeAsync(executionContext);
 
     // Generated
     protected abstract DurableTask InvokeInner();
@@ -190,7 +176,7 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
 /// </summary>
 [GenerateSerializer]
 [SelfInvokingReturnType(nameof(InitializeRequest))]
-public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurableTaskRequest, ISchedulableTask<TResult>
+public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurableTaskRequest, ISchedulableTask
 {
     // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
     // For now, we're not doing that, just to make sure that we can get far without needing it, demonstrating the extensibility of Orleans.
@@ -270,35 +256,19 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
         return this;
     }
 
-    async ValueTask<ScheduledTask> ISchedulableTask.ScheduleUntypedAsync(TaskId taskId, SchedulingOptions? options)
+    public async ValueTask<DurableTaskExecutionContext> ScheduleAsync(TaskId taskId, SchedulingOptions? options)
     {
         Debug.Assert(Context is not null);
+        Context.SchedulingOptions = options;
 
         var callerContext = _grainContextAccessor.GrainContext;
-        var localRuntime = GetRuntime(callerContext);
+        var runtime = GetRuntime(callerContext);
 
-        // Set the caller id now, not at creation time, since the value may have been passed around before eventually being scheduled.
-        Context.TaskId = taskId;
-        Context.Caller = callerContext.GrainReference;
-        Context.SchedulingOptions = options;
-        return await localRuntime.ScheduleLocallyAsync(this);
+        return await runtime.EvaluateStepAsync(taskId, this);
     }
 
-    async ValueTask<ScheduledTask<TResult>> ISchedulableTask<TResult>.ScheduleTypedAsync(TaskId taskId, SchedulingOptions? options)
-    {
-        Debug.Assert(Context is not null);
-
-        var callerContext = _grainContextAccessor.GrainContext;
-        var localRuntime = GetRuntime(callerContext);
-
-        // Set the caller id now, not at creation time, since the value may have been passed around before eventually being scheduled.
-        Context.TaskId = taskId;
-        Context.Caller = callerContext.GrainReference;
-        Context.SchedulingOptions = options;
-        return await localRuntime.ScheduleLocallyAsync(this);
-    }
-
-    async Task IDurableTaskRequest.ScheduleRemoteAsync()
+    /*
+    public async Task ScheduleRemoteAsync()
     {
         // Submit this request to the remote service.
         Debug.Assert(Context is not null);
@@ -307,37 +277,25 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
         var remote = Context.Target.Cast<IDurableTaskGrainExtension>();
         await remote.ScheduleAsync(this);
     }
+    */
 
     /// <inheritdoc/>
-    protected internal override ValueTask<TResult> InvokeAsyncTypedCore(DurableTaskExecutionContext executionContext)
+    internal override async ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext)
     {
-        throw new NotImplementedException("Durable task requests can not be invoked directly");
-    }
-
-    /// <inheritdoc/>
-    protected internal override ValueTask InvokeAsyncUntypedCore(DurableTaskExecutionContext executionContext)
-    {
-        throw new NotImplementedException("Durable task requests can not be invoked directly");
+        // Schedule this request with the remote service and return a pending respone, since the remote service
+        // will call back into this
+        Debug.Assert(Context is not null);
+        Context.TaskId = executionContext.TaskId;
+        Context.Caller = _grainContextAccessor.GrainContext?.GrainReference;
+        var remote = Context.Target.Cast<IDurableTaskGrainExtension>();
+        return await remote.ScheduleAsync(this);
     }
 
     /// <inheritdoc/>
     ValueTask<Response> IInvokable.Invoke() => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
-    async ValueTask<Response> IDurableTaskRequest.InvokeImplementation(DurableTaskExecutionContext executionContext)
-    {
-        // The IDurableTaskGrainRuntime calls this method to execute the method body on the implementation.
-        // By this stage, it must already have been made durable.
-        try
-        {
-            var result = await InvokeInner().InvokeAsync(executionContext);
-            return Response.FromResult(result);
-        }
-        catch (Exception exception)
-        {
-            return Response.FromException(exception);
-        }
-    }
+    ValueTask<Response> IDurableTaskRequest.InvokeImplementation(DurableTaskExecutionContext executionContext) => InvokeInner().InvokeAsync(executionContext);
 
     // Generated
     protected abstract DurableTask<TResult> InvokeInner();

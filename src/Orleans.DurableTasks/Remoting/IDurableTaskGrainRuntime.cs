@@ -16,7 +16,7 @@ public interface IDurableTaskClient
 public interface IDurableTaskServer 
 {
     // Called by DurableTaskRequest.Invoke to ensure that a task is scheduled
-    ValueTask ScheduleAsync(IDurableTaskRequest request);
+    ValueTask<Response> ScheduleAsync(IDurableTaskRequest request);
 
     // API used by ScheduledTask/<T> to check for a result for a task.
     // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
@@ -33,10 +33,9 @@ public interface IDurableTaskGrainRuntime
     // It is intended for local `DurableTask` methods (steps) versus remotely issued requests
     // The DurableTaskRequest is not serializable to storage.
     // It blocks until the response has been completed, rather than returning a pending result.
-    ValueTask EvaluateStepAsync(TaskId taskId, DurableTask taskDefinition);
-    ValueTask<TResult> EvaluateStepAsync<TResult>(TaskId taskId, DurableTask<TResult> taskDefinition);
-    ValueTask<ScheduledTask> ScheduleLocallyAsync(DurableTaskRequest durableTaskRequest);
-    ValueTask<ScheduledTask<TResult>> ScheduleLocallyAsync<TResult>(DurableTaskRequest<TResult> durableTaskRequest);
+    ValueTask<DurableTaskExecutionContext> EvaluateStepAsync(TaskId taskId, DurableTask taskDefinition);
+
+    //ValueTask<DurableTaskExecutionContext> ScheduleLocallyAsync(IDurableTaskRequest durableTaskRequest);
 }
 
 internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTaskGrainExtension
@@ -46,13 +45,19 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
     private readonly ILogger<DurableTaskGrainExtension> _logger;
     private readonly IDurableTaskGrainStorage _storage;
     private readonly ISystemClock _systemClock;
+    private readonly IGrainContext _grainContext;
     private readonly CleanupPolicy _defaultCleanupPolicy = new CleanupPolicy { CleanupAge = TimeSpan.FromDays(1) };
 
-    public DurableTaskGrainExtension(ILogger<DurableTaskGrainExtension> logger, IDurableTaskGrainStorage storage, ISystemClock systemClock)
+    public DurableTaskGrainExtension(
+        IGrainContextAccessor grainContextAccessor,
+        IDurableTaskGrainStorage storage,
+        ISystemClock systemClock,
+        ILogger<DurableTaskGrainExtension> logger)
     {
         _logger = logger;
         _storage = storage;
         _systemClock = systemClock;
+        _grainContext = grainContextAccessor.GrainContext;
     }
 
     private DurableTaskExecutionContext CreateExecutionContext(TaskId taskId, DurableTaskState state) => _pendingTasks[taskId] = new DurableTaskExecutionContext(taskId, this, state);
@@ -84,7 +89,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         return false;
     }
 
-    public async ValueTask OnResponse(TaskId taskId, Response response)
+    async ValueTask IDurableTaskClient.OnResponse(TaskId taskId, Response response)
     {
         if (!TryGetExecutionContext(taskId, out var executionContext))
         {
@@ -106,7 +111,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         executionContext.SetResponse(response);
     }
 
-    async ValueTask IDurableTaskServer.ScheduleAsync(IDurableTaskRequest request)
+    async ValueTask<Response> IDurableTaskServer.ScheduleAsync(IDurableTaskRequest request)
     {
         if (request.Context is not { } requestContext)
         {
@@ -117,13 +122,26 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         var client = requestContext.Caller?.Cast<IDurableTaskGrainExtension>();
         if (TryGetExecutionContext(taskId, out var executionContext))
         {
-            // Ensure the client is subscribed to the existing task.
-            await SubscribeClientAsync(taskId, executionContext, client);
-            return;
+            // This is not a new request, so either poll it or subscribe the client to receive a notification once it has completed.
+            var responseTask = executionContext.AsValueTask();
+            if (client is not null)
+            {
+                // The client will receive a callback with the response, rather than receiving an immediate response.
+                await SubscribeClientAsync(taskId, executionContext, client);
+            }
+            else if (responseTask.IsCompleted)
+            {
+                // There is no addressable client, so poll the task and return the result if it has completed.
+                // This is for cases where the client does not have a stable identity (for example, it is not a true grain).
+                return await responseTask;
+            }
+
+            return PendingResponse.Instance;
         }
 
-        // Schedule the task
+        // Schedule the new request.
         await ScheduleNewTaskRequestAsync(request, client);
+        return PendingResponse.Instance;
     }
 
     private async ValueTask SubscribeClientAsync(TaskId taskId, DurableTaskExecutionContext executionContext, IDurableTaskClient? client)
@@ -167,57 +185,37 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         InvokeRequestMethod(taskId, request, executionContext);
     }
 
-    public async ValueTask EvaluateStepAsync(TaskId taskId, DurableTask durableTask)
+    public async ValueTask<DurableTaskExecutionContext> EvaluateStepAsync(TaskId taskId, DurableTask durableTask)
     {
         if (!TryGetExecutionContext(taskId, out var executionContext))
         {
             executionContext = await CreateExecutionContextAsync(taskId);
         }
 
-        var responseTask = executionContext.AsValueTask();
+        var storedResponse = executionContext.AsValueTask();
 
-        // If the task has already completed, do not start it again.
-        if (!responseTask.IsCompleted)
+        // If the task has already completed, so there is no need to start it again.
+        if (!storedResponse.IsCompleted)
         {
             try
             {
                 // Invoke the method immediately.
-                await durableTask.InvokeAsyncUntypedCore(executionContext);
-                await CompleteRequestWithResponse(taskId, Response.Completed, executionContext);
+                var immediateResponse = await durableTask.InvokeAsync(executionContext);
+
+                // If the response is still pending, do not propagate it to the execution context yet.
+                if (immediateResponse is not PendingResponse)
+                {
+                    await CompleteRequestWithResponse(taskId, Response.Completed, executionContext);
+                }
             }
             catch (Exception exception)
             {
+                // TODO: apply an internal retry policy here. If only the implementation of the task failed, 
                 await CompleteRequestWithResponse(taskId, Response.FromException(exception), executionContext);
             }
         }
 
-        var response = await responseTask;
-        _ = response.Result;
-    }
-
-    public async ValueTask<TResult> EvaluateStepAsync<TResult>(TaskId taskId, DurableTask<TResult> durableTask)
-    {
-        if (!TryGetExecutionContext(taskId, out var executionContext))
-        {
-            executionContext = await CreateExecutionContextAsync(taskId);
-        }
-
-        var responseTask = executionContext.AsValueTask();
-        if (!responseTask.IsCompleted)
-        {
-            try
-            {
-                var newResponse = await durableTask.InvokeAsyncTypedCore(executionContext);
-                await CompleteRequestWithResponse(taskId, Response.FromResult(newResponse), executionContext);
-            }
-            catch (Exception exception)
-            {
-                await CompleteRequestWithResponse(taskId, Response.FromException(exception), executionContext);
-            }
-        }
-
-        var response = await executionContext.AsValueTask();
-        return response.GetResult<TResult>();
+        return executionContext;
     }
 
     private async Task<DurableTaskExecutionContext> CreateExecutionContextAsync(TaskId taskId)
@@ -246,6 +244,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
 
         try
         {
+            request.SetTarget(_grainContext);
             var response = await request.InvokeImplementation(context);
             await CompleteRequestWithResponse(taskId, response, context);
         }
@@ -389,11 +388,8 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         return completedTaskIds is not null;
     }
 
-    public async ValueTask<ScheduledTask> ScheduleLocallyAsync(DurableTaskRequest durableTaskRequest) => new UntypedScheduledTask(await ScheduleLocallyAsyncCore(durableTaskRequest));
-
-    public async ValueTask<ScheduledTask<TResult>> ScheduleLocallyAsync<TResult>(DurableTaskRequest<TResult> durableTaskRequest) => new ScheduledTask<TResult>(await ScheduleLocallyAsyncCore(durableTaskRequest));
-
-    private async ValueTask<DurableTaskExecutionContext> ScheduleLocallyAsyncCore(IDurableTaskRequest durableTaskRequest)
+    /*
+    public async ValueTask<DurableTaskExecutionContext> ScheduleLocallyAsync(IDurableTaskRequest durableTaskRequest)
     {
         var context = durableTaskRequest.Context;
         Debug.Assert(context is not null);
@@ -419,6 +415,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         // For non-persistent contexts (such as an external client or hosted client), this can be implemented via polling instead, for example.
         return executionContext;
     }
+    */
 
     public ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskClient? client)
     {

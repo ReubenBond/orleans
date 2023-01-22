@@ -11,7 +11,8 @@ public readonly struct DurableTaskAwaiter : INotifyCompletion, ICriticalNotifyCo
 
     internal DurableTaskAwaiter(DurableTask durableTask)
     {
-        _awaiter = durableTask.InvokeAsync(null!).GetAwaiter();
+        throw new NotImplementedException();
+        //_awaiter = new ValueTask(durableTask.InvokeAsync(null!).AsTask()).GetAwaiter();
     }
 
     public void GetResult() => _awaiter.GetResult();
@@ -29,7 +30,8 @@ public readonly struct DurableTaskAwaiter<TResult> : INotifyCompletion, ICritica
 
     internal DurableTaskAwaiter(DurableTask<TResult> durableTask)
     {
-        _awaiter = durableTask.InvokeAsync(null!).GetAwaiter();
+        throw new NotImplementedException();
+        //_awaiter = durableTask.InvokeAsync(null!).GetAwaiter();
     }
 
     public TResult GetResult() => _awaiter.GetResult();
