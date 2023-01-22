@@ -323,6 +323,43 @@ internal sealed class PendingResponseActivator : IActivator<PendingResponse>
 }
 
 /// <summary>
+/// Represents a pending result for a <see cref="DurableTask"/> or <see cref="DurableTask{TResult}"/> method.
+/// </summary>
+[GenerateSerializer, Immutable, UseActivator, SuppressReferenceTracking]
+public sealed class SubscribedResponse : Response
+{
+    /// <summary>
+    /// Gets the singleton instance of this class.
+    /// </summary>
+    public static SubscribedResponse Instance { get; } = new SubscribedResponse();
+
+    /// <inheritdoc/>
+    public override object? Result { get => null; set => throw new InvalidOperationException($"Type {nameof(SubscribedResponse)} is read-only"); } 
+
+    /// <inheritdoc/>
+    public override Exception? Exception { get => null; set => throw new InvalidOperationException($"Type {nameof(SubscribedResponse)} is read-only"); }
+
+    /// <inheritdoc/>
+    public override T GetResult<T>() => default!;
+
+    /// <inheritdoc/>
+    public override void Dispose() { }
+
+    /// <inheritdoc/>
+    public override string ToString() => "[Subscribed]";
+}
+
+/// <summary>
+/// Activator for <see cref="SubscribedResponse"/>.
+/// </summary>
+[RegisterActivator]
+internal sealed class SubscribedResponseActivator : IActivator<SubscribedResponse>
+{
+    /// <inheritdoc/>
+    public SubscribedResponse Create() => SubscribedResponse.Instance;
+}
+
+/// <summary>
 /// Represents an unkown task result for a <see cref="DurableTask"/> or <see cref="DurableTask{TResult}"/> method.
 /// </summary>
 [GenerateSerializer, Immutable, UseActivator, SuppressReferenceTracking]

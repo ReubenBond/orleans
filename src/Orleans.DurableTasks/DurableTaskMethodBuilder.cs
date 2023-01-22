@@ -16,7 +16,6 @@ public struct DurableTaskMethodBuilder
     public void Start<TStateMachine>(ref TStateMachine stateMachine)
         where TStateMachine : IAsyncStateMachine
     {
-        Console.WriteLine($"Start {stateMachine}");
         // Box the state machine and do not start it.
         // Instead, the state machine will be started once the resulting task is awaited (not when the method is called directly)
         _taskSource = DurableTaskMethodInvocation.Create(ref stateMachine);
@@ -24,18 +23,15 @@ public struct DurableTaskMethodBuilder
 
     public void SetStateMachine(IAsyncStateMachine stateMachine)
     {
-        Console.WriteLine($"Set state machine {stateMachine}");
     }
 
     public void SetException(Exception exception)
     {
-        Console.WriteLine($"Set exception {exception}");
         _taskSource.SetException(exception);
     }
 
     public void SetResult()
     {
-        Console.WriteLine($"Set result");
         _taskSource.SetResult();
     }
 
@@ -44,7 +40,6 @@ public struct DurableTaskMethodBuilder
         where TAwaiter : INotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        Console.WriteLine($"AwaitOnCompleted {awaiter} ({awaiter.GetType()}) {stateMachine} ({stateMachine.GetType()}");
         awaiter.OnCompleted(stateMachine.MoveNext);
     }
 
@@ -53,7 +48,6 @@ public struct DurableTaskMethodBuilder
         where TAwaiter : ICriticalNotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        Console.WriteLine($"AwaitUnsafeOnCompleted {awaiter} ({awaiter.GetType()}) {stateMachine} ({stateMachine.GetType()}");
         awaiter.UnsafeOnCompleted(stateMachine.MoveNext);
     }
 }
@@ -72,7 +66,6 @@ public struct DurableTaskMethodBuilder<TResult>
     public void Start<TStateMachine>(ref TStateMachine stateMachine)
         where TStateMachine : IAsyncStateMachine
     {
-        Console.WriteLine($"Start {stateMachine}");
         // Box the state machine and do not start it.
         // Instead, the state machine will be started once the resulting task is awaited (not when the method is called directly)
         _taskSource = DurableTaskMethodInvocation.Create<TResult, TStateMachine>(ref stateMachine);
@@ -80,18 +73,15 @@ public struct DurableTaskMethodBuilder<TResult>
 
     public void SetStateMachine(IAsyncStateMachine stateMachine)
     {
-        Console.WriteLine($"Set state machine {stateMachine}");
     }
 
     public void SetException(Exception exception)
     {
-        Console.WriteLine($"Set exception {exception}");
         _taskSource.SetException(exception);
     }
 
     public void SetResult(TResult result)
     {
-        Console.WriteLine($"Set result {result}");
         _taskSource.SetResult(result);
     }
 
@@ -100,7 +90,6 @@ public struct DurableTaskMethodBuilder<TResult>
         where TAwaiter : INotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        Console.WriteLine($"AwaitOnCompleted {awaiter} ({awaiter.GetType()}) {stateMachine} ({stateMachine.GetType()}");
         awaiter.OnCompleted(stateMachine.MoveNext);
     }
 
@@ -109,7 +98,6 @@ public struct DurableTaskMethodBuilder<TResult>
         where TAwaiter : ICriticalNotifyCompletion
         where TStateMachine : IAsyncStateMachine
     {
-        Console.WriteLine($"AwaitUnsafeOnCompleted {awaiter} ({awaiter.GetType()}) {stateMachine} ({stateMachine.GetType()}");
         awaiter.UnsafeOnCompleted(stateMachine.MoveNext);
     }
 }

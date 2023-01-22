@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Orleans.DurableTasks.Remoting;
+using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;

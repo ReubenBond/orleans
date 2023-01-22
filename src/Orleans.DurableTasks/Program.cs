@@ -14,6 +14,7 @@ using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration.Internal;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.DurableTasks;
 
@@ -21,9 +22,11 @@ public static class DurableTaskHostingExtensions
 {
     public static ISiloBuilder AddDurableTasks(this ISiloBuilder siloBuilder)
     {
+
         siloBuilder.Services.AddTransient<VolatileDurableTaskGrainStorage>();
         siloBuilder.Services.AddFromExisting<IDurableTaskGrainStorage, VolatileDurableTaskGrainStorage>();
 
+        siloBuilder.Services.AddSingleton<DurableTaskGrainExtensionShared>();
         siloBuilder.Services.AddScoped<DurableTaskGrainExtension>();
         siloBuilder.Services.AddFromExisting<IDurableTaskGrainRuntime, DurableTaskGrainExtension>();
         siloBuilder.Services.AddTransientKeyedService<Type, IGrainExtension>(typeof(IDurableTaskGrainExtension), (sp, _) => sp.GetRequiredService<DurableTaskGrainExtension>());
@@ -112,13 +115,30 @@ public class Program
                 siloBuilder.AddMemoryGrainStorageAsDefault();
                 siloBuilder.AddDurableTasks();
             })
+            .ConfigureLogging(logging =>
+            {
+                logging.AddFilter((category, level) => category is not null && category.StartsWith("Orleans.DurableTasks"));
+            })
             .UseConsoleLifetime();
         using var host = hostBuilder.Build();
         await host.StartAsync();
 
         var client = host.Services.GetRequiredService<IClusterClient>();
+
+        var bankGrain = client.GetGrain<IBankGrain>("first-tech");
+        var billGates = client.GetGrain<IAccountGrain>("billg");
+        var me = client.GetGrain<IAccountGrain>("rebond");
+
+        var scheduledTask = await bankGrain
+            .Transfer(billGates, me, 1_000_000_000)
+            .ScheduleAsync("transfer123");
+
+        var success = await scheduledTask;
+        Console.WriteLine(success ? "Success!" : "Fail :(");
+        /*
         var clientGrain = client.GetGrain<IClientGrain>("client");
         await clientGrain.Run();
+        */
         await host.WaitForShutdownAsync();
     }
 

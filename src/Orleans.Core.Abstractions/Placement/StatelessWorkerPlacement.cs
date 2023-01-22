@@ -23,6 +23,9 @@ namespace Orleans.Runtime
         [Id(0)]
         public int MaxLocal { get; private set; }
 
+        /// <inheritdoc />
+        public override bool IsGrain => false;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="StatelessWorkerPlacement"/> class.
         /// </summary>

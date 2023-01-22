@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Runtime;
+using Orleans.Runtime.Placement;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks.Remoting;
@@ -34,27 +35,42 @@ public interface IDurableTaskGrainRuntime
     ValueTask<DurableTaskExecutionContext> EvaluateStepAsync(TaskId taskId, DurableTask taskDefinition);
 }
 
+internal class DurableTaskGrainExtensionShared
+{
+    public IGrainContextAccessor GrainContextAccessor { get; }
+    public ISystemClock SystemClock { get; }
+    public ILogger<DurableTaskGrainExtension> Logger { get; }
+    public PlacementStrategyResolver PlacementStrategyResolver { get; }
+    public CleanupPolicy DefaultCleanupPolicy { get; } = new CleanupPolicy { CleanupAge = TimeSpan.FromDays(1) };
+
+    public DurableTaskGrainExtensionShared(IGrainContextAccessor grainContextAccessor,
+        ISystemClock systemClock,
+        PlacementStrategyResolver placementStrategyResolver,
+        ILogger<DurableTaskGrainExtension> logger)
+    {
+        GrainContextAccessor = grainContextAccessor;
+        SystemClock = systemClock;
+        PlacementStrategyResolver = placementStrategyResolver;
+        Logger = logger;
+    }
+}
+
 internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTaskGrainExtension
 {
     private readonly Dictionary<TaskId, DurableTaskExecutionContext> _pendingTasks = new();
     private readonly Dictionary<TaskId, Task> _runningTasks = new();
-    private readonly ILogger<DurableTaskGrainExtension> _logger;
+    private readonly DurableTaskGrainExtensionShared _shared;
     private readonly IDurableTaskGrainStorage _storage;
-    private readonly ISystemClock _systemClock;
-    private readonly IGrainContext _grainContext;
-    private readonly CleanupPolicy _defaultCleanupPolicy = new CleanupPolicy { CleanupAge = TimeSpan.FromDays(1) };
 
     public DurableTaskGrainExtension(
-        IGrainContextAccessor grainContextAccessor,
         IDurableTaskGrainStorage storage,
-        ISystemClock systemClock,
-        ILogger<DurableTaskGrainExtension> logger)
+        DurableTaskGrainExtensionShared shared)
     {
-        _logger = logger;
+        _shared = shared;
         _storage = storage;
-        _systemClock = systemClock;
-        _grainContext = grainContextAccessor.GrainContext;
     }
+
+    private GrainId GrainId => _shared.GrainContextAccessor.GrainContext.GrainId;
 
     private DurableTaskExecutionContext CreateExecutionContext(TaskId taskId, DurableTaskState state) => _pendingTasks[taskId] = new DurableTaskExecutionContext(taskId, this, state);
 
@@ -85,13 +101,33 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         return false;
     }
 
+    private IDurableTaskGrainExtension? GetCallerClientReference(DurableTaskRequestContext requestContext)
+    {
+        var caller = requestContext.Caller;
+        if (caller is null)
+        {
+            return null;
+        }
+
+        var type = caller.GetGrainId().Type;
+
+        // TODO: Consider using (cleaner?) grain manifest lookup instead. Placement can configure manifest (eg, see StatelessWorkerPlacement)
+        var placement = _shared.PlacementStrategyResolver.GetPlacementStrategy(type);
+        if (placement.IsGrain)
+        {
+            return caller.Cast<IDurableTaskGrainExtension>();
+        }
+
+        return null;
+    }
+
     async ValueTask IDurableTaskClient.OnResponse(TaskId taskId, Response response)
     {
         if (!TryGetExecutionContext(taskId, out var executionContext))
         {
             // No such task. This may be because this client has already received a response for this task and removed its entry for it.
             // TODO: Perhaps this should log at a lower level since it is likely not the symptom of a bug or exceptional condition.
-            _logger.LogWarning("Received response for unknown task {TaskId}: {Response}", taskId, response);
+            _shared.Logger.LogWarning("Received response for unknown task {TaskId}: {Response}", taskId, response);
             return;
         }
 
@@ -99,7 +135,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         // TODO: If this write (or just about any state write) fails, then we need to undo the update to the task state.
         // The most straightforward way to do that might be to take a copy before mutating it.
         executionContext.State.Result = response;
-        executionContext.State.CompletedAt = _systemClock.GetUtcNow();
+        executionContext.State.CompletedAt = _shared.SystemClock.GetUtcNow();
         _storage.AddOrUpdateTask(taskId, executionContext.State);
         await _storage.WriteAsync();
 
@@ -115,7 +151,14 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         }
 
         var taskId = requestContext.TaskId;
-        var client = requestContext.Caller?.Cast<IDurableTaskGrainExtension>();
+        var client = GetCallerClientReference(requestContext);
+
+        if (_shared.Logger.IsEnabled(LogLevel.Trace))
+        {
+            var clientId = client?.GetGrainId().ToString() ?? "[none]";
+            _shared.Logger.LogTrace("{Id} received scheduling request for task {TaskId} from client {Client}", GrainId, taskId, clientId);
+        }
+
         if (TryGetExecutionContext(taskId, out var executionContext))
         {
             // This is not a new request, so either poll it or subscribe the client to receive a notification once it has completed.
@@ -131,13 +174,36 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
                 // This is for cases where the client does not have a stable identity (for example, it is not a true grain).
                 return await responseTask;
             }
+        }
+        else
+        {
+            // Schedule the new request.
+            Debug.Assert(!_pendingTasks.ContainsKey(taskId));
+            var newTaskState = new DurableTaskState
+            {
+                Request = request,
+                CreatedAt = _shared.SystemClock.GetUtcNow()
+            };
 
-            return PendingResponse.Instance;
+            if (client is not null)
+            {
+                newTaskState.Clients = new HashSet<IDurableTaskClient> { client };
+            }
+
+            _storage.AddOrUpdateTask(taskId, newTaskState);
+            await _storage.WriteAsync();
+
+            // Schedule the task with the runtime.
+            executionContext = CreateExecutionContext(taskId, newTaskState);
+            InvokeRequestMethod(taskId, request, executionContext);
         }
 
-        // Schedule the new request.
-        await ScheduleNewTaskRequestAsync(request, client);
-        return PendingResponse.Instance;
+        // The result indicates whether the caller will receive a callback (subscribed) or whether they must poll for a result.
+        return client switch
+        {
+            { } => SubscribedResponse.Instance,
+            _ => PendingResponse.Instance
+        };
     }
 
     private async ValueTask SubscribeClientAsync(TaskId taskId, DurableTaskExecutionContext executionContext, IDurableTaskClient? client)
@@ -158,31 +224,13 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         }
     }
 
-    private async ValueTask ScheduleNewTaskRequestAsync(IDurableTaskRequest request, IDurableTaskClient? client)
-    {
-        var taskId = request.Context!.TaskId;
-        Debug.Assert(!_pendingTasks.ContainsKey(taskId));
-        var newTaskState = new DurableTaskState
-        {
-            Request = request,
-            CreatedAt = _systemClock.GetUtcNow()
-        };
-
-        if (client is not null)
-        {
-            newTaskState.Clients = new HashSet<IDurableTaskClient> { client };
-        }
-
-        _storage.AddOrUpdateTask(taskId, newTaskState);
-        await _storage.WriteAsync();
-
-        // Schedule the task with the runtime.
-        var executionContext = CreateExecutionContext(taskId, newTaskState);
-        InvokeRequestMethod(taskId, request, executionContext);
-    }
-
     public async ValueTask<DurableTaskExecutionContext> EvaluateStepAsync(TaskId taskId, DurableTask durableTask)
     {
+        if (_shared.Logger.IsEnabled(LogLevel.Trace))
+        {
+            _shared.Logger.LogTrace("{Id} evaluating task {TaskId}", GrainId, taskId);
+        }
+
         if (!TryGetExecutionContext(taskId, out var executionContext))
         {
             executionContext = await CreateExecutionContextAsync(taskId);
@@ -198,10 +246,47 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
                 // Invoke the method immediately.
                 var immediateResponse = await durableTask.InvokeAsync(executionContext);
 
-                // If the response is still pending, do not propagate it to the execution context yet.
-                if (immediateResponse is not PendingResponse)
+                if (immediateResponse is PendingResponse)
                 {
-                    await CompleteRequestWithResponse(taskId, Response.Completed, executionContext);
+                    if (_shared.Logger.IsEnabled(LogLevel.Trace))
+                    {
+                        _shared.Logger.LogTrace("{Id} polling task {TaskId}", GrainId, taskId);
+                    }
+
+                    // Ensure that the request is being polled in the background so that the response can be propagated to the caller.
+                    _ = Task.Run(async () =>
+                    {
+                        while (true)
+                        {
+                            await Task.Delay(1_000);
+                            try
+                            {
+                                var response = await durableTask.InvokeAsync(executionContext);
+                                if (response is not PendingResponse)
+                                {
+                                    await CompleteRequestWithResponse(taskId, response, executionContext);
+                                    break;
+                                }
+                            }
+                            catch (Exception exception)
+                            {
+                                _shared.Logger.LogError(exception, "{Id} error polling task {TaskId}", GrainId, taskId);
+                            }
+                        }
+                    });
+                }
+                else if (immediateResponse is SubscribedResponse)
+                {
+                    // The response will be propagated to the caller asynchronously via a callback.
+                    if (_shared.Logger.IsEnabled(LogLevel.Trace))
+                    {
+                        _shared.Logger.LogTrace("{Id} subscribed for completion notifications for task {TaskId}", GrainId, taskId);
+                    }
+                }
+                else
+                {
+                    // If the response is still pending, do not propagate it to the execution context yet.
+                    await CompleteRequestWithResponse(taskId, immediateResponse, executionContext);
                 }
             }
             catch (Exception exception)
@@ -218,9 +303,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
     {
         var newTaskState = new DurableTaskState
         {
-            // The request is not propagated to the task state because it is not serializable.
-            // It represents a local method call (a lambda, local function, class method, etc).
-            CreatedAt = _systemClock.GetUtcNow()
+            CreatedAt = _shared.SystemClock.GetUtcNow()
         };
 
         _storage.AddOrUpdateTask(taskId, newTaskState);
@@ -240,19 +323,24 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
 
         try
         {
-            request.SetTarget(_grainContext);
+            request.SetTarget(_shared.GrainContextAccessor.GrainContext);
             var response = await request.InvokeImplementation(context);
             await CompleteRequestWithResponse(taskId, response, context);
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Error invoking durable task request {Request}", request);
+            _shared.Logger.LogError(exception, "{Id} error invoking durable task request {Request}", GrainId, request);
             await CompleteRequestWithResponse(taskId, Response.FromException(exception), context);
         }
     }
 
     private async Task CompleteRequestWithResponse(TaskId taskId, Response response, DurableTaskExecutionContext executionContext)
     {
+        if (_shared.Logger.IsEnabled(LogLevel.Trace))
+        {
+            _shared.Logger.LogTrace("{Id} task {TaskId} completed with result {Result}", GrainId, taskId, response);
+        }
+
         var state = executionContext.State;
         if (state.Result is null)
         {
@@ -262,9 +350,10 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
             // Note that this and the next call to notify callers may result in two writes in quick succession.
             // That is ok: we want to ensure that every client always sees the same result for a task, so it is important to persist the task before notifying the first client.
             state.Result = response;
-            state.CompletedAt = _systemClock.GetUtcNow();
+            state.CompletedAt = _shared.SystemClock.GetUtcNow();
             _storage.AddOrUpdateTask(taskId, state);
             await _storage.WriteAsync();
+            executionContext.SetResponse(response);
         }
 
         await NotifyClientsAndCleanupTask(taskId, executionContext);
@@ -284,9 +373,9 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
                 if (state.Clients is { } clients)
                 {
                     clientCount = clients.Count;
-                    if (_logger.IsEnabled(LogLevel.Trace))
+                    if (_shared.Logger.IsEnabled(LogLevel.Trace))
                     {
-                        _logger.LogTrace("Notifying {ClientsCount} clients for completion of task {TaskId}", clientCount, taskId);
+                        _shared.Logger.LogTrace("{Id} notifying {ClientsCount} clients for completion of task {TaskId}", GrainId, clientCount, taskId);
                     }
 
                     var response = state.Result;
@@ -303,14 +392,18 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
 
                 PruneCompletedTasks();
                 await _storage.WriteAsync();
-                _logger.LogTrace("Notified {ClientsCount} clients for completion of task {TaskId}", clientCount, taskId);
+
+                if (_shared.Logger.IsEnabled(LogLevel.Trace))
+                {
+                    _shared.Logger.LogTrace("{Id} notified {ClientsCount} clients for completion of task {TaskId}", GrainId, clientCount, taskId);
+                }
 
                 // Success, no more work to be done right now.
                 break;
             }
             catch (Exception exception)
             {
-                _logger.LogWarning(exception, "Exception while notifying clients of completion for durable task {TaskId}", taskId);
+                _shared.Logger.LogWarning(exception, "{Id} exception while notifying clients of completion for durable task {TaskId}", GrainId, taskId);
             }
 
             // TODO: Make this configurable and probably use exponential backoff, potentially with some coordination with other tasks.
@@ -328,7 +421,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         var allTasks = _storage.Tasks.ToDictionary(static task => task.Id, static task => task.State);
         HashSet<TaskId>? completedTaskIds = default;
         Dictionary<TaskId, HashSet<TaskId>>? waitingOnParent = default;
-        var now = _systemClock.GetUtcNow();
+        var now = _shared.SystemClock.GetUtcNow();
         foreach (var (taskId, state) in allTasks)
         {
             if (state.Result is null)
@@ -343,7 +436,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
                 continue;
             }
 
-            if (state.CompletedAt is not { } completedAt || now.Subtract(completedAt) < _defaultCleanupPolicy.CleanupAge)
+            if (state.CompletedAt is not { } completedAt || now.Subtract(completedAt) < _shared.DefaultCleanupPolicy.CleanupAge)
             {
                 // The task is being retained for at least the specified period of time.
                 continue;
@@ -372,11 +465,20 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
                 {
                     foreach (var childTaskId in childTaskIds)
                     {
+                        if (_shared.Logger.IsEnabled(LogLevel.Trace))
+                        {
+                            _shared.Logger.LogTrace("{Id} pruning completed child task {TaskId}", GrainId, childTaskId);
+                        }
+
                         _storage.RemoveTask(childTaskId);
                     }
                 }
 
                 // Prune the task.
+                if (_shared.Logger.IsEnabled(LogLevel.Trace))
+                {
+                    _shared.Logger.LogTrace("{Id} pruning completed task {TaskId}", GrainId, taskId);
+                }
                 _storage.RemoveTask(taskId);
             }
         }
