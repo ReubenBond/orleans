@@ -17,6 +17,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.DurableTasks;
+#pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
+#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
 
 public static class DurableTaskHostingExtensions
 {
@@ -39,8 +41,6 @@ public static class DurableTaskHostingExtensions
     }
 }
 
-#pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
 public class Program
 {
     public interface IBankGrain : IGrainWithStringKey
@@ -98,28 +98,28 @@ public class Program
         public async Task Run()
         {
             var client = this.GrainFactory;
-            var bankGrain = client.GetGrain<IBankGrain>("first-tech");
-            var billGates = client.GetGrain<IAccountGrain>("billg");
-            var me = client.GetGrain<IAccountGrain>("rebond");
+            var bankGrain = client.GetGrain<IBankGrain>("bank");
+            var customer = client.GetGrain<IAccountGrain>("customer");
+            var business = client.GetGrain<IAccountGrain>("business");
 
             var scheduledTask = await bankGrain
-                .Transfer(billGates, me, 1_000_000_000)
+                .Transfer(customer, business, 20)
                 .ScheduleAsync("transfer123");
 
             var success = await scheduledTask;
             Console.WriteLine(success ? "Success!" : "Fail :(");
-            Console.WriteLine("BillG balance: " + await billGates.GetBalance());
-            Console.WriteLine("Me balance: " + await me.GetBalance());
+            Console.WriteLine("Customer balance: " + await customer.GetBalance());
+            Console.WriteLine("Business balance: " + await business.GetBalance());
         }
 
         public async DurableTask RunWorkflow()
         {
             var client = this.GrainFactory;
-            var bankGrain = client.GetGrain<IBankGrain>("first-tech");
-            var billGates = client.GetGrain<IAccountGrain>("billg");
-            var me = client.GetGrain<IAccountGrain>("rebond");
+            var bankGrain = client.GetGrain<IBankGrain>("bank");
+            var customer = client.GetGrain<IAccountGrain>("customer");
+            var business = client.GetGrain<IAccountGrain>("business");
 
-            var randomId = await DurableTask.Run(Guid.NewGuid).AsStep("generate-random-id");
+            var randomId = await DurableTask.Run(() => Guid.NewGuid()).AsStep("generate-random-id");
             Console.WriteLine(randomId);
 
             // If the task is interrupted (eg, power outage) and is retried, it will only sleep for the remaining time.
@@ -127,13 +127,13 @@ public class Program
             Console.WriteLine("slept? " + slept);
 
             var scheduledTask = await bankGrain
-                .Transfer(billGates, me, 1_000_000_000)
+                .Transfer(customer, business, 20)
                 .ScheduleAsync("transfer123");
 
             var success = await scheduledTask;
             Console.WriteLine(success ? "Success!" : "Fail :(");
-            Console.WriteLine("BillG balance: " + await billGates.GetBalance());
-            Console.WriteLine("Me balance: " + await me.GetBalance());
+            Console.WriteLine("Customer balance: " + await customer.GetBalance());
+            Console.WriteLine("Business balance: " + await business.GetBalance());
         }
     }
 
@@ -148,7 +148,8 @@ public class Program
             })
             .ConfigureLogging(logging =>
             {
-                logging.AddFilter((category, level) => category is not null && category.StartsWith("Orleans.DurableTasks"));
+                logging.SetMinimumLevel(LogLevel.Critical);
+                //logging.AddFilter((category, level) => category is not null && category.StartsWith("Orleans.DurableTasks"));
             })
             .UseConsoleLifetime();
         using var host = hostBuilder.Build();
@@ -156,21 +157,21 @@ public class Program
 
         var client = host.Services.GetRequiredService<IClusterClient>();
 
-        var bankGrain = client.GetGrain<IBankGrain>("first-tech");
-        var billGates = client.GetGrain<IAccountGrain>("billg");
-        var me = client.GetGrain<IAccountGrain>("rebond");
+        var bank = client.GetGrain<IBankGrain>("bank");
+        var customer = client.GetGrain<IAccountGrain>("customer");
+        var business = client.GetGrain<IAccountGrain>("business");
 
-        // await await?!
-        await await billGates.Deposit(120_000_000_000).ScheduleAsync("create-pc-industry");
+        // await await?! awaiting ScheduleAsync yields a ScheduledTask, promising that the 
+        await await customer.Deposit(120_000_000_000).ScheduleAsync("create-pc-industry");
 
-        var scheduledTask = await bankGrain
-            .Transfer(billGates, me, 20)
+        var scheduledTask = await bank
+            .Transfer(customer, business, 20)
             .ScheduleAsync("transfer123");
 
         var success = await scheduledTask;
         Console.WriteLine(success ? "Success!" : "Fail :(");
-        Console.WriteLine("BillG balance: " + await billGates.GetBalance());
-        Console.WriteLine("Me balance: " + await me.GetBalance());
+        Console.WriteLine("Customer balance: " + await customer.GetBalance());
+        Console.WriteLine("Business balance: " + await business.GetBalance());
 
         var clientGrain = client.GetGrain<IClientGrain>("client");
         Console.WriteLine("Now to do the same thing via a regular grain call");
