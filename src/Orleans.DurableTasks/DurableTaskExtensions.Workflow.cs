@@ -1,7 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
 using Orleans.DurableTasks.Remoting;
-using Orleans.Runtime;
-using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;
 
@@ -79,7 +76,7 @@ public static class DurableTaskExtensions
         // Create a new, nested task id for the step
         var taskId = parentContext.TaskId.Child(stepId);
 
-        var executionContext = await parentContext.Runtime.EvaluateStepAsync(taskId, taskDefinition);
+        var executionContext = await parentContext.EvaluateStepAsync(taskId, taskDefinition);
         return await executionContext.GetResultAsync<TResult>();
     }
 
@@ -96,7 +93,7 @@ public static class DurableTaskExtensions
         var parentContext = DurableTaskExecutionContext.GetCurrentContextOrThrow();
         var taskId = parentContext.TaskId.Child(stepId);
 
-        var executionContext = await parentContext.Runtime.EvaluateStepAsync(taskId, taskDefinition);
+        var executionContext = await parentContext.EvaluateStepAsync(taskId, taskDefinition);
         await executionContext.AsUntypedValueTask();
     }
 

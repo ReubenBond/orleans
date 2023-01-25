@@ -123,7 +123,7 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
     }
 
     /// <inheritdoc/>
-    internal override async ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext)
+    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
@@ -272,7 +272,7 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
     }
 
     /// <inheritdoc/>
-    internal override async ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext)
+    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:

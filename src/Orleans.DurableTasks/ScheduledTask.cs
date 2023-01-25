@@ -5,7 +5,7 @@ namespace Orleans.DurableTasks;
 
 public abstract class ScheduledTask
 {
-    public abstract TaskId Id { get; }
+    public abstract TaskId TaskId { get; }
 
     public ValueTask CancelAsync()
     {
@@ -26,7 +26,7 @@ public class ScheduledTask<TResult> : ScheduledTask
         _executionContext = executionContext;
     }
 
-    public override TaskId Id => _executionContext.TaskId;
+    public override TaskId TaskId => _executionContext.TaskId;
     public override async Task<TResult> AsTask() => await this;
     public new ScheduledTaskAwaiter<TResult> GetAwaiter() => new(this);
     protected internal override ValueTask AsUntypedValueTask() => _executionContext.AsUntypedValueTask();
@@ -42,7 +42,7 @@ internal sealed class UntypedScheduledTask : ScheduledTask
         _executionContext = executionContext;
     }
 
-    public override TaskId Id => _executionContext.TaskId;
+    public override TaskId TaskId => _executionContext.TaskId;
     public override Task AsTask() => _executionContext.AsUntypedValueTask().AsTask();
     public new ScheduledTaskAwaiter GetAwaiter() => new(this);
     protected internal override ValueTask AsUntypedValueTask() => _executionContext.AsUntypedValueTask();

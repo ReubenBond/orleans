@@ -6,7 +6,7 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;
 
-public sealed partial class DurableTaskExecutionContext : IValueTaskSource<Response>, IValueTaskSource
+public abstract partial class DurableTaskExecutionContext : IValueTaskSource<Response>, IValueTaskSource
 {
     private ManualResetValueTaskSourceCore<Response> _tcs = new()
     {
@@ -17,7 +17,7 @@ public sealed partial class DurableTaskExecutionContext : IValueTaskSource<Respo
     internal ValueTask<Response> AsValueTask() => new(this, _tcs.Version);
     internal DurableTaskResultAwaitable<TResult> GetResultAsync<TResult>() => new(this);
 
-    internal void SetResponse(Response response)
+    public void SetResponse(Response response)
     {
         Debug.Assert(response is not PendingResponse);
         _tcs.SetResult(response);

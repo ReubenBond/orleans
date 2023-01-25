@@ -57,7 +57,7 @@ internal class DurableTaskGrainExtensionShared
 
 internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTaskGrainExtension
 {
-    private readonly Dictionary<TaskId, DurableTaskExecutionContext> _pendingTasks = new();
+    private readonly Dictionary<TaskId, GrainDurableTaskExecutionContext> _pendingTasks = new();
     private readonly Dictionary<TaskId, Task> _runningTasks = new();
     private readonly DurableTaskGrainExtensionShared _shared;
     private readonly IDurableTaskGrainStorage _storage;
@@ -78,7 +78,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
     /// <param name="taskId">The task id.</param>
     /// <param name="state">The task state.</param>
     /// <returns>The new execution context.</returns>
-    private DurableTaskExecutionContext CreateExecutionContext(TaskId taskId, DurableTaskState state) => _pendingTasks[taskId] = new DurableTaskExecutionContext(taskId, this, state);
+    private GrainDurableTaskExecutionContext CreateExecutionContext(TaskId taskId, DurableTaskState state) => _pendingTasks[taskId] = new GrainDurableTaskExecutionContext(taskId, this, state);
 
     /// <summary>
     /// Gets the execution context corresponding to the provided task, if it exists, and returns it.
@@ -86,7 +86,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
     /// <param name="taskId">The task to get an execution context from.</param>
     /// <param name="executionContext">The execution context.</param>
     /// <returns><see langword="true"/> if the execution context was found, <see langword="false"/> otherwise.</returns>
-    private bool TryGetExecutionContext(TaskId taskId, [NotNullWhen(true)] out DurableTaskExecutionContext? executionContext)
+    private bool TryGetExecutionContext(TaskId taskId, [NotNullWhen(true)] out GrainDurableTaskExecutionContext? executionContext)
     {
         // Is an active method already waiting for this?
         if (_pendingTasks.TryGetValue(taskId, out executionContext))
@@ -97,7 +97,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         if (_storage.TryGetTask(taskId, out var state))
         {
             // Rehydrate the execution context from its persisted state.
-            executionContext = new DurableTaskExecutionContext(taskId, this, state);
+            executionContext = new GrainDurableTaskExecutionContext(taskId, this, state);
 
             // If the task has completed, set the result now.
             if (state.Result is { } response)
@@ -247,7 +247,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         };
     }
 
-    private async ValueTask SubscribeClientAsync(TaskId taskId, DurableTaskExecutionContext executionContext, IDurableTaskClient? client)
+    private async ValueTask SubscribeClientAsync(TaskId taskId, GrainDurableTaskExecutionContext executionContext, IDurableTaskClient? client)
     {
         if (client is not null)
         {
@@ -363,7 +363,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         return executionContext;
     }
 
-    private async Task<DurableTaskExecutionContext> CreateExecutionContextAsync(TaskId taskId)
+    private async Task<GrainDurableTaskExecutionContext> CreateExecutionContextAsync(TaskId taskId)
     {
         var newTaskState = new DurableTaskState
         {
@@ -376,12 +376,12 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         return CreateExecutionContext(taskId, newTaskState);
     }
 
-    private void InvokeRequestMethod(TaskId taskId, IDurableTaskRequest request, DurableTaskExecutionContext context)
+    private void InvokeRequestMethod(TaskId taskId, IDurableTaskRequest request, GrainDurableTaskExecutionContext context)
     {
         _runningTasks.Add(taskId, InvokeRequestMethodCore(taskId, request, context));
     }
 
-    private async Task InvokeRequestMethodCore(TaskId taskId, IDurableTaskRequest request, DurableTaskExecutionContext context)
+    private async Task InvokeRequestMethodCore(TaskId taskId, IDurableTaskRequest request, GrainDurableTaskExecutionContext context)
     {
         await Task.Yield();
 
@@ -398,7 +398,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
         }
     }
 
-    private async Task CompleteRequestWithResponse(TaskId taskId, Response response, DurableTaskExecutionContext executionContext)
+    private async Task CompleteRequestWithResponse(TaskId taskId, Response response, GrainDurableTaskExecutionContext executionContext)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
@@ -433,7 +433,7 @@ internal class DurableTaskGrainExtension : IDurableTaskGrainRuntime, IDurableTas
     /// <param name="taskId">The task which has completed.</param>
     /// <param name="executionContext">The task execution context, containing the result.</param>
     /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-    private async Task NotifyClientsAndCleanupTask(TaskId taskId, DurableTaskExecutionContext executionContext)
+    private async Task NotifyClientsAndCleanupTask(TaskId taskId, GrainDurableTaskExecutionContext executionContext)
     {
         Debug.Assert(executionContext.State.Result is not null);
         while (true)

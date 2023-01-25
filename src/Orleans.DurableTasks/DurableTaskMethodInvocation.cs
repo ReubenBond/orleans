@@ -59,7 +59,7 @@ internal sealed class UntypedDurableTaskMethodInvocation<TStateMachine> : Untype
 
     void IAsyncStateMachine.SetStateMachine(IAsyncStateMachine stateMachine) => _stateMachine.SetStateMachine(stateMachine);
 
-    internal override ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext) 
+    protected internal override ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext) 
     {
         _executionContext = executionContext;
         StartInvocation();
@@ -125,7 +125,7 @@ internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : Dura
 
     void IAsyncStateMachine.SetStateMachine(IAsyncStateMachine stateMachine) => _stateMachine.SetStateMachine(stateMachine);
 
-    internal override ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext)
+    protected internal override ValueTask<Response> InvokeAsync(DurableTaskExecutionContext executionContext)
     {
         _executionContext = executionContext;
         StartInvocation();
