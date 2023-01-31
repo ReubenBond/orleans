@@ -196,7 +196,7 @@ namespace Orleans.Messaging
                         (int)ErrorCode.ProxyClient_QueueRequest,
                         "Sending message {Message} via gateway {Gateway}",
                         msg,
-                        connection.RemoteEndPoint);
+                        connection.RemoteEndpoint);
                 }
             }
             else
@@ -220,7 +220,7 @@ namespace Orleans.Messaging
                                 (int)ErrorCode.ProxyClient_QueueRequest,
                                 "Sending message {Message} via gateway {Gateway}",
                                 message,
-                                connection.RemoteEndPoint);
+                                connection.RemoteEndpoint);
                         }
                     }
                     catch (Exception exception)

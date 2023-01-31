@@ -1,3 +1,4 @@
+/*
 using System;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,3 +42,4 @@ public static class UnixSocketConnectionExtensions
         return (IServiceProvider sp, object key) => ActivatorUtilities.CreateInstance<UnixSocketConnectionListenerFactory>(sp);
     }
 }
+*/

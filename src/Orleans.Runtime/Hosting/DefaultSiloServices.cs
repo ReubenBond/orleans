@@ -10,7 +10,6 @@ using Orleans.Metadata;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Providers;
-using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
@@ -29,8 +28,6 @@ using System.Reflection;
 using System.Linq;
 using Microsoft.Extensions.Options;
 using Orleans.Timers.Internal;
-using Microsoft.AspNetCore.Connections;
-using Orleans.Networking.Shared;
 using Orleans.Configuration.Internal;
 using Orleans.Runtime.Metadata;
 using Orleans.GrainReferences;
@@ -39,6 +36,8 @@ using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
 using System.Runtime.InteropServices;
+using Orleans.Connections;
+using Orleans.Connections.Transport;
 
 namespace Orleans.Hosting
 {
@@ -123,7 +122,7 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
             services.AddSingleton<GrainLocator>();
             services.AddSingleton<GrainLocatorResolver>();
-            services.AddSingleton<DhtGrainLocator>(sp => DhtGrainLocator.FromLocalGrainDirectory(sp.GetService<LocalGrainDirectory>()));
+            services.AddSingleton<DhtGrainLocator>(sp => DhtGrainLocator.FromLocalGrainDirectory(sp.GetService<LocalGrainDirectory>(), sp.GetService<ILoggerFactory>()));
             services.AddSingleton<GrainDirectoryResolver>();
             services.AddSingleton<IGrainDirectoryResolver, GenericGrainDirectoryResolver>();
             services.AddSingleton<CachedGrainLocator>();
@@ -353,21 +352,12 @@ namespace Orleans.Hosting
                 (sp, _) => sp.GetRequiredService<IAsyncEnumerableGrainExtension>());
 
             // Networking
+            services.AddSingleton<MessageHandlerShared>();
             services.TryAddSingleton<ConnectionCommon>();
             services.TryAddSingleton<ConnectionManager>();
             services.TryAddSingleton<ConnectionPreambleHelper>();
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, ConnectionManagerLifecycleAdapter<ISiloLifecycle>>();
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionMaintainer>();
-
-            services.AddSingletonKeyedService<object, IConnectionFactory>(
-                SiloConnectionFactory.ServicesKey,
-                (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionFactory>(sp));
-            services.AddSingletonKeyedService<object, IConnectionListenerFactory>(
-                SiloConnectionListener.ServicesKey,
-                (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionListenerFactory>(sp));
-            services.AddSingletonKeyedService<object, IConnectionListenerFactory>(
-                GatewayConnectionListener.ServicesKey,
-                (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionListenerFactory>(sp));
 
             services.AddSerializer();
             services.AddSingleton<ITypeNameFilter, AllowOrleansTypes>();
@@ -378,19 +368,38 @@ namespace Orleans.Hosting
             services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, ConfigureOrleansJsonSerializerOptions>();
             services.AddSingleton<OrleansJsonSerializer>();
 
-            services.TryAddTransient(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
+            services.TryAddTransient<MessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
                 sp,
                 sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value));
+
             services.TryAddSingleton<ConnectionFactory, SiloConnectionFactory>();
-            services.AddSingleton<NetworkingTrace>();
+            services.AddSingleton<ConnectionTrace>();
             services.AddSingleton<RuntimeMessagingTrace>();
             services.AddFromExisting<MessagingTrace, RuntimeMessagingTrace>();
 
-            // Use Orleans server.
-            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionListener>();
-            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, GatewayConnectionListener>();
-            services.AddSingleton<SocketSchedulers>();
-            services.AddSingleton<SharedMemoryPool>();
+            ConfigureMessageTransport(services);
+        }
+
+        private static void ConfigureMessageTransport(IServiceCollection services)
+        {
+            services.AddSingleton<IOptionsFactory<TransportListenerOptions>, TransportListenerOptionsFactory>();
+            services.AddSingleton<IOptionsFactory<TransportFactoryOptions>, TransportFactoryOptionsFactory>();
+            services.AddSingleton<IMessageTransportListenerProvider, OrleansMessageTransportListenerProvider>();
+            services.AddSingleton<IMessageTransportFactoryProvider, OrleansMessageTransportFactoryProvider>();
+            
+            // Add default silo connection listener
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionListener>(sp => ActivatorUtilities.CreateInstance<SiloConnectionListener>(sp, SiloConnectionListener.DefaultListenerName));
+            services.AddOptions<TransportListenerOptions>(SiloConnectionListener.DefaultListenerName).Configure((TransportListenerOptions options, IOptions<EndpointOptions> endpointOptions) =>
+            {
+                options.Endpoint = endpointOptions.Value.GetListeningSiloEndpoint();
+            });
+
+            // Add default gateway connection listener
+            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, GatewayConnectionListener>(sp => ActivatorUtilities.CreateInstance<GatewayConnectionListener>(sp, GatewayConnectionListener.DefaultListenerName));
+            services.AddOptions<TransportListenerOptions>(GatewayConnectionListener.DefaultListenerName).Configure((TransportListenerOptions options, IOptions<EndpointOptions> endpointOptions) =>
+            {
+                options.Endpoint = endpointOptions.Value.GetListeningProxyEndpoint();
+            });
         }
 
         private class AllowOrleansTypes : ITypeNameFilter
