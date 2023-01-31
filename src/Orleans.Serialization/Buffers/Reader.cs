@@ -230,25 +230,8 @@ namespace Orleans.Serialization.Buffers
     /// <summary>
     /// Marker type for <see cref="Reader{TInput}"/> objects which operate over <see cref="ReadOnlySpan{Byte}"/> buffers.
     /// </summary>
-    public struct SpanReaderInput
+    public readonly struct SpanReaderInput
     {
-        internal long Length;
-    }
-
-    /// <summary>
-    /// <see cref="Reader{TInput}"/> provider which operates over <see cref="ReadOnlySequence{Byte}"/> buffers.
-    /// </summary>
-    public struct ReadOnlySequenceReaderInput
-    {
-        internal readonly ReadOnlySequence<byte> Sequence;
-        internal SequencePosition NextSequencePosition;
-        internal long VisitedBuffersLength;
-
-        public ReadOnlySequenceReaderInput(ReadOnlySequence<byte> sequence)
-        {
-            Sequence = sequence;
-            NextSequencePosition = sequence.Start;
-        }
     }
 
     /// <summary>
@@ -284,7 +267,7 @@ namespace Orleans.Serialization.Buffers
                 _previousBuffersSize = 0;
                 _sequenceOffset = globalOffset;
             }
-            else if (IsReaderInput)
+            else if (IsStreamReaderInput)
             {
                 _input = input;
                 _nextSequencePosition = default;
@@ -346,7 +329,7 @@ namespace Orleans.Serialization.Buffers
                 {
                     return _sequenceOffset + _bufferPos;
                 }
-                else if (_input is ReaderInput readerInput)
+                else if (_input is StreamReaderInput readerInput)
                 {
                     return readerInput.Position;
                 }
@@ -373,7 +356,7 @@ namespace Orleans.Serialization.Buffers
                 {
                     return _currentSpan.Length;
                 }
-                else if (_input is ReaderInput readerInput)
+                else if (_input is StreamReaderInput readerInput)
                 {
                     return readerInput.Length;
                 }
@@ -413,7 +396,7 @@ namespace Orleans.Serialization.Buffers
                     ThrowInsufficientData();
                 }
             }
-            else if (_input is ReaderInput input)
+            else if (_input is StreamReaderInput input)
             {
                 input.Skip(count);
             }
@@ -453,7 +436,7 @@ namespace Orleans.Serialization.Buffers
                     ThrowInvalidPosition(position, forked.Position);
                 }
             }
-            else if (_input is ReaderInput input)
+            else if (_input is StreamReaderInput input)
             {
                 input.Seek(position);
                 forked = new Reader<TInput>(_input, Session, 0);
@@ -490,7 +473,7 @@ namespace Orleans.Serialization.Buffers
             {
                 // Nothing is required.
             }
-            else if (_input is ReaderInput input)
+            else if (_input is StreamReaderInput input)
             {
                 // Seek the input stream.
                 input.Seek(Position);
@@ -565,7 +548,7 @@ namespace Orleans.Serialization.Buffers
 
                 return ReadByteSlow(ref this);
             }
-            else if (_input is ReaderInput readerInput)
+            else if (_input is StreamReaderInput readerInput)
             {
                 return readerInput.ReadByte();
             }
@@ -616,7 +599,7 @@ namespace Orleans.Serialization.Buffers
                     return b1 | (b2 << 8) | (b3 << 16) | (b4 << 24);
                 }
             }
-            else if (_input is ReaderInput readerInput)
+            else if (_input is StreamReaderInput readerInput)
             {
                 return readerInput.ReadUInt32();
             }
@@ -665,7 +648,7 @@ namespace Orleans.Serialization.Buffers
                            | (b5 << 32) | (b6 << 40) | (b7 << 48) | (b8 << 56);
                 }
             }
-            else if (_input is ReaderInput readerInput)
+            else if (_input is StreamReaderInput readerInput)
             {
                 return readerInput.ReadUInt64();
             }
@@ -720,7 +703,7 @@ namespace Orleans.Serialization.Buffers
                 var destination = new Span<byte>(bytes);
                 ReadBytes(destination);
             }
-            else if (_input is ReaderInput readerInput)
+            else if (_input is StreamReaderInput readerInput)
             {
                 readerInput.ReadBytes(bytes, 0, (int)count);
             }
@@ -745,7 +728,7 @@ namespace Orleans.Serialization.Buffers
 
                 ReadBytesMultiSegment(destination);
             }
-            else if (_input is ReaderInput readerInput)
+            else if (_input is StreamReaderInput readerInput)
             {
                 readerInput.ReadBytes(destination);
             }
@@ -794,7 +777,7 @@ namespace Orleans.Serialization.Buffers
                 bytes = default;
                 return false;
             }
-            else if (_input is ReaderInput readerInput)
+            else if (_input is StreamReaderInput readerInput)
             {
                 return readerInput.TryReadBytes(length, out bytes);
             }
