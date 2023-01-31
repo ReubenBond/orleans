@@ -24,16 +24,32 @@ namespace Orleans.Hosting
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            this.logger.LogInformation("Starting Orleans Silo.");
+            if (logger.IsEnabled(LogLevel.Information))
+            {
+                this.logger.LogInformation("Starting Orleans Silo");
+            }
+
             await this.silo.StartAsync(cancellationToken).ConfigureAwait(false);
-            this.logger.LogInformation("Orleans Silo started.");
+
+            if (logger.IsEnabled(LogLevel.Information))
+            {
+                this.logger.LogInformation("Orleans Silo started");
+            }
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            this.logger.LogInformation("Stopping Orleans Silo");
+            if (logger.IsEnabled(LogLevel.Information))
+            {
+                this.logger.LogInformation("Stopping Orleans Silo");
+            }
+
             await this.silo.StopAsync(cancellationToken).ConfigureAwait(false);
-            this.logger.LogInformation("Orleans Silo stopped.");
+
+            if (logger.IsEnabled(LogLevel.Information))
+            {
+                this.logger.LogInformation("Orleans Silo stopped");
+            }
         }
 
         private void ValidateSystemConfiguration(IEnumerable<IConfigurationValidator> configurationValidators)

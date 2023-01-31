@@ -36,7 +36,7 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("SlowBVT"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerActivationsPerSiloDoNotExceedMaxLocalWorkersCount()
         {
-            var gatewayOptions = this.Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>();
+            var gatewayOptions = this.Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayMembershipProviderOptions>>();
             var gatewaysCount = gatewayOptions.Value.Gateways.Count;
             // do extra calls to trigger activation of ExpectedMaxLocalActivations local activations
             int numberOfCalls = ExpectedMaxLocalActivations * 3 * gatewaysCount; 
@@ -108,7 +108,7 @@ namespace DefaultCluster.Tests.General
         [SkippableFact(Skip = "Skipping test for now, since there seems to be a bug"), TestCategory("Functional"), TestCategory("StatelessWorker")]
         public async Task StatelessWorkerFastActivationsDontFailInMultiSiloDeployment()
         {
-            var gatewayOptions = this.Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>();
+            var gatewayOptions = this.Fixture.Client.ServiceProvider.GetRequiredService<IOptions<StaticGatewayMembershipProviderOptions>>();
             var gatewaysCount = gatewayOptions.Value.Gateways.Count;
 
             if (gatewaysCount < 2)

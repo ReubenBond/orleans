@@ -1,7 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Messaging;
-using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
 using Orleans.Tests.SqlUtils;
 using Orleans.Configuration;
@@ -32,17 +30,7 @@ namespace UnitTests.MembershipTests
                 Invariant = GetAdoInvariant(),
                 ConnectionString = this.connectionString,
             };
-            return new AdoNetClusteringTable(this.Services, this.clusterOptions, Options.Create(options), this.loggerFactory.CreateLogger<AdoNetClusteringTable>());
-        }
-
-        protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
-        {
-            var options = new AdoNetClusteringClientOptions()
-            {
-                ConnectionString = this.connectionString,
-                Invariant = GetAdoInvariant()
-            };
-            return new AdoNetGatewayListProvider(this.loggerFactory.CreateLogger<AdoNetGatewayListProvider>(), this.Services, Options.Create(options), this.gatewayOptions, this.clusterOptions);
+            return new AdoNetClusteringTable(this.clusterOptions, Options.Create(options), this.loggerFactory.CreateLogger<AdoNetClusteringTable>());
         }
 
         protected override string GetAdoInvariant()

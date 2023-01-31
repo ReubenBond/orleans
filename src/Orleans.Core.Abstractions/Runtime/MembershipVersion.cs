@@ -17,7 +17,7 @@ namespace Orleans.Runtime
         /// <param name="version">The underlying version.</param>
         public MembershipVersion(long version)
         {
-            this.Value = version;
+            Value = version;
         }
 
         /// <summary>
@@ -45,6 +45,12 @@ namespace Orleans.Runtime
 
         /// <inheritdoc/>
         public override string ToString() => this.Value.ToString();
+
+        /// <summary>
+        /// Gets the next membership version.
+        /// </summary>
+        /// <returns>A new <see cref="MembershipVersion"/>.</returns>
+        public MembershipVersion Successor() => new (Value + 1);
 
         /// <summary>
         /// Compares the provided operands for equality.

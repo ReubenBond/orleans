@@ -9,21 +9,9 @@ using Xunit;
 
 namespace NonSilo.Tests
 {
-    public class NoOpGatewaylistProvider : IGatewayListProvider
+    public class UnimplementedGatewayMembershipProvider : IGatewayMembershipProvider
     {
-        public TimeSpan MaxStaleness => throw new NotImplementedException();
-
-        public bool IsUpdatable => throw new NotImplementedException();
-
-        public Task<IList<Uri>> GetGateways()
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task InitializeGatewayListProvider()
-        {
-            throw new NotImplementedException();
-        }
+        public ValueTask<GatewayMembershipSnapshot> GetGatewaysAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
     }
 
     /// <summary>
@@ -51,7 +39,7 @@ namespace NonSilo.Tests
                         });
 
                         clientBuilder.ConfigureServices(services =>
-                            services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
+                            services.AddSingleton<IGatewayMembershipProvider, UnimplementedGatewayMembershipProvider>());
                     })
                     .Build();
 
@@ -70,7 +58,7 @@ namespace NonSilo.Tests
                         });
 
                         clientBuilder.ConfigureServices(services =>
-                            services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
+                            services.AddSingleton<IGatewayMembershipProvider, UnimplementedGatewayMembershipProvider>());
                     })
                     .Build();
 
@@ -89,7 +77,7 @@ namespace NonSilo.Tests
                         });
 
                         clientBuilder.ConfigureServices(services =>
-                            services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
+                            services.AddSingleton<IGatewayMembershipProvider, UnimplementedGatewayMembershipProvider>());
                     })
                     .Build();
 
@@ -105,7 +93,7 @@ namespace NonSilo.Tests
                         options.ServiceId = "someServiceId";
                     });
 
-                    clientBuilder.ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
+                    clientBuilder.ConfigureServices(services => services.AddSingleton<IGatewayMembershipProvider, UnimplementedGatewayMembershipProvider>());
                 })
                 .Build();
 
@@ -122,7 +110,7 @@ namespace NonSilo.Tests
             var hostBuilder = new HostBuilder()
                 .UseOrleansClient((ctx, clientBuilder) =>
                 {
-                    clientBuilder.ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
+                    clientBuilder.ConfigureServices(services => services.AddSingleton<IGatewayMembershipProvider, UnimplementedGatewayMembershipProvider>());
                 })
                 .ConfigureServices(RemoveConfigValidators);
 
@@ -146,7 +134,7 @@ namespace NonSilo.Tests
                             options.Interfaces.Clear();
                         });
                 })
-                .ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
+                .ConfigureServices(services => services.AddSingleton<IGatewayMembershipProvider, UnimplementedGatewayMembershipProvider>());
 
             var host = hostBuilder.Build();
 
@@ -162,7 +150,7 @@ namespace NonSilo.Tests
             var hostBuilder = new HostBuilder()
                 .UseOrleansClient((ctx, clientBuilder) =>
                 {
-                    clientBuilder.ConfigureServices(services => services.AddSingleton<IGatewayListProvider, NoOpGatewaylistProvider>());
+                    clientBuilder.ConfigureServices(services => services.AddSingleton<IGatewayMembershipProvider, UnimplementedGatewayMembershipProvider>());
                 })
                 .ConfigureServices(RemoveConfigValidators);
 

@@ -37,7 +37,7 @@ namespace Orleans.Messaging
     //
     // The list of known gateways is managed by the GatewayManager class. See comments there for details.
     // </summary>
-    internal class ClientMessageCenter : IMessageCenter, IDisposable
+    internal class ClientMessageCenter : IMessageCenter
     {
         private readonly object grainBucketUpdateLock = new object();
 
@@ -191,9 +191,9 @@ namespace Orleans.Messaging
                 {
                     this.logger.LogTrace(
                         (int)ErrorCode.ProxyClient_QueueRequest,
-                        "Sending message {Message} via gateway {Gateway}",
+                        "Sending message {Message} via gateway connection {Connection}",
                         msg,
-                        connection.RemoteEndPoint);
+                        connection);
                 }
             }
             else
@@ -215,9 +215,9 @@ namespace Orleans.Messaging
                         {
                             this.logger.LogTrace(
                                 (int)ErrorCode.ProxyClient_QueueRequest,
-                                "Sending message {Message} via gateway {Gateway}",
+                                "Sending message {Message} via gateway connection {Connection}",
                                 message,
-                                connection.RemoteEndPoint);
+                                connection);
                         }
                     }
                     catch (Exception exception)
@@ -420,11 +420,6 @@ namespace Orleans.Messaging
             }
 
             this.connectionStatusListener.NotifyGatewayCountChanged(gatewayCount, gatewayCount + 1);
-        }
-
-        public void Dispose()
-        {
-            gatewayManager.Dispose();
         }
     }
 }
