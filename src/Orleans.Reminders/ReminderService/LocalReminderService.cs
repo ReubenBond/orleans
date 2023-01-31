@@ -456,10 +456,10 @@ namespace Orleans.Runtime.ReminderService
                 if (logger.IsEnabled(LogLevel.Debug))
                 {
                     logger.LogDebug(
-                    (int)ErrorCode.RS_LocalStop,
-                    "Locally stopping reminder {PreviousReminder} as it is different than newly registered reminder {Reminder}",
-                    prevReminder,
-                    entry);
+                        (int)ErrorCode.RS_LocalStop,
+                        "Locally stopping reminder {PreviousReminder} as it is different than newly registered reminder {Reminder}",
+                        prevReminder,
+                        entry);
                 }
 
                 prevReminder.StopReminder();
@@ -532,8 +532,12 @@ namespace Orleans.Runtime.ReminderService
             {
                 if (!RingRange.InRange(grainId))
                 {
-                    logger.LogWarning((int)ErrorCode.RS_NotResponsible, "I shouldn't have received request '{Request}' for {GrainId}. It is not in my responsibility range: {Range}",
-                        debugInfo, grainId.ToString(), RingRange);
+                    logger.LogWarning(
+                        (int)ErrorCode.RS_NotResponsible,
+                        "I shouldn't have received request '{Request}' for {GrainId}. It is not in my responsibility range: {Range}",
+                        debugInfo,
+                        grainId.ToString(),
+                        RingRange);
                     // For now, we still let the caller proceed without throwing an exception... the periodical mechanism will take care of reminders being registered at the wrong silo
                     // otherwise, we can either reject the request, or re-route the request
                 }

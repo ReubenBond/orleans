@@ -781,6 +781,11 @@ namespace Orleans.Runtime
     [SerializerTransparent]
     public abstract class VoidRequest : RequestBase
     {
+        public VoidRequest()
+        {
+            AddInvokeMethodOptions(InvokeMethodOptions.OneWay);
+        }
+
         /// <inheritdoc/>
         [DebuggerHidden]
         public sealed override ValueTask<Response> Invoke()

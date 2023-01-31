@@ -89,13 +89,17 @@ namespace Orleans.Runtime
         public virtual Task Start()
         {
             RingRange = ring.GetMyRange();
-            Logger.LogInformation(
-                (int)ErrorCode.RS_ServiceStarting,
-                "Starting {TypeName} grain service on: {Silo} x{HashCode}, with range {RingRange}",
-                this.typeName,
-                Silo,
-                Silo.GetConsistentHashCode().ToString("X8"),
-                RingRange);
+            if (Logger.IsEnabled(LogLevel.Debug))
+            {
+                Logger.LogDebug(
+                    (int)ErrorCode.RS_ServiceStarting,
+                    "Starting {TypeName} grain service on: {Silo} x{HashCode}, with range {RingRange}",
+                    this.typeName,
+                    Silo,
+                    Silo.GetConsistentHashCode().ToString("X8"),
+                    RingRange);
+            }
+
             StartInBackground().Ignore();
 
             return Task.CompletedTask;
@@ -118,10 +122,14 @@ namespace Orleans.Runtime
         {
             StoppedCancellationTokenSource.Cancel();
 
-            Logger.LogInformation(
-                (int)ErrorCode.RS_ServiceStopping,
-                "Stopping {TypeName} grain service",
-                typeName);
+            if (Logger.IsEnabled(LogLevel.Debug))
+            {
+                Logger.LogDebug(
+                    (int)ErrorCode.RS_ServiceStopping,
+                    "Stopping {TypeName} grain service",
+                    typeName);
+            }
+
             Status = GrainServiceStatus.Stopped;
 
             return Task.CompletedTask;
@@ -142,12 +150,16 @@ namespace Orleans.Runtime
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
         public virtual Task OnRangeChange(IRingRange oldRange, IRingRange newRange, bool increased)
         {
-            Logger.LogInformation(
-                (int)ErrorCode.RS_RangeChanged,
-                "My range changed from {OldRange} to {NewRange} increased = {Increased}",
-                oldRange,
-                newRange,
-                increased);
+            if (Logger.IsEnabled(LogLevel.Debug))
+            {
+                Logger.LogDebug(
+                    (int)ErrorCode.RS_RangeChanged,
+                    "My range changed from {OldRange} to {NewRange} increased = {Increased}",
+                    oldRange,
+                    newRange,
+                    increased);
+            }
+
             RingRange = newRange;
             RangeSerialNumber++;
 

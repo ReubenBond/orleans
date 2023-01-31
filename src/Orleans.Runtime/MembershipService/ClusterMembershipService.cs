@@ -26,10 +26,8 @@ namespace Orleans.Runtime
             this.snapshot = membershipTableManager.MembershipTableSnapshot.CreateClusterMembershipSnapshot();
             this.updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
                 (previous, proposed) => proposed.Version == MembershipVersion.MinValue || proposed.Version > previous.Version,
-                this.snapshot)
-            {
-                OnPublished = update => Interlocked.Exchange(ref this.snapshot, update)
-            };
+                this.snapshot,
+                update => Interlocked.Exchange(ref snapshot, update));
             this.membershipTableManager = membershipTableManager;
             this.log = log;
             this.fatalErrorHandler = fatalErrorHandler;
@@ -73,6 +71,11 @@ namespace Orleans.Runtime
                     await Task.Delay(TimeSpan.FromMilliseconds(10));
                 } while (this.snapshot.Version < v || this.snapshot.Version < this.membershipTableManager.MembershipTableSnapshot.Version);
             }
+        }
+
+        public async ValueTask Refresh()
+        {
+            await membershipTableManager.Refresh();
         }
 
         public async Task<bool> TryKill(SiloAddress siloAddress) => await this.membershipTableManager.TryKill(siloAddress);

@@ -1,10 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Net;
+using System.Numerics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.Messaging;
+using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 
 namespace TestExtensions
@@ -18,7 +26,23 @@ namespace TestExtensions
                 {
                     clientBuilder.UseLocalhostClustering();
                     configureClientBuilder?.Invoke(clientBuilder);
-                }).Build();
+                })
+                .ConfigureServices(services =>
+                {
+                    services.RemoveAll(typeof(ClientMessageCenter));
+                    services.AddSingleton<ClientMessageCenter>(sp => new ClientMessageCenter(
+                        sp.GetRequiredService<IOptions<ClientMessagingOptions>>(),
+                        IPAddress.Loopback,
+                        -1000,
+                        ClientGrainId.Create(),
+                        sp.GetRequiredService<OutsideRuntimeClient>(),
+                        sp.GetRequiredService<MessageFactory>(),
+                        sp.GetRequiredService<IClusterConnectionStatusListener>(),
+                        sp.GetRequiredService<ILoggerFactory>(),
+                        sp.GetRequiredService<ConnectionManager>(),
+                        sp.GetRequiredService<GatewayManager>()));
+                })
+                .Build();
 
             this.Client = host.Services.GetRequiredService<IClusterClient>();
             this.RuntimeClient = this.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();

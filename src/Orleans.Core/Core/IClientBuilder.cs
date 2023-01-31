@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Connections.Transport;
 
 namespace Orleans.Hosting
 {
@@ -11,5 +12,10 @@ namespace Orleans.Hosting
         /// Gets the services collection.
         /// </summary>
         IServiceCollection Services { get; }
+
+        /// <summary>
+        /// Gets the transport collection.
+        /// </summary>
+        IClientTransportCollection Transports { get; }
     }
 }

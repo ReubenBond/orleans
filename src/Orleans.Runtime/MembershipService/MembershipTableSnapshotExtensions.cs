@@ -10,7 +10,7 @@ namespace Orleans.Runtime.MembershipService
             foreach (var member in membership.Entries)
             {
                 var entry = member.Value;
-                memberBuilder[entry.SiloAddress] = new ClusterMember(entry.SiloAddress, entry.Status, entry.SiloName);
+                memberBuilder[entry.SiloAddress] = new ClusterMember(entry.SiloAddress, entry.Status, entry.SiloName, entry.Endpoints);
             }
 
             return new ClusterMembershipSnapshot(memberBuilder.ToImmutable(), membership.Version);

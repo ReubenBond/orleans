@@ -15,6 +15,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Collections.Concurrent;
 using NonSilo.Tests.Utilities;
+using Orleans.Runtime.Messaging;
 
 namespace NonSilo.Tests.Membership
 {
@@ -31,6 +32,7 @@ namespace NonSilo.Tests.Membership
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly IMembershipGossiper membershipGossiper;
         private readonly SiloLifecycleSubject lifecycle;
+        private readonly ListenerEndpointRegistry _listenerEndpointRegistry = new();
 
         public MembershipTableManagerTests(ITestOutputHelper output)
         {
@@ -97,6 +99,7 @@ namespace NonSilo.Tests.Membership
                 });
 
             var manager = new MembershipTableManager(
+                listenerEndpointRegistry: _listenerEndpointRegistry,
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
@@ -213,6 +216,7 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
+                listenerEndpointRegistry: _listenerEndpointRegistry,
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
@@ -307,6 +311,7 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
+                listenerEndpointRegistry: _listenerEndpointRegistry,
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
@@ -348,6 +353,7 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
+                listenerEndpointRegistry: _listenerEndpointRegistry,
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
@@ -385,6 +391,7 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
+                listenerEndpointRegistry: _listenerEndpointRegistry,
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
@@ -430,6 +437,7 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
+                listenerEndpointRegistry: _listenerEndpointRegistry,
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
@@ -470,6 +478,7 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
+                listenerEndpointRegistry: _listenerEndpointRegistry,
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
@@ -501,6 +510,7 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
+                listenerEndpointRegistry: _listenerEndpointRegistry,
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
@@ -541,6 +551,7 @@ namespace NonSilo.Tests.Membership
 
             var clusterMembershipOptions = new ClusterMembershipOptions();
             var manager = new MembershipTableManager(
+                listenerEndpointRegistry: _listenerEndpointRegistry,
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(clusterMembershipOptions),
                 membershipTable: membershipTable,
@@ -614,6 +625,7 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
+                listenerEndpointRegistry: _listenerEndpointRegistry,
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,
@@ -702,6 +714,7 @@ namespace NonSilo.Tests.Membership
             var membershipTable = new InMemoryMembershipTable(new TableVersion(123, "123"), otherSilos);
 
             var manager = new MembershipTableManager(
+                listenerEndpointRegistry: _listenerEndpointRegistry,
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,

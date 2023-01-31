@@ -75,7 +75,7 @@ namespace Orleans.Hosting
         /// </returns>
         public static IClientBuilder UseDynamoDBClustering(
             this IClientBuilder builder,
-            Action<DynamoDBGatewayOptions> configureOptions)
+            Action<DynamoDBClusteringOptions> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
@@ -85,7 +85,7 @@ namespace Orleans.Hosting
                         services.Configure(configureOptions);
                     }
 
-                    services.AddSingleton<IGatewayListProvider, DynamoDBGatewayListProvider>();
+                    services.AddSingleton<IGatewayMembershipProvider, GatewayMembershipProvider>();
                 });
         }
 
@@ -103,13 +103,13 @@ namespace Orleans.Hosting
         /// </returns>
         public static IClientBuilder UseDynamoDBClustering(
             this IClientBuilder builder,
-            Action<OptionsBuilder<DynamoDBGatewayOptions>> configureOptions)
+            Action<OptionsBuilder<DynamoDBClusteringOptions>> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
                 {
-                    configureOptions?.Invoke(services.AddOptions<DynamoDBGatewayOptions>());
-                    services.AddSingleton<IGatewayListProvider, DynamoDBGatewayListProvider>();
+                    configureOptions?.Invoke(services.AddOptions<DynamoDBClusteringOptions>());
+                    services.AddSingleton<IGatewayMembershipProvider, GatewayMembershipProvider>();
                 });
         }
     }

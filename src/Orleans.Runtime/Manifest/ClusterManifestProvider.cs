@@ -43,10 +43,8 @@ namespace Orleans.Runtime.Metadata
                 ImmutableArray.Create(this.LocalGrainManifest));
             _updates = new AsyncEnumerable<ClusterManifest>(
                 (previous, proposed) => previous.Version <= MajorMinorVersion.Zero || proposed.Version > previous.Version,
-                _current)
-            {
-                OnPublished = update => Interlocked.Exchange(ref _current, update)
-            };
+                _current,
+                update => Interlocked.Exchange(ref _current, update));
         }
 
         public ClusterManifest Current => _current;

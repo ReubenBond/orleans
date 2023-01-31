@@ -1,7 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans.AzureUtils;
 using Orleans.Clustering.AzureStorage;
 using Orleans.Configuration;
 using Orleans.Messaging;
@@ -35,7 +34,7 @@ namespace Orleans.Hosting
                         services.Configure(configureOptions);
                     }
 
-                    services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>()
+                    services.AddSingleton<IMembershipTable, AzureTableStorageMembershipTable>()
                     .ConfigureFormatter<AzureStorageClusteringOptions>();
                 });
         }
@@ -60,7 +59,7 @@ namespace Orleans.Hosting
                 services =>
                 {
                     configureOptions?.Invoke(services.AddOptions<AzureStorageClusteringOptions>());
-                    services.AddSingleton<IMembershipTable, AzureBasedMembershipTable>()
+                    services.AddSingleton<IMembershipTable, AzureTableStorageMembershipTable>()
                     .ConfigureFormatter<AzureStorageClusteringOptions>();
                 });
         }
@@ -79,7 +78,7 @@ namespace Orleans.Hosting
         /// </returns>
         public static IClientBuilder UseAzureStorageClustering(
             this IClientBuilder builder,
-            Action<AzureStorageGatewayOptions> configureOptions)
+            Action<AzureStorageClusteringOptions> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
@@ -89,8 +88,9 @@ namespace Orleans.Hosting
                         services.Configure(configureOptions);
                     }
 
-                    services.AddSingleton<IGatewayListProvider, AzureGatewayListProvider>()
-                    .ConfigureFormatter<AzureStorageGatewayOptions>();
+                    services.AddSingleton<IGatewayMembershipProvider, GatewayMembershipProvider>();
+                    services.AddSingleton<IMembershipTable, AzureTableStorageMembershipTable>()
+                        .ConfigureFormatter<AzureStorageClusteringOptions>();
                 });
         }
 
@@ -108,14 +108,15 @@ namespace Orleans.Hosting
         /// </returns>
         public static IClientBuilder UseAzureStorageClustering(
             this IClientBuilder builder,
-            Action<OptionsBuilder<AzureStorageGatewayOptions>> configureOptions)
+            Action<OptionsBuilder<AzureStorageClusteringOptions>> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
                 {
-                    configureOptions?.Invoke(services.AddOptions<AzureStorageGatewayOptions>());
-                    services.AddSingleton<IGatewayListProvider, AzureGatewayListProvider>()
-                    .ConfigureFormatter<AzureStorageGatewayOptions>();
+                    configureOptions?.Invoke(services.AddOptions<AzureStorageClusteringOptions>());
+                    services.AddSingleton<IGatewayMembershipProvider, GatewayMembershipProvider>();
+                    services.AddSingleton<IMembershipTable, AzureTableStorageMembershipTable>()
+                    .ConfigureFormatter<AzureStorageClusteringOptions>();
                 });
         }
     }

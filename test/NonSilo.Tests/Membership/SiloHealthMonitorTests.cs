@@ -12,6 +12,7 @@ using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using Orleans;
 using Orleans.Configuration;
+using Orleans.Connections.Transport;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
 using TestExtensions;
@@ -287,6 +288,17 @@ namespace NonSilo.Tests.Membership
 
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
-        private static ClusterMember Member(SiloAddress address, SiloStatus status) => new ClusterMember(address, status, address.ToString());
+        private static ClusterMember Member(SiloAddress address, SiloStatus status) => new (
+            address,
+            status,
+            address.ToString(),
+            new List<EndpointInfo>
+            {
+                new EndpointInfo
+                {
+                    Name = "silo",
+                    ["ep"] = address.Endpoint.ToString()
+                }
+            });
     }
 }

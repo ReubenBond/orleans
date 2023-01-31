@@ -10,8 +10,10 @@ using NonSilo.Tests.Utilities;
 using NSubstitute;
 using Orleans;
 using Orleans.Configuration;
+using Orleans.Connections.Transport;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
+using Orleans.Runtime.Messaging;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -41,6 +43,7 @@ namespace NonSilo.Tests.Membership
         private readonly ILocalSiloHealthMonitor localSiloHealthMonitor;
         private readonly IOptionsMonitor<ClusterMembershipOptions> optionsMonitor;
         private readonly IClusterMembershipService membershipService;
+        private readonly ListenerEndpointRegistry _listenerEndpointRegistry = new();
 
         public MembershipAgentTests(ITestOutputHelper output)
         {
@@ -77,6 +80,7 @@ namespace NonSilo.Tests.Membership
             this.membershipTable = new InMemoryMembershipTable(new TableVersion(1, "1"));
             this.clusterMembershipOptions = Options.Create(new ClusterMembershipOptions());
             this.manager = new MembershipTableManager(
+                listenerEndpointRegistry: _listenerEndpointRegistry,
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(new ClusterMembershipOptions()),
                 membershipTable: membershipTable,

@@ -12,5 +12,10 @@ namespace Orleans.Hosting
         /// The services shared by the silo and host.
         /// </summary>
         IServiceCollection Services { get; }
+
+        /// <summary>
+        /// Gets the transport collection.
+        /// </summary>
+        ISiloTransportCollection Transports { get; }
     }
 }
