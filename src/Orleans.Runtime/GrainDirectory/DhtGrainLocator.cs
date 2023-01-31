@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 
@@ -11,8 +12,9 @@ namespace Orleans.Runtime.GrainDirectory
     /// <summary>
     /// Implementation of <see cref="IGrainLocator"/> that uses the in memory distributed directory of Orleans
     /// </summary>
-    internal class DhtGrainLocator : IGrainLocator
+    internal class DhtGrainLocator : IGrainLocator, IAsyncDisposable, IDisposable
     {
+        private readonly ILogger<BatchedDeregistrationWorker> _batchedWorkerLogger;
         private readonly ILocalGrainDirectory _localGrainDirectory;
         private readonly IGrainContext _grainContext;
         private readonly object _initLock = new();
@@ -21,8 +23,10 @@ namespace Orleans.Runtime.GrainDirectory
 
         public DhtGrainLocator(
             ILocalGrainDirectory localGrainDirectory,
-            IGrainContext grainContext)
+            IGrainContext grainContext,
+            ILoggerFactory loggerFactory)
         {
+            _batchedWorkerLogger = loggerFactory.CreateLogger<BatchedDeregistrationWorker>();
             _localGrainDirectory = localGrainDirectory;
             _grainContext = grainContext;
         }
@@ -62,26 +66,53 @@ namespace Orleans.Runtime.GrainDirectory
                         return;
                     }
 
-                    _forceWorker = new BatchedDeregistrationWorker(_localGrainDirectory, _grainContext, UnregistrationCause.Force);
-                    _neaWorker = new BatchedDeregistrationWorker(_localGrainDirectory, _grainContext, UnregistrationCause.NonexistentActivation);
+                    _forceWorker = new BatchedDeregistrationWorker(_localGrainDirectory, _grainContext, UnregistrationCause.Force, _batchedWorkerLogger);
+                    _neaWorker = new BatchedDeregistrationWorker(_localGrainDirectory, _grainContext, UnregistrationCause.NonexistentActivation, _batchedWorkerLogger);
                 }
             }
         }
 
-        public static DhtGrainLocator FromLocalGrainDirectory(LocalGrainDirectory localGrainDirectory)
-            => new(localGrainDirectory, localGrainDirectory.RemoteGrainDirectory);
+        public static DhtGrainLocator FromLocalGrainDirectory(LocalGrainDirectory localGrainDirectory, ILoggerFactory loggerFactory)
+            => new(localGrainDirectory, localGrainDirectory.RemoteGrainDirectory, loggerFactory);
 
         public void CachePlacementDecision(GrainId grainId, SiloAddress siloAddress) => _localGrainDirectory.CachePlacementDecision(grainId, siloAddress);
         public void InvalidateCache(GrainId grainId) => _localGrainDirectory.InvalidateCacheEntry(grainId);
         public void InvalidateCache(GrainAddress address) => _localGrainDirectory.InvalidateCacheEntry(address);
         public bool TryLookupInCache(GrainId grainId, out GrainAddress address) => _localGrainDirectory.TryCachedLookup(grainId, out address);
 
-        private class BatchedDeregistrationWorker
+        public async ValueTask DisposeAsync()
+        {
+            if (_forceWorker is { } forceWorker)
+            {
+                await forceWorker.DisposeAsync();
+            }
+
+            if (_neaWorker is { } neaWorker)
+            {
+                await neaWorker.DisposeAsync();
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_forceWorker is { } forceWorker)
+            {
+                forceWorker.Dispose();
+            }
+
+            if (_neaWorker is { } neaWorker)
+            {
+                neaWorker.Dispose();
+            }
+        }
+
+        private class BatchedDeregistrationWorker : IAsyncDisposable, IDisposable
         {
             private const int OperationBatchSizeLimit = 2_000;
             private readonly ILocalGrainDirectory _localGrainDirectory;
             private readonly IGrainContext _grainContext;
             private readonly UnregistrationCause _cause;
+            private readonly ILogger<BatchedDeregistrationWorker> _logger;
             private readonly Channel<(TaskCompletionSource<bool> tcs, GrainAddress address)> _queue;
 #pragma warning disable IDE0052 // Remove unread private members
             private readonly Task _runTask;
@@ -90,11 +121,13 @@ namespace Orleans.Runtime.GrainDirectory
             public BatchedDeregistrationWorker(
                 ILocalGrainDirectory localGrainDirectory,
                 IGrainContext grainContext,
-                UnregistrationCause cause)
+                UnregistrationCause cause,
+                ILogger<BatchedDeregistrationWorker> logger)
             {
                 _localGrainDirectory = localGrainDirectory;
                 _grainContext = grainContext;
                 _cause = cause;
+                _logger = logger;
                 _queue = Channel.CreateUnbounded<(TaskCompletionSource<bool> tcs, GrainAddress address)>(new UnboundedChannelOptions
                 {
                     SingleReader = true,
@@ -104,10 +137,26 @@ namespace Orleans.Runtime.GrainDirectory
                 _runTask = _grainContext.RunOrQueueTask(() => ProcessDeregistrationQueue());
             }
 
+            public void Dispose()
+            {
+                _queue.Writer.TryComplete();
+            }
+
+            public async ValueTask DisposeAsync()
+            {
+                _queue.Writer.TryComplete();
+                await _runTask.ConfigureAwait(false);
+            }
+
             public Task Unregister(GrainAddress address)
             {
                 var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                _queue.Writer.TryWrite((tcs, address));
+                if (!_queue.Writer.TryWrite((tcs, address)))
+                {
+                    _logger.LogDebug("Ignoring attempt to unregister grain {GrainAddress} after worker has been disposed.", address);
+                    tcs.SetResult(false);
+                }
+
                 return tcs.Task;
             }
 

@@ -5,7 +5,6 @@ using Benchmarks.Models;
 using Benchmarks.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.Networking.Shared;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
@@ -78,17 +77,17 @@ namespace Benchmarks
             _readBytesLength = _serializedPayload.Length;
 
             _pipe = new Pipe(new PipeOptions(readerScheduler: PipeScheduler.Inline, writerScheduler: PipeScheduler.Inline, pauseWriterThreshold: 0));
-            _messageSerializer = new(_sessionPool, new SharedMemoryPool(), new SiloMessagingOptions());
+            _messageSerializer = new(_sessionPool, new SiloMessagingOptions());
         }
 
         [Fact]
         public void SerializeComplex()
         {
             var writer = Buffer.CreateWriter(_session);
-            _session.FullReset();
+            _session.Reset();
             _serializer.Serialize(_value, ref writer);
 
-            _session.FullReset();
+            _session.Reset();
             var reader = Reader.Create(writer.Output.GetReadOnlySpan(), _session);
             _ = _serializer.Deserialize(ref reader);
             Buffer.Reset();
@@ -111,59 +110,56 @@ namespace Benchmarks
         public SimpleStruct OrleansStructRoundTrip()
         {
             var writer = Buffer.CreateWriter(_session);
-            _session.FullReset();
+            _session.Reset();
             _structSerializer.Serialize(_structValue, ref writer);
 
-            _session.FullReset();
+            _session.Reset();
             var reader = Reader.Create(writer.Output.GetReadOnlySpan(), _session);
             var result = _structSerializer.Deserialize(ref reader);
             Buffer.Reset();
             return result;
         }
 
+/*
         [Fact]
         [Benchmark]
         public void OrleansMessageSerializerStructRoundTrip()
         {
-            _messageSerializer.Write(_pipe.Writer, _structMessage);
-            _pipe.Writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+            var buffer = new PooledBuffer();
+            var (headerLength, bodyLength) = _messageSerializer.Write(ref buffer, _structMessage);
 
-            _pipe.Reader.TryRead(out var readResult);
-            var reader = readResult.Buffer;
-            _messageSerializer.TryRead(ref reader, out var result);
+            var readBuffer = buffer.Slice();
+            _messageSerializer.Read(in readBuffer, headerLength, bodyLength, out var result);
 
             ((Response<SimpleStruct>)result.BodyObject).Dispose();
-
-            _pipe.Writer.Complete();
-            _pipe.Reader.Complete();
-            _pipe.Reset();
         }
+        */
 
         [Fact]
         //[Benchmark]
         public object OrleansClassRoundTrip()
         {
             var writer = Buffer.CreateWriter(_session);
-            _session.FullReset();
+            _session.Reset();
             _serializer.Serialize(_value, ref writer);
 
-            _session.FullReset();
+            _session.Reset();
             var reader = Reader.Create(writer.Output.GetReadOnlySpan(), _session);
             var result = _serializer.Deserialize(ref reader);
             Buffer.Reset();
             return result;
         }
 
+        /*
         [Fact]
         //[Benchmark]
         public void OrleansMessageSerializerClassRoundTrip()
         {
-            _messageSerializer.Write(_pipe.Writer, _message);
-            _pipe.Writer.FlushAsync().AsTask().GetAwaiter().GetResult();
+            var buffer = new PooledBuffer();
+            var (headerLength, bodyLength) = _messageSerializer.Write(ref buffer, _message);
 
-            _pipe.Reader.TryRead(out var readResult);
-            var reader = readResult.Buffer;
-            _messageSerializer.TryRead(ref reader, out var result);
+            var readBuffer = buffer.Slice();
+            _messageSerializer.Read(in readBuffer, headerLength, bodyLength, out var result);
 
             ((Response<ComplexClass>)result.BodyObject).Dispose();
 
@@ -171,13 +167,14 @@ namespace Benchmarks
             _pipe.Reader.Complete();
             _pipe.Reset();
         }
+        */
 
         [Fact]
         //[Benchmark]
         public object OrleansSerialize()
         {
             var writer = Buffer.CreateWriter(_session);
-            _session.FullReset();
+            _session.Reset();
             _serializer.Serialize(_value, ref writer);
             Buffer.Reset();
             return _session;
@@ -187,7 +184,7 @@ namespace Benchmarks
         //[Benchmark]
         public object OrleansDeserialize()
         {
-            _session.FullReset();
+            _session.Reset();
             var reader = Reader.Create(_serializedPayload, _session);
             return _serializer.Deserialize(ref reader);
         }
