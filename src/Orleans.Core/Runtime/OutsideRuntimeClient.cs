@@ -1,8 +1,7 @@
 using System;
 using System.Collections.Concurrent;
-using System.Diagnostics;
+using System.Collections.Generic;
 using System.Net;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,8 +57,6 @@ namespace Orleans
 
         internal ClientMessageCenter MessageCenter { get; private set; }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
-            Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
         public OutsideRuntimeClient(
             ILoggerFactory loggerFactory,
             IOptions<ClientMessagingOptions> clientMessagingOptions,
@@ -392,8 +389,6 @@ namespace Orleans
             this.disposing = true;
 
             Utils.SafeExecute(() => this.callbackTimer?.Dispose());
-
-            Utils.SafeExecute(() => MessageCenter?.Dispose());
 
             this.ClusterConnectionLost = null;
             this.GatewayCountChanged = null;

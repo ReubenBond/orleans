@@ -201,7 +201,12 @@ namespace Orleans.Runtime
         public override string ToString()
         {
             var now = DateTime.UtcNow;
-            var all = buckets.ToList();
+            List<KeyValuePair<DateTime, Bucket>> all;
+            lock (buckets)
+            {
+                all = buckets.ToList();
+            }
+
             var bucketsText = Utils.EnumerableToString(all.OrderBy(bucket => bucket.Key), bucket => $"{Utils.TimeSpanToString(bucket.Key - now)}->{bucket.Value.Items.Count} items");
             return $"<#Activations={all.Sum(b => b.Value.Items.Count)}, #Buckets={all.Count}, buckets={bucketsText}>";
         }

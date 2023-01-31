@@ -10,7 +10,7 @@ namespace Orleans
     /// </summary>
     public static class PublicOrleansTaskExtensions
     {
-        private static readonly Action<Task> IgnoreTaskContinuation = t => { _ = t.Exception; };
+        private static readonly Action<Task> IgnoreTaskContinuation = IgnoreTaskResult;
 
         /// <summary>
         /// Observes and ignores a potential exception on a given Task.
@@ -34,5 +34,7 @@ namespace Orleans
                     TaskScheduler.Default);
             }
         }
+
+        private static void IgnoreTaskResult(Task task) => _ = task.Exception;
     }
 }

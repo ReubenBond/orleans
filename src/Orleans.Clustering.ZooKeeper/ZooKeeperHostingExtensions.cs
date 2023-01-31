@@ -23,7 +23,7 @@ namespace Orleans.Hosting
         /// </returns>
         public static ISiloBuilder UseZooKeeperClustering(
             this ISiloBuilder builder,
-            Action<ZooKeeperClusteringSiloOptions> configureOptions)
+            Action<ZooKeeperClusteringOptions> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
@@ -51,12 +51,12 @@ namespace Orleans.Hosting
         /// </returns>
         public static ISiloBuilder UseZooKeeperClustering(
             this ISiloBuilder builder,
-            Action<OptionsBuilder<ZooKeeperClusteringSiloOptions>> configureOptions)
+            Action<OptionsBuilder<ZooKeeperClusteringOptions>> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
                 {
-                    configureOptions?.Invoke(services.AddOptions<ZooKeeperClusteringSiloOptions>());
+                    configureOptions?.Invoke(services.AddOptions<ZooKeeperClusteringOptions>());
                     services.AddSingleton<IMembershipTable, ZooKeeperBasedMembershipTable>();
                 });
         }
@@ -75,7 +75,7 @@ namespace Orleans.Hosting
         /// </returns>
         public static IClientBuilder UseZooKeeperClustering(
             this IClientBuilder builder,
-            Action<ZooKeeperGatewayListProviderOptions> configureOptions)
+            Action<ZooKeeperClusteringOptions> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
@@ -85,7 +85,8 @@ namespace Orleans.Hosting
                         services.Configure(configureOptions);
                     }
 
-                    services.AddSingleton<IGatewayListProvider, ZooKeeperGatewayListProvider>();
+                    services.AddSingleton<IGatewayMembershipProvider, GatewayMembershipProvider>();
+                    services.AddSingleton<IMembershipTable, ZooKeeperBasedMembershipTable>();
                 });
         }
 
@@ -103,13 +104,14 @@ namespace Orleans.Hosting
         /// </returns>
         public static IClientBuilder UseZooKeeperClustering(
             this IClientBuilder builder,
-            Action<OptionsBuilder<ZooKeeperGatewayListProviderOptions>> configureOptions)
+            Action<OptionsBuilder<ZooKeeperClusteringOptions>> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
                 {
-                    configureOptions?.Invoke(services.AddOptions<ZooKeeperGatewayListProviderOptions>());
-                    services.AddSingleton<IGatewayListProvider, ZooKeeperGatewayListProvider>();
+                    configureOptions?.Invoke(services.AddOptions<ZooKeeperClusteringOptions>());
+                    services.AddSingleton<IGatewayMembershipProvider, GatewayMembershipProvider>();
+                    services.AddSingleton<IMembershipTable, ZooKeeperBasedMembershipTable>();
                 });
         }
     }

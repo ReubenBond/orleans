@@ -4,6 +4,7 @@ using System.Net;
 using System.Text;
 using Azure;
 using Azure.Data.Tables;
+using Orleans.Connections.Transport;
 using Orleans.Runtime;
 
 namespace Orleans.AzureUtils
@@ -36,6 +37,7 @@ namespace Orleans.AzureUtils
         public string RowKey { get; set; }
         public DateTimeOffset? Timestamp { get; set; }
         public ETag ETag { get; set; }
+        public string Endpoints { get; set; }
 
         internal const string TABLE_VERSION_ROW = "VersionRow"; // Row key for version row.
         internal const char Seperator = '-';

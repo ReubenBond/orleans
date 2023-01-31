@@ -1,12 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Runtime;
 
 namespace Orleans.Messaging
 {
     /// <summary>
     /// Interface that provides Orleans gateways information.
     /// </summary>
+    [Obsolete("Use IGatewayMembershipService instead")]
     public interface IGatewayListProvider
     {
         /// <summary>
@@ -32,5 +37,28 @@ namespace Orleans.Messaging
         /// </summary>
         [Obsolete("This attribute is no longer used and all providers are considered updatable")]
         bool IsUpdatable { get; }
+    }
+
+    /// <summary>
+    /// This implementation of <see cref="IGatewayListProvider"/> is provided only for backwards compatibility with consumers who are relying on that interface.
+    /// </summary>
+#pragma warning disable CS0618 // Type or member is obsolete
+    internal sealed class GatewayMembershipServiceGatewayListProvider : IGatewayListProvider
+#pragma warning restore CS0618 // Type or member is obsolete
+    {
+        private readonly GatewayOptions _gatewayOptions;
+        private readonly IGatewayMembershipService _gatewayMembershipService;
+        public GatewayMembershipServiceGatewayListProvider(
+            IOptions<GatewayOptions> gatewayOptions,
+            IGatewayMembershipService gatewayMembershipService)
+        {
+            _gatewayOptions = gatewayOptions.Value;
+            _gatewayMembershipService = gatewayMembershipService;
+        }
+
+        public TimeSpan MaxStaleness => _gatewayOptions.GatewayListRefreshPeriod;
+        public bool IsUpdatable => true;
+        public Task<IList<Uri>> GetGateways() => Task.FromResult<IList<Uri>>(_gatewayMembershipService.CurrentSnapshot.Gateways.Keys.Select(static key => key.ToGatewayUri()).ToList());
+        public Task InitializeGatewayListProvider() => _gatewayMembershipService.Refresh().AsTask();
     }
 }

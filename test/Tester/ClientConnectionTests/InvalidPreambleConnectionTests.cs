@@ -21,8 +21,10 @@ namespace Tester.ClientConnectionTests
         [Fact, TestCategory("Functional")]
         public async Task ShouldCloseConnectionWhenClientSendsInvalidPreambleSize()
         {
-            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
-            var gwEndpoint = gateways.First().ToIPEndPoint();
+            var gatewayMembershipService = this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayMembershipService>();
+            await gatewayMembershipService.Refresh();
+            var gateways = gatewayMembershipService.CurrentSnapshot.Gateways.Keys.ToList();
+            var gwEndpoint = gateways.First().Endpoint;
 
             using (Socket s = new Socket(gwEndpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
             {

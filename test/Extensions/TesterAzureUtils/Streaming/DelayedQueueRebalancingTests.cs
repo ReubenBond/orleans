@@ -43,7 +43,7 @@ namespace Tester.AzureUtils.Streaming
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.Configure<StaticGatewayListProviderOptions>(options => options.Gateways = options.Gateways.Take(1).ToList());
+                clientBuilder.Configure<StaticGatewayMembershipProviderOptions>(options => options.Gateways = options.Gateways.Take(1).ToList());
             }
         }
 

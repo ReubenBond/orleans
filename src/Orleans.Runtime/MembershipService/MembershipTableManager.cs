@@ -8,7 +8,9 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Connections.Transport;
 using Orleans.Internal;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Utilities;
 using Orleans.Serialization.TypeSystem;
 
@@ -28,6 +30,7 @@ namespace Orleans.Runtime.MembershipService
 
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly IMembershipGossiper gossiper;
+        private readonly ListenerEndpointRegistry _listenerEndpointRegistry;
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly IMembershipTable membershipTableProvider;
         private readonly ILogger log;
@@ -41,6 +44,7 @@ namespace Orleans.Runtime.MembershipService
         private MembershipTableSnapshot snapshot;
 
         public MembershipTableManager(
+            ListenerEndpointRegistry listenerEndpointRegistry,
             ILocalSiloDetails localSiloDetails,
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
             IMembershipTable membershipTable,
@@ -50,6 +54,7 @@ namespace Orleans.Runtime.MembershipService
             IAsyncTimerFactory timerFactory,
             ISiloLifecycle siloLifecycle)
         {
+            _listenerEndpointRegistry = listenerEndpointRegistry;
             this.localSiloDetails = localSiloDetails;
             this.membershipTableProvider = membershipTable;
             this.fatalErrorHandler = fatalErrorHandler;
@@ -64,10 +69,8 @@ namespace Orleans.Runtime.MembershipService
                     initialEntries);
             this.updates = new AsyncEnumerable<MembershipTableSnapshot>(
                 (previous, proposed) => proposed.Version == MembershipVersion.MinValue || proposed.Version > previous.Version,
-                this.snapshot)
-            {
-                OnPublished = update => Interlocked.Exchange(ref this.snapshot, update)
-            };
+                this.snapshot,
+                update => Interlocked.Exchange(ref this.snapshot, update));
 
             this.membershipUpdateTimer = timerFactory.Create(
                 this.clusterMembershipOptions.TableRefreshTimeout,
@@ -159,12 +162,15 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                this.log.LogInformation(
-                    (int)ErrorCode.MembershipStarting,
-                    "MembershipOracle starting on host {HostName} with SiloAddress {SiloAddress} at {StartTime}",
-                    this.localSiloDetails.DnsHostName,
-                    this.myAddress,
-                    LogFormatter.PrintDate(this.siloStartTime));
+                if (this.log.IsEnabled(LogLevel.Debug))
+                {
+                    this.log.LogDebug(
+                        (int)ErrorCode.MembershipStarting,
+                        $"{nameof(MembershipTableManager)} starting on host {{HostName}} with SiloAddress {{SiloAddress}} at {{StartTime}}",
+                        this.localSiloDetails.DnsHostName,
+                        this.myAddress,
+                        LogFormatter.PrintDate(this.siloStartTime));
+                }
 
                 // Init the membership table.
                 await this.membershipTableProvider.InitializeMembershipTable(true);
@@ -455,7 +461,9 @@ namespace Orleans.Runtime.MembershipService
         {
             if (table.TryGet(myAddress) is { } myTuple)
             {
-                return (myTuple.Item1.Copy(), myTuple.Item2);
+                var myEntry = myTuple.Item1.Copy();
+                myEntry.Endpoints = _listenerEndpointRegistry.GetEndpoints();
+                return (myEntry, myTuple.Item2);
             }
 
             var result = CreateLocalSiloEntry(currentStatus);
@@ -478,7 +486,8 @@ namespace Orleans.Runtime.MembershipService
 
                 SuspectTimes = new List<Tuple<SiloAddress, DateTime>>(),
                 StartTime = this.siloStartTime,
-                IAmAliveTime = GetDateTimeUtcNow()
+                IAmAliveTime = GetDateTimeUtcNow(),
+                Endpoints = _listenerEndpointRegistry.GetEndpoints()
             };
         }
 

@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -137,5 +139,19 @@ namespace Orleans.Runtime
         {
             return services.GetRequiredServiceByKey<string, TService>(name);
         }
+
+        public static IEnumerable<TService> GetServicesByName<TService>(this IServiceProvider services, string name) => GetServicesByKey<string, TService>(services, name);
+
+        public static IEnumerable<TService> GetServicesByKey<TKey, TService>(this IServiceProvider services, TKey key)
+        {
+            foreach (var entry in services.GetService<IEnumerable<IKeyedService<TKey, TService>>>())
+            {
+                if (entry.Equals(key))
+                {
+                    yield return entry.GetService(services);
+                }
+            }
+        }
     }
 }
+

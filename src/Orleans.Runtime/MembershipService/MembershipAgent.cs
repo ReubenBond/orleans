@@ -97,25 +97,31 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task BecomeActive()
         {
-            this.log.LogInformation(
-                (int)ErrorCode.MembershipBecomeActive,
-                "-BecomeActive");
+            if (log.IsEnabled(LogLevel.Debug))
+            {
+                this.log.LogDebug(
+                    (int)ErrorCode.MembershipBecomeActive,
+                    "Validating connectivity and updating status to Active");
+            }
 
             await this.ValidateInitialConnectivity();
 
             try
             {
                 await this.UpdateStatus(SiloStatus.Active);
-                this.log.LogInformation(
-                    (int)ErrorCode.MembershipFinishBecomeActive,
-                    "-Finished BecomeActive.");
+                if (log.IsEnabled(LogLevel.Debug))
+                {
+                    this.log.LogDebug(
+                        (int)ErrorCode.MembershipFinishBecomeActive,
+                        "Updated status to Active");
+                }
             }
             catch (Exception exception)
             {
-                this.log.LogInformation(
+                this.log.LogError(
                     (int)ErrorCode.MembershipFailedToBecomeActive,
                     exception,
-                    "BecomeActive failed");
+                    "Error updating silo status to Active");
                 throw;
             }
         }
@@ -194,7 +200,7 @@ namespace Orleans.Runtime.MembershipService
 
                 this.log.LogInformation(
                     (int)ErrorCode.MembershipSendingPreJoinPing,
-                    "About to send pings to {Count} nodes in order to validate communication in the Joining state. Pinged nodes = {Nodes}",
+                    "Sending probes to {Count} silos in order to validate connectivity. Pinged silos = {Silos}",
                     members.Length,
                     Utils.EnumerableToString(members));
 
@@ -268,7 +274,11 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task BecomeJoining()
         {
-            this.log.LogInformation((int)ErrorCode.MembershipJoining, "Joining");
+            if (log.IsEnabled(LogLevel.Debug))
+            {
+                this.log.LogDebug((int)ErrorCode.MembershipJoining, "Updating status to Joining");
+            }
+
             try
             {
                 await this.UpdateStatus(SiloStatus.Joining);

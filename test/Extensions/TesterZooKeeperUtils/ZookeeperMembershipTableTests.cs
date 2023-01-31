@@ -32,18 +32,10 @@ namespace UnitTests.MembershipTests
 
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
-            var options = new ZooKeeperClusteringSiloOptions();
+            var options = new ZooKeeperClusteringOptions();
             options.ConnectionString = this.connectionString;
            
             return new ZooKeeperBasedMembershipTable(this.Services.GetService<ILogger<ZooKeeperBasedMembershipTable>>(), Options.Create(options), this.clusterOptions);
-        }
-
-        protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
-        {
-            var options = new ZooKeeperGatewayListProviderOptions();
-            options.ConnectionString = this.connectionString;
-
-            return ActivatorUtilities.CreateInstance<ZooKeeperGatewayListProvider>(this.Services, Options.Create(options), this.clusterOptions);
         }
 
         protected override async Task<string> GetConnectionString()

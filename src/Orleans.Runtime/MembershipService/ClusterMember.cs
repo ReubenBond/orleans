@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using Orleans.Connections.Transport;
 
 namespace Orleans.Runtime
 {
@@ -20,11 +23,12 @@ namespace Orleans.Runtime
         /// <param name="name">
         /// The silo name.
         /// </param>
-        public ClusterMember(SiloAddress siloAddress, SiloStatus status, string name)
+        public ClusterMember(SiloAddress siloAddress, SiloStatus status, string name, IEnumerable<EndpointInfo> endpoints)
         {
             this.SiloAddress = siloAddress ?? throw new ArgumentNullException(nameof(siloAddress));
             this.Status = status;
             this.Name = name;
+            this.Endpoints = endpoints?.ToList() ?? new List<EndpointInfo>();
         }
 
         /// <summary>
@@ -47,6 +51,17 @@ namespace Orleans.Runtime
         /// <value>The silo name.</value>
         [Id(2)]
         public string Name { get; }
+
+        /// <summary>
+        /// Gets the silo endpoints.
+        /// </summary>
+        [Id(3)]
+        public List<EndpointInfo> Endpoints { get; }
+
+        /// <summary>
+        /// Gets other properties associated with the silo.
+        /// </summary>
+        public Dictionary<string, string> Properties { get; }
 
         /// <inheritdoc/>
         public override bool Equals(object obj) => this.Equals(obj as ClusterMember);

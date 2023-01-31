@@ -1,13 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading.Tasks;
-using System.Threading;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
-using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.TestingHost;
@@ -16,39 +9,47 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Configuration.Internal;
 using Microsoft.Extensions.Hosting;
 using Orleans.Runtime.Messaging;
+using Orleans.Connections.Transport;
+using Orleans.Connections.Transport.Sockets;
+using System.Collections.Immutable;
 
 namespace Tester
 {
-    public class TestGatewayManager : IGatewayListProvider
-    {
-        public TimeSpan MaxStaleness => TimeSpan.FromSeconds(1);
-
-        public bool IsUpdatable => true;
-
-        public IList<Uri> Gateways { get; }
-
-        public TestGatewayManager()
-        {
-            Gateways = new List<Uri>();
-        }
-
-        public Task InitializeGatewayListProvider()
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task<IList<Uri>> GetGateways()
-        {
-            return Task.FromResult(Gateways);
-        }
-    }
-
     public class GatewayConnectionTests : TestClusterPerTest
     {
+        private class TestGatewayMembershipProvider : IGatewayMembershipProvider
+        {
+            public MembershipVersion Version { get; set; }
+
+            public ValueTask<GatewayMembershipSnapshot> GetGatewaysAsync(CancellationToken cancellationToken) => new(new GatewayMembershipSnapshot(Gateways, Version));
+
+            /// <summary>
+            /// Gets or sets the list of gateways.
+            /// </summary>
+            public List<GatewayMember> Gateways { get; set; }
+
+            /// <summary>
+            /// Adds a gateway described via a TCP endpoint.
+            /// </summary>
+            /// <param name="endpoint"></param>
+            public void AddTcpGateway(IPEndPoint endpoint)
+            {
+                Gateways.Add(new GatewayMember(
+                    SiloAddress.New(endpoint, 0),
+                    new[]
+                    {
+                    new EndpointInfo(ClientOutboundConnectionFactory.DefaultConnectorName)
+                    {
+                        [TcpMessageTransportConnector.EndpointAddressPropertyName] = endpoint.ToString()
+                    }
+                    }.ToImmutableArray()));
+                Version = Version.Successor();
+            }
+        }
+
         private OutsideRuntimeClient runtimeClient;
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
@@ -88,7 +89,7 @@ namespace Tester
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 var basePort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]);
-                var primaryGw = new IPEndPoint(IPAddress.Loopback, basePort).ToGatewayUri();
+                var primaryGw = new IPEndPoint(IPAddress.Loopback, basePort);
                 clientBuilder.Configure<GatewayOptions>(options =>
                 {
                     options.GatewayListRefreshPeriod = TimeSpan.FromMilliseconds(100);
@@ -97,11 +98,11 @@ namespace Tester
                 {
                     services.AddSingleton(sp =>
                     {
-                        var gateway = new TestGatewayManager();
-                        gateway.Gateways.Add(primaryGw);
+                        var gateway = new TestGatewayMembershipProvider();
+                        gateway.AddTcpGateway(primaryGw);
                         return gateway;
                     });
-                    services.AddFromExisting<IGatewayListProvider, TestGatewayManager>();
+                    services.AddFromExisting<IGatewayMembershipProvider, TestGatewayMembershipProvider>();
                 });
             }
         }
@@ -122,19 +123,22 @@ namespace Tester
             var timeoutCount = 0;
 
             // Fake Gateway
-            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
-            var port = gateways.First().Port + 2;
+            var gatewayMembershipService = this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayMembershipService>();
+            await gatewayMembershipService.Refresh();
+            var gateways = gatewayMembershipService.CurrentSnapshot;
+            var port = gateways.Gateways.First().Key.Endpoint.Port + 2;
             var endpoint = new IPEndPoint(IPAddress.Loopback, port);
             var evt = new SocketAsyncEventArgs();
-            var gatewayManager = this.runtimeClient.ServiceProvider.GetService<TestGatewayManager>();
+            var gatewayManager = this.runtimeClient.ServiceProvider.GetService<TestGatewayMembershipProvider>();
             evt.Completed += (sender, args) =>
             {
                 connectionCount++;
-                gatewayManager.Gateways.Remove(endpoint.ToGatewayUri());
+                gatewayManager.Gateways.RemoveAll(gw => gw.SiloAddress.Endpoint.Equals(endpoint));
+                gatewayManager.Version = gatewayManager.Version.Successor();
             };
 
             // Add the fake gateway and wait the refresh from the client
-            gatewayManager.Gateways.Add(endpoint.ToGatewayUri());
+            gatewayManager.AddTcpGateway(endpoint);
             await Task.Delay(200);
 
             using (var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
@@ -168,9 +172,11 @@ namespace Tester
         [Fact, TestCategory("Functional")]
         public async Task ConnectionFromDifferentClusterIsRejected()
         {
-            // Arange
-            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
-            var gwEndpoint  = gateways.First().ToIPEndPoint();
+            // Arrange
+            var gatewayMembershipService = this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayMembershipService>();
+            await gatewayMembershipService.Refresh();
+            var gateways = gatewayMembershipService.CurrentSnapshot;
+            var gwEndpoint = gateways.Gateways.First().Key.Endpoint;
             var exceptions = new List<Exception>();
 
             Task<bool> RetryFunc(Exception exception, CancellationToken cancellationToken)

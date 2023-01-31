@@ -1,11 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
@@ -15,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace UnitTests.MembershipTests
 {
@@ -36,7 +30,7 @@ namespace UnitTests.MembershipTests
         private static readonly string hostName = Dns.GetHostName();
         private readonly ILogger logger;
         private readonly IMembershipTable membershipTable;
-        private readonly IGatewayListProvider gatewayListProvider;
+        private readonly IGatewayMembershipProvider gatewayListProvider;
         protected readonly string clusterId;
         protected readonly string connectionString;
         protected ILoggerFactory loggerFactory;
@@ -71,7 +65,8 @@ namespace UnitTests.MembershipTests
 
             this.gatewayOptions = Options.Create(new GatewayOptions());
             gatewayListProvider = CreateGatewayListProvider(logger);
-            gatewayListProvider.InitializeGatewayListProvider().WithTimeout(TimeSpan.FromMinutes(1)).Wait();
+            var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(1)).Token;
+            gatewayListProvider.GetGatewaysAsync(cancellation).AsTask().WithCancellation(cancellation).Wait();
         }
 
         public IGrainFactory GrainFactory => this.environment.GrainFactory;
@@ -87,7 +82,9 @@ namespace UnitTests.MembershipTests
             this.loggerFactory.Dispose();
         }
 
-        protected abstract IGatewayListProvider CreateGatewayListProvider(ILogger logger);
+        protected virtual IGatewayMembershipProvider CreateGatewayListProvider(ILogger logger) => new GatewayMembershipProvider(
+            loggerFactory.CreateLogger<GatewayMembershipProvider>(),
+            CreateMembershipTable(logger));
         protected abstract IMembershipTable CreateMembershipTable(ILogger logger);
         protected abstract Task<string> GetConnectionString();
 
@@ -116,16 +113,16 @@ namespace UnitTests.MembershipTests
                 version = (await membershipTable.ReadRow(membershipEntry.SiloAddress)).Version;
             }
 
-            var gateways = await gatewayListProvider.GetGateways();
+            var gatewaySnapshot = await gatewayListProvider.GetGatewaysAsync(CancellationToken.None);
 
-            var entries = new List<string>(gateways.Select(g => g.ToString()));
+            var entries = gatewaySnapshot.Gateways.Keys.ToList();
 
             // only members with a non-zero Gateway port
-            Assert.DoesNotContain(membershipEntries[3].SiloAddress.ToGatewayUri().ToString(), entries);
+            Assert.DoesNotContain(membershipEntries[3].SiloAddress, entries);
 
             // only Active members
-            Assert.Contains(membershipEntries[5].SiloAddress.ToGatewayUri().ToString(), entries);
-            Assert.Contains(membershipEntries[9].SiloAddress.ToGatewayUri().ToString(), entries);
+            Assert.Contains(membershipEntries[5].SiloAddress, entries);
+            Assert.Contains(membershipEntries[9].SiloAddress, entries);
             Assert.Equal(2, entries.Count);
         }
 

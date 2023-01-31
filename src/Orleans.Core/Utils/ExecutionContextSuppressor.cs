@@ -8,7 +8,7 @@ namespace Orleans.Runtime.Internal;
 /// <remarks>
 /// Note that this is a ref-struct to avoid it being used in an async method.
 /// </remarks>
-public ref struct ExecutionContextSuppressor
+public readonly ref struct ExecutionContextSuppressor
 {
     private readonly bool _restoreFlow;
 

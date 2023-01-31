@@ -32,18 +32,19 @@ namespace Tester.ClientConnectionTests
         [Fact]
         public async Task ConnectIsRetryableTest()
         {
-            var gateways = await this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayListProvider>().GetGateways();
-            var gwEndpoint = gateways.First();
+            var gatewayMembershipService = this.HostedCluster.Client.ServiceProvider.GetRequiredService<IGatewayMembershipService>();
+            await gatewayMembershipService.Refresh();
 
             // Create a client with no gateway endpoint and then add a gateway endpoint when the client fails to connect.
-            var gatewayProvider = new MockGatewayListProvider();
+            var gatewayProvider = new TestGatewayMembershipProvider();
+            gatewayProvider.Snapshot = new GatewayMembershipSnapshot(Array.Empty<GatewayMember>(), default);
             var exceptions = new List<Exception>();
 
             Task<bool> RetryFunc(Exception exception, CancellationToken cancellationToken)
             {
                 Assert.IsType<SiloUnavailableException>(exception);
                 exceptions.Add(exception);
-                gatewayProvider.Gateways = new List<Uri> { gwEndpoint }.AsReadOnly();
+                gatewayProvider.Snapshot = gatewayMembershipService.CurrentSnapshot;
                 return Task.FromResult(true);
             }
 
@@ -57,7 +58,7 @@ namespace Tester.ClientConnectionTests
                             options.ClusterId = existingClientOptions.ClusterId;
                             options.ServiceId = existingClientOptions.ServiceId;
                         })
-                        .ConfigureServices(services => services.AddSingleton<IGatewayListProvider>(gatewayProvider))
+                        .ConfigureServices(services => services.AddSingleton<IGatewayMembershipProvider>(gatewayProvider))
                         .UseConnectionRetryFilter(RetryFunc);
                 })
                 .Build();
@@ -69,17 +70,11 @@ namespace Tester.ClientConnectionTests
             await host.StopAsync();
         }
 
-        public class MockGatewayListProvider : IGatewayListProvider
+        private class TestGatewayMembershipProvider : IGatewayMembershipProvider
         {
-            public ReadOnlyCollection<Uri> Gateways { get; set; } = new ReadOnlyCollection<Uri>(new List<Uri>());
+            public GatewayMembershipSnapshot Snapshot { get; set; }
 
-            public Task InitializeGatewayListProvider() => Task.CompletedTask;
-
-            public Task<IList<Uri>> GetGateways() => Task.FromResult<IList<Uri>>(this.Gateways);
-
-            public TimeSpan MaxStaleness => TimeSpan.FromSeconds(30);
-
-            public bool IsUpdatable => true;
+            public ValueTask<GatewayMembershipSnapshot> GetGatewaysAsync(CancellationToken cancellationToken) => new(Snapshot);
         }
     }
 }
