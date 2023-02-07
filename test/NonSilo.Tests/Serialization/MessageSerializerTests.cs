@@ -191,7 +191,7 @@ namespace UnitTests.Serialization
             var buffer = new PooledBuffer();
             try
             {
-                var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageHeaderSize;
+                var maxBodySize = this.fixture.Services.GetService<IOptions<SiloMessagingOptions>>().Value.MaxMessageBodySize;
 
                 // Create a request with a ridiculously big argument
                 var arg = new byte[maxBodySize + 1];
@@ -250,7 +250,7 @@ namespace UnitTests.Serialization
             {
                 var (headerSize, bodySize) = this.messageSerializer.Write(ref buffer, message);
 
-                var reader = buffer.Slice(0);
+                var reader = buffer.Slice();
                 this.messageSerializer.Read(in reader, headerSize, bodySize, out var deserializedMessage);
                 return deserializedMessage;
             }

@@ -27,7 +27,7 @@ namespace Orleans.Runtime.Messaging
         public ValueTask Completed => new(this, _completion.Version);
         public override Memory<byte> Buffer => _buffer.GetMemory();
 
-        public int FramedLength => _messageLength.HeaderLength + _messageLength.BodyLength;
+        public int FramedLength => Message.LENGTH_HEADER_SIZE + _messageLength.HeaderLength + _messageLength.BodyLength;
         public int UnconsumedLength => _buffer.Length - FramedLength;
 
         public PooledBuffer.BufferSlice Payload => _buffer.Slice(Message.LENGTH_HEADER_SIZE, _messageLength.HeaderLength + _messageLength.BodyLength);

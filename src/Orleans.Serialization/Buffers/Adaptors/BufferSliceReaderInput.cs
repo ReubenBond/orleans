@@ -96,7 +96,7 @@ public struct BufferSliceReaderInput
             }
 
             var result = head.Array.AsSpan(finalOffset, finalLength);
-            _position += finalLength;
+            _position += finalOffset + finalLength;
             Debug.Assert(_position == endPosition);
             _segment = FinalSegmentSentinel;
             return result;

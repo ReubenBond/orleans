@@ -58,7 +58,7 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 // Decode header
-                var header = buffer.Slice(headerLength);
+                var header = buffer.Slice(0, headerLength);
 
                 // Build message
                 message = new();
@@ -132,15 +132,17 @@ namespace Orleans.Runtime.Messaging
                 var headerLength = writer.Position;
                 _serializationSession.Reset();
 
+                int bodyLength = 0;
                 if (bodyCodec is not null)
                 {
                     writer = Writer.Create(writer.Output, _serializationSession);
                     if (rawCodec != null) rawCodec.WriteRaw(ref writer, message.BodyObject);
                     else bodyCodec.WriteField(ref writer, 0, null, message.BodyObject);
                     writer.Commit();
+                    bodyLength = writer.Position;
                 }
 
-                var bodyLength = writer.Position;
+                buffer = writer.Output;
 
                 // Before completing, check lengths
                 ThrowIfLengthsInvalid(headerLength, bodyLength);
