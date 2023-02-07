@@ -42,10 +42,9 @@ namespace Orleans.Runtime.Messaging
 
         internal void Return(MessageSerializer serializer)
         {
-            return;
-            /*
             _serializerPool.Enqueue(serializer);
 
+            /*
             CheckPool();
             void CheckPool()
             {
@@ -70,10 +69,9 @@ namespace Orleans.Runtime.Messaging
 
         internal void Return(MessageReadRequest handler)
         {
-            return;
-            /*
             _receivePool.Enqueue(handler);
 
+            /*
             CheckPool();
             void CheckPool()
             {
@@ -98,10 +96,9 @@ namespace Orleans.Runtime.Messaging
 
         internal void Return(MessageWriteRequest handler)
         {
-            return;
-            /*
             _sendPool.Enqueue(handler);
 
+            /*
             CheckPool();
             void CheckPool()
             {

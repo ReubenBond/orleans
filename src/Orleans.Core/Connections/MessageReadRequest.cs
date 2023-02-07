@@ -45,7 +45,7 @@ namespace Orleans.Runtime.Messaging
 
         public void Reset()
         {
-            _messageLength = (0, 0);
+            _messageLength = default;
             _connection = default;
             _completion.Reset();
             _buffer.Reset();

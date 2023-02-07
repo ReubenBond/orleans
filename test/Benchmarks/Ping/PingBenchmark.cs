@@ -9,6 +9,7 @@ using BenchmarkGrainInterfaces.Ping;
 using BenchmarkGrains.Ping;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -33,17 +34,21 @@ namespace Benchmarks.Ping
             {
                 var primary = i == 0 ? null : new IPEndPoint(IPAddress.Loopback, 11111);
                 var hostBuilder = new HostBuilder().UseOrleans((ctx, siloBuilder) =>
-                {
-                    siloBuilder.UseLocalhostClustering(
-                        siloPort: 11111 + i,
-                        gatewayPort: 30000 + i,
-                        primarySiloEndpoint: primary);
-
-                    if (i == 0 && grainsOnSecondariesOnly)
                     {
-                        siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
-                    }
-                });
+                        siloBuilder.UseLocalhostClustering(
+                            siloPort: 11111 + i,
+                            gatewayPort: 30000 + i,
+                            primarySiloEndpoint: primary);
+
+                        if (i == 0 && grainsOnSecondariesOnly)
+                        {
+                            siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
+                        }
+                    })
+                    .ConfigureServices(services =>
+                    {
+                        services.AddLogging(logging => logging.AddConsole());
+                    });
 
                 var host = hostBuilder.Build();
 
@@ -56,17 +61,21 @@ namespace Benchmarks.Ping
             if (startClient)
             {
                 var hostBuilder = new HostBuilder().UseOrleansClient((ctx, clientBuilder) =>
-                {
-                    if (numSilos == 1)
                     {
-                        clientBuilder.UseLocalhostClustering();
-                    }
-                    else
+                        if (numSilos == 1)
+                        {
+                            clientBuilder.UseLocalhostClustering();
+                        }
+                        else
+                        {
+                            var gateways = Enumerable.Range(30000, numSilos).Select(i => new IPEndPoint(IPAddress.Loopback, i)).ToArray();
+                            clientBuilder.UseStaticClustering(gateways);
+                        }
+                    })
+                    .ConfigureServices(services =>
                     {
-                        var gateways = Enumerable.Range(30000, numSilos).Select(i => new IPEndPoint(IPAddress.Loopback, i)).ToArray();
-                        clientBuilder.UseStaticClustering(gateways);
-                    }
-                });
+                        services.AddLogging(logging => logging.AddConsole());
+                    });
 
                 this.clientHost = hostBuilder.Build();
                 this.clientHost.StartAsync().GetAwaiter().GetResult();
@@ -106,7 +115,7 @@ namespace Benchmarks.Ping
         public Task PingConcurrent() => this.Run(
             runs: 3,
             grainFactory: this.client,
-            blocksPerWorker: 10);
+            blocksPerWorker: 1);
 
         public Task PingConcurrentHostedClient(int blocksPerWorker = 30) => this.Run(
             runs: 3,
@@ -118,7 +127,7 @@ namespace Benchmarks.Ping
             var loadGenerator = new ConcurrentLoadGenerator<IPingGrain>(
                 maxConcurrency: 250,
                 blocksPerWorker: blocksPerWorker,
-                requestsPerBlock: 500,
+                requestsPerBlock: 5,
                 issueRequest: g => g.Run(),
                 getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId));
             await loadGenerator.Warmup();

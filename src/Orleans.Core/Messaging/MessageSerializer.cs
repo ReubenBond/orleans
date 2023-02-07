@@ -2,12 +2,9 @@
 
 using System;
 using System.Buffers;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO.Pipelines;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text;
 using Orleans.Configuration;
 using Orleans.Serialization.Buffers;
@@ -23,8 +20,6 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class MessageSerializer
     {
-        private const int FramingLength = Message.LENGTH_HEADER_SIZE;
-        private const int MessageSizeHint = 4096;
         private readonly Dictionary<Type, ResponseCodec> _rawResponseCodecs = new();
         private readonly CodecProvider _codecProvider;
         private readonly IFieldCodec<GrainAddress> _activationAddressCodec;

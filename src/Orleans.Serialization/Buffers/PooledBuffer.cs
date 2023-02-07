@@ -564,7 +564,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                     }
 
                     Current = head.Array.AsSpan(finalOffset, finalLength);
-                    _position += finalLength;
+                    _position += finalOffset + finalLength;
                     Debug.Assert(_position == endPosition);
                     _segment = FinalSegmentSentinel;
                     return true;
