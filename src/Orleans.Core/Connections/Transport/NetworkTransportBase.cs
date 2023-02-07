@@ -1,6 +1,6 @@
 #nullable enable
 
-namespace Orleans.Connections.Transport.Utilities;
+namespace Orleans.Connections.Transport;
 
 public abstract class MessageTransportBase : MessageTransport
 {

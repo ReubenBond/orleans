@@ -21,7 +21,7 @@ public class TlsMessageTransportListener : TcpMessageTransportListener
 
     public override async ValueTask<MessageTransport?> AcceptAsync(CancellationToken cancellationToken = default)
     {
-        var innerTransport = await base.AcceptAsync(cancellationToken);
+        var innerTransport = await base.AcceptAsync(cancellationToken).ConfigureAwait(false);
         if (innerTransport is null)
         {
             return null;

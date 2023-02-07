@@ -13,6 +13,7 @@ using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Connections.Transport;
 using Orleans.Connections;
+using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -71,6 +72,7 @@ namespace Orleans.Runtime.Messaging
         protected void Start()
         {
             if (_listener is null) throw new InvalidOperationException($"Listener is not bound, call {nameof(BindAsync)} first");
+            using var _ = new ExecutionContextSuppressor();
             _acceptLoopTask = RunAcceptLoop();
         }
 
@@ -82,7 +84,7 @@ namespace Orleans.Runtime.Messaging
             {
                 while (true)
                 {
-                    var context = await listener.AcceptAsync(_shutdownCancellation.Token);
+                    var context = await listener.AcceptAsync(_shutdownCancellation.Token).ConfigureAwait(false);
                     if (context == null) break;
 
                     var connection = CreateConnection(context);
@@ -105,7 +107,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 _shutdownCancellation.Cancel();
-                await _listener.UnbindAsync(cancellationToken);
+                await _listener.UnbindAsync(cancellationToken).ConfigureAwait(false);
 
                 if (_acceptLoopTask is not null)
                 {
