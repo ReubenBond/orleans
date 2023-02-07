@@ -47,7 +47,7 @@ namespace Benchmarks.Ping
                     })
                     .ConfigureServices(services =>
                     {
-                        services.AddLogging(logging => logging.AddConsole());
+                        //services.AddLogging(logging => logging.AddConsole());
                     });
 
                 var host = hostBuilder.Build();
@@ -74,7 +74,7 @@ namespace Benchmarks.Ping
                     })
                     .ConfigureServices(services =>
                     {
-                        services.AddLogging(logging => logging.AddConsole());
+                        //services.AddLogging(logging => logging.AddConsole());
                     });
 
                 this.clientHost = hostBuilder.Build();
