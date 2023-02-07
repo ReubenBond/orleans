@@ -217,7 +217,7 @@ public abstract class StreamMessageTransport : MessageTransportBase
                         }
                     }
 
-                    operation.OnCompleted();
+                    operation.SetResult();
                 }
 
                 await _writerSignal.WaitAsync();
@@ -232,7 +232,7 @@ public abstract class StreamMessageTransport : MessageTransportBase
             _shutdownReason ??= error;
             if ((error ?? _shutdownReason) is { } reason)
             {
-                operation?.OnError(reason);
+                operation?.SetException(reason);
             }
 
             if (error is not null)

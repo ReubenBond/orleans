@@ -103,8 +103,8 @@ namespace Orleans.Runtime.Messaging
             public override ReadOnlyMemory<byte> Buffer => throw new NotImplementedException();
             public override ReadOnlySequence<byte> Buffers => _buffer.AsReadOnlySequence();
 
-            public override void OnCompleted() => _completion.SetResult();
-            public override void OnError(Exception error) => _completion.SetException(error);
+            public override void SetResult() => _completion.SetResult();
+            public override void SetException(Exception error) => _completion.SetException(error);
 
             public void Dispose() => _buffer.Reset();
 

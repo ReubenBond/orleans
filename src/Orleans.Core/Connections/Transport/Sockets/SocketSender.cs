@@ -38,6 +38,18 @@ internal sealed class SocketSender : SocketAwaitableEventArgs
         return Error is not null ? ValueTask.FromException(Error) : default;
     }
 
+    public ValueTask SendAsync(Socket socket, List<ArraySegment<byte>> buffers)
+    {
+        BufferList = buffers;
+
+        if (socket.SendAsync(this))
+        {
+            return new ValueTask(this, 0);
+        }
+
+        return Error is not null ? ValueTask.FromException(Error) : default;
+    }
+
     public void Reset()
     {
         // We clear the buffer and buffer list before we put it back into the pool

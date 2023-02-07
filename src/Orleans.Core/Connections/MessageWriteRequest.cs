@@ -5,13 +5,14 @@ using Orleans.Serialization.Buffers;
 using System.Buffers.Binary;
 using Orleans.Connections.Transport;
 using System.Threading.Tasks.Sources;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class MessageWriteRequest : WriteRequest, IValueTaskSource
+    internal sealed class MessageWriteRequest : WriteRequest//, IValueTaskSource
     {
         private readonly MessageHandlerShared _shared;
-        private ManualResetValueTaskSourceCore<int> _completion = new();
+        //private ManualResetValueTaskSourceCore<int> _completion = new();
         private PooledBuffer _buffer = new();
 
         public MessageWriteRequest(MessageHandlerShared shared)
@@ -43,28 +44,32 @@ namespace Orleans.Runtime.Messaging
 
         public override ReadOnlySequence<byte> Buffers => _buffer.AsReadOnlySequence();
 
-        public ValueTask Completed => new(this, _completion.Version);
+        //public ValueTask Completed => new(this, _completion.Version);
 
-        public override void OnCompleted()
+        public override void SetResult()
         {
-            _completion.SetResult(0);
+            Reset();
         }
 
-        public override void OnError(Exception error)
+        public override void SetException(Exception error)
         {
-            _completion.SetException(error);
+            _shared.MessagingTrace.LogError(error, "Error sending message {Message}", Message);
+            //_completion.SetException(error);
+            Reset();
         }
 
         public void Reset()
         {
             Message = null;
             _buffer.Reset();
-            _completion.Reset();
+            //_completion.Reset();
             _shared.Return(this);
         }
 
+        /*
         void IValueTaskSource.OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags) => _completion.OnCompleted(continuation, state, token, flags);
         void IValueTaskSource.GetResult(short token) => _completion.GetResult(token);
         ValueTaskSourceStatus IValueTaskSource.GetStatus(short token) => _completion.GetStatus(token);
+        */
     }
 }

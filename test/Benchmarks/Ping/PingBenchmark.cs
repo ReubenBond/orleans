@@ -110,12 +110,12 @@ namespace Benchmarks.Ping
         public Task PingConcurrentForever() => this.Run(
             runs: int.MaxValue,
             grainFactory: this.client,
-            blocksPerWorker: 10);
+            blocksPerWorker: 2);
 
         public Task PingConcurrent() => this.Run(
             runs: 3,
             grainFactory: this.client,
-            blocksPerWorker: 1);
+            blocksPerWorker: 2);
 
         public Task PingConcurrentHostedClient(int blocksPerWorker = 30) => this.Run(
             runs: 3,
@@ -127,7 +127,7 @@ namespace Benchmarks.Ping
             var loadGenerator = new ConcurrentLoadGenerator<IPingGrain>(
                 maxConcurrency: 250,
                 blocksPerWorker: blocksPerWorker,
-                requestsPerBlock: 5,
+                requestsPerBlock: 50,
                 issueRequest: g => g.Run(),
                 getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId));
             await loadGenerator.Warmup();

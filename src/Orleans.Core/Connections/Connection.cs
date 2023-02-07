@@ -10,6 +10,8 @@ using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Buffers;
 using Orleans.Connections.Transport;
 using Orleans.Connections;
+using Orleans.Runtime.Internal;
+using System.Collections.Generic;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -23,8 +25,8 @@ namespace Orleans.Runtime.Messaging
         };
 
         private readonly ConnectionCommon _shared;
-        private readonly Channel<MessageWriteRequest> _outboundMessages;
-        private readonly ChannelWriter<MessageWriteRequest> _outboundMessageWriter;
+        //private readonly Channel<MessageWriteRequest> _outboundMessages;
+        //private readonly ChannelWriter<MessageWriteRequest> _outboundMessageWriter;
         private readonly TaskCompletionSource<int> _transportConnectionClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<int> _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly string _id;
@@ -40,8 +42,8 @@ namespace Orleans.Runtime.Messaging
             _id = CorrelationIdGenerator.GetNextId();
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _shared = shared;
-            _outboundMessages = Channel.CreateUnbounded<MessageWriteRequest>(OutgoingMessageChannelOptions);
-            _outboundMessageWriter = _outboundMessages.Writer;
+            //_outboundMessages = Channel.CreateUnbounded<MessageWriteRequest>(OutgoingMessageChannelOptions);
+            //_outboundMessageWriter = _outboundMessages.Writer;
 
             _transport.Closed.Register(static state => ((Connection)state).OnTransportConnectionClosed(), this);
 
@@ -86,8 +88,12 @@ namespace Orleans.Runtime.Messaging
 
         protected virtual async Task RunAsyncCore()
         {
-            _processIncomingTask = ProcessIncoming();
-            _processOutgoingTask = ProcessOutgoing();
+            using (new ExecutionContextSuppressor())
+            {
+                _processIncomingTask = ProcessIncoming();
+                _processOutgoingTask = Task.CompletedTask;// ProcessOutgoing();
+            }
+
             _initializationTcs.TrySetResult(0);
             await Task.WhenAll(_processIncomingTask, _processOutgoingTask);
         }
@@ -147,7 +153,7 @@ namespace Orleans.Runtime.Messaging
             NetworkingInstruments.OnClosedSocket(ConnectionDirection);
 
             // Signal the outgoing message processor to exit gracefully.
-            _outboundMessageWriter.TryComplete();
+            //_outboundMessageWriter.TryComplete();
 
             // Close the underlying message transport
             await _transport.CloseAsync(new ConnectionAbortedException());
@@ -190,6 +196,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             // Reroute enqueued messages.
+            /*
             var i = 0;
             while (_outboundMessages.Reader.TryRead(out var sendWorkItem))
             {
@@ -214,6 +221,7 @@ namespace Orleans.Runtime.Messaging
                     i,
                     RemoteEndpoint?.ToString() ?? "(never connected)");
             }
+            */
         }
 
         public virtual void Send(Message message)
@@ -235,10 +243,10 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            if (!_outboundMessageWriter.TryWrite(handler))
+            if (!_transport.WriteAsync(handler))
             {
-                handler.Reset();
-                RerouteMessage(message);
+                StartClosing(new ConnectionAbortedException());
+                return;
             }
         }
 
@@ -258,14 +266,11 @@ namespace Orleans.Runtime.Messaging
             {
                 while (true)
                 {
-                    if (!readRequest.Completed.IsCompleted)
+                    if (!_transport.ReadAsync(readRequest))
                     {
-                        if (!_transport.ReadAsync(readRequest))
-                        {
-                            // Connection closed.
-                            error = new ConnectionAbortedException();
-                            break;
-                        }
+                        // Connection closed.
+                        error = new ConnectionAbortedException();
+                        break;
                     }
 
                     await readRequest.Completed;
@@ -321,17 +326,26 @@ HandleCompletedRequest:
             }
         }
 
+        /*
         private async Task ProcessOutgoing()
         {
             await Task.Yield();
 
             var outboundQueue = _outboundMessages.Reader;
             Exception error = default;
+            Queue<MessageWriteRequest> processingRequests = new();
             try
             {
                 while (true)
                 {
                     var more = await outboundQueue.WaitToReadAsync();
+                    while (processingRequests.TryPeek(out var request) && request.Completed.IsCompleted)
+                    {
+                        _ = processingRequests.Dequeue();
+                        await request.Completed;
+                        request.Reset();
+                    }
+
                     if (!more)
                     {
                         break;
@@ -340,14 +354,12 @@ HandleCompletedRequest:
                     MessageWriteRequest message = default;
                     while (outboundQueue.TryRead(out message))
                     {
+                        processingRequests.Enqueue(message);
                         if (!_transport.WriteAsync(message))
                         {
                             error = new ConnectionAbortedException();
                             break;
                         }
-
-                        await message.Completed;
-                        message.Reset();
                     }
 
                     if (error is not null)
@@ -373,6 +385,7 @@ HandleCompletedRequest:
                 StartClosing(error);
             }
         }
+        */
 
         private void RerouteMessage(Message message)
         {

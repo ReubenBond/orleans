@@ -12,6 +12,7 @@ using Orleans.Connections.Transport.Utilities;
 using Orleans.Connections.Sockets;
 using System.Diagnostics;
 using Orleans.Runtime.Internal;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Connections.Transport.Sockets;
 
@@ -24,7 +25,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
     private readonly SocketSender _socketSender = new();
     private readonly SocketReceiver _socketReceiver = new();
     private readonly Socket _socket;
-    private readonly Queue<WriteRequest> _writeRequests = new();
+    private Queue<WriteRequest> _writeRequests = new();
     private readonly Queue<ReadRequest> _readRequests = new();
     private readonly SingleWaiterInlineSignal _readSignal = new();
     private readonly SingleWaiterInlineSignal _writeSignal = new();
@@ -66,8 +67,12 @@ public sealed class TcpMessageTransport : MessageTransportBase
         try
         {
             // Spawn send and receive logic
-            var receiveTask = ProcessReads();
-            var sendTask = ProcessWrites();
+            Task receiveTask, sendTask;
+            using (new ExecutionContextSuppressor())
+            {
+                receiveTask = ProcessReads();
+                sendTask = ProcessWrites();
+            }
 
             // Now wait for both to complete
             await receiveTask;
@@ -320,26 +325,46 @@ public sealed class TcpMessageTransport : MessageTransportBase
 
     private async Task ProcessWrites()
     {
+        const int TargetNumBuffers = 800;
         await Task.Yield();
         Exception? error = null;
-        WriteRequest? request = null;
+        Queue<WriteRequest> requests = new();
+        List<ArraySegment<byte>> buffers = new(capacity: TargetNumBuffers);
+        List<WriteRequest> processingRequests = new(capacity: TargetNumBuffers);
         try
         {
             // Loop until termination.
             while (!_connectionClosingCts.IsCancellationRequested)
             {
-                // Handle each request.
-                while (TryDequeue(out request))
+                if (requests.Count == 0)
                 {
+                    RefreshRequestQueue(ref requests);
+                }
+
+                if (requests.Count > 0)
+                {
+                    buffers.Clear();
+                    processingRequests.Clear();
+
+                    // Handle each request.
+                    while (buffers.Count < TargetNumBuffers && requests.TryDequeue(out var request))
+                    {
+                        processingRequests.Add(request);
+                        if (request.IsSingleBuffer)
+                        {
+                            buffers.Add(request.Buffer.GetArray());
+                        }
+                        else
+                        {
+                            foreach (var b in request.Buffers)
+                            {
+                                buffers.Add(b.GetArray());
+                            }
+                        }
+                    }
+
                     _socketSender.Reset();
-                    if (request.IsSingleBuffer)
-                    {
-                        await _socketSender.SendAsync(_socket, request.Buffer);
-                    }
-                    else
-                    {
-                        await _socketSender.SendAsync(_socket, request.Buffers);
-                    }
+                    await _socketSender.SendAsync(_socket, buffers);
 
                     if (_socketSender.HasError)
                     {
@@ -383,8 +408,11 @@ public sealed class TcpMessageTransport : MessageTransportBase
                         break;
                     }
 
-                    // Signal that the request is completed
-                    request.OnCompleted();
+                    // Signal that the requests are completed
+                    foreach (var request in processingRequests)
+                    {
+                        request.SetResult();
+                    }
                 }
 
                 if (error is not null)
@@ -417,18 +445,21 @@ public sealed class TcpMessageTransport : MessageTransportBase
         {
             if (error is { })
             {
-                request?.OnError(error);
+                foreach (var request in processingRequests)
+                {
+                    request.SetException(error);
+                }
             }
 
             _shutdownReason ??= error;
             _connectionClosingCts.Cancel();
         }
 
-        bool TryDequeue([NotNullWhen(true)] out WriteRequest? request)
+        void RefreshRequestQueue(ref Queue<WriteRequest> queue)
         {
             lock (_writesLock)
             {
-                return _writeRequests.TryDequeue(out request);
+                queue = Interlocked.Exchange(ref _writeRequests, queue);
             }
         }
     }
