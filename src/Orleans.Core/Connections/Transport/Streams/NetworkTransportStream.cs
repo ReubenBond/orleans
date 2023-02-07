@@ -94,7 +94,7 @@ public class NetworkTransportStream : Stream
         public override ReadOnlyMemory<byte> Buffer => _buffer;
         public ValueTask OnCompleteAsync() => _signal.WaitAsync();
         public override void OnCompleted() => _signal.Signal();
-        public override void OnError(Exception error) => _signal.SetException(error);
+        public override void OnError(Exception error) => _signal.SignalException(error);
     }
 
     private sealed class StreamReadRequest : ReadRequest
