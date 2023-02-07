@@ -7,6 +7,7 @@ using Orleans.Serialization.Buffers;
 using System.Buffers.Binary;
 using Orleans.Connections.Transport;
 using System.Threading.Tasks.Sources;
+using System.Diagnostics;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -28,7 +29,7 @@ namespace Orleans.Runtime.Messaging
         public override Memory<byte> Buffer => _buffer.GetMemory();
 
         public int FramedLength => Message.LENGTH_HEADER_SIZE + _messageLength.HeaderLength + _messageLength.BodyLength;
-        public int UnconsumedLength => _buffer.Length - FramedLength;
+        public int UnconsumedLength => _buffer.Length > FramedLength ? _buffer.Length - FramedLength : 0;
 
         public PooledBuffer.BufferSlice Payload => _buffer.Slice(Message.LENGTH_HEADER_SIZE, _messageLength.HeaderLength + _messageLength.BodyLength);
         public PooledBuffer.BufferSlice Unconsumed => _buffer.Slice(FramedLength);
@@ -82,7 +83,11 @@ namespace Orleans.Runtime.Messaging
 
         public override bool OnProgress(int bytesRead)
         {
-            _buffer.Advance(bytesRead);
+            if (bytesRead > 0)
+            {
+                _buffer.Advance(bytesRead);
+            }
+
             return TryDeframeMessage();
         }
 

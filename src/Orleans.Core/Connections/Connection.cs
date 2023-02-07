@@ -270,6 +270,7 @@ namespace Orleans.Runtime.Messaging
 
                     await readRequest.Completed;
 
+HandleCompletedRequest:
                     if (readRequest.UnconsumedLength > 0)
                     {
                         // Copy the excess data for the next request.
@@ -282,6 +283,10 @@ namespace Orleans.Runtime.Messaging
                         // Assign the excess data to the next request.
                         readRequest = RentHandler();
                         readRequest.SetBuffer(in excessBuffer);
+                        if (readRequest.OnProgress(0))
+                        {
+                            goto HandleCompletedRequest;
+                        }
                     }
                     else
                     {
