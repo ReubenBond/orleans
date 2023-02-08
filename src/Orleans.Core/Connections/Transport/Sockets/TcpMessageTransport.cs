@@ -28,7 +28,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
     private Queue<WriteRequest> _writeRequests = new();
     private readonly Queue<ReadRequest> _readRequests = new();
     private readonly SingleWaiterInlineSignal _readSignal = new();
-    private readonly SingleWaiterInlineSignal _writeSignal = new();
+    private readonly SingleWaiterInlineSignal _writeSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Action _fireReadSignal;
     private readonly Action _fireWriteSignal;
     private readonly ILogger _logger;
@@ -325,12 +325,16 @@ public sealed class TcpMessageTransport : MessageTransportBase
 
     private async Task ProcessWrites()
     {
-        const int TargetNumBuffers = 800;
+        const int SoftBatchMax = 32;
         await Task.Yield();
         Exception? error = null;
         Queue<WriteRequest> requests = new();
-        List<ArraySegment<byte>> buffers = new(capacity: TargetNumBuffers);
-        List<WriteRequest> processingRequests = new(capacity: TargetNumBuffers);
+        List<ArraySegment<byte>> buffers = new(capacity: SoftBatchMax);
+        List<WriteRequest> processingRequests = new(capacity: SoftBatchMax);
+        /*
+        byte[] writeBuffer = GC.AllocateUninitializedArray<byte>(1024 * 1024, pinned: true);
+        int writeIndex;
+        */
         try
         {
             // Loop until termination.
@@ -347,7 +351,29 @@ public sealed class TcpMessageTransport : MessageTransportBase
                     processingRequests.Clear();
 
                     // Handle each request.
-                    while (buffers.Count < TargetNumBuffers && requests.TryDequeue(out var request))
+                    /*
+                    writeIndex = 0;
+                    while (requests.TryPeek(out var request) && ((request.IsSingleBuffer && request.Buffer.Length < writeBuffer.Length - writeIndex) || (request.Buffers.Length < writeBuffer.Length - writeIndex)))
+                    {
+                        _ = requests.Dequeue();
+                        processingRequests.Add(request);
+                        if (request.IsSingleBuffer)
+                        {
+                            request.Buffer.Span.CopyTo(writeBuffer.AsSpan(writeIndex));
+                            writeIndex += request.Buffer.Length;
+                        }
+                        else
+                        {
+                            foreach (var b in request.Buffers)
+                            {
+                                b.Span.CopyTo(writeBuffer.AsSpan(writeIndex));
+                                writeIndex += b.Length;
+                            }
+                        }
+                    }
+                    */
+
+                    while (buffers.Count < SoftBatchMax && requests.TryDequeue(out var request))
                     {
                         processingRequests.Add(request);
                         if (request.IsSingleBuffer)
@@ -364,41 +390,12 @@ public sealed class TcpMessageTransport : MessageTransportBase
                     }
 
                     _socketSender.Reset();
+                    //await _socketSender.SendAsync(_socket, writeBuffer.AsMemory(0, writeIndex));
                     await _socketSender.SendAsync(_socket, buffers);
 
                     if (_socketSender.HasError)
                     {
-                        if (IsConnectionResetError(_socketSender.SocketError))
-                        {
-                            // This could be ignored if _shutdownReason is alwritey set.
-                            var ex = _socketSender.Error;
-                            error = new ConnectionResetException(ex.Message, ex);
-
-                            // There's still a small chance that both DoReceive() and DoSend() can log the same connection reset.
-                            // Both logs will have the same ConnectionId. I don't think it's worthwhile to lock just to avoid this.
-                            if (!_socketDisposed)
-                            {
-                                SocketsLog.ConnectionReset(_logger, this);
-                            }
-                        }
-                        else if (IsConnectionAbortError(_socketSender.SocketError))
-                        {
-                            // This exception should always be ignored because _shutdownReason should be set.
-                            error = _socketSender.Error;
-
-                            if (!_socketDisposed)
-                            {
-                                // This is unexpected if the socket hasn't been disposed yet.
-                                SocketsLog.ConnectionError(_logger, this, error);
-                            }
-                        }
-                        else
-                        {
-                            // This is unexpected.
-                            error = _socketSender.Error;
-                            SocketsLog.ConnectionError(_logger, this, error);
-                        }
-
+                        error = GetSendAsyncError();
                         break;
                     }
 
@@ -413,6 +410,9 @@ public sealed class TcpMessageTransport : MessageTransportBase
                     {
                         request.SetResult();
                     }
+
+                    // Check for pending messages before waiting.
+                    continue;
                 }
 
                 if (error is not null)
@@ -462,6 +462,43 @@ public sealed class TcpMessageTransport : MessageTransportBase
                 queue = Interlocked.Exchange(ref _writeRequests, queue);
             }
         }
+    }
+
+    private Exception GetSendAsyncError()
+    {
+        Exception error;
+        if (IsConnectionResetError(_socketSender.SocketError))
+        {
+            // This could be ignored if _shutdownReason is alwritey set.
+            var ex = _socketSender.Error!;
+            error = new ConnectionResetException(ex.Message, ex);
+
+            // There's still a small chance that both DoReceive() and DoSend() can log the same connection reset.
+            // Both logs will have the same ConnectionId. I don't think it's worthwhile to lock just to avoid this.
+            if (!_socketDisposed)
+            {
+                SocketsLog.ConnectionReset(_logger, this);
+            }
+        }
+        else if (IsConnectionAbortError(_socketSender.SocketError))
+        {
+            // This exception should always be ignored because _shutdownReason should be set.
+            error = _socketSender.Error!;
+
+            if (!_socketDisposed)
+            {
+                // This is unexpected if the socket hasn't been disposed yet.
+                SocketsLog.ConnectionError(_logger, this, error);
+            }
+        }
+        else
+        {
+            // This is unexpected.
+            error = _socketSender.Error!;
+            SocketsLog.ConnectionError(_logger, this, error);
+        }
+
+        return error;
     }
 
     private static bool IsConnectionResetError(SocketError errorCode)

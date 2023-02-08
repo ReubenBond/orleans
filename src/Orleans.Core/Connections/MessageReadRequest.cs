@@ -26,14 +26,7 @@ namespace Orleans.Runtime.Messaging
         }
 
         public ValueTask Completed => new(this, _completion.Version);
-        public override Memory<byte> Buffer
-        {
-            get
-            {
-                var buf = _buffer.GetMemory();
-                return buf[..Math.Min(buf.Length, FramedLength)];
-            }
-        }
+        public override Memory<byte> Buffer => _buffer.GetMemory();
 
         public int FramedLength => Message.LENGTH_HEADER_SIZE + _messageLength.HeaderLength + _messageLength.BodyLength;
         public int UnconsumedLength => _buffer.Length > FramedLength ? _buffer.Length - FramedLength : 0;
