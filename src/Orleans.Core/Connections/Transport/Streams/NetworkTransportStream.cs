@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Connections.Transport.Utilities;
 using Orleans.Connections.Transport;
+using System.Threading.Tasks.Sources;
 
 namespace Orleans.Connections.Transport.Streams;
 
@@ -79,9 +80,9 @@ public class NetworkTransportStream : Stream
     public override Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     public override void Flush() { }
 
-    private sealed class StreamWriteRequest : WriteRequest
+    private sealed class StreamWriteRequest : WriteRequest, IValueTaskSource
     {
-        private readonly SingleWaiterInlineSignal _signal = new();
+        private readonly ManualResetValueTaskSourceCore<bool> _signal = new();
         private ReadOnlyMemory<byte> _buffer;
         public StreamWriteRequest()
         {
@@ -92,9 +93,12 @@ public class NetworkTransportStream : Stream
         public override ReadOnlySequence<byte> Buffers => throw null!;
         public void SetBuffer(ReadOnlyMemory<byte> buffer) => _buffer = buffer;
         public override ReadOnlyMemory<byte> Buffer => _buffer;
-        public ValueTask OnCompleteAsync() => _signal.WaitAsync();
-        public override void SetResult() => _signal.Signal();
-        public override void SetException(Exception error) => _signal.SignalException(error);
+        public ValueTask OnCompleteAsync() => new(this, _signal.Version);
+        public override void SetResult() => _signal.SetResult(true);
+        public override void SetException(Exception error) => _signal.SetException(error);
+        public void GetResult(short token) => _signal.GetResult(token);
+        public ValueTaskSourceStatus GetStatus(short token) => _signal.GetStatus(token);
+        public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _signal.OnCompleted(continuation, state, token, flags);
     }
 
     private sealed class StreamReadRequest : ReadRequest

@@ -9,7 +9,6 @@ using BenchmarkGrainInterfaces.Ping;
 using BenchmarkGrains.Ping;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -34,21 +33,17 @@ namespace Benchmarks.Ping
             {
                 var primary = i == 0 ? null : new IPEndPoint(IPAddress.Loopback, 11111);
                 var hostBuilder = new HostBuilder().UseOrleans((ctx, siloBuilder) =>
-                    {
-                        siloBuilder.UseLocalhostClustering(
-                            siloPort: 11111 + i,
-                            gatewayPort: 30000 + i,
-                            primarySiloEndpoint: primary);
+                {
+                    siloBuilder.UseLocalhostClustering(
+                        siloPort: 11111 + i,
+                        gatewayPort: 30000 + i,
+                        primarySiloEndpoint: primary);
 
-                        if (i == 0 && grainsOnSecondariesOnly)
-                        {
-                            siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
-                        }
-                    })
-                    .ConfigureServices(services =>
+                    if (i == 0 && grainsOnSecondariesOnly)
                     {
-                        //services.AddLogging(logging => logging.AddConsole());
-                    });
+                        siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
+                    }
+                });
 
                 var host = hostBuilder.Build();
 
@@ -61,21 +56,17 @@ namespace Benchmarks.Ping
             if (startClient)
             {
                 var hostBuilder = new HostBuilder().UseOrleansClient((ctx, clientBuilder) =>
+                {
+                    if (numSilos == 1)
                     {
-                        if (numSilos == 1)
-                        {
-                            clientBuilder.UseLocalhostClustering();
-                        }
-                        else
-                        {
-                            var gateways = Enumerable.Range(30000, numSilos).Select(i => new IPEndPoint(IPAddress.Loopback, i)).ToArray();
-                            clientBuilder.UseStaticClustering(gateways);
-                        }
-                    })
-                    .ConfigureServices(services =>
+                        clientBuilder.UseLocalhostClustering();
+                    }
+                    else
                     {
-                        //services.AddLogging(logging => logging.AddConsole());
-                    });
+                        var gateways = Enumerable.Range(30000, numSilos).Select(i => new IPEndPoint(IPAddress.Loopback, i)).ToArray();
+                        clientBuilder.UseStaticClustering(gateways);
+                    }
+                });
 
                 this.clientHost = hostBuilder.Build();
                 this.clientHost.StartAsync().GetAwaiter().GetResult();
@@ -110,12 +101,12 @@ namespace Benchmarks.Ping
         public Task PingConcurrentForever() => this.Run(
             runs: int.MaxValue,
             grainFactory: this.client,
-            blocksPerWorker: 2);
+            blocksPerWorker: 10);
 
         public Task PingConcurrent() => this.Run(
             runs: 3,
             grainFactory: this.client,
-            blocksPerWorker: 2);
+            blocksPerWorker: 10);
 
         public Task PingConcurrentHostedClient(int blocksPerWorker = 30) => this.Run(
             runs: 3,
@@ -127,7 +118,7 @@ namespace Benchmarks.Ping
             var loadGenerator = new ConcurrentLoadGenerator<IPingGrain>(
                 maxConcurrency: 250,
                 blocksPerWorker: blocksPerWorker,
-                requestsPerBlock: 50,
+                requestsPerBlock: 500,
                 issueRequest: g => g.Run(),
                 getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId));
             await loadGenerator.Warmup();

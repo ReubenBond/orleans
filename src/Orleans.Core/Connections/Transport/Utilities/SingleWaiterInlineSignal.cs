@@ -20,27 +20,59 @@ internal sealed class SingleWaiterInlineSignal : IValueTaskSource
     // ResetMask is used to clear both status flags.
     private const uint ResetMask = ~SignaledFlag & ~WaitingFlag;
 
-    private ManualResetValueTaskSourceCore<bool> _waitSource;
+    private Action? _continuation;
     private volatile uint _status;
 
-    public bool RunContinuationsAsynchronously
+    public readonly struct SignalAwaiter : INotifyCompletion, ICriticalNotifyCompletion
     {
-        get => _waitSource.RunContinuationsAsynchronously;
-        set => _waitSource.RunContinuationsAsynchronously = value;
-    }
+        private readonly SingleWaiterInlineSignal _signal;
 
-    ValueTaskSourceStatus IValueTaskSource.GetStatus(short token) => _waitSource.GetStatus(token);
+        public SignalAwaiter(SingleWaiterInlineSignal signal)
+        {
+            _signal = signal;
+        }
 
-    void IValueTaskSource.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _waitSource.OnCompleted(continuation, state, token, flags);
+        public void GetResult()
+        {
+            Reset();
+        }
 
-    void IValueTaskSource.GetResult(short token)
-    {
-        // Reset the wait source.
-        _waitSource.GetResult(token);
-        _waitSource.Reset();
+        public bool IsCompleted => (_signal._status & SignaledFlag) == SignaledFlag;
+        public void OnCompleted(Action continuation) => UnsafeOnCompleted(continuation);
+        public void UnsafeOnCompleted(Action continuation)
+        {
+            var existing = Interlocked.Exchange(ref _signal._continuation, continuation);
+            Debug.Assert(existing is null);
 
-        // Reset the status.
-        ResetStatus();
+            // Indicate that there is a waiter.
+            var status = Interlocked.Or(ref _signal._status, WaitingFlag);
+
+            // If there was already a waiter, that is an error since this class is designed for use with a single waiter.
+            if ((status & WaitingFlag) == WaitingFlag)
+            {
+                ThrowConcurrentWaitersNotSupported();
+            }
+
+            // If the event was already signaled, immediately wake the waiter.
+            if ((status & SignaledFlag) == SignaledFlag)
+            {
+                // Reset just the status because the _waitSource has not been set.
+                // We know that _waitSource has not been set because _waitSource is only set when
+                // Signal() observes that the "Waiting" flag had been set but not the "Signaled" flag.
+                Reset();
+                return;
+            }
+
+            // Signaller will call continuation.
+        }
+
+        private void Reset()
+        {
+            // The event is being handled, so clear the "Signaled" flag now.
+            // The waiter is no longer waiting, so clear the "Waiting" flag, too.
+            Interlocked.And(ref _signal._status, ResetMask);
+            Interlocked.Exchange(ref _signal._continuation, null);
+        }
     }
 
     /// <summary>
@@ -59,91 +91,16 @@ internal sealed class SingleWaiterInlineSignal : IValueTaskSource
             // This is a sanity check to ensure that the signalling conditions are true:
             // that "Signaled" and "Waiting" flags are both set.
             Debug.Assert((_status & (SignaledFlag | WaitingFlag)) == (SignaledFlag | WaitingFlag));
-            _waitSource.SetResult(true);
+            Debug.Assert(_continuation is not null);
+            _continuation();
+            Debug.Assert(_continuation is null);
         }
     }
 
-    /// <summary>
-    /// Wait for the event to be signaled.
-    /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ValueTask WaitAsync()
-    {
-        // Indicate that there is a waiter.
-        var status = Interlocked.Or(ref _status, WaitingFlag);
-
-        // If there was already a waiter, that is an error since this class is designed for use with a single waiter.
-        if ((status & WaitingFlag) == WaitingFlag)
-        {
-            ThrowConcurrentWaitersNotSupported();
-        }
-
-        // If the event was already signaled, immediately wake the waiter.
-        if ((status & SignaledFlag) == SignaledFlag)
-        {
-            // Reset just the status because the _waitSource has not been set.
-            // We know that _waitSource has not been set because _waitSource is only set when
-            // Signal() observes that the "Waiting" flag had been set but not the "Signaled" flag.
-            ResetStatus();
-            return default;
-        }
-
-        return new(this, _waitSource.Version);
-    }
-
-//  TODO BAD BAD BAD BAD
-//  TODO BAD BAD BAD BAD
-//  TODO BAD BAD BAD BAD
-//  TODO BAD BAD BAD BAD
-//  TODO BAD BAD BAD BAD
-//  TODO BAD BAD BAD BAD
-//  TODO BAD BAD BAD BAD
-//  TODO BAD BAD BAD BAD
-//  TODO BAD BAD BAD BAD
-//  TODO BAD BAD BAD BAD
-//  TODO BAD BAD BAD BAD
-//  TODO BAD BAD BAD BAD
-    /// <summary>
-    /// Signal the waiter with an exception.
-    /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void SignalException(Exception exception)
-    {
-        // Set the signaled flag.
-        var status = Interlocked.Or(ref _status, SignaledFlag);
-
-        // If there was a waiter and the signaled flag was unset, wake the waiter now.
-        if ((status & SignaledFlag) != SignaledFlag && (status & WaitingFlag) == WaitingFlag)
-        {
-            // Note that in this assert we are checking the volatile _status field.
-            // This is a sanity check to ensure that the signalling conditions are true:
-            // that "Signaled" and "Waiting" flags are both set.
-            Debug.Assert((_status & (SignaledFlag | WaitingFlag)) == (SignaledFlag | WaitingFlag));
-            _waitSource.SetException(exception);
-//  TODO BAD BAD BAD BAD
-//  TODO BAD BAD BAD BAD
-//  TODO BAD BAD BAD BAD
-//  TODO BAD BAD BAD BAD
-//  TODO BAD BAD BAD BAD
-//  TODO BAD BAD BAD BAD
-        }
-    }
-
-    /// <summary>
-    /// Called when a waiter handles the event signal.
-    /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void ResetStatus()
-    {
-        // The event is being handled, so clear the "Signaled" flag now.
-        // The waiter is no longer waiting, so clear the "Waiting" flag, too.
-        var status = Interlocked.And(ref _status, ResetMask);
-
-        // If both the "Waiting" and "Signaled" flags were not already set, something has gone catastrophically wrong.
-        Debug.Assert((status & (WaitingFlag | SignaledFlag)) == (WaitingFlag | SignaledFlag));
-    }
+    public SignalAwaiter GetAwaiter() => new SignalAwaiter(this);
 
     private static void ThrowConcurrentWaitersNotSupported() => throw new InvalidOperationException("Concurrent waiters are not supported");
+    private static void ThrowBlockingWaitNotSupported() => throw new InvalidOperationException("Blocking waits are not supported");
 }
 
 //  TODO BAD BAD BAD BAD

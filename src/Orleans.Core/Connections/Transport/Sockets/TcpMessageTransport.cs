@@ -18,7 +18,6 @@ namespace Orleans.Connections.Transport.Sockets;
 
 public sealed class TcpMessageTransport : MessageTransportBase
 {
-    private const int MinReadSize = 256;
     private static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
     private static readonly bool IsMacOS = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
 

@@ -245,7 +245,8 @@ namespace Orleans.Runtime.Messaging
 
             if (!_transport.WriteAsync(handler))
             {
-                StartClosing(new ConnectionAbortedException());
+                handler.Reset();
+                RerouteMessage(message);
                 return;
             }
         }
