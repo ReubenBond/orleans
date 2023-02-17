@@ -176,7 +176,7 @@ namespace Benchmarks
                     Console.WriteLine("Initializing");
                     var test = new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true);
                     Console.WriteLine("Starting");
-                    test.PingConcurrentHostedClient(blocksPerWorker: 10).GetAwaiter().GetResult();
+                    test.PingConcurrentHostedClient(blocksPerWorker: 100).GetAwaiter().GetResult();
                     Console.WriteLine("Stopping");
                     test.Shutdown().GetAwaiter().GetResult();
                     Console.WriteLine("Stopped");
