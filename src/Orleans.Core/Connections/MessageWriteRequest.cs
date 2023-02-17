@@ -25,24 +25,34 @@ namespace Orleans.Runtime.Messaging
         public void Initialize(Message message)
         {
             Message = message;
+            SerializeAndFrameMessage();
+        }
 
+        public override ReadOnlyMemory<byte> Buffer => throw new InvalidOperationException();
+
+        public override ReadOnlySequence<byte> Buffers
+        {
+            get
+            {
+                return _buffer.AsReadOnlySequence();
+            }
+        }
+
+        private void SerializeAndFrameMessage()
+        {
             // Reserve space for framing
             var framingBytes = _buffer.GetSpan(Message.LENGTH_HEADER_SIZE);
             _buffer.Advance(Message.LENGTH_HEADER_SIZE);
 
             // Serialize the message in full
             var messageSerializer = _shared.GetMessageSerializer();
-            var (headerLength, bodyLength) = messageSerializer.Write(ref _buffer, message);
+            var (headerLength, bodyLength) = messageSerializer.Write(ref _buffer, Message);
             _shared.Return(messageSerializer);
 
             // Write the framing
             BinaryPrimitives.WriteInt32LittleEndian(framingBytes, headerLength);
             BinaryPrimitives.WriteInt32LittleEndian(framingBytes[sizeof(int)..], bodyLength);
         }
-
-        public override ReadOnlyMemory<byte> Buffer => throw new InvalidOperationException();
-
-        public override ReadOnlySequence<byte> Buffers => _buffer.AsReadOnlySequence();
 
         //public ValueTask Completed => new(this, _completion.Version);
 

@@ -26,8 +26,8 @@ public sealed class TcpMessageTransport : MessageTransportBase
     private readonly Socket _socket;
     private Queue<WriteRequest> _writeRequests = new();
     private readonly Queue<ReadRequest> _readRequests = new();
-    private readonly SingleWaiterInlineSignal _readSignal = new();
-    private readonly SingleWaiterInlineSignal _writeSignal = new() { RunContinuationsAsynchronously = true };
+    private readonly SingleWaiterInlineSignal _readSignal = new() { RunContinuationsAsynchronously = false };
+    private readonly SingleWaiterInlineSignal _writeSignal = new() { RunContinuationsAsynchronously = false };
     private readonly Action _fireReadSignal;
     private readonly Action _fireWriteSignal;
     private readonly ILogger _logger;
