@@ -16,22 +16,12 @@ namespace Orleans.Runtime.Messaging
 {
     internal abstract class Connection
     {
-        private static readonly UnboundedChannelOptions OutgoingMessageChannelOptions = new()
-        {
-            SingleReader = true,
-            SingleWriter = false,
-            AllowSynchronousContinuations = false
-        };
-
         private readonly ConnectionCommon _shared;
-        //private readonly Channel<MessageWriteRequest> _outboundMessages;
-        //private readonly ChannelWriter<MessageWriteRequest> _outboundMessageWriter;
         private readonly TaskCompletionSource<int> _transportConnectionClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<int> _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly string _id;
         private readonly MessageTransport _transport;
         private Task _processIncomingTask;
-        private Task _processOutgoingTask;
         private Task _closeTask;
 
         protected Connection(
@@ -41,9 +31,6 @@ namespace Orleans.Runtime.Messaging
             _id = CorrelationIdGenerator.GetNextId();
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _shared = shared;
-            //_outboundMessages = Channel.CreateUnbounded<MessageWriteRequest>(OutgoingMessageChannelOptions);
-            //_outboundMessageWriter = _outboundMessages.Writer;
-
             _transport.Closed.Register(static state => ((Connection)state).OnTransportConnectionClosed(), this);
 
             RemoteEndpoint = NormalizeEndpoint(Context.RemoteEndpoint);
@@ -90,11 +77,10 @@ namespace Orleans.Runtime.Messaging
             using (new ExecutionContextSuppressor())
             {
                 _processIncomingTask = ProcessIncoming();
-                _processOutgoingTask = Task.CompletedTask;// ProcessOutgoing();
             }
 
             _initializationTcs.TrySetResult(0);
-            await Task.WhenAll(_processIncomingTask, _processOutgoingTask);
+            await _processIncomingTask;
         }
 
         /// <summary>
@@ -151,9 +137,6 @@ namespace Orleans.Runtime.Messaging
         {
             NetworkingInstruments.OnClosedSocket(ConnectionDirection);
 
-            // Signal the outgoing message processor to exit gracefully.
-            //_outboundMessageWriter.TryComplete();
-
             // Close the underlying message transport
             await _transport.CloseAsync(new ConnectionAbortedException());
 
@@ -171,19 +154,6 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-            if (_processOutgoingTask is { IsCompleted: false } outgoing)
-            {
-                try
-                {
-                    await outgoing;
-                }
-                catch (Exception processOutgoingException)
-                {
-                    // Swallow any exceptions here.
-                    Log.LogWarning(processOutgoingException, "Exception processing outgoing messages on connection {Connection}", this);
-                }
-            }
-
             try
             {
                 await _transport.DisposeAsync();
@@ -193,34 +163,6 @@ namespace Orleans.Runtime.Messaging
                 // Swallow any exceptions here.
                 Log.LogWarning(abortException, "Exception terminating connection {Connection}", this);
             }
-
-            // Reroute enqueued messages.
-            /*
-            var i = 0;
-            while (_outboundMessages.Reader.TryRead(out var sendWorkItem))
-            {
-                if (i == 0 && Log.IsEnabled(LogLevel.Information))
-                {
-                    Log.LogInformation(
-                        "Rerouting messages for remote endpoint {EndPoint}",
-                        RemoteEndpoint?.ToString() ?? "(never connected)");
-                }
-
-                ++i;
-
-                var message = sendWorkItem.Message;
-                sendWorkItem.Reset();
-                RetryMessage(message);
-            }
-
-            if (i > 0 && Log.IsEnabled(LogLevel.Information))
-            {
-                Log.LogInformation(
-                    "Rerouted {Count} messages for remote endpoint {EndPoint}",
-                    i,
-                    RemoteEndpoint?.ToString() ?? "(never connected)");
-            }
-            */
         }
 
         public virtual void Send(Message message)
@@ -245,6 +187,8 @@ namespace Orleans.Runtime.Messaging
             if (!_transport.WriteAsync(handler))
             {
                 StartClosing(new ConnectionAbortedException());
+                RerouteMessage(message);
+                handler.Reset();
                 return;
             }
         }
@@ -324,67 +268,6 @@ HandleCompletedRequest:
                 return readRequest;
             }
         }
-
-        /*
-        private async Task ProcessOutgoing()
-        {
-            await Task.Yield();
-
-            var outboundQueue = _outboundMessages.Reader;
-            Exception error = default;
-            Queue<MessageWriteRequest> processingRequests = new();
-            try
-            {
-                while (true)
-                {
-                    var more = await outboundQueue.WaitToReadAsync();
-                    while (processingRequests.TryPeek(out var request) && request.Completed.IsCompleted)
-                    {
-                        _ = processingRequests.Dequeue();
-                        await request.Completed;
-                        request.Reset();
-                    }
-
-                    if (!more)
-                    {
-                        break;
-                    }
-
-                    MessageWriteRequest message = default;
-                    while (outboundQueue.TryRead(out message))
-                    {
-                        processingRequests.Enqueue(message);
-                        if (!_transport.WriteAsync(message))
-                        {
-                            error = new ConnectionAbortedException();
-                            break;
-                        }
-                    }
-
-                    if (error is not null)
-                    {
-                        break;
-                    }
-                }
-            }
-            catch (Exception exception)
-            {
-                if (IsValid)
-                {
-                    Log.LogWarning(
-                        exception,
-                        "Exception while processing messages to remote endpoint {EndPoint}",
-                        RemoteEndpoint);
-                }
-
-                error = exception;
-            }
-            finally
-            {
-                StartClosing(error);
-            }
-        }
-        */
 
         private void RerouteMessage(Message message)
         {

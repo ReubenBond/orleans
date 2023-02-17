@@ -12,7 +12,6 @@ using Orleans.Connections.Transport.Utilities;
 using Orleans.Connections.Sockets;
 using System.Diagnostics;
 using Orleans.Runtime.Internal;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Connections.Transport.Sockets;
 
@@ -38,6 +37,8 @@ public sealed class TcpMessageTransport : MessageTransportBase
     private readonly object _shutdownLock = new();
     private readonly object _writesLock = new();
     private readonly object _readsLock = new();
+    private bool _readsCompleted;
+    private bool _writesCompleted;
     private Task? _processingTask;
     private volatile bool _socketDisposed;
     private volatile Exception? _shutdownReason;
@@ -74,8 +75,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
                 sendTask = ProcessWrites();
             }
 
-            // Now wait for both to complete
-
+            // Wait for both to complete
             try
             {
                 await receiveTask;
@@ -130,7 +130,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
                 _socketDisposed = true;
 
                 // shutdownReason should only be null if the output was completed gracefully, so no one should ever
-                // ever observe the nondescript ConnectionAbortedException except for  && request.Buffer.Lengthconnection middleware attempting
+                // ever observe the nondescript ConnectionAbortedException except for connection middleware attempting
                 // to half close the connection which is currently unsupported.
                 _shutdownReason ??= new ConnectionAbortedException("The Socket transport's send loop completed gracefully.");
                 SocketsLog.ConnectionWriteFin(_logger, this, _shutdownReason.Message);
@@ -163,6 +163,11 @@ public sealed class TcpMessageTransport : MessageTransportBase
 
         lock (_readsLock)
         {
+            if (_readsCompleted)
+            {
+                return false;
+            }
+
             _readRequests.Enqueue(request);
         }
 
@@ -179,6 +184,11 @@ public sealed class TcpMessageTransport : MessageTransportBase
 
         lock (_writesLock)
         {
+            if (_writesCompleted)
+            {
+                return false;
+            }
+
             _writeRequests.Enqueue(request);
         }
 
@@ -337,6 +347,16 @@ public sealed class TcpMessageTransport : MessageTransportBase
             _shutdownReason ??= error;
             _connectionClosingCts.Cancel();
             _writeSignal.Signal();
+
+            lock (_readsLock)
+            {
+                _readsCompleted = true;
+            }
+
+            while (TryDequeue(out request))
+            {
+                request.OnError(_shutdownReason!);
+            }
         }
 
         bool TryDequeue([NotNullWhen(true)] out ReadRequest? request)
@@ -356,10 +376,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
         Queue<WriteRequest> requests = new();
         List<ArraySegment<byte>> buffers = new(capacity: SoftBatchMax);
         List<WriteRequest> processingRequests = new(capacity: SoftBatchMax);
-        /*
-        byte[] writeBuffer = GC.AllocateUninitializedArray<byte>(1024 * 1024, pinned: true);
-        int writeIndex;
-        */
+
         try
         {
             // Loop until termination.
@@ -380,29 +397,6 @@ public sealed class TcpMessageTransport : MessageTransportBase
                 buffers.Clear();
                 processingRequests.Clear();
 
-                // Handle each request.
-                /*
-                writeIndex = 0;
-                while (requests.TryPeek(out var request) && ((request.IsSingleBuffer && request.Buffer.Length < writeBuffer.Length - writeIndex) || (request.Buffers.Length < writeBuffer.Length - writeIndex)))
-                {
-                    _ = requests.Dequeue();
-                    processingRequests.Add(request);
-                    if (request.IsSingleBuffer)
-                    {
-                        request.Buffer.Span.CopyTo(writeBuffer.AsSpan(writeIndex));
-                        writeIndex += request.Buffer.Length;
-                    }
-                    else
-                    {
-                        foreach (var b in request.Buffers)
-                        {
-                            b.Span.CopyTo(writeBuffer.AsSpan(writeIndex));
-                            writeIndex += b.Length;
-                        }
-                    }
-                }
-                */
-
                 while (buffers.Count < SoftBatchMax && requests.TryDequeue(out var request))
                 {
                     processingRequests.Add(request);
@@ -420,7 +414,6 @@ public sealed class TcpMessageTransport : MessageTransportBase
                 }
 
                 _socketSender.Reset();
-                //await _socketSender.SendAsync(_socket, writeBuffer.AsMemory(0, writeIndex));
                 await _socketSender.SendAsync(_socket, buffers).ConfigureAwait(false);
 
                 if (_socketSender.HasError)
@@ -475,6 +468,17 @@ public sealed class TcpMessageTransport : MessageTransportBase
             _shutdownReason ??= error;
             _connectionClosingCts.Cancel();
             _readSignal.Signal();
+
+            lock (_writesLock)
+            {
+                _writesCompleted = true;
+            }
+
+            // Drain requests.
+            while (requests.TryDequeue(out var request) || _writeRequests.TryDequeue(out request))
+            {
+                request.SetException(_shutdownReason!);
+            }
         }
 
         void RefreshRequestQueue(ref Queue<WriteRequest> queue)
