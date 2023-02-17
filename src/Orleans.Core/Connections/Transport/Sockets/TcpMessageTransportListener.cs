@@ -92,6 +92,11 @@ public class TcpMessageTransportListener : MessageTransportListener
 
                 return connection;
             }
+            catch (OperationCanceledException)
+            {
+                // Graceful termination.
+                return null;
+            }
             catch (ObjectDisposedException)
             {
                 // A call was made to UnbindAsync/DisposeAsync just return null which signals we're done

@@ -75,8 +75,24 @@ public sealed class TcpMessageTransport : MessageTransportBase
             }
 
             // Now wait for both to complete
-            await receiveTask;
-            await sendTask;
+
+            try
+            {
+                await receiveTask;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(0, ex, $"Unexpected exception in {nameof(TcpMessageTransport)}.{nameof(ProcessReads)}.");
+            }
+
+            try
+            {
+                await sendTask;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(0, ex, $"Unexpected exception in {nameof(TcpMessageTransport)}.{nameof(ProcessWrites)}.");
+            }
 
             _socketReceiver.Dispose();
             _socketSender.Dispose();
@@ -181,6 +197,8 @@ public sealed class TcpMessageTransport : MessageTransportBase
         Shutdown();
 
         _connectionClosingCts.Cancel();
+        _readSignal.Signal();
+        _writeSignal.Signal();
 
         if (_processingTask is null)
         {
@@ -220,7 +238,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
                     while (true)
                     {
                         Debug.Assert(request.Buffer.Length > 0);
-                        await _socketReceiver.ReceiveAsync(_socket, request.Buffer);
+                        await _socketReceiver.ReceiveAsync(_socket, request.Buffer).ConfigureAwait(false);
 
                         if (_socketReceiver.HasError)
                         {
@@ -252,7 +270,10 @@ public sealed class TcpMessageTransport : MessageTransportBase
                             {
                                 // This is unexpected.
                                 error = _socketReceiver.Error;
-                                SocketsLog.ConnectionError(_logger, this, error);
+                                if (!_socketDisposed)
+                                {
+                                    SocketsLog.ConnectionError(_logger, this, error);
+                                }
                             }
 
                             break;
@@ -286,7 +307,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
                     break;
                 }
 
-                await _readSignal.WaitAsync();
+                await _readSignal.WaitAsync().ConfigureAwait(false);
             }
         }
         catch (ObjectDisposedException ex)
@@ -304,7 +325,10 @@ public sealed class TcpMessageTransport : MessageTransportBase
         {
             // This is unexpected.
             error = ex;
-            SocketsLog.ConnectionError(_logger, this, error);
+            if (!_socketDisposed)
+            {
+                SocketsLog.ConnectionError(_logger, this, error);
+            }
         }
         finally
         {
@@ -312,6 +336,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
 
             _shutdownReason ??= error;
             _connectionClosingCts.Cancel();
+            _writeSignal.Signal();
         }
 
         bool TryDequeue([NotNullWhen(true)] out ReadRequest? request)
@@ -342,77 +367,66 @@ public sealed class TcpMessageTransport : MessageTransportBase
             {
                 if (requests.Count == 0)
                 {
+                    // Check for pending messages before waiting.
                     RefreshRequestQueue(ref requests);
+
+                    if (requests.Count == 0)
+                    {
+                        await _writeSignal.WaitAsync().ConfigureAwait(false);
+                        continue;
+                    }
                 }
 
-                if (requests.Count > 0)
+                buffers.Clear();
+                processingRequests.Clear();
+
+                // Handle each request.
+                /*
+                writeIndex = 0;
+                while (requests.TryPeek(out var request) && ((request.IsSingleBuffer && request.Buffer.Length < writeBuffer.Length - writeIndex) || (request.Buffers.Length < writeBuffer.Length - writeIndex)))
                 {
-                    buffers.Clear();
-                    processingRequests.Clear();
-
-                    // Handle each request.
-                    /*
-                    writeIndex = 0;
-                    while (requests.TryPeek(out var request) && ((request.IsSingleBuffer && request.Buffer.Length < writeBuffer.Length - writeIndex) || (request.Buffers.Length < writeBuffer.Length - writeIndex)))
+                    _ = requests.Dequeue();
+                    processingRequests.Add(request);
+                    if (request.IsSingleBuffer)
                     {
-                        _ = requests.Dequeue();
-                        processingRequests.Add(request);
-                        if (request.IsSingleBuffer)
+                        request.Buffer.Span.CopyTo(writeBuffer.AsSpan(writeIndex));
+                        writeIndex += request.Buffer.Length;
+                    }
+                    else
+                    {
+                        foreach (var b in request.Buffers)
                         {
-                            request.Buffer.Span.CopyTo(writeBuffer.AsSpan(writeIndex));
-                            writeIndex += request.Buffer.Length;
-                        }
-                        else
-                        {
-                            foreach (var b in request.Buffers)
-                            {
-                                b.Span.CopyTo(writeBuffer.AsSpan(writeIndex));
-                                writeIndex += b.Length;
-                            }
+                            b.Span.CopyTo(writeBuffer.AsSpan(writeIndex));
+                            writeIndex += b.Length;
                         }
                     }
-                    */
+                }
+                */
 
-                    while (buffers.Count < SoftBatchMax && requests.TryDequeue(out var request))
+                while (buffers.Count < SoftBatchMax && requests.TryDequeue(out var request))
+                {
+                    processingRequests.Add(request);
+                    if (request.IsSingleBuffer)
                     {
-                        processingRequests.Add(request);
-                        if (request.IsSingleBuffer)
+                        buffers.Add(request.Buffer.GetArray());
+                    }
+                    else
+                    {
+                        foreach (var b in request.Buffers)
                         {
-                            buffers.Add(request.Buffer.GetArray());
-                        }
-                        else
-                        {
-                            foreach (var b in request.Buffers)
-                            {
-                                buffers.Add(b.GetArray());
-                            }
+                            buffers.Add(b.GetArray());
                         }
                     }
+                }
 
-                    _socketSender.Reset();
-                    //await _socketSender.SendAsync(_socket, writeBuffer.AsMemory(0, writeIndex));
-                    await _socketSender.SendAsync(_socket, buffers);
+                _socketSender.Reset();
+                //await _socketSender.SendAsync(_socket, writeBuffer.AsMemory(0, writeIndex));
+                await _socketSender.SendAsync(_socket, buffers).ConfigureAwait(false);
 
-                    if (_socketSender.HasError)
-                    {
-                        error = GetSendAsyncError();
-                        break;
-                    }
-
-                    if (error is not null)
-                    {
-                        // Bubble the error up
-                        break;
-                    }
-
-                    // Signal that the requests are completed
-                    foreach (var request in processingRequests)
-                    {
-                        request.SetResult();
-                    }
-
-                    // Check for pending messages before waiting.
-                    continue;
+                if (_socketSender.HasError)
+                {
+                    error = GetSendAsyncError();
+                    break;
                 }
 
                 if (error is not null)
@@ -421,7 +435,11 @@ public sealed class TcpMessageTransport : MessageTransportBase
                     break;
                 }
 
-                await _writeSignal.WaitAsync();
+                // Signal that the requests are completed
+                foreach (var request in processingRequests)
+                {
+                    request.SetResult();
+                }
             }
         }
         catch (ObjectDisposedException ex)
@@ -439,7 +457,10 @@ public sealed class TcpMessageTransport : MessageTransportBase
         {
             // This is unexpected.
             error = ex;
-            SocketsLog.ConnectionError(_logger, this, error);
+            if (!_socketDisposed)
+            {
+                SocketsLog.ConnectionError(_logger, this, error);
+            }
         }
         finally
         {
@@ -453,6 +474,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
 
             _shutdownReason ??= error;
             _connectionClosingCts.Cancel();
+            _readSignal.Signal();
         }
 
         void RefreshRequestQueue(ref Queue<WriteRequest> queue)
@@ -495,7 +517,10 @@ public sealed class TcpMessageTransport : MessageTransportBase
         {
             // This is unexpected.
             error = _socketSender.Error!;
-            SocketsLog.ConnectionError(_logger, this, error);
+            if (!_socketDisposed)
+            {
+                SocketsLog.ConnectionError(_logger, this, error);
+            }
         }
 
         return error;

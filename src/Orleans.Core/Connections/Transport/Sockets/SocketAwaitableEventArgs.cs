@@ -37,16 +37,16 @@ internal class SocketAwaitableEventArgs : SocketAsyncEventArgs, IValueTaskSource
     protected override void OnCompleted(SocketAsyncEventArgs _)
     {
         IsCompleted = true;
-        var c = _continuation;
+        var continuation = _continuation;
 
-        if (c != null || (c = Interlocked.CompareExchange(ref _continuation, _continuationCompleted, null)) != null)
+        if (continuation != null || (continuation = Interlocked.CompareExchange(ref _continuation, _continuationCompleted, null)) != null)
         {
-            var continuationState = UserToken;
+            var state = UserToken;
             UserToken = null;
             _continuation = _continuationCompleted; // in case someone's polling IsCompleted
 
             // Execute the continuation inline.
-            c(continuationState);
+            continuation(state);
         }
     }
 
@@ -79,7 +79,9 @@ internal class SocketAwaitableEventArgs : SocketAsyncEventArgs, IValueTaskSource
         if (ReferenceEquals(prevContinuation, _continuationCompleted))
         {
             UserToken = null;
-            ThreadPool.UnsafeQueueUserWorkItem(continuation, state, preferLocal: true);
+
+            // Execute the continuation inline.
+            continuation(state);
         }
     }
 }

@@ -11,7 +11,6 @@ using Orleans.Serialization.Buffers;
 using Orleans.Connections.Transport;
 using Orleans.Connections;
 using Orleans.Runtime.Internal;
-using System.Collections.Generic;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -273,7 +272,7 @@ namespace Orleans.Runtime.Messaging
                         break;
                     }
 
-                    await readRequest.Completed;
+                    await readRequest.Completed.ConfigureAwait(false);
 
 HandleCompletedRequest:
                     if (readRequest.UnconsumedLength > 0)

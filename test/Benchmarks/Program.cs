@@ -173,11 +173,13 @@ namespace Benchmarks
                 Console.WriteLine("## Silo to Silo ##");
                 while (!Console.KeyAvailable)
                 {
+                    Console.WriteLine("Initializing");
                     var test = new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true);
                     Console.WriteLine("Starting");
                     test.PingConcurrentHostedClient(blocksPerWorker: 10).GetAwaiter().GetResult();
                     Console.WriteLine("Stopping");
                     test.Shutdown().GetAwaiter().GetResult();
+                    Console.WriteLine("Stopped");
                 }
 
                 Console.WriteLine("Interrupted by user");

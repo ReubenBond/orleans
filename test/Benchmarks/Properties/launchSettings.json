@@ -2,7 +2,7 @@
   "profiles": {
     "Benchmarks": {
       "commandName": "Project",
-      "commandLineArgs": "PingForever"
+      "commandLineArgs": "ConcurrentPing_SiloToSilo_Forever"
     }
   }
 }
