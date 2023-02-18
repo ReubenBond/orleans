@@ -167,8 +167,8 @@ namespace Benchmarks
             },
             ["ConcurrentPing_SiloToSilo_Forever"] = _ =>
             {
-                Console.WriteLine("Press any key to begin.");
-                Console.ReadKey();
+                //Console.WriteLine("Press any key to begin.");
+                //Console.ReadKey();
                 Console.WriteLine("Press any key to end.");
                 Console.WriteLine("## Silo to Silo ##");
                 while (!Console.KeyAvailable)

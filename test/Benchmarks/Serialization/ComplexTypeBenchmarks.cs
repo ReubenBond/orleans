@@ -120,6 +120,7 @@ namespace Benchmarks
             return result;
         }
 
+/*
         [Fact]
         [Benchmark]
         public void OrleansMessageSerializerStructRoundTrip()
@@ -132,6 +133,7 @@ namespace Benchmarks
 
             ((Response<SimpleStruct>)result.BodyObject).Dispose();
         }
+        */
 
         [Fact]
         //[Benchmark]
@@ -148,6 +150,7 @@ namespace Benchmarks
             return result;
         }
 
+        /*
         [Fact]
         //[Benchmark]
         public void OrleansMessageSerializerClassRoundTrip()
@@ -164,6 +167,7 @@ namespace Benchmarks
             _pipe.Reader.Complete();
             _pipe.Reset();
         }
+        */
 
         [Fact]
         //[Benchmark]

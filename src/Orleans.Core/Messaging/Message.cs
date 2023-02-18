@@ -2,11 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Runtime
 {
     [Id(101)]
-    internal sealed class Message : ISpanFormattable
+    internal sealed class Message : ISpanFormattable, IDisposable
     {
         public const int LENGTH_HEADER_SIZE = 8;
 
@@ -15,7 +16,66 @@ namespace Orleans.Runtime
 
         public CoarseStopwatch _timeToExpiry;
 
-        public object BodyObject { get; set; }
+        internal MessageReadRequest _readRequest;
+        internal object _bodyObject;
+
+        public object BodyObject
+        {
+            get
+            {
+                if (_readRequest is not null)
+                {
+                    DeserializeRequestBody();
+                }
+
+                return _bodyObject;
+            }
+
+            set
+            {
+                _bodyObject = value;
+
+                if (_readRequest is { } readRequest)
+                {
+                    _readRequest = null;
+                    readRequest.Reset();
+                }
+            }
+        }
+
+        private void DeserializeRequestBody()
+        {
+            var messageSerializer = _readRequest.Shared.GetMessageSerializer();
+            try
+            {
+                messageSerializer.ReadBodyObject(this);
+            }
+            finally
+            {
+                _readRequest.Shared.Return(messageSerializer);
+                _readRequest.Reset();
+                _readRequest = null;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void SetMessageReadRequest(MessageReadRequest request)
+        {
+            if (_readRequest is not null && !Equals(_readRequest, request))
+            {
+                _readRequest.Reset();
+            }
+
+            _bodyObject = null;
+
+            _readRequest = request;
+        }
+
+        public void Dispose()
+        {
+            _readRequest?.Reset();
+            _readRequest = null;
+        }
 
         public PackedHeaders _headers;
         public CorrelationId _id;

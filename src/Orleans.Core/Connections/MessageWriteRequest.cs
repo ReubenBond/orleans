@@ -30,13 +30,7 @@ namespace Orleans.Runtime.Messaging
 
         public override ReadOnlyMemory<byte> Buffer => throw new InvalidOperationException();
 
-        public override ReadOnlySequence<byte> Buffers
-        {
-            get
-            {
-                return _buffer.AsReadOnlySequence();
-            }
-        }
+        public override ReadOnlySequence<byte> Buffers => _buffer.AsReadOnlySequence();
 
         private void SerializeAndFrameMessage()
         {

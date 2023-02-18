@@ -380,7 +380,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         /// Initializes a new instance of the <see cref="BufferSlice"/> type.
         /// </summary>
         /// <param name="buffer">The buffer.</param>
-        /// <param name="offset">The offet into the buffer at which this slice begins.</param>
+        /// <param name="offset">The offset into the buffer at which this slice begins.</param>
         /// <param name="length">The length of this slice.</param>
         public BufferSlice(in PooledBuffer buffer, int offset, int length)
         {
@@ -407,15 +407,15 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         /// <summary>
         /// Forms a slice out of this instance, beginning at the specified offset into this slice.
         /// </summary>
-        /// <param name="offset">The offet into this slice where the newly formed slice will begin.</param>
+        /// <param name="offset">The offset into this slice where the newly formed slice will begin.</param>
         /// <returns>A slice instance.</returns>
         public readonly BufferSlice Slice(int offset) => new(in _buffer, _offset + offset, _length - offset);
 
         /// <summary>
         /// Forms a slice out of this instance, beginning at the specified offset into this slice and having the specified length.
         /// </summary>
-        /// <param name="offset">The offet into this slice where the newly formed slice will begin.</param>
-        /// <param name="length">The lenght of the new slice.</param>
+        /// <param name="offset">The offset into this slice where the newly formed slice will begin.</param>
+        /// <param name="length">The length of the new slice.</param>
         /// <returns>A slice instance.</returns>
         public readonly BufferSlice Slice(int offset, int length) => new(in _buffer, _offset + offset, length);
 
@@ -481,7 +481,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             private SequenceSegment _segment;
 
             /// <summary>
-            /// Intializes a new instance of the <see cref="SpanEnumerator"/> type.
+            /// Initializes a new instance of the <see cref="SpanEnumerator"/> type.
             /// </summary>
             /// <param name="slice">The slice to enumerate.</param>
             public SpanEnumerator(BufferSlice slice)

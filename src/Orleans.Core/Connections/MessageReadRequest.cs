@@ -8,12 +8,13 @@ using System.Buffers.Binary;
 using Orleans.Connections.Transport;
 using System.Threading.Tasks.Sources;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime.Messaging
 {
     internal sealed class MessageReadRequest : ReadRequest, IThreadPoolWorkItem, IValueTaskSource
     {
-        private readonly MessageHandlerShared _shared;
+        internal readonly MessageHandlerShared Shared;
 
         private ManualResetValueTaskSourceCore<int> _completion = new();
         private PooledBuffer _buffer = new();
@@ -22,7 +23,7 @@ namespace Orleans.Runtime.Messaging
 
         public MessageReadRequest(MessageHandlerShared shared)
         {
-            _shared = shared;
+            Shared = shared;
         }
 
         public ValueTask Completed => new(this, _completion.Version);
@@ -33,12 +34,15 @@ namespace Orleans.Runtime.Messaging
 
         public PooledBuffer.BufferSlice Payload => _buffer.Slice(Message.LENGTH_HEADER_SIZE, _messageLength.HeaderLength + _messageLength.BodyLength);
         public PooledBuffer.BufferSlice Unconsumed => _buffer.Slice(FramedLength);
+        public PooledBuffer.BufferSlice Body => _buffer.Slice(Message.LENGTH_HEADER_SIZE + _messageLength.HeaderLength, _messageLength.BodyLength);
+        public int BodyLength => _messageLength.BodyLength;
 
         public void SetConnection(Connection connection)
         {
             _connection = connection;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetBuffer(in PooledBuffer buffer)
         {
             _buffer = buffer;
@@ -50,7 +54,7 @@ namespace Orleans.Runtime.Messaging
             _connection = default;
             _completion.Reset();
             _buffer.Reset();
-            _shared.Return(this);
+            Shared.Return(this);
         }
 
         public override void OnError(Exception error)
@@ -58,6 +62,7 @@ namespace Orleans.Runtime.Messaging
             _completion.SetException(error);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryDeframeMessage()
         {
             if (_buffer.Length < Message.LENGTH_HEADER_SIZE)
@@ -91,30 +96,55 @@ namespace Orleans.Runtime.Messaging
             return TryDeframeMessage();
         }
 
+        /*
         internal Message TestReadMessage()
         {
-            var messageSerializer = _shared.GetMessageSerializer();
+            var messageSerializer = Shared.GetMessageSerializer();
             try
             {
                 var buffer = Payload;
-                messageSerializer.Read(in buffer, _messageLength.HeaderLength, _messageLength.BodyLength, out var message);
+                messageSerializer.ReadHeaders(in buffer, _messageLength.HeaderLength, _messageLength.BodyLength, out var message);
+                if (_messageLength.BodyLength != 0)
+                {
+                    // Body deserialization is more likely to fail than header deserialization.
+                    // Separating the two allows for these kinds of errors to be propagated back to the caller.
+                    // The buffer is owned by the message now, so clear it now to ensure it is not returned to the pool.
+                    message.SetMessageReadRequest(this);
+                }
+
                 return message;
             }
             finally
             {
-                _shared.Return(messageSerializer);
-                Reset();
+                if (_messageLength.BodyLength == 0)
+                {
+                    Reset();
+                }
             }
         }
+        */
 
         void IThreadPoolWorkItem.Execute()
         {
             Message message = null;
-            var messageSerializer = _shared.GetMessageSerializer();
+            var messageSerializer = Shared.GetMessageSerializer();
             try
             {
-                var buffer = Payload;
-                messageSerializer.Read(in buffer, _messageLength.HeaderLength, _messageLength.BodyLength, out message);
+                messageSerializer.ReadHeaders(Payload, _messageLength.HeaderLength, _messageLength.BodyLength, out message);
+
+                // Body deserialization is more likely to fail than header deserialization.
+                // Separating the two allows for these kinds of errors to be propagated back to the caller.
+                if (_messageLength.BodyLength > 0)
+                {
+                    // This instance is owned by the message now, so it will not be reset immediately.
+                    message.SetMessageReadRequest(this);
+                }
+                else
+                {
+                    // Otherwise, return this instance to the pool immediately.
+                    Reset();
+                }
+
                 _connection.OnReceivedMessage(message);
             }
             catch (Exception exception) when (HandleReceiveMessageFailure(message, exception))
@@ -122,13 +152,12 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
-                _shared.Return(messageSerializer);
-                Reset();
+                Shared.Return(messageSerializer);
             }
 
             bool HandleReceiveMessageFailure(Message message, Exception exception)
             {
-                _shared.MessagingTrace.LogWarning(
+                Shared.MessagingTrace.LogWarning(
                     exception,
                     "Exception reading message {Message} from remote endpoint {Remote} to local endpoint {Local}",
                     message,
@@ -150,7 +179,7 @@ namespace Orleans.Runtime.Messaging
                     if (message.Direction == Message.Directions.Request)
                     {
                         // Send a fast fail to the caller.
-                        var response = _shared.MessageFactory.CreateResponseMessage(message);
+                        var response = Shared.MessageFactory.CreateResponseMessage(message);
                         response.Result = Message.ResponseTypes.Error;
                         response.BodyObject = Response.FromException(exception);
 
@@ -162,7 +191,7 @@ namespace Orleans.Runtime.Messaging
                         // If the message was a response, propagate the exception to the intended recipient.
                         message.Result = Message.ResponseTypes.Error;
                         message.BodyObject = Response.FromException(exception);
-                        _shared.MessageCenter.DispatchLocalMessage(message);
+                        Shared.MessageCenter.DispatchLocalMessage(message);
                     }
                 }
 
