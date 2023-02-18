@@ -104,7 +104,7 @@ public class NetworkTransportStream : Stream
         public void SetBuffer(Memory<byte> buffer) => _buffer = buffer;
         public override Memory<byte> Buffer => _buffer;
 
-        public override bool OnProgress(int bytesRead)
+        public override bool OnRead(int bytesRead)
         {
             _signal.SetResult(bytesRead);
             return true;
