@@ -27,7 +27,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
     private Queue<WriteRequest> _writeRequests = new();
     private readonly Queue<ReadRequest> _readRequests = new();
     private readonly SingleWaiterInlineSignal _readSignal = new() { RunContinuationsAsynchronously = false };
-    private readonly SingleWaiterInlineSignal _writeSignal = new() { RunContinuationsAsynchronously = false };
+    private readonly SingleWaiterInlineSignal _writeSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Action _fireReadSignal;
     private readonly Action _fireWriteSignal;
     private readonly ILogger _logger;
@@ -289,8 +289,8 @@ public sealed class TcpMessageTransport : MessageTransportBase
                             break;
                         }
 
-                        var transfered = _socketReceiver.BytesTransferred;
-                        if (transfered == 0)
+                        var transferred = _socketReceiver.BytesTransferred;
+                        if (transferred == 0)
                         {
                             // FIN
                             SocketsLog.ConnectionReadFin(_logger, this);
@@ -298,7 +298,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
                             break;
                         }
 
-                        if (request.OnProgress(transfered))
+                        if (request.OnProgress(transferred))
                         {
                             break;
                         }
