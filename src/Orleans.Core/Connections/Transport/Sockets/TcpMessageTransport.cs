@@ -298,7 +298,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
                             break;
                         }
 
-                        if (request.OnProgress(transferred))
+                        if (request.OnRead(transferred))
                         {
                             break;
                         }

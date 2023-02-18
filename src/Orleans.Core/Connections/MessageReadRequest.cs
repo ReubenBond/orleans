@@ -86,7 +86,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        public override bool OnProgress(int bytesRead)
+        public override bool OnRead(int bytesRead)
         {
             if (bytesRead > 0)
             {

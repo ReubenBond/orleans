@@ -143,7 +143,7 @@ public abstract class StreamMessageTransport : MessageTransportBase
                             break;
                         }
 
-                        if (operation.OnProgress(bytesRead))
+                        if (operation.OnRead(bytesRead))
                         {
                             break;
                         }
