@@ -165,7 +165,7 @@ namespace Orleans.Runtime
 
             if (msg.Direction == Message.Directions.Response)
             {
-                // Requests are made through the runtime client, so deliver responses to the rutnime client so that the request callback can be executed.
+                // Requests are made through the runtime client, so deliver responses to the runtime client so that the request callback can be executed.
                 this.runtimeClient.ReceiveResponse(msg);
             }
             else
