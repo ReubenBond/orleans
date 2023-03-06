@@ -218,6 +218,11 @@ namespace Orleans.Serialization.TypeSystem
         public int Arity { get; }
 
         /// <summary>
+        /// Gets the number of generic parameters which this type requires, not including the arity of the containing type.
+        /// </summary>
+        public int OwnArity => Arity - (ContainingType?.Arity ?? 0);
+
+        /// <summary>
         /// Gets the type name, which includes the namespace if this is not a nested type.
         /// </summary>
         public string Name { get; }

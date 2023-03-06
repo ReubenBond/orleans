@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace Orleans.Serialization.TypeSystem;
 
@@ -380,5 +381,29 @@ public static class RuntimeTypeNameParser
         private static void ThrowUnexpectedCharacter(char expected, char actual) => throw new InvalidOperationException($"Encountered unexpected character. Expected '{expected}', actual '{actual}'.");
 
         private static void ThrowEndOfInput() => throw new InvalidOperationException("Tried to read past the end of the input");
+
+        public override string ToString()
+        {
+            var result = new StringBuilder();
+            var i = 0;
+            foreach (var c in Input)
+            {
+                if (i == Index)
+                {
+                    result.Append("^^^");
+                }
+
+                result.Append(c);
+
+                if (i == Index)
+                {
+                    result.Append("^^^");
+                }
+
+                ++i;
+            }
+
+            return result.ToString();
+        }
     }
 }
