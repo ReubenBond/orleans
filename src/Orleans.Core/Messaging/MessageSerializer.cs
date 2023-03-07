@@ -65,38 +65,6 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        /* 
-        public void Read(in BufferSlice buffer, int headerLength, int bodyLength, out Message message)
-        {
-            // Check lengths
-            ThrowIfLengthsInvalid(headerLength, bodyLength);
-
-            try
-            {
-                // Decode header
-                var header = buffer.Slice(0, headerLength);
-
-                // Build message
-                message = new();
-                var headersReader = Reader.Create(header, _deserializationSession);
-                Deserialize(ref headersReader, message);
-                if (bodyLength != 0)
-                {
-                    // Decode body
-                    var body = buffer.Slice(headerLength, bodyLength);
-
-                    // Body deserialization is more likely to fail than header deserialization.
-                    // Separating the two allows for these kinds of errors to be propagated back to the caller.
-                    message.SetBodyBuffers(this, body);
-                }
-            }
-            finally
-            {
-                _deserializationSession.Reset();
-            }
-        }
-        */
-
         internal void ReadBodyObject(Message message)
         {
             try
@@ -373,14 +341,5 @@ namespace Orleans.Runtime.Messaging
             _idSpanCodec.WriteRaw(ref writer, value.Type.Value);
             IdSpanCodec.WriteRaw(ref writer, value.Key);
         }
-    }
-
-    internal readonly struct MessageBufferWriter : IBufferWriter<byte>
-    {
-        private readonly PrefixingBufferWriter _buffer;
-        public MessageBufferWriter(PrefixingBufferWriter buffer) => _buffer = buffer;
-        public void Advance(int count) => _buffer.Advance(count);
-        public Memory<byte> GetMemory(int sizeHint = 0) => _buffer.GetMemory(sizeHint);
-        public Span<byte> GetSpan(int sizeHint = 0) => _buffer.GetSpan(sizeHint);
     }
 }
