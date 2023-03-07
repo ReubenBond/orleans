@@ -7,7 +7,6 @@ using Orleans.Serialization.Buffers;
 using System.Buffers.Binary;
 using Orleans.Connections.Transport;
 using System.Threading.Tasks.Sources;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime.Messaging
@@ -95,34 +94,6 @@ namespace Orleans.Runtime.Messaging
 
             return TryDeframeMessage();
         }
-
-        /*
-        internal Message TestReadMessage()
-        {
-            var messageSerializer = Shared.GetMessageSerializer();
-            try
-            {
-                var buffer = Payload;
-                messageSerializer.ReadHeaders(in buffer, _messageLength.HeaderLength, _messageLength.BodyLength, out var message);
-                if (_messageLength.BodyLength != 0)
-                {
-                    // Body deserialization is more likely to fail than header deserialization.
-                    // Separating the two allows for these kinds of errors to be propagated back to the caller.
-                    // The buffer is owned by the message now, so clear it now to ensure it is not returned to the pool.
-                    message.SetMessageReadRequest(this);
-                }
-
-                return message;
-            }
-            finally
-            {
-                if (_messageLength.BodyLength == 0)
-                {
-                    Reset();
-                }
-            }
-        }
-        */
 
         void IThreadPoolWorkItem.Execute()
         {

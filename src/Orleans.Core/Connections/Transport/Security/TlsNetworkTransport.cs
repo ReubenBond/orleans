@@ -10,21 +10,31 @@ using Orleans.Connections.Transport.Streams;
 
 namespace Orleans.Connections.Transport.Security;
 
+/// <summary>
+/// <see cref="MessageTransport"/> which encrypts and decrypts all data using TLS.
+/// </summary>
 public abstract class TlsMessageTransport : StreamMessageTransport
 {
     private readonly MessageTransport _innerTransport;
     private readonly TlsOptions _options;
     private readonly ILogger _logger;
-    private readonly NetworkTransportStream _networkTransportStream;
+    private readonly MessageTransportStream _networkTransportStream;
     private readonly SslStream _sslStream;
 
+    /// <summary>
+    /// Initializes a new <see cref="TlsMessageTransport"/> instance.
+    /// </summary>
+    /// <param name="transport"></param>
+    /// <param name="options"></param>
+    /// <param name="logger"></param>
+    /// <exception cref="ArgumentNullException"></exception>
     public TlsMessageTransport(MessageTransport transport, TlsOptions options, ILogger logger) : base(logger)
     {
         _innerTransport = transport;
 
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger;
-        _networkTransportStream = new NetworkTransportStream(_innerTransport, _options.MemoryPool);
+        _networkTransportStream = new MessageTransportStream(_innerTransport, _options.MemoryPool);
         _sslStream = new SslStream(
                 _networkTransportStream,
                 leaveInnerStreamOpen: false,
@@ -61,16 +71,24 @@ public abstract class TlsMessageTransport : StreamMessageTransport
                 });
     }
 
+    /// <summary>
+    /// Gets the TLS options.
+    /// </summary>
     protected TlsOptions Options => _options;
 
+    /// <summary>
+    /// Gets the underlying <see cref="SslStream"/>.
+    /// </summary>
     protected override SslStream Stream => _sslStream;
 
+    /// <inheritdoc/>
     public override async ValueTask CloseAsync(Exception? closeException)
     {
         await _innerTransport.CloseAsync(closeException);
         await base.CloseAsync(closeException);
     }
 
+    /// <inheritdoc/>
     protected override async Task RunAsyncCore()
     {
         try
@@ -120,8 +138,10 @@ public abstract class TlsMessageTransport : StreamMessageTransport
         }
     }
 
+    /// <inheritdoc/>
     protected abstract Task AuthenticateAsyncCore(MessageTransport transport, bool certificateRequired, CancellationToken cancellationToken);
 
+    /// <inheritdoc/>
     public override async ValueTask DisposeAsync()
     {
         await _sslStream.DisposeAsync();

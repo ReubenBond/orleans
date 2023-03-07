@@ -16,16 +16,58 @@ using Orleans.Runtime;
 
 namespace Orleans.Connections.Transport;
 
+/// <summary>
+/// Represents a bi-directional communication channel between two hosts.
+/// </summary>
 public abstract class MessageTransport : IAsyncDisposable
 {
+    /// <summary>
+    /// Gets the cancellation token which is canceled once the connection is closed.
+    /// </summary>
     public virtual CancellationToken Closed { get; }
+
+    /// <summary>
+    /// Gets the endpoint of the local side of the channel, if available.
+    /// </summary>
     public virtual EndPoint? LocalEndpoint { get; set; }
+
+    /// <summary>
+    /// Gets the <see cref="EndPoint"/> of the remote side of the channel, if available.
+    /// </summary>
     public virtual EndPoint? RemoteEndpoint { get; set; }
+
+    /// <summary>
+    /// Gets a value indicating whether this instance is valid.
+    /// </summary>
     public virtual bool IsValid => !Closed.IsCancellationRequested;
+
+    /// <summary>
+    /// Submits a read request to the channel.
+    /// </summary>
+    /// <param name="request">The read request.</param>
+    /// <returns><see langword="true"/> if the read request was accepted by the channel, <see langword="false"/> if it was rejected.</returns>
     public abstract bool ReadAsync(ReadRequest request);
+
+    /// <summary>
+    /// Submits a write request to the channel.
+    /// </summary>
+    /// <param name="request">The write request.</param>
+    /// <returns><see langword="true"/> if the read request was accepted by the channel, <see langword="false"/> if it was rejected.</returns>
     public abstract bool WriteAsync(WriteRequest request);
+
+    /// <summary>
+    /// Closes the channel, optionally with a provided exception.
+    /// </summary>
+    /// <param name="closeException">The channel close exception, which is propagated to requests.</param>
+    /// <returns>A <see cref="ValueTask"/> which completes once the channel has been closed.</returns>
     public abstract ValueTask CloseAsync(Exception? closeException);
+
+    /// <summary>
+    /// Gets the collection of features available on the channel.
+    /// </summary>
     public abstract IFeatureCollection Features { get; }
+    
+    /// <inheritdoc/>
     public virtual ValueTask DisposeAsync()
     {
         GC.SuppressFinalize(this);
@@ -33,8 +75,17 @@ public abstract class MessageTransport : IAsyncDisposable
     }
 }
 
+/// <summary>
+/// Provides <see cref="MessageTransportFactory"/> instances.
+/// </summary>
 public interface IMessageTransportFactoryProvider
 {
+    /// <summary>
+    /// Gets an <see cref="MessageTransportFactory"/> instance which is suitable for connecting to the provided <see cref="EndPoint"/>.
+    /// </summary>
+    /// <param name="endpoint">The endpoint.</param>
+    /// <param name="factory">The factory.</param>
+    /// <returns><see langword="true"/> if a suitable <see cref="MessageTransportFactory"/> could be provided; otherwise <see langword="false"/>.</returns>
     bool TryGetMessageTransportFactory(EndPoint endpoint, [NotNullWhen(true)] out MessageTransportFactory? factory);
 }
 
@@ -49,6 +100,7 @@ internal sealed class OrleansMessageTransportFactoryProvider : IMessageTransport
         _tlsOptions = tlsOptions;
     }
 
+    /// <inheritdoc/>
     public bool TryGetMessageTransportFactory(EndPoint endpoint, [NotNullWhen(true)] out MessageTransportFactory? factory)
     {
         var tlsOptions = _tlsOptions.CurrentValue;
@@ -66,9 +118,20 @@ internal sealed class OrleansMessageTransportFactoryProvider : IMessageTransport
     }
 }
 
+/// <summary>
+/// Creates <see cref="MessageTransport"/> instances which are connected to a specified <see cref="EndPoint"/>.
+/// </summary>
 public abstract class MessageTransportFactory : IAsyncDisposable
 {
+    /// <summary>
+    /// Creates a <see cref="MessageTransport"/> connected to the specified <paramref name="endpoint"/>.
+    /// </summary>
+    /// <param name="endpoint">The endpoint to connect to.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The connected message transport.</returns>
     public abstract ValueTask<MessageTransport> CreateAsync(EndPoint endpoint, CancellationToken cancellationToken = default);
+
+    /// <inheritdoc/>
     public virtual ValueTask DisposeAsync()
     {
         GC.SuppressFinalize(this);
@@ -76,8 +139,17 @@ public abstract class MessageTransportFactory : IAsyncDisposable
     }
 }
 
+/// <summary>
+/// Provides <see cref="MessageTransportListener"/> instances.
+/// </summary>
 public interface IMessageTransportListenerProvider
 {
+    /// <summary>
+    /// Creates a <see cref="MessageTransportListener"/> for the provided <paramref name="listenOptions"/>.
+    /// </summary>
+    /// <param name="listenOptions">The listener options.</param>
+    /// <param name="listener">The listener.</param>
+    /// <returns><see langword="true"/> if a suitable <see cref="MessageTransportListener"/> could be provided; otherwise <see langword="false"/>.</returns>
     bool TryGetMessageTransportListener(TransportListenerOptions listenOptions, [NotNullWhen(true)] out MessageTransportListener? listener);
 }
 
@@ -94,18 +166,24 @@ internal sealed class OrleansMessageTransportListenerProvider : IMessageTranspor
 
     public bool TryGetMessageTransportListener(TransportListenerOptions listenOptions, [NotNullWhen(true)] out MessageTransportListener? listener)
     {
+        listener = default;
         var tlsOptions = _tlsOptions.CurrentValue;
-        var endpoint = (IPEndPoint)listenOptions.Endpoint!;
+        if (listenOptions.Endpoint is not IPEndPoint endpoint)
+        {
+            return false;
+        }
+
         if (tlsOptions.EnableTransportLayerSecurity)
         {
             listener = new TlsMessageTransportListener(endpoint, _tlsOptions.CurrentValue, _loggerFactory);
-            return true;
         }
         else
         {
             listener = new TcpMessageTransportListener(endpoint, _loggerFactory);
-            return true;
         }
+
+        if (listenOptions.)
+        return listener is not null;
     }
 }
 
@@ -287,6 +365,21 @@ public class TransportListenerOptions : IMessageTransportBuilder
     {
         _middleware.Add(middleware ?? throw new ArgumentNullException(nameof(middleware)));
         return this;
+    }
+
+    internal MessageTransport ApplyMiddleware(MessageTransport transport)
+    {
+        if (_middleware is { Count: > 0 })
+        {
+            var middleware = new List<Func<MessageTransport, MessageTransport>>(_middleware);
+            middleware.Reverse();
+            foreach (var middlewareDelegate in middleware)
+            {
+                transport = middlewareDelegate(transport);
+            }
+        }
+
+        return transport;
     }
 }
 
