@@ -226,7 +226,7 @@ HandleCompletedRequest:
                         readRequest.Unconsumed.CopyTo(ref excessBuffer);
 
                         // Dispatch the current request.
-                        ThreadPool.UnsafeQueueUserWorkItem(readRequest, preferLocal: true);
+                        ThreadPool.UnsafeQueueUserWorkItem(readRequest, preferLocal: false);
 
                         // Assign the excess data to the next request.
                         readRequest = RentHandler();
@@ -239,7 +239,7 @@ HandleCompletedRequest:
                     else
                     {
                         // Dispatch the request.
-                        ThreadPool.UnsafeQueueUserWorkItem(readRequest, preferLocal: true);
+                        ThreadPool.UnsafeQueueUserWorkItem(readRequest, preferLocal: false);
                         readRequest = RentHandler();
                     }
                 }
