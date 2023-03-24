@@ -17,15 +17,15 @@ public class TcpMessageTransportListener : MessageTransportListener
     private Socket? _listenSocket;
 
     [SetsRequiredMembers]
-    internal TcpMessageTransportListener(IPEndPoint localEndpoint, ILoggerFactory loggerFactory)
+    internal TcpMessageTransportListener(TransportListenerOptions listenOptions, ILoggerFactory loggerFactory)
     {
-        Debug.Assert(localEndpoint != null);
         Debug.Assert(loggerFactory != null);
-
-        LocalEndpoint = localEndpoint ?? throw new ArgumentNullException(nameof(localEndpoint));
+        TransportListenerOptions = listenOptions;
+        LocalEndpoint = listenOptions.Endpoint ?? throw new ArgumentNullException(nameof(listenOptions.Endpoint));
         Logger = loggerFactory.CreateLogger("Orleans.Connections.Transport.Sockets");
     }
 
+    protected TransportListenerOptions TransportListenerOptions { get; }
     protected ILogger Logger { get; }
 
     public override EndPoint LocalEndpoint { get; }
@@ -87,10 +87,10 @@ public class TcpMessageTransportListener : MessageTransportListener
                 var acceptSocket = await _listenSocket!.AcceptAsync(cancellationToken).ConfigureAwait(false);
                 OnAcceptSocket(acceptSocket);
 
-                var connection = new TcpMessageTransport(acceptSocket, Logger);
-                connection.Start();
+                var transport = new TcpMessageTransport(acceptSocket, Logger);
+                transport.Start();
 
-                return connection;
+                return transport;
             }
             catch (OperationCanceledException)
             {

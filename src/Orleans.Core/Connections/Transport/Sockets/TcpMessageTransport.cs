@@ -68,11 +68,16 @@ public sealed class TcpMessageTransport : MessageTransportBase
         try
         {
             // Spawn send and receive logic
-            Task receiveTask, sendTask;
-            using (new ExecutionContextSuppressor())
+            (var receiveTask, var sendTask) = StartProcessing();
+
+            (Task ReceiveTask, Task SendTask) StartProcessing()
             {
-                receiveTask = ProcessReads();
-                sendTask = ProcessWrites();
+                using (new ExecutionContextSuppressor())
+                {
+                    var receiveTask = ProcessReads();
+                    var sendTask = ProcessWrites();
+                    return (receiveTask, sendTask);
+                }
             }
 
             // Wait for both to complete

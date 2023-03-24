@@ -5,16 +5,17 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Connections.Transport.Sockets;
 
 namespace Orleans.Connections.Transport.Security;
 
 public class TlsMessageTransportListener : TcpMessageTransportListener
 {
-    private readonly TlsOptions _options;
+    private readonly IOptionsMonitor<TlsOptions> _options;
 
     [SetsRequiredMembers]
-    public TlsMessageTransportListener(IPEndPoint localEndpoint, TlsOptions options, ILoggerFactory loggerFactory) : base(localEndpoint, loggerFactory)
+    public TlsMessageTransportListener(TransportListenerOptions listenOptions, IOptionsMonitor<TlsOptions> options, ILoggerFactory loggerFactory) : base(listenOptions, loggerFactory)
     {
         _options = options;
     }
@@ -27,7 +28,7 @@ public class TlsMessageTransportListener : TcpMessageTransportListener
             return null;
         }
 
-        var transport = new ServerTlsMessageTransport(innerTransport, _options, Logger);
+        var transport = new ServerTlsMessageTransport(innerTransport, _options.CurrentValue, Logger);
         transport.Start();
         return transport;
     }

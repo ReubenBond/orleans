@@ -2,7 +2,6 @@
 
 using Microsoft.Extensions.Logging;
 using Orleans.Connections.Transport.Utilities;
-using Orleans.Connections.Transport;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;

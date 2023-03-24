@@ -5,6 +5,7 @@ using System.Buffers;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Sources;
 using Orleans.Connections.Transport.Utilities;
 
 namespace Orleans.Connections.Transport.Streams;
@@ -128,20 +129,25 @@ public class MessageTransportStream : Stream
         public override void SetException(Exception error) => _signal.SignalException(error);
     }
 
-    private sealed class StreamReadRequest : ReadRequest
+    private sealed class StreamReadRequest : ReadRequest, IValueTaskSource<int>
     {
-        private readonly UnsafeInlineSignal<int> _signal = new();
+        private ManualResetValueTaskSourceCore<int> _completion = new();
         private Memory<byte> _buffer;
-        public void SetBuffer(Memory<byte> buffer) => _buffer = buffer;
+
         public override Memory<byte> Buffer => _buffer;
+
+        public void SetBuffer(Memory<byte> buffer) => _buffer = buffer;
 
         public override bool OnRead(int bytesRead)
         {
-            _signal.SetResult(bytesRead);
+            _completion.SetResult(bytesRead);
             return true;
         }
 
-        public ValueTask<int> OnProgressAsync() => _signal.WaitAsync();
-        public override void OnError(Exception error) => _signal.SetException(error);
+        public ValueTask<int> OnProgressAsync() => new(this, _completion.Version);
+        public override void OnError(Exception error) => _completion.SetException(error);
+        void IValueTaskSource<int>.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _completion.OnCompleted(continuation, state, token, flags);
+        int IValueTaskSource<int>.GetResult(short token) => _completion.GetResult(token);
+        ValueTaskSourceStatus IValueTaskSource<int>.GetStatus(short token) => _completion.GetStatus(token);
     }
 }

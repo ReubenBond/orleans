@@ -175,14 +175,13 @@ internal sealed class OrleansMessageTransportListenerProvider : IMessageTranspor
 
         if (tlsOptions.EnableTransportLayerSecurity)
         {
-            listener = new TlsMessageTransportListener(endpoint, _tlsOptions.CurrentValue, _loggerFactory);
+            listener = new TlsMessageTransportListener(listenOptions, _tlsOptions, _loggerFactory);
         }
         else
         {
-            listener = new TcpMessageTransportListener(endpoint, _loggerFactory);
+            listener = new TcpMessageTransportListener(listenOptions, _loggerFactory);
         }
 
-        if (listenOptions.)
         return listener is not null;
     }
 }
@@ -191,7 +190,7 @@ public interface IMessageTransportBuilder
 {
     public bool IsServer { get; }
     IServiceProvider ApplicationServices { get; }
-    IMessageTransportBuilder AddMiddleware(Func<MessageTransport, MessageTransport> middleware);
+    //IMessageTransportBuilder AddMiddleware(Func<MessageTransport, MessageTransport> middleware);
 }
 
 public sealed class ConnectionInitiatorFeature
@@ -265,7 +264,7 @@ public static class TransportFactoryClientBuilderExtensions
         return services.AddSingletonNamedService<MessageTransportListener>(
             transportName,
             (sp, name) => new TcpMessageTransportListener(
-                endpoint,
+                sp.GetRequiredService<IOptionsMonitor<TransportListenerOptions>>().Get(transportName),
                 sp.GetRequiredService<ILoggerFactory>()));
     }
 
@@ -347,7 +346,7 @@ public class TransportFactoryOptions : IMessageTransportBuilder
 
 public class TransportListenerOptions : IMessageTransportBuilder
 {
-    private readonly List<Func<MessageTransport, MessageTransport>> _middleware = new();
+    //private readonly List<Func<MessageTransport, MessageTransport>> _middleware = new();
     private readonly IServiceProvider _applicationServices;
 
     public TransportListenerOptions(IServiceProvider serviceProvider)
@@ -361,7 +360,7 @@ public class TransportListenerOptions : IMessageTransportBuilder
 
     IServiceProvider IMessageTransportBuilder.ApplicationServices => _applicationServices;
     bool IMessageTransportBuilder.IsServer => true;
-    public IMessageTransportBuilder AddMiddleware(Func<MessageTransport, MessageTransport> middleware)
+    /*public IMessageTransportBuilder AddMiddleware(Func<MessageTransport, MessageTransport> middleware)
     {
         _middleware.Add(middleware ?? throw new ArgumentNullException(nameof(middleware)));
         return this;
@@ -381,6 +380,7 @@ public class TransportListenerOptions : IMessageTransportBuilder
 
         return transport;
     }
+    */
 }
 
 internal abstract class ServiceProviderOptionsFactory<T> : OptionsFactory<T> where T : class
