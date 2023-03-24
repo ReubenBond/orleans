@@ -72,7 +72,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected virtual async Task RunAsyncCore()
+        protected virtual Task RunAsyncCore()
         {
             using (new ExecutionContextSuppressor())
             {
@@ -80,7 +80,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             _initializationTcs.TrySetResult(0);
-            await _processIncomingTask;
+            return _processIncomingTask;
         }
 
         /// <summary>

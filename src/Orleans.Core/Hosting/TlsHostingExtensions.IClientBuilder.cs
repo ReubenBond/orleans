@@ -61,7 +61,7 @@ namespace Orleans.Hosting
 
             if (!certificate.HasPrivateKey)
             {
-                TlsMessageTransportHostingExtensions.ThrowNoPrivateKey(certificate, nameof(certificate));
+                ThrowNoPrivateKey(certificate, nameof(certificate));
             }
 
             return builder.UseTls(options =>
@@ -88,7 +88,7 @@ namespace Orleans.Hosting
 
             if (!certificate.HasPrivateKey)
             {
-                TlsMessageTransportHostingExtensions.ThrowNoPrivateKey(certificate, nameof(certificate));
+                ThrowNoPrivateKey(certificate, nameof(certificate));
             }
 
             return builder.UseTls(options =>
@@ -121,12 +121,15 @@ namespace Orleans.Hosting
 
             if (options.LocalCertificate is X509Certificate2 certificate && !certificate.HasPrivateKey)
             {
-                TlsMessageTransportHostingExtensions.ThrowNoPrivateKey(certificate, $"{nameof(TlsOptions)}.{nameof(TlsOptions.LocalCertificate)}");
+                ThrowNoPrivateKey(certificate, $"{nameof(TlsOptions)}.{nameof(TlsOptions.LocalCertificate)}");
             }
 
-            builder.Services.AddOptions<TransportFactoryOptions>().Configure((TransportFactoryOptions options, IOptionsMonitor<TlsOptions> tlsOptions) => options.UseClientTls(() => tlsOptions.CurrentValue));
-
             return builder;
+        }
+
+        internal static void ThrowNoPrivateKey(X509Certificate2 certificate, string parameterName)
+        {
+            throw new ArgumentException($"Certificate {certificate.ToString(verbose: true)} does not contain a private key", parameterName);
         }
     }
 }
