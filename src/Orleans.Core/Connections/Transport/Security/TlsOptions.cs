@@ -25,7 +25,7 @@ public class TlsOptions
 
     /// <summary>
     /// <para>
-    /// Specifies the local certificate used to authenticate TLS connections. This is ignored on server if LocalCertificateSelector is set.
+    /// Specifies the local certificate used to authenticate TLS connections. This is ignored on server if <see cref="LocalServerCertificateSelector"/> is set.
     /// </para>
     /// <para>
     /// To omit client authentication set to <c>null</c> on client and set <see cref="RemoteCertificateMode"/> to <see cref="RemoteCertificateMode.AllowCertificate"/> or <see cref="RemoteCertificateMode.NoCertificate"/> on server.

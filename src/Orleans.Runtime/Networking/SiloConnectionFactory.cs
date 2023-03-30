@@ -22,7 +22,7 @@ namespace Orleans.Runtime.Messaging
         private bool isInitialized;
         private ConnectionManager connectionManager;
         private MessageCenter messageCenter;
-        private ISiloStatusOracle siloStatusOracle;
+        private ClusterMembershipService clusterMembership;
 
         public SiloConnectionFactory(
             IServiceProvider serviceProvider,
@@ -43,16 +43,37 @@ namespace Orleans.Runtime.Messaging
             this.connectionPreambleHelper = connectionPreambleHelper;
         }
 
-        public override ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
+        public override async ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
         {
             EnsureInitialized();
 
-            if (this.siloStatusOracle.IsDeadSilo(address))
+            var hasRefreshed = false;
+            while (true)
             {
-                throw new ConnectionAbortedException($"Denying connection to known-dead silo {address}");
+                var snapshot = clusterMembership.CurrentSnapshot;
+                var status = snapshot.GetSiloStatus(address);
+                if (status.IsTerminating())
+                {
+                    throw new ConnectionAbortedException($"Denying connection to known-dead silo {address}");
+                }
+
+                if (status == SiloStatus.None)
+                {
+                    if (hasRefreshed)
+                    {
+                        throw new ConnectionAbortedException($"Unable to connect to unknown silo {address}");
+                    }
+
+                    await clusterMembership.Refresh();
+                    continue;
+                }
+
+                break;
             }
 
-            return base.ConnectAsync(address, cancellationToken);
+            clusterMembership.CurrentSnapshot.
+
+            return await base.ConnectAsync(address, cancellationToken);
         }
 
         protected override Connection CreateConnection(SiloAddress address, MessageTransport transport)
@@ -81,7 +102,7 @@ namespace Orleans.Runtime.Messaging
                     {
                         this.messageCenter = this.serviceProvider.GetRequiredService<MessageCenter>();
                         this.connectionManager = this.serviceProvider.GetRequiredService<ConnectionManager>();
-                        this.siloStatusOracle = this.serviceProvider.GetRequiredService<ISiloStatusOracle>();
+                        this.clusterMembership = this.serviceProvider.GetRequiredService<ClusterMembershipService>();
                         this.isInitialized = true;
                     }
                 }

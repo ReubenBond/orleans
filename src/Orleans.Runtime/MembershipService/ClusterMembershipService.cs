@@ -52,7 +52,7 @@ namespace Orleans.Runtime
 
         public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => this.updates;
 
-        public ValueTask Refresh(MembershipVersion targetVersion)
+        public ValueTask Refresh(MembershipVersion targetVersion, CancellationToken cancellationToken = default)
         {
             if (targetVersion != default && targetVersion != MembershipVersion.MinValue && this.snapshot.Version >= targetVersion)
                 return default;
@@ -73,6 +73,11 @@ namespace Orleans.Runtime
                     await Task.Delay(TimeSpan.FromMilliseconds(10));
                 } while (this.snapshot.Version < v || this.snapshot.Version < this.membershipTableManager.MembershipTableSnapshot.Version);
             }
+        }
+
+        public async ValueTask Refresh()
+        {
+            await membershipTableManager.Refresh();
         }
 
         public async Task<bool> TryKill(SiloAddress siloAddress) => await this.membershipTableManager.TryKill(siloAddress);

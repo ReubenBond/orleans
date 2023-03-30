@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 
 using System;
 using System.Collections;
@@ -50,13 +50,10 @@ public class FeatureCollection : IFeatureCollection
     }
 
     /// <inheritdoc />
-    public virtual int Revision
-    {
-        get { return _containerRevision + (_defaults?.Revision ?? 0); }
-    }
+    public virtual int Revision => _containerRevision + (_defaults?.Revision ?? 0);
 
     /// <inheritdoc />
-    public bool IsReadOnly { get { return false; } }
+    public bool IsReadOnly => false;
 
     /// <inheritdoc />
     public object? this[Type key]
@@ -70,6 +67,7 @@ public class FeatureCollection : IFeatureCollection
 
             return _features != null && _features.TryGetValue(key, out var result) ? result : _defaults?[key];
         }
+
         set
         {
             if (key == null)
@@ -86,19 +84,13 @@ public class FeatureCollection : IFeatureCollection
                 return;
             }
 
-            if (_features == null)
-            {
-                _features = new Dictionary<Type, object>(_initialCapacity);
-            }
+            _features ??= new Dictionary<Type, object>(_initialCapacity);
             _features[key] = value;
             _containerRevision++;
         }
     }
 
-    IEnumerator IEnumerable.GetEnumerator()
-    {
-        return GetEnumerator();
-    }
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     /// <inheritdoc />
     public IEnumerator<KeyValuePair<Type, object>> GetEnumerator()
@@ -122,27 +114,15 @@ public class FeatureCollection : IFeatureCollection
     }
 
     /// <inheritdoc />
-    public TFeature? Get<TFeature>()
-    {
-        return (TFeature?)this[typeof(TFeature)];
-    }
+    public TFeature? Get<TFeature>() => (TFeature?)this[typeof(TFeature)];
 
     /// <inheritdoc />
-    public void Set<TFeature>(TFeature? instance)
-    {
-        this[typeof(TFeature)] = instance;
-    }
+    public void Set<TFeature>(TFeature? instance) => this[typeof(TFeature)] = instance;
 
     private sealed class KeyComparer : IEqualityComparer<KeyValuePair<Type, object>>
     {
-        public bool Equals(KeyValuePair<Type, object> x, KeyValuePair<Type, object> y)
-        {
-            return x.Key.Equals(y.Key);
-        }
+        public bool Equals(KeyValuePair<Type, object> x, KeyValuePair<Type, object> y) => x.Key.Equals(y.Key);
 
-        public int GetHashCode(KeyValuePair<Type, object> obj)
-        {
-            return obj.Key.GetHashCode();
-        }
+        public int GetHashCode(KeyValuePair<Type, object> obj) => obj.Key.GetHashCode();
     }
 }

@@ -8,6 +8,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Connections.Transport.Security;
 
+/// <summary>
+/// Message transport encrypts and decrypts all data using TLS, authenticating with the remote endpoint as a server.
+/// </summary>
 public class ServerTlsMessageTransport : TlsMessageTransport
 {
     private readonly X509Certificate2? _certificate;

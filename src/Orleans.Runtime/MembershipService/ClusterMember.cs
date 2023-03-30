@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using Orleans.Connections.Transport;
 
 namespace Orleans.Runtime
 {
@@ -47,6 +49,17 @@ namespace Orleans.Runtime
         /// <value>The silo name.</value>
         [Id(2)]
         public string Name { get; }
+
+        /// <summary>
+        /// Gets the silo endpoints.
+        /// </summary>
+        [Id(3)]
+        public List<EndPointInfo> Endpoints { get; }
+
+        /// <summary>
+        /// Gets other properties associated with the silo.
+        /// </summary>
+        public Dictionary<string, string> Properties { get; }
 
         /// <inheritdoc/>
         public override bool Equals(object obj) => this.Equals(obj as ClusterMember);

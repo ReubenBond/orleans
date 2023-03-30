@@ -22,7 +22,7 @@ namespace Orleans.Runtime.Messaging
 
         public GatewayConnectionListener(
             string name,
-            IOptionsMonitor<TransportListenerOptions> transportListenerOptions,
+            IOptionsMonitor<ServerMessageTransportBuilder> transportListenerOptions,
             IEnumerable<IMessageTransportListenerProvider> listenerProviders,
             IOptions<ConnectionOptions> connectionOptions,
             OverloadDetector overloadDetector,
@@ -60,7 +60,7 @@ namespace Orleans.Runtime.Messaging
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            if (TransportListenerOptions.Endpoint is null) return;
+            if (TransportListenerOptions.ListenEndpoint is null) return;
 
             lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.RuntimeInitialize - 1, this);
             lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.Active, _ => Task.Run(Start));
