@@ -14,18 +14,21 @@ namespace Orleans.Connections.Transport.Sockets;
 
 public class TcpMessageTransportListener : MessageTransportListener
 {
+    private readonly IServiceProvider _serviceProvider;
     private Socket? _listenSocket;
 
     [SetsRequiredMembers]
-    internal TcpMessageTransportListener(TransportListenerOptions listenOptions, ILoggerFactory loggerFactory)
+    internal TcpMessageTransportListener(ServerMessageTransportBuilder listenOptions, IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
     {
         Debug.Assert(loggerFactory != null);
         TransportListenerOptions = listenOptions;
-        LocalEndpoint = listenOptions.Endpoint ?? throw new ArgumentNullException(nameof(listenOptions.Endpoint));
+        _serviceProvider = serviceProvider;
+        LocalEndpoint = listenOptions.ListenEndpoint ?? throw new ArgumentNullException(nameof(listenOptions.ListenEndpoint));
         Logger = loggerFactory.CreateLogger("Orleans.Connections.Transport.Sockets");
     }
 
-    protected TransportListenerOptions TransportListenerOptions { get; }
+    protected ServerMessageTransportBuilder TransportListenerOptions { get; }
+
     protected ILogger Logger { get; }
 
     public override EndPoint LocalEndpoint { get; }
@@ -90,7 +93,8 @@ public class TcpMessageTransportListener : MessageTransportListener
                 var transport = new TcpMessageTransport(acceptSocket, Logger);
                 transport.Start();
 
-                return transport;
+                var result = TransportListenerOptions.ApplyMiddleware(_serviceProvider, transport);
+                return result;
             }
             catch (OperationCanceledException)
             {

@@ -65,11 +65,11 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal void ReadBodyObject(Message message)
+        internal void ReadBodyObject(Message message, MessageReadRequest readRequest)
         {
             try
             {
-                var reader = Reader.Create(message._readRequest.Body, _deserializationSession);
+                var reader = Reader.Create(readRequest.Body, _deserializationSession);
                 var field = reader.ReadFieldHeader();
 
                 if (message.Result == ResponseTypes.Success)

@@ -22,7 +22,7 @@ namespace Orleans.Runtime.Messaging
 
         public SiloConnectionListener(
             string name,
-            IOptionsMonitor<TransportListenerOptions> transportListenerOptions,
+            IOptionsMonitor<ServerMessageTransportBuilder> transportListenerOptions,
             IEnumerable<IMessageTransportListenerProvider> listenerProviders,
             IOptions<ConnectionOptions> connectionOptions,
             MessageCenter messageCenter,
@@ -59,7 +59,7 @@ namespace Orleans.Runtime.Messaging
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            if (TransportListenerOptions.Endpoint is null) return;
+            if (TransportListenerOptions.ListenEndpoint is null) return;
 
             lifecycle.Subscribe(nameof(SiloConnectionListener), ServiceLifecycleStage.RuntimeInitialize - 1, this);
         }

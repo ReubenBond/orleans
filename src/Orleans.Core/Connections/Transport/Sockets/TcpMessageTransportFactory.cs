@@ -47,6 +47,7 @@ public class TcpMessageTransportFactory : MessageTransportFactory
 
         var connection = new TcpMessageTransport(socket, Logger);
         connection.Start();
+
         return connection;
     }
 

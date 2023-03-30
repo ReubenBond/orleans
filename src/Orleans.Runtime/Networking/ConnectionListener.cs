@@ -14,9 +14,62 @@ using Orleans.Internal;
 using Orleans.Connections.Transport;
 using Orleans.Connections;
 using Orleans.Runtime.Internal;
+using Microsoft.Extensions.DependencyInjection;
+using System.Runtime.CompilerServices;
+using Orleans.Connections.Transport.Sockets;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Connections.Transport.Security;
 
 namespace Orleans.Runtime.Messaging
 {
+
+    public interface IServerEndpointCollection
+    {
+        IMessageTransportListenerBuilder AddListener(string endpointName);
+        IMessageTransportBuilder AddHandler(string endpointName);
+    }
+
+    public interface IMessageTransportListenerBuilder
+    {
+        public string EndPointName { get; }
+        public IServiceCollection Services { get; }
+    }
+
+    public interface IMessageTransportBuilder
+    {
+        public string EndPointName { get; }
+        public IServiceCollection Services { get; }
+    }
+
+    public static class TcpMessageTransportBuilderExtensions
+    {
+        public static IMessageTransportListenerBuilder UseTcp(this IMessageTransportListenerBuilder builder)
+        {
+            // Add a listener and a factory
+            builder.Services.AddSingletonNamedService<IMessageTransportListenerProvider, TcpMessageTransportListenerProvider>(builder.EndPointName);
+            builder.Services.AddSingletonNamedService<IMessageTransportFactoryProvider, TcpMessageTransportFactoryProvider>(builder.EndPointName);
+
+            // Add a non-named registration pointing to the named one
+            builder.Services.AddSingleton(sp => sp.GetRequiredServiceByName<IMessageTransportListenerProvider>(builder.EndPointName));
+
+            return builder;
+        }
+    }
+
+    public static class TlsMessageTransportBuilderExtensions
+    {
+        public static IMessageTransportListenerBuilder UseTls(this IMessageTransportListenerBuilder builder, Action<OptionsBuilder<TlsOptions>> configureOptions)
+        {
+            // Add middleware
+            builder.Services.AddSingletonNamedService<IMessageTransportListenerMiddleware>(builder.EndPointName, (sp, name) => ActivatorUtilities.CreateInstance<TlsMessageTransportListenerMiddleware>(sp, name));
+            builder.Services.AddSingletonNamedService<IMessageTransportMiddleware>(builder.EndPointName, (sp, name) => ActivatorUtilities.CreateInstance<TlsMessageTransportMiddleware>(sp, name));
+            var options = builder.Services.AddOptions<TlsOptions>(builder.EndPointName);
+            configureOptions?.Invoke(options);
+
+            return builder;
+        }
+    }
+
     internal abstract class ConnectionListener
     {
         private readonly ConnectionManager _connectionManager;
@@ -28,7 +81,7 @@ namespace Orleans.Runtime.Messaging
         private Task? _acceptLoopTask;
 
         protected ConnectionListener(
-            TransportListenerOptions listenerOptions,
+            ServerMessageTransportBuilder listenerOptions,
             IEnumerable<IMessageTransportListenerProvider> listenerProviders,
             IOptions<ConnectionOptions> connectionOptions,
             ConnectionManager connectionManager,
@@ -41,7 +94,7 @@ namespace Orleans.Runtime.Messaging
             _connectionShared = connectionShared;
         }
 
-        protected TransportListenerOptions TransportListenerOptions { get; }
+        protected ServerMessageTransportBuilder TransportListenerOptions { get; }
 
         protected IServiceProvider ServiceProvider => _connectionShared.ServiceProvider;
 

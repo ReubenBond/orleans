@@ -16,16 +16,15 @@ namespace Orleans.Runtime
 
         public CoarseStopwatch _timeToExpiry;
 
-        internal MessageReadRequest _readRequest;
         internal object _bodyObject;
 
         public object BodyObject
         {
             get
             {
-                if (_readRequest is not null)
+                if (_bodyObject is MessageReadRequest readRequest)
                 {
-                    DeserializeRequestBody();
+                    DeserializeRequestBody(readRequest);
                 }
 
                 return _bodyObject;
@@ -33,48 +32,40 @@ namespace Orleans.Runtime
 
             set
             {
+                (_bodyObject as MessageReadRequest)?.Reset();
                 _bodyObject = value;
-
-                if (_readRequest is { } readRequest)
-                {
-                    _readRequest = null;
-                    readRequest.Reset();
-                }
             }
         }
 
-        private void DeserializeRequestBody()
+        private void DeserializeRequestBody(MessageReadRequest readRequest)
         {
-            var messageSerializer = _readRequest.Shared.GetMessageSerializer();
+            var messageSerializer = readRequest.Shared.GetMessageSerializer();
             try
             {
-                messageSerializer.ReadBodyObject(this);
+                messageSerializer.ReadBodyObject(this, readRequest);
             }
             finally
             {
-                _readRequest.Shared.Return(messageSerializer);
-                _readRequest.Reset();
-                _readRequest = null;
+                readRequest.Shared.Return(messageSerializer);
+                readRequest.Reset();
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void SetMessageReadRequest(MessageReadRequest request)
         {
-            if (_readRequest is not null && !Equals(_readRequest, request))
+            if (_bodyObject is MessageReadRequest current && !Equals(current, request))
             {
-                _readRequest.Reset();
+                current.Reset();
             }
 
-            _bodyObject = null;
-
-            _readRequest = request;
+            _bodyObject = request;
         }
 
         public void Dispose()
         {
-            _readRequest?.Reset();
-            _readRequest = null;
+            (_bodyObject as MessageReadRequest)?.Reset();
+            _bodyObject = null;
         }
 
         public PackedHeaders _headers;

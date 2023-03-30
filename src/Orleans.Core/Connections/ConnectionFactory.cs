@@ -25,6 +25,9 @@ internal abstract class ConnectionFactory
 
     public virtual async ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
     {
+        // Get the collection of endpoint info for the address
+        // Enumerate each endpoint info and try to create a transport for it.
+        // When the first transport is successfully created, use it.
         var endpoint = address.Endpoint;
         if (!TryGetTransportFactory(endpoint, out var transportFactory))
         {
@@ -35,10 +38,7 @@ internal abstract class ConnectionFactory
         var transport = await transportFactory.CreateAsync(endpoint, cancellationToken);
 
         var options = _transportFactoryOptions.CurrentValue;
-        foreach (var middleware in options.Middleware)
-        {
-            transport = middleware(transport);
-        }
+        transport = options.ApplyMiddleware(transport);
 
         // Create a connection object to represent the connection.
         var connection = CreateConnection(address, transport);

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Azure;
@@ -11,6 +12,7 @@ using Orleans.AzureUtils;
 using Orleans.Clustering.AzureStorage;
 using Orleans.Clustering.AzureStorage.Utilities;
 using Orleans.Configuration;
+using Orleans.Connections.Transport;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace Orleans.Runtime.MembershipService
@@ -279,6 +281,10 @@ namespace Orleans.Runtime.MembershipService
             for (int i = 0; i < suspectingSilos.Count; i++)
                 parse.AddSuspector(suspectingSilos[i], suspectingTimes[i]);
 
+            parse.Endpoints = string.IsNullOrWhiteSpace(tableEntry.Endpoints)
+                ? Array.Empty<EndPointInfo>()
+                : System.Text.Json.JsonSerializer.Deserialize<EndPointInfo[]>(tableEntry.Endpoints);
+
             return parse;
         }
 
@@ -301,7 +307,8 @@ namespace Orleans.Runtime.MembershipService
                 UpdateZone = memEntry.UpdateZone.ToString(CultureInfo.InvariantCulture),
                 FaultZone = memEntry.FaultZone.ToString(CultureInfo.InvariantCulture),
                 StartTime = LogFormatter.PrintDate(memEntry.StartTime),
-                IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime)
+                IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime),
+                Endpoints = System.Text.Json.JsonSerializer.Serialize(memEntry.Endpoints ?? Array.Empty<EndPointInfo>()),
             };
 
             if (memEntry.SuspectTimes != null)
