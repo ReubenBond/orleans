@@ -35,7 +35,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionPreambleHelper connectionPreambleHelper)
             : base(
                   transportListenerOptions.Get(name),
-                  listeners.Where(static listener => listener.Features.Get<IConnectionDirectionFeature>()?.Direction == ConnectionDirection.SiloToSilo),
+                  listeners.Where(static listener => listener.Features.Get<ITransportProtocolFeature>()?.Protocol == TransportProtocol.Cluster),
                   connectionOptions,
                   connectionManager,
                   connectionShared)

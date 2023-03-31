@@ -1,3 +1,5 @@
+using System;
+
 namespace Orleans.Messaging
 {
     internal enum ConnectionDirection : byte
@@ -7,22 +9,34 @@ namespace Orleans.Messaging
         GatewayToClient
     }
 
-    internal interface IConnectionDirectionFeature
+    public enum TransportProtocol
     {
-        public ConnectionDirection Direction { get; }
+        Cluster,
+        Gateway
     }
 
-    internal class ConnectionDirectionFeature : IConnectionDirectionFeature
+    public interface ITransportProtocolFeature
     {
-        public static ConnectionDirectionFeature GatewayToClient { get; } = new ConnectionDirectionFeature(ConnectionDirection.GatewayToClient);
-        public static ConnectionDirectionFeature SiloToSilo { get; } = new ConnectionDirectionFeature(ConnectionDirection.SiloToSilo);
-        public static ConnectionDirectionFeature ClientToGateway { get; } = new ConnectionDirectionFeature(ConnectionDirection.ClientToGateway);
+        public TransportProtocol Protocol { get; }
+    }
 
-        private ConnectionDirectionFeature(ConnectionDirection direction)
+    internal class TransportProtocolFeature : ITransportProtocolFeature
+    {
+        private static readonly TransportProtocolFeature Cluster = new (TransportProtocol.Cluster);
+        private static readonly TransportProtocolFeature Gateway = new (TransportProtocol.Gateway);
+
+        public static TransportProtocolFeature Get(TransportProtocol protocol) => protocol switch
         {
-            Direction = direction;
+            TransportProtocol.Cluster => Cluster,
+            TransportProtocol.Gateway => Gateway,
+            _ => throw new ArgumentOutOfRangeException(nameof(protocol)),
+        };
+
+        private TransportProtocolFeature(TransportProtocol protocol)
+        {
+            Protocol = protocol;
         }
 
-        public ConnectionDirection Direction { get; }
+        public TransportProtocol Protocol { get; }
     }
 }

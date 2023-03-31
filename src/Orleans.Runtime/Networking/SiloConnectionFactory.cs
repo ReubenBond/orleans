@@ -37,7 +37,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionCommon connectionShared,
             ProbeRequestMonitor probeRequestMonitor,
             ConnectionPreambleHelper connectionPreambleHelper)
-            : base(connectors.Where(static connector => connector.Features.Get<IConnectionDirectionFeature>()?.Direction == ConnectionDirection.SiloToSilo))
+            : base(connectors.Where(static connector => connector.Features.Get<ITransportProtocolFeature>()?.Protocol == TransportProtocol.Cluster))
         {
             _connectionOptions = connectionOptions.Value;
             _serviceProvider = serviceProvider;

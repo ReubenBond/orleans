@@ -19,6 +19,7 @@ using Orleans.Connections.Transport.Security;
 using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Runtime.Messaging;
+using System.Net;
 
 namespace Orleans.Hosting
 {
@@ -67,16 +68,14 @@ namespace Orleans.Runtime.Messaging
         {
             return builder
                 .AddListener(GatewayConnectionListener.DefaultListenerName)
-                .AddMiddleware(new ActionMessageTransportListenerMiddleware(
-                    listener => listener.Features.Set<IConnectionDirectionFeature>((ConnectionDirectionFeature?)ConnectionDirectionFeature.GatewayToClient)));
+                .SetProtocol(TransportProtocol.Gateway);
         }
 
         public static IListenerBuilder AddDefaultSiloListener(this ISiloTransportCollection builder)
         {
             return builder
                 .AddListener(SiloConnectionListener.DefaultListenerName)
-                .AddMiddleware(new ActionMessageTransportListenerMiddleware(
-                    listener => listener.Features.Set<IConnectionDirectionFeature>((ConnectionDirectionFeature?)ConnectionDirectionFeature.SiloToSilo)));
+                .SetProtocol(TransportProtocol.Cluster);
         }
 
         private sealed class FuncMessageTransportListenerMiddleware : IMessageTransportListenerMiddleware
@@ -146,10 +145,35 @@ namespace Orleans.Runtime.Messaging
                     sp.GetRequiredService<ILoggerFactory>()));
             builder.Services.AddSingletonNamedService<MessageTransportConnector, TcpMessageTransportConnector>(builder.EndPointName);
 
-            // Add a non-named registrations pointing to the named ones
+            // Add a non-named registrations pointing to the named ones so that ConnectionFactory and ConnectionListener can find them.
             builder.Services.AddSingleton(sp => sp.GetRequiredServiceByName<MessageTransportListener>(builder.EndPointName));
             builder.Services.AddSingleton(sp => sp.GetRequiredServiceByName<MessageTransportConnector>(builder.EndPointName));
 
+            return builder;
+        }
+    }
+
+    public static class FooDeleteMe
+    {
+        public static void Configure(ISiloBuilder siloBuilder)
+        {
+            siloBuilder.Transports
+                .AddListener(SiloConnectionListener.DefaultListenerName) // remote hosts use this name to match with connectors configured on their end
+                .SetProtocol(TransportProtocol.Cluster) // This is for silo-to-silo communication (not client-to-gateway)
+                .UseTcp(optionsBuilder => optionsBuilder.Configure(listenerOptions => listenerOptions.EndPoint = IPEndPoint.Parse("127.0.0.1:8000")))
+                .UseTls(optionsBuilder => optionsBuilder.Configure(tlsOptions =>
+                {
+                    tlsOptions.AllowAnyRemoteCertificate();
+                    tlsOptions.LocalCertificate = System.Security.Cryptography.X509Certificates.X509Certificate2.CreateFromPemFile("my-cert-file.pem");
+                }));
+        }
+    }
+
+    public static class ConnectionDirectionMiddlewareExtensions
+    {
+        public static IListenerBuilder SetProtocol(this IListenerBuilder builder, TransportProtocol protocol)
+        {
+            builder.AddMiddleware(listener => listener.Features.Set<ITransportProtocolFeature>(TransportProtocolFeature.Get(protocol)));
             return builder;
         }
     }

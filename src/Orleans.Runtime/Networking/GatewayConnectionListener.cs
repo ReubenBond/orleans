@@ -37,7 +37,7 @@ namespace Orleans.Runtime.Messaging
             ILogger<GatewayConnectionListener> logger)
             : base(
                   transportListenerOptions.Get(name),
-                  listeners.Where(static listener => listener.Features.Get<IConnectionDirectionFeature>()?.Direction == ConnectionDirection.GatewayToClient),
+                  listeners.Where(static listener => listener.Features.Get<ITransportProtocolFeature>()?.Protocol == TransportProtocol.Gateway),
                   connectionOptions,
                   connectionManager,
                   connectionShared)

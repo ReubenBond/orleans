@@ -183,7 +183,7 @@ internal class ClientTransportCollection : IClientTransportCollection
         var result = new ConnectorBuilder(endPointName, _services);
         result.AddMiddleware(factory =>
         {
-            factory.Features.Set<IConnectionDirectionFeature>(ConnectionDirectionFeature.ClientToGateway);
+            factory.Features.Set<ITransportProtocolFeature>(TransportProtocolFeature.ClientToGateway);
             factory.Features.Set<IEndPointNameFeature>(new EndPointNameFeature(endPointName));
         });
         return result;
