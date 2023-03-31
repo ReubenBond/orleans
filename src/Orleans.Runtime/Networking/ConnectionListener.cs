@@ -4,7 +4,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -15,54 +14,153 @@ using Orleans.Connections.Transport;
 using Orleans.Connections;
 using Orleans.Runtime.Internal;
 using Microsoft.Extensions.DependencyInjection;
-using System.Runtime.CompilerServices;
 using Orleans.Connections.Transport.Sockets;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Connections.Transport.Security;
+using Orleans.Hosting;
+using Orleans.Messaging;
+using Orleans.Runtime.Messaging;
+
+namespace Orleans.Hosting
+{
+    public interface ISiloTransportCollection
+    {
+        IListenerBuilder AddListener(string endPointName);
+        IConnectorBuilder AddConnector(string endPointName);
+    }
+}
 
 namespace Orleans.Runtime.Messaging
 {
-
-    public interface IServerEndpointCollection
+    internal class SiloTransportCollection : ISiloTransportCollection
     {
-        IMessageTransportListenerBuilder AddListener(string endpointName);
-        IMessageTransportBuilder AddHandler(string endpointName);
+        private readonly IServiceCollection _services;
+        public SiloTransportCollection(IServiceCollection services) => _services = services;
+
+        public IListenerBuilder AddListener(string endPointName)
+        {
+            var result = new ListenerBuilder(endPointName, _services);
+            result.AddMiddleware(listener => listener.Features.Set<IEndPointNameFeature>(new EndPointNameFeature(endPointName)));
+            return result;
+        }
+
+        public IConnectorBuilder AddConnector(string endPointName)
+        {
+            var result = new ConnectorBuilder(endPointName, _services);
+            result.AddMiddleware(listener => listener.Features.Set<IEndPointNameFeature>(new EndPointNameFeature(endPointName)));
+            return result;
+        }
     }
 
-    public interface IMessageTransportListenerBuilder
+    public static class SiloTransportConnectionExtensions
+    {
+        public static IListenerBuilder AddMiddleware(this IListenerBuilder builder, IMessageTransportListenerMiddleware middleware)
+        {
+            builder.Services.AddSingletonNamedService(builder.EndPointName, middleware);
+            return builder;
+        }
+
+    public static IListenerBuilder AddMiddleware(this IListenerBuilder builder, Action<MessageTransportListener> middleware) => builder.AddMiddleware(new ActionMessageTransportListenerMiddleware(middleware));
+
+    public static IListenerBuilder AddMiddleware(this IListenerBuilder builder, Func<MessageTransportListener, MessageTransportListener> middleware) => builder.AddMiddleware(new FuncMessageTransportListenerMiddleware(middleware));
+
+        public static IListenerBuilder AddDefaultGatewayListener(this ISiloTransportCollection builder)
+        {
+            return builder
+                .AddListener(GatewayConnectionListener.DefaultListenerName)
+                .AddMiddleware(new ActionMessageTransportListenerMiddleware(
+                    listener => listener.Features.Set<IConnectionDirectionFeature>((ConnectionDirectionFeature?)ConnectionDirectionFeature.GatewayToClient)));
+        }
+
+        public static IListenerBuilder AddDefaultSiloListener(this ISiloTransportCollection builder)
+        {
+            return builder
+                .AddListener(SiloConnectionListener.DefaultListenerName)
+                .AddMiddleware(new ActionMessageTransportListenerMiddleware(
+                    listener => listener.Features.Set<IConnectionDirectionFeature>((ConnectionDirectionFeature?)ConnectionDirectionFeature.SiloToSilo)));
+        }
+
+        private sealed class FuncMessageTransportListenerMiddleware : IMessageTransportListenerMiddleware
+        {
+            private readonly Func<MessageTransportListener, MessageTransportListener> _middleware;
+
+            public FuncMessageTransportListenerMiddleware(Func<MessageTransportListener, MessageTransportListener> middleware)
+            {
+                _middleware = middleware;
+            }
+
+            public MessageTransportListener Apply(MessageTransportListener listener) => _middleware(listener);
+        }
+
+        private sealed class ActionMessageTransportListenerMiddleware : IMessageTransportListenerMiddleware
+        {
+            private readonly Action<MessageTransportListener> _middleware;
+
+            public ActionMessageTransportListenerMiddleware(Action<MessageTransportListener> middleware)
+            {
+                _middleware = middleware;
+            }
+
+            public MessageTransportListener Apply(MessageTransportListener listener)
+            {
+                _middleware(listener);
+                return listener;
+            }
+        }
+    }
+
+    public interface IListenerBuilder
     {
         public string EndPointName { get; }
         public IServiceCollection Services { get; }
     }
 
-    public interface IMessageTransportBuilder
+    public class ListenerBuilder : IListenerBuilder
     {
-        public string EndPointName { get; }
+        public ListenerBuilder(string endPointName, IServiceCollection services)
+        {
+            EndPointName = endPointName;
+            Services = services;
+        }
+
         public IServiceCollection Services { get; }
+
+        public string EndPointName { get; }
     }
 
     public static class TcpMessageTransportBuilderExtensions
     {
-        public static IMessageTransportListenerBuilder UseTcp(this IMessageTransportListenerBuilder builder)
+        public static IListenerBuilder UseTcp(this IListenerBuilder builder, Action<OptionsBuilder<TcpMessageTransportListenerOptions>>? configureListenerOptions = default, Action<OptionsBuilder<TcpMessageTransportOptions>>? configureTransportOptions = default)
         {
             // Add a listener and a factory
-            builder.Services.AddSingletonNamedService<IMessageTransportListenerProvider, TcpMessageTransportListenerProvider>(builder.EndPointName);
-            builder.Services.AddSingletonNamedService<IMessageTransportFactoryProvider, TcpMessageTransportFactoryProvider>(builder.EndPointName);
+            var listenerOptions = builder.Services.AddOptions<TcpMessageTransportListenerOptions>(builder.EndPointName);
+            configureListenerOptions?.Invoke(listenerOptions);
+            var options = builder.Services.AddOptions<TcpMessageTransportOptions>(builder.EndPointName);
+            configureTransportOptions?.Invoke(options);
 
-            // Add a non-named registration pointing to the named one
-            builder.Services.AddSingleton(sp => sp.GetRequiredServiceByName<IMessageTransportListenerProvider>(builder.EndPointName));
+            builder.Services.AddSingletonNamedService<MessageTransportListener>(
+                builder.EndPointName,
+                (sp, name) => new TcpMessageTransportListener(
+                    name,
+                    sp.GetRequiredService<IOptionsMonitor<TcpMessageTransportOptions>>(),
+                    sp.GetRequiredService<IOptionsMonitor<TcpMessageTransportListenerOptions>>(),
+                    sp.GetRequiredService<ILoggerFactory>()));
+            builder.Services.AddSingletonNamedService<MessageTransportConnector, TcpMessageTransportConnector>(builder.EndPointName);
+
+            // Add a non-named registrations pointing to the named ones
+            builder.Services.AddSingleton(sp => sp.GetRequiredServiceByName<MessageTransportListener>(builder.EndPointName));
+            builder.Services.AddSingleton(sp => sp.GetRequiredServiceByName<MessageTransportConnector>(builder.EndPointName));
 
             return builder;
         }
     }
 
-    public static class TlsMessageTransportBuilderExtensions
+    public static class TlsListenerBuilderExtensions
     {
-        public static IMessageTransportListenerBuilder UseTls(this IMessageTransportListenerBuilder builder, Action<OptionsBuilder<TlsOptions>> configureOptions)
+        public static IListenerBuilder UseTls(this IListenerBuilder builder, Action<OptionsBuilder<TlsOptions>> configureOptions)
         {
             // Add middleware
             builder.Services.AddSingletonNamedService<IMessageTransportListenerMiddleware>(builder.EndPointName, (sp, name) => ActivatorUtilities.CreateInstance<TlsMessageTransportListenerMiddleware>(sp, name));
-            builder.Services.AddSingletonNamedService<IMessageTransportMiddleware>(builder.EndPointName, (sp, name) => ActivatorUtilities.CreateInstance<TlsMessageTransportMiddleware>(sp, name));
+            builder.Services.AddSingletonNamedService<IMessageTransportConnectorMiddleware>(builder.EndPointName, (sp, name) => ActivatorUtilities.CreateInstance<TlsMessageTransportConnectorMiddleware>(sp, name));
             var options = builder.Services.AddOptions<TlsOptions>(builder.EndPointName);
             configureOptions?.Invoke(options);
 
@@ -74,27 +172,33 @@ namespace Orleans.Runtime.Messaging
     {
         private readonly ConnectionManager _connectionManager;
         private readonly ConnectionCommon _connectionShared;
-        private readonly IMessageTransportListenerProvider[] _listenerProviders;
+        private readonly MessageTransportListener[] _listeners;
+        private readonly List<EndPointInfo> _endpoints;
         private readonly ConcurrentDictionary<Connection, object?> _connections = new(ReferenceEqualsComparer.Default);
         private readonly CancellationTokenSource _shutdownCancellation = new();
-        private MessageTransportListener? _listener;
         private Task? _acceptLoopTask;
 
         protected ConnectionListener(
-            ServerMessageTransportBuilder listenerOptions,
-            IEnumerable<IMessageTransportListenerProvider> listenerProviders,
+            ListenerBuilder listenerOptions,
+            IEnumerable<MessageTransportListener> listenerProviders,
             IOptions<ConnectionOptions> connectionOptions,
             ConnectionManager connectionManager,
             ConnectionCommon connectionShared)
         {
             TransportListenerOptions = listenerOptions;
-            _listenerProviders = listenerProviders.Reverse().ToArray();
+
+            // Get the listeners which are marked as gateway to client listeners.
+            _listeners = listenerProviders.ToArray();
+            _endpoints = new(_listeners.Length);
+
             _connectionManager = connectionManager;
             ConnectionOptions = connectionOptions.Value;
             _connectionShared = connectionShared;
         }
 
-        protected ServerMessageTransportBuilder TransportListenerOptions { get; }
+        protected bool IsEnabled => _listeners is { Length: > 0 };
+
+        protected ListenerBuilder TransportListenerOptions { get; }
 
         protected IServiceProvider ServiceProvider => _connectionShared.ServiceProvider;
 
@@ -106,33 +210,32 @@ namespace Orleans.Runtime.Messaging
 
         protected async Task BindAsync(CancellationToken cancellationToken)
         {
-            foreach (var provider in _listenerProviders)
+            foreach (var listener in _listeners)
             {
-                if (provider.TryGetMessageTransportListener(TransportListenerOptions, out _listener))
-                {
-                    break;
-                }
+                _endpoints.Add(await listener.BindAsync(cancellationToken));
             }
-
-            if (_listener is null)
-            {
-                throw new OrleansConfigurationException($"None of the configured transport listeners were able to satisfy the demands.");
-            }
-
-            await _listener.BindAsync(cancellationToken);
         }
 
         protected void Start()
         {
-            if (_listener is null) throw new InvalidOperationException($"Listener is not bound, call {nameof(BindAsync)} first");
+            if (_endpoints is not { Count: > 0 })
+            {
+                throw new InvalidOperationException($"Listener is not bound, call {nameof(BindAsync)} first");
+            }
+
             using var _ = new ExecutionContextSuppressor();
-            _acceptLoopTask = RunAcceptLoop();
+            var tasks = new List<Task>(_listeners.Length);
+            foreach (var listener in _listeners)
+            {
+                tasks.Add(RunAcceptLoop(listener));
+            }
+
+            _acceptLoopTask = Task.WhenAll(tasks);
         }
 
-        private async Task RunAcceptLoop()
+        private async Task RunAcceptLoop(MessageTransportListener listener)
         {
             await Task.Yield();
-            var listener = _listener!;
             try
             {
                 while (true)
@@ -146,7 +249,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exception)
             {
-                TransportTrace.LogCritical(exception, "Exception in AcceptAsync");
+                TransportTrace.LogCritical(exception, $"Exception in AcceptAsync for listener {listener}");
             }
         }
 
@@ -154,13 +257,13 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                if (_listener is null)
+                if (!IsEnabled)
                 {
                     return;
                 }
 
                 _shutdownCancellation.Cancel();
-                await _listener.UnbindAsync(cancellationToken).ConfigureAwait(false);
+                await Task.WhenAll(_listeners.Select(listener => listener.UnbindAsync(cancellationToken).AsTask())).ConfigureAwait(false);
 
                 if (_acceptLoopTask is not null)
                 {
@@ -179,7 +282,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 await _connectionManager.Closed;
-                await _listener.DisposeAsync();
+                await Task.WhenAll(_listeners.Select(listener => listener.DisposeAsync().AsTask()));
             }
             catch (Exception exception)
             {

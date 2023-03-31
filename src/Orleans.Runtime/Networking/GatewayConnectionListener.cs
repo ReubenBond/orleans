@@ -1,16 +1,18 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Connections.Transport;
+using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
 {
     internal sealed class GatewayConnectionListener : ConnectionListener, ILifecycleParticipant<ISiloLifecycle>, ILifecycleObserver
     {
-        public const string DefaultListenerName = "DefaultGatewayListener";
+        public const string DefaultListenerName = "gw";
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly MessageCenter messageCenter;
         private readonly ConnectionCommon connectionShared;
@@ -22,8 +24,8 @@ namespace Orleans.Runtime.Messaging
 
         public GatewayConnectionListener(
             string name,
-            IOptionsMonitor<ServerMessageTransportBuilder> transportListenerOptions,
-            IEnumerable<IMessageTransportListenerProvider> listenerProviders,
+            IOptionsMonitor<ListenerBuilder> transportListenerOptions,
+            IEnumerable<MessageTransportListener> listeners,
             IOptions<ConnectionOptions> connectionOptions,
             OverloadDetector overloadDetector,
             ILocalSiloDetails localSiloDetails,
@@ -33,7 +35,12 @@ namespace Orleans.Runtime.Messaging
             ConnectionCommon connectionShared,
             ConnectionPreambleHelper connectionPreambleHelper,
             ILogger<GatewayConnectionListener> logger)
-            : base(transportListenerOptions.Get(name), listenerProviders, connectionOptions, connectionManager, connectionShared)
+            : base(
+                  transportListenerOptions.Get(name),
+                  listeners.Where(static listener => listener.Features.Get<IConnectionDirectionFeature>()?.Direction == ConnectionDirection.GatewayToClient),
+                  connectionOptions,
+                  connectionManager,
+                  connectionShared)
         {
             this.overloadDetector = overloadDetector;
             this.gateway = messageCenter.Gateway;
@@ -60,7 +67,7 @@ namespace Orleans.Runtime.Messaging
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            if (TransportListenerOptions.ListenEndpoint is null) return;
+            if (!IsEnabled) return;
 
             lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.RuntimeInitialize - 1, this);
             lifecycle.Subscribe(nameof(GatewayConnectionListener), ServiceLifecycleStage.Active, _ => Task.Run(Start));

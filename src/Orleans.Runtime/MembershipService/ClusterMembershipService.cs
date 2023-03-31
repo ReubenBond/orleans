@@ -52,7 +52,7 @@ namespace Orleans.Runtime
 
         public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => this.updates;
 
-        public ValueTask Refresh(MembershipVersion targetVersion, CancellationToken cancellationToken = default)
+        public ValueTask Refresh(MembershipVersion targetVersion)
         {
             if (targetVersion != default && targetVersion != MembershipVersion.MinValue && this.snapshot.Version >= targetVersion)
                 return default;

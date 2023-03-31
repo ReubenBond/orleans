@@ -1,17 +1,18 @@
 using System;
 using System.Collections.Generic;
-using System.Net;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Connections.Transport;
+using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
 {
     internal sealed class SiloConnectionListener : ConnectionListener, ILifecycleParticipant<ISiloLifecycle>, ILifecycleObserver
     {
-        public const string DefaultListenerName = "DefaultSiloListener";
+        public const string DefaultListenerName = "silo";
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly MessageCenter messageCenter;
         private readonly EndpointOptions endpointOptions;
@@ -22,8 +23,8 @@ namespace Orleans.Runtime.Messaging
 
         public SiloConnectionListener(
             string name,
-            IOptionsMonitor<ServerMessageTransportBuilder> transportListenerOptions,
-            IEnumerable<IMessageTransportListenerProvider> listenerProviders,
+            IOptionsMonitor<ListenerBuilder> transportListenerOptions,
+            IEnumerable<MessageTransportListener> listeners,
             IOptions<ConnectionOptions> connectionOptions,
             MessageCenter messageCenter,
             IOptions<EndpointOptions> endpointOptions,
@@ -32,7 +33,12 @@ namespace Orleans.Runtime.Messaging
             ConnectionCommon connectionShared,
             ProbeRequestMonitor probeRequestMonitor,
             ConnectionPreambleHelper connectionPreambleHelper)
-            : base(transportListenerOptions.Get(name), listenerProviders, connectionOptions, connectionManager, connectionShared)
+            : base(
+                  transportListenerOptions.Get(name),
+                  listeners.Where(static listener => listener.Features.Get<IConnectionDirectionFeature>()?.Direction == ConnectionDirection.SiloToSilo),
+                  connectionOptions,
+                  connectionManager,
+                  connectionShared)
         {
             this.messageCenter = messageCenter;
             this.localSiloDetails = localSiloDetails;
@@ -59,7 +65,7 @@ namespace Orleans.Runtime.Messaging
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            if (TransportListenerOptions.ListenEndpoint is null) return;
+            if (!IsEnabled) return;
 
             lifecycle.Subscribe(nameof(SiloConnectionListener), ServiceLifecycleStage.RuntimeInitialize - 1, this);
         }

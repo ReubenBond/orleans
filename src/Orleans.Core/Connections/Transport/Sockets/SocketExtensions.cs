@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 
 namespace Orleans.Connections.Transport.Sockets;
 
-public static class SocketExtensions
+internal static class SocketExtensions
 {
     private const int SIO_LOOPBACK_FAST_PATH = -1744830448;
     private static readonly byte[] Enabled = BitConverter.GetBytes(1);
@@ -16,9 +16,12 @@ public static class SocketExtensions
     /// for more information.
     /// </summary>
     /// <param name="socket">The socket for which FastPath should be enabled.</param>
-    public static void EnableFastPath(this Socket socket)
+    public static void EnableFastPath(this Socket socket, bool noDelay = true)
     {
-        try { socket.NoDelay = true; } catch { }
+        if (noDelay)
+        {
+            try { socket.NoDelay = true; } catch { }
+        }
 
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             return;

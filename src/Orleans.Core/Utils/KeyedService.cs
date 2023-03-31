@@ -53,7 +53,7 @@ namespace Orleans.Runtime
         where TService : class
     {
         public KeyedService(TKey key)
-            : base(key, (sp, k) => sp.GetService<TInstance>())
+            : base(key, (sp, k) => ActivatorUtilities.CreateInstance<TInstance>(sp))
         {
         }
     }
@@ -83,6 +83,17 @@ namespace Orleans.Runtime
             this.instance = new Lazy<TService>(() => factory(services, Key));
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="KeyedSingletonService{TKey, TService}"/> class.
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <param name="instance">The instance.</param>
+        public KeyedSingletonService(TKey key, TService instance)
+        {
+            this.Key = key;
+            this.instance = new Lazy<TService>(instance);
+        }
+
         /// <inheritdoc/>
         public TService GetService(IServiceProvider services) => this.instance.Value;
 
@@ -105,7 +116,7 @@ namespace Orleans.Runtime
         where TService : class
     {
         public KeyedSingletonService(TKey key, IServiceProvider services)
-            : base(key, services, (sp, k) => sp.GetService<TInstance>())
+            : base(key, services, (sp, k) => ActivatorUtilities.CreateInstance<TInstance>(sp))
         {
         }
     }
@@ -153,7 +164,6 @@ namespace Orleans.Runtime
             where TInstance : class, TService
             where TService : class
         {
-            collection.TryAddTransient<TInstance>();
             return collection.AddSingleton<IKeyedService<TKey, TService>>(_ => new KeyedService<TKey, TService, TInstance>(key));
         }
 
@@ -173,8 +183,16 @@ namespace Orleans.Runtime
             where TInstance : class, TService
             where TService : class
         {
-            collection.TryAddTransient<TInstance>();
             return collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedSingletonService<TKey, TService, TInstance>(key, sp));
+        }
+
+        /// <summary>
+        /// Register a singleton keyed service
+        /// </summary>
+        public static IServiceCollection AddSingletonKeyedService<TKey, TService>(this IServiceCollection collection, TKey key, TService instance)
+            where TService : class
+        {
+            return collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedSingletonService<TKey, TService>(key, instance));
         }
 
         /// <summary>
@@ -203,6 +221,15 @@ namespace Orleans.Runtime
             where TService : class
         {
             return collection.AddSingletonKeyedService<string, TService>(name, factory);
+        }
+
+        /// <summary>
+        /// Register a singleton named service
+        /// </summary>
+        public static IServiceCollection AddSingletonNamedService<TService>(this IServiceCollection collection, string name, TService instance)
+            where TService : class
+        {
+            return collection.AddSingletonKeyedService<string, TService>(name, instance);
         }
 
         /// <summary>

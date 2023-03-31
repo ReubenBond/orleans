@@ -4,34 +4,39 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Connections.Transport;
+using System.Linq;
+using System.Threading;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime.Messaging
 {
     internal sealed class ClientOutboundConnectionFactory : ConnectionFactory
     {
-        internal static readonly object ServicesKey = new object();
-        private readonly ConnectionCommon connectionShared;
-        private readonly ConnectionOptions connectionOptions;
-        private readonly ClusterOptions clusterOptions;
-        private readonly ConnectionPreambleHelper connectionPreambleHelper;
-        private readonly object initializationLock = new object();
-        private volatile bool isInitialized;
-        private ClientMessageCenter messageCenter;
-        private ConnectionManager connectionManager;
+        public const string DefaultConnectorName = "gw";
+        private readonly object _initializationLock = new();
+        private readonly IGatewayListProvider _gatewayListProvider;
+        private readonly ConnectionCommon _connectionShared;
+        private readonly ConnectionOptions _connectionOptions;
+        private readonly ClusterOptions _clusterOptions;
+        private readonly ConnectionPreambleHelper _connectionPreambleHelper;
+        private volatile bool _isInitialized;
+        private ClientMessageCenter _messageCenter;
+        private ConnectionManager _connectionManager;
 
         public ClientOutboundConnectionFactory(
+            IGatewayListProvider gatewayListProvider,
             IOptions<ConnectionOptions> connectionOptions,
             IOptions<ClusterOptions> clusterOptions,
-            IEnumerable<IMessageTransportFactoryProvider> transportFactoryProviders,
+            IEnumerable<MessageTransportConnector> connectors,
             ConnectionCommon connectionShared,
-            ConnectionPreambleHelper connectionPreambleHelper,
-            IOptionsMonitor<TransportFactoryOptions> transportFactoryOptions)
-            : base(transportFactoryProviders, transportFactoryOptions)
+            ConnectionPreambleHelper connectionPreambleHelper)
+            : base(connectors.Where(static connector => connector.Features.Get<IConnectionDirectionFeature>().Direction == ConnectionDirection.ClientToGateway))
         {
-            this.connectionOptions = connectionOptions.Value;
-            this.connectionShared = connectionShared;
-            this.clusterOptions = clusterOptions.Value;
-            this.connectionPreambleHelper = connectionPreambleHelper;
+            _connectionOptions = connectionOptions.Value;
+            _gatewayListProvider = gatewayListProvider;
+            _connectionShared = connectionShared;
+            _clusterOptions = clusterOptions.Value;
+            _connectionPreambleHelper = connectionPreambleHelper;
         }
 
         protected override Connection CreateConnection(SiloAddress address, MessageTransport transport)
@@ -41,25 +46,42 @@ namespace Orleans.Runtime.Messaging
             return new ClientOutboundConnection(
                 address,
                 transport,
-                this.messageCenter,
-                this.connectionManager,
-                this.connectionShared,
-                this.connectionOptions,
-                this.connectionPreambleHelper,
-                this.clusterOptions);
+                _messageCenter,
+                _connectionManager,
+                _connectionShared,
+                _connectionOptions,
+                _connectionPreambleHelper,
+                _clusterOptions);
+        }
+
+        protected override async IAsyncEnumerable<EndPointInfo> GetEndpointInfo(SiloAddress siloAddress, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            foreach (var uri in await _gatewayListProvider.GetGateways())
+            {
+                var address = uri.ToGatewayAddress();
+                if (address.Equals(siloAddress))
+                {
+                    // TODO: Enhance IGatewayProvider to support providing EndPointInfo objects
+                    yield return new EndPointInfo()
+                    {
+                        Name = DefaultConnectorName,
+                        ["ep"] = address.Endpoint.ToString(),
+                    };
+                }
+            }
         }
 
         private void EnsureInitialized()
         {
-            if (!isInitialized)
+            if (!_isInitialized)
             {
-                lock (this.initializationLock)
+                lock (_initializationLock)
                 {
-                    if (!isInitialized)
+                    if (!_isInitialized)
                     {
-                        this.messageCenter = this.connectionShared.ServiceProvider.GetRequiredService<ClientMessageCenter>();
-                        this.connectionManager = this.connectionShared.ServiceProvider.GetRequiredService<ConnectionManager>();
-                        this.isInitialized = true;
+                        _messageCenter = _connectionShared.ServiceProvider.GetRequiredService<ClientMessageCenter>();
+                        _connectionManager = _connectionShared.ServiceProvider.GetRequiredService<ConnectionManager>();
+                        _isInitialized = true;
                     }
                 }
             }

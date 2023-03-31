@@ -28,6 +28,9 @@ public class TlsMessageTransportListener : MessageTransportListener
     }
 
     /// <inheritdoc/>
+    public override IFeatureCollection Features => _innerListener.Features;
+
+    /// <inheritdoc/>
     public override async ValueTask<MessageTransport?> AcceptAsync(CancellationToken cancellationToken = default)
     {
         var innerTransport = await _innerListener.AcceptAsync(cancellationToken).ConfigureAwait(false);
