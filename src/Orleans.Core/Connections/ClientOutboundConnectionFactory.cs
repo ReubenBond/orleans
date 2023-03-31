@@ -1,3 +1,4 @@
+#nullable enable
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -7,6 +8,8 @@ using Orleans.Connections.Transport;
 using System.Linq;
 using System.Threading;
 using System.Runtime.CompilerServices;
+using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -20,8 +23,8 @@ namespace Orleans.Runtime.Messaging
         private readonly ClusterOptions _clusterOptions;
         private readonly ConnectionPreambleHelper _connectionPreambleHelper;
         private volatile bool _isInitialized;
-        private ClientMessageCenter _messageCenter;
-        private ConnectionManager _connectionManager;
+        private ClientMessageCenter? _messageCenter;
+        private ConnectionManager? _connectionManager;
 
         public ClientOutboundConnectionFactory(
             IGatewayListProvider gatewayListProvider,
@@ -30,7 +33,7 @@ namespace Orleans.Runtime.Messaging
             IEnumerable<MessageTransportConnector> connectors,
             ConnectionCommon connectionShared,
             ConnectionPreambleHelper connectionPreambleHelper)
-            : base(connectors.Where(static connector => connector.Features.Get<IConnectionDirectionFeature>().Direction == ConnectionDirection.ClientToGateway))
+            : base(connectors.Where(static connector => connector.Features.Get<ITransportProtocolFeature>()?.Protocol == TransportProtocol.Gateway))
         {
             _connectionOptions = connectionOptions.Value;
             _gatewayListProvider = gatewayListProvider;
@@ -59,6 +62,11 @@ namespace Orleans.Runtime.Messaging
             foreach (var uri in await _gatewayListProvider.GetGateways())
             {
                 var address = uri.ToGatewayAddress();
+                if (address is null)
+                {
+                    continue;
+                }
+
                 if (address.Equals(siloAddress))
                 {
                     // TODO: Enhance IGatewayProvider to support providing EndPointInfo objects
@@ -71,6 +79,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        [MemberNotNull(nameof(_messageCenter), nameof(_connectionManager))]
         private void EnsureInitialized()
         {
             if (!_isInitialized)
@@ -85,6 +94,9 @@ namespace Orleans.Runtime.Messaging
                     }
                 }
             }
+
+            Debug.Assert(_messageCenter is not null);
+            Debug.Assert(_connectionManager is not null);
         }
     }
 }
