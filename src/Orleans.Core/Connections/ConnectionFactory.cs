@@ -1,61 +1,76 @@
+#nullable enable
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using System.Net;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Options;
 using Orleans.Connections.Transport;
 
 namespace Orleans.Runtime.Messaging;
 
 internal abstract class ConnectionFactory
 {
-    private readonly IMessageTransportFactoryProvider[] _transportFactoryProviders;
-    private readonly IOptionsMonitor<TransportFactoryOptions> _transportFactoryOptions;
+    private readonly Dictionary<string, MessageTransportConnector> _transportConnectors;
 
     protected ConnectionFactory(
-        IEnumerable<IMessageTransportFactoryProvider> transportFactoryProviders,
-        IOptionsMonitor<TransportFactoryOptions> transportFactoryOptions)
+        IEnumerable<MessageTransportConnector> transportConnectors)
     {
-        _transportFactoryProviders = transportFactoryProviders.ToArray();
-        _transportFactoryOptions = transportFactoryOptions;
+        _transportConnectors = transportConnectors.ToDictionary(
+            static connector => connector.Features.Get<IEndPointNameFeature>()?.EndPointName ?? throw new InvalidOperationException($"{nameof(MessageTransportConnector)} {connector} is missing required feature {nameof(IEndPointNameFeature)}"),
+            static connector => connector);
     }
 
     protected abstract Connection CreateConnection(SiloAddress address, MessageTransport context);
 
     public virtual async ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
     {
-        // Get the collection of endpoint info for the address
-        // Enumerate each endpoint info and try to create a transport for it.
-        // When the first transport is successfully created, use it.
-        var endpoint = address.Endpoint;
-        if (!TryGetTransportFactory(endpoint, out var transportFactory))
+        // Get the collection of endpoints for this peer
+        // For each, try to get the connector with a matching name.
+        // If a connector is found, use that connector to connect.
+        // Repeat until success.
+        // If no connectors are found, throw.
+
+        List<Exception>? exceptions = null;
+        var endPoints = new List<EndPointInfo>();
+        await foreach (var endPointInfo in GetEndpointInfo(address, cancellationToken))
         {
-            throw new KeyNotFoundException($"Could not find an endpoint for peer {address}");
-        }
-
-        // Connect to the endpoint.
-        var transport = await transportFactory.CreateAsync(endpoint, cancellationToken);
-
-        var options = _transportFactoryOptions.CurrentValue;
-        transport = options.ApplyMiddleware(transport);
-
-        // Create a connection object to represent the connection.
-        var connection = CreateConnection(address, transport);
-        return connection;
-    }
-
-    protected virtual bool TryGetTransportFactory(EndPoint endpoint, out MessageTransportFactory transportFactory)
-    {
-        foreach (var provider in _transportFactoryProviders)
-        {
-            if (provider.TryGetMessageTransportFactory(endpoint, out transportFactory))
+            endPoints.Add(endPointInfo);
+            if (!_transportConnectors.TryGetValue(endPointInfo.Name, out var connector))
             {
-                return true;
+                continue;
+            }
+
+            try
+            {
+                // Connect to the endpoint.
+                var transport = await connector.CreateAsync(endPointInfo, cancellationToken);
+
+                // Create a connection object to represent the connection.
+                var connection = CreateConnection(address, transport);
+                return connection;
+            }
+            catch (Exception exception)
+            {
+                (exceptions ??= new()).Add(exception);
             }
         }
 
-        transportFactory = null;
-        return false;
+        if (exceptions is null or { Count: 0 })
+        {
+            if (endPoints.Count > 0)
+            {
+                throw new KeyNotFoundException($"No suitable connector found for peer {address} with endpoints {string.Join(", ", endPoints.Select(ep => ep.Name))}");
+            }
+
+            throw new KeyNotFoundException($"Could not find an endpoint for peer {address}");
+        }
+        else
+        {
+            throw new AggregateException($"Unable to connect to peer {address} with endpoints {string.Join(", ", endPoints.Select(ep => ep.Name))}. See {nameof(AggregateException.InnerExceptions)} for details.", exceptions);
+        }
     }
+
+    protected abstract IAsyncEnumerable<EndPointInfo> GetEndpointInfo(SiloAddress siloAddress, CancellationToken cancellationToken = default);
 }

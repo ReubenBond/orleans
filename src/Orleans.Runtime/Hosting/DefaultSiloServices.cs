@@ -382,21 +382,21 @@ namespace Orleans.Hosting
 
         private static void ConfigureMessageTransport(IServiceCollection services)
         {
-            services.AddSingleton<IOptionsFactory<ServerMessageTransportBuilder>, TransportListenerOptionsFactory>();
+            services.AddSingleton<IOptionsFactory<ListenerBuilder>, TransportListenerOptionsFactory>();
             services.AddSingleton<IOptionsFactory<TransportFactoryOptions>, TransportFactoryOptionsFactory>();
             services.AddSingleton<IMessageTransportListenerProvider, OrleansMessageTransportListenerProvider>();
             services.AddSingleton<IMessageTransportFactoryProvider, OrleansMessageTransportFactoryProvider>();
             
             // Add default silo connection listener
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionListener>(sp => ActivatorUtilities.CreateInstance<SiloConnectionListener>(sp, SiloConnectionListener.DefaultListenerName));
-            services.AddOptions<ServerMessageTransportBuilder>(SiloConnectionListener.DefaultListenerName).Configure((ServerMessageTransportBuilder options, IOptions<EndpointOptions> endpointOptions) =>
+            services.AddOptions<ListenerBuilder>(SiloConnectionListener.DefaultListenerName).Configure((ListenerBuilder options, IOptions<EndpointOptions> endpointOptions) =>
             {
                 options.ListenEndpoint = endpointOptions.Value.GetListeningSiloEndpoint();
             });
 
             // Add default gateway connection listener
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, GatewayConnectionListener>(sp => ActivatorUtilities.CreateInstance<GatewayConnectionListener>(sp, GatewayConnectionListener.DefaultListenerName));
-            services.AddOptions<ServerMessageTransportBuilder>(GatewayConnectionListener.DefaultListenerName).Configure((ServerMessageTransportBuilder options, IOptions<EndpointOptions> endpointOptions) =>
+            services.AddOptions<ListenerBuilder>(GatewayConnectionListener.DefaultListenerName).Configure((ListenerBuilder options, IOptions<EndpointOptions> endpointOptions) =>
             {
                 options.ListenEndpoint = endpointOptions.Value.GetListeningProxyEndpoint();
             });

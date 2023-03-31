@@ -1,46 +1,50 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Connections.Transport;
+using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
 {
     internal sealed class SiloConnectionFactory : ConnectionFactory
     {
-        internal static readonly object ServicesKey = new object();
-        private readonly ILocalSiloDetails localSiloDetails;
-        private readonly ConnectionCommon connectionShared;
-        private readonly ProbeRequestMonitor probeRequestMonitor;
-        private readonly ConnectionPreambleHelper connectionPreambleHelper;
+        private readonly ILocalSiloDetails _localSiloDetails;
+        private readonly ConnectionCommon _connectionShared;
+        private readonly ProbeRequestMonitor _probeRequestMonitor;
+        private readonly ConnectionPreambleHelper _connectionPreambleHelper;
         private readonly ConnectionOptions _connectionOptions;
-        private readonly IServiceProvider serviceProvider;
-        private readonly object initializationLock = new ();
-        private bool isInitialized;
-        private ConnectionManager connectionManager;
-        private MessageCenter messageCenter;
-        private ClusterMembershipService clusterMembership;
+        private readonly IServiceProvider _serviceProvider;
+        private readonly object _initializationLock = new ();
+        private bool _isInitialized;
+        private ConnectionManager? _connectionManager;
+        private MessageCenter? _messageCenter;
+        private ClusterMembershipService? _clusterMembership;
 
         public SiloConnectionFactory(
             IServiceProvider serviceProvider,
             IOptions<ConnectionOptions> connectionOptions,
-            IOptionsMonitor<TransportFactoryOptions> transportFactoryOptions,
-            IEnumerable<IMessageTransportFactoryProvider> transportFactoryProviders,
+            IEnumerable<MessageTransportConnector> connectors,
             ILocalSiloDetails localSiloDetails,
             ConnectionCommon connectionShared,
             ProbeRequestMonitor probeRequestMonitor,
             ConnectionPreambleHelper connectionPreambleHelper)
-            : base(transportFactoryProviders, transportFactoryOptions)
+            : base(connectors.Where(static connector => connector.Features.Get<IConnectionDirectionFeature>()?.Direction == ConnectionDirection.SiloToSilo))
         {
             _connectionOptions = connectionOptions.Value;
-            this.serviceProvider = serviceProvider;
-            this.localSiloDetails = localSiloDetails;
-            this.connectionShared = connectionShared;
-            this.probeRequestMonitor = probeRequestMonitor;
-            this.connectionPreambleHelper = connectionPreambleHelper;
+            _serviceProvider = serviceProvider;
+            _localSiloDetails = localSiloDetails;
+            _connectionShared = connectionShared;
+            _probeRequestMonitor = probeRequestMonitor;
+            _connectionPreambleHelper = connectionPreambleHelper;
         }
 
         public override async ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
@@ -50,7 +54,7 @@ namespace Orleans.Runtime.Messaging
             var hasRefreshed = false;
             while (true)
             {
-                var snapshot = clusterMembership.CurrentSnapshot;
+                var snapshot = _clusterMembership.CurrentSnapshot;
                 var status = snapshot.GetSiloStatus(address);
                 if (status.IsTerminating())
                 {
@@ -64,14 +68,12 @@ namespace Orleans.Runtime.Messaging
                         throw new ConnectionAbortedException($"Unable to connect to unknown silo {address}");
                     }
 
-                    await clusterMembership.Refresh();
+                    await _clusterMembership.Refresh();
                     continue;
                 }
 
                 break;
             }
-
-            clusterMembership.CurrentSnapshot.
 
             return await base.ConnectAsync(address, cancellationToken);
         }
@@ -83,30 +85,67 @@ namespace Orleans.Runtime.Messaging
             return new SiloConnection(
                 address,
                 transport,
-                this.messageCenter,
-                this.localSiloDetails,
-                this.connectionManager,
+                _messageCenter,
+                _localSiloDetails,
+                _connectionManager,
                 _connectionOptions,
-                this.connectionShared,
-                this.probeRequestMonitor,
-                this.connectionPreambleHelper);
+                _connectionShared,
+                _probeRequestMonitor,
+                _connectionPreambleHelper);
         }
 
+        protected override async IAsyncEnumerable<EndPointInfo> GetEndpointInfo(SiloAddress siloAddress, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            EnsureInitialized();
+
+            ClusterMember? member;
+            var didRefresh = false;
+            var membershipSnapshot = _clusterMembership.CurrentSnapshot;
+            while (!membershipSnapshot.Members.TryGetValue(siloAddress, out member) && !didRefresh)
+            {
+                // Allow for one refresh.
+                // If silo identity encodes the membership version, then we can do this more intelligently by only refreshing if our current version is below
+                // The silo's joining version.
+                await _clusterMembership.Refresh();
+                membershipSnapshot = _clusterMembership.CurrentSnapshot;
+                didRefresh = true;
+            }
+
+            var status = membershipSnapshot.GetSiloStatus(siloAddress);
+            if (status.IsTerminating())
+            {
+                throw new ConnectionAbortedException($"Denying connection to known-dead silo {siloAddress}");
+            }
+
+            if (member is not null)
+            {
+                foreach (var info in member.Endpoints)
+                {
+                    yield return info;
+                }
+            }
+        }
+
+        [MemberNotNull(nameof(_messageCenter), nameof(_connectionManager), nameof(_clusterMembership))]
         private void EnsureInitialized()
         {
-            if (!isInitialized)
+            if (!_isInitialized)
             {
-                lock (this.initializationLock)
+                lock (_initializationLock)
                 {
-                    if (!isInitialized)
+                    if (!_isInitialized)
                     {
-                        this.messageCenter = this.serviceProvider.GetRequiredService<MessageCenter>();
-                        this.connectionManager = this.serviceProvider.GetRequiredService<ConnectionManager>();
-                        this.clusterMembership = this.serviceProvider.GetRequiredService<ClusterMembershipService>();
-                        this.isInitialized = true;
+                        _messageCenter = _serviceProvider.GetRequiredService<MessageCenter>();
+                        _connectionManager = _serviceProvider.GetRequiredService<ConnectionManager>();
+                        _clusterMembership = _serviceProvider.GetRequiredService<ClusterMembershipService>();
+                        _isInitialized = true;
                     }
                 }
             }
+
+            Debug.Assert(_messageCenter is not null);
+            Debug.Assert(_connectionManager is not null);
+            Debug.Assert(_clusterMembership is not null);
         }
     }
 }

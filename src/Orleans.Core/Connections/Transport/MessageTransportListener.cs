@@ -17,6 +17,11 @@ public abstract class MessageTransportListener : IAsyncDisposable
     public required string EndpointName { get; init; }
 
     /// <summary>
+    /// Gets the collection of features available on the listener.
+    /// </summary>
+    public abstract IFeatureCollection Features { get; }
+
+    /// <summary>
     /// Binds to the configured endpoint and begins listening for incoming connections.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>

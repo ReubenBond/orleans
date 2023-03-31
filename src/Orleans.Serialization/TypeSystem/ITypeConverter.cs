@@ -28,7 +28,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="typeName">Name of the type.</param>
         /// <param name="assemblyName">Name of the assembly.</param>
-        /// <returns><see langword="true" /> if the specified type is allowed; <see langword="false" /> if the type is not allowed; <see langword="null" /> if the type is unknown by this filter.</returns>
+        /// <returns><see langword="true" /> if the specified type is allowed; <see langword="false" /> if the type is not allowed; otherwise, <see langword="null" /> if this filter does not allow or disallow the type.</returns>
         bool? IsTypeNameAllowed(string typeName, string assemblyName);
     }
 
@@ -37,11 +37,11 @@ namespace Orleans.Serialization
     /// </summary>
     public interface ITypeFilter
     {
-        /// <summary>
-        /// Determines whether the specified type is allowed to be serialized, deserialized, etcetera.
-        /// </summary>
-        /// <param name="type">The type</param>
-        /// <returns><see langword="true" /> if the specified type is allowed; <see langword="false" /> if the type is not allowed; <see langword="null" /> if the type is unknown by this filter.</returns>
-        bool? IsTypeAllowed(Type type);
+/// <summary>
+/// Determines whether the specified type is allowed to be serialized, deserialized, etcetera.
+/// </summary>
+/// <param name="type">The type</param>
+/// <returns><see langword="true" /> if the specified type is allowed; <see langword="false" /> if the type is not allowed; otherwise, <see langword="null" /> if this filter does not allow or disallow the type.</returns>
+bool? IsTypeAllowed(Type type);
     }
 }

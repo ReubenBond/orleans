@@ -9,44 +9,60 @@ using System.Net;
 using System.Diagnostics;
 using Orleans.Connections.Sockets;
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Connections.Transport.Sockets;
 
+public class TcpMessageTransportListenerOptions
+{
+    public IPEndPoint? EndPoint { get; set; }
+}
+
+/// <summary>
+/// <see cref="MessageTransportListener"/> which listens for TCP connections.
+/// </summary>
 public class TcpMessageTransportListener : MessageTransportListener
 {
-    private readonly IServiceProvider _serviceProvider;
     private Socket? _listenSocket;
+    private readonly IOptionsMonitor<TcpMessageTransportOptions> _tcpOptions;
+    private readonly IOptionsMonitor<TcpMessageTransportListenerOptions> _listenerOptions;
 
     [SetsRequiredMembers]
-    internal TcpMessageTransportListener(ServerMessageTransportBuilder listenOptions, IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
+    internal TcpMessageTransportListener(string endpointName, IOptionsMonitor<TcpMessageTransportOptions> tcpOptions, IOptionsMonitor<TcpMessageTransportListenerOptions> listenerOptions, ILoggerFactory loggerFactory)
     {
         Debug.Assert(loggerFactory != null);
-        TransportListenerOptions = listenOptions;
-        _serviceProvider = serviceProvider;
-        LocalEndpoint = listenOptions.ListenEndpoint ?? throw new ArgumentNullException(nameof(listenOptions.ListenEndpoint));
+        _listenerOptions = listenerOptions;
+        _tcpOptions = tcpOptions;
+        EndpointName = endpointName;
         Logger = loggerFactory.CreateLogger("Orleans.Connections.Transport.Sockets");
     }
 
-    protected ServerMessageTransportBuilder TransportListenerOptions { get; }
-
     protected ILogger Logger { get; }
 
-    public override EndPoint LocalEndpoint { get; }
+    /// <inheritdoc/>
+    public override FeatureCollection Features { get; } = new FeatureCollection();
 
     protected virtual Socket CreateListenSocket()
     {
-        var listenSocket = new Socket(LocalEndpoint!.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+        var options = _tcpOptions.Get(EndpointName);
+        var listenerOptions = _listenerOptions.Get(EndpointName);
+        var listenSocket = new Socket(listenerOptions.EndPoint!.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
         {
-            LingerState = new LingerOption(true, 0),
-            NoDelay = true
+            LingerState = options.LingerOption,
+            NoDelay = options.NoDelay,
         };
+
         listenSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-        listenSocket.EnableFastPath();
+
+        if (options.FastPath)
+        {
+            listenSocket.EnableFastPath(noDelay: options.NoDelay);
+        }
 
         // IPv6Any is expected to bind to both IPv6 and IPv4
-        if (LocalEndpoint is IPEndPoint ip && ip.Address == IPAddress.IPv6Any)
+        if (listenerOptions.EndPoint is IPEndPoint ip && ip.Address == IPAddress.IPv6Any)
         {
-            listenSocket.DualMode = true;
+            listenSocket.DualMode = options.DualMode;
         }
 
         return listenSocket;
@@ -54,10 +70,11 @@ public class TcpMessageTransportListener : MessageTransportListener
 
     protected virtual void OnAcceptSocket(Socket socket)
     {
-        socket.NoDelay = true;
+        var options = _tcpOptions.Get(EndpointName);
+        socket.NoDelay = options.NoDelay;
     }
 
-    public override ValueTask BindAsync(CancellationToken cancellationToken = default)
+    public override ValueTask<EndPointInfo> BindAsync(CancellationToken cancellationToken = default)
     {
         if (_listenSocket != null)
         {
@@ -68,7 +85,8 @@ public class TcpMessageTransportListener : MessageTransportListener
 
         try
         {
-            listenSocket.Bind(LocalEndpoint);
+            var listenerOptions = _listenerOptions.Get(EndpointName);
+            listenSocket.Bind(listenerOptions.EndPoint!);
         }
         catch (SocketException e) when (e.SocketErrorCode == SocketError.AddressAlreadyInUse)
         {
@@ -78,7 +96,12 @@ public class TcpMessageTransportListener : MessageTransportListener
         listenSocket.Listen(512);
 
         _listenSocket = listenSocket;
-        return default;
+        var endpointInfo = new EndPointInfo
+        {
+            Name = EndpointName,
+            ["ep"] = _listenSocket.LocalEndPoint!.ToString()!
+        };
+        return new (endpointInfo);
     }
 
     public override async ValueTask<MessageTransport?> AcceptAsync(CancellationToken cancellationToken = default)
@@ -93,8 +116,7 @@ public class TcpMessageTransportListener : MessageTransportListener
                 var transport = new TcpMessageTransport(acceptSocket, Logger);
                 transport.Start();
 
-                var result = TransportListenerOptions.ApplyMiddleware(_serviceProvider, transport);
-                return result;
+                return transport;
             }
             catch (OperationCanceledException)
             {
