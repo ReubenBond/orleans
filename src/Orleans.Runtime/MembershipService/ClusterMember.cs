@@ -54,7 +54,7 @@ namespace Orleans.Runtime
         /// Gets the silo endpoints.
         /// </summary>
         [Id(3)]
-        public List<EndPointInfo> Endpoints { get; }
+        public List<EndpointInfo> Endpoints { get; }
 
         /// <summary>
         /// Gets other properties associated with the silo.

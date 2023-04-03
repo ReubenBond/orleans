@@ -282,8 +282,8 @@ namespace Orleans.Runtime.MembershipService
                 parse.AddSuspector(suspectingSilos[i], suspectingTimes[i]);
 
             parse.Endpoints = string.IsNullOrWhiteSpace(tableEntry.Endpoints)
-                ? Array.Empty<EndPointInfo>()
-                : System.Text.Json.JsonSerializer.Deserialize<EndPointInfo[]>(tableEntry.Endpoints);
+                ? Array.Empty<EndpointInfo>()
+                : System.Text.Json.JsonSerializer.Deserialize<EndpointInfo[]>(tableEntry.Endpoints);
 
             return parse;
         }
@@ -308,7 +308,7 @@ namespace Orleans.Runtime.MembershipService
                 FaultZone = memEntry.FaultZone.ToString(CultureInfo.InvariantCulture),
                 StartTime = LogFormatter.PrintDate(memEntry.StartTime),
                 IAmAliveTime = LogFormatter.PrintDate(memEntry.IAmAliveTime),
-                Endpoints = System.Text.Json.JsonSerializer.Serialize(memEntry.Endpoints ?? Array.Empty<EndPointInfo>()),
+                Endpoints = System.Text.Json.JsonSerializer.Serialize(memEntry.Endpoints ?? Array.Empty<EndpointInfo>()),
             };
 
             if (memEntry.SuspectTimes != null)

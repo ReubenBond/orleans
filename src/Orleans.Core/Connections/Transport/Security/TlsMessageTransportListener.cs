@@ -31,6 +31,9 @@ public class TlsMessageTransportListener : MessageTransportListener
     public override IFeatureCollection Features => _innerListener.Features;
 
     /// <inheritdoc/>
+    public override bool IsValid => _innerListener.IsValid;
+
+    /// <inheritdoc/>
     public override async ValueTask<MessageTransport?> AcceptAsync(CancellationToken cancellationToken = default)
     {
         var innerTransport = await _innerListener.AcceptAsync(cancellationToken).ConfigureAwait(false);
@@ -45,7 +48,7 @@ public class TlsMessageTransportListener : MessageTransportListener
     }
 
     /// <inheritdoc/>
-    public override async ValueTask<EndPointInfo> BindAsync(CancellationToken cancellationToken = default)
+    public override async ValueTask<EndpointInfo> BindAsync(CancellationToken cancellationToken = default)
     {
         var innerInfo = await _innerListener.BindAsync(cancellationToken);
 

@@ -65,7 +65,7 @@ namespace Orleans.Runtime.Messaging
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            if (!IsEnabled) return;
+            if (!HasListeners) return;
 
             lifecycle.Subscribe(nameof(SiloConnectionListener), ServiceLifecycleStage.RuntimeInitialize - 1, this);
         }

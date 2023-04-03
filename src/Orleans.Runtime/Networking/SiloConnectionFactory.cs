@@ -94,7 +94,7 @@ namespace Orleans.Runtime.Messaging
                 _connectionPreambleHelper);
         }
 
-        protected override async IAsyncEnumerable<EndPointInfo> GetEndpointInfo(SiloAddress siloAddress, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        protected override async IAsyncEnumerable<EndpointInfo> GetEndpointInfo(SiloAddress siloAddress, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             EnsureInitialized();
 

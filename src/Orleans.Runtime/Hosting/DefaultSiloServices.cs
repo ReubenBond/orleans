@@ -38,6 +38,7 @@ using Orleans.Serialization.Cloning;
 using System.Runtime.InteropServices;
 using Orleans.Connections;
 using Orleans.Connections.Transport;
+using Orleans.Connections.Transport.Sockets;
 
 namespace Orleans.Hosting
 {
@@ -45,8 +46,9 @@ namespace Orleans.Hosting
     {
         private static readonly ServiceDescriptor ServiceDescriptor = new(typeof(ServicesAdded), new ServicesAdded());
 
-        internal static void AddDefaultServices(IServiceCollection services)
+        internal static void AddDefaultServices(this ISiloBuilder siloBuilder)
         {
+            var services = siloBuilder.Services;
             if (services.Contains(ServiceDescriptor))
             {
                 return;
@@ -223,11 +225,13 @@ namespace Orleans.Hosting
 
             // Compatibility
             services.TryAddSingleton<CompatibilityDirectorManager>();
-            // Compatability strategy
+
+            // Compatibility strategy
             services.AddSingletonNamedService<CompatibilityStrategy, AllVersionsCompatible>(nameof(AllVersionsCompatible));
             services.AddSingletonNamedService<CompatibilityStrategy, BackwardCompatible>(nameof(BackwardCompatible));
             services.AddSingletonNamedService<CompatibilityStrategy, StrictVersionCompatible>(nameof(StrictVersionCompatible));
-            // Compatability directors
+
+            // Compatibility directors
             services.AddSingletonKeyedService<Type, ICompatibilityDirector, BackwardCompatilityDirector>(typeof(BackwardCompatible));
             services.AddSingletonKeyedService<Type, ICompatibilityDirector, AllVersionsCompatibilityDirector>(typeof(AllVersionsCompatible));
             services.AddSingletonKeyedService<Type, ICompatibilityDirector, StrictVersionCompatibilityDirector>(typeof(StrictVersionCompatible));
@@ -370,29 +374,31 @@ namespace Orleans.Hosting
             services.AddSingleton<RuntimeMessagingTrace>();
             services.AddFromExisting<MessagingTrace, RuntimeMessagingTrace>();
 
-            ConfigureMessageTransport(services);
+            ConfigureMessageTransport(siloBuilder);
         }
 
-        private static void ConfigureMessageTransport(IServiceCollection services)
+        private static void ConfigureMessageTransport(ISiloBuilder siloBuilder)
         {
-            services.AddSingleton<IOptionsFactory<ListenerBuilder>, TransportListenerOptionsFactory>();
-            services.AddSingleton<IOptionsFactory<TransportFactoryOptions>, TransportFactoryOptionsFactory>();
-            services.AddSingleton<IMessageTransportListenerProvider, OrleansMessageTransportListenerProvider>();
-            services.AddSingleton<IMessageTransportFactoryProvider, OrleansMessageTransportFactoryProvider>();
+            var services = siloBuilder.Services;
+            var transports = siloBuilder.Transports;
             
             // Add default silo connection listener
-            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionListener>(sp => ActivatorUtilities.CreateInstance<SiloConnectionListener>(sp, SiloConnectionListener.DefaultListenerName));
-            services.AddOptions<ListenerBuilder>(SiloConnectionListener.DefaultListenerName).Configure((ListenerBuilder options, IOptions<EndpointOptions> endpointOptions) =>
-            {
-                options.ListenEndpoint = endpointOptions.Value.GetListeningSiloEndpoint();
-            });
+            services.AddSingleton<SiloConnectionListener>(sp => ActivatorUtilities.CreateInstance<SiloConnectionListener>(sp, SiloConnectionListener.DefaultListenerName));
+            services.AddFromExisting<ConnectionListener, SiloConnectionListener>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionListener>();
+            transports
+                .AddListener(SiloConnectionListener.DefaultListenerName)
+                .SetProtocol(Messaging.TransportProtocol.Cluster)
+                .UseTcp(listenerOptions => listenerOptions.PostConfigure((TcpMessageTransportListenerOptions options, IOptions<EndpointOptions> epOptions) => options.Endpoint ??= epOptions.Value.GetListeningSiloEndpoint()));
 
             // Add default gateway connection listener
-            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, GatewayConnectionListener>(sp => ActivatorUtilities.CreateInstance<GatewayConnectionListener>(sp, GatewayConnectionListener.DefaultListenerName));
-            services.AddOptions<ListenerBuilder>(GatewayConnectionListener.DefaultListenerName).Configure((ListenerBuilder options, IOptions<EndpointOptions> endpointOptions) =>
-            {
-                options.ListenEndpoint = endpointOptions.Value.GetListeningProxyEndpoint();
-            });
+            services.AddSingleton<GatewayConnectionListener>(sp => ActivatorUtilities.CreateInstance<GatewayConnectionListener>(sp, GatewayConnectionListener.DefaultListenerName));
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GatewayConnectionListener>();
+            services.AddFromExisting<ConnectionListener, GatewayConnectionListener>();
+            transports
+                .AddListener(GatewayConnectionListener.DefaultListenerName)
+                .SetProtocol(Messaging.TransportProtocol.Gateway)
+                .UseTcp(listenerOptions => listenerOptions.PostConfigure((TcpMessageTransportListenerOptions options, IOptions<EndpointOptions> epOptions) => options.Endpoint ??= epOptions.Value.GetListeningProxyEndpoint()));
         }
 
         private class AllowOrleansTypes : ITypeNameFilter

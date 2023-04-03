@@ -150,18 +150,18 @@ internal class InMemoryTransportConnectionHub
 
     public static InMemoryTransportConnectionHub Instance { get; } = new();
 
-    public void RegisterConnectionListenerFactory(EndPoint endPoint, InMemoryTransportListener listener)
+    public void RegisterConnectionListenerFactory(EndPoint endpoint, InMemoryTransportListener listener)
     {
-        _listeners[endPoint] = listener;
+        _listeners[endpoint] = listener;
         listener.OnDisposed.Register(() =>
         {
-            ((IDictionary<EndPoint, InMemoryTransportListener>)_listeners).Remove(new KeyValuePair<EndPoint, InMemoryTransportListener>(endPoint, listener));
+            ((IDictionary<EndPoint, InMemoryTransportListener>)_listeners).Remove(new KeyValuePair<EndPoint, InMemoryTransportListener>(endpoint, listener));
         });
     }
 
-    public InMemoryTransportListener GetConnectionListenerFactory(EndPoint endPoint)
+    public InMemoryTransportListener GetConnectionListenerFactory(EndPoint endpoint)
     {
-        _listeners.TryGetValue(endPoint, out var listener);
+        _listeners.TryGetValue(endpoint, out var listener);
         return listener;
     }
 }

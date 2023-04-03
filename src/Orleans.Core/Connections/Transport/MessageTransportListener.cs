@@ -12,6 +12,11 @@ namespace Orleans.Connections.Transport;
 public abstract class MessageTransportListener : IAsyncDisposable
 {
     /// <summary>
+    /// Gets a value indicating whether this instance is valid and should be used.
+    /// </summary>
+    public abstract bool IsValid { get; }
+
+    /// <summary>
     /// Gets the name of the endpoint.
     /// </summary>
     public required string EndpointName { get; init; }
@@ -26,7 +31,7 @@ public abstract class MessageTransportListener : IAsyncDisposable
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The bound endpoint configuration.</returns>
-    public abstract ValueTask<EndPointInfo> BindAsync(CancellationToken cancellationToken = default);
+    public abstract ValueTask<EndpointInfo> BindAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Accepts an incoming connection.
