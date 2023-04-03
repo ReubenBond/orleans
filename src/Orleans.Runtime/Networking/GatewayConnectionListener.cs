@@ -23,8 +23,7 @@ namespace Orleans.Runtime.Messaging
         private readonly Gateway gateway;
 
         public GatewayConnectionListener(
-            string name,
-            IOptionsMonitor<ListenerBuilder> transportListenerOptions,
+            ListenerEndpointRegistry listenerEndpointRegistry,
             IEnumerable<MessageTransportListener> listeners,
             IOptions<ConnectionOptions> connectionOptions,
             OverloadDetector overloadDetector,
@@ -36,7 +35,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionPreambleHelper connectionPreambleHelper,
             ILogger<GatewayConnectionListener> logger)
             : base(
-                  transportListenerOptions.Get(name),
+                  listenerEndpointRegistry,
                   listeners.Where(static listener => listener.Features.Get<ITransportProtocolFeature>()?.Protocol == TransportProtocol.Gateway),
                   connectionOptions,
                   connectionManager,

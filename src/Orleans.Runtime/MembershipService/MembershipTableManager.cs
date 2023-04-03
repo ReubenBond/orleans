@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Connections.Transport;
 using Orleans.Internal;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Utilities;
@@ -29,7 +30,7 @@ namespace Orleans.Runtime.MembershipService
 
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly IMembershipGossiper gossiper;
-        private readonly ConnectionListener[] _connectionListeners;
+        private readonly ListenerEndpointRegistry _listenerEndpointRegistry;
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly IMembershipTable membershipTableProvider;
         private readonly ILogger log;
@@ -43,7 +44,7 @@ namespace Orleans.Runtime.MembershipService
         private MembershipTableSnapshot snapshot;
 
         public MembershipTableManager(
-            IEnumerable<ConnectionListener> connectionListeners,
+            ListenerEndpointRegistry listenerEndpointRegistry,
             ILocalSiloDetails localSiloDetails,
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
             IMembershipTable membershipTable,
@@ -53,7 +54,7 @@ namespace Orleans.Runtime.MembershipService
             IAsyncTimerFactory timerFactory,
             ISiloLifecycle siloLifecycle)
         {
-            _connectionListeners = connectionListeners.ToArray();
+            _listenerEndpointRegistry = listenerEndpointRegistry;
             this.localSiloDetails = localSiloDetails;
             this.membershipTableProvider = membershipTable;
             this.fatalErrorHandler = fatalErrorHandler;
@@ -459,7 +460,9 @@ namespace Orleans.Runtime.MembershipService
         {
             if (table.TryGet(myAddress) is { } myTuple)
             {
-                return (myTuple.Item1.Copy(), myTuple.Item2);
+                var myEntry = myTuple.Item1.Copy();
+                myEntry.Endpoints = _listenerEndpointRegistry.GetEndpoints();
+                return (myEntry, myTuple.Item2);
             }
 
             var result = CreateLocalSiloEntry(currentStatus);
@@ -483,7 +486,7 @@ namespace Orleans.Runtime.MembershipService
                 SuspectTimes = new List<Tuple<SiloAddress, DateTime>>(),
                 StartTime = this.siloStartTime,
                 IAmAliveTime = GetDateTimeUtcNow(),
-                Endpoints = _connectionListeners.SelectMany(static listener => listener.Endpoints).ToArray(),
+                Endpoints = _listenerEndpointRegistry.GetEndpoints()
             };
         }
 

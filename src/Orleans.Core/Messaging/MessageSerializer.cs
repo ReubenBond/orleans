@@ -103,7 +103,7 @@ namespace Orleans.Runtime.Messaging
             var headers = message.Headers;
             IFieldCodec? bodyCodec = null;
             ResponseCodec? rawCodec = null;
-            if (message._bodyObject is not null)
+            if (message._bodyObject is not null and not MessageReadRequest)
             {
                 bodyCodec = _codecProvider.GetCodec(message._bodyObject.GetType());
                 if (headers.ResponseType is ResponseTypes.None && bodyCodec is ResponseCodec responseCodec)
@@ -134,7 +134,7 @@ namespace Orleans.Runtime.Messaging
                     bodyLength = writer.Position;
                     buffer = writer.Output;
                 }
-                else if (message._readRequest is { } readRequest)
+                else if (message._bodyObject is MessageReadRequest readRequest)
                 {
                     bodyLength = readRequest.BodyLength;
                     if (bodyLength > 0)
@@ -142,8 +142,8 @@ namespace Orleans.Runtime.Messaging
                         readRequest.Body.CopyTo(ref buffer);
                     }
 
+                    message._bodyObject = null;
                     readRequest.Reset();
-                    message._readRequest = null;
                 }
 
                 // Before completing, check lengths

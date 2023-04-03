@@ -51,6 +51,7 @@ namespace Orleans.Runtime.Messaging
         {
             EnsureInitialized();
 
+            /*
             var hasRefreshed = false;
             while (true)
             {
@@ -74,6 +75,7 @@ namespace Orleans.Runtime.Messaging
 
                 break;
             }
+            */
 
             return await base.ConnectAsync(address, cancellationToken);
         }
@@ -98,6 +100,14 @@ namespace Orleans.Runtime.Messaging
         {
             EnsureInitialized();
 
+            await Task.Yield();
+
+            yield return new EndpointInfo(SiloConnectionListener.DefaultListenerName)
+            {
+                ["ep"] = siloAddress.Endpoint.ToString(),
+            };
+
+            /*
             ClusterMember? member;
             var didRefresh = false;
             var membershipSnapshot = _clusterMembership.CurrentSnapshot;
@@ -124,6 +134,7 @@ namespace Orleans.Runtime.Messaging
                     yield return info;
                 }
             }
+            */
         }
 
         [MemberNotNull(nameof(_messageCenter), nameof(_connectionManager), nameof(_clusterMembership))]

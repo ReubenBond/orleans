@@ -1,11 +1,13 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Connections.Transport.Sockets;
 using Orleans.Messaging;
@@ -128,7 +130,7 @@ internal class EndpointNameFeature : IEndpointNameFeature
 }
 
 /// <summary>
-/// Middleware which operates on <see cref="MessageTransportConnector"/>.
+/// Middleware which operates on <see cref="MessageTransportConnector"/> instances.
 /// </summary>
 public interface IMessageTransportConnectorMiddleware
 {
@@ -140,6 +142,9 @@ public interface IMessageTransportConnectorMiddleware
     MessageTransportConnector Apply(MessageTransportConnector transport);
 }
 
+/// <summary>
+/// Middleware which operates on <see cref="MessageTransportListener"/> instances.
+/// </summary>
 public interface IMessageTransportListenerMiddleware
 {
     /// <summary>
@@ -158,10 +163,12 @@ public static class TcpMessageTransportBuilderExtensions
         var options = builder.Services.AddOptions<TcpMessageTransportOptions>(builder.EndpointName);
         configureTransportOptions?.Invoke(options);
 
-        builder.Services.AddSingletonNamedService<MessageTransportConnector, TcpMessageTransportConnector>(builder.EndpointName);
-
-        // Add a non-named registrations pointing to the named ones
-        builder.Services.AddSingleton(sp => sp.GetRequiredServiceByName<MessageTransportConnector>(builder.EndpointName));
+        builder.Services.AddSingletonNamedService<MessageTransportConnector>(
+            builder.EndpointName,
+            (sp, name) => new TcpMessageTransportConnector(
+                name,
+                sp.GetRequiredService<IOptionsMonitor<TcpMessageTransportOptions>>(),
+                sp.GetRequiredService<ILoggerFactory>()));
 
         return builder;
     }
@@ -252,9 +259,25 @@ internal class ConnectorBuilder : IConnectorBuilder
     {
         EndpointName = endpointName;
         Services = services;
+        services.AddSingleton(GetConnectorFunc(endpointName));
     }
 
     public IServiceCollection Services { get; }
 
     public string EndpointName { get; }
+
+        private static Func<IServiceProvider, MessageTransportConnector> GetConnectorFunc(string name)
+        {
+            return sp =>
+            {
+                var connector = sp.GetRequiredServiceByName<MessageTransportConnector>(name);
+                var mw = sp.GetServicesByName<IMessageTransportConnectorMiddleware>(name);
+                foreach (var middleware in mw)
+                {
+                    connector = middleware.Apply(connector);
+                }
+
+                return connector;
+            };
+        }
 }

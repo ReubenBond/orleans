@@ -21,6 +21,7 @@ using Orleans.Messaging;
 using Orleans.Runtime.Messaging;
 using System.Net;
 using System.Collections.Immutable;
+using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Hosting
 {
@@ -120,11 +121,29 @@ namespace Orleans.Runtime.Messaging
         {
             EndpointName = endpointName;
             Services = services;
+
+            // Add a non-named registrations pointing to the named ones so that ConnectionFactory and ConnectionListener can find them.
+            services.AddSingleton(GetListenerFunc(endpointName));
         }
 
         public IServiceCollection Services { get; }
 
         public string EndpointName { get; }
+
+        private static Func<IServiceProvider, MessageTransportListener> GetListenerFunc(string name)
+        {
+            return sp =>
+            {
+                var listener = sp.GetRequiredServiceByName<MessageTransportListener>(name);
+                var mw = sp.GetServicesByName<IMessageTransportListenerMiddleware>(name);
+                foreach (var middleware in mw)
+                {
+                    listener = middleware.Apply(listener);
+                }
+
+                return listener;
+            };
+        }
     }
 
     public static class TcpMessageTransportBuilderExtensions
@@ -144,29 +163,8 @@ namespace Orleans.Runtime.Messaging
                     sp.GetRequiredService<IOptionsMonitor<TcpMessageTransportOptions>>(),
                     sp.GetRequiredService<IOptionsMonitor<TcpMessageTransportListenerOptions>>(),
                     sp.GetRequiredService<ILoggerFactory>()));
-            builder.Services.AddSingletonNamedService<MessageTransportConnector, TcpMessageTransportConnector>(builder.EndpointName);
-
-            // Add a non-named registrations pointing to the named ones so that ConnectionFactory and ConnectionListener can find them.
-            builder.Services.AddSingleton(sp => sp.GetRequiredServiceByName<MessageTransportListener>(builder.EndpointName));
-            builder.Services.AddSingleton(sp => sp.GetRequiredServiceByName<MessageTransportConnector>(builder.EndpointName));
 
             return builder;
-        }
-    }
-
-    public static class DeleteMe
-    {
-        public static void Configure(ISiloBuilder siloBuilder)
-        {
-            siloBuilder.Transports
-                .AddListener(SiloConnectionListener.DefaultListenerName) // remote hosts use this name to match with connectors configured on their end
-                .SetProtocol(TransportProtocol.Cluster) // This is for silo-to-silo communication (not client-to-gateway)
-                .UseTcp(optionsBuilder => optionsBuilder.Configure(listenerOptions => listenerOptions.Endpoint = IPEndPoint.Parse("127.0.0.1:8000")))
-                .UseTls(optionsBuilder => optionsBuilder.Configure(tlsOptions =>
-                {
-                    tlsOptions.AllowAnyRemoteCertificate();
-                    tlsOptions.LocalCertificate = System.Security.Cryptography.X509Certificates.X509Certificate2.CreateFromPemFile("my-cert-file.pem");
-                }));
         }
     }
 
@@ -190,30 +188,93 @@ namespace Orleans.Runtime.Messaging
         }
     }
 
+    public sealed class ListenerEndpointRegistry
+    {
+        private readonly List<EndpointInfo> _endpoints = new();
+
+        public void AddEndpoints(EndpointInfo[] endpoints)
+        {
+            lock (_endpoints)
+            {
+                foreach (var endpoint in endpoints)
+                {
+                    var index = -1;
+                    for (var i = 0; i < _endpoints.Count; i++)
+                    {
+                        if (StringComparer.Ordinal.Equals(_endpoints[i].Name, endpoint.Name))
+                        {
+                            index = i;
+                            break;
+                        }
+                    }
+
+                    if (index >= 0)
+                    {
+                        _endpoints[index] = endpoint;
+                    }
+                    else
+                    {
+                        _endpoints.Add(endpoint);
+                    }
+                }
+            }
+        }
+
+        public void RemoveEndpoints(EndpointInfo[] endpoints)
+        {
+            lock (_endpoints)
+            {
+                foreach (var endpoint in endpoints)
+                {
+                    var index = -1;
+                    for (var i = 0; i < _endpoints.Count; i++)
+                    {
+                        if (StringComparer.Ordinal.Equals(_endpoints[i].Name, endpoint.Name))
+                        {
+                            index = i;
+                            break;
+                        }
+                    }
+
+                    if (index >= 0)
+                    {
+                        _endpoints.RemoveAt(index);
+                    }
+                }
+            }
+        }
+
+        public EndpointInfo[] GetEndpoints()
+        {
+            lock (_endpoints)
+            {
+                return _endpoints.ToArray();
+            }
+        }
+    }
+
     internal abstract class ConnectionListener
     {
+        private readonly ListenerEndpointRegistry _listenerEndpointRegistry;
         private readonly ConnectionManager _connectionManager;
         private readonly ConnectionCommon _connectionShared;
         private readonly MessageTransportListener[] _listeners;
-        private readonly List<EndpointInfo> _endpoints;
         private readonly ConcurrentDictionary<Connection, object?> _connections = new(ReferenceEqualsComparer.Default);
         private readonly CancellationTokenSource _shutdownCancellation = new();
-        private bool _disposed;
         private Task? _acceptLoopTask;
+        private EndpointInfo[] _endpoints = Array.Empty<EndpointInfo>();
 
         protected ConnectionListener(
-            ListenerBuilder listenerOptions,
-            IEnumerable<MessageTransportListener> listenerProviders,
+            ListenerEndpointRegistry listenerEndpointRegistry,
+            IEnumerable<MessageTransportListener> listeners,
             IOptions<ConnectionOptions> connectionOptions,
             ConnectionManager connectionManager,
             ConnectionCommon connectionShared)
         {
-            TransportListenerOptions = listenerOptions;
 
             // Get the listeners which are valid according to their configuration.
-            _listeners = listenerProviders.Where(static listener => listener.IsValid).ToArray();
-            _endpoints = new(_listeners.Length);
-
+            _listeners = listeners.Where(static listener => listener.IsValid).ToArray();
+            _listenerEndpointRegistry = listenerEndpointRegistry;
             _connectionManager = connectionManager;
             ConnectionOptions = connectionOptions.Value;
             _connectionShared = connectionShared;
@@ -221,15 +282,12 @@ namespace Orleans.Runtime.Messaging
 
         protected bool HasListeners => _listeners is { Length: > 0 };
 
-        protected ListenerBuilder TransportListenerOptions { get; }
-
         protected IServiceProvider ServiceProvider => _connectionShared.ServiceProvider;
 
         protected ConnectionTrace TransportTrace => _connectionShared.ConnectionTrace;
 
         protected ConnectionOptions ConnectionOptions { get; }
 
-        public ImmutableArray<EndpointInfo> Endpoints { get; }
 
         protected abstract Connection CreateConnection(MessageTransport transport);
 
@@ -241,14 +299,17 @@ namespace Orleans.Runtime.Messaging
                 tasks.Add(listener.BindAsync(cancellationToken).AsTask());
             }
 
-            _endpoints.AddRange(await Task.WhenAll(tasks).ConfigureAwait(false));
+            var endpoints = await Task.WhenAll(tasks).ConfigureAwait(false);
+            _endpoints = endpoints;
+            _listenerEndpointRegistry.AddEndpoints(endpoints);
         }
 
         protected void Start()
         {
-            if (_endpoints is not { Count: > 0 })
+            if (_endpoints is { Length: 0 })
             {
-                throw new InvalidOperationException($"Listener is not bound, call {nameof(BindAsync)} first");
+                _acceptLoopTask = Task.CompletedTask;
+                return;
             }
 
             using var _ = new ExecutionContextSuppressor();
@@ -289,6 +350,8 @@ namespace Orleans.Runtime.Messaging
                 {
                     return;
                 }
+
+                _listenerEndpointRegistry.RemoveEndpoints(_endpoints);
 
                 _shutdownCancellation.Cancel();
                 await Task.WhenAll(_listeners.Select(listener => listener.UnbindAsync(cancellationToken).AsTask())).ConfigureAwait(false);
