@@ -381,10 +381,16 @@ namespace Orleans.Hosting
         {
             var services = siloBuilder.Services;
             var transports = siloBuilder.Transports;
+
+            services.AddSingleton<ListenerEndpointRegistry>();
+
+            // Add the default connector for connecting to other silos
+            transports.AddConnector(SiloConnectionListener.DefaultListenerName)
+                .SetProtocol(Messaging.TransportProtocol.Cluster)
+                .UseTcp();
             
             // Add default silo connection listener
-            services.AddSingleton<SiloConnectionListener>(sp => ActivatorUtilities.CreateInstance<SiloConnectionListener>(sp, SiloConnectionListener.DefaultListenerName));
-            services.AddFromExisting<ConnectionListener, SiloConnectionListener>();
+            services.AddSingleton<SiloConnectionListener>(sp => ActivatorUtilities.CreateInstance<SiloConnectionListener>(sp));
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionListener>();
             transports
                 .AddListener(SiloConnectionListener.DefaultListenerName)
@@ -392,9 +398,8 @@ namespace Orleans.Hosting
                 .UseTcp(listenerOptions => listenerOptions.PostConfigure((TcpMessageTransportListenerOptions options, IOptions<EndpointOptions> epOptions) => options.Endpoint ??= epOptions.Value.GetListeningSiloEndpoint()));
 
             // Add default gateway connection listener
-            services.AddSingleton<GatewayConnectionListener>(sp => ActivatorUtilities.CreateInstance<GatewayConnectionListener>(sp, GatewayConnectionListener.DefaultListenerName));
+            services.AddSingleton<GatewayConnectionListener>(sp => ActivatorUtilities.CreateInstance<GatewayConnectionListener>(sp));
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GatewayConnectionListener>();
-            services.AddFromExisting<ConnectionListener, GatewayConnectionListener>();
             transports
                 .AddListener(GatewayConnectionListener.DefaultListenerName)
                 .SetProtocol(Messaging.TransportProtocol.Gateway)

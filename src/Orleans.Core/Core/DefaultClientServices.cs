@@ -143,7 +143,8 @@ namespace Orleans
             services.AddSingleton<IGrainPropertiesProvider, ImplementedInterfaceProvider>();
 
             var transports = clientBuilder.Transports;
-            transports.AddConnector(ClientOutboundConnectionFactory.DefaultConnectorName).UseTcp();
+            transports.AddConnector(ClientOutboundConnectionFactory.DefaultConnectorName)
+                .UseTcp();
         }
 
         /// <summary>
@@ -164,7 +165,7 @@ namespace Orleans
         }
 
         /// <summary>
-        /// A marker type used to determine
+        /// A marker type used to determine whether the default services have been added.
         /// </summary>
         private class ServicesAdded { }
     }

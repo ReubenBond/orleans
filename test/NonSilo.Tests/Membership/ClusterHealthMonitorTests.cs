@@ -1,10 +1,4 @@
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NonSilo.Tests.Utilities;
@@ -13,6 +7,7 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
+using Orleans.Runtime.Messaging;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -35,6 +30,7 @@ namespace NonSilo.Tests.Membership
         private readonly ILocalSiloHealthMonitor localSiloHealthMonitor;
         private readonly InMemoryMembershipTable membershipTable;
         private readonly IRemoteSiloProber prober;
+        private readonly ListenerEndpointRegistry _listenerEndpointRegistry = new();
 
         public ClusterHealthMonitorTests(ITestOutputHelper output)
         {
@@ -122,6 +118,7 @@ namespace NonSilo.Tests.Membership
             }
 
             var manager = new MembershipTableManager(
+                listenerEndpointRegistry: _listenerEndpointRegistry,
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(clusterMembershipOptions),
                 membershipTable: membershipTable,

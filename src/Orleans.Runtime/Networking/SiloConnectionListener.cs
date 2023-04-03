@@ -22,8 +22,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
 
         public SiloConnectionListener(
-            string name,
-            IOptionsMonitor<ListenerBuilder> transportListenerOptions,
+            ListenerEndpointRegistry listenerEndpointRegistry,
             IEnumerable<MessageTransportListener> listeners,
             IOptions<ConnectionOptions> connectionOptions,
             MessageCenter messageCenter,
@@ -34,7 +33,7 @@ namespace Orleans.Runtime.Messaging
             ProbeRequestMonitor probeRequestMonitor,
             ConnectionPreambleHelper connectionPreambleHelper)
             : base(
-                  transportListenerOptions.Get(name),
+                  listenerEndpointRegistry,
                   listeners.Where(static listener => listener.Features.Get<ITransportProtocolFeature>()?.Protocol == TransportProtocol.Cluster),
                   connectionOptions,
                   connectionManager,

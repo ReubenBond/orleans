@@ -70,9 +70,8 @@ namespace Orleans.Runtime.Messaging
                 if (address.Equals(siloAddress))
                 {
                     // TODO: Enhance IGatewayProvider to support providing EndPointInfo objects
-                    yield return new EndpointInfo()
+                    yield return new EndpointInfo(DefaultConnectorName)
                     {
-                        Name = DefaultConnectorName,
                         ["ep"] = address.Endpoint.ToString(),
                     };
                 }
