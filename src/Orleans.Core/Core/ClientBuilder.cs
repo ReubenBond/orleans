@@ -18,7 +18,7 @@ namespace Orleans.Hosting
         {
             Services = services;
             Transports = new ClientTransportCollection(services);
-            DefaultClientServices.AddDefaultServices(services);
+            this.AddDefaultServices();
         }
 
         /// <inheritdoc/>

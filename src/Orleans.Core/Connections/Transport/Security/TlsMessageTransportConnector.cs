@@ -29,7 +29,10 @@ public class TlsMessageTransportConnector : MessageTransportConnector
     public override IFeatureCollection Features => _innerConnector.Features;
 
     /// <inheritdoc/>
-    public override async ValueTask<MessageTransport> CreateAsync(EndPointInfo endpointInfo, CancellationToken cancellationToken = default)
+    public override bool IsValid => _innerConnector.IsValid;
+
+    /// <inheritdoc/>
+    public override async ValueTask<MessageTransport> CreateAsync(EndpointInfo endpointInfo, CancellationToken cancellationToken = default)
     {
         var innerTransport = await _innerConnector.CreateAsync(endpointInfo, cancellationToken);
         var tlsOptions = _tlsOptions.Get(_name);

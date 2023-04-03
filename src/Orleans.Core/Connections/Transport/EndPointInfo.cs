@@ -1,4 +1,4 @@
-﻿#nullable enable
+#nullable enable
 
 using System;
 using System.Collections.Generic;
@@ -9,9 +9,9 @@ namespace Orleans.Connections.Transport;
 /// Property bag describing a messaging endpoint.
 /// </summary>
 [GenerateSerializer]
-public sealed class EndPointInfo : Dictionary<string, string>
+public sealed class EndpointInfo : Dictionary<string, string>
 {
-    public EndPointInfo() : base(StringComparer.Ordinal) { }
+    public EndpointInfo() : base(StringComparer.Ordinal) { }
 
     /// <summary>
     /// Gets or sets the name of the endpoint.

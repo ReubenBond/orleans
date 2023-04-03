@@ -20,13 +20,14 @@ using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Runtime.Messaging;
 using System.Net;
+using System.Collections.Immutable;
 
 namespace Orleans.Hosting
 {
     public interface ISiloTransportCollection
     {
-        IListenerBuilder AddListener(string endPointName);
-        IConnectorBuilder AddConnector(string endPointName);
+        IListenerBuilder AddListener(string endpointName);
+        IConnectorBuilder AddConnector(string endpointName);
     }
 }
 
@@ -37,17 +38,17 @@ namespace Orleans.Runtime.Messaging
         private readonly IServiceCollection _services;
         public SiloTransportCollection(IServiceCollection services) => _services = services;
 
-        public IListenerBuilder AddListener(string endPointName)
+        public IListenerBuilder AddListener(string endpointName)
         {
-            var result = new ListenerBuilder(endPointName, _services);
-            result.AddMiddleware(listener => listener.Features.Set<IEndPointNameFeature>(new EndPointNameFeature(endPointName)));
+            var result = new ListenerBuilder(endpointName, _services);
+            result.AddMiddleware(listener => listener.Features.Set<IEndpointNameFeature>(new EndpointNameFeature(endpointName)));
             return result;
         }
 
-        public IConnectorBuilder AddConnector(string endPointName)
+        public IConnectorBuilder AddConnector(string endpointName)
         {
-            var result = new ConnectorBuilder(endPointName, _services);
-            result.AddMiddleware(listener => listener.Features.Set<IEndPointNameFeature>(new EndPointNameFeature(endPointName)));
+            var result = new ConnectorBuilder(endpointName, _services);
+            result.AddMiddleware(listener => listener.Features.Set<IEndpointNameFeature>(new EndpointNameFeature(endpointName)));
             return result;
         }
     }
@@ -56,7 +57,7 @@ namespace Orleans.Runtime.Messaging
     {
         public static IListenerBuilder AddMiddleware(this IListenerBuilder builder, IMessageTransportListenerMiddleware middleware)
         {
-            builder.Services.AddSingletonNamedService(builder.EndPointName, middleware);
+            builder.Services.AddSingletonNamedService(builder.EndpointName, middleware);
             return builder;
         }
 
@@ -109,21 +110,21 @@ namespace Orleans.Runtime.Messaging
 
     public interface IListenerBuilder
     {
-        public string EndPointName { get; }
+        public string EndpointName { get; }
         public IServiceCollection Services { get; }
     }
 
     public class ListenerBuilder : IListenerBuilder
     {
-        public ListenerBuilder(string endPointName, IServiceCollection services)
+        public ListenerBuilder(string endpointName, IServiceCollection services)
         {
-            EndPointName = endPointName;
+            EndpointName = endpointName;
             Services = services;
         }
 
         public IServiceCollection Services { get; }
 
-        public string EndPointName { get; }
+        public string EndpointName { get; }
     }
 
     public static class TcpMessageTransportBuilderExtensions
@@ -131,36 +132,36 @@ namespace Orleans.Runtime.Messaging
         public static IListenerBuilder UseTcp(this IListenerBuilder builder, Action<OptionsBuilder<TcpMessageTransportListenerOptions>>? configureListenerOptions = default, Action<OptionsBuilder<TcpMessageTransportOptions>>? configureTransportOptions = default)
         {
             // Add a listener and a factory
-            var listenerOptions = builder.Services.AddOptions<TcpMessageTransportListenerOptions>(builder.EndPointName);
+            var listenerOptions = builder.Services.AddOptions<TcpMessageTransportListenerOptions>(builder.EndpointName);
             configureListenerOptions?.Invoke(listenerOptions);
-            var options = builder.Services.AddOptions<TcpMessageTransportOptions>(builder.EndPointName);
+            var options = builder.Services.AddOptions<TcpMessageTransportOptions>(builder.EndpointName);
             configureTransportOptions?.Invoke(options);
 
             builder.Services.AddSingletonNamedService<MessageTransportListener>(
-                builder.EndPointName,
+                builder.EndpointName,
                 (sp, name) => new TcpMessageTransportListener(
                     name,
                     sp.GetRequiredService<IOptionsMonitor<TcpMessageTransportOptions>>(),
                     sp.GetRequiredService<IOptionsMonitor<TcpMessageTransportListenerOptions>>(),
                     sp.GetRequiredService<ILoggerFactory>()));
-            builder.Services.AddSingletonNamedService<MessageTransportConnector, TcpMessageTransportConnector>(builder.EndPointName);
+            builder.Services.AddSingletonNamedService<MessageTransportConnector, TcpMessageTransportConnector>(builder.EndpointName);
 
             // Add a non-named registrations pointing to the named ones so that ConnectionFactory and ConnectionListener can find them.
-            builder.Services.AddSingleton(sp => sp.GetRequiredServiceByName<MessageTransportListener>(builder.EndPointName));
-            builder.Services.AddSingleton(sp => sp.GetRequiredServiceByName<MessageTransportConnector>(builder.EndPointName));
+            builder.Services.AddSingleton(sp => sp.GetRequiredServiceByName<MessageTransportListener>(builder.EndpointName));
+            builder.Services.AddSingleton(sp => sp.GetRequiredServiceByName<MessageTransportConnector>(builder.EndpointName));
 
             return builder;
         }
     }
 
-    public static class FooDeleteMe
+    public static class DeleteMe
     {
         public static void Configure(ISiloBuilder siloBuilder)
         {
             siloBuilder.Transports
                 .AddListener(SiloConnectionListener.DefaultListenerName) // remote hosts use this name to match with connectors configured on their end
                 .SetProtocol(TransportProtocol.Cluster) // This is for silo-to-silo communication (not client-to-gateway)
-                .UseTcp(optionsBuilder => optionsBuilder.Configure(listenerOptions => listenerOptions.EndPoint = IPEndPoint.Parse("127.0.0.1:8000")))
+                .UseTcp(optionsBuilder => optionsBuilder.Configure(listenerOptions => listenerOptions.Endpoint = IPEndPoint.Parse("127.0.0.1:8000")))
                 .UseTls(optionsBuilder => optionsBuilder.Configure(tlsOptions =>
                 {
                     tlsOptions.AllowAnyRemoteCertificate();
@@ -169,13 +170,10 @@ namespace Orleans.Runtime.Messaging
         }
     }
 
-    public static class ConnectionDirectionMiddlewareExtensions
+    public static class ListenerBuilderProtocolExtensions
     {
         public static IListenerBuilder SetProtocol(this IListenerBuilder builder, TransportProtocol protocol)
-        {
-            builder.AddMiddleware(listener => listener.Features.Set<ITransportProtocolFeature>(TransportProtocolFeature.Get(protocol)));
-            return builder;
-        }
+            => builder.AddMiddleware(listener => listener.Features.Set<ITransportProtocolFeature>(TransportProtocolFeature.Get(protocol)));
     }
 
     public static class TlsListenerBuilderExtensions
@@ -183,9 +181,9 @@ namespace Orleans.Runtime.Messaging
         public static IListenerBuilder UseTls(this IListenerBuilder builder, Action<OptionsBuilder<TlsOptions>> configureOptions)
         {
             // Add middleware
-            builder.Services.AddSingletonNamedService<IMessageTransportListenerMiddleware>(builder.EndPointName, (sp, name) => ActivatorUtilities.CreateInstance<TlsMessageTransportListenerMiddleware>(sp, name));
-            builder.Services.AddSingletonNamedService<IMessageTransportConnectorMiddleware>(builder.EndPointName, (sp, name) => ActivatorUtilities.CreateInstance<TlsMessageTransportConnectorMiddleware>(sp, name));
-            var options = builder.Services.AddOptions<TlsOptions>(builder.EndPointName);
+            builder.Services.AddSingletonNamedService<IMessageTransportListenerMiddleware>(builder.EndpointName, (sp, name) => ActivatorUtilities.CreateInstance<TlsMessageTransportListenerMiddleware>(sp, name));
+            builder.Services.AddSingletonNamedService<IMessageTransportConnectorMiddleware>(builder.EndpointName, (sp, name) => ActivatorUtilities.CreateInstance<TlsMessageTransportConnectorMiddleware>(sp, name));
+            var options = builder.Services.AddOptions<TlsOptions>(builder.EndpointName);
             configureOptions?.Invoke(options);
 
             return builder;
@@ -197,9 +195,10 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionManager _connectionManager;
         private readonly ConnectionCommon _connectionShared;
         private readonly MessageTransportListener[] _listeners;
-        private readonly List<EndPointInfo> _endpoints;
+        private readonly List<EndpointInfo> _endpoints;
         private readonly ConcurrentDictionary<Connection, object?> _connections = new(ReferenceEqualsComparer.Default);
         private readonly CancellationTokenSource _shutdownCancellation = new();
+        private bool _disposed;
         private Task? _acceptLoopTask;
 
         protected ConnectionListener(
@@ -211,8 +210,8 @@ namespace Orleans.Runtime.Messaging
         {
             TransportListenerOptions = listenerOptions;
 
-            // Get the listeners which are marked as gateway to client listeners.
-            _listeners = listenerProviders.ToArray();
+            // Get the listeners which are valid according to their configuration.
+            _listeners = listenerProviders.Where(static listener => listener.IsValid).ToArray();
             _endpoints = new(_listeners.Length);
 
             _connectionManager = connectionManager;
@@ -220,7 +219,7 @@ namespace Orleans.Runtime.Messaging
             _connectionShared = connectionShared;
         }
 
-        protected bool IsEnabled => _listeners is { Length: > 0 };
+        protected bool HasListeners => _listeners is { Length: > 0 };
 
         protected ListenerBuilder TransportListenerOptions { get; }
 
@@ -230,14 +229,19 @@ namespace Orleans.Runtime.Messaging
 
         protected ConnectionOptions ConnectionOptions { get; }
 
+        public ImmutableArray<EndpointInfo> Endpoints { get; }
+
         protected abstract Connection CreateConnection(MessageTransport transport);
 
         protected async Task BindAsync(CancellationToken cancellationToken)
         {
+            var tasks = new List<Task<EndpointInfo>>(_listeners.Length);
             foreach (var listener in _listeners)
             {
-                _endpoints.Add(await listener.BindAsync(cancellationToken));
+                tasks.Add(listener.BindAsync(cancellationToken).AsTask());
             }
+
+            _endpoints.AddRange(await Task.WhenAll(tasks).ConfigureAwait(false));
         }
 
         protected void Start()
@@ -281,7 +285,7 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                if (!IsEnabled)
+                if (!HasListeners)
                 {
                     return;
                 }

@@ -40,7 +40,10 @@ public class TcpMessageTransportConnector : MessageTransportConnector
     public override IFeatureCollection Features { get; } = new FeatureCollection();
 
     /// <inheritdoc/>
-    public override async ValueTask<MessageTransport> CreateAsync(EndPointInfo endpointInfo, CancellationToken cancellationToken = default)
+    public override bool IsValid => true;
+
+    /// <inheritdoc/>
+    public override async ValueTask<MessageTransport> CreateAsync(EndpointInfo endpointInfo, CancellationToken cancellationToken = default)
     {
         if (!endpointInfo.TryGetValue("ep", out var endpointString))
         {

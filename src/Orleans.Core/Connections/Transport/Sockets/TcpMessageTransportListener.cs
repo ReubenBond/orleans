@@ -15,7 +15,8 @@ namespace Orleans.Connections.Transport.Sockets;
 
 public class TcpMessageTransportListenerOptions
 {
-    public IPEndPoint? EndPoint { get; set; }
+    public IPEndPoint? Endpoint { get; set; }
+    public bool Enabled { get; set; } = true;
 }
 
 /// <summary>
@@ -42,11 +43,13 @@ public class TcpMessageTransportListener : MessageTransportListener
     /// <inheritdoc/>
     public override FeatureCollection Features { get; } = new FeatureCollection();
 
+    public override bool IsValid => _listenerOptions.Get(EndpointName).Enabled;
+
     protected virtual Socket CreateListenSocket()
     {
         var options = _tcpOptions.Get(EndpointName);
         var listenerOptions = _listenerOptions.Get(EndpointName);
-        var listenSocket = new Socket(listenerOptions.EndPoint!.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+        var listenSocket = new Socket(listenerOptions.Endpoint!.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
         {
             LingerState = options.LingerOption,
             NoDelay = options.NoDelay,
@@ -60,7 +63,7 @@ public class TcpMessageTransportListener : MessageTransportListener
         }
 
         // IPv6Any is expected to bind to both IPv6 and IPv4
-        if (listenerOptions.EndPoint is IPEndPoint ip && ip.Address == IPAddress.IPv6Any)
+        if (listenerOptions.Endpoint is IPEndPoint ip && ip.Address == IPAddress.IPv6Any)
         {
             listenSocket.DualMode = options.DualMode;
         }
@@ -74,7 +77,7 @@ public class TcpMessageTransportListener : MessageTransportListener
         socket.NoDelay = options.NoDelay;
     }
 
-    public override ValueTask<EndPointInfo> BindAsync(CancellationToken cancellationToken = default)
+    public override ValueTask<EndpointInfo> BindAsync(CancellationToken cancellationToken = default)
     {
         if (_listenSocket != null)
         {
@@ -86,7 +89,7 @@ public class TcpMessageTransportListener : MessageTransportListener
         try
         {
             var listenerOptions = _listenerOptions.Get(EndpointName);
-            listenSocket.Bind(listenerOptions.EndPoint!);
+            listenSocket.Bind(listenerOptions.Endpoint!);
         }
         catch (SocketException e) when (e.SocketErrorCode == SocketError.AddressAlreadyInUse)
         {
@@ -96,7 +99,7 @@ public class TcpMessageTransportListener : MessageTransportListener
         listenSocket.Listen(512);
 
         _listenSocket = listenSocket;
-        var endpointInfo = new EndPointInfo
+        var endpointInfo = new EndpointInfo
         {
             Name = EndpointName,
             ["ep"] = _listenSocket.LocalEndPoint!.ToString()!
@@ -106,7 +109,7 @@ public class TcpMessageTransportListener : MessageTransportListener
 
     public override async ValueTask<MessageTransport?> AcceptAsync(CancellationToken cancellationToken = default)
     {
-        while (true)
+        while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
@@ -139,6 +142,8 @@ public class TcpMessageTransportListener : MessageTransportListener
                 SocketsLog.ConnectionReset(Logger, connection: "(null)");
             }
         }
+
+        return null;
     }
 
     public override ValueTask UnbindAsync(CancellationToken cancellationToken)

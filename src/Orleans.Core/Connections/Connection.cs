@@ -254,7 +254,7 @@ HandleCompletedRequest:
                 {
                     Log.LogWarning(
                         error,
-                        "Exception while processing messages from remote endpoint {EndPoint}",
+                        "Exception while processing messages from remote endpoint {Endpoint}",
                         RemoteEndpoint);
                 }
 
@@ -274,7 +274,7 @@ HandleCompletedRequest:
             if (Log.IsEnabled(LogLevel.Information))
             {
                 Log.LogInformation(
-                    "Rerouting message {Message} from remote endpoint {EndPoint}",
+                    "Rerouting message {Message} from remote endpoint {Endpoint}",
                     message,
                     RemoteEndpoint?.ToString() ?? "(never connected)");
             }

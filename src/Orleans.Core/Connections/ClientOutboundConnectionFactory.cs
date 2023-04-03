@@ -57,7 +57,7 @@ namespace Orleans.Runtime.Messaging
                 _clusterOptions);
         }
 
-        protected override async IAsyncEnumerable<EndPointInfo> GetEndpointInfo(SiloAddress siloAddress, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        protected override async IAsyncEnumerable<EndpointInfo> GetEndpointInfo(SiloAddress siloAddress, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             foreach (var uri in await _gatewayListProvider.GetGateways())
             {
@@ -70,7 +70,7 @@ namespace Orleans.Runtime.Messaging
                 if (address.Equals(siloAddress))
                 {
                     // TODO: Enhance IGatewayProvider to support providing EndPointInfo objects
-                    yield return new EndPointInfo()
+                    yield return new EndpointInfo()
                     {
                         Name = DefaultConnectorName,
                         ["ep"] = address.Endpoint.ToString(),

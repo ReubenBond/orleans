@@ -81,7 +81,7 @@ public abstract class MessageTransport : IAsyncDisposable
 }
 
 /// <summary>
-/// Creates <see cref="MessageTransport"/> instances which are connected to a specified <see cref="EndPoint"/>.
+/// Creates <see cref="MessageTransport"/> instances which are connected to a specified endpoint.
 /// </summary>
 public abstract class MessageTransportConnector : IAsyncDisposable
 {
@@ -89,6 +89,11 @@ public abstract class MessageTransportConnector : IAsyncDisposable
     /// Gets the collection of features available on the transport factory.
     /// </summary>
     public abstract IFeatureCollection Features { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether this connector is valid for use.
+    /// </summary>
+    public abstract bool IsValid { get; }
     
     /// <summary>
     /// Creates a <see cref="MessageTransport"/> connected to the specified <paramref name="endpoint"/>.
@@ -96,7 +101,7 @@ public abstract class MessageTransportConnector : IAsyncDisposable
     /// <param name="endpoint">The endpoint to connect to.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The connected message transport.</returns>
-    public abstract ValueTask<MessageTransport> CreateAsync(EndPointInfo endpoint, CancellationToken cancellationToken = default);
+    public abstract ValueTask<MessageTransport> CreateAsync(EndpointInfo endpoint, CancellationToken cancellationToken = default);
 
     /// <inheritdoc/>
     public virtual ValueTask DisposeAsync()
@@ -106,20 +111,20 @@ public abstract class MessageTransportConnector : IAsyncDisposable
     }
 }
 
-internal interface IEndPointNameFeature
+internal interface IEndpointNameFeature
 {
-    public string EndPointName { get; }
+    public string EndpointName { get; }
 }
 
-internal class EndPointNameFeature : IEndPointNameFeature
+internal class EndpointNameFeature : IEndpointNameFeature
 {
     [SetsRequiredMembers]
-    public EndPointNameFeature(string endPointName)
+    public EndpointNameFeature(string endpointName)
     {
-        EndPointName = endPointName;
+        EndpointName = endpointName;
     }
 
-    public required string EndPointName { get; init; }
+    public required string EndpointName { get; init; }
 }
 
 /// <summary>
@@ -150,27 +155,37 @@ public static class TcpMessageTransportBuilderExtensions
     public static IConnectorBuilder UseTcp(this IConnectorBuilder builder, Action<OptionsBuilder<TcpMessageTransportOptions>>? configureTransportOptions = default)
     {
         // Add a listener and a factory
-        var options = builder.Services.AddOptions<TcpMessageTransportOptions>(builder.EndPointName);
+        var options = builder.Services.AddOptions<TcpMessageTransportOptions>(builder.EndpointName);
         configureTransportOptions?.Invoke(options);
 
-        builder.Services.AddSingletonNamedService<MessageTransportConnector, TcpMessageTransportConnector>(builder.EndPointName);
+        builder.Services.AddSingletonNamedService<MessageTransportConnector, TcpMessageTransportConnector>(builder.EndpointName);
 
         // Add a non-named registrations pointing to the named ones
-        builder.Services.AddSingleton(sp => sp.GetRequiredServiceByName<MessageTransportConnector>(builder.EndPointName));
+        builder.Services.AddSingleton(sp => sp.GetRequiredServiceByName<MessageTransportConnector>(builder.EndpointName));
 
         return builder;
     }
 }
 
+/// <summary>
+/// Builder type for building a connector which can create a <see cref="MessageTransport"/> connected to a specified endpoint.
+/// </summary>
 public interface IConnectorBuilder
 {
-    public string EndPointName { get; }
+    /// <summary>
+    /// Gets the endpoint name.
+    /// </summary>
+    public string EndpointName { get; }
+
+    /// <summary>
+    /// Gets the service collection.
+    /// </summary>
     public IServiceCollection Services { get; }
 }
 
 public interface IClientTransportCollection
 {
-    IConnectorBuilder AddTransport(string endPointName);
+    IConnectorBuilder AddConnector(string endpointName);
 }
 
 internal class ClientTransportCollection : IClientTransportCollection
@@ -178,14 +193,11 @@ internal class ClientTransportCollection : IClientTransportCollection
     private readonly IServiceCollection _services;
     public ClientTransportCollection(IServiceCollection services) => _services = services;
 
-    public IConnectorBuilder AddTransport(string endPointName)
+    public IConnectorBuilder AddConnector(string endpointName)
     {
-        var result = new ConnectorBuilder(endPointName, _services);
-        result.AddMiddleware(factory =>
-        {
-            factory.Features.Set<ITransportProtocolFeature>(TransportProtocolFeature.ClientToGateway);
-            factory.Features.Set<IEndPointNameFeature>(new EndPointNameFeature(endPointName));
-        });
+        var result = new ConnectorBuilder(endpointName, _services);
+        result.AddMiddleware(factory => factory.Features.Set<IEndpointNameFeature>(new EndpointNameFeature(endpointName)));
+        result.SetProtocol(TransportProtocol.Gateway);
         return result;
     }
 }
@@ -194,13 +206,16 @@ public static class ConnectorBuilderMiddlewareExtensions
 {
     public static IConnectorBuilder AddMiddleware(this IConnectorBuilder builder, IMessageTransportConnectorMiddleware middleware)
     {
-        builder.Services.AddSingletonNamedService(builder.EndPointName, middleware);
+        builder.Services.AddSingletonNamedService(builder.EndpointName, middleware);
         return builder;
     }
 
     public static IConnectorBuilder AddMiddleware(this IConnectorBuilder builder, Action<MessageTransportConnector> middleware) => builder.AddMiddleware(new ActionMessageTransportConnectorMiddleware(middleware));
 
     public static IConnectorBuilder AddMiddleware(this IConnectorBuilder builder, Func<MessageTransportConnector, MessageTransportConnector> middleware) => builder.AddMiddleware(new FuncMessageTransportConnectorMiddleware(middleware));
+
+    public static IConnectorBuilder SetProtocol(this IConnectorBuilder builder, TransportProtocol protocol)
+        => builder.AddMiddleware(connector => connector.Features.Set<ITransportProtocolFeature>(TransportProtocolFeature.Get(protocol)));
 
     private sealed class FuncMessageTransportConnectorMiddleware : IMessageTransportConnectorMiddleware
     {
@@ -233,13 +248,13 @@ public static class ConnectorBuilderMiddlewareExtensions
 
 internal class ConnectorBuilder : IConnectorBuilder
 {
-    public ConnectorBuilder(string endPointName, IServiceCollection services)
+    public ConnectorBuilder(string endpointName, IServiceCollection services)
     {
-        EndPointName = endPointName;
+        EndpointName = endpointName;
         Services = services;
     }
 
     public IServiceCollection Services { get; }
 
-    public string EndPointName { get; }
+    public string EndpointName { get; }
 }

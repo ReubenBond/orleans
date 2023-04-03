@@ -19,6 +19,7 @@ using Orleans.Serialization.Cloning;
 using Microsoft.Extensions.Hosting;
 using System.Runtime.InteropServices;
 using Orleans.Connections;
+using Orleans.Hosting;
 using Orleans.Connections.Transport;
 
 namespace Orleans
@@ -33,9 +34,10 @@ namespace Orleans
         /// <summary>
         /// Configures the default services for a client.
         /// </summary>
-        /// <param name="services">The service collection.</param>
-        public static void AddDefaultServices(IServiceCollection services)
+        /// <param name="clientBuilder">The client builder.</param>
+        public static void AddDefaultServices(this IClientBuilder clientBuilder)
         {
+            var services = clientBuilder.Services;
             if (services.Contains(ServiceDescriptor))
             {
                 return;
@@ -140,13 +142,9 @@ namespace Orleans
             services.AddSingleton<IGrainInterfacePropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, ImplementedInterfaceProvider>();
-            ConfigureMessageTransport(services);
-        }
 
-        private static void ConfigureMessageTransport(IServiceCollection services)
-        {
-            services.AddSingleton<IOptionsFactory<TransportFactoryOptions>, TransportFactoryOptionsFactory>();
-            services.AddSingleton<IMessageTransportFactoryProvider, OrleansMessageTransportFactoryProvider>();
+            var transports = clientBuilder.Transports;
+            transports.AddConnector(ClientOutboundConnectionFactory.DefaultConnectorName).UseTcp();
         }
 
         /// <summary>

@@ -305,7 +305,7 @@ namespace Orleans
         public DateTime IAmAliveTime { get; set; }
 
         [Id(11)]
-        public EndPointInfo[] Endpoints { get; set; }
+        public EndpointInfo[] Endpoints { get; set; }
 
         public void AddOrUpdateSuspector(SiloAddress localSilo, DateTime voteTime, int maxVotes)
         {

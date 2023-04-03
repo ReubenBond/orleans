@@ -183,7 +183,7 @@ namespace Orleans.Runtime.Messaging
                 if (this.trace.IsEnabled(LogLevel.Information))
                 {
                     this.trace.LogInformation(
-                        "Establishing connection to endpoint {EndPoint}",
+                        "Establishing connection to endpoint {Endpoint}",
                         address);
                 }
 
@@ -196,7 +196,7 @@ namespace Orleans.Runtime.Messaging
                 if (this.trace.IsEnabled(LogLevel.Information))
                 {
                     this.trace.LogInformation(
-                        "Connected to endpoint {EndPoint}",
+                        "Connected to endpoint {Endpoint}",
                         address);
                 }
 
@@ -213,7 +213,7 @@ namespace Orleans.Runtime.Messaging
 
                 this.trace.LogWarning(
                     exception,
-                    "Connection attempt to endpoint {EndPoint} failed",
+                    "Connection attempt to endpoint {Endpoint} failed",
                     address);
 
                 if (exception is OperationCanceledException && openConnectionCancellation?.IsCancellationRequested == true && !shutdownCancellation.IsCancellationRequested)

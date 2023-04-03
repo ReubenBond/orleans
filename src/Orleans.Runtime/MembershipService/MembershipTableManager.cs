@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Utilities;
 using Orleans.Serialization.TypeSystem;
 
@@ -28,6 +29,7 @@ namespace Orleans.Runtime.MembershipService
 
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly IMembershipGossiper gossiper;
+        private readonly ConnectionListener[] _connectionListeners;
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly IMembershipTable membershipTableProvider;
         private readonly ILogger log;
@@ -41,6 +43,7 @@ namespace Orleans.Runtime.MembershipService
         private MembershipTableSnapshot snapshot;
 
         public MembershipTableManager(
+            IEnumerable<ConnectionListener> connectionListeners,
             ILocalSiloDetails localSiloDetails,
             IOptions<ClusterMembershipOptions> clusterMembershipOptions,
             IMembershipTable membershipTable,
@@ -50,6 +53,7 @@ namespace Orleans.Runtime.MembershipService
             IAsyncTimerFactory timerFactory,
             ISiloLifecycle siloLifecycle)
         {
+            _connectionListeners = connectionListeners.ToArray();
             this.localSiloDetails = localSiloDetails;
             this.membershipTableProvider = membershipTable;
             this.fatalErrorHandler = fatalErrorHandler;
@@ -478,7 +482,8 @@ namespace Orleans.Runtime.MembershipService
 
                 SuspectTimes = new List<Tuple<SiloAddress, DateTime>>(),
                 StartTime = this.siloStartTime,
-                IAmAliveTime = GetDateTimeUtcNow()
+                IAmAliveTime = GetDateTimeUtcNow(),
+                Endpoints = _connectionListeners.SelectMany(static listener => listener.Endpoints).ToArray(),
             };
         }
 
