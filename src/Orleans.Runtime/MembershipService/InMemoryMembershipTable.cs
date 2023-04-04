@@ -95,5 +95,12 @@ namespace Orleans.Runtime.MembershipService
                 }
             }
         }
+
+        public void Reset()
+        {
+            siloTable.Clear();
+            lastETagCounter = 0;
+            tableVersion = new TableVersion(0, NewETag());
+        }
     }
 }

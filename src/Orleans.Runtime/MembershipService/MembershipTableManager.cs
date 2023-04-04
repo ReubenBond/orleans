@@ -69,10 +69,8 @@ namespace Orleans.Runtime.MembershipService
                     initialEntries);
             this.updates = new AsyncEnumerable<MembershipTableSnapshot>(
                 (previous, proposed) => proposed.Version == MembershipVersion.MinValue || proposed.Version > previous.Version,
-                this.snapshot)
-            {
-                OnPublished = update => Interlocked.Exchange(ref this.snapshot, update)
-            };
+                this.snapshot,
+                update => Interlocked.Exchange(ref this.snapshot, update));
 
             this.membershipUpdateTimer = timerFactory.Create(
                 this.clusterMembershipOptions.TableRefreshTimeout,

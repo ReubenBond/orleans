@@ -6,11 +6,11 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Connections.Transport;
+using Orleans.Connections.Transport.Sockets;
 using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
@@ -47,39 +47,6 @@ namespace Orleans.Runtime.Messaging
             _connectionPreambleHelper = connectionPreambleHelper;
         }
 
-        public override async ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
-        {
-            EnsureInitialized();
-
-            /*
-            var hasRefreshed = false;
-            while (true)
-            {
-                var snapshot = _clusterMembership.CurrentSnapshot;
-                var status = snapshot.GetSiloStatus(address);
-                if (status.IsTerminating())
-                {
-                    throw new ConnectionAbortedException($"Denying connection to known-dead silo {address}");
-                }
-
-                if (status == SiloStatus.None)
-                {
-                    if (hasRefreshed)
-                    {
-                        throw new ConnectionAbortedException($"Unable to connect to unknown silo {address}");
-                    }
-
-                    await _clusterMembership.Refresh();
-                    continue;
-                }
-
-                break;
-            }
-            */
-
-            return await base.ConnectAsync(address, cancellationToken);
-        }
-
         protected override Connection CreateConnection(SiloAddress address, MessageTransport transport)
         {
             EnsureInitialized();
@@ -100,22 +67,26 @@ namespace Orleans.Runtime.Messaging
         {
             EnsureInitialized();
 
-            await Task.Yield();
-
-            yield return new EndpointInfo(SiloConnectionListener.DefaultListenerName)
+            // Handle the development clustering scenario, where an endpoint IP address is hard-coded with a generation of 0.
+            // This could be made into an abstraction to support non-TCP/IP cases.
+            if (siloAddress.Generation == 0)
             {
-                ["ep"] = siloAddress.Endpoint.ToString(),
-            };
+                yield return new EndpointInfo(SiloConnectionListener.DefaultListenerName)
+                {
+                    [TcpMessageTransportConnector.EndpointAddressPropertyName] = siloAddress.Endpoint.ToString(),
+                };
 
-            /*
+                yield break;
+            }
+
             ClusterMember? member;
             var didRefresh = false;
             var membershipSnapshot = _clusterMembership.CurrentSnapshot;
             while (!membershipSnapshot.Members.TryGetValue(siloAddress, out member) && !didRefresh)
             {
-                // Allow for one refresh.
-                // If silo identity encodes the membership version, then we can do this more intelligently by only refreshing if our current version is below
-                // The silo's joining version.
+                // Allow for one refresh in the event that the silo is not found in the current membership table.
+                // If silo identity encoded the membership version, then we could do this more intelligently by only refreshing if our current version is below
+                // the silo's joining version.
                 await _clusterMembership.Refresh();
                 membershipSnapshot = _clusterMembership.CurrentSnapshot;
                 didRefresh = true;
@@ -134,7 +105,6 @@ namespace Orleans.Runtime.Messaging
                     yield return info;
                 }
             }
-            */
         }
 
         [MemberNotNull(nameof(_messageCenter), nameof(_connectionManager), nameof(_clusterMembership))]

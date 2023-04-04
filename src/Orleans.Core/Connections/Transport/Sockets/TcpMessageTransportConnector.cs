@@ -25,6 +25,7 @@ public class TcpMessageTransportOptions
 /// </summary>
 public class TcpMessageTransportConnector : MessageTransportConnector
 {
+    public const string EndpointAddressPropertyName = "ep";
     private readonly string _name;
     private readonly IOptionsMonitor<TcpMessageTransportOptions> _options;
     private readonly ILogger _logger;
@@ -45,7 +46,7 @@ public class TcpMessageTransportConnector : MessageTransportConnector
     /// <inheritdoc/>
     public override async ValueTask<MessageTransport> CreateAsync(EndpointInfo endpointInfo, CancellationToken cancellationToken = default)
     {
-        if (!endpointInfo.TryGetValue("ep", out var endpointString))
+        if (!endpointInfo.TryGetValue(EndpointAddressPropertyName, out var endpointString))
         {
             throw new ConnectionAbortedException($"Endpoint {endpointInfo.Name} is configured for TCP but no destination address was specified");
         }

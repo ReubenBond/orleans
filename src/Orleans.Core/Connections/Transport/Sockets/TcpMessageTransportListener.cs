@@ -101,7 +101,7 @@ public class TcpMessageTransportListener : MessageTransportListener
         _listenSocket = listenSocket;
         var endpointInfo = new EndpointInfo(EndpointName)
         {
-            ["ep"] = _listenSocket.LocalEndPoint!.ToString()!
+            [TcpMessageTransportConnector.EndpointAddressPropertyName] = _listenSocket.LocalEndPoint!.ToString()!
         };
         return new (endpointInfo);
     }
