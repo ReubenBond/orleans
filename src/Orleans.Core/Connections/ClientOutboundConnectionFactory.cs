@@ -10,6 +10,7 @@ using System.Threading;
 using System.Runtime.CompilerServices;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
+using Orleans.Connections.Transport.Sockets;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -72,7 +73,7 @@ namespace Orleans.Runtime.Messaging
                     // TODO: Enhance IGatewayProvider to support providing EndPointInfo objects
                     yield return new EndpointInfo(DefaultConnectorName)
                     {
-                        ["ep"] = address.Endpoint.ToString(),
+                        [TcpMessageTransportConnector.EndpointAddressPropertyName] = address.Endpoint.ToString(),
                     };
                 }
             }

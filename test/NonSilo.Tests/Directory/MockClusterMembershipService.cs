@@ -29,10 +29,8 @@ namespace UnitTests.Directory
             this.snapshot = ToSnapshot(this.statuses, ++version);
             this.updates = this.updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
                 (previous, proposed) => proposed.Version == MembershipVersion.MinValue || proposed.Version > previous.Version,
-                this.snapshot)
-            {
-                OnPublished = update => Interlocked.Exchange(ref this.snapshot, update)
-            };
+                this.snapshot,
+                update => Interlocked.Exchange(ref this.snapshot, update));
         }
 
         public void UpdateSiloStatus(SiloAddress siloAddress, SiloStatus siloStatus, string name)
