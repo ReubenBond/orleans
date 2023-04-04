@@ -194,7 +194,8 @@ namespace Orleans.Runtime.MembershipService
 
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
-            throw new NotImplementedException();
+            table.CleanupDefunctSiloEntries(beforeDate);
+            return Task.CompletedTask;
         }
     }
 }
