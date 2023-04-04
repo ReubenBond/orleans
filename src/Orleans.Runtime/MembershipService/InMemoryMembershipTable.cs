@@ -83,5 +83,17 @@ namespace Orleans.Runtime.MembershipService
         {
             return lastETagCounter++.ToString(CultureInfo.InvariantCulture);
         }
+
+        public void CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        {
+            foreach (var (entry, _) in siloTable.Values.ToList())
+            {
+                if (entry.Status != SiloStatus.Active
+                    && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
+                {
+                    siloTable.Remove(entry.SiloAddress, out _);
+                }
+            }
+        }
     }
 }
