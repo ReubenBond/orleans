@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Serialization.Configuration
 {
@@ -12,7 +13,7 @@ namespace Orleans.Serialization.Configuration
         /// Initializes a new instance of the <see cref="TypeManifestProviderAttribute"/> class.
         /// </summary>
         /// <param name="providerType">The metadata provider type.</param>
-        public TypeManifestProviderAttribute(Type providerType)
+        public TypeManifestProviderAttribute([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]Type providerType)
         {
             if (providerType is null)
             {
@@ -30,6 +31,7 @@ namespace Orleans.Serialization.Configuration
         /// <summary>
         /// Gets the manifest provider type.
         /// </summary>
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
         public Type ProviderType { get; }
     }
 }

@@ -13,9 +13,9 @@ namespace Orleans.CodeGenerator
         public static ClassDeclarationSyntax GenerateMetadata(Compilation compilation, MetadataModel metadataModel, LibraryTypes libraryTypes)
         {
             var configParam = "config".ToIdentifierName();
-            var addSerializerMethod = configParam.Member("Serializers").Member("Add");
-            var addCopierMethod = configParam.Member("Copiers").Member("Add");
-            var addConverterMethod = configParam.Member("Converters").Member("Add");
+            var addSerializerMethod = configParam.Member("AddSerializer");
+            var addCopierMethod = configParam.Member("AddCopier");
+            var addConverterMethod = configParam.Member("AddConverter");
             var body = new List<StatementSyntax>();
 
             foreach (var type in metadataModel.SerializableTypes)
@@ -53,28 +53,28 @@ namespace Orleans.CodeGenerator
                     ArgumentList(SingletonSeparatedList(Argument(TypeOfExpression(type.ToOpenTypeSyntax())))))));
             }
 
-            var addProxyMethod = configParam.Member("InterfaceProxies").Member("Add");
+            var addProxyMethod = configParam.Member("AddInterfaceProxy");
             foreach (var type in metadataModel.GeneratedProxies)
             {
                 body.Add(ExpressionStatement(InvocationExpression(addProxyMethod,
                     ArgumentList(SingletonSeparatedList(Argument(TypeOfExpression(type.TypeSyntax)))))));
             }
 
-            var addInvokableInterfaceMethod = configParam.Member("Interfaces").Member("Add");
+            var addInvokableInterfaceMethod = configParam.Member("AddInterface");
             foreach (var type in metadataModel.InvokableInterfaces)
             {
                 body.Add(ExpressionStatement(InvocationExpression(addInvokableInterfaceMethod,
                     ArgumentList(SingletonSeparatedList(Argument(TypeOfExpression(type.InterfaceType.ToOpenTypeSyntax())))))));
             }
 
-            var addInvokableInterfaceImplementationMethod = configParam.Member("InterfaceImplementations").Member("Add");
+            var addInvokableInterfaceImplementationMethod = configParam.Member("AddInterfaceImplementation");
             foreach (var type in metadataModel.InvokableInterfaceImplementations)
             {
                 body.Add(ExpressionStatement(InvocationExpression(addInvokableInterfaceImplementationMethod,
                     ArgumentList(SingletonSeparatedList(Argument(TypeOfExpression(type.ToOpenTypeSyntax())))))));
             }
 
-            var addActivatorMethod = configParam.Member("Activators").Member("Add");
+            var addActivatorMethod = configParam.Member("AddActivator");
             foreach (var type in metadataModel.ActivatableTypes)
             {
                 body.Add(ExpressionStatement(InvocationExpression(addActivatorMethod,
@@ -87,14 +87,14 @@ namespace Orleans.CodeGenerator
                     ArgumentList(SingletonSeparatedList(Argument(TypeOfExpression(type.ToOpenTypeSyntax())))))));
             }
 
-            var addWellKnownTypeIdMethod = configParam.Member("WellKnownTypeIds").Member("Add");
+            var addWellKnownTypeIdMethod = configParam.Member("AddWellKnownTypeId");
             foreach (var type in metadataModel.WellKnownTypeIds)
             {
                 body.Add(ExpressionStatement(InvocationExpression(addWellKnownTypeIdMethod,
                     ArgumentList(SeparatedList(new[] { Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(type.Id))), Argument(TypeOfExpression(type.Type)) })))));
             }
 
-            var addTypeAliasMethod = configParam.Member("WellKnownTypeAliases").Member("Add");
+            var addTypeAliasMethod = configParam.Member("AddWellKnownTypeAlias");
             foreach (var type in metadataModel.TypeAliases)
             {
                 body.Add(ExpressionStatement(InvocationExpression(addTypeAliasMethod,
