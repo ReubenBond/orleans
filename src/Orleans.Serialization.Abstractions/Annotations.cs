@@ -536,7 +536,7 @@ namespace Orleans
         TValue ConvertFromSurrogate(in TSurrogate surrogate);
 
         /// <summary>
-        /// Converts a value to the valuetype.
+        /// Converts a value to the value type.
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The surrogate.</returns>

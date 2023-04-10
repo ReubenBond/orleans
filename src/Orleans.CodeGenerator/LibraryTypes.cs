@@ -18,7 +18,6 @@ namespace Orleans.CodeGenerator
             {
                 Compilation = compilation,
                 ApplicationPartAttribute = Type("Orleans.ApplicationPartAttribute"),
-                Action_2 = Type("System.Action`2"),
                 ITypeManifestProvider = Type("Orleans.Serialization.Configuration.ITypeManifestProvider"),
                 Field = Type("Orleans.Serialization.WireProtocol.Field"),
                 FieldCodec_1 = Type("Orleans.Serialization.Codecs.IFieldCodec`1"),
@@ -28,7 +27,6 @@ namespace Orleans.CodeGenerator
                 CompoundTypeAliasAttribute = Type("Orleans.CompoundTypeAliasAttribute"),
                 CopyContext = Type("Orleans.Serialization.Cloning.CopyContext"),
                 MethodInfo = Type("System.Reflection.MethodInfo"),
-                Func_2 = Type("System.Func`2"),
                 GenerateMethodSerializersAttribute = Type("Orleans.GenerateMethodSerializersAttribute"),
                 GenerateSerializerAttribute = Type("Orleans.GenerateSerializerAttribute"),
                 SerializationCallbacksAttribute = Type("Orleans.SerializationCallbacksAttribute"),
@@ -84,6 +82,8 @@ namespace Orleans.CodeGenerator
                 ValueTask_1 = Type("System.Threading.Tasks.ValueTask`1"),
                 ValueTypeGetter_2 = Type("Orleans.Serialization.Utilities.ValueTypeGetter`2"),
                 ValueTypeSetter_2 = Type("Orleans.Serialization.Utilities.ValueTypeSetter`2"),
+                ReferenceTypeGetter_2 = Type("Orleans.Serialization.Utilities.ReferenceTypeGetter`2"),
+                ReferenceTypeSetter_2 = Type("Orleans.Serialization.Utilities.ReferenceTypeSetter`2"),
                 Writer = Type("Orleans.Serialization.Buffers.Writer`1"),
                 FSharpSourceConstructFlagsOrDefault = TypeOrDefault("Microsoft.FSharp.Core.SourceConstructFlags"),
                 FSharpCompilationMappingAttributeOrDefault = TypeOrDefault("Microsoft.FSharp.Core.CompilationMappingAttribute"),
@@ -198,14 +198,12 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        public INamedTypeSymbol Action_2 { get; private set; }
         public INamedTypeSymbol ITypeManifestProvider { get; private set; }
         public INamedTypeSymbol Field { get; private set; }
         public INamedTypeSymbol DeepCopier_1 { get; private set; }
         public INamedTypeSymbol ShallowCopier { get; private set; }
         public INamedTypeSymbol FieldCodec_1 { get; private set; }
         public INamedTypeSymbol AbstractTypeSerializer { get; private set; }
-        public INamedTypeSymbol Func_2 { get; private set; }
         public INamedTypeSymbol CompoundTypeAliasAttribute { get; private set; }
         public INamedTypeSymbol GenerateMethodSerializersAttribute { get; private set; }
         public INamedTypeSymbol GenerateSerializerAttribute { get; private set; }
@@ -236,6 +234,8 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol ValueTask_1 { get; private set; }
         public INamedTypeSymbol ValueTypeGetter_2 { get; private set; }
         public INamedTypeSymbol ValueTypeSetter_2 { get; private set; }
+        public INamedTypeSymbol ReferenceTypeGetter_2 { get; private set; }
+        public INamedTypeSymbol ReferenceTypeSetter_2 { get; private set; }
         public INamedTypeSymbol Writer { get; private set; }
         public INamedTypeSymbol[] IdAttributeTypes { get; private set; }
         public INamedTypeSymbol[] ConstructorAttributeTypes { get; private set; }

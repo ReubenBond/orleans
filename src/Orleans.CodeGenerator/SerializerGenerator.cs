@@ -1367,15 +1367,14 @@ namespace Orleans.CodeGenerator
                 var valueType = containingType.IsValueType;
                 var containingTypeSyntax = containingType.ToTypeSyntax();
 
-                var delegateType = (setter ? (valueType ? library.ValueTypeSetter_2 : library.Action_2) : (valueType ? library.ValueTypeGetter_2 : library.Func_2))
+                var delegateType = (setter ? (valueType ? library.ValueTypeSetter_2 : library.ReferenceTypeSetter_2) : (valueType ? library.ValueTypeGetter_2 : library.ReferenceTypeGetter_2))
                     .ToTypeSyntax(containingTypeSyntax, fieldType);
 
                 // Generate syntax to initialize the field in the constructor
                 var fieldAccessorUtility = AliasQualifiedName("global", IdentifierName("Orleans.Serialization")).Member("Utilities").Member("FieldAccessor");
                 var accessorMethod = setter ? (valueType ? "GetValueSetter" : "GetReferenceSetter") : (valueType ? "GetValueGetter" : "GetGetter");
-                var accessorInvoke = CastExpression(delegateType,
-                    InvocationExpression(fieldAccessorUtility.Member(accessorMethod))
-                        .AddArgumentListArguments(Argument(TypeOfExpression(containingTypeSyntax)), Argument(fieldName.GetLiteralExpression())));
+                var accessorInvoke = InvocationExpression(fieldAccessorUtility.Member(accessorMethod, delegateType))
+                        .AddArgumentListArguments(Argument(TypeOfExpression(containingTypeSyntax)), Argument(fieldName.GetLiteralExpression()));
 
                 return new(delegateType, accessorName, accessorInvoke);
             }

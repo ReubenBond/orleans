@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -10,7 +11,7 @@ namespace Orleans.Serialization.Utilities
     /// <typeparam name="TDeclaring">The declaring type of the field.</typeparam>
     /// <typeparam name="TField">The field type.</typeparam>
     /// <param name="instance">The instance having its field set.</param>
-    public delegate TField ValueTypeGetter<TDeclaring, out TField>(ref TDeclaring instance) where TDeclaring : struct;
+    public delegate TField ValueTypeGetter<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes.PublicFields)] TDeclaring, out TField>(ref TDeclaring instance) where TDeclaring : struct;
 
     /// <summary>
     /// The delegate used to set fields in value types.
@@ -19,7 +20,24 @@ namespace Orleans.Serialization.Utilities
     /// <typeparam name="TField">The field type.</typeparam>
     /// <param name="instance">The instance having its field set.</param>
     /// <param name="value">The value being set.</param>
-    public delegate void ValueTypeSetter<TDeclaring, in TField>(ref TDeclaring instance, TField value) where TDeclaring : struct;
+    public delegate void ValueTypeSetter<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes.PublicFields)] TDeclaring, in TField>(ref TDeclaring instance, TField value) where TDeclaring : struct;
+
+    /// <summary>
+    /// The delegate used to set fields in value types.
+    /// </summary>
+    /// <typeparam name="TDeclaring">The declaring type of the field.</typeparam>
+    /// <typeparam name="TField">The field type.</typeparam>
+    /// <param name="instance">The instance having its field set.</param>
+    public delegate TField ReferenceTypeGetter<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes.PublicFields)] TDeclaring, out TField>(TDeclaring instance) where TDeclaring : struct;
+
+    /// <summary>
+    /// The delegate used to set fields in value types.
+    /// </summary>
+    /// <typeparam name="TDeclaring">The declaring type of the field.</typeparam>
+    /// <typeparam name="TField">The field type.</typeparam>
+    /// <param name="instance">The instance having its field set.</param>
+    /// <param name="value">The value being set.</param>
+    public delegate void ReferenceTypeSetter<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes.PublicFields)] TDeclaring, in TField>(TDeclaring instance, TField value) where TDeclaring : struct;
 
     /// <summary>
     /// Functionality for accessing fields.
@@ -30,18 +48,22 @@ namespace Orleans.Serialization.Utilities
         /// Returns a delegate to get the value of a specified field.
         /// </summary>
         /// <returns>A delegate to get the value of a specified field.</returns>
-        public static Delegate GetGetter(Type declaringType, string fieldName) => GetGetter(declaringType, fieldName, false);
+        public static TDelegate GetGetter<TDelegate>(
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes.PublicFields)] Type declaringType,
+            string fieldName) where TDelegate : Delegate => GetGetter<TDelegate>(declaringType, fieldName, false);
 
         /// <summary>
         /// Returns a delegate to get the value of a specified field.
         /// </summary>
         /// <returns>A delegate to get the value of a specified field.</returns>
-        public static Delegate GetValueGetter(Type declaringType, string fieldName) => GetGetter(declaringType, fieldName, true);
+        public static TDelegate GetValueGetter<TDelegate>(
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes.PublicFields)] Type declaringType, string fieldName) where TDelegate : Delegate => GetGetter<TDelegate>(declaringType, fieldName, true);
 
-        private static Delegate GetGetter(Type declaringType, string fieldName, bool byref)
+        private static TDelegate GetGetter<TDelegate>(
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes.PublicFields)] Type declaringType, string fieldName, bool byRef) where TDelegate : Delegate
         {
             var field = declaringType.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-            var parameterTypes = new[] { typeof(object), byref ? declaringType.MakeByRefType() : declaringType };
+            var parameterTypes = new[] { typeof(object), byRef ? declaringType.MakeByRefType() : declaringType };
 
             var method = new DynamicMethod(fieldName + "Get", field.FieldType, parameterTypes, typeof(FieldAccessor).Module, true);
 
@@ -51,25 +73,26 @@ namespace Orleans.Serialization.Utilities
             emitter.Emit(OpCodes.Ldfld, field);
             emitter.Emit(OpCodes.Ret);
 
-            return method.CreateDelegate((byref ? typeof(ValueTypeGetter<,>) : typeof(Func<,>)).MakeGenericType(declaringType, field.FieldType));
+            return (TDelegate)method.CreateDelegate(typeof(TDelegate));
         }
 
         /// <summary>
         /// Returns a delegate to set the value of this field for an instance.
         /// </summary>
         /// <returns>A delegate to set the value of this field for an instance.</returns>
-        public static Delegate GetReferenceSetter(Type declaringType, string fieldName) => GetSetter(declaringType, fieldName, false);
+        public static TDelegate GetReferenceSetter<TDelegate>([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes.PublicFields)] Type declaringType, string fieldName) where TDelegate : Delegate => GetSetter<TDelegate>(declaringType, fieldName, false);
 
         /// <summary>
         /// Returns a delegate to set the value of this field for an instance.
         /// </summary>
         /// <returns>A delegate to set the value of this field for an instance.</returns>
-        public static Delegate GetValueSetter(Type declaringType, string fieldName) => GetSetter(declaringType, fieldName, true);
+        public static TDelegate GetValueSetter<TDelegate>([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes.PublicFields)] Type declaringType, string fieldName) where TDelegate : Delegate => GetSetter<TDelegate>(declaringType, fieldName, true);
 
-        private static Delegate GetSetter(Type declaringType, string fieldName, bool byref)
+        [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2070")]
+        private static TDelegate GetSetter<TDelegate>([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes.PublicFields)] Type declaringType, string fieldName, bool byRef) where TDelegate : Delegate
         {
             var field = declaringType.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-            var parameterTypes = new[] { typeof(object), byref ? declaringType.MakeByRefType() : declaringType, field.FieldType };
+            var parameterTypes = new[] { typeof(object), byRef ? declaringType.MakeByRefType() : declaringType, field.FieldType };
 
             var method = new DynamicMethod(fieldName + "Set", null, parameterTypes, typeof(FieldAccessor).Module, true);
 
@@ -80,7 +103,7 @@ namespace Orleans.Serialization.Utilities
             emitter.Emit(OpCodes.Stfld, field);
             emitter.Emit(OpCodes.Ret);
 
-            return method.CreateDelegate((byref ? typeof(ValueTypeSetter<,>) : typeof(Action<,>)).MakeGenericType(declaringType, field.FieldType));
+            return (TDelegate)method.CreateDelegate(typeof(TDelegate));
         }
     }
 }
