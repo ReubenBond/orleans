@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Serialization.Activators;
 
 namespace Orleans.Serialization.Serializers
@@ -12,6 +13,10 @@ namespace Orleans.Serialization.Serializers
         /// </summary>
         /// <typeparam name="T">The type.</typeparam>
         /// <returns>The activator.</returns>
-        IActivator<T> GetActivator<T>();
+        IActivator<T> GetActivator<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+#endif
+            T>();
     }
 }

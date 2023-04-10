@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace Orleans.Serialization.TypeSystem
@@ -30,6 +31,9 @@ namespace Orleans.Serialization.TypeSystem
         }
 
         /// <inheritdoc />
+#if NET5_0_OR_GREATER
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
+#endif
         public override bool TryResolveType(string name, out Type type)
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -51,10 +55,12 @@ namespace Orleans.Serialization.TypeSystem
             return true;
         }
 
+        [RequiresUnreferencedCode("Calls Orleans.Serialization.TypeSystem.CachedTypeResolver.TryPerformUncachedTypeResolution(String, out Type, Assembly[])")]
         private bool TryPerformUncachedTypeResolution(string name, out Type type)
         {
             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
             if (!TryPerformUncachedTypeResolution(name, out type, assemblies))
+
             {
                 return false;
             }
@@ -86,6 +92,7 @@ namespace Orleans.Serialization.TypeSystem
             }
         }
 
+        [RequiresUnreferencedCode("Calls System.Reflection.Assembly.GetType(String, Boolean)")]
         private bool TryPerformUncachedTypeResolution(string fullName, out Type type, Assembly[] assemblies)
         {
             if (null == assemblies)

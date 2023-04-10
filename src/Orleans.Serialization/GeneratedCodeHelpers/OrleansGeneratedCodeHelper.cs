@@ -1,6 +1,8 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -52,7 +54,11 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <param name="caller">The caller.</param>
         /// <param name="codecProvider">The codec provider.</param>
         /// <returns>The unwrapped service.</returns>
-        public static TService GetService<TService>(object caller, ICodecProvider codecProvider)
+        public static TService GetService<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+#endif
+            TService>(object caller, ICodecProvider codecProvider)
         {
             var state = ResolutionState.Value;
 
@@ -222,7 +228,15 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <param name="parameterTypes">The parameter types.</param>
         /// <returns>The corresponding <see cref="MethodInfo"/>.</returns>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public static MethodInfo GetMethodInfoOrDefault(Type interfaceType, string methodName, Type[] methodTypeParameters, Type[] parameterTypes)
+#if NET5_0_OR_GREATER
+        [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2060", Justification = "Called from generated code, which is responsible for guaranteeing the symbols are rooted")]
+        [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2072", Justification = "Called from generated code, which is responsible for guaranteeing the symbols are rooted")]
+#endif
+        public static MethodInfo GetMethodInfoOrDefault(
+#if NET5_0_OR_GREATER
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods | DynamicallyAccessedMemberTypes.Interfaces)]
+#endif
+            Type interfaceType, string methodName, Type[] methodTypeParameters, Type[] parameterTypes)
         {
             if (interfaceType is null)
             {
@@ -276,7 +290,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                 return current;
             }
 
-            foreach (var implemented in interfaceType.GetInterfaces())
+            foreach (var implemented in interfaceType.GetInterfaces().ToArray())
             {
                 if (GetMethodInfoOrDefault(implemented, methodName, methodTypeParameters, parameterTypes) is { } method)
                 {
@@ -290,7 +304,12 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <summary>
         /// Default copier implementation for (rarely copied) exception classes
         /// </summary>
-        public abstract class ExceptionCopier<T, B> : IDeepCopier<T>, IBaseCopier<T> where T : B where B : Exception
+        public abstract class ExceptionCopier<
+#if NET5_0_OR_GREATER
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+#endif
+            T,
+            B> : IDeepCopier<T>, IBaseCopier<T> where T : B where B : Exception
         {
             private readonly IActivator<T> _activator;
             private readonly IBaseCopier<B> _baseTypeCopier;

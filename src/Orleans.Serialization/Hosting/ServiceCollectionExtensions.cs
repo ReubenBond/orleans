@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -118,7 +119,11 @@ namespace Orleans.Serialization
             public IServiceCollection Services { get; }
         }
 
-        private sealed class ActivatorHolder<T> : IActivator<T>, IServiceHolder<IActivator<T>>
+        private sealed class ActivatorHolder<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+#endif
+            T> : IActivator<T>, IServiceHolder<IActivator<T>>
         {
             private readonly IActivatorProvider _activatorProvider;
             private IActivator<T> _activator;
@@ -184,7 +189,11 @@ namespace Orleans.Serialization
             public IValueSerializer<TField> Value => _serializer ??= _provider.GetValueSerializer<TField>();
         }
 
-        private sealed class CopierHolder<T> : IDeepCopier<T>, IServiceHolder<IDeepCopier<T>>, IOptionalDeepCopier
+        private sealed class CopierHolder<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+#endif
+            T> : IDeepCopier<T>, IServiceHolder<IDeepCopier<T>>, IOptionalDeepCopier
         {
             private readonly IDeepCopierProvider _codecProvider;
             private IDeepCopier<T> _copier;
@@ -203,7 +212,11 @@ namespace Orleans.Serialization
             public IDeepCopier<T> Value => _copier ??= _codecProvider.GetDeepCopier<T>();
         }
 
-        private sealed class BaseCopierHolder<T> : IBaseCopier<T>, IServiceHolder<IBaseCopier<T>> where T : class
+        private sealed class BaseCopierHolder<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+#endif
+            T> : IBaseCopier<T>, IServiceHolder<IBaseCopier<T>> where T : class
         {
             private readonly IDeepCopierProvider _codecProvider;
             private IBaseCopier<T> _copier;

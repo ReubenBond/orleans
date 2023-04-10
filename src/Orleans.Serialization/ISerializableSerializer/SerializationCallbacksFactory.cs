@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
@@ -32,14 +33,27 @@ namespace Orleans.Serialization
         /// <param name="type">The type.</param>
         /// <returns>Serialization callbacks.</returns>
         [SecurityCritical]
-        public SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TOwner, TDelegate>(Type type) where TOwner : struct where TDelegate : Delegate
+        public SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TOwner, TDelegate>(
+#if NET5_0_OR_GREATER
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)]
+#endif
+            Type type) where TOwner : struct where TDelegate : Delegate
             => GetValueTypeCallbacks<TDelegate>(type, typeof(TOwner));
 
-        private SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TDelegate>(Type type, Type owner) where TDelegate : Delegate
-            => (SerializationCallbacks<TDelegate>)_cache.GetOrAdd(type, (t, o) => CreateTypedCallbacks<TDelegate>(t, o), owner);
+        private SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TDelegate>(
+#if NET5_0_OR_GREATER
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)]
+#endif
+            Type type, Type owner) where TDelegate : Delegate
+#pragma warning disable IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
+            => (SerializationCallbacks<TDelegate>)_cache.GetOrAdd(type, static (t, o) => CreateTypedCallbacks<TDelegate>(t, o), owner);
+#pragma warning restore IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
 
-        [SecurityCritical]
-        private static SerializationCallbacks<TDelegate> CreateTypedCallbacks<TDelegate>(Type type, Type owner) where TDelegate : Delegate
+        private static SerializationCallbacks<TDelegate> CreateTypedCallbacks<TDelegate>(
+#if NET5_0_OR_GREATER
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)]
+#endif
+            Type type, Type owner) where TDelegate : Delegate
         {
             var onDeserializing = default(TDelegate);
             var onDeserialized = default(TDelegate);

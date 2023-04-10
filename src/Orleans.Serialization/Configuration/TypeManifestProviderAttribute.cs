@@ -13,7 +13,11 @@ namespace Orleans.Serialization.Configuration
         /// Initializes a new instance of the <see cref="TypeManifestProviderAttribute"/> class.
         /// </summary>
         /// <param name="providerType">The metadata provider type.</param>
-        public TypeManifestProviderAttribute([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]Type providerType)
+        public TypeManifestProviderAttribute(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
+#endif
+            Type providerType)
         {
             if (providerType is null)
             {
@@ -31,7 +35,9 @@ namespace Orleans.Serialization.Configuration
         /// <summary>
         /// Gets the manifest provider type.
         /// </summary>
+#if NET5_0_OR_GREATER
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
+#endif
         public Type ProviderType { get; }
     }
 }

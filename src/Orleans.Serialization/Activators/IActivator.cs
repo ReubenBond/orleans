@@ -7,7 +7,11 @@ namespace Orleans.Serialization.Activators
     /// Functionality for creating object instances.
     /// </summary>
     /// <typeparam name="T">The instance type which this implementation creates.</typeparam>
-    public interface IActivator<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)] T>
+    public interface IActivator<
+#if NET5_0_OR_GREATER
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+#endif
+    T>
     {
         /// <summary>
         /// Creates an instance of type <typeparamref name="T"/>.

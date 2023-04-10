@@ -24,14 +24,22 @@ namespace Orleans.Serialization.Cloning
         /// </summary>
         /// <typeparam name="T">The type supported by the copier.</typeparam>
         /// <returns>A deep copier capable of copying instances of type <typeparamref name="T"/>.</returns>
-        IDeepCopier<T> GetDeepCopier<T>();
+        IDeepCopier<T> GetDeepCopier<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+#endif
+            T>();
 
         /// <summary>
         /// Gets a deep copier capable of copying instances of type <typeparamref name="T"/>, or returns <see langword="null"/> if an appropriate copier was not found.
         /// </summary>
         /// <typeparam name="T">The type supported by the copier.</typeparam>
         /// <returns>A deep copier capable of copying instances of type <typeparamref name="T"/>, or <see langword="null"/> if an appropriate copier was not found.</returns>
-        IDeepCopier<T> TryGetDeepCopier<T>();
+        IDeepCopier<T> TryGetDeepCopier<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+#endif
+            T>();
 
         /// <summary>
         /// Gets a deep copier capable of copying instances of type <paramref name="type"/>.
@@ -40,7 +48,11 @@ namespace Orleans.Serialization.Cloning
         /// The type supported by the returned copier.
         /// </param>
         /// <returns>A deep copier capable of copying instances of type <paramref name="type"/>.</returns>
-        IDeepCopier GetDeepCopier(Type type);
+        IDeepCopier GetDeepCopier(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+#endif
+            Type type);
 
         /// <summary>
         /// Gets a deep copier capable of copying instances of type <paramref name="type"/>, or returns <see langword="null"/> if an appropriate copier was not found.
@@ -49,7 +61,11 @@ namespace Orleans.Serialization.Cloning
         /// The type supported by the returned copier.
         /// </param>
         /// <returns>A deep copier capable of copying instances of type <paramref name="type"/>, or <see langword="null"/> if an appropriate copier was not found.</returns>
-        IDeepCopier TryGetDeepCopier(Type type);
+        IDeepCopier TryGetDeepCopier(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+#endif
+            Type type);
 
         /// <summary>
         /// Gets a base type copier capable of copying instances of type <typeparamref name="T"/>.
@@ -58,7 +74,11 @@ namespace Orleans.Serialization.Cloning
         /// The type supported by the returned copier.
         /// </typeparam>
         /// <returns>A base type copier capable of copying instances of type <typeparamref name="T"/>.</returns>
-        IBaseCopier<T> GetBaseCopier<T>() where T : class;
+        IBaseCopier<T> GetBaseCopier<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+#endif
+            T>() where T : class;
     }
 
     /// <summary>
@@ -299,17 +319,27 @@ namespace Orleans.Serialization.Cloning
 #endif
         };
 
-        public static bool Contains(Type type)
+        public static bool Contains(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+#endif
+            Type type)
         {
             if (Types.TryGetValue(type, out var result))
             {
                 return result;
             }
 
-            return Types.GetOrAdd(type, IsShallowCopyableInternal(type));
+#pragma warning disable IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
+            return Types.GetOrAdd(type, static type => IsShallowCopyableInternal(type));
+#pragma warning restore IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
         }
 
-        private static bool IsShallowCopyableInternal(Type type)
+        private static bool IsShallowCopyableInternal(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+#endif
+            Type type)
         {
             if (type.IsPrimitive || type.IsEnum)
             {
@@ -335,13 +365,17 @@ namespace Orleans.Serialization.Cloning
                     || def == typeof(Tuple<,,,,,,>)
                     || def == typeof(Tuple<,,,,,,,>))
                 {
-                    return Array.TrueForAll(type.GenericTypeArguments, a => Contains(a));
+#pragma warning disable IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
+                    return Array.TrueForAll(type.GenericTypeArguments, static a => Contains(a));
+#pragma warning restore IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
                 }
             }
 
             if (type.IsValueType && !type.IsGenericTypeDefinition)
             {
-                return Array.TrueForAll(type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic), f => Contains(f.FieldType));
+#pragma warning disable IL2072 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.
+                return Array.TrueForAll(type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic), static f => Contains(f.FieldType));
+#pragma warning restore IL2072 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.
             }
 
             if (typeof(Exception).IsAssignableFrom(type))

@@ -211,7 +211,5 @@ namespace Orleans.Serialization
                 }
             }
         }
-
-        private static T GetServiceFromCollection<T>(IServiceCollection services) => (T)services.LastOrDefault(d => d.ServiceType == typeof(T))?.ImplementationInstance;
     }
 }

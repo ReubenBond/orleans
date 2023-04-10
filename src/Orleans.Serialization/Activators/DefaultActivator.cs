@@ -5,17 +5,23 @@ using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Activators
 {
-    internal sealed class DefaultActivator<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)] T> : IActivator<T> where T : class
+    internal sealed class DefaultActivator<
+#if NET5_0_OR_GREATER
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicParameterlessConstructor | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+#endif
+        T> : IActivator<T> where T : class
     {
         private static readonly Func<T> DefaultConstructorFunction = Init();
         private readonly Func<T> _constructor = DefaultConstructorFunction;
 
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
-        private readonly Type _type = typeof(T);
+#if NET5_0_OR_GREATER
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicParameterlessConstructor | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+#endif
+        private static readonly Type Type = typeof(T);
 
         private static Func<T> Init()
         {
-            var ctor = typeof(T).GetConstructor(Type.EmptyTypes);
+            var ctor = Type.GetConstructor(Type.EmptyTypes);
             if (ctor is null)
                 return null;
 
@@ -26,6 +32,6 @@ namespace Orleans.Serialization.Activators
             return (Func<T>)method.CreateDelegate(typeof(Func<T>));
         }
 
-        public T Create() => _constructor is { } ctor ? ctor() : Unsafe.As<T>(RuntimeHelpers.GetUninitializedObject(_type));
+        public T Create() => _constructor is { } ctor ? ctor() : Unsafe.As<T>(RuntimeHelpers.GetUninitializedObject(Type));
     }
 }

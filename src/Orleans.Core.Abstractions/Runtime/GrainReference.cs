@@ -11,6 +11,7 @@ using Orleans.CodeGeneration;
 using System.Text;
 using System.Diagnostics;
 using Orleans.Serialization;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Runtime
 {
@@ -399,7 +400,11 @@ namespace Orleans.Runtime
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
             => destination.TryWrite($"GrainReference:{GrainId}:{InterfaceType}", out charsWritten);
 
-        protected TInvokable GetInvokable<TInvokable>() => ActivatorUtilities.GetServiceOrCreateInstance<TInvokable>(Shared.ServiceProvider);
+        protected TInvokable GetInvokable<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+#endif
+            TInvokable>() => ActivatorUtilities.GetServiceOrCreateInstance<TInvokable>(Shared.ServiceProvider);
 
         /// <summary>
         /// Invokes the provided method.

@@ -8,6 +8,7 @@ using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 
 namespace Orleans.Serialization
@@ -1690,7 +1691,11 @@ namespace Orleans.Serialization
         /// Returns a copier which is specialized to the provided type parameter.
         /// </summary>
         /// <typeparam name="T">The underlying type for the returned copier.</typeparam>
-        public DeepCopier<T> GetCopier<T>() => new(_codecProvider.GetDeepCopier<T>(), _contextPool);
+        public DeepCopier<T> GetCopier<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+#endif
+            T>() => new(_codecProvider.GetDeepCopier<T>(), _contextPool);
 
         /// <summary>
         /// Creates a copy of the provided value.

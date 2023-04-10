@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
@@ -163,7 +164,11 @@ namespace Orleans.Serialization.Codecs
     /// Copier for multi-dimensional arrays.
     /// </summary>
     /// <typeparam name="T">The array element type.</typeparam>
-    internal sealed class MultiDimensionalArrayCopier<T> : IGeneralizedCopier
+    internal sealed class MultiDimensionalArrayCopier<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+#endif
+        T> : IGeneralizedCopier
     {
         /// <inheritdoc/>
         public object DeepCopy(object original, CopyContext context)
@@ -176,10 +181,12 @@ namespace Orleans.Serialization.Codecs
             var type = original.GetType();
             var originalArray = (Array)original;
             var elementType = type.GetElementType();
+#pragma warning disable IL2072 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.
             if (ShallowCopyableTypes.Contains(elementType))
             {
                 return originalArray.Clone();
             }
+#pragma warning restore IL2072 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.
 
             // We assume that all arrays have lower bound 0. In .NET 4.0, it's hard to create an array with a non-zero lower bound.
             var rank = originalArray.Rank;

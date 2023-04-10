@@ -6,6 +6,7 @@ using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Security;
@@ -76,7 +77,9 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
-        [SecurityCritical]
+#if NET5_0_OR_GREATER
+        [UnconditionalSuppressMessage("ReflectionAnalyzers", "IL2072", Justification = "Serialization using this codec requires that private fields are preserved")]
+#endif
         public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.IsReference)
@@ -120,7 +123,11 @@ namespace Orleans.Serialization
             return result;
         }
 
-        private object ReadObject<TInput>(ref Reader<TInput> reader, Type type, uint placeholderReferenceId)
+        private object ReadObject<TInput>(ref Reader<TInput> reader,
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+#endif
+            Type type, uint placeholderReferenceId)
         {
             var callbacks = _serializationCallbacks.GetReferenceTypeCallbacks(type);
 
@@ -210,7 +217,9 @@ namespace Orleans.Serialization
 
         /// <inheritdoc />
         [SecurityCritical]
-        public bool IsSupportedType(Type type) =>
+        [UnconditionalSuppressMessage("ReflectionAnalyzers", "IL2067")]
+        public bool IsSupportedType(
+            Type type) =>
             type == CodecType || typeof(Exception).IsAssignableFrom(type) || SerializableType.IsAssignableFrom(type) && SerializationConstructorFactory.HasSerializationConstructor(type);
     }
 }
