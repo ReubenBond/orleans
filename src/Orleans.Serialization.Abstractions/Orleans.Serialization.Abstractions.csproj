@@ -8,6 +8,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>Orleans</RootNamespace>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
+    <IsTrimmable>true</IsTrimmable>
   </PropertyGroup>
   
   <ItemGroup>
