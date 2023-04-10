@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Serialization.TypeSystem;
 
@@ -15,7 +16,12 @@ public class CompoundTypeAliasTree
     /// <summary>
     /// Initializes a new instance of the <see cref="CompoundTypeAliasTree"/> class.
     /// </summary>
-    private CompoundTypeAliasTree(object? key, Type? value)
+    private CompoundTypeAliasTree(
+        object? key,
+#if NET5_0_OR_GREATER
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+#endif
+        Type? value)
     {
         Key = key;
         Value = value;
@@ -29,6 +35,9 @@ public class CompoundTypeAliasTree
     /// <summary>
     /// Gets the value for this node.
     /// </summary>
+#if NET5_0_OR_GREATER
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+#endif
     public Type? Value { get; private set; }
 
     /// <summary>
@@ -57,7 +66,11 @@ public class CompoundTypeAliasTree
     /// Adds a node to the tree.
     /// </summary>
     /// <param name="key">The key for the new node.</param>
-    public CompoundTypeAliasTree Add(Type key) => AddInternal(key);
+    public CompoundTypeAliasTree Add(
+#if NET5_0_OR_GREATER
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+#endif
+        Type key) => AddInternal(key);
 
     /// <summary>
     /// Adds a node to the tree.
@@ -70,17 +83,35 @@ public class CompoundTypeAliasTree
     /// </summary>
     /// <param name="key">The key for the new node.</param>
     /// <param name="value">The value for the new node.</param>
-    public CompoundTypeAliasTree Add(string key, Type value) => AddInternal(key, value);
+    public CompoundTypeAliasTree Add(
+        string key,
+#if NET5_0_OR_GREATER
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+#endif
+        Type value) => AddInternal(key, value);
 
     /// <summary>
     /// Adds a node to the tree.
     /// </summary>
     /// <param name="key">The key for the new node.</param>
     /// <param name="value">The value for the new node.</param>
-    public CompoundTypeAliasTree Add(Type key, Type value) => AddInternal(key, value);
+    public CompoundTypeAliasTree Add(
+#if NET5_0_OR_GREATER
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+#endif
+        Type key,
+#if NET5_0_OR_GREATER
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+#endif
+        Type value) => AddInternal(key, value);
 
     private CompoundTypeAliasTree AddInternal(object key) => AddInternal(key, default);
-    private CompoundTypeAliasTree AddInternal(object key, Type? value)
+    private CompoundTypeAliasTree AddInternal(
+        object key,
+#if NET5_0_OR_GREATER
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+#endif
+        Type? value)
     {
 #if NET6_0_OR_GREATER
         ArgumentNullException.ThrowIfNull(key, nameof(key));
