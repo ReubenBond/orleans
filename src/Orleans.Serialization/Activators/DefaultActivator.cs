@@ -1,13 +1,16 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization.Activators
 {
-    internal sealed class DefaultActivator<T> : IActivator<T> where T : class
+    internal sealed class DefaultActivator<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)] T> : IActivator<T> where T : class
     {
         private static readonly Func<T> DefaultConstructorFunction = Init();
         private readonly Func<T> _constructor = DefaultConstructorFunction;
+
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
         private readonly Type _type = typeof(T);
 
         private static Func<T> Init()

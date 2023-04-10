@@ -1,11 +1,13 @@
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace Orleans.Serialization.Activators
 {
     /// <summary>
     /// Functionality for creating object instances.
     /// </summary>
     /// <typeparam name="T">The instance type which this implementation creates.</typeparam>
-    public interface IActivator<T>
+    public interface IActivator<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)] T>
     {
         /// <summary>
         /// Creates an instance of type <typeparamref name="T"/>.
