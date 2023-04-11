@@ -26,7 +26,7 @@ namespace Orleans.Serialization.Cloning
         /// <returns>A deep copier capable of copying instances of type <typeparamref name="T"/>.</returns>
         IDeepCopier<T> GetDeepCopier<
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
 #endif
             T>();
 
@@ -37,7 +37,7 @@ namespace Orleans.Serialization.Cloning
         /// <returns>A deep copier capable of copying instances of type <typeparamref name="T"/>, or <see langword="null"/> if an appropriate copier was not found.</returns>
         IDeepCopier<T> TryGetDeepCopier<
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
 #endif
             T>();
 
@@ -50,7 +50,7 @@ namespace Orleans.Serialization.Cloning
         /// <returns>A deep copier capable of copying instances of type <paramref name="type"/>.</returns>
         IDeepCopier GetDeepCopier(
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
 #endif
             Type type);
 
@@ -63,7 +63,7 @@ namespace Orleans.Serialization.Cloning
         /// <returns>A deep copier capable of copying instances of type <paramref name="type"/>, or <see langword="null"/> if an appropriate copier was not found.</returns>
         IDeepCopier TryGetDeepCopier(
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
 #endif
             Type type);
 
@@ -76,7 +76,7 @@ namespace Orleans.Serialization.Cloning
         /// <returns>A base type copier capable of copying instances of type <typeparamref name="T"/>.</returns>
         IBaseCopier<T> GetBaseCopier<
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
 #endif
             T>() where T : class;
     }
@@ -321,7 +321,7 @@ namespace Orleans.Serialization.Cloning
 
         public static bool Contains(
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
 #endif
             Type type)
         {
@@ -337,7 +337,7 @@ namespace Orleans.Serialization.Cloning
 
         private static bool IsShallowCopyableInternal(
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
 #endif
             Type type)
         {

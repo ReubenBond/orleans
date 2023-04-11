@@ -7,7 +7,7 @@ namespace Orleans.Serialization.Activators
 {
     internal sealed class DefaultActivator<
 #if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicParameterlessConstructor | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+        [DynamicallyAccessedMembers(PublicConstructors | PublicParameterlessConstructor | NonPublicConstructors)]
 #endif
         T> : IActivator<T> where T : class
     {
@@ -15,7 +15,7 @@ namespace Orleans.Serialization.Activators
         private readonly Func<T> _constructor = DefaultConstructorFunction;
 
 #if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicParameterlessConstructor | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+        [DynamicallyAccessedMembers(PublicConstructors | PublicParameterlessConstructor | NonPublicConstructors)]
 #endif
         private static readonly Type Type = typeof(T);
 

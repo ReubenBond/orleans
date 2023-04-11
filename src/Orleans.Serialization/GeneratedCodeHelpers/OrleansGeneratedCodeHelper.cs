@@ -56,7 +56,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <returns>The unwrapped service.</returns>
         public static TService GetService<
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+            [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
 #endif
             TService>(object caller, ICodecProvider codecProvider)
         {
@@ -234,7 +234,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 #endif
         public static MethodInfo GetMethodInfoOrDefault(
 #if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods | DynamicallyAccessedMemberTypes.Interfaces)]
+        [DynamicallyAccessedMembers(PublicMethods | NonPublicMethods | Interfaces)]
 #endif
             Type interfaceType, string methodName, Type[] methodTypeParameters, Type[] parameterTypes)
         {
@@ -306,7 +306,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// </summary>
         public abstract class ExceptionCopier<
 #if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+        [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
 #endif
             T,
             B> : IDeepCopier<T>, IBaseCopier<T> where T : B where B : Exception

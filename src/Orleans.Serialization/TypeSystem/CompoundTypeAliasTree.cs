@@ -19,7 +19,7 @@ public class CompoundTypeAliasTree
     private CompoundTypeAliasTree(
         object? key,
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
         Type? value)
     {
@@ -36,7 +36,7 @@ public class CompoundTypeAliasTree
     /// Gets the value for this node.
     /// </summary>
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
     public Type? Value { get; private set; }
 
@@ -68,7 +68,7 @@ public class CompoundTypeAliasTree
     /// <param name="key">The key for the new node.</param>
     public CompoundTypeAliasTree Add(
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
         Type key) => AddInternal(key);
 
@@ -86,7 +86,7 @@ public class CompoundTypeAliasTree
     public CompoundTypeAliasTree Add(
         string key,
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
         Type value) => AddInternal(key, value);
 
@@ -97,11 +97,11 @@ public class CompoundTypeAliasTree
     /// <param name="value">The value for the new node.</param>
     public CompoundTypeAliasTree Add(
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
         Type key,
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
         Type value) => AddInternal(key, value);
 
@@ -109,7 +109,7 @@ public class CompoundTypeAliasTree
     private CompoundTypeAliasTree AddInternal(
         object key,
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
         Type? value)
     {

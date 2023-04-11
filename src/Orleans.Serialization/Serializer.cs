@@ -1693,7 +1693,7 @@ namespace Orleans.Serialization
         /// <typeparam name="T">The underlying type for the returned copier.</typeparam>
         public DeepCopier<T> GetCopier<
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
 #endif
             T>() => new(_codecProvider.GetDeepCopier<T>(), _contextPool);
 

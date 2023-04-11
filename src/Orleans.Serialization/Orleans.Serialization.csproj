@@ -3,12 +3,11 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Serialization</PackageId>
     <PackageDescription>Fast, flexible, and version-tolerant serializer for .NET</PackageDescription>
-    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks);netstandard2.1</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
-    <IsTrimmable>true</IsTrimmable>
   </PropertyGroup>
 
   <ItemGroup>

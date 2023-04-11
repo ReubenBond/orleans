@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.Serialization;
-using System.Security;
 
 namespace Orleans.Serialization
 {
@@ -39,11 +38,7 @@ namespace Orleans.Serialization
 
         public ValueTypeSerializer GetSerializer(Type type) => _serializers.GetOrAdd(type, _createSerializerDelegate);
 
-        private ValueTypeSerializer CreateTypedSerializer<
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors | DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)]
-#endif
-            T>() where T : struct
+        private ValueTypeSerializer CreateTypedSerializer<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors | PublicMethods | NonPublicMethods)] T>() where T : struct
         {
             var constructor = _constructorFactory.GetSerializationConstructorDelegate<T, ValueTypeSerializer<T>.ValueConstructor>();
             var callbacks =

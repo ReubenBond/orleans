@@ -31,7 +31,7 @@ namespace Orleans.Serialization.Configuration
         /// <param name="type">The activator type.</param>
         public void AddActivator(
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
             Type type) => Activators.Add(type);  
 
@@ -46,7 +46,7 @@ namespace Orleans.Serialization.Configuration
         /// <param name="type">The field codec type.</param>
         public void AddFieldCodec(
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
             Type type) => FieldCodecs.Add(type);  
 
@@ -61,7 +61,7 @@ namespace Orleans.Serialization.Configuration
         /// <param name="type">The serializer type.</param>
         public void AddSerializer(
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
             Type type) => Serializers.Add(type);  
 
@@ -76,7 +76,7 @@ namespace Orleans.Serialization.Configuration
         /// <param name="type">The copier type.</param>
         public void AddCopier(
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
             Type type) => Copiers.Add(type);  
 
@@ -91,7 +91,7 @@ namespace Orleans.Serialization.Configuration
         /// <param name="type">The converter type.</param>
         public void AddConverter(
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
             Type type) => Converters.Add(type);  
 
@@ -106,7 +106,7 @@ namespace Orleans.Serialization.Configuration
         /// <param name="type">The interface type.</param>
         public void AddInterface(
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
             Type type) => Interfaces.Add(type);  
 
@@ -124,7 +124,7 @@ namespace Orleans.Serialization.Configuration
         /// <param name="type">The interface proxy type.</param>
         public void AddInterfaceProxy(
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
             Type type) => InterfaceProxies.Add(type);  
 
@@ -139,7 +139,7 @@ namespace Orleans.Serialization.Configuration
         /// <param name="type">The interface implementation type.</param>
         public void AddInterfaceImplementation(
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
             Type type) => InterfaceImplementations.Add(type);  
 
@@ -156,7 +156,7 @@ namespace Orleans.Serialization.Configuration
         public void AddWellKnownTypeId(
             uint typeId,
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
             Type type) => WellKnownTypeIds[typeId] = type;
 
@@ -173,7 +173,7 @@ namespace Orleans.Serialization.Configuration
         public void AddWellKnownTypeAlias(
             string typeAlias,
 #if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+    [DynamicallyAccessedMembers(All)]
 #endif
             Type type) => WellKnownTypeAliases[typeAlias] = type;
 

@@ -402,7 +402,7 @@ namespace Orleans.Runtime
 
         protected TInvokable GetInvokable<
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+            [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
 #endif
             TInvokable>() => ActivatorUtilities.GetServiceOrCreateInstance<TInvokable>(Shared.ServiceProvider);
 

@@ -166,7 +166,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T">The array element type.</typeparam>
     internal sealed class MultiDimensionalArrayCopier<
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
 #endif
         T> : IGeneralizedCopier
     {

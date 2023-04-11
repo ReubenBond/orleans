@@ -1,0 +1,2 @@
+global using System.Diagnostics.CodeAnalysis;
+global using static System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes;

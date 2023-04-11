@@ -210,7 +210,7 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IActivator<T> GetActivator<
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+            [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
 #endif
             T>()
         {
@@ -292,7 +292,7 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IBaseCopier<TField> GetBaseCopier<
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
 #endif
             TField>() where TField : class
         {
@@ -307,7 +307,7 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IDeepCopier<T> GetDeepCopier<
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
 #endif
             T>()
         {
@@ -319,7 +319,7 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IDeepCopier<T> TryGetDeepCopier<
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
 #endif
             T>()
         {
@@ -342,7 +342,7 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IDeepCopier GetDeepCopier(
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
 #endif
             Type fieldType)
         {
@@ -354,7 +354,7 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IDeepCopier TryGetDeepCopier(
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
 #endif
             Type fieldType)
         {
@@ -367,7 +367,7 @@ namespace Orleans.Serialization.Serializers
 
         private IDeepCopier TryCreateCopier(
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
 #endif
             Type fieldType)
         {
@@ -501,7 +501,7 @@ namespace Orleans.Serialization.Serializers
 
         private object GetServiceOrCreateInstance(
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+            [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
 #endif
             Type type, object[] constructorArguments = null)
         {
@@ -657,7 +657,7 @@ namespace Orleans.Serialization.Serializers
 
         private IDeepCopier CreateCopierInstance(
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
+            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
 #endif
             Type fieldType,
             Type searchType)

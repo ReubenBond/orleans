@@ -15,7 +15,7 @@ namespace Orleans.Serialization.Serializers
         /// <returns>The activator.</returns>
         IActivator<T> GetActivator<
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+            [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
 #endif
             T>();
     }

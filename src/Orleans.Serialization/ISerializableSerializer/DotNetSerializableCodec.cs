@@ -124,7 +124,7 @@ namespace Orleans.Serialization
 
         private object ReadObject<TInput>(ref Reader<TInput> reader,
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+            [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
 #endif
             Type type, uint placeholderReferenceId)
         {

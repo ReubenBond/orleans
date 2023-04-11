@@ -33,14 +33,14 @@ namespace Orleans.Serialization
         /// <returns>Serialization callbacks.</returns>
         public SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TOwner, TDelegate>(
 #if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(PublicMethods | NonPublicMethods)]
 #endif
             Type type) where TOwner : struct where TDelegate : Delegate
             => GetValueTypeCallbacks<TDelegate>(type, typeof(TOwner));
 
         private SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TDelegate>(
 #if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(PublicMethods | NonPublicMethods)]
 #endif
             Type type, Type owner) where TDelegate : Delegate
 #pragma warning disable IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
@@ -49,7 +49,7 @@ namespace Orleans.Serialization
 
         private static SerializationCallbacks<TDelegate> CreateTypedCallbacks<TDelegate>(
 #if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)]
+        [DynamicallyAccessedMembers(PublicMethods | NonPublicMethods)]
 #endif
             Type type, Type owner) where TDelegate : Delegate
         {

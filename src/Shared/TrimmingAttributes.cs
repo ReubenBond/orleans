@@ -14,8 +14,8 @@ namespace System.Diagnostics.CodeAnalysis;
 /// This allows tools to understand which methods are unsafe to call when removing unreferenced
 /// code from an application.
 /// </remarks>
-[Conditional("NET5_0_OR_GREATER")]
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Constructor | AttributeTargets.Class, Inherited = false)]
+[Conditional("NET5_0_OR_GREATER")]
 internal sealed class RequiresUnreferencedCodeAttribute : Attribute
 {
     /// <summary>
@@ -51,8 +51,8 @@ internal sealed class RequiresUnreferencedCodeAttribute : Attribute
 /// <see cref="SuppressMessageAttribute"/> in that it doesn't have a
 /// <see cref="ConditionalAttribute"/>. So it is always preserved in the compiled assembly.
 /// </remarks>
-[Conditional("NET5_0_OR_GREATER")]
 [AttributeUsage(AttributeTargets.All, Inherited = false, AllowMultiple = true)]
+[Conditional("NET5_0_OR_GREATER")]
 internal sealed class UnconditionalSuppressMessageAttribute : Attribute
 {
     /// <summary>
@@ -123,12 +123,12 @@ internal sealed class UnconditionalSuppressMessageAttribute : Attribute
     public string? Justification { get; set; }
 }
 
-[Conditional("NET5_0_OR_GREATER")]
 [AttributeUsage(
         AttributeTargets.Field | AttributeTargets.ReturnValue | AttributeTargets.GenericParameter |
         AttributeTargets.Parameter | AttributeTargets.Property | AttributeTargets.Method |
         AttributeTargets.Class | AttributeTargets.Interface | AttributeTargets.Struct,
         Inherited = false)]
+[Conditional("NET5_0_OR_GREATER")]
 internal sealed class DynamicallyAccessedMembersAttribute : Attribute
 {
     /// <summary>
@@ -154,7 +154,6 @@ internal sealed class DynamicallyAccessedMembersAttribute : Attribute
 /// This enumeration has a <see cref="FlagsAttribute"/> attribute that allows a
 /// bitwise combination of its member values.
 /// </summary>
-[Conditional("NET5_0_OR_GREATER")]
 [Flags]
 internal enum DynamicallyAccessedMemberTypes
 {

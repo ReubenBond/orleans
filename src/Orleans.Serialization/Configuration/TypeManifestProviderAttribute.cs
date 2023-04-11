@@ -15,7 +15,7 @@ namespace Orleans.Serialization.Configuration
         /// <param name="providerType">The metadata provider type.</param>
         public TypeManifestProviderAttribute(
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
+            [DynamicallyAccessedMembers(PublicConstructors)]
 #endif
             Type providerType)
         {
@@ -36,7 +36,7 @@ namespace Orleans.Serialization.Configuration
         /// Gets the manifest provider type.
         /// </summary>
 #if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
+        [DynamicallyAccessedMembers(PublicConstructors)]
 #endif
         public Type ProviderType { get; }
     }

@@ -121,7 +121,7 @@ namespace Orleans.Serialization
 
         private sealed class ActivatorHolder<
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+            [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
 #endif
             T> : IActivator<T>, IServiceHolder<IActivator<T>>
         {

@@ -194,7 +194,7 @@ namespace Orleans.Serialization.TypeSystem
 
             void AddAllowedType(
 #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.Interfaces)]
+            [DynamicallyAccessedMembers(Interfaces)]
 #endif
                 Type type)
             {

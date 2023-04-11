@@ -9,7 +9,7 @@ namespace Orleans.Serialization.Activators
     /// <typeparam name="T">The instance type which this implementation creates.</typeparam>
     public interface IActivator<
 #if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+        [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
 #endif
     T>
     {
