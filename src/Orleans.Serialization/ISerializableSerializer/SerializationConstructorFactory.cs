@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Security;
 
@@ -14,7 +15,7 @@ namespace Orleans.Serialization
     internal sealed class SerializationConstructorFactory
     {
         private static readonly Type[] SerializationConstructorParameterTypes = { typeof(SerializationInfo), typeof(StreamingContext) };
-        private readonly Func<Type, object> _createConstructorDelegate = t => GetSerializationConstructorInvoker(t, typeof(object), typeof(Action<object, SerializationInfo, StreamingContext>));
+        private static readonly Func<Type, object> CreateConstructorDelegate = static t => GetSerializationConstructorInvoker(t, typeof(object), typeof(Action<object, SerializationInfo, StreamingContext>));
         private readonly ConcurrentDictionary<Type, object> _constructors = new();
 
         /// <summary>
@@ -27,7 +28,7 @@ namespace Orleans.Serialization
             Type type) => GetSerializationConstructor(type) != null;
 
         public Action<object, SerializationInfo, StreamingContext> GetSerializationConstructorDelegate(Type type)
-            => (Action<object, SerializationInfo, StreamingContext>)_constructors.GetOrAdd(type, _createConstructorDelegate);
+            => (Action<object, SerializationInfo, StreamingContext>)_constructors.GetOrAdd(type, CreateConstructorDelegate);
 
         public TConstructor GetSerializationConstructorDelegate<
             [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
@@ -53,6 +54,11 @@ namespace Orleans.Serialization
             Type type, Type owner, Type delegateType)
         {
             var constructor = GetSerializationConstructor(type) ?? (typeof(Exception).IsAssignableFrom(type) ? GetSerializationConstructor(typeof(Exception)) : null);
+            if (!RuntimeFeature.IsDynamicCodeSupported)
+            {
+                return GetSerializationConstructorInvokerViaReflection(owner, delegateType, constructor);
+            }
+
             if (constructor is null)
             {
                 throw new SerializationException($"{nameof(ISerializable)} constructor not found on type {type}.");
@@ -84,6 +90,17 @@ namespace Orleans.Serialization
             il.Emit(OpCodes.Ret);
 
             return method.CreateDelegate(delegateType);
+        }
+
+        private static Delegate GetSerializationConstructorInvokerViaReflection(Type owner, Type delegateType, ConstructorInfo constructor)
+        {
+            if (owner.IsValueType || !delegateType.Equals(typeof(Action<object, SerializationInfo, StreamingContext>)))
+            {
+                throw new PlatformNotSupportedException($"Cannot create a constructor delegate because dynamic code is not supported on this platform.");
+            }
+
+            Action<object, SerializationInfo, StreamingContext> result = (instance, info, context) => constructor.Invoke(new[] { instance, info, context });
+            return result;
         }
     }
 }
