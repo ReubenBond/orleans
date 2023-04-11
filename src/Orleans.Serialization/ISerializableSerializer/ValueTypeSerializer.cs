@@ -3,7 +3,8 @@ using Orleans.Serialization.Codecs;
 using System;
 using System.Buffers;
 using System.Runtime.Serialization;
-using System.Security;
+using static Orleans.Serialization.SerializationConstructorFactory;
+using static Orleans.Serialization.SerializationCallbacksFactory;
 
 namespace Orleans.Serialization
 {
@@ -19,22 +20,18 @@ namespace Orleans.Serialization
     /// <typeparam name="T">The type which this serializer can serialize.</typeparam>
     internal class ValueTypeSerializer<T> : ValueTypeSerializer where T : struct
     {
-        public delegate void ValueConstructor(ref T value, SerializationInfo info, StreamingContext context);
-
-        public delegate void SerializationCallback(ref T value, StreamingContext context);
-
         private static readonly Type Type = typeof(T);
 
-        private readonly ValueConstructor _constructor;
-        private readonly SerializationCallbacksFactory.SerializationCallbacks<SerializationCallback> _callbacks;
+        private readonly ValueSerializationConstructor<T> _constructor;
+        private readonly SerializationCallbacks<ValueTypeSerializationCallback<T>> _callbacks;
 
         private readonly IFormatterConverter _formatterConverter;
         private readonly StreamingContext _streamingContext;
         private readonly SerializationEntryCodec _entrySerializer;
 
         public ValueTypeSerializer(
-            ValueConstructor constructor,
-            SerializationCallbacksFactory.SerializationCallbacks<SerializationCallback> callbacks,
+            ValueSerializationConstructor<T> constructor,
+            SerializationCallbacks<ValueTypeSerializationCallback<T>> callbacks,
             SerializationEntryCodec entrySerializer,
             StreamingContext streamingContext,
             IFormatterConverter formatterConverter)

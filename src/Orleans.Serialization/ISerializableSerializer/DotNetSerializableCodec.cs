@@ -122,11 +122,7 @@ namespace Orleans.Serialization
             return result;
         }
 
-        private object ReadObject<TInput>(ref Reader<TInput> reader,
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
-#endif
-            Type type, uint placeholderReferenceId)
+        private object ReadObject<TInput>(ref Reader<TInput> reader, [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] Type type, uint placeholderReferenceId)
         {
             var callbacks = _serializationCallbacks.GetReferenceTypeCallbacks(type);
 

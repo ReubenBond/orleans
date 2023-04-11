@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Concurrent;
-using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.Serialization;
 
@@ -40,9 +39,8 @@ namespace Orleans.Serialization
 
         private ValueTypeSerializer CreateTypedSerializer<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors | PublicMethods | NonPublicMethods)] T>() where T : struct
         {
-            var constructor = _constructorFactory.GetSerializationConstructorDelegate<T, ValueTypeSerializer<T>.ValueConstructor>();
-            var callbacks =
-                _callbacksFactory.GetValueTypeCallbacks<T, ValueTypeSerializer<T>.SerializationCallback>(typeof(T));
+            var constructor = _constructorFactory.GetValueTypeSerializationConstructorDelegate<T>();
+            var callbacks = _callbacksFactory.GetValueTypeCallbacks<T>();
             var serializer = new ValueTypeSerializer<T>(constructor, callbacks, _entrySerializer, _streamingContext, _formatterConverter);
             return serializer;
         }

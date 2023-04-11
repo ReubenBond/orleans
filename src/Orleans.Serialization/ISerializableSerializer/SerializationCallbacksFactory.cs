@@ -1,10 +1,10 @@
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
-using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
-using System.Security;
 
 namespace Orleans.Serialization
 {
@@ -13,8 +13,10 @@ namespace Orleans.Serialization
     /// </summary>
     internal sealed class SerializationCallbacksFactory
     {
+        private static readonly Func<Type, object> CreateReferenceTypeCallbacksDelegate = CreateReferenceTypeCallbacks;
         private readonly ConcurrentDictionary<Type, object> _cache = new();
-        private readonly Func<Type, object> _factory = t => CreateTypedCallbacks<Action<object, StreamingContext>>(t, typeof(object));
+
+        public delegate void ValueTypeSerializationCallback<T>(ref T value, StreamingContext context);
 
         /// <summary>
         /// Gets serialization callbacks for reference types.
@@ -22,76 +24,140 @@ namespace Orleans.Serialization
         /// <param name="type">The type.</param>
         /// <returns>Serialization callbacks.</returns>
         public SerializationCallbacks<Action<object, StreamingContext>> GetReferenceTypeCallbacks(Type type) => (
-            SerializationCallbacks<Action<object, StreamingContext>>)_cache.GetOrAdd(type, _factory);
+            SerializationCallbacks<Action<object, StreamingContext>>)_cache.GetOrAdd(type, CreateReferenceTypeCallbacksDelegate);
 
         /// <summary>
         /// Gets serialization callbacks for value types.
         /// </summary>
-        /// <typeparam name="TOwner">The declaring type.</typeparam>
-        /// <typeparam name="TDelegate">The delegate type.</typeparam>
-        /// <param name="type">The type.</param>
+        /// <typeparam name="T">The declaring type.</typeparam>
         /// <returns>Serialization callbacks.</returns>
-        public SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TOwner, TDelegate>(
-#if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(PublicMethods | NonPublicMethods)]
-#endif
-            Type type) where TOwner : struct where TDelegate : Delegate
-            => GetValueTypeCallbacks<TDelegate>(type, typeof(TOwner));
+        public SerializationCallbacks<ValueTypeSerializationCallback<T>> GetValueTypeCallbacks<T>() where T : struct 
+            => (SerializationCallbacks<ValueTypeSerializationCallback<T>>)_cache.GetOrAdd(typeof(T), static (_) => CreateValueTypeCallbacks<T>());
 
-        private SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TDelegate>(
-#if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(PublicMethods | NonPublicMethods)]
-#endif
-            Type type, Type owner) where TDelegate : Delegate
-#pragma warning disable IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
-            => (SerializationCallbacks<TDelegate>)_cache.GetOrAdd(type, static (t, o) => CreateTypedCallbacks<TDelegate>(t, o), owner);
-#pragma warning restore IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
-
-        private static SerializationCallbacks<TDelegate> CreateTypedCallbacks<TDelegate>(
-#if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(PublicMethods | NonPublicMethods)]
-#endif
-            Type type, Type owner) where TDelegate : Delegate
+        private static SerializationCallbacks<ValueTypeSerializationCallback<T>> CreateValueTypeCallbacks<[DynamicallyAccessedMembers(PublicMethods | NonPublicMethods)] T>()
         {
-            var onDeserializing = default(TDelegate);
-            var onDeserialized = default(TDelegate);
-            var onSerializing = default(TDelegate);
-            var onSerialized = default(TDelegate);
+            var methods = GetCallbackMethods(typeof(T));
+            ValueTypeSerializationCallback<T> onDeserializing;
+            ValueTypeSerializationCallback<T> onDeserialized;
+            ValueTypeSerializationCallback<T> onSerializing;
+            ValueTypeSerializationCallback<T> onSerialized;
+            if (RuntimeFeature.IsDynamicCodeSupported)
+            {
+                onDeserializing = (ValueTypeSerializationCallback<T>)GetSerializationMethod(typeof(T), methods.OnDeserializing, typeof(T)).CreateDelegate(typeof(ValueTypeSerializationCallback<T>));
+                onDeserialized = (ValueTypeSerializationCallback<T>)GetSerializationMethod(typeof(T), methods.OnDeserialized, typeof(T)).CreateDelegate(typeof(ValueTypeSerializationCallback<T>));
+                onSerializing = (ValueTypeSerializationCallback<T>)GetSerializationMethod(typeof(T), methods.OnSerializing, typeof(T)).CreateDelegate(typeof(ValueTypeSerializationCallback<T>));
+                onSerialized = (ValueTypeSerializationCallback<T>)GetSerializationMethod(typeof(T), methods.OnSerialized, typeof(T)).CreateDelegate(typeof(ValueTypeSerializationCallback<T>));
+            }
+            else
+            {
+                void OnDeserializing(ref T self, StreamingContext context)
+                {
+                    var boxed = (object)self;
+                    methods.OnDeserializing.Invoke(boxed, new object[] { context });
+                    self = (T)boxed;
+                }
+
+                onDeserializing = OnDeserializing;
+                void OnDeserialized(ref T self, StreamingContext context)
+                {
+                    var boxed = (object)self;
+                    methods.OnDeserialized.Invoke(boxed, new object[] { context });
+                    self = (T)boxed;
+                }
+
+                onDeserialized = OnDeserialized;
+                void OnSerializing(ref T self, StreamingContext context)
+                {
+                    var boxed = (object)self;
+                    methods.OnSerializing.Invoke(boxed, new object[] { context });
+                    self = (T)boxed;
+                }
+
+                onSerializing = OnSerializing;
+                void OnSerialized(ref T self, StreamingContext context)
+                {
+                    var boxed = (object)self;
+                    methods.OnSerialized.Invoke(boxed, new object[] { context });
+                    self = (T)boxed;
+                }
+
+                onSerialized = OnSerialized;
+            }
+
+            return new SerializationCallbacks<ValueTypeSerializationCallback<T>>(onDeserializing, onDeserialized, onSerializing, onSerialized);
+        }
+
+        private static SerializationCallbacks<Action<object, StreamingContext>> CreateReferenceTypeCallbacks(Type type)
+        {
+            var methods = GetCallbackMethods(type);
+            Action<object, StreamingContext> onDeserializing;
+            Action<object, StreamingContext> onDeserialized;
+            Action<object, StreamingContext> onSerializing;
+            Action<object, StreamingContext> onSerialized;
+            if (RuntimeFeature.IsDynamicCodeSupported)
+            {
+                onDeserializing = (Action<object, StreamingContext>)GetSerializationMethod(type, methods.OnDeserializing, typeof(object)).CreateDelegate(typeof(Action<object, StreamingContext>));
+                onDeserialized = (Action<object, StreamingContext>)GetSerializationMethod(type, methods.OnDeserialized, typeof(object)).CreateDelegate(typeof(Action<object, StreamingContext>));
+                onSerializing = (Action<object, StreamingContext>)GetSerializationMethod(type, methods.OnSerializing, typeof(object)).CreateDelegate(typeof(Action<object, StreamingContext>));
+                onSerialized = (Action<object, StreamingContext>)GetSerializationMethod(type, methods.OnSerialized, typeof(object)).CreateDelegate(typeof(Action<object, StreamingContext>));
+            }
+            else
+            {
+                void OnDeserializing(object self, StreamingContext context) => methods.OnDeserializing.Invoke(self, new object[] { context });
+                void OnDeserialized(object self, StreamingContext context) => methods.OnDeserialized.Invoke(self, new object[] { context });
+                void OnSerializing(object self, StreamingContext context) => methods.OnSerializing.Invoke(self, new object[] { context });
+                void OnSerialized(object self, StreamingContext context) => methods.OnSerialized.Invoke(self, new object[] { context });
+
+                onDeserializing = OnDeserializing;
+                onDeserialized = OnDeserialized;
+                onSerializing = OnSerializing;
+                onSerialized = OnSerialized;
+            }
+
+            return new SerializationCallbacks<Action<object, StreamingContext>>(onDeserializing, onDeserialized, onSerializing, onSerialized);
+        }
+
+        private static (MethodInfo OnDeserializing, MethodInfo OnDeserialized, MethodInfo OnSerializing, MethodInfo OnSerialized) GetCallbackMethods([DynamicallyAccessedMembers(PublicMethods | NonPublicMethods)] Type type)
+        {
+            var onDeserializing = default(MethodInfo);
+            var onDeserialized = default(MethodInfo);
+            var onSerializing = default(MethodInfo);
+            var onSerialized = default(MethodInfo);
             foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
             {
-                var parameterInfos = method.GetParameters();
-                if (parameterInfos.Length != 1)
+                var parameters = method.GetParameters();
+                if (parameters.Length != 1)
                 {
                     continue;
                 }
 
-                if (parameterInfos[0].ParameterType != typeof(StreamingContext))
+                if (parameters[0].ParameterType != typeof(StreamingContext))
                 {
                     continue;
                 }
 
                 if (method.IsDefined(typeof(OnDeserializingAttribute), false))
                 {
-                    onDeserializing = (TDelegate)GetSerializationMethod(type, method, owner).CreateDelegate(typeof(TDelegate));
+                    onDeserializing = method;
                 }
 
                 if (method.IsDefined(typeof(OnDeserializedAttribute), false))
                 {
-                    onDeserialized = (TDelegate)GetSerializationMethod(type, method, owner).CreateDelegate(typeof(TDelegate));
+                    onDeserialized = method;
                 }
 
                 if (method.IsDefined(typeof(OnSerializingAttribute), false))
                 {
-                    onSerializing = (TDelegate)GetSerializationMethod(type, method, owner).CreateDelegate(typeof(TDelegate));
+                    onSerializing = method;
                 }
 
                 if (method.IsDefined(typeof(OnSerializedAttribute), false))
                 {
-                    onSerialized = (TDelegate)GetSerializationMethod(type, method, owner).CreateDelegate(typeof(TDelegate));
+                    onSerialized = method;
                 }
             }
 
-            return new SerializationCallbacks<TDelegate>(onDeserializing, onDeserialized, onSerializing, onSerialized);
+            return (onDeserializing, onDeserialized, onSerializing, onSerialized);
         }
 
         private static DynamicMethod GetSerializationMethod(Type type, MethodInfo callbackMethod, Type owner)
