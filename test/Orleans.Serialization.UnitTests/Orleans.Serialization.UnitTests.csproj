@@ -1,8 +1,8 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <IsTestProject>true</IsTestProject>
-    <TargetFrameworks>$(TestTargetFrameworks);netcoreapp3.1</TargetFrameworks>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>

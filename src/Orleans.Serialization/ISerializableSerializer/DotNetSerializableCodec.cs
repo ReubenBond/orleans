@@ -53,7 +53,6 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
-        [SecurityCritical]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
         {
             if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
@@ -216,7 +215,6 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
-        [SecurityCritical]
         [UnconditionalSuppressMessage("ReflectionAnalyzers", "IL2067")]
         public bool IsSupportedType(
             Type type) =>

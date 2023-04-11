@@ -22,18 +22,15 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns><see langword="true" /> if the provided type has a serialization constructor; otherwise, <see langword="false" />.</returns>
-        [SecurityCritical]
         public static bool HasSerializationConstructor(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
 #endif
             Type type) => GetSerializationConstructor(type) != null;
 
-        [SecurityCritical]
         public Action<object, SerializationInfo, StreamingContext> GetSerializationConstructorDelegate(Type type)
             => (Action<object, SerializationInfo, StreamingContext>)_constructors.GetOrAdd(type, _createConstructorDelegate);
 
-        [SecurityCritical]
         public TConstructor GetSerializationConstructorDelegate<
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
@@ -51,7 +48,6 @@ namespace Orleans.Serialization
             => _constructors.GetOrAdd(owner, static (t, d) => GetSerializationConstructorInvoker(t, t, d), delegateType);
 #pragma warning restore IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
 
-        [SecurityCritical]
         private static ConstructorInfo GetSerializationConstructor(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
@@ -62,7 +58,6 @@ namespace Orleans.Serialization
                 SerializationConstructorParameterTypes,
                 null);
 
-        [SecurityCritical]
         private static Delegate GetSerializationConstructorInvoker(
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]

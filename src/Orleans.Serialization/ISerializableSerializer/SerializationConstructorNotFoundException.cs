@@ -14,9 +14,8 @@ namespace Orleans.Serialization
         /// Initializes a new instance of the <see cref="SerializationConstructorNotFoundException"/> class.
         /// </summary>
         /// <param name="type">The type.</param>
-        [SecurityCritical]
         public SerializationConstructorNotFoundException(Type type) : base(
-            (string)$"Could not find a suitable serialization constructor on type {type.FullName}")
+            $"Could not find a suitable serialization constructor on type {type.FullName}")
         {
         }
 
@@ -25,7 +24,6 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="info">The serialization information.</param>
         /// <param name="context">The context.</param>
-        [SecurityCritical]
         protected SerializationConstructorNotFoundException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
         }

@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Serialization.TestKit</PackageId>
-    <TargetFrameworks>$(DefaultTargetFrameworks);netstandard2.1</TargetFrameworks>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <PackageDescription>Test kit for projects using Orleans.Serialization</PackageDescription>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
   </PropertyGroup>

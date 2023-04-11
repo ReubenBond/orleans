@@ -189,11 +189,7 @@ namespace Orleans.Serialization
             public IValueSerializer<TField> Value => _serializer ??= _provider.GetValueSerializer<TField>();
         }
 
-        private sealed class CopierHolder<
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
-#endif
-            T> : IDeepCopier<T>, IServiceHolder<IDeepCopier<T>>, IOptionalDeepCopier
+        private sealed class CopierHolder<T> : IDeepCopier<T>, IServiceHolder<IDeepCopier<T>>, IOptionalDeepCopier
         {
             private readonly IDeepCopierProvider _codecProvider;
             private IDeepCopier<T> _copier;
@@ -209,14 +205,12 @@ namespace Orleans.Serialization
 
             public bool IsShallowCopyable() => (Value as IOptionalDeepCopier)?.IsShallowCopyable() ?? false;
 
+#pragma warning disable IL2091 // Target generic argument does not satisfy 'DynamicallyAccessedMembersAttribute' in target method or type. The generic parameter of the source method or type does not have matching annotations.
             public IDeepCopier<T> Value => _copier ??= _codecProvider.GetDeepCopier<T>();
+#pragma warning restore IL2091 // Target generic argument does not satisfy 'DynamicallyAccessedMembersAttribute' in target method or type. The generic parameter of the source method or type does not have matching annotations.
         }
 
-        private sealed class BaseCopierHolder<
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
-#endif
-            T> : IBaseCopier<T>, IServiceHolder<IBaseCopier<T>> where T : class
+        private sealed class BaseCopierHolder<T> : IBaseCopier<T>, IServiceHolder<IBaseCopier<T>> where T : class
         {
             private readonly IDeepCopierProvider _codecProvider;
             private IBaseCopier<T> _copier;
@@ -228,7 +222,9 @@ namespace Orleans.Serialization
 
             public void DeepCopy(T original, T copy, CopyContext context) => Value.DeepCopy(original, copy, context);
 
+#pragma warning disable IL2091 // Target generic argument does not satisfy 'DynamicallyAccessedMembersAttribute' in target method or type. The generic parameter of the source method or type does not have matching annotations.
             public IBaseCopier<T> Value => _copier ??= _codecProvider.GetBaseCopier<T>();
+#pragma warning restore IL2091 // Target generic argument does not satisfy 'DynamicallyAccessedMembersAttribute' in target method or type. The generic parameter of the source method or type does not have matching annotations.
         }
     }
 

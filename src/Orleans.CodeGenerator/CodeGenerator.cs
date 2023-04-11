@@ -154,6 +154,14 @@ namespace Orleans.CodeGenerator
                     continue;
                 }
 
+                if (asm.GetAttributes(LibraryTypes.TypeManifestProviderAttribute, out var typeManifestAttributes))
+                {
+                    foreach (var attr in typeManifestAttributes)
+                    {
+                        metadataModel.MetadataProviders.Add((INamedTypeSymbol)attr.ConstructorArguments.First().Value);
+                    }
+                }
+
                 if (asm.GetAttributes(LibraryTypes.ApplicationPartAttribute, out var attrs))
                 {
                     metadataModel.ApplicationParts.Add(asm.MetadataName);

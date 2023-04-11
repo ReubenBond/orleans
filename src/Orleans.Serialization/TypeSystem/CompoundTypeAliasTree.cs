@@ -124,7 +124,7 @@ public class CompoundTypeAliasTree
         {
             if (value is not null && existing.Value is not null)
             {
-                throw new ArgumentException("A key with this value already exists");
+                //throw new ArgumentException("A key with this value already exists");
             }
 
             existing.Value = value;

@@ -9,7 +9,6 @@ namespace Orleans.Serialization
 {
     internal sealed class SerializationEntryCodec : IFieldCodec<SerializationEntrySurrogate>
     {
-        [SecurityCritical]
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer,
             uint fieldIdDelta,
             Type expectedType,
@@ -27,7 +26,6 @@ namespace Orleans.Serialization
             writer.WriteEndObject();
         }
 
-        [SecurityCritical]
         public SerializationEntrySurrogate ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             field.EnsureWireTypeTagDelimited();

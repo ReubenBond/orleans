@@ -22,7 +22,6 @@ namespace Orleans.Serialization
             nameof(CreateTypedSerializer),
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
-        [SecurityCritical]
         public ValueTypeSerializerFactory(
             SerializationEntryCodec entrySerializer,
             SerializationConstructorFactory constructorFactory,
@@ -38,10 +37,8 @@ namespace Orleans.Serialization
             _createSerializerDelegate = type => (ValueTypeSerializer)_createTypedSerializerMethodInfo.MakeGenericMethod(type).Invoke(this, null);
         }
 
-        [SecurityCritical]
         public ValueTypeSerializer GetSerializer(Type type) => _serializers.GetOrAdd(type, _createSerializerDelegate);
 
-        [SecurityCritical]
         private ValueTypeSerializer CreateTypedSerializer<
 #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors | DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)]

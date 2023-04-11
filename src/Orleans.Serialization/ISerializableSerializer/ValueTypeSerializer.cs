@@ -32,7 +32,6 @@ namespace Orleans.Serialization
         private readonly StreamingContext _streamingContext;
         private readonly SerializationEntryCodec _entrySerializer;
 
-        [SecurityCritical]
         public ValueTypeSerializer(
             ValueConstructor constructor,
             SerializationCallbacksFactory.SerializationCallbacks<SerializationCallback> callbacks,
@@ -47,7 +46,6 @@ namespace Orleans.Serialization
             _formatterConverter = formatterConverter;
         }
 
-        [SecurityCritical]
         public override void WriteValue<TBufferWriter>(ref Writer<TBufferWriter> writer, object value)
         {
             var item = (T)value;
@@ -78,7 +76,6 @@ namespace Orleans.Serialization
             _callbacks.OnSerialized?.Invoke(ref item, _streamingContext);
         }
 
-        [SecurityCritical]
         public override object ReadValue<TInput>(ref Reader<TInput> reader, Type type)
         {
             var info = new SerializationInfo(Type, _formatterConverter);

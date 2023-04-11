@@ -21,7 +21,6 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns>Serialization callbacks.</returns>
-        [SecurityCritical]
         public SerializationCallbacks<Action<object, StreamingContext>> GetReferenceTypeCallbacks(Type type) => (
             SerializationCallbacks<Action<object, StreamingContext>>)_cache.GetOrAdd(type, _factory);
 
@@ -32,7 +31,6 @@ namespace Orleans.Serialization
         /// <typeparam name="TDelegate">The delegate type.</typeparam>
         /// <param name="type">The type.</param>
         /// <returns>Serialization callbacks.</returns>
-        [SecurityCritical]
         public SerializationCallbacks<TDelegate> GetValueTypeCallbacks<TOwner, TDelegate>(
 #if NET5_0_OR_GREATER
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)]
@@ -96,7 +94,6 @@ namespace Orleans.Serialization
             return new SerializationCallbacks<TDelegate>(onDeserializing, onDeserialized, onSerializing, onSerialized);
         }
 
-        [SecurityCritical]
         private static DynamicMethod GetSerializationMethod(Type type, MethodInfo callbackMethod, Type owner)
         {
             Type[] callbackParameterTypes;

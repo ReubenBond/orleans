@@ -18,6 +18,12 @@ namespace Orleans.CodeGenerator
             var addConverterMethod = configParam.Member("AddConverter");
             var body = new List<StatementSyntax>();
 
+            foreach (var type in metadataModel.MetadataProviders)
+            {
+                body.Add(ExpressionStatement(InvocationExpression(ObjectCreationExpression(type.ToTypeSyntax()).WithArgumentList(ArgumentList(SeparatedList<ArgumentSyntax>())).Member("Configure"),
+                    ArgumentList(SingletonSeparatedList(Argument(configParam))))));
+            }
+
             foreach (var type in metadataModel.SerializableTypes)
             {
                 body.Add(ExpressionStatement(InvocationExpression(addSerializerMethod,
@@ -113,7 +119,7 @@ namespace Orleans.CodeGenerator
             var interfaceType = libraryTypes.ITypeManifestProvider;
             return ClassDeclaration("Metadata_" + SyntaxGeneration.Identifier.SanitizeIdentifierName(compilation.AssemblyName))
                 .AddBaseListTypes(SimpleBaseType(interfaceType.ToTypeSyntax()))
-                .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
+                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.SealedKeyword))
                 .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
                 .AddMembers(configureMethod);
         }
