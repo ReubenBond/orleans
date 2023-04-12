@@ -100,12 +100,12 @@ namespace Orleans.Runtime
     /// <typeparam name="TService">The type of the service.</typeparam>
     /// <typeparam name="TInstance">The type of the instance.</typeparam>
     /// <seealso cref="Orleans.Runtime.KeyedSingletonService{TKey, TService}" />
-    public class KeyedSingletonService<TKey, [DynamicallyAccessedMembers(PublicParameterlessConstructor)] TService, TInstance> : KeyedSingletonService<TKey, TService>
+    public class KeyedSingletonService<TKey, [DynamicallyAccessedMembers(PublicParameterlessConstructor)] TService, [DynamicallyAccessedMembers(PublicConstructors)] TInstance> : KeyedSingletonService<TKey, TService>
         where TInstance : TService
         where TService : class
     {
         public KeyedSingletonService(TKey key, IServiceProvider services)
-            : base(key, services, (sp, k) => sp.GetService<TInstance>())
+            : base(key, services, (sp, k) => ActivatorUtilities.CreateInstance<TInstance>(sp))
         {
         }
     }
@@ -169,7 +169,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Register a singleton keyed service
         /// </summary>
-        public static IServiceCollection AddSingletonKeyedService<TKey, [DynamicallyAccessedMembers(PublicParameterlessConstructor)] TService, TInstance>(this IServiceCollection collection, TKey key)
+        public static IServiceCollection AddSingletonKeyedService<TKey, [DynamicallyAccessedMembers(PublicParameterlessConstructor)] TService, [DynamicallyAccessedMembers(PublicConstructors)] TInstance>(this IServiceCollection collection, TKey key)
             where TInstance : class, TService
             where TService : class
         {

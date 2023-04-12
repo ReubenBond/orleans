@@ -17,7 +17,7 @@ namespace Orleans.Hosting
         /// <typeparam name="TDirector">The placement director.</typeparam>
         /// <param name="builder">The builder.</param>
         /// <returns>The builder.</returns>
-        public static ISiloBuilder AddPlacementDirector<TStrategy, TDirector>(this ISiloBuilder builder)
+        public static ISiloBuilder AddPlacementDirector<TStrategy, [DynamicallyAccessedMembers(PublicConstructors)] TDirector>(this ISiloBuilder builder)
             where TStrategy : PlacementStrategy, new()
             where TDirector : class, IPlacementDirector
         {
@@ -37,7 +37,7 @@ namespace Orleans.Hosting
             return builder.ConfigureServices(services => services.AddPlacementDirector<TStrategy>(createDirector));
         }
 
-        internal static void AddPlacementDirector<TStrategy, TDirector>(this IServiceCollection services)
+        internal static void AddPlacementDirector<TStrategy, [DynamicallyAccessedMembers(PublicConstructors)] TDirector>(this IServiceCollection services)
             where TStrategy : PlacementStrategy, new()
             where TDirector : class, IPlacementDirector
         {

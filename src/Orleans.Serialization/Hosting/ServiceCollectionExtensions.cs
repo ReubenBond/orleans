@@ -103,7 +103,7 @@ namespace Orleans.Serialization
             return default;
         }
 
-        private sealed class ConfigurationContext
+        public sealed class ConfigurationContext
         {
             public ConfigurationContext(IServiceCollection services) => Builder = new SerializerBuilder(services);
 
@@ -112,14 +112,14 @@ namespace Orleans.Serialization
             public ISerializerBuilder Builder { get; }
         }
 
-        private class SerializerBuilder : ISerializerBuilder
+        public class SerializerBuilder : ISerializerBuilder
         {
             public SerializerBuilder(IServiceCollection services) => Services = services;
 
             public IServiceCollection Services { get; }
         }
 
-        private sealed class ActivatorHolder<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] T> : IActivator<T>, IServiceHolder<IActivator<T>>
+        public sealed class ActivatorHolder<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] T> : IActivator<T>, IServiceHolder<IActivator<T>>
         {
             private readonly IActivatorProvider _activatorProvider;
             private IActivator<T> _activator;
@@ -134,7 +134,7 @@ namespace Orleans.Serialization
             public T Create() => Value.Create();
         }
 
-        private sealed class FieldCodecHolder<TField> : IFieldCodec<TField>, IServiceHolder<IFieldCodec<TField>>
+        public sealed class FieldCodecHolder<TField> : IFieldCodec<TField>, IServiceHolder<IFieldCodec<TField>>
         {
             private readonly IFieldCodecProvider _codecProvider;
             private IFieldCodec<TField> _codec;
@@ -151,7 +151,7 @@ namespace Orleans.Serialization
             public IFieldCodec<TField> Value => _codec ??= _codecProvider.GetCodec<TField>();
         }
 
-        private sealed class BaseCodecHolder<TField> : IBaseCodec<TField>, IServiceHolder<IBaseCodec<TField>> where TField : class
+        public sealed class BaseCodecHolder<TField> : IBaseCodec<TField>, IServiceHolder<IBaseCodec<TField>> where TField : class
         {
             private readonly IBaseCodecProvider _provider;
             private IBaseCodec<TField> _baseCodec;
@@ -168,7 +168,7 @@ namespace Orleans.Serialization
             public IBaseCodec<TField> Value => _baseCodec ??= _provider.GetBaseCodec<TField>();
         }
 
-        private sealed class ValueSerializerHolder<TField> : IValueSerializer<TField>, IServiceHolder<IValueSerializer<TField>> where TField : struct
+        public sealed class ValueSerializerHolder<TField> : IValueSerializer<TField>, IServiceHolder<IValueSerializer<TField>> where TField : struct
         {
             private readonly IValueSerializerProvider _provider;
             private IValueSerializer<TField> _serializer;
@@ -185,7 +185,7 @@ namespace Orleans.Serialization
             public IValueSerializer<TField> Value => _serializer ??= _provider.GetValueSerializer<TField>();
         }
 
-        private sealed class CopierHolder<T> : IDeepCopier<T>, IServiceHolder<IDeepCopier<T>>, IOptionalDeepCopier
+        public sealed class CopierHolder<T> : IDeepCopier<T>, IServiceHolder<IDeepCopier<T>>, IOptionalDeepCopier
         {
             private readonly IDeepCopierProvider _codecProvider;
             private IDeepCopier<T> _copier;
@@ -205,7 +205,7 @@ namespace Orleans.Serialization
             public IDeepCopier<T> Value => _copier ??= _codecProvider.GetDeepCopier<T>();
         }
 
-        private sealed class BaseCopierHolder<T> : IBaseCopier<T>, IServiceHolder<IBaseCopier<T>> where T : class
+        public sealed class BaseCopierHolder<T> : IBaseCopier<T>, IServiceHolder<IBaseCopier<T>> where T : class
         {
             private readonly IDeepCopierProvider _codecProvider;
             private IBaseCopier<T> _copier;
@@ -226,7 +226,7 @@ namespace Orleans.Serialization
     /// Holds a reference to a service.
     /// </summary>
     /// <typeparam name="T">The service type.</typeparam>
-    internal interface IServiceHolder<T>
+    public interface IServiceHolder<T>
     {
         /// <summary>
         /// Gets the service.

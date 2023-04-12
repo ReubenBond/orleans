@@ -30,28 +30,15 @@ namespace Orleans.Serialization.Codecs
     /// <seealso cref="Orleans.Serialization.Codecs.IFieldCodec" />
     public interface IFieldCodec<T> : IFieldCodec
     {
-        /// <summary>
-        /// Writes a field.
-        /// </summary>
-        /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
-        /// <param name="writer">The writer.</param>
-        /// <param name="fieldIdDelta">The field identifier delta.</param>
-        /// <param name="expectedType">The expected type.</param>
-        /// <param name="value">The value.</param>
         void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, T value) where TBufferWriter : IBufferWriter<byte>;
 
-        /// <summary>
-        /// Reads a value.
-        /// </summary>
-        /// <typeparam name="TInput">The reader input type.</typeparam>
-        /// <param name="reader">The reader.</param>
-        /// <param name="field">The field.</param>
-        /// <returns>The value.</returns>
         new T ReadValue<TInput>(ref Reader<TInput> reader, Field field);
 
+        /// <inheritdoc/>
         void IFieldCodec.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value)
             => WriteField(ref writer, fieldIdDelta, expectedType, (T)value);
 
+        /// <inheritdoc/>
         object IFieldCodec.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);
     }
 

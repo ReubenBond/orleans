@@ -30,17 +30,17 @@ namespace Orleans.Serialization
         /// Returns a serializer which is specialized to the provided type parameter.
         /// </summary>
         /// <typeparam name="T">The underlying type for the returned serializer.</typeparam>
-        public Serializer<T> GetSerializer<T>() => new(_sessionPool);
+        public Serializer<T> GetSerializer<[DynamicallyAccessedMembers(All)] T>() => new(_sessionPool);
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided type, <typeparamref name="T"/>, can be serialized, and <see langword="false"/> otherwise.
         /// </summary>
-        public bool CanSerialize<T>() => _sessionPool.CodecProvider.TryGetCodec(typeof(T)) is { };
+        public bool CanSerialize<[DynamicallyAccessedMembers(All)] T>() => _sessionPool.CodecProvider.TryGetCodec(typeof(T)) is { };
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided type, <paramref name="type"/>, can be serialized, and <see langword="false"/> otherwise.
         /// </summary>
-        public bool CanSerialize(Type type) => _sessionPool.CodecProvider.TryGetCodec(type) is { };
+        public bool CanSerialize([DynamicallyAccessedMembers(All)] Type type) => _sessionPool.CodecProvider.TryGetCodec(type) is { };
 
         /// <summary>
         /// Serializes the provided <paramref name="value"/> into a new array.
@@ -72,7 +72,7 @@ namespace Orleans.Serialization
         /// <param name="value">The value to serialize.</param>
         /// <param name="destination">The destination where serialized data will be written.</param>
         /// <remarks>This method slices the <paramref name="destination"/> to the serialized data length.</remarks>
-        public void Serialize<T>(T value, ref Memory<byte> destination)
+        public void Serialize<[DynamicallyAccessedMembers(All)] T>(T value, ref Memory<byte> destination)
         {
             using var session = _sessionPool.GetSession();
             var writer = Writer.Create(destination, session);
@@ -90,7 +90,7 @@ namespace Orleans.Serialization
         /// <param name="destination">The destination where serialized data will be written.</param>
         /// <param name="session">The serializer session.</param>
         /// <remarks>This method slices the <paramref name="destination"/> to the serialized data length.</remarks>
-        public void Serialize<T>(T value, ref Memory<byte> destination, SerializerSession session)
+        public void Serialize<[DynamicallyAccessedMembers(All)] T>(T value, ref Memory<byte> destination, SerializerSession session)
         {
             var writer = Writer.Create(destination, session);
             var codec = session.CodecProvider.GetCodec<T>();
@@ -143,7 +143,7 @@ namespace Orleans.Serialization
         /// <param name="session">The serializer session.</param>
         /// <param name="sizeHint">The estimated upper bound for the length of the serialized data.</param>
         /// <remarks>The destination stream will not be flushed by this method.</remarks>
-        public void Serialize<T>(T value, Stream destination, SerializerSession session, int sizeHint = 0)
+        public void Serialize<[DynamicallyAccessedMembers(All)] T>(T value, Stream destination, SerializerSession session, int sizeHint = 0)
         {
             if (destination is MemoryStream memoryStream)
             {
@@ -1548,7 +1548,7 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="type">The expected type of the value.</param>
         /// <returns>The deserialized value.</returns>
-        public object Deserialize(ReadOnlySequence<byte> source, Type type)
+        public object Deserialize(ReadOnlySequence<byte> source, [DynamicallyAccessedMembers(All)] Type type)
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
@@ -1564,7 +1564,7 @@ namespace Orleans.Serialization
         /// <param name="session">The serializer session.</param>
         /// <param name="type">The expected type of the value.</param>
         /// <returns>The deserialized value.</returns>
-        public object Deserialize(ReadOnlySequence<byte> source, SerializerSession session, Type type)
+        public object Deserialize(ReadOnlySequence<byte> source, SerializerSession session, [DynamicallyAccessedMembers(All)] Type type)
         {
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec(type);

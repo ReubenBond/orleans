@@ -1,4 +1,9 @@
+using System;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime.Messaging;
+using Orleans.Serialization;
+using Orleans.Serialization.Codecs;
 
 [assembly: InternalsVisibleTo("Orleans.BroadcastChannel")]
 [assembly: InternalsVisibleTo("Orleans.CodeGeneration")]
@@ -27,3 +32,19 @@ using System.Runtime.CompilerServices;
 
 // Mocking libraries
 [assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]
+
+public static class PinnedTypes
+{
+    public static void GoBePinned()
+    {
+        PrintType(typeof(ServiceCollectionExtensions.FieldCodecHolder<NetworkProtocolVersion>));
+        PrintType(typeof(ServiceCollectionExtensions.CopierHolder<bool>));
+        PrintType(typeof(IFieldCodec<NetworkProtocolVersion>));
+        PrintType(typeof(Orleans.Serialization.Invocation.PooledResponseCopier<bool>));
+    }
+
+    private static string PrintType([DynamicallyAccessedMembers(All)] Type type)
+    {
+        return type.ToString();
+    }
+}

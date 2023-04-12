@@ -38,7 +38,8 @@ namespace Orleans.Runtime
         /// <inheritdoc />
         public override Task OnStart(CancellationToken cancellationToken = default)
         {
-            foreach(var stage in this.observers.GroupBy(o => o.Stage).OrderBy(s => s.Key))
+            var groupedOrderedObservers = this.observers.GroupBy(o => o.Stage).OrderBy(s => s.Key).ToArray();
+            foreach(var stage in groupedOrderedObservers)
             {
                 if (this.logger.IsEnabled(LogLevel.Debug))
                 {

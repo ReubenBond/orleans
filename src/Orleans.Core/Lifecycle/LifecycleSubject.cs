@@ -104,9 +104,8 @@ namespace Orleans
             if (this.highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
             try
             {
-                foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers
-                    .GroupBy(orderedObserver => orderedObserver.Stage)
-                    .OrderBy(group => group.Key))
+                var groupedOrderedObservers = this.subscribers.GroupBy(o => o.Stage).OrderBy(s => s.Key).ToArray();
+                foreach (IGrouping<int, OrderedObserver> observerGroup in groupedOrderedObservers)
                 {
                     if (cancellationToken.IsCancellationRequested)
                     {
