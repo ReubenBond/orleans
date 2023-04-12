@@ -1,6 +1,8 @@
 using System;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.GrainDirectory;
+using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Codecs;
@@ -37,13 +39,42 @@ public static class PinnedTypes
 {
     public static void GoBePinned()
     {
-        PrintType(typeof(ServiceCollectionExtensions.FieldCodecHolder<NetworkProtocolVersion>));
-        PrintType(typeof(ServiceCollectionExtensions.CopierHolder<bool>));
-        PrintType(typeof(IFieldCodec<NetworkProtocolVersion>));
-        PrintType(typeof(Orleans.Serialization.Invocation.PooledResponseCopier<bool>));
+        KeepType(typeof(TupleCodec<Orleans.Runtime.SiloAddress, System.DateTime>));
+        KeepType(typeof(ServiceCollectionExtensions.FieldCodecHolder<NetworkProtocolVersion>)); // These types are probably not needed: can avoid DI and request the codec from CodecProvider directly.
+        KeepType(typeof(ServiceCollectionExtensions.FieldCodecHolder<DateTime>));
+        KeepType(typeof(ServiceCollectionExtensions.FieldCodecHolder<bool>));
+        KeepType(typeof(ServiceCollectionExtensions.FieldCodecHolder<GrainInterfaceType>));
+        KeepType(typeof(ServiceCollectionExtensions.FieldCodecHolder<GrainType>));
+        KeepType(typeof(Orleans.Serialization.ServiceCollectionExtensions.FieldCodecHolder<Orleans.Runtime.GrainId>));
+        KeepType(typeof(ServiceCollectionExtensions.FieldCodecHolder<float>));
+        KeepType(typeof(ServiceCollectionExtensions.FieldCodecHolder<long>));
+        KeepType(typeof(ServiceCollectionExtensions.FieldCodecHolder<int>));
+        KeepType(typeof(ServiceCollectionExtensions.FieldCodecHolder<AddressAndTag>));
+        KeepType(typeof(ServiceCollectionExtensions.CopierHolder<bool>));
+        KeepType(typeof(IFieldCodec<NetworkProtocolVersion>));
+        KeepType(typeof(ImmutableDictionaryCodec<Orleans.Runtime.GrainType, Orleans.Metadata.GrainProperties>));
+        KeepType(typeof(Orleans.Serialization.ServiceCollectionExtensions.ValueSerializerHolder<Orleans.Serialization.Codecs.ImmutableDictionarySurrogate<Orleans.Runtime.GrainType, Orleans.Metadata.GrainProperties>>));
+        KeepType(typeof(Orleans.Serialization.ServiceCollectionExtensions.ValueSerializerHolder<Orleans.Serialization.Codecs.ImmutableDictionarySurrogate<Orleans.Runtime.GrainInterfaceType, Orleans.Metadata.GrainInterfaceProperties>>));
+        KeepType(typeof(Orleans.Serialization.Codecs.ImmutableDictionaryCodec<Orleans.Runtime.GrainInterfaceType, Orleans.Metadata.GrainInterfaceProperties>));
+        KeepType(typeof(OrleansCodeGen.Orleans.Serialization.Codecs.Codec_ImmutableDictionarySurrogate<Orleans.Runtime.GrainInterfaceType, Orleans.Metadata.GrainInterfaceProperties>));
+        KeepType(typeof(OrleansCodeGen.Orleans.Serialization.Codecs.Codec_ImmutableDictionarySurrogate<Orleans.Runtime.GrainType, Orleans.Metadata.GrainProperties>));
+        KeepType(typeof(Orleans.Serialization.ServiceCollectionExtensions.ValueSerializerHolder<Orleans.Serialization.Codecs.ImmutableDictionarySurrogate<System.String, System.String>>));
+        KeepType(typeof(Orleans.Serialization.ServiceCollectionExtensions.CopierHolder<System.ValueTuple<Orleans.Runtime.GrainId, System.Int32>>));
+        KeepType(typeof(Orleans.Serialization.Codecs.ImmutableDictionaryCodec<Orleans.Runtime.SiloAddress, System.ValueTuple<System.Collections.Immutable.ImmutableHashSet<Orleans.Runtime.GrainId>, System.Int64>>));
+        KeepType(typeof(Orleans.Serialization.ServiceCollectionExtensions.ValueSerializerHolder<Orleans.Serialization.Codecs.ImmutableDictionarySurrogate<Orleans.Runtime.SiloAddress, System.ValueTuple<System.Collections.Immutable.ImmutableHashSet<Orleans.Runtime.GrainId>, System.Int64>>>));
+        KeepType(typeof(OrleansCodeGen.Orleans.Serialization.Codecs.Codec_ImmutableDictionarySurrogate<Orleans.Runtime.SiloAddress, System.ValueTuple<System.Collections.Immutable.ImmutableHashSet<Orleans.Runtime.GrainId>, System.Int64>>));
+        KeepType(typeof(Orleans.Serialization.ServiceCollectionExtensions.FieldCodecHolder<System.ValueTuple<System.Collections.Immutable.ImmutableHashSet<Orleans.Runtime.GrainId>, System.Int64>>));
+        KeepType(typeof(Orleans.Serialization.Codecs.ValueTupleCodec<System.Collections.Immutable.ImmutableHashSet<Orleans.Runtime.GrainId>, System.Int64>));
+        KeepType(typeof(Orleans.Serialization.Codecs.ImmutableHashSetCodec<Orleans.Runtime.GrainId>));
+        KeepType(typeof(Orleans.Serialization.ServiceCollectionExtensions.ValueSerializerHolder<Orleans.Serialization.Codecs.ImmutableHashSetSurrogate<Orleans.Runtime.GrainId>>));
+        KeepType(typeof(Orleans.Serialization.Invocation.PooledResponseCopier<bool>));
+        KeepType(typeof(Orleans.Serialization.Invocation.PooledResponseCodec<bool>));
+        KeepType(typeof(OrleansCodeGen.Orleans.Serialization.Codecs.Codec_ImmutableHashSetSurrogate<Orleans.Runtime.GrainId>));
+        KeepType(typeof(Orleans.Serialization.Codecs.TupleCopier<Orleans.Runtime.SiloAddress, System.DateTime>));
+        KeepType(typeof(Orleans.Serialization.Invocation.PooledResponseCopier<Orleans.GrainDirectory.AddressAndTag>));
     }
 
-    private static string PrintType([DynamicallyAccessedMembers(All)] Type type)
+    private static string KeepType([DynamicallyAccessedMembers(All)] Type type)
     {
         return type.ToString();
     }

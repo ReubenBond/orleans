@@ -43,7 +43,7 @@ namespace Orleans.Serialization
                 void CallConstructor(ref T instance, SerializationInfo info, StreamingContext context)
                 {
                     var boxed = (object)instance;
-                    constructor.Invoke(new[] { boxed, info, context });
+                    constructor.Invoke(boxed, new object[] { info, context });
                     instance = (T)boxed;
                 }
 
@@ -91,7 +91,7 @@ namespace Orleans.Serialization
             var constructor = GetSerializationConstructor(type) ?? (typeof(Exception).IsAssignableFrom(type) ? GetSerializationConstructor(typeof(Exception)) : null);
             if (!RuntimeFeature.IsDynamicCodeSupported)
             {
-                void CallConstructor(object instance, SerializationInfo info, StreamingContext context) => constructor.Invoke(new[] { instance, info, context });
+                void CallConstructor(object instance, SerializationInfo info, StreamingContext context) => constructor.Invoke(instance, new object[] { info, context });
                 return CallConstructor;
             }
 

@@ -1,6 +1,8 @@
 // See https://aka.ms/new-console-template for more information
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
+using System.Net;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -71,18 +73,29 @@ while (!Debugger.IsAttached)
 #pragma warning disable IL3050 // Calling members annotated with 'RequiresDynamicCodeAttribute' may break functionality when AOT compiling.
 using var host = Host.CreateDefaultBuilder(args)
     //.ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Trace))
-    .UseOrleans(siloBuilder => siloBuilder.UseLocalhostClustering())
+    .UseOrleans((ctx, siloBuilder) =>
+    {
+
+        // In order to support multiple hosts forming a cluster, they must listen on different ports.
+        // Use the --InstanceId X option to launch subsequent hosts.
+        int.TryParse(ctx.Configuration["InstanceId"], out var instanceId);
+        siloBuilder.UseLocalhostClustering(
+            siloPort: 11111 + instanceId,
+            gatewayPort: 30000 + instanceId,
+            primarySiloEndpoint: new IPEndPoint(IPAddress.Loopback, 11111));
+    })
     .Build();
 #pragma warning restore IL3050 // Calling members annotated with 'RequiresDynamicCodeAttribute' may break functionality when AOT compiling.
 
 PinnedTypes.GoBePinned();
 await host.StartAsync();
 var grainFactory = host.Services.GetRequiredService<IGrainFactory>();
-var response = await grainFactory.GetGrain<IEchoGrain>(Guid.NewGuid()).Echo("Hello World!");
+var response = await grainFactory.GetGrain<IEchoGrain>(Guid.Empty).Echo("Hello World!");
 Console.WriteLine($"Echo response: {response}");
+Console.WriteLine("bye?");
+Console.ReadLine();
 Console.WriteLine("bye");
 await host.StopAsync();
-
 
 public interface IEchoGrain : IGrainWithGuidKey
 {
@@ -91,7 +104,7 @@ public interface IEchoGrain : IGrainWithGuidKey
 
 public class EchoGrain : Grain, IEchoGrain
 {
-    public Task<string> Echo(string message) => Task.FromResult(message);
+    public Task<string> Echo(string message) => Task.FromResult($"EchoGrain is responding to \"{message}\" from process {Environment.ProcessId}");
 }
 
 #endif
