@@ -164,11 +164,7 @@ namespace Orleans.Serialization.Codecs
     /// Copier for multi-dimensional arrays.
     /// </summary>
     /// <typeparam name="T">The array element type.</typeparam>
-    internal sealed class MultiDimensionalArrayCopier<
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
-#endif
-        T> : IGeneralizedCopier
+    internal sealed class MultiDimensionalArrayCopier<[DynamicallyAccessedMembers(NonPublicFields | PublicFields)] T> : IGeneralizedCopier
     {
         /// <inheritdoc/>
         public object DeepCopy(object original, CopyContext context)

@@ -13,10 +13,6 @@ namespace Orleans.Serialization.Serializers
         /// </summary>
         /// <typeparam name="T">The type.</typeparam>
         /// <returns>The activator.</returns>
-        IActivator<T> GetActivator<
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
-#endif
-            T>();
+        IActivator<T> GetActivator<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] T>();
     }
 }

@@ -29,11 +29,7 @@ namespace Orleans.Serialization.Configuration
         /// Adds an activator for the specified type.
         /// </summary>
         /// <param name="type">The activator type.</param>
-        public void AddActivator(
-#if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(All)]
-#endif
-            Type type) => Activators.Add(type);  
+        public void AddActivator([DynamicallyAccessedMembers(All)] Type type) => Activators.Add(type);  
 
         /// <summary>
         /// Gets the set of known field codecs, which are responsible for serializing and deserializing fields of a given type.
@@ -44,11 +40,7 @@ namespace Orleans.Serialization.Configuration
         /// Adds an field codec for the specified type.
         /// </summary>
         /// <param name="type">The field codec type.</param>
-        public void AddFieldCodec(
-#if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(All)]
-#endif
-            Type type) => FieldCodecs.Add(type);  
+        public void AddFieldCodec([DynamicallyAccessedMembers(All)] Type type) => FieldCodecs.Add(type);  
 
         /// <summary>
         /// Gets the set of known serializers, which are responsible for serializing and deserializing a given type.
@@ -59,11 +51,7 @@ namespace Orleans.Serialization.Configuration
         /// Adds an serializer for the specified type.
         /// </summary>
         /// <param name="type">The serializer type.</param>
-        public void AddSerializer(
-#if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(All)]
-#endif
-            Type type) => Serializers.Add(type);  
+        public void AddSerializer([DynamicallyAccessedMembers(All)] Type type) => Serializers.Add(type);  
 
         /// <summary>
         /// Gets the set of copiers, which are responsible for creating deep copies of a given type.
@@ -74,11 +62,7 @@ namespace Orleans.Serialization.Configuration
         /// Adds an copier for the specified type.
         /// </summary>
         /// <param name="type">The copier type.</param>
-        public void AddCopier(
-#if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(All)]
-#endif
-            Type type) => Copiers.Add(type);  
+        public void AddCopier([DynamicallyAccessedMembers(All)] Type type) => Copiers.Add(type);  
 
         /// <summary>
         /// Gets the set of converters, which are responsible for converting from one type to another.
@@ -89,11 +73,7 @@ namespace Orleans.Serialization.Configuration
         /// Adds an converter for the specified type.
         /// </summary>
         /// <param name="type">The converter type.</param>
-        public void AddConverter(
-#if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(All)]
-#endif
-            Type type) => Converters.Add(type);  
+        public void AddConverter([DynamicallyAccessedMembers(All)] Type type) => Converters.Add(type);  
 
         /// <summary>
         /// Gets the set of known interfaces, which are interfaces that have corresponding proxies in the <see cref="InterfaceProxies"/> collection.
@@ -104,11 +84,7 @@ namespace Orleans.Serialization.Configuration
         /// Adds an interface for the specified type.
         /// </summary>
         /// <param name="type">The interface type.</param>
-        public void AddInterface(
-#if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(All)]
-#endif
-            Type type) => Interfaces.Add(type);  
+        public void AddInterface([DynamicallyAccessedMembers(All)] Type type) => Interfaces.Add(type);  
 
         /// <summary>
         /// Gets the set of known interface proxies, which capture method invocations which can be serialized, deserialized, and invoked against an implementation of this interface.
@@ -122,11 +98,7 @@ namespace Orleans.Serialization.Configuration
         /// Adds an interface proxy for the specified type.
         /// </summary>
         /// <param name="type">The interface proxy type.</param>
-        public void AddInterfaceProxy(
-#if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(All)]
-#endif
-            Type type) => InterfaceProxies.Add(type);  
+        public void AddInterfaceProxy([DynamicallyAccessedMembers(All)] Type type) => InterfaceProxies.Add(type);  
 
         /// <summary>
         /// Gets the set of interface implementations, which are implementations of the interfaces present in <see cref="Interfaces"/>.
@@ -137,11 +109,7 @@ namespace Orleans.Serialization.Configuration
         /// Adds an interface implementation for the specified type.
         /// </summary>
         /// <param name="type">The interface implementation type.</param>
-        public void AddInterfaceImplementation(
-#if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(All)]
-#endif
-            Type type) => InterfaceImplementations.Add(type);  
+        public void AddInterfaceImplementation([DynamicallyAccessedMembers(All)] Type type) => InterfaceImplementations.Add(type);  
 
         /// <summary>
         /// Gets the mapping of well-known type identifiers to their corresponding type.
@@ -153,12 +121,7 @@ namespace Orleans.Serialization.Configuration
         /// </summary>
         /// <param name="typeId">The type identifier.</param>
         /// <param name="type">The type.</param>
-        public void AddWellKnownTypeId(
-            uint typeId,
-#if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(All)]
-#endif
-            Type type) => WellKnownTypeIds[typeId] = type;
+        public void AddWellKnownTypeId(uint typeId, [DynamicallyAccessedMembers(All)] Type type) => WellKnownTypeIds[typeId] = type;
 
         /// <summary>
         /// Gets the mapping of well-known type aliases to their corresponding type.
@@ -170,12 +133,7 @@ namespace Orleans.Serialization.Configuration
         /// </summary>
         /// <param name="typeAlias">The type alias.</param>
         /// <param name="type">The type.</param>
-        public void AddWellKnownTypeAlias(
-            string typeAlias,
-#if NET5_0_OR_GREATER
-    [DynamicallyAccessedMembers(All)]
-#endif
-            Type type) => WellKnownTypeAliases[typeAlias] = type;
+        public void AddWellKnownTypeAlias(string typeAlias, [DynamicallyAccessedMembers(All)] Type type) => WellKnownTypeAliases[typeAlias] = type;
 
         /// <summary>
         /// Gets the mapping of allowed type names.

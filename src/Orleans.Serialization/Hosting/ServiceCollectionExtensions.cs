@@ -119,11 +119,7 @@ namespace Orleans.Serialization
             public IServiceCollection Services { get; }
         }
 
-        private sealed class ActivatorHolder<
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
-#endif
-            T> : IActivator<T>, IServiceHolder<IActivator<T>>
+        private sealed class ActivatorHolder<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] T> : IActivator<T>, IServiceHolder<IActivator<T>>
         {
             private readonly IActivatorProvider _activatorProvider;
             private IActivator<T> _activator;

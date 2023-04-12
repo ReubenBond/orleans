@@ -2,8 +2,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
+#if false 
+/*
 #pragma warning disable IL3050 // Calling members annotated with 'RequiresDynamicCodeAttribute' may break functionality when AOT compiling.
-
 var services = new ServiceCollection()
 //    .AddSingleton(typeof(IDam<>), typeof(Dam<>))
     .AddSingleton(typeof(IList<>), typeof(List<>))
@@ -28,9 +29,9 @@ public interface IDam<[DynamicallyAccessedMembers(PublicParameterlessConstructor
 public class Dam<[DynamicallyAccessedMembers(All)] T> : IDam<T>
 {
 }
-
 #pragma warning restore IL3050 // Calling members annotated with 'RequiresDynamicCodeAttribute' may break functionality when AOT compiling.
-#if false
+*/
+#else
 #pragma warning disable IL3050 // Calling members annotated with 'RequiresDynamicCodeAttribute' may break functionality when AOT compiling.
 using var host = Host.CreateDefaultBuilder(args).UseOrleans(siloBuilder => siloBuilder.UseLocalhostClustering()).Build();
 #pragma warning restore IL3050 // Calling members annotated with 'RequiresDynamicCodeAttribute' may break functionality when AOT compiling.
