@@ -22,6 +22,7 @@ namespace Orleans.Metadata
         }
 
         /// <inheritdoc/>
+        [SuppressMessage("Trimming", "IL2070:'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.", Justification = "<Pending>")]
         public void Populate(Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
             var counter = 0;

@@ -18,7 +18,10 @@ namespace Orleans.CodeGeneration
         /// <param name="grainType">The grain type.</param>
         /// <param name="bAllMethods">Whether to get all methods or only declared methods.</param>
         /// <returns>All grain interface methods for a specified type.</returns>
-        public static MethodInfo[] GetMethods(Type grainType, bool bAllMethods = true)
+        [SuppressMessage("Trimming", "IL2072:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
+        [SuppressMessage("Trimming", "IL2075:'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
+        [SuppressMessage("Trimming", "IL2070:'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.", Justification = "<Pending>")]
+        public static MethodInfo[] GetMethods([DynamicallyAccessedMembers(PublicMethods | NonPublicMethods | Interfaces)] Type grainType, bool bAllMethods = true)
         {
             var methodInfos = new List<MethodInfo>();
             GetMethodsImpl(grainType, grainType, methodInfos);
@@ -37,7 +40,7 @@ namespace Orleans.CodeGeneration
 
             return methodInfos.ToArray();
 
-            static void GetMethodsImpl(Type grainType, Type serviceType, List<MethodInfo> methodInfos)
+            static void GetMethodsImpl([DynamicallyAccessedMembers(PublicMethods | NonPublicMethods | Interfaces)] Type grainType, Type serviceType, List<MethodInfo> methodInfos)
             {
                 foreach (var iType in GetGrainInterfaces(serviceType))
                 {

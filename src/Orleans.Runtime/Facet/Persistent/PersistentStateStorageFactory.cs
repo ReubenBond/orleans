@@ -1,4 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,7 +16,7 @@ namespace Orleans.Runtime
     {
 
         /// <inheritdoc/>
-        public IPersistentState<TState> Create<TState>(IGrainContext context, IPersistentStateConfiguration cfg)
+        public IPersistentState<TState> Create<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] TState>(IGrainContext context, IPersistentStateConfiguration cfg)
         {
             var storageProvider = !string.IsNullOrWhiteSpace(cfg.StorageName)
                 ? context.ActivationServices.GetServiceByName<IGrainStorage>(cfg.StorageName)
@@ -53,7 +52,7 @@ namespace Orleans.Runtime
             throw new BadProviderConfigException(errMsg);
         }
 
-        private sealed class PersistentStateBridge<TState> : IPersistentState<TState>, ILifecycleParticipant<IGrainLifecycle>
+        private sealed class PersistentStateBridge<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] TState> : IPersistentState<TState>, ILifecycleParticipant<IGrainLifecycle>
         {
             private readonly string stateName;
             private readonly IGrainContext context;

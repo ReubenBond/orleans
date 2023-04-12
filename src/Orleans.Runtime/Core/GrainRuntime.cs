@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Timers;
 using Orleans.Storage;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Activators;
 
 namespace Orleans.Runtime
 {
@@ -76,7 +78,7 @@ namespace Orleans.Runtime
             collectibleContext.DelayDeactivation(timeSpan);
         }
 
-        public IStorage<TGrainState> GetStorage<TGrainState>(IGrainContext grainContext)
+        public IStorage<TGrainState> GetStorage<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] TGrainState>(IGrainContext grainContext)
         {
             if (grainContext is null) throw new ArgumentNullException(nameof(grainContext));
             var grainType = grainContext.GrainInstance?.GetType() ?? throw new ArgumentNullException(nameof(IGrainContext.GrainInstance));

@@ -25,12 +25,13 @@ namespace Orleans.Serialization
         /// <returns>
         /// A collection of types which have serializability issues.
         /// </returns>
+        [SuppressMessage("Trimming", "IL2075:'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
+        [SuppressMessage("Trimming", "IL2067:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.", Justification = "<Pending>")]
         public static Dictionary<Type, SerializerConfigurationComplaint> AnalyzeSerializerAvailability(ICodecProvider codecProvider, TypeManifestOptions options)
         {
             var allComplaints = new Dictionary<Type, SerializerConfigurationComplaint>();
             foreach (var @interface in options.Interfaces)
             {
-#pragma warning disable IL2075 // 'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.
                 foreach (var method in @interface.GetMethods())
                 {
                     if (typeof(Task).IsAssignableFrom(method.ReturnType))
@@ -51,7 +52,6 @@ namespace Orleans.Serialization
                         VisitType(param.ParameterType, method);
                     }
                 }
-#pragma warning restore IL2075 // 'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.
             }
 
             return allComplaints;
@@ -64,9 +64,7 @@ namespace Orleans.Serialization
                 }
 
                 var hasCodec = codecProvider.TryGetCodec(type) is not null;
-#pragma warning disable IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
                 var hasCopier = codecProvider.TryGetDeepCopier(type) is not null;
-#pragma warning restore IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
                 if (!hasCodec || !hasCopier)
                 {
                     if (!allComplaints.TryGetValue(type, out var complaint))

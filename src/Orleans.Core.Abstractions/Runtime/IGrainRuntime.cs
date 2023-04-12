@@ -55,6 +55,6 @@ namespace Orleans.Runtime
         /// <typeparam name="TGrainState">The grain state type.</typeparam>
         /// <param name="grainContext">The grain context.</param>
         /// <returns>The grain storage for the provided grain.</returns>
-        IStorage<TGrainState> GetStorage<TGrainState>(IGrainContext grainContext);
+        IStorage<TGrainState> GetStorage<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] TGrainState>(IGrainContext grainContext);
     }
 }

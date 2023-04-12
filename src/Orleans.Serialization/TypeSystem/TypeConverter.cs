@@ -121,6 +121,9 @@ namespace Orleans.Serialization.TypeSystem
             }
         }
 
+        [SuppressMessage("Trimming", "IL2072:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
+        [SuppressMessage("Trimming", "IL2075:'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
+        [SuppressMessage("Trimming", "IL2067:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.", Justification = "<Pending>")]
         private void ConsumeMetadata(TypeManifestOptions metadata)
         {
             AddFromMetadata(metadata.Serializers, typeof(IBaseCodec<>));
@@ -132,13 +135,11 @@ namespace Orleans.Serialization.TypeSystem
             AddFromMetadata(metadata.Converters, typeof(IConverter<,>));
             foreach (var type in metadata.InterfaceProxies)
             {
-#pragma warning disable IL2072 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.
                 AddAllowedType(type switch
                 {
                     { IsGenericType: true } => type.GetGenericTypeDefinition(),
                     _ => type
                 });
-#pragma warning restore IL2072 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.
             }
 
             void AddFromMetadata(HashSet<Type> metadataCollection, Type genericType)
@@ -147,9 +148,7 @@ namespace Orleans.Serialization.TypeSystem
 
                 foreach (var type in metadataCollection)
                 {
-#pragma warning disable IL2075 // 'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.
                     var interfaces = type.GetInterfaces();
-#pragma warning restore IL2075 // 'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.
                     foreach (var @interface in interfaces)
                     {
                         if (!@interface.IsGenericType)
@@ -187,16 +186,10 @@ namespace Orleans.Serialization.TypeSystem
                     return;
                 }
 
-#pragma warning disable IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
                 AddAllowedType(genericArgument);
-#pragma warning restore IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
             }
 
-            void AddAllowedType(
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(Interfaces)]
-#endif
-                Type type)
+            void AddAllowedType([DynamicallyAccessedMembers(Interfaces)] Type type)
             {
                 FormatAndAddAllowedType(type);
 

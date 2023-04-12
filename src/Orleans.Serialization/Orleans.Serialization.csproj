@@ -8,6 +8,7 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <IsTrimmable Condition="$(TargetFramework) != 'netstandard2.1'">true</IsTrimmable>
   </PropertyGroup>
 
   <ItemGroup>

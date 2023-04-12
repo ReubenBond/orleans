@@ -31,6 +31,7 @@ namespace Orleans.Metadata
         /// <param name="grainType">Type of the grain.</param>
         /// <param name="grainClass">The grain class.</param>
         /// <returns><see langword="true"/> if a corresponding grain class was found, <see langword="false"/> otherwise.</returns>
+        [UnconditionalSuppressMessage("Trimming", "IL2055:Either the type on which the MakeGenericType is called can't be statically determined, or the type parameters to be used for generic arguments can't be statically determined.", Justification = "<Pending>")]
         public bool TryGetGrainClass(GrainType grainType, [NotNullWhen(true)] out Type grainClass)
         {
             GrainType lookupType;

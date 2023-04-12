@@ -7,7 +7,7 @@ namespace Orleans.Runtime
     /// </summary>
     /// <typeparam name="TState">The underlying state type.</typeparam>
     /// <seealso cref="Orleans.Core.IStorage{TState}" />
-    public interface IPersistentState<TState> : IStorage<TState>
+    public interface IPersistentState<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] TState> : IStorage<TState>
     {
     }
 }

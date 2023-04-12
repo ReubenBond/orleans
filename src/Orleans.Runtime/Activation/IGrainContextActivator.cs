@@ -315,7 +315,7 @@ namespace Orleans.Runtime
         /// Returns interleave predicate depending on whether class is marked with <see cref="MayInterleaveAttribute"/> or not.
         /// </summary>
         /// <param name="grainType">Grain class.</param>
-        private static Func<IInvokable, bool> GetMayInterleavePredicate(Type grainType)
+        private static Func<IInvokable, bool> GetMayInterleavePredicate([DynamicallyAccessedMembers(PublicMethods)] Type grainType)
         {
             var attribute = grainType.GetCustomAttribute<MayInterleaveAttribute>();
             if (attribute is null)

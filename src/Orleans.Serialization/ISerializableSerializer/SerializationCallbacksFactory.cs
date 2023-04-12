@@ -23,7 +23,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns>Serialization callbacks.</returns>
-        public SerializationCallbacks<Action<object, StreamingContext>> GetReferenceTypeCallbacks(Type type) => (
+        public SerializationCallbacks<Action<object, StreamingContext>> GetReferenceTypeCallbacks([DynamicallyAccessedMembers(PublicMethods | NonPublicMethods)] Type type) => (
             SerializationCallbacks<Action<object, StreamingContext>>)_cache.GetOrAdd(type, CreateReferenceTypeCallbacksDelegate);
 
         /// <summary>
@@ -31,7 +31,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <typeparam name="T">The declaring type.</typeparam>
         /// <returns>Serialization callbacks.</returns>
-        public SerializationCallbacks<ValueTypeSerializationCallback<T>> GetValueTypeCallbacks<T>() where T : struct 
+        public SerializationCallbacks<ValueTypeSerializationCallback<T>> GetValueTypeCallbacks<[DynamicallyAccessedMembers(PublicMethods | NonPublicMethods)] T>() where T : struct 
             => (SerializationCallbacks<ValueTypeSerializationCallback<T>>)_cache.GetOrAdd(typeof(T), static (_) => CreateValueTypeCallbacks<T>());
 
         private static SerializationCallbacks<ValueTypeSerializationCallback<T>> CreateValueTypeCallbacks<[DynamicallyAccessedMembers(PublicMethods | NonPublicMethods)] T>()
@@ -87,7 +87,7 @@ namespace Orleans.Serialization
             return new SerializationCallbacks<ValueTypeSerializationCallback<T>>(onDeserializing, onDeserialized, onSerializing, onSerialized);
         }
 
-        private static SerializationCallbacks<Action<object, StreamingContext>> CreateReferenceTypeCallbacks(Type type)
+        private static SerializationCallbacks<Action<object, StreamingContext>> CreateReferenceTypeCallbacks([DynamicallyAccessedMembers(PublicMethods | NonPublicMethods)] Type type)
         {
             var methods = GetCallbackMethods(type);
             Action<object, StreamingContext> onDeserializing;

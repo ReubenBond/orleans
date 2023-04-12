@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
@@ -187,6 +188,7 @@ namespace Orleans.GrainReferences
         /// <param name="config">The local type manifest.</param>
         /// <param name="resolver">The grain interface type to grain type resolver.</param>
         /// <param name="typeConverter">The type converter, for generic parameter.</param>
+        [UnconditionalSuppressMessage("Trimming", "IL2072:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
         public RpcProvider(
             IOptions<TypeManifestOptions> config,
             GrainInterfaceTypeResolver resolver,
@@ -213,7 +215,7 @@ namespace Orleans.GrainReferences
                 _mapping[id] = type;
             }
 
-            static Type GetMainInterface(Type t)
+            static Type GetMainInterface([DynamicallyAccessedMembers(Interfaces)] Type t)
             {
                 var all = t.GetInterfaces();
                 Type result = null;
@@ -246,6 +248,7 @@ namespace Orleans.GrainReferences
         /// <param name="interfaceType">The grain interface type.</param>
         /// <param name="result">The proxy object type.</param>
         /// <returns>A value indicating whether a suitable type was found and was able to be constructed.</returns>
+        [RequiresUnreferencedCode("MakeGenericType")]
         public bool TryGet(GrainInterfaceType interfaceType, [NotNullWhen(true)] out Type result)
         {
             GrainInterfaceType lookupId;
@@ -314,6 +317,7 @@ namespace Orleans.GrainReferences
         }
 
         /// <inheritdoc />
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         public bool TryGet(GrainType grainType, GrainInterfaceType interfaceType, out IGrainReferenceActivator activator)
         {
             if (!_rpcProvider.TryGet(interfaceType, out var proxyType))
@@ -360,21 +364,29 @@ namespace Orleans.GrainReferences
             /// </summary>
             /// <param name="referenceType">The generated proxy object type.</param>
             /// <param name="shared">The functionality shared between all grain references for a specified grain type and grain interface type.</param>
-            public GrainReferenceActivator(Type referenceType, GrainReferenceShared shared)
+            public GrainReferenceActivator([DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] Type referenceType, GrainReferenceShared shared)
             {
                 _shared = shared;
 
                 var ctor = referenceType.GetConstructor(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, new[] { typeof(GrainReferenceShared), typeof(IdSpan) })
                     ?? throw new SerializerException("Invalid proxy type: " + referenceType);
 
-                var method = new DynamicMethod(referenceType.Name, typeof(GrainReference), new[] { typeof(object), typeof(GrainReferenceShared), typeof(IdSpan) });
-                var il = method.GetILGenerator();
-                // arg0 is unused for better delegate performance (avoids argument shuffling thunk)
-                il.Emit(OpCodes.Ldarg_1);
-                il.Emit(OpCodes.Ldarg_2);
-                il.Emit(OpCodes.Newobj, ctor);
-                il.Emit(OpCodes.Ret);
-                _create = method.CreateDelegate<Func<GrainReferenceShared, IdSpan, GrainReference>>();
+                if (RuntimeFeature.IsDynamicCodeSupported)
+                {
+                    var method = new DynamicMethod(referenceType.Name, typeof(GrainReference), new[] { typeof(object), typeof(GrainReferenceShared), typeof(IdSpan) });
+                    var il = method.GetILGenerator();
+                    // arg0 is unused for better delegate performance (avoids argument shuffling thunk)
+                    il.Emit(OpCodes.Ldarg_1);
+                    il.Emit(OpCodes.Ldarg_2);
+                    il.Emit(OpCodes.Newobj, ctor);
+                    il.Emit(OpCodes.Ret);
+                    _create = method.CreateDelegate<Func<GrainReferenceShared, IdSpan, GrainReference>>();
+                }
+                else
+                {
+                    GrainReference CallConstructor(GrainReferenceShared shared, IdSpan key) => (GrainReference)ctor.Invoke(new object[] { shared, key });
+                    _create = CallConstructor;
+                }
             }
 
             public GrainReference CreateReference(GrainId grainId) => _create(_shared, grainId.Key);

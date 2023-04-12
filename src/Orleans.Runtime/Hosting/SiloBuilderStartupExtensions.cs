@@ -28,7 +28,7 @@ namespace Orleans.Hosting
         /// <returns>
         /// The provided <see cref="ISiloBuilder"/>.
         /// </returns>
-        public static ISiloBuilder AddStartupTask<TStartup>(
+        public static ISiloBuilder AddStartupTask<[DynamicallyAccessedMembers(PublicConstructors)] TStartup>(
             this ISiloBuilder builder,
             int stage = ServiceLifecycleStage.Active)
             where TStartup : class, IStartupTask

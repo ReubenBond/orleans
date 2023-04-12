@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
+using Orleans.Serialization.Activators;
 using Orleans.Storage;
 
 #nullable enable
@@ -13,7 +14,7 @@ namespace Orleans.Core
     /// </summary>
     /// <typeparam name="TState">The underlying state type.</typeparam>
     /// <seealso cref="Orleans.Core.IStorage{TState}" />
-    public sealed class StateStorageBridge<TState> : IStorage<TState>
+    public sealed class StateStorageBridge<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] TState> : IStorage<TState>
     {
         private readonly string name;
         private readonly GrainId grainId;

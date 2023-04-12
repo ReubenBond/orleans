@@ -31,9 +31,7 @@ namespace Orleans.Serialization.TypeSystem
         }
 
         /// <inheritdoc />
-#if NET5_0_OR_GREATER
         [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
-#endif
         public override bool TryResolveType(string name, out Type type)
         {
             if (string.IsNullOrWhiteSpace(name))

@@ -5,6 +5,7 @@
     <Description>Core runtime library of Microsoft Orleans that hosts and executes grains within a silo.</Description>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <IsTrimmable Condition="$(TargetFramework) != 'netstandard2.1'">true</IsTrimmable>
   </PropertyGroup>
 
   <ItemGroup>

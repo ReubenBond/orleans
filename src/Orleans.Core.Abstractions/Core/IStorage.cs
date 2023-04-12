@@ -58,7 +58,7 @@ namespace Orleans.Core
     /// <summary>
     /// Provides method for operating on grain state.
     /// </summary>
-    public interface IStorage<TState> : IStorage
+    public interface IStorage<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] TState> : IStorage
     {
         /// <summary>
         /// Gets or sets the state.

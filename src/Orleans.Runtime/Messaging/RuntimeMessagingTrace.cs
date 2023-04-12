@@ -67,6 +67,7 @@ namespace Orleans.Runtime
         {
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         internal void OnDispatcherReceiveInvalidActivation(Message message, ActivationState activationState)
         {
             if (this.IsEnabled(DispatcherReceiveInvalidActivationEventName))
@@ -78,6 +79,7 @@ namespace Orleans.Runtime
             LogDispatcherReceiveInvalidActivation(this, activationState, message, null);
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         internal void OnDispatcherDiscardedRejection(Message message, Message.RejectionTypes rejectionType, string reason, Exception exception)
         {
             if (this.IsEnabled(DispatcherDiscardedRejectionEventName))
@@ -88,6 +90,7 @@ namespace Orleans.Runtime
             LogDispatcherDiscardedRejection(this, message, reason, rejectionType, exception);
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         internal void OnDispatcherRejectMessage(Message message, Message.RejectionTypes rejectionType, string reason, Exception exception)
         {
             if (this.IsEnabled(DispatcherRejectedMessageEventName))
@@ -103,6 +106,7 @@ namespace Orleans.Runtime
             }
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         internal void OnDispatcherForwarding(Message message, GrainAddress oldAddress, GrainAddress forwardingAddress, string failedOperation, Exception exception)
         {
             if (this.IsEnabled(DispatcherForwardingEventName))
@@ -118,6 +122,7 @@ namespace Orleans.Runtime
             MessagingProcessingInstruments.OnDispatcherMessageForwared(message);
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         internal void OnDispatcherForwardingFailed(Message message, GrainAddress oldAddress, GrainAddress forwardingAddress, string failedOperation, Exception exception)
         {
             if (this.IsEnabled(DispatcherForwardingFailedEventName))
@@ -128,6 +133,7 @@ namespace Orleans.Runtime
             LogDispatcherForwardingFailed(this, message, oldAddress, forwardingAddress, failedOperation, message.ForwardCount, exception);
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         internal void OnDispatcherForwardingMultiple(int messageCount, GrainAddress oldAddress, GrainAddress forwardingAddress, string failedOperation, Exception exception)
         {
             if (this.IsEnabled(DispatcherForwardingMultipleEventName))
@@ -141,6 +147,7 @@ namespace Orleans.Runtime
             }
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         internal void OnDispatcherSelectTargetFailed(Message message, Exception exception)
         {
             if (this.IsEnabled(DispatcherSelectTargetFailedEventName))

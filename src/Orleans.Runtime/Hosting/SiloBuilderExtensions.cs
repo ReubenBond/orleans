@@ -43,7 +43,8 @@ namespace Orleans.Hosting
         /// <param name="builder">The silo builder.</param>
         /// <param name="configuration">The configuration.</param>
         /// <returns>The silo builder.</returns>
-        public static ISiloBuilder Configure<TOptions>(this ISiloBuilder builder, IConfiguration configuration) where TOptions : class
+        [SuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
+        public static ISiloBuilder Configure<[DynamicallyAccessedMembers(PublicConstructors | PublicProperties)] TOptions>(this ISiloBuilder builder, IConfiguration configuration) where TOptions : class
         {
             return builder.ConfigureServices(services => services.AddOptions<TOptions>().Bind(configuration));
         }

@@ -63,7 +63,7 @@ namespace Orleans.Runtime
     /// </summary>
     /// <typeparam name="TKey">The type of the key.</typeparam>
     /// <typeparam name="TService">The type of the service.</typeparam>
-    public class KeyedSingletonService<TKey, TService> : IKeyedService<TKey, TService>
+    public class KeyedSingletonService<TKey, [DynamicallyAccessedMembers(PublicParameterlessConstructor)] TService> : IKeyedService<TKey, TService>
     where TService : class
     {
         private readonly Lazy<TService> instance;
@@ -100,7 +100,7 @@ namespace Orleans.Runtime
     /// <typeparam name="TService">The type of the service.</typeparam>
     /// <typeparam name="TInstance">The type of the instance.</typeparam>
     /// <seealso cref="Orleans.Runtime.KeyedSingletonService{TKey, TService}" />
-    public class KeyedSingletonService<TKey, TService, TInstance> : KeyedSingletonService<TKey, TService>
+    public class KeyedSingletonService<TKey, [DynamicallyAccessedMembers(PublicParameterlessConstructor)] TService, TInstance> : KeyedSingletonService<TKey, TService>
         where TInstance : TService
         where TService : class
     {
@@ -160,7 +160,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Register a singleton keyed service
         /// </summary>
-        public static IServiceCollection AddSingletonKeyedService<TKey, TService>(this IServiceCollection collection, TKey key, Func<IServiceProvider, TKey, TService> factory)
+        public static IServiceCollection AddSingletonKeyedService<TKey, [DynamicallyAccessedMembers(PublicParameterlessConstructor)] TService>(this IServiceCollection collection, TKey key, Func<IServiceProvider, TKey, TService> factory)
             where TService : class
         {
             return collection.AddSingleton<IKeyedService<TKey, TService>>(sp => new KeyedSingletonService<TKey, TService>(key, sp, factory));
@@ -169,7 +169,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Register a singleton keyed service
         /// </summary>
-        public static IServiceCollection AddSingletonKeyedService<TKey, TService, TInstance>(this IServiceCollection collection, TKey key)
+        public static IServiceCollection AddSingletonKeyedService<TKey, [DynamicallyAccessedMembers(PublicParameterlessConstructor)] TService, TInstance>(this IServiceCollection collection, TKey key)
             where TInstance : class, TService
             where TService : class
         {

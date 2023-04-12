@@ -400,11 +400,7 @@ namespace Orleans.Runtime
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
             => destination.TryWrite($"GrainReference:{GrainId}:{InterfaceType}", out charsWritten);
 
-        protected TInvokable GetInvokable<
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
-#endif
-            TInvokable>() => ActivatorUtilities.GetServiceOrCreateInstance<TInvokable>(Shared.ServiceProvider);
+        protected TInvokable GetInvokable<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] TInvokable>() => ActivatorUtilities.GetServiceOrCreateInstance<TInvokable>(Shared.ServiceProvider);
 
         /// <summary>
         /// Invokes the provided method.

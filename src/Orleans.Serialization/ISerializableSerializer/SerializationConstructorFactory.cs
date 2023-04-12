@@ -74,7 +74,9 @@ namespace Orleans.Serialization
         private object GetSerializationConstructorDelegate(
             [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
             Type owner, Type delegateType)
+#pragma warning disable IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
             => _constructors.GetOrAdd(owner, static (t, d) => GetSerializationConstructorInvoker(t, t, d), delegateType);
+#pragma warning restore IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
 
         private static ConstructorInfo GetSerializationConstructor(
             [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
@@ -84,9 +86,7 @@ namespace Orleans.Serialization
                 SerializationConstructorParameterTypes,
                 null);
 
-        private static Delegate GetSerializationConstructorInvoker(
-            [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] Type type,
-            Type owner, Type delegateType)
+        private static Delegate GetSerializationConstructorInvoker([DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] Type type, Type owner, Type delegateType)
         {
             var constructor = GetSerializationConstructor(type) ?? (typeof(Exception).IsAssignableFrom(type) ? GetSerializationConstructor(typeof(Exception)) : null);
             if (!RuntimeFeature.IsDynamicCodeSupported)

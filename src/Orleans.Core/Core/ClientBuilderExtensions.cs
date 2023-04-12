@@ -90,6 +90,7 @@ namespace Orleans.Hosting
         /// <param name="builder">The host builder.</param>
         /// <param name="configuration">The configuration.</param>
         /// <returns>The client builder.</returns>
+        [RequiresUnreferencedCode("Options requires unreferenced code")]
         public static IClientBuilder Configure<TOptions>(this IClientBuilder builder, IConfiguration configuration) where TOptions : class
         {
             return builder.ConfigureServices(services => services.AddOptions<TOptions>().Bind(configuration));

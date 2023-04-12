@@ -2,9 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Activators;
@@ -89,6 +87,7 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
+        [SuppressMessage("Trimming", "IL2075:'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
         private void ConsumeMetadata(IOptions<TypeManifestOptions> codecConfiguration)
         {
             var metadata = codecConfiguration.Value;
@@ -107,9 +106,7 @@ namespace Orleans.Serialization.Serializers
 
                 foreach (var type in metadataCollection)
                 {
-#pragma warning disable IL2075 // 'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.
                     var interfaces = type.GetInterfaces();
-#pragma warning restore IL2075 // 'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.
                     foreach (var @interface in interfaces)
                     {
                         if (!@interface.IsGenericType)
@@ -208,11 +205,7 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IActivator<T> GetActivator<
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
-#endif
-            T>()
+        public IActivator<T> GetActivator<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] T>()
         {
             var type = typeof(T);
             var searchType = type.IsConstructedGenericType ? type.GetGenericTypeDefinition() : type;
@@ -290,11 +283,7 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IBaseCopier<TField> GetBaseCopier<
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
-#endif
-            TField>() where TField : class
+        public IBaseCopier<TField> GetBaseCopier<[DynamicallyAccessedMembers(NonPublicFields | PublicFields)] TField>() where TField : class
         {
             var type = typeof(TField);
             var searchType = type.IsConstructedGenericType ? type.GetGenericTypeDefinition() : type;
@@ -305,11 +294,7 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IDeepCopier<T> GetDeepCopier<
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
-#endif
-            T>()
+        public IDeepCopier<T> GetDeepCopier<[DynamicallyAccessedMembers(NonPublicFields | PublicFields)] T>()
         {
             var res = TryGetDeepCopier<T>();
             if (res is null) ThrowCopierNotFound(typeof(T));
@@ -317,11 +302,7 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IDeepCopier<T> TryGetDeepCopier<
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
-#endif
-            T>()
+        public IDeepCopier<T> TryGetDeepCopier<[DynamicallyAccessedMembers(NonPublicFields | PublicFields)] T>()
         {
             if (_typedCopiers.TryGetValue(typeof(T), out var existing))
                 return (IDeepCopier<T>)existing;
@@ -340,11 +321,7 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IDeepCopier GetDeepCopier(
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
-#endif
-            Type fieldType)
+        public IDeepCopier GetDeepCopier([DynamicallyAccessedMembers(NonPublicFields | PublicFields)] Type fieldType)
         {
             var res = TryGetDeepCopier(fieldType);
             if (res is null) ThrowCopierNotFound(fieldType);
@@ -352,11 +329,7 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IDeepCopier TryGetDeepCopier(
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
-#endif
-            Type fieldType)
+        public IDeepCopier TryGetDeepCopier([DynamicallyAccessedMembers(NonPublicFields | PublicFields)] Type fieldType)
         {
             // If the field type is unavailable, return the void copier which can at least handle references.
             return fieldType is null ? _voidCopier
@@ -365,11 +338,7 @@ namespace Orleans.Serialization.Serializers
                 : null;
         }
 
-        private IDeepCopier TryCreateCopier(
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
-#endif
-            Type fieldType)
+        private IDeepCopier TryCreateCopier([DynamicallyAccessedMembers(NonPublicFields | PublicFields)] Type fieldType)
         {
             if (!_initialized) Initialize();
 
@@ -499,11 +468,7 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
-        private object GetServiceOrCreateInstance(
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
-#endif
-            Type type, object[] constructorArguments = null)
+        private object GetServiceOrCreateInstance([DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] Type type, object[] constructorArguments = null)
         {
             var result = OrleansGeneratedCodeHelper.TryGetService(type);
             if (result != null)
@@ -591,6 +556,7 @@ namespace Orleans.Serialization.Serializers
             return codecType != null ? (IFieldCodec)GetServiceOrCreateInstance(codecType, constructorArguments) : null;
         }
 
+        [SuppressMessage("Trimming", "IL2055:Either the type on which the MakeGenericType is called can't be statically determined, or the type parameters to be used for generic arguments can't be statically determined.", Justification = "<Pending>")]
         private bool TryGetSurrogateCodec(Type fieldType, Type searchType, out Type surrogateCodecType, out object[] constructorArguments)
         {
             if (_converters.TryGetValue(searchType, out var converterType))
@@ -618,15 +584,11 @@ namespace Orleans.Serialization.Serializers
                 constructorArguments = new object[] { GetServiceOrCreateInstance(converterType) };
                 if (typeArgs[0].IsValueType)
                 {
-#pragma warning disable IL2055 // Either the type on which the MakeGenericType is called can't be statically determined, or the type parameters to be used for generic arguments can't be statically determined.
                     surrogateCodecType = typeof(ValueTypeSurrogateCodec<,,>).MakeGenericType(typeArgs);
-#pragma warning restore IL2055 // Either the type on which the MakeGenericType is called can't be statically determined, or the type parameters to be used for generic arguments can't be statically determined.
                 }
                 else
                 {
-#pragma warning disable IL2055 // Either the type on which the MakeGenericType is called can't be statically determined, or the type parameters to be used for generic arguments can't be statically determined.
                     surrogateCodecType = typeof(SurrogateCodec<,,>).MakeGenericType(typeArgs);
-#pragma warning restore IL2055 // Either the type on which the MakeGenericType is called can't be statically determined, or the type parameters to be used for generic arguments can't be statically determined.
                 }
 
                 return true;
@@ -655,12 +617,7 @@ namespace Orleans.Serialization.Serializers
             return codecType != null ? (IBaseCodec)GetServiceOrCreateInstance(codecType, constructorArguments) : null;
         }
 
-        private IDeepCopier CreateCopierInstance(
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(NonPublicFields | DynamicallyAccessedMemberTypes .PublicFields)]
-#endif
-            Type fieldType,
-            Type searchType)
+        private IDeepCopier CreateCopierInstance([DynamicallyAccessedMembers(NonPublicFields | PublicFields)] Type fieldType, Type searchType)
         {
             if (searchType == ObjectType)
                 return _objectCopier;

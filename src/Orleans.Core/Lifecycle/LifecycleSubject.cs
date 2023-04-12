@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -47,7 +48,7 @@ namespace Orleans
         /// <seealso cref="ServiceLifecycleStage"/>
         /// <param name="type">The lifecycle stage class.</param>
         /// <returns>The collection of all stage numbers and their corresponding names.</returns>
-        protected static ImmutableDictionary<int, string> GetStageNames(Type type)
+        protected static ImmutableDictionary<int, string> GetStageNames([DynamicallyAccessedMembers(PublicFields | NonPublicFields)] Type type)
         {
             try
             {

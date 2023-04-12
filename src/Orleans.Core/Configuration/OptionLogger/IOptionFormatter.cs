@@ -23,7 +23,7 @@ namespace Orleans
     /// Option formatter for a certain option type <typeparamref name="T"/>
     /// </summary>
     /// <typeparam name="T">The options type.</typeparam>
-    public interface IOptionFormatter<T> : IOptionFormatter
+    public interface IOptionFormatter<[DynamicallyAccessedMembers(PublicParameterlessConstructor | PublicProperties)] T> : IOptionFormatter
     {
     }
 
@@ -31,7 +31,7 @@ namespace Orleans
     /// IOptionFormatterResolver resolve specific OptionFormatter for certain named option
     /// </summary>
     /// <typeparam name="T">The options type.</typeparam>
-    public interface IOptionFormatterResolver<T>
+    public interface IOptionFormatterResolver<[DynamicallyAccessedMembers(PublicParameterlessConstructor | PublicProperties)] T>
     {
         /// <summary>
         /// Resolves the options formatter for the specified options type with the specified options name.

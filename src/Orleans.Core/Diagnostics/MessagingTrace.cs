@@ -67,6 +67,7 @@ namespace Orleans.Runtime
             this.log = loggerFactory.CreateLogger(Category);
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         public void OnSendMessage(Message message)
         {
             if (this.IsEnabled(SendMessageEventName))
@@ -75,6 +76,7 @@ namespace Orleans.Runtime
             }
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         public void OnIncomingMessageAgentReceiveMessage(Message message)
         {
             if (this.IsEnabled(IncomingMessageAgentReceiveMessageEventName))
@@ -86,6 +88,7 @@ namespace Orleans.Runtime
             MessagingProcessingInstruments.OnImaMessageReceived(message);
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         public void OnDispatcherReceiveMessage(Message message)
         {
             if (this.IsEnabled(DispatcherReceiveMessageEventName))
@@ -97,6 +100,7 @@ namespace Orleans.Runtime
             MessagingProcessingInstruments.OnDispatcherMessageReceive(message);
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         internal void OnDropExpiredMessage(Message message, MessagingInstruments.Phase phase)
         {
             if (this.IsEnabled(DropExpiredMessageEventName))
@@ -108,6 +112,7 @@ namespace Orleans.Runtime
             LogDropExpiredMessage(this, message, phase, null);
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         internal void OnDropBlockedApplicationMessage(Message message)
         {
             if (this.IsEnabled(DropBlockedApplicationMessageEventName))
@@ -124,6 +129,7 @@ namespace Orleans.Runtime
             LogSiloDropSendingMessage(this, localSiloAddress, message, reason, null);
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         public void OnEnqueueInboundMessage(Message message)
         {
             if (this.IsEnabled(EnqueueInboundMessageEventName))
@@ -134,6 +140,7 @@ namespace Orleans.Runtime
             LogEnqueueInboundMessage(this, message, null);
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         public void OnDequeueInboundMessage(Message message)
         {
             if (this.IsEnabled(DequeueInboundMessageEventName))
@@ -144,6 +151,7 @@ namespace Orleans.Runtime
             LogDequeueInboundMessage(this, message, null);
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         internal void OnCreateMessage(Message message)
         {
             if (this.IsEnabled(CreateMessageEventName))
@@ -152,6 +160,7 @@ namespace Orleans.Runtime
             }
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         public void OnScheduleMessage(Message message)
         {
             if (this.IsEnabled(ScheduleMessageEventName))
@@ -160,6 +169,7 @@ namespace Orleans.Runtime
             }
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         public void OnEnqueueMessageOnActivation(Message message, IGrainContext context)
         {
             if (this.IsEnabled(EnqueueMessageOnActivationEventName))
@@ -170,6 +180,7 @@ namespace Orleans.Runtime
             MessagingProcessingInstruments.OnImaMessageEnqueued(context);
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         public void OnInvokeMessage(Message message)
         {
             if (this.IsEnabled(InvokeMessageEventName))
@@ -178,6 +189,7 @@ namespace Orleans.Runtime
             }
         }
 
+        [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
         public void OnRejectSendMessageToDeadSilo(SiloAddress localSilo, Message message)
         {
             MessagingInstruments.OnFailedSentMessage(message);

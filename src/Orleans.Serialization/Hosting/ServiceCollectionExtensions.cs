@@ -205,9 +205,8 @@ namespace Orleans.Serialization
 
             public bool IsShallowCopyable() => (Value as IOptionalDeepCopier)?.IsShallowCopyable() ?? false;
 
-#pragma warning disable IL2091 // Target generic argument does not satisfy 'DynamicallyAccessedMembersAttribute' in target method or type. The generic parameter of the source method or type does not have matching annotations.
+            [SuppressMessage("Trimming", "IL2091:Target generic argument does not satisfy 'DynamicallyAccessedMembersAttribute' in target method or type. The generic parameter of the source method or type does not have matching annotations.", Justification = "<Pending>")]
             public IDeepCopier<T> Value => _copier ??= _codecProvider.GetDeepCopier<T>();
-#pragma warning restore IL2091 // Target generic argument does not satisfy 'DynamicallyAccessedMembersAttribute' in target method or type. The generic parameter of the source method or type does not have matching annotations.
         }
 
         private sealed class BaseCopierHolder<T> : IBaseCopier<T>, IServiceHolder<IBaseCopier<T>> where T : class
@@ -222,9 +221,8 @@ namespace Orleans.Serialization
 
             public void DeepCopy(T original, T copy, CopyContext context) => Value.DeepCopy(original, copy, context);
 
-#pragma warning disable IL2091 // Target generic argument does not satisfy 'DynamicallyAccessedMembersAttribute' in target method or type. The generic parameter of the source method or type does not have matching annotations.
+            [SuppressMessage("Trimming", "IL2091:Target generic argument does not satisfy 'DynamicallyAccessedMembersAttribute' in target method or type. The generic parameter of the source method or type does not have matching annotations.", Justification = "<Pending>")]
             public IBaseCopier<T> Value => _copier ??= _codecProvider.GetBaseCopier<T>();
-#pragma warning restore IL2091 // Target generic argument does not satisfy 'DynamicallyAccessedMembersAttribute' in target method or type. The generic parameter of the source method or type does not have matching annotations.
         }
     }
 

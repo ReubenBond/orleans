@@ -49,7 +49,7 @@ namespace Orleans.Serialization.Utilities
         /// Returns a delegate to get the value of a specified field.
         /// </summary>
         /// <returns>A delegate to get the value of a specified field.</returns>
-        public static ReferenceTypeGetter<TDeclaring, TField> GetReferenceGetter<TDeclaring, TField>(string fieldName) where TDeclaring : class
+        public static ReferenceTypeGetter<TDeclaring, TField> GetReferenceGetter<[DynamicallyAccessedMembers(NonPublicFields | PublicFields)] TDeclaring, TField>(string fieldName) where TDeclaring : class
         {
             if (!RuntimeFeature.IsDynamicCodeSupported)
             {
@@ -78,7 +78,7 @@ namespace Orleans.Serialization.Utilities
         /// Returns a delegate to get the value of a specified field.
         /// </summary>
         /// <returns>A delegate to get the value of a specified field.</returns>
-        public static ValueTypeGetter<TDeclaring, TField> GetValueGetter<TDeclaring, TField>(string fieldName) where TDeclaring : struct
+        public static ValueTypeGetter<TDeclaring, TField> GetValueGetter<[DynamicallyAccessedMembers(NonPublicFields | PublicFields)] TDeclaring, TField>(string fieldName) where TDeclaring : struct
         {
             if (!RuntimeFeature.IsDynamicCodeSupported)
             {
@@ -107,7 +107,7 @@ namespace Orleans.Serialization.Utilities
         /// Returns a delegate to set the value of this field for an instance.
         /// </summary>
         /// <returns>A delegate to set the value of this field for an instance.</returns>
-        public static ReferenceTypeSetter<TDeclaring, TField> GetReferenceSetter<TDeclaring, TField>(string fieldName) where TDeclaring : class
+        public static ReferenceTypeSetter<TDeclaring, TField> GetReferenceSetter<[DynamicallyAccessedMembers(NonPublicFields | PublicFields)] TDeclaring, TField>(string fieldName) where TDeclaring : class
         {
             if (!RuntimeFeature.IsDynamicCodeSupported)
             {
@@ -137,7 +137,7 @@ namespace Orleans.Serialization.Utilities
         /// Returns a delegate to set the value of this field for an instance.
         /// </summary>
         /// <returns>A delegate to set the value of this field for an instance.</returns>
-        public static ValueTypeSetter<TDeclaring, TField> GetValueSetter<TDeclaring, TField>(string fieldName) where TDeclaring : struct
+        public static ValueTypeSetter<TDeclaring, TField> GetValueSetter<[DynamicallyAccessedMembers(NonPublicFields | PublicFields)] TDeclaring, TField>(string fieldName) where TDeclaring : struct
         {
             if (!RuntimeFeature.IsDynamicCodeSupported)
             {

@@ -16,7 +16,7 @@ namespace Orleans.Runtime
             this.services = services;
         }
 
-        public ArgumentFactory CreateFactory(Type grainClass)
+        public ArgumentFactory CreateFactory([DynamicallyAccessedMembers(PublicConstructors)] Type grainClass)
         {
             return new ArgumentFactory(this.services, grainClass);
         }
@@ -27,11 +27,11 @@ namespace Orleans.Runtime
         internal class ArgumentFactory
         {
             private static readonly MethodInfo GetFactoryMethod = typeof(ArgumentFactory).GetMethod("GetFactory", BindingFlags.NonPublic | BindingFlags.Static);
-            private readonly List<Factory<IGrainContext, object>> argumentFactorys;
+            private readonly List<Factory<IGrainContext, object>> argumentFactories;
 
-            public ArgumentFactory(IServiceProvider services, Type type)
+            public ArgumentFactory(IServiceProvider services, [DynamicallyAccessedMembers(PublicConstructors)] Type type)
             {
-                this.argumentFactorys = new List<Factory<IGrainContext, object>>();
+                this.argumentFactories = new List<Factory<IGrainContext, object>>();
                 List<Type> types = new List<Type>();
                 // find constructor - supports only single public constructor
                 IEnumerable<ParameterInfo> parameters = type.GetConstructors()
@@ -47,7 +47,7 @@ namespace Orleans.Runtime
                     MethodInfo getFactory = GetFactoryMethod.MakeGenericMethod(attribute.GetType());
                     var argumentFactory = (Factory<IGrainContext, object>)getFactory.Invoke(this, new object[] { services, parameter, attribute, type });
                     // cache argument factory
-                    this.argumentFactorys.Add(argumentFactory);
+                    this.argumentFactories.Add(argumentFactory);
                     // cache argument type
                     types.Add(parameter.ParameterType);
                 }
@@ -59,8 +59,8 @@ namespace Orleans.Runtime
             public object[] CreateArguments(IGrainContext grainContext)
             {
                 int i = 0;
-                object[] results = new object[argumentFactorys.Count];
-                foreach (Factory<IGrainContext, object> argumentFactory in argumentFactorys)
+                object[] results = new object[argumentFactories.Count];
+                foreach (Factory<IGrainContext, object> argumentFactory in argumentFactories)
                 {
                     results[i++] = argumentFactory(grainContext);
                 }

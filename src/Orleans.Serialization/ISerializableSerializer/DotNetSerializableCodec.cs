@@ -76,9 +76,7 @@ namespace Orleans.Serialization
         }
 
         /// <inheritdoc />
-#if NET5_0_OR_GREATER
         [UnconditionalSuppressMessage("ReflectionAnalyzers", "IL2072", Justification = "Serialization using this codec requires that private fields are preserved")]
-#endif
         public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.IsReference)
@@ -124,7 +122,9 @@ namespace Orleans.Serialization
 
         private object ReadObject<TInput>(ref Reader<TInput> reader, [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] Type type, uint placeholderReferenceId)
         {
+#pragma warning disable IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
             var callbacks = _serializationCallbacks.GetReferenceTypeCallbacks(type);
+#pragma warning restore IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
 
             var info = new SerializationInfo(type, _formatterConverter);
             var result = RuntimeHelpers.GetUninitializedObject(type);
@@ -172,7 +172,9 @@ namespace Orleans.Serialization
 
         private void WriteObject<TBufferWriter>(ref Writer<TBufferWriter> writer, Type type, object value) where TBufferWriter : IBufferWriter<byte>
         {
+#pragma warning disable IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
             var callbacks = _serializationCallbacks.GetReferenceTypeCallbacks(type);
+#pragma warning restore IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
             var info = new SerializationInfo(type, _formatterConverter);
 
             // Serialize the type name according to the value populated in the SerializationInfo.

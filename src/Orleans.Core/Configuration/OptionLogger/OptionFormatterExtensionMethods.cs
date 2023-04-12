@@ -24,7 +24,7 @@ namespace Orleans.Configuration
         /// <returns>
         /// The <see cref="IServiceCollection"/>, for chaining with other calls.
         /// </returns>
-        public static IServiceCollection ConfigureFormatter<TOptions, TOptionFormatter>(this IServiceCollection services)
+        public static IServiceCollection ConfigureFormatter<[DynamicallyAccessedMembers(PublicParameterlessConstructor | PublicProperties)] TOptions, TOptionFormatter>(this IServiceCollection services)
             where TOptions : class
             where TOptionFormatter : class, IOptionFormatter<TOptions>
         {
@@ -57,7 +57,7 @@ namespace Orleans.Configuration
         /// <returns>
         /// The <see cref="IServiceCollection"/>, for chaining with other calls.
         /// </returns>
-        public static IServiceCollection ConfigureFormatter<TOptions>(this IServiceCollection services)
+        public static IServiceCollection ConfigureFormatter<[DynamicallyAccessedMembers(PublicParameterlessConstructor | PublicProperties)] TOptions>(this IServiceCollection services)
             where TOptions : class, new()
         {
             return services.AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatter<TOptions>>());
@@ -78,7 +78,7 @@ namespace Orleans.Configuration
         /// <returns>
         /// The <see cref="IServiceCollection"/>, for chaining with other calls.
         /// </returns>
-        public static IServiceCollection TryConfigureFormatter<TOptions, TOptionFormatter>(this IServiceCollection services)
+        public static IServiceCollection TryConfigureFormatter<[DynamicallyAccessedMembers(PublicParameterlessConstructor | PublicProperties)] TOptions, TOptionFormatter>(this IServiceCollection services)
             where TOptions : class
             where TOptionFormatter : class, IOptionFormatter<TOptions>
         {
@@ -105,7 +105,7 @@ namespace Orleans.Configuration
         /// <returns>
         /// The <see cref="IServiceCollection"/>, for chaining with other calls.
         /// </returns>
-        public static IServiceCollection ConfigureFormatterResolver<TOptions, TOptionFormatterResolver>(this IServiceCollection services)
+        public static IServiceCollection ConfigureFormatterResolver<[DynamicallyAccessedMembers(PublicParameterlessConstructor | PublicProperties)] TOptions, TOptionFormatterResolver>(this IServiceCollection services)
             where TOptions : class
             where TOptionFormatterResolver : class, IOptionFormatterResolver<TOptions>
         {
@@ -115,7 +115,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Configure option formatter resolver for named option TOptions, if none is configured
         /// </summary>
-        public static IServiceCollection TryConfigureFormatterResolver<TOptions, TOptionFormatterResolver>(this IServiceCollection services)
+        public static IServiceCollection TryConfigureFormatterResolver<[DynamicallyAccessedMembers(PublicParameterlessConstructor | PublicProperties)] TOptions, TOptionFormatterResolver>(this IServiceCollection services)
             where TOptions : class
             where TOptionFormatterResolver : class, IOptionFormatterResolver<TOptions>
         {
@@ -142,7 +142,7 @@ namespace Orleans.Configuration
         /// <returns>
         /// The <see cref="IServiceCollection"/>, for chaining with other calls.
         /// </returns>
-        public static IServiceCollection ConfigureNamedOptionForLogging<TOptions>(this IServiceCollection services, string name)
+        public static IServiceCollection ConfigureNamedOptionForLogging<[DynamicallyAccessedMembers(PublicParameterlessConstructor | PublicProperties)] TOptions>(this IServiceCollection services, string name)
             where TOptions : class
         {
             return services.AddSingleton<IOptionFormatter>(sp => sp.GetService<IOptionFormatterResolver<TOptions>>().Resolve(name));

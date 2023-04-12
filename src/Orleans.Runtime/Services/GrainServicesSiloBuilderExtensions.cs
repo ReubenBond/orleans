@@ -24,12 +24,13 @@ namespace Orleans.Hosting
             return builder.ConfigureServices(services => services.AddGrainService<T>());
         }
 
-        private static IGrainService GrainServiceFactory(Type serviceType, IServiceProvider services)
+        [UnconditionalSuppressMessage("Trimming", "IL2070:'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.", Justification = "<Pending>")]
+        private static IGrainService GrainServiceFactory([DynamicallyAccessedMembers(PublicConstructors | Interfaces)] Type serviceType, IServiceProvider services)
         {
             var grainServiceInterfaceType = serviceType.GetInterfaces().FirstOrDefault(x => x.GetInterfaces().Contains(typeof(IGrainService)));
             if (grainServiceInterfaceType is null)
             {
-                throw new InvalidOperationException(String.Format($"Cannot find an interface on {serviceType.FullName} which implements IGrainService"));
+                throw new InvalidOperationException($"Cannot find an interface on {serviceType.FullName} which implements IGrainService");
             }
 
             var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainServiceInterfaceType);
@@ -44,7 +45,7 @@ namespace Orleans.Hosting
         /// <typeparam name="T">The grain service implementation type.</typeparam>
         /// <param name="services">The service collection.</param>
         /// <returns>The service collection.</returns>
-        public static IServiceCollection AddGrainService<T>(this IServiceCollection services)
+        public static IServiceCollection AddGrainService<[DynamicallyAccessedMembers(PublicConstructors | Interfaces)] T>(this IServiceCollection services)
         {
             return services.AddGrainService(typeof(T));
         }
@@ -55,7 +56,7 @@ namespace Orleans.Hosting
         /// <param name="services">The service collection.</param>
         /// <param name="grainServiceType">The grain service implementation type.</param>
         /// <returns>The service collection.</returns>
-        public static IServiceCollection AddGrainService(this IServiceCollection services, Type grainServiceType)
+        public static IServiceCollection AddGrainService(this IServiceCollection services, [DynamicallyAccessedMembers(PublicConstructors | Interfaces)] Type grainServiceType)
         {
             return services.AddSingleton<IGrainService>(sp => GrainServiceFactory(grainServiceType, sp));
         }

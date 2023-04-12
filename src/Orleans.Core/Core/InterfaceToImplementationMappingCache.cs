@@ -2,11 +2,9 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using Orleans.CodeGeneration;
-using Orleans.Utilities;
 
 namespace Orleans
 {
@@ -15,6 +13,11 @@ namespace Orleans
     /// </summary>
     internal class InterfaceToImplementationMappingCache
     {
+        /// <summary>
+        /// The map from implementation types to interface types to map of method to method infos.
+        /// </summary>
+        private readonly ConcurrentDictionary<Type, Dictionary<Type, Dictionary<MethodInfo, Entry>>> mappings = new();
+
         /// <summary>
         /// Maps a grain interface method's <see cref="MethodInfo"/> to an implementation's <see cref="MethodInfo"/>.
         /// </summary>
@@ -29,7 +32,7 @@ namespace Orleans
             }
 
             /// <summary>
-            /// Gets the grain implmentation <see cref="MethodInfo"/>.
+            /// Gets the grain implementation <see cref="MethodInfo"/>.
             /// </summary>
             public MethodInfo ImplementationMethod { get; }
 
@@ -38,6 +41,7 @@ namespace Orleans
             /// </summary>
             public MethodInfo InterfaceMethod { get; }
 
+            [SuppressMessage("Trimming", "IL2060:Call to 'System.Reflection.MethodInfo.MakeGenericMethod' can not be statically analyzed. It's not possible to guarantee the availability of requirements of the generic method.", Justification = "<Pending>")]
             public (MethodInfo ImplementationMethod, MethodInfo InterfaceMethod) GetConstructedGenericMethod(MethodInfo method)
             {
                 return ConstructedGenericMethods.GetOrAdd(method.GetGenericArguments(), (key, state) =>
@@ -76,11 +80,6 @@ namespace Orleans
         }
 
         /// <summary>
-        /// The map from implementation types to interface types to map of method to method infos.
-        /// </summary>
-        private readonly ConcurrentDictionary<Type, Dictionary<Type, Dictionary<MethodInfo, Entry>>> mappings = new();
-
-        /// <summary>
         /// Returns a mapping from method id to method info for the provided implementation and interface types.
         /// </summary>
         /// <param name="implementationType">The implementation type.</param>
@@ -88,7 +87,7 @@ namespace Orleans
         /// <returns>
         /// A mapping from method id to method info.
         /// </returns>
-        public Dictionary<MethodInfo, Entry> GetOrCreate(Type implementationType, Type interfaceType)
+        public Dictionary<MethodInfo, Entry> GetOrCreate([DynamicallyAccessedMembers(Interfaces | PublicMethods | NonPublicMethods)] Type implementationType, Type interfaceType)
         {
             // Get or create the mapping between interfaceId and invoker for the provided type.
             if (!this.mappings.TryGetValue(implementationType, out var invokerMap))
@@ -111,7 +110,8 @@ namespace Orleans
         /// </summary>
         /// <param name="implementationType">The implementation type.</param>
         /// <returns>The mapped interface.</returns>
-        private static Dictionary<Type, Dictionary<MethodInfo, Entry>> CreateInterfaceToImplementationMap(Type implementationType)
+        [SuppressMessage("Trimming", "IL2072:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
+        private static Dictionary<Type, Dictionary<MethodInfo, Entry>> CreateInterfaceToImplementationMap([DynamicallyAccessedMembers(Interfaces | PublicMethods | NonPublicMethods)] Type implementationType)
         {
             var interfaces = implementationType.GetInterfaces();
 
