@@ -8,7 +8,7 @@ namespace Orleans
     /// <typeparam name="T">
     /// The underlying state type.
     /// </typeparam>
-    public interface IGrainState<T>
+    public interface IGrainState<[DynamicallyAccessedMembers(All)] T>
     {
         /// <summary>
         /// Gets or sets the state.
@@ -30,7 +30,7 @@ namespace Orleans
     /// <typeparam name="T">The type of application level payload.</typeparam>
     [Serializable]
     [GenerateSerializer]
-    public sealed class GrainState<T> : IGrainState<T>
+    public sealed class GrainState<[DynamicallyAccessedMembers(All)] T> : IGrainState<T>
     {
         /// <inheritdoc />
         [Id(0)]

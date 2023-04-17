@@ -13,14 +13,14 @@ namespace Orleans.Serialization.Serializers
         /// </summary>
         /// <typeparam name="TField">The field type.</typeparam>
         /// <returns>A codec.</returns>
-        IFieldCodec<TField> GetCodec<TField>();
+        IFieldCodec<TField> GetCodec<[DynamicallyAccessedMembers(All)] TField>();
 
         /// <summary>
         /// Gets a codec for the specific type, or <see langword="null"/> if no appropriate codec was found.
         /// </summary>
         /// <typeparam name="TField">The field type.</typeparam>
         /// <returns>A codec.</returns>
-        IFieldCodec<TField> TryGetCodec<TField>();
+        IFieldCodec<TField> TryGetCodec<[DynamicallyAccessedMembers(All)] TField>();
 
         /// <summary>
         /// Gets a codec for the specific type.
@@ -29,7 +29,7 @@ namespace Orleans.Serialization.Serializers
         /// The field type.
         /// </param>
         /// <returns>A codec.</returns>
-        IFieldCodec GetCodec(Type fieldType);
+        IFieldCodec GetCodec([DynamicallyAccessedMembers(All)] Type fieldType);
 
         /// <summary>
         /// Gets a codec for the specific type, or <see langword="null"/> if no appropriate codec was found.
@@ -38,6 +38,6 @@ namespace Orleans.Serialization.Serializers
         /// The field type.
         /// </param>
         /// <returns>A codec.</returns>
-        IFieldCodec TryGetCodec(Type fieldType);
+        IFieldCodec TryGetCodec([DynamicallyAccessedMembers(All)] Type fieldType);
     }
 }

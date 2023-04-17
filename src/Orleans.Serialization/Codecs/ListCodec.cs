@@ -14,7 +14,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
-    public sealed class ListCodec<T> : IFieldCodec<List<T>>
+    public sealed class ListCodec<[DynamicallyAccessedMembers(All)] T> : IFieldCodec<List<T>>
     {
         private readonly Type CodecElementType = typeof(T);
 
@@ -122,7 +122,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
-    public sealed class ListCopier<T> : IDeepCopier<List<T>>, IBaseCopier<List<T>>
+    public sealed class ListCopier<[DynamicallyAccessedMembers(All)] T> : IDeepCopier<List<T>>, IBaseCopier<List<T>>
     {
         private readonly IDeepCopier<T> _copier;
 

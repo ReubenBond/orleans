@@ -10,7 +10,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterSerializer]
-    public sealed class SortedDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<SortedDictionary<TKey, TValue>, SortedDictionarySurrogate<TKey, TValue>>
+    public sealed class SortedDictionaryCodec<[DynamicallyAccessedMembers(All)] TKey, [DynamicallyAccessedMembers(All)] TValue> : GeneralizedReferenceTypeSurrogateCodec<SortedDictionary<TKey, TValue>, SortedDictionarySurrogate<TKey, TValue>>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SortedDictionaryCodec{TKey, TValue}"/> class.
@@ -46,7 +46,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [GenerateSerializer]
-    public struct SortedDictionarySurrogate<TKey, TValue>
+    public struct SortedDictionarySurrogate<[DynamicallyAccessedMembers(All)] TKey, [DynamicallyAccessedMembers(All)] TValue>
     {
         /// <summary>
         /// Gets or sets the values.
@@ -69,7 +69,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterCopier]
-    public sealed class SortedDictionaryCopier<TKey, TValue> : IDeepCopier<SortedDictionary<TKey, TValue>>, IBaseCopier<SortedDictionary<TKey, TValue>>
+    public sealed class SortedDictionaryCopier<[DynamicallyAccessedMembers(All)] TKey, [DynamicallyAccessedMembers(All)] TValue> : IDeepCopier<SortedDictionary<TKey, TValue>>, IBaseCopier<SortedDictionary<TKey, TValue>>
     {
         private readonly IDeepCopier<TKey> _keyCopier;
         private readonly IDeepCopier<TValue> _valueCopier;

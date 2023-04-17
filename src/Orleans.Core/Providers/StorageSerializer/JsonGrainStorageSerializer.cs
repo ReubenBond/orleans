@@ -23,14 +23,14 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public BinaryData Serialize<T>(T value)
+        public BinaryData Serialize<[DynamicallyAccessedMembers(All)] T>(T value)
         {
             var data = _orleansJsonSerializer.Serialize(value, typeof(T));
             return new BinaryData(data);
         }
 
         /// <inheritdoc/>
-        public T Deserialize<T>(BinaryData input)
+        public T Deserialize<[DynamicallyAccessedMembers(All)] T>(BinaryData input)
         {
             return (T)_orleansJsonSerializer.Deserialize(typeof(T), input.ToString());
         }

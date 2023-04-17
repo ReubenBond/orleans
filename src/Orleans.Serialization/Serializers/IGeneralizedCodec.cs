@@ -13,7 +13,7 @@ namespace Orleans.Serialization.Serializers
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns><see langword="true" /> if the specified type is supported; otherwise, <see langword="false" />.</returns>
-        bool IsSupportedType(Type type);
+        bool IsSupportedType([DynamicallyAccessedMembers(All)] Type type);
     }
 
     /// <summary>
@@ -26,13 +26,13 @@ namespace Orleans.Serialization.Serializers
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns><see langword="true" /> if the specified type is supported; otherwise, <see langword="false" />.</returns>
-        bool IsSupportedType(Type type);
+        bool IsSupportedType([DynamicallyAccessedMembers(All)] Type type);
 
         /// <summary>
         /// Gets an <see cref="IFieldCodec"/> implementation which supports the specified type.
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns>An <see cref="IFieldCodec"/> implementation which supports the specified type.</returns>
-        IFieldCodec GetSpecializedCodec(Type type);
+        IFieldCodec GetSpecializedCodec([DynamicallyAccessedMembers(All)] Type type);
     }
 }

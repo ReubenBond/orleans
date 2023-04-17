@@ -7,7 +7,7 @@ namespace Orleans.Serialization.Serializers
     /// Functionality for serializing a value type.
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
-    public interface IValueSerializer<T> : IValueSerializer where T : struct
+    public interface IValueSerializer<[DynamicallyAccessedMembers(All)] T> : IValueSerializer where T : struct
     {
         /// <summary>
         /// Serializes the provided value.

@@ -28,7 +28,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The type which this implementation can read and write.</typeparam>
     /// <seealso cref="Orleans.Serialization.Codecs.IFieldCodec" />
-    public interface IFieldCodec<T> : IFieldCodec
+    public interface IFieldCodec<[DynamicallyAccessedMembers(All)] T> : IFieldCodec
     {
         void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, T value) where TBufferWriter : IBufferWriter<byte>;
 
@@ -53,7 +53,7 @@ namespace Orleans.Serialization.Codecs
     /// Hooks for stages in serialization and copying.
     /// </summary>
     /// <typeparam name="T">The underlying value type.</typeparam>
-    public interface ISerializationCallbacks<T>
+    public interface ISerializationCallbacks<[DynamicallyAccessedMembers(All)] T>
     {
         /// <summary>
         /// Called when serializing.
@@ -94,7 +94,7 @@ namespace Orleans.Serialization.Codecs
         void OnCopied(T original, T result);
     }
 
-    internal sealed class UntypedCodecWrapper<TField> : IFieldCodec<TField>
+    internal sealed class UntypedCodecWrapper<[DynamicallyAccessedMembers(All)] TField> : IFieldCodec<TField>
     {
         private readonly IFieldCodec _codec;
 

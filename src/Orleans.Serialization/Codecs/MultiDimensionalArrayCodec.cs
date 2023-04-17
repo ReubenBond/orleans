@@ -13,7 +13,7 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for multi-dimensional arrays.
     /// </summary>
     /// <typeparam name="T">The array element type.</typeparam>
-    internal sealed class MultiDimensionalArrayCodec<T> : IGeneralizedCodec
+    internal sealed class MultiDimensionalArrayCodec<[DynamicallyAccessedMembers(All)] T> : IGeneralizedCodec
     {
         private static readonly Type DimensionFieldType = typeof(int[]);
         private readonly Type CodecElementType = typeof(T);
@@ -152,7 +152,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
-        public bool IsSupportedType(Type type) => type.IsArray && !type.IsSZArray;
+        public bool IsSupportedType([DynamicallyAccessedMembers(All)] Type type) => type.IsArray && !type.IsSZArray;
 
         private static object ThrowIndexOutOfRangeException(int[] lengths) => throw new IndexOutOfRangeException(
             $"Encountered too many elements in array of type {typeof(T)} with declared lengths {string.Join(", ", lengths)}.");

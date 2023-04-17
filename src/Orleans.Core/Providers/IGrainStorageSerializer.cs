@@ -16,7 +16,7 @@ namespace Orleans.Storage
         /// <param name="input">The object to serialize.</param>
         /// <typeparam name="T">The input type.</typeparam>
         /// <returns>The serialized input.</returns>
-        BinaryData Serialize<T>(T input);
+        BinaryData Serialize<[DynamicallyAccessedMembers(All)] T>(T input);
 
         /// <summary>
         /// Deserializes the provided data.
@@ -24,7 +24,7 @@ namespace Orleans.Storage
         /// <param name="input">The data to deserialize.</param>
         /// <typeparam name="T">The output type.</typeparam>
         /// <returns>The deserialized object.</returns>
-        T Deserialize<T>(BinaryData input);
+        T Deserialize<[DynamicallyAccessedMembers(All)] T>(BinaryData input);
     }
 
     /// <summary>
@@ -39,7 +39,7 @@ namespace Orleans.Storage
         /// <param name="input">The data to deserialize.</param>
         /// <typeparam name="T">The output type.</typeparam>
         /// <returns>The deserialized object.</returns>
-        public static T Deserialize<T>(this IGrainStorageSerializer serializer, ReadOnlyMemory<byte> input)
+        public static T Deserialize<[DynamicallyAccessedMembers(All)] T>(this IGrainStorageSerializer serializer, ReadOnlyMemory<byte> input)
             => serializer.Deserialize<T>(new BinaryData(input));
     }
 

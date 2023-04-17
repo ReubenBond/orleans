@@ -9,7 +9,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
-    public sealed class SortedSetCodec<T> : GeneralizedReferenceTypeSurrogateCodec<SortedSet<T>, SortedSetSurrogate<T>>
+    public sealed class SortedSetCodec<[DynamicallyAccessedMembers(All)] T> : GeneralizedReferenceTypeSurrogateCodec<SortedSet<T>, SortedSetSurrogate<T>>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="SortedSetCodec{T}"/> class.
@@ -35,7 +35,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [GenerateSerializer]
-    public struct SortedSetSurrogate<T>
+    public struct SortedSetSurrogate<[DynamicallyAccessedMembers(All)] T>
     {
         /// <summary>
         /// Gets or sets the values.
@@ -57,7 +57,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
-    public sealed class SortedSetCopier<T> : IDeepCopier<SortedSet<T>>, IBaseCopier<SortedSet<T>>
+    public sealed class SortedSetCopier<[DynamicallyAccessedMembers(All)] T> : IDeepCopier<SortedSet<T>>, IBaseCopier<SortedSet<T>>
     {
         private readonly IDeepCopier<T> _elementCopier;
 

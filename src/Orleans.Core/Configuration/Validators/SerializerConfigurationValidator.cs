@@ -44,7 +44,7 @@ namespace Orleans
             }
             else
             {
-                // Enable in development envioronment by default.
+                // Enable in development environment by default.
                 var environment = serviceProvider.GetService<IHostEnvironment>();
                 _enabled = environment is not null && environment.IsDevelopment();
             }

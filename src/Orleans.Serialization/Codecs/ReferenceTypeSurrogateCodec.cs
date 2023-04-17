@@ -12,7 +12,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="TField">The type which the implementation of this class supports.</typeparam>
     /// <typeparam name="TSurrogate">The surrogate type serialized in place of <typeparamref name="TField"/>.</typeparam>
-    public abstract class ReferenceTypeSurrogateCodec<TField, TSurrogate> : IFieldCodec<TField> where TSurrogate : struct
+    public abstract class ReferenceTypeSurrogateCodec<[DynamicallyAccessedMembers(All)] TField, [DynamicallyAccessedMembers(All)] TSurrogate> : IFieldCodec<TField> where TSurrogate : struct
     {
         private readonly Type CodecFieldType = typeof(TField);
         private readonly IValueSerializer<TSurrogate> _surrogateSerializer;
@@ -27,6 +27,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc/>
+        [SuppressMessage("Trimming", "IL2072:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
         public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.WireType == WireType.Reference)

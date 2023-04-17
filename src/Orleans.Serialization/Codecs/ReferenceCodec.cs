@@ -63,7 +63,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <summary>
-        /// Write an object reference if <paramref name="value"/> has already been written and has been tracked via <see cref="RecordObject(SerializerSession, object)"/>.        /// 
+        /// Write an object reference if <paramref name="value"/> has already been written and has been tracked via <see cref="RecordObject(SerializerSession, object)"/>.
         /// </summary>
         /// <remarks>This overload allows specifying a fixed reference type for codecs that implement <see cref="IDerivedTypeCodec"/>.</remarks>
         /// <typeparam name="TBufferWriter">The buffer writer type.</typeparam>
@@ -116,7 +116,8 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The referenced value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static T ReadReference<T, TInput>(ref Reader<TInput> reader, Field field) => (T)ReadReference(ref reader, field.FieldType ?? typeof(T));
+        [SuppressMessage("Trimming", "IL2072:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
+        public static T ReadReference<[DynamicallyAccessedMembers(All)] T, TInput>(ref Reader<TInput> reader, Field field) => (T)ReadReference(ref reader, field.FieldType ?? typeof(T));
 
         /// <summary>
         /// Reads the reference.
@@ -126,7 +127,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="fieldType">The field type.</param>
         /// <returns>The referenced value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static object ReadReference<TInput>(ref Reader<TInput> reader, Type fieldType)
+        public static object ReadReference<TInput>(ref Reader<TInput> reader, [DynamicallyAccessedMembers(All)] Type fieldType)
         {
             MarkValueField(reader.Session);
             var reference = reader.ReadVarUInt32();
@@ -136,7 +137,7 @@ namespace Orleans.Serialization.Codecs
             return ReadReference(ref reader, fieldType, reference);
         }
 
-        private static object ReadReference<TInput>(ref Reader<TInput> reader, Type fieldType, uint reference)
+        private static object ReadReference<TInput>(ref Reader<TInput> reader, [DynamicallyAccessedMembers(All)] Type fieldType, uint reference)
         {
             var value = reader.Session.ReferencedObjects.TryGetReferencedObject(reference);
             if (value is null) throw new ReferenceNotFoundException(fieldType, reference);
@@ -148,9 +149,10 @@ namespace Orleans.Serialization.Codecs
             };
         }
 
+        [SuppressMessage("Trimming", "IL2072:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
         private static object DeserializeFromMarker<TInput>(
             ref Reader<TInput> reader,
-            Type fieldType,
+            [DynamicallyAccessedMembers(All)] Type fieldType,
             UnknownFieldMarker marker,
             uint reference)
         {

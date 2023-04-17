@@ -10,6 +10,6 @@ namespace Orleans.Serialization.Serializers
         /// </summary>
         /// <typeparam name="TField">The value type.</typeparam>
         /// <returns>A value serializer for the specified type.</returns>
-        IValueSerializer<TField> GetValueSerializer<TField>() where TField : struct;
+        IValueSerializer<TField> GetValueSerializer<[DynamicallyAccessedMembers(All)] TField>() where TField : struct;
     }
 }

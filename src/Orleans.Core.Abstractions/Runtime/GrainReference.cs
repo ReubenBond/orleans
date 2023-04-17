@@ -124,7 +124,8 @@ namespace Orleans.Runtime
     internal class GrainReferenceCopierProvider : ISpecializableCopier
     {
         /// <inheritdoc/>
-        public IDeepCopier GetSpecializedCopier(Type type) => (IDeepCopier)Activator.CreateInstance(typeof(TypedGrainReferenceCopier<>).MakeGenericType(type));
+        [UnconditionalSuppressMessage("Trimming", "IL2070:'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.", Justification = "<Pending>")]
+        public IDeepCopier GetSpecializedCopier(Type type) => (IDeepCopier)Activator.CreateInstance(typeof(TypedGrainReferenceCopier<>).MakeGenericType(type)); 
 
         /// <inheritdoc/>
         public bool IsSupportedType(Type type) => typeof(IAddressable).IsAssignableFrom(type) && type.IsInterface;
@@ -134,7 +135,7 @@ namespace Orleans.Runtime
     /// A strongly-typed copier for grain reference instances.
     /// </summary>
     /// <typeparam name="TInterface">The grain interface type.</typeparam>
-    internal class TypedGrainReferenceCopier<TInterface> : IDeepCopier<TInterface>
+    internal class TypedGrainReferenceCopier<[DynamicallyAccessedMembers(All)] TInterface> : IDeepCopier<TInterface> where TInterface : class, IAddressable
     {
         /// <inheritdoc/>
         public TInterface DeepCopy(TInterface input, CopyContext context)
@@ -166,10 +167,11 @@ namespace Orleans.Runtime
         public GrainReferenceCodecProvider(IServiceProvider serviceProvider) => _serviceProvider = serviceProvider;
 
         /// <inheritdoc/>
-        public IFieldCodec GetSpecializedCodec(Type type) => (IFieldCodec)ActivatorUtilities.GetServiceOrCreateInstance(_serviceProvider, typeof(TypedGrainReferenceCodec<>).MakeGenericType(type));
+        [UnconditionalSuppressMessage("Trimming", "IL2070:'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.", Justification = "<Pending>")]
+        public IFieldCodec GetSpecializedCodec([DynamicallyAccessedMembers(All)] Type type) => (IFieldCodec)ActivatorUtilities.GetServiceOrCreateInstance(_serviceProvider, typeof(TypedGrainReferenceCodec<>).MakeGenericType(type));
 
         /// <inheritdoc/>
-        public bool IsSupportedType(Type type) => typeof(IAddressable).IsAssignableFrom(type);
+        public bool IsSupportedType([DynamicallyAccessedMembers(All)] Type type) => typeof(IAddressable).IsAssignableFrom(type);
 
         /// <summary>
         /// Throws an exception indicating that a parameter type is not supported.
@@ -183,7 +185,7 @@ namespace Orleans.Runtime
     /// A strongly-typed codec for grain reference instances.
     /// </summary>
     /// <typeparam name="T">The grain reference interface type.</typeparam>
-    internal class TypedGrainReferenceCodec<T> : GeneralizedReferenceTypeSurrogateCodec<T, GrainReferenceSurrogate>
+    internal class TypedGrainReferenceCodec<[DynamicallyAccessedMembers(All)]T> : GeneralizedReferenceTypeSurrogateCodec<T, GrainReferenceSurrogate>
         where T : class, IAddressable
     {
         private readonly IGrainFactory _grainFactory;

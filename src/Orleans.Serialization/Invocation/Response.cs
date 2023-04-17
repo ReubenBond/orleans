@@ -187,7 +187,7 @@ namespace Orleans.Serialization.Invocation
     }
 
     [RegisterSerializer]
-    internal sealed class PooledResponseCodec<TResult> : ResponseCodec, IFieldCodec<Response<TResult>>
+    internal sealed class PooledResponseCodec<[DynamicallyAccessedMembers(All)] TResult> : ResponseCodec, IFieldCodec<Response<TResult>>
     {
         private readonly Type _codecFieldType = typeof(Response<TResult>);
         private readonly Type _resultType = typeof(TResult);
@@ -254,7 +254,7 @@ namespace Orleans.Serialization.Invocation
     }
 
     [RegisterCopier]
-    internal sealed class PooledResponseCopier<TResult> : IDeepCopier<Response<TResult>>
+    internal sealed class PooledResponseCopier<[DynamicallyAccessedMembers(All)] TResult> : IDeepCopier<Response<TResult>>
     {
         private readonly IDeepCopier<TResult> _copier;
 

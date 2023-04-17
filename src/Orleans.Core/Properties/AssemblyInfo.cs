@@ -72,8 +72,8 @@ public static class PinnedTypes
         KeepType(typeof(ImmutableHashSetCodec<GrainId>));
         KeepType(typeof(PooledResponseCopier<bool>));
         KeepType(typeof(PooledResponseCopier<AddressAndTag>));
-        KeepType(typeof(PooledResponseCodec<AddressAndTag>));
         KeepType(typeof(PooledResponseCodec<bool>));
+        KeepType(typeof(PooledResponseCodec<AddressAndTag>));
         KeepType(typeof(TupleCopier<SiloAddress, DateTime>));
         KeepType(typeof(TupleCodec<SiloAddress, DateTime>));
 

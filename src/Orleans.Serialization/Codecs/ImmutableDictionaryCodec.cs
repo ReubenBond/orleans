@@ -12,7 +12,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterSerializer]
-    public sealed class ImmutableDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<ImmutableDictionary<TKey, TValue>, ImmutableDictionarySurrogate<TKey, TValue>>
+    public sealed class ImmutableDictionaryCodec<[DynamicallyAccessedMembers(All)] TKey, [DynamicallyAccessedMembers(All)] TValue> : GeneralizedReferenceTypeSurrogateCodec<ImmutableDictionary<TKey, TValue>, ImmutableDictionarySurrogate<TKey, TValue>>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ImmutableDictionaryCodec{TKey, TValue}"/> class.
@@ -37,7 +37,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [GenerateSerializer]
-    public struct ImmutableDictionarySurrogate<TKey, TValue>
+    public struct ImmutableDictionarySurrogate<[DynamicallyAccessedMembers(All)] TKey, [DynamicallyAccessedMembers(All)] TValue>
     {
         /// <summary>
         /// Gets or sets the values.
@@ -53,7 +53,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterCopier]
-    public sealed class ImmutableDictionaryCopier<TKey, TValue> : IDeepCopier<ImmutableDictionary<TKey, TValue>>, IOptionalDeepCopier
+    public sealed class ImmutableDictionaryCopier<[DynamicallyAccessedMembers(All)] TKey, [DynamicallyAccessedMembers(All)] TValue> : IDeepCopier<ImmutableDictionary<TKey, TValue>>, IOptionalDeepCopier
     {
         private readonly IDeepCopier<TKey> _keyCopier;
         private readonly IDeepCopier<TValue> _valueCopier;

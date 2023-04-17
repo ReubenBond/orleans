@@ -11,7 +11,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
-    public sealed class ImmutableSortedSetCodec<T> : GeneralizedReferenceTypeSurrogateCodec<ImmutableSortedSet<T>, ImmutableSortedSetSurrogate<T>>
+    public sealed class ImmutableSortedSetCodec<[DynamicallyAccessedMembers(All)] T> : GeneralizedReferenceTypeSurrogateCodec<ImmutableSortedSet<T>, ImmutableSortedSetSurrogate<T>>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ImmutableSortedSetCodec{T}"/> class.
@@ -38,7 +38,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [GenerateSerializer]
-    public struct ImmutableSortedSetSurrogate<T>
+    public struct ImmutableSortedSetSurrogate<[DynamicallyAccessedMembers(All)] T>
     {
         /// <summary>
         /// Gets or sets the values.
@@ -60,7 +60,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
-    public sealed class ImmutableSortedSetCopier<T> : IDeepCopier<ImmutableSortedSet<T>>, IOptionalDeepCopier
+    public sealed class ImmutableSortedSetCopier<[DynamicallyAccessedMembers(All)] T> : IDeepCopier<ImmutableSortedSet<T>>, IOptionalDeepCopier
     {
         private readonly IDeepCopier<T> _copier;
 

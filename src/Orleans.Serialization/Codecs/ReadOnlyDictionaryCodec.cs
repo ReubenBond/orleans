@@ -6,7 +6,7 @@ using System.Collections.ObjectModel;
 namespace Orleans.Serialization.Codecs
 {
     [RegisterSerializer]
-    public sealed class ReadOnlyDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<ReadOnlyDictionary<TKey, TValue>, ReadOnlyDictionarySurrogate<TKey, TValue>>
+    public sealed class ReadOnlyDictionaryCodec<[DynamicallyAccessedMembers(All)] TKey, [DynamicallyAccessedMembers(All)] TValue> : GeneralizedReferenceTypeSurrogateCodec<ReadOnlyDictionary<TKey, TValue>, ReadOnlyDictionarySurrogate<TKey, TValue>>
     {
         public ReadOnlyDictionaryCodec(IValueSerializer<ReadOnlyDictionarySurrogate<TKey, TValue>> surrogateSerializer) : base(surrogateSerializer)
         {
@@ -18,14 +18,14 @@ namespace Orleans.Serialization.Codecs
     }
 
     [GenerateSerializer]
-    public struct ReadOnlyDictionarySurrogate<TKey, TValue>
+    public struct ReadOnlyDictionarySurrogate<[DynamicallyAccessedMembers(All)] TKey, [DynamicallyAccessedMembers(All)] TValue>
     {
         [Id(0)]
         public Dictionary<TKey, TValue> Values;
     }
 
     [RegisterCopier]
-    public sealed class ReadOnlyDictionaryCopier<TKey, TValue> : IDeepCopier<ReadOnlyDictionary<TKey, TValue>>
+    public sealed class ReadOnlyDictionaryCopier<[DynamicallyAccessedMembers(All)] TKey, [DynamicallyAccessedMembers(All)] TValue> : IDeepCopier<ReadOnlyDictionary<TKey, TValue>>
     {
         private readonly IDeepCopier<TKey> _keyCopier;
         private readonly IDeepCopier<TValue> _valueCopier;

@@ -22,7 +22,7 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public BinaryData Serialize<T>(T value)
+        public BinaryData Serialize<[DynamicallyAccessedMembers(All)] T>(T value)
         {
             var buffer = new ArrayBufferWriter<byte>();
             this.serializer.Serialize(value, buffer);
@@ -30,7 +30,7 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public T Deserialize<T>(BinaryData input)
+        public T Deserialize<[DynamicallyAccessedMembers(All)] T>(BinaryData input)
         {
             return this.serializer.Deserialize<T>(input.ToMemory());
         }

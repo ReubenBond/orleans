@@ -8,7 +8,7 @@ namespace Orleans.Serialization.Serializers
     /// Functionality for serializing and deserializing members in a type hierarchy.
     /// </summary>
     /// <typeparam name="T">The type supported by this codec.</typeparam>
-    public interface IBaseCodec<in T> : IBaseCodec where T : class
+    public interface IBaseCodec<[DynamicallyAccessedMembers(All)] in T> : IBaseCodec where T : class
     {
         /// <summary>
         /// Serializes the provided value.
@@ -44,7 +44,7 @@ namespace Orleans.Serialization.Serializers
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns><see langword="true" /> if the specified type is supported; otherwise, <see langword="false" />.</returns>
-        bool IsSupportedType(Type type);
+        bool IsSupportedType([DynamicallyAccessedMembers(All)] Type type);
     }
 
     /// <summary>
@@ -57,13 +57,13 @@ namespace Orleans.Serialization.Serializers
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns><see langword="true" /> if the specified type is supported; otherwise, <see langword="false" />.</returns>
-        bool IsSupportedType(Type type);
+        bool IsSupportedType([DynamicallyAccessedMembers(All)] Type type);
 
         /// <summary>
         /// Gets an <see cref="IBaseCodec"/> implementation which supports the specified type.
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns>An <see cref="IBaseCodec"/> implementation which supports the specified type.</returns>
-        IBaseCodec GetSpecializedCodec(Type type);
+        IBaseCodec GetSpecializedCodec([DynamicallyAccessedMembers(All)] Type type);
     }
 }

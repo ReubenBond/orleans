@@ -15,7 +15,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterSerializer]
-    public sealed class DictionaryCodec<TKey, TValue> : IFieldCodec<Dictionary<TKey, TValue>>
+    public sealed class DictionaryCodec<[DynamicallyAccessedMembers(All)] TKey, [DynamicallyAccessedMembers(All)] TValue> : IFieldCodec<Dictionary<TKey, TValue>>
     {
         private readonly Type _keyFieldType = typeof(TKey);
         private readonly Type _valueFieldType = typeof(TValue);
@@ -153,7 +153,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The type of the t key.</typeparam>
     /// <typeparam name="TValue">The type of the t value.</typeparam>
     [RegisterCopier]
-    public sealed class DictionaryCopier<TKey, TValue> : IDeepCopier<Dictionary<TKey, TValue>>, IBaseCopier<Dictionary<TKey, TValue>>
+    public sealed class DictionaryCopier<[DynamicallyAccessedMembers(All)] TKey, [DynamicallyAccessedMembers(All)] TValue> : IDeepCopier<Dictionary<TKey, TValue>>, IBaseCopier<Dictionary<TKey, TValue>>
     {
         private readonly IDeepCopier<TKey> _keyCopier;
         private readonly IDeepCopier<TValue> _valueCopier;

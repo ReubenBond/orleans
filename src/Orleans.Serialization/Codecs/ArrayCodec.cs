@@ -13,7 +13,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
-    public sealed class ArrayCodec<T> : IFieldCodec<T[]>
+    public sealed class ArrayCodec<[DynamicallyAccessedMembers(All)] T> : IFieldCodec<T[]>
     {
         private readonly IFieldCodec<T> _fieldCodec;
         private readonly Type CodecElementType = typeof(T);
@@ -130,7 +130,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
-    public sealed class ArrayCopier<T> : IDeepCopier<T[]>
+    public sealed class ArrayCopier<[DynamicallyAccessedMembers(All)] T> : IDeepCopier<T[]>
     {
         private readonly IDeepCopier<T> _elementCopier;
 
@@ -167,7 +167,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
-    public sealed class ReadOnlyMemoryCodec<T> : IFieldCodec<ReadOnlyMemory<T>>
+    public sealed class ReadOnlyMemoryCodec<[DynamicallyAccessedMembers(All)] T> : IFieldCodec<ReadOnlyMemory<T>>
     {
         private readonly Type CodecType = typeof(ReadOnlyMemory<T>);
         private readonly Type CodecElementType = typeof(T);
@@ -280,7 +280,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
-    public sealed class ReadOnlyMemoryCopier<T> : IDeepCopier<ReadOnlyMemory<T>>
+    public sealed class ReadOnlyMemoryCopier<[DynamicallyAccessedMembers(All)] T> : IDeepCopier<ReadOnlyMemory<T>>
     {
         private readonly IDeepCopier<T> _elementCopier;
 
@@ -329,7 +329,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
-    public sealed class MemoryCodec<T> : IFieldCodec<Memory<T>>
+    public sealed class MemoryCodec<[DynamicallyAccessedMembers(All)] T> : IFieldCodec<Memory<T>>
     {
         private readonly Type CodecType = typeof(Memory<T>);
         private readonly Type CodecElementType = typeof(T);
@@ -442,7 +442,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
-    public sealed class MemoryCopier<T> : IDeepCopier<Memory<T>>
+    public sealed class MemoryCopier<[DynamicallyAccessedMembers(All)] T> : IDeepCopier<Memory<T>>
     {
         private readonly IDeepCopier<T> _elementCopier;
 
@@ -491,7 +491,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
-    public sealed class ArraySegmentCodec<T> : IFieldCodec<ArraySegment<T>>
+    public sealed class ArraySegmentCodec<[DynamicallyAccessedMembers(All)] T> : IFieldCodec<ArraySegment<T>>
     {
         private readonly Type CodecType = typeof(ArraySegment<T>);
         private readonly Type CodecElementType = typeof(T);
@@ -607,7 +607,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
-    public sealed class ArraySegmentCopier<T> : IDeepCopier<ArraySegment<T>>
+    public sealed class ArraySegmentCopier<[DynamicallyAccessedMembers(All)] T> : IDeepCopier<ArraySegment<T>>
     {
         private readonly IDeepCopier<T> _elementCopier;
 

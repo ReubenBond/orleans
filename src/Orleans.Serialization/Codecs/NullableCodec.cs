@@ -13,7 +13,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
-    public sealed class NullableCodec<T> : IFieldCodec<T?> where T : struct
+    public sealed class NullableCodec<[DynamicallyAccessedMembers(All)] T> : IFieldCodec<T?> where T : struct
     {
         private readonly Type CodecFieldType = typeof(T);
         private readonly IFieldCodec<T> _fieldCodec;
@@ -67,7 +67,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
-    public sealed class NullableCopier<T> : IDeepCopier<T?>, IOptionalDeepCopier where T : struct
+    public sealed class NullableCopier<[DynamicallyAccessedMembers(All)] T> : IDeepCopier<T?>, IOptionalDeepCopier where T : struct
     {
         private readonly IDeepCopier<T> _copier;
 

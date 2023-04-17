@@ -54,11 +54,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <param name="caller">The caller.</param>
         /// <param name="codecProvider">The codec provider.</param>
         /// <returns>The unwrapped service.</returns>
-        public static TService GetService<
-#if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
-#endif
-            TService>(object caller, ICodecProvider codecProvider)
+        public static TService GetService<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] TService>(object caller, ICodecProvider codecProvider)
         {
             var state = ResolutionState.Value;
 
@@ -148,7 +144,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <summary>
         /// Returns the provided copier if it's not shallow-copyable.
         /// </summary>
-        public static IDeepCopier<T> GetOptionalCopier<T>(IDeepCopier<T> copier) => copier is IOptionalDeepCopier o && o.IsShallowCopyable() ? null : copier;
+        public static IDeepCopier<T> GetOptionalCopier<[DynamicallyAccessedMembers(All)] T>(IDeepCopier<T> copier) => copier is IOptionalDeepCopier o && o.IsShallowCopyable() ? null : copier;
 
         /// <summary>        
         /// Generated code helper method which throws an <see cref="ArgumentOutOfRangeException"/>.
@@ -213,6 +209,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.NoInlining)]
+        [SuppressMessage("Trimming", "IL2072:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
         public static TField DeserializeUnexpectedType<TInput, TField>(this ref Reader<TInput> reader, scoped ref Field field) where TField : class
         {
             var specificSerializer = reader.Session.CodecProvider.GetCodec(field.FieldType);
@@ -228,15 +225,9 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <param name="parameterTypes">The parameter types.</param>
         /// <returns>The corresponding <see cref="MethodInfo"/>.</returns>
         [MethodImpl(MethodImplOptions.NoInlining)]
-#if NET5_0_OR_GREATER
         [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2060", Justification = "Called from generated code, which is responsible for guaranteeing the symbols are rooted")]
         [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2072", Justification = "Called from generated code, which is responsible for guaranteeing the symbols are rooted")]
-#endif
-        public static MethodInfo GetMethodInfoOrDefault(
-#if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(PublicMethods | NonPublicMethods | Interfaces)]
-#endif
-            Type interfaceType, string methodName, Type[] methodTypeParameters, Type[] parameterTypes)
+        public static MethodInfo GetMethodInfoOrDefault([DynamicallyAccessedMembers(PublicMethods | NonPublicMethods | Interfaces)] Type interfaceType, string methodName, Type[] methodTypeParameters, Type[] parameterTypes)
         {
             if (interfaceType is null)
             {
@@ -304,12 +295,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <summary>
         /// Default copier implementation for (rarely copied) exception classes
         /// </summary>
-        public abstract class ExceptionCopier<
-#if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
-#endif
-            T,
-            B> : IDeepCopier<T>, IBaseCopier<T> where T : B where B : Exception
+        public abstract class ExceptionCopier<[DynamicallyAccessedMembers(All)] T, [DynamicallyAccessedMembers(All)] B> : IDeepCopier<T>, IBaseCopier<T> where T : B where B : Exception
         {
             private readonly IActivator<T> _activator;
             private readonly IBaseCopier<B> _baseTypeCopier;

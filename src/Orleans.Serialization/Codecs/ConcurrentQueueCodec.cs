@@ -10,7 +10,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
-    public sealed class ConcurrentQueueCodec<T> : GeneralizedReferenceTypeSurrogateCodec<ConcurrentQueue<T>, ConcurrentQueueSurrogate<T>>
+    public sealed class ConcurrentQueueCodec<[DynamicallyAccessedMembers(All)] T> : GeneralizedReferenceTypeSurrogateCodec<ConcurrentQueue<T>, ConcurrentQueueSurrogate<T>>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ConcurrentQueueCodec{T}"/> class.
@@ -32,7 +32,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [GenerateSerializer]
-    public struct ConcurrentQueueSurrogate<T>
+    public struct ConcurrentQueueSurrogate<[DynamicallyAccessedMembers(All)] T>
     {
         /// <summary>
         /// Gets or sets the values.
@@ -47,7 +47,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T"></typeparam>
     [RegisterCopier]
-    public sealed class ConcurrentQueueCopier<T> : IDeepCopier<ConcurrentQueue<T>>, IBaseCopier<ConcurrentQueue<T>>
+    public sealed class ConcurrentQueueCopier<[DynamicallyAccessedMembers(All)] T> : IDeepCopier<ConcurrentQueue<T>>, IBaseCopier<ConcurrentQueue<T>>
     {
         private readonly IDeepCopier<T> _copier;
 

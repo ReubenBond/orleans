@@ -12,7 +12,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
-    public sealed class TupleCodec<T> : IFieldCodec<Tuple<T>>
+    public sealed class TupleCodec<[DynamicallyAccessedMembers(All)] T> : IFieldCodec<Tuple<T>>
     {
         private readonly Type CodecElementType = typeof(T);
 
@@ -86,7 +86,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
-    public sealed class TupleCopier<T> : IDeepCopier<Tuple<T>>, IOptionalDeepCopier
+    public sealed class TupleCopier<[DynamicallyAccessedMembers(All)] T> : IDeepCopier<Tuple<T>>, IOptionalDeepCopier
     {
         private readonly IDeepCopier<T> _copier;
 
@@ -126,7 +126,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T1">The type of the tuple's first component.</typeparam>
     /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
     [RegisterSerializer]
-    public sealed class TupleCodec<T1, T2> : IFieldCodec<Tuple<T1, T2>>
+    public sealed class TupleCodec<[DynamicallyAccessedMembers(All)] T1, [DynamicallyAccessedMembers(All)] T2> : IFieldCodec<Tuple<T1, T2>>
     {
         private static readonly Type ElementType1 = typeof(T1);
         private static readonly Type ElementType2 = typeof(T2);
@@ -210,7 +210,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T1">The type of the tuple's first component.</typeparam>
     /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
     [RegisterCopier]
-    public sealed class TupleCopier<T1, T2> : IDeepCopier<Tuple<T1, T2>>, IOptionalDeepCopier
+    public sealed class TupleCopier<[DynamicallyAccessedMembers(All)] T1, [DynamicallyAccessedMembers(All)] T2> : IDeepCopier<Tuple<T1, T2>>, IOptionalDeepCopier
     {
         private readonly IDeepCopier<T1> _copier1;
         private readonly IDeepCopier<T2> _copier2;
@@ -258,7 +258,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
     /// <typeparam name="T3">The type of the tuple's third component.</typeparam>
     [RegisterSerializer]
-    public sealed class TupleCodec<T1, T2, T3> : IFieldCodec<Tuple<T1, T2, T3>>
+    public sealed class TupleCodec<[DynamicallyAccessedMembers(All)] T1, [DynamicallyAccessedMembers(All)] T2, [DynamicallyAccessedMembers(All)] T3> : IFieldCodec<Tuple<T1, T2, T3>>
     {
         private static readonly Type ElementType1 = typeof(T1);
         private static readonly Type ElementType2 = typeof(T2);
@@ -355,7 +355,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T2">The type of the tuple's second component.</typeparam>
     /// <typeparam name="T3">The type of the tuple's third component.</typeparam>
     [RegisterCopier]
-    public sealed class TupleCopier<T1, T2, T3> : IDeepCopier<Tuple<T1, T2, T3>>, IOptionalDeepCopier
+    public sealed class TupleCopier<[DynamicallyAccessedMembers(All)] T1, [DynamicallyAccessedMembers(All)] T2, [DynamicallyAccessedMembers(All)] T3> : IDeepCopier<Tuple<T1, T2, T3>>, IOptionalDeepCopier
     {
         private readonly IDeepCopier<T1> _copier1;
         private readonly IDeepCopier<T2> _copier2;
@@ -412,7 +412,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T3">The type of the tuple's third component.</typeparam>
     /// <typeparam name="T4">The type of the tuple's fourth component.</typeparam>
     [RegisterSerializer]
-    public sealed class TupleCodec<T1, T2, T3, T4> : IFieldCodec<Tuple<T1, T2, T3, T4>>
+    public sealed class TupleCodec<[DynamicallyAccessedMembers(All)] T1, [DynamicallyAccessedMembers(All)] T2, [DynamicallyAccessedMembers(All)] T3, [DynamicallyAccessedMembers(All)] T4> : IFieldCodec<Tuple<T1, T2, T3, T4>>
     {
         private static readonly Type ElementType1 = typeof(T1);
         private static readonly Type ElementType2 = typeof(T2);
@@ -520,7 +520,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T3">The type of the tuple's third component.</typeparam>
     /// <typeparam name="T4">The type of the tuple's fourth component.</typeparam>
     [RegisterCopier]
-    public sealed class TupleCopier<T1, T2, T3, T4> : IDeepCopier<Tuple<T1, T2, T3, T4>>, IOptionalDeepCopier
+    public sealed class TupleCopier<[DynamicallyAccessedMembers(All)] T1, [DynamicallyAccessedMembers(All)] T2, [DynamicallyAccessedMembers(All)] T3, [DynamicallyAccessedMembers(All)] T4> : IDeepCopier<Tuple<T1, T2, T3, T4>>, IOptionalDeepCopier
     {
         private readonly IDeepCopier<T1> _copier1;
         private readonly IDeepCopier<T2> _copier2;
@@ -583,7 +583,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T4">The type of the tuple's fourth component.</typeparam>
     /// <typeparam name="T5">The type of the tuple's fifth component.</typeparam>
     [RegisterSerializer]
-    public sealed class TupleCodec<T1, T2, T3, T4, T5> : IFieldCodec<Tuple<T1, T2, T3, T4, T5>>
+    public sealed class TupleCodec<[DynamicallyAccessedMembers(All)] T1, [DynamicallyAccessedMembers(All)] T2, [DynamicallyAccessedMembers(All)] T3, [DynamicallyAccessedMembers(All)] T4, [DynamicallyAccessedMembers(All)] T5> : IFieldCodec<Tuple<T1, T2, T3, T4, T5>>
     {
         private static readonly Type ElementType1 = typeof(T1);
         private static readonly Type ElementType2 = typeof(T2);
@@ -705,7 +705,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T4">The type of the tuple's fourth component.</typeparam>
     /// <typeparam name="T5">The type of the tuple's fifth component.</typeparam>
     [RegisterCopier]
-    public sealed class TupleCopier<T1, T2, T3, T4, T5> : IDeepCopier<Tuple<T1, T2, T3, T4, T5>>, IOptionalDeepCopier
+    public sealed class TupleCopier<[DynamicallyAccessedMembers(All)] T1, [DynamicallyAccessedMembers(All)] T2, [DynamicallyAccessedMembers(All)] T3, [DynamicallyAccessedMembers(All)] T4, [DynamicallyAccessedMembers(All)] T5> : IDeepCopier<Tuple<T1, T2, T3, T4, T5>>, IOptionalDeepCopier
     {
         private readonly IDeepCopier<T1> _copier1;
         private readonly IDeepCopier<T2> _copier2;
@@ -774,7 +774,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T5">The type of the tuple's fifth component.</typeparam>
     /// <typeparam name="T6">The type of the tuple's sixth component.</typeparam>
     [RegisterSerializer]
-    public sealed class TupleCodec<T1, T2, T3, T4, T5, T6> : IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6>>
+    public sealed class TupleCodec<[DynamicallyAccessedMembers(All)] T1, [DynamicallyAccessedMembers(All)] T2, [DynamicallyAccessedMembers(All)] T3, [DynamicallyAccessedMembers(All)] T4, [DynamicallyAccessedMembers(All)] T5, [DynamicallyAccessedMembers(All)] T6> : IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6>>
     {
         private static readonly Type ElementType1 = typeof(T1);
         private static readonly Type ElementType2 = typeof(T2);
@@ -907,7 +907,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T5">The type of the tuple's fifth component.</typeparam>
     /// <typeparam name="T6">The type of the tuple's sixth component.</typeparam>
     [RegisterCopier]
-    public sealed class TupleCopier<T1, T2, T3, T4, T5, T6> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6>>, IOptionalDeepCopier
+    public sealed class TupleCopier<[DynamicallyAccessedMembers(All)] T1, [DynamicallyAccessedMembers(All)] T2, [DynamicallyAccessedMembers(All)] T3, [DynamicallyAccessedMembers(All)] T4, [DynamicallyAccessedMembers(All)] T5, [DynamicallyAccessedMembers(All)] T6> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6>>, IOptionalDeepCopier
     {
         private readonly IDeepCopier<T1> _copier1;
         private readonly IDeepCopier<T2> _copier2;
@@ -982,7 +982,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T6">The type of the tuple's sixth component.</typeparam>
     /// <typeparam name="T7">The type of the tuple's seventh component.</typeparam>
     [RegisterSerializer]
-    public sealed class TupleCodec<T1, T2, T3, T4, T5, T6, T7> : IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6, T7>>
+    public sealed class TupleCodec<[DynamicallyAccessedMembers(All)] T1, [DynamicallyAccessedMembers(All)] T2, [DynamicallyAccessedMembers(All)] T3, [DynamicallyAccessedMembers(All)] T4, [DynamicallyAccessedMembers(All)] T5, [DynamicallyAccessedMembers(All)] T6, [DynamicallyAccessedMembers(All)] T7> : IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6, T7>>
     {
         private static readonly Type ElementType1 = typeof(T1);
         private static readonly Type ElementType2 = typeof(T2);
@@ -1127,7 +1127,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T6">The type of the tuple's sixth component.</typeparam>
     /// <typeparam name="T7">The type of the tuple's seventh component.</typeparam>
     [RegisterCopier]
-    public sealed class TupleCopier<T1, T2, T3, T4, T5, T6, T7> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6, T7>>, IOptionalDeepCopier
+    public sealed class TupleCopier<[DynamicallyAccessedMembers(All)] T1, [DynamicallyAccessedMembers(All)] T2, [DynamicallyAccessedMembers(All)] T3, [DynamicallyAccessedMembers(All)] T4, [DynamicallyAccessedMembers(All)] T5, [DynamicallyAccessedMembers(All)] T6, [DynamicallyAccessedMembers(All)] T7> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6, T7>>, IOptionalDeepCopier
     {
         private readonly IDeepCopier<T1> _copier1;
         private readonly IDeepCopier<T2> _copier2;
@@ -1208,7 +1208,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T7">The type of the tuple's seventh component.</typeparam>
     /// <typeparam name="T8">The type of the tuple's eighth component.</typeparam>
     [RegisterSerializer]
-    public sealed class TupleCodec<T1, T2, T3, T4, T5, T6, T7, T8> : IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6, T7, T8>>
+    public sealed class TupleCodec<[DynamicallyAccessedMembers(All)] T1, [DynamicallyAccessedMembers(All)] T2, [DynamicallyAccessedMembers(All)] T3, [DynamicallyAccessedMembers(All)] T4, [DynamicallyAccessedMembers(All)] T5, [DynamicallyAccessedMembers(All)] T6, [DynamicallyAccessedMembers(All)] T7, [DynamicallyAccessedMembers(All)] T8> : IFieldCodec<Tuple<T1, T2, T3, T4, T5, T6, T7, T8>>
     {
         private static readonly Type ElementType1 = typeof(T1);
         private static readonly Type ElementType2 = typeof(T2);
@@ -1363,7 +1363,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="T7">The type of the tuple's seventh component.</typeparam>
     /// <typeparam name="T8">The type of the tuple's eighth component.</typeparam>
     [RegisterCopier]
-    public sealed class TupleCopier<T1, T2, T3, T4, T5, T6, T7, T8> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6, T7, T8>>, IOptionalDeepCopier
+    public sealed class TupleCopier<[DynamicallyAccessedMembers(All)] T1, [DynamicallyAccessedMembers(All)] T2, [DynamicallyAccessedMembers(All)] T3, [DynamicallyAccessedMembers(All)] T4, [DynamicallyAccessedMembers(All)] T5, [DynamicallyAccessedMembers(All)] T6, [DynamicallyAccessedMembers(All)] T7, [DynamicallyAccessedMembers(All)] T8> : IDeepCopier<Tuple<T1, T2, T3, T4, T5, T6, T7, T8>>, IOptionalDeepCopier
     {
         private readonly IDeepCopier<T1> _copier1;
         private readonly IDeepCopier<T2> _copier2;

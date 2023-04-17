@@ -11,7 +11,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T"></typeparam>
     /// <seealso cref="Orleans.Serialization.Codecs.IFieldCodec{T}" />
-    public abstract class Enum32BaseCodec<T> : IFieldCodec<T> where T : unmanaged, Enum
+    public abstract class Enum32BaseCodec<[DynamicallyAccessedMembers(All)] T> : IFieldCodec<T> where T : unmanaged, Enum
     {
         private readonly Type CodecFieldType = typeof(T);
 

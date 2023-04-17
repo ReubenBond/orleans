@@ -48,7 +48,7 @@ namespace Orleans.Serialization
         /// <typeparam name="T">The expected type of <paramref name="value"/>.</typeparam>
         /// <param name="value">The value to serialize.</param>
         /// <returns>A byte array containing the serialized value.</returns>
-        public byte[] SerializeToArray<T>(T value)
+        public byte[] SerializeToArray<[DynamicallyAccessedMembers(All)] T>(T value)
         {
             using var session = _sessionPool.GetSession();
             var writer = Writer.CreatePooled(session);
@@ -107,7 +107,7 @@ namespace Orleans.Serialization
         /// <param name="destination">The destination where serialized data will be written.</param>
         /// <param name="sizeHint">The estimated upper bound for the length of the serialized data.</param>
         /// <remarks>The destination stream will not be flushed by this method.</remarks>
-        public void Serialize<T>(T value, Stream destination, int sizeHint = 0)
+        public void Serialize<[DynamicallyAccessedMembers(All)] T>(T value, Stream destination, int sizeHint = 0)
         {
             if (destination is MemoryStream memoryStream)
             {
@@ -177,7 +177,7 @@ namespace Orleans.Serialization
         /// <typeparam name="TBufferWriter">The output buffer writer.</typeparam>
         /// <param name="value">The value to serialize.</param>
         /// <param name="destination">The destination where serialized data will be written.</param>
-        public void Serialize<T, TBufferWriter>(T value, TBufferWriter destination) where TBufferWriter : IBufferWriter<byte>
+        public void Serialize<[DynamicallyAccessedMembers(All)] T, TBufferWriter>(T value, TBufferWriter destination) where TBufferWriter : IBufferWriter<byte>
         {
             using var session = _sessionPool.GetSession();
             var writer = Writer.Create(destination, session);
@@ -196,7 +196,7 @@ namespace Orleans.Serialization
         /// <param name="value">The value to serialize.</param>
         /// <param name="destination">The destination where serialized data will be written.</param>
         /// <param name="session">The serializer session.</param>
-        public void Serialize<T, TBufferWriter>(T value, TBufferWriter destination, SerializerSession session) where TBufferWriter : IBufferWriter<byte>
+        public void Serialize<[DynamicallyAccessedMembers(All)] T, TBufferWriter>(T value, TBufferWriter destination, SerializerSession session) where TBufferWriter : IBufferWriter<byte>
         {
             var writer = Writer.Create(destination, session);
             var codec = session.CodecProvider.GetCodec<T>();
@@ -213,7 +213,7 @@ namespace Orleans.Serialization
         /// <typeparam name="TBufferWriter">The output buffer writer.</typeparam>
         /// <param name="value">The value to serialize.</param>
         /// <param name="destination">The destination where serialized data will be written.</param>
-        public void Serialize<T, TBufferWriter>(T value, ref Writer<TBufferWriter> destination) where TBufferWriter : IBufferWriter<byte>
+        public void Serialize<[DynamicallyAccessedMembers(All)] T, TBufferWriter>(T value, ref Writer<TBufferWriter> destination) where TBufferWriter : IBufferWriter<byte>
         {
             var codec = destination.Session.CodecProvider.GetCodec<T>();
             codec.WriteField(ref destination, 0, typeof(T), value);
@@ -227,7 +227,7 @@ namespace Orleans.Serialization
         /// <param name="value">The value to serialize.</param>
         /// <param name="destination">The destination where serialized data will be written.</param>
         /// <remarks>This method slices the <paramref name="destination"/> to the serialized data length.</remarks>
-        public void Serialize<T>(T value, ref Span<byte> destination)
+        public void Serialize<[DynamicallyAccessedMembers(All)] T>(T value, ref Span<byte> destination)
         {
             using var session = _sessionPool.GetSession();
             var writer = Writer.Create(destination, session);
@@ -245,7 +245,7 @@ namespace Orleans.Serialization
         /// <param name="destination">The destination where serialized data will be written.</param>
         /// <param name="session">The serializer session.</param>
         /// <remarks>This method slices the <paramref name="destination"/> to the serialized data length.</remarks>
-        public void Serialize<T>(T value, ref Span<byte> destination, SerializerSession session)
+        public void Serialize<[DynamicallyAccessedMembers(All)] T>(T value, ref Span<byte> destination, SerializerSession session)
         {
             var writer = Writer.Create(destination, session);
             var codec = session.CodecProvider.GetCodec<T>();
@@ -261,7 +261,7 @@ namespace Orleans.Serialization
         /// <param name="value">The value to serialize.</param>
         /// <param name="destination">The destination where serialized data will be written.</param>
         /// <returns>The length of the serialized data.</returns>
-        public int Serialize<T>(T value, byte[] destination)
+        public int Serialize<[DynamicallyAccessedMembers(All)] T>(T value, byte[] destination)
         {
             using var session = _sessionPool.GetSession();
             var writer = Writer.Create(destination, session);
@@ -278,7 +278,7 @@ namespace Orleans.Serialization
         /// <param name="value">The value to serialize.</param>
         /// <param name="destination">The destination where serialized data will be written.</param>
         /// <returns>The length of the serialized data.</returns>
-        public int Serialize<T>(T value, ArraySegment<byte> destination)
+        public int Serialize<[DynamicallyAccessedMembers(All)] T>(T value, ArraySegment<byte> destination)
         {
             var destinationSpan = destination.AsSpan();
             Serialize(value, ref destinationSpan);
@@ -293,7 +293,7 @@ namespace Orleans.Serialization
         /// <param name="destination">The destination where serialized data will be written.</param>
         /// <param name="session">The serializer session.</param>
         /// <returns>The length of the serialized data.</returns>
-        public int Serialize<T>(T value, ArraySegment<byte> destination, SerializerSession session)
+        public int Serialize<[DynamicallyAccessedMembers(All)] T>(T value, ArraySegment<byte> destination, SerializerSession session)
         {
             var destinationSpan = destination.AsSpan();
             Serialize(value, ref destinationSpan, session);
@@ -308,7 +308,7 @@ namespace Orleans.Serialization
         /// <param name="destination">The destination where serialized data will be written.</param>
         /// <param name="session">The serializer session.</param>
         /// <returns>The length of the serialized data.</returns>
-        public int Serialize<T>(T value, byte[] destination, SerializerSession session)
+        public int Serialize<[DynamicallyAccessedMembers(All)] T>(T value, byte[] destination, SerializerSession session)
         {
             var writer = Writer.Create(destination, session);
             var codec = session.CodecProvider.GetCodec<T>();
@@ -323,7 +323,7 @@ namespace Orleans.Serialization
         /// <typeparam name="T">The serialized type.</typeparam>
         /// <param name="source">The source buffer.</param>
         /// <returns>The deserialized value.</returns>
-        public T Deserialize<T>(Stream source)
+        public T Deserialize<[DynamicallyAccessedMembers(All)] T>(Stream source)
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
@@ -339,7 +339,7 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="session">The serializer session.</param>
         /// <returns>The deserialized value.</returns>
-        public T Deserialize<T>(Stream source, SerializerSession session)
+        public T Deserialize<[DynamicallyAccessedMembers(All)] T>(Stream source, SerializerSession session)
         {
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec<T>();
@@ -353,37 +353,7 @@ namespace Orleans.Serialization
         /// <typeparam name="T">The serialized type.</typeparam>
         /// <param name="source">The source buffer.</param>
         /// <returns>The deserialized value.</returns>
-        public T Deserialize<T>(ReadOnlySequence<byte> source)
-        {
-            using var session = _sessionPool.GetSession();
-            var reader = Reader.Create(source, session);
-            var codec = session.CodecProvider.GetCodec<T>();
-            var field = reader.ReadFieldHeader();
-            return codec.ReadValue(ref reader, field);
-        }
-
-        /// <summary>
-        /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
-        /// </summary>
-        /// <typeparam name="T">The serialized type.</typeparam>
-        /// <param name="source">The source buffer.</param>
-        /// <param name="session">The serializer session.</param>
-        /// <returns>The deserialized value.</returns>
-        public T Deserialize<T>(ReadOnlySequence<byte> source, SerializerSession session)
-        {
-            var reader = Reader.Create(source, session);
-            var codec = session.CodecProvider.GetCodec<T>();
-            var field = reader.ReadFieldHeader();
-            return codec.ReadValue(ref reader, field);
-        }
-
-        /// <summary>
-        /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
-        /// </summary>
-        /// <typeparam name="T">The serialized type.</typeparam>
-        /// <param name="source">The source buffer.</param>
-        /// <returns>The deserialized value.</returns>
-        public T Deserialize<T>(ReadOnlySpan<byte> source)
+        public T Deserialize<[DynamicallyAccessedMembers(All)] T>(ReadOnlySequence<byte> source)
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
@@ -399,7 +369,7 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="session">The serializer session.</param>
         /// <returns>The deserialized value.</returns>
-        public T Deserialize<T>(ReadOnlySpan<byte> source, SerializerSession session)
+        public T Deserialize<[DynamicallyAccessedMembers(All)] T>(ReadOnlySequence<byte> source, SerializerSession session)
         {
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec<T>();
@@ -413,7 +383,14 @@ namespace Orleans.Serialization
         /// <typeparam name="T">The serialized type.</typeparam>
         /// <param name="source">The source buffer.</param>
         /// <returns>The deserialized value.</returns>
-        public T Deserialize<T>(byte[] source) => Deserialize<T>(source.AsSpan());
+        public T Deserialize<[DynamicallyAccessedMembers(All)] T>(ReadOnlySpan<byte> source)
+        {
+            using var session = _sessionPool.GetSession();
+            var reader = Reader.Create(source, session);
+            var codec = session.CodecProvider.GetCodec<T>();
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
+        }
 
         /// <summary>
         /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
@@ -422,7 +399,13 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="session">The serializer session.</param>
         /// <returns>The deserialized value.</returns>
-        public T Deserialize<T>(byte[] source, SerializerSession session) => Deserialize<T>(source.AsSpan(), session);
+        public T Deserialize<[DynamicallyAccessedMembers(All)] T>(ReadOnlySpan<byte> source, SerializerSession session)
+        {
+            var reader = Reader.Create(source, session);
+            var codec = session.CodecProvider.GetCodec<T>();
+            var field = reader.ReadFieldHeader();
+            return codec.ReadValue(ref reader, field);
+        }
 
         /// <summary>
         /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
@@ -430,7 +413,7 @@ namespace Orleans.Serialization
         /// <typeparam name="T">The serialized type.</typeparam>
         /// <param name="source">The source buffer.</param>
         /// <returns>The deserialized value.</returns>
-        public T Deserialize<T>(ReadOnlyMemory<byte> source) => Deserialize<T>(source.Span);
+        public T Deserialize<[DynamicallyAccessedMembers(All)] T>(byte[] source) => Deserialize<T>(source.AsSpan());
 
         /// <summary>
         /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
@@ -439,14 +422,31 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="session">The serializer session.</param>
         /// <returns>The deserialized value.</returns>
-        public T Deserialize<T>(ReadOnlyMemory<byte> source, SerializerSession session) => Deserialize<T>(source.Span, session);
+        public T Deserialize<[DynamicallyAccessedMembers(All)] T>(byte[] source, SerializerSession session) => Deserialize<T>(source.AsSpan(), session);
+
+        /// <summary>
+        /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <typeparam name="T">The serialized type.</typeparam>
+        /// <param name="source">The source buffer.</param>
+        /// <returns>The deserialized value.</returns>
+        public T Deserialize<[DynamicallyAccessedMembers(All)] T>(ReadOnlyMemory<byte> source) => Deserialize<T>(source.Span);
+
+        /// <summary>
+        /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <typeparam name="T">The serialized type.</typeparam>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="session">The serializer session.</param>
+        /// <returns>The deserialized value.</returns>
+        public T Deserialize<[DynamicallyAccessedMembers(All)] T>(ReadOnlyMemory<byte> source, SerializerSession session) => Deserialize<T>(source.Span, session);
 
         /// <summary>
         /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
         /// </summary>
         /// <param name="source">The source buffer.</param>
         /// <returns>The deserialized value.</returns>
-        public T Deserialize<T>(ArraySegment<byte> source) => Deserialize<T>(source.AsSpan());
+        public T Deserialize<[DynamicallyAccessedMembers(All)] T>(ArraySegment<byte> source) => Deserialize<T>(source.AsSpan());
 
         /// <summary>
         /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
@@ -454,7 +454,7 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="session">The serializer session.</param>
         /// <returns>The deserialized value.</returns>
-        public T Deserialize<T>(ArraySegment<byte> source, SerializerSession session) => Deserialize<T>(source.AsSpan(), session);
+        public T Deserialize<[DynamicallyAccessedMembers(All)] T>(ArraySegment<byte> source, SerializerSession session) => Deserialize<T>(source.AsSpan(), session);
         
         /// <summary>
         /// Deserialize a value of type <typeparamref name="T"/> from <paramref name="source"/>.
@@ -463,7 +463,7 @@ namespace Orleans.Serialization
         /// <typeparam name="TInput">The reader input type.</typeparam>
         /// <param name="source">The source buffer.</param>
         /// <returns>The deserialized value.</returns>
-        public T Deserialize<T, TInput>(ref Reader<TInput> source)
+        public T Deserialize<[DynamicallyAccessedMembers(All)] T, TInput>(ref Reader<TInput> source)
         {
             var codec = source.Session.CodecProvider.GetCodec<T>();
             var field = source.ReadFieldHeader();
@@ -475,7 +475,7 @@ namespace Orleans.Serialization
     /// Serializes and deserializes values.
     /// </summary>
     /// <typeparam name="T">The type of value which this instance serializes and deserializes.</typeparam>
-    public sealed class Serializer<T>
+    public sealed class Serializer<[DynamicallyAccessedMembers(All)] T>
     {
         private readonly IFieldCodec<T> _codec;
         private readonly SerializerSessionPool _sessionPool;
@@ -851,7 +851,7 @@ namespace Orleans.Serialization
     /// Serializes and deserializes value types.
     /// </summary>
     /// <typeparam name="T">The type which this instance operates on.</typeparam>
-    public sealed class ValueSerializer<T> where T : struct
+    public sealed class ValueSerializer<[DynamicallyAccessedMembers(All)] T> where T : struct
     {
         private readonly IValueSerializer<T> _codec;
         private readonly SerializerSessionPool _sessionPool;
@@ -1271,7 +1271,7 @@ namespace Orleans.Serialization
         /// <summary>
         /// Returns <see langword="true"/> if the provided type, <paramref name="type"/>, can be serialized, and <see langword="false"/> otherwise.
         /// </summary>
-        public bool CanSerialize(Type type) => _sessionPool.CodecProvider.TryGetCodec(type) is { };
+        public bool CanSerialize([DynamicallyAccessedMembers(All)] Type type) => _sessionPool.CodecProvider.TryGetCodec(type) is { };
 
         /// <summary>
         /// Serializes the provided <paramref name="value"/> into <paramref name="destination"/>.
@@ -1518,7 +1518,7 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="type">The expected type of the value.</param>
         /// <returns>The deserialized value.</returns>
-        public object Deserialize(Stream source, Type type)
+        public object Deserialize(Stream source, [DynamicallyAccessedMembers(All)] Type type)
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
@@ -1534,7 +1534,7 @@ namespace Orleans.Serialization
         /// <param name="session">The serializer session.</param>
         /// <param name="type">The expected type of the value.</param>
         /// <returns>The deserialized value.</returns>
-        public object Deserialize(Stream source, SerializerSession session, Type type)
+        public object Deserialize(Stream source, SerializerSession session, [DynamicallyAccessedMembers(All)] Type type)
         {
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec(type);
@@ -1578,7 +1578,7 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="type">The expected type of the value.</param>
         /// <returns>The deserialized value.</returns>
-        public object Deserialize(ReadOnlySpan<byte> source, Type type)
+        public object Deserialize(ReadOnlySpan<byte> source, [DynamicallyAccessedMembers(All)] Type type)
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
@@ -1594,7 +1594,7 @@ namespace Orleans.Serialization
         /// <param name="session">The serializer session.</param>
         /// <param name="type">The expected type of the value.</param>
         /// <returns>The deserialized value.</returns>
-        public object Deserialize(ReadOnlySpan<byte> source, SerializerSession session, Type type)
+        public object Deserialize(ReadOnlySpan<byte> source, SerializerSession session, [DynamicallyAccessedMembers(All)] Type type)
         {
             var reader = Reader.Create(source, session);
             var codec = session.CodecProvider.GetCodec(type);
@@ -1608,7 +1608,7 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="type">The expected type of the value.</param>
         /// <returns>The deserialized value.</returns>
-        public object Deserialize(byte[] source, Type type) => Deserialize(source.AsSpan(), type);
+        public object Deserialize(byte[] source, [DynamicallyAccessedMembers(All)] Type type) => Deserialize(source.AsSpan(), type);
 
         /// <summary>
         /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
@@ -1617,7 +1617,7 @@ namespace Orleans.Serialization
         /// <param name="session">The serializer session.</param>
         /// <param name="type">The expected type of the value.</param>
         /// <returns>The deserialized value.</returns>
-        public object Deserialize(byte[] source, SerializerSession session, Type type) => Deserialize(source.AsSpan(), session, type);
+        public object Deserialize(byte[] source, SerializerSession session, [DynamicallyAccessedMembers(All)] Type type) => Deserialize(source.AsSpan(), session, type);
 
         /// <summary>
         /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
@@ -1625,24 +1625,7 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="type">The expected type of the value.</param>
         /// <returns>The deserialized value.</returns>
-        public object Deserialize(ReadOnlyMemory<byte> source, Type type) => Deserialize(source.Span, type);
-
-        /// <summary>
-        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
-        /// </summary>
-        /// <param name="source">The source buffer.</param>
-        /// <param name="session">The serializer session.</param>
-        /// <param name="type">The expected type of the value.</param>
-        /// <returns>The deserialized value.</returns>
-        public object Deserialize(ReadOnlyMemory<byte> source, SerializerSession session, Type type) => Deserialize(source.Span, session, type);
-
-        /// <summary>
-        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
-        /// </summary>
-        /// <param name="source">The source buffer.</param>
-        /// <param name="type">The expected type of the value.</param>
-        /// <returns>The deserialized value.</returns>
-        public object Deserialize(ArraySegment<byte> source, Type type) => Deserialize(source.AsSpan(), type);
+        public object Deserialize(ReadOnlyMemory<byte> source, [DynamicallyAccessedMembers(All)] Type type) => Deserialize(source.Span, type);
 
         /// <summary>
         /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
@@ -1651,7 +1634,24 @@ namespace Orleans.Serialization
         /// <param name="session">The serializer session.</param>
         /// <param name="type">The expected type of the value.</param>
         /// <returns>The deserialized value.</returns>
-        public object Deserialize(ArraySegment<byte> source, SerializerSession session, Type type) => Deserialize(source.AsSpan(), session, type);
+        public object Deserialize(ReadOnlyMemory<byte> source, SerializerSession session, [DynamicallyAccessedMembers(All)] Type type) => Deserialize(source.Span, session, type);
+
+        /// <summary>
+        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The deserialized value.</returns>
+        public object Deserialize(ArraySegment<byte> source, [DynamicallyAccessedMembers(All)] Type type) => Deserialize(source.AsSpan(), type);
+
+        /// <summary>
+        /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
+        /// </summary>
+        /// <param name="source">The source buffer.</param>
+        /// <param name="session">The serializer session.</param>
+        /// <param name="type">The expected type of the value.</param>
+        /// <returns>The deserialized value.</returns>
+        public object Deserialize(ArraySegment<byte> source, SerializerSession session, [DynamicallyAccessedMembers(All)] Type type) => Deserialize(source.AsSpan(), session, type);
         
         /// <summary>
         /// Deserialize a value of type <paramref name="type"/> from <paramref name="source"/>.
@@ -1660,7 +1660,7 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="type">The expected type of the value.</param>
         /// <returns>The deserialized value.</returns>
-        public object Deserialize<TInput>(ref Reader<TInput> source, Type type)
+        public object Deserialize<TInput>(ref Reader<TInput> source, [DynamicallyAccessedMembers(All)] Type type)
         {
             var codec = source.Session.CodecProvider.GetCodec(type);
             var field = source.ReadFieldHeader();
@@ -1691,7 +1691,7 @@ namespace Orleans.Serialization
         /// Returns a copier which is specialized to the provided type parameter.
         /// </summary>
         /// <typeparam name="T">The underlying type for the returned copier.</typeparam>
-        public DeepCopier<T> GetCopier<[DynamicallyAccessedMembers(NonPublicFields | PublicFields)] T>() => new(_codecProvider.GetDeepCopier<T>(), _contextPool);
+        public DeepCopier<T> GetCopier<[DynamicallyAccessedMembers(All)] T>() => new(_codecProvider.GetDeepCopier<T>(), _contextPool);
 
         /// <summary>
         /// Creates a copy of the provided value.
@@ -1709,7 +1709,7 @@ namespace Orleans.Serialization
     /// <summary>
     /// Provides functionality for copying objects and values.
     /// </summary>
-    public sealed class DeepCopier<T>
+    public sealed class DeepCopier<[DynamicallyAccessedMembers(All)] T>
     {
         private readonly IDeepCopier<T> _copier;
         private readonly CopyContextPool _contextPool;

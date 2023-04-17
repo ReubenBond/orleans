@@ -6,10 +6,8 @@ using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
 using System.Collections.Concurrent;
-using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
-using System.Security;
 
 namespace Orleans.Serialization
 {
@@ -215,7 +213,7 @@ namespace Orleans.Serialization
         /// <inheritdoc />
         [UnconditionalSuppressMessage("ReflectionAnalyzers", "IL2067")]
         public bool IsSupportedType(
-            Type type) =>
+            [DynamicallyAccessedMembers(All)] Type type) =>
             type == CodecType || typeof(Exception).IsAssignableFrom(type) || SerializableType.IsAssignableFrom(type) && SerializationConstructorFactory.HasSerializationConstructor(type);
     }
 }

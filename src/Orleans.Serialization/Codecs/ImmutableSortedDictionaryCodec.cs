@@ -12,7 +12,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterSerializer]
-    public sealed class ImmutableSortedDictionaryCodec<TKey, TValue> : GeneralizedReferenceTypeSurrogateCodec<ImmutableSortedDictionary<TKey, TValue>, ImmutableSortedDictionarySurrogate<TKey, TValue>>
+    public sealed class ImmutableSortedDictionaryCodec<[DynamicallyAccessedMembers(All)] TKey, [DynamicallyAccessedMembers(All)] TValue> : GeneralizedReferenceTypeSurrogateCodec<ImmutableSortedDictionary<TKey, TValue>, ImmutableSortedDictionarySurrogate<TKey, TValue>>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ImmutableSortedDictionaryCodec{TKey, TValue}"/> class.
@@ -41,7 +41,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [GenerateSerializer]
-    public struct ImmutableSortedDictionarySurrogate<TKey, TValue>
+    public struct ImmutableSortedDictionarySurrogate<[DynamicallyAccessedMembers(All)] TKey, [DynamicallyAccessedMembers(All)] TValue>
     {
         /// <summary>
         /// Gets or sets the values.
@@ -56,6 +56,7 @@ namespace Orleans.Serialization.Codecs
         /// <value>The key comparer.</value>
         [Id(1)]
         public IComparer<TKey> KeyComparer;
+
         [Id(2)]
         public IEqualityComparer<TValue> ValueComparer;
     }
@@ -66,7 +67,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [RegisterCopier]
-    public sealed class ImmutableSortedDictionaryCopier<TKey, TValue> : IDeepCopier<ImmutableSortedDictionary<TKey, TValue>>, IOptionalDeepCopier
+    public sealed class ImmutableSortedDictionaryCopier<[DynamicallyAccessedMembers(All)] TKey, [DynamicallyAccessedMembers(All)] TValue> : IDeepCopier<ImmutableSortedDictionary<TKey, TValue>>, IOptionalDeepCopier
     {
         private readonly IDeepCopier<TKey> _keyCopier;
         private readonly IDeepCopier<TValue> _valueCopier;

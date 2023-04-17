@@ -52,7 +52,7 @@ namespace Orleans.Serialization.Codecs
         }
 
         /// <inheritdoc />
-        public bool IsSupportedType(Type type) =>
+        public bool IsSupportedType([DynamicallyAccessedMembers(All)] Type type) =>
             type == CodecType
             || type == _ordinalType
             || type == _ordinalIgnoreCaseType

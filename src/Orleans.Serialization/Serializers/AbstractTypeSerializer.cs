@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
@@ -10,7 +11,7 @@ namespace Orleans.Serialization.Serializers
     /// <summary>
     /// Serializer for types which are abstract and therefore cannot be instantiated themselves, such as abstract classes and interface types.
     /// </summary>
-    public class AbstractTypeSerializer<TField> : AbstractTypeSerializer, IFieldCodec<TField>, IBaseCodec<TField> where TField : class
+    public class AbstractTypeSerializer<[DynamicallyAccessedMembers(All)] TField> : AbstractTypeSerializer, IFieldCodec<TField>, IBaseCodec<TField> where TField : class
     {
         public AbstractTypeSerializer() : base(typeof(TField)) { }
 
@@ -25,7 +26,7 @@ namespace Orleans.Serialization.Serializers
     }
 
     // without the class type constraint
-    internal sealed class AbstractTypeSerializerWrapper<TField> : AbstractTypeSerializer, IFieldCodec<TField>
+    internal sealed class AbstractTypeSerializerWrapper<[DynamicallyAccessedMembers(All)] TField> : AbstractTypeSerializer, IFieldCodec<TField>
     {
         public AbstractTypeSerializerWrapper() : base(typeof(TField)) { }
 
@@ -53,6 +54,8 @@ namespace Orleans.Serialization.Serializers
             specificSerializer.WriteField(ref writer, fieldIdDelta, expectedType, value);
         }
 
+        [SuppressMessage("Trimming", "IL2072:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
+        [SuppressMessage("Trimming", "IL2077:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The source field does not have matching annotations.", Justification = "<Pending>")]
         public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.IsReference)

@@ -14,7 +14,7 @@ namespace Orleans.Serialization.Serializers;
 /// <typeparam name="TField">The type which the implementation of this class supports.</typeparam>
 /// <typeparam name="TSurrogate">The surrogate type serialized in place of <typeparamref name="TField"/>.</typeparam>
 /// <typeparam name="TConverter">The converter type which converts between <typeparamref name="TField"/> and <typeparamref name="TSurrogate"/>.</typeparam>
-public sealed class ValueTypeSurrogateCodec<TField, TSurrogate, TConverter>
+public sealed class ValueTypeSurrogateCodec<[DynamicallyAccessedMembers(All)] TField, [DynamicallyAccessedMembers(All)] TSurrogate, TConverter>
     : IFieldCodec<TField>, IDeepCopier<TField>, IValueSerializer<TField>
     where TField : struct
     where TSurrogate : struct

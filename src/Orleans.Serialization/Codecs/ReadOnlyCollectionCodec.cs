@@ -10,7 +10,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [GenerateSerializer]
-    public struct ReadOnlyCollectionSurrogate<T>
+    public struct ReadOnlyCollectionSurrogate<[DynamicallyAccessedMembers(All)] T>
     {
         /// <summary>
         /// Gets or sets the values.
@@ -25,7 +25,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterSerializer]
-    public sealed class ReadOnlyCollectionCodec<T> : GeneralizedReferenceTypeSurrogateCodec<ReadOnlyCollection<T>, ReadOnlyCollectionSurrogate<T>>
+    public sealed class ReadOnlyCollectionCodec<[DynamicallyAccessedMembers(All)] T> : GeneralizedReferenceTypeSurrogateCodec<ReadOnlyCollection<T>, ReadOnlyCollectionSurrogate<T>>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="ReadOnlyCollectionCodec{T}"/> class.
@@ -47,7 +47,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [RegisterCopier]
-    public sealed class ReadOnlyCollectionCopier<T> : IDeepCopier<ReadOnlyCollection<T>>
+    public sealed class ReadOnlyCollectionCopier<[DynamicallyAccessedMembers(All)] T> : IDeepCopier<ReadOnlyCollection<T>>
     {
         private readonly IDeepCopier<T> _elementCopier;
 
