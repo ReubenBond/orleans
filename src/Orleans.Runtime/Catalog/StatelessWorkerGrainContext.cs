@@ -24,7 +24,10 @@ namespace Orleans.Runtime
         /// debugging, where being able to identify the message loop task corresponding to an activation can
         /// be useful.
         /// </summary>
+#pragma warning disable IDE0052 // Remove unread private members
         private readonly Task _messageLoopTask;
+#pragma warning restore IDE0052 // Remove unread private members
+        
         private GrainReference _grainReference;
 
         public StatelessWorkerGrainContext(

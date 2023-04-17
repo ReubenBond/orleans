@@ -116,6 +116,7 @@ namespace Orleans.Serialization.Codecs
         /// <param name="field">The field.</param>
         /// <returns>The referenced value.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [SuppressMessage("Trimming", "IL2072:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
         public static T ReadReference<[DynamicallyAccessedMembers(All)] T, TInput>(ref Reader<TInput> reader, Field field) => (T)ReadReference(ref reader, field.FieldType ?? typeof(T));
 
         /// <summary>
@@ -148,6 +149,7 @@ namespace Orleans.Serialization.Codecs
             };
         }
 
+        [SuppressMessage("Trimming", "IL2072:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
         private static object DeserializeFromMarker<TInput>(
             ref Reader<TInput> reader,
             [DynamicallyAccessedMembers(All)] Type fieldType,

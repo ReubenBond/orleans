@@ -14,6 +14,8 @@ using Orleans.Runtime.Services;
 using Orleans.Timers;
 using UnitTests.GrainInterfaces;
 
+
+#pragma warning disable 612,618
 namespace UnitTests.Grains
 {
     // NOTE: if you make any changes here, copy them to ReminderTestCopyGrain
@@ -452,3 +454,4 @@ namespace UnitTests.Grains
         }
     }
 }
+#pragma warning restore 612, 618

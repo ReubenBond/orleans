@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Clustering.AzureStorage.Utilities
 {
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal enum TableStorageErrorCode
     {
         Runtime = 100000,

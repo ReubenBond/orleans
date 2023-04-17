@@ -69,7 +69,8 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
             return GetGrainType<TGrainKey, NotApplicable>();
         }
 
-        // Orleans.Storage.AdoNetStorageProvider cannot be resolved, because the containing assembly is not referenced since not needed.
+// Orleans.Storage.AdoNetStorageProvider cannot be resolved, because the containing assembly is not referenced since not needed.
+#pragma warning disable 1574
         /// <summary>
         /// Returns a grain type name.
         /// </summary>
@@ -80,6 +81,7 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         /// In <see cref="Orleans.Storage.AdoNetStorageProvider"/> private function <em>ExtractClassBaseType</em> relies this is in this form. Should be fixed
         /// if/when this is changed in Orleans.
         /// </remarks>
+#pragma warning restore 1574
         public static string GetGrainType<TGrainKey, TGrain>()
         {
             Func<Type, Type, Type> func;
@@ -93,3 +95,5 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         }
     }
 }
+
+#pragma warning restore ORLEANS0102

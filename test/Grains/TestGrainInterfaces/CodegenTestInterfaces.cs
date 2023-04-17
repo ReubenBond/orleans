@@ -337,8 +337,10 @@ namespace UnitTests.GrainInterfaces
     [GenerateSerializer]
     public readonly struct ReadOnlyStructWithReadOnlyArray
     {
+#pragma warning disable IDE0032 // Use auto property
         [Id(0)]
         private readonly byte[] value;
+#pragma warning restore IDE0032 // Use auto property
 
         public ReadOnlyStructWithReadOnlyArray(byte[] value) => this.value = value;
 

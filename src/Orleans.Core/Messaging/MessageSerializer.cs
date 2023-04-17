@@ -125,6 +125,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        [SuppressMessage("Trimming", "IL2072:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
         private void ReadBodyObject<TInput>(Message message, ref Reader<TInput> reader)
         {
             var field = reader.ReadFieldHeader();

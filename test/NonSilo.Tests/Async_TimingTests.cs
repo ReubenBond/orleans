@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using Orleans.Internal;
 using Xunit;
 
+#pragma warning disable 618
+
 namespace UnitTests
 {
     public class Async_TimingTests
@@ -66,3 +68,6 @@ namespace UnitTests
         }
     }
 }
+
+#pragma warning restore 618
+

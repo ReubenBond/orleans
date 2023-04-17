@@ -26,6 +26,8 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         private SubscriberClient _subscriber;
         private TimeSpan? _deadline;
         private ServiceEndpoint _customEndpoint;
+
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         private readonly ILogger _logger;
 
         public PubSubDataManager(ILoggerFactory loggerFactory, string projectId, string topicId, string subscriptionId, string serviceId, TimeSpan? deadline = null, string customEndpoint = "")

@@ -43,6 +43,7 @@ namespace Orleans.Runtime.ReminderService
             var remEntries = new List<ReminderEntry>();
             foreach (var entry in entries)
             {
+#pragma warning disable RCS1075 // Avoid empty catch clause that catches System.Exception.
                 try
                 {
                     ReminderEntry converted = ConvertFromTableEntry(entry.Entity, entry.ETag);
@@ -52,6 +53,7 @@ namespace Orleans.Runtime.ReminderService
                 {
                     // Ignoring...
                 }
+#pragma warning restore RCS1075 // Avoid empty catch clause that catches System.Exception.
             }
             return new ReminderTableData(remEntries);
         }

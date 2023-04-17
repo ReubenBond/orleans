@@ -11,6 +11,8 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
+#pragma warning disable 618
+
 namespace DefaultCluster.Tests.General
 {
     public class BasicActivationTests : HostedTestClusterEnsureDefaultStarted
@@ -271,3 +273,5 @@ namespace DefaultCluster.Tests.General
         }
     }
 }
+
+#pragma warning restore 618

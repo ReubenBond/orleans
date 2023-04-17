@@ -14,7 +14,7 @@ namespace Orleans.Core
     /// </summary>
     /// <typeparam name="TState">The underlying state type.</typeparam>
     /// <seealso cref="Orleans.Core.IStorage{TState}" />
-    public sealed class StateStorageBridge<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] TState> : IStorage<TState>
+    public sealed class StateStorageBridge<[DynamicallyAccessedMembers(All)] TState> : IStorage<TState>
     {
         private readonly string name;
         private readonly GrainId grainId;

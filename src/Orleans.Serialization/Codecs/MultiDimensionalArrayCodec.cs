@@ -177,10 +177,12 @@ namespace Orleans.Serialization.Codecs
             var type = original.GetType();
             var originalArray = (Array)original;
             var elementType = type.GetElementType();
+#pragma warning disable IL2072 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.
             if (ShallowCopyableTypes.Contains(elementType))
             {
                 return originalArray.Clone();
             }
+#pragma warning restore IL2072 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.
 
             // We assume that all arrays have lower bound 0. In .NET 4.0, it's hard to create an array with a non-zero lower bound.
             var rank = originalArray.Rank;

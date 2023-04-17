@@ -11,6 +11,7 @@ namespace Orleans.CodeGenerator
     [Generator]
     public class OrleansSerializationSourceGenerator : ISourceGenerator
     {
+        [SuppressMessage("MicrosoftCodeAnalysisCorrectness", "RS1035:Do not use APIs banned for analyzers", Justification = "<Pending>")]
         public void Execute(GeneratorExecutionContext context)
         {
             try

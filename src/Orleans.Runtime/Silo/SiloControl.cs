@@ -93,6 +93,7 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2001:AvoidCallingProblematicMethods", MessageId = "System.GC.Collect")]
         public Task ForceGarbageCollection()
         {
             logger.LogInformation("ForceGarbageCollection");

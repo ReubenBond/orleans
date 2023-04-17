@@ -26,6 +26,7 @@ namespace Orleans.GrainDirectory.AzureStorage.Utilities
 // No default namespace intentionally to cause compile errors if something is not defined
 #endif
 {
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal enum ErrorCode
     {
         Runtime = 100000,

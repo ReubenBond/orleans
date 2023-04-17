@@ -191,7 +191,9 @@ namespace Orleans.Runtime.Host
                 logger.LogWarning((int)ErrorCode.AzureServiceRuntime_NotLoaded, msg1);
 
                 // Microsoft.WindowsAzure.ServiceRuntime isn't loaded. We may be running within a web role or not in Azure.
+#pragma warning disable 618
                 assembly = Assembly.Load(new AssemblyName("Microsoft.WindowsAzure.ServiceRuntime, Version = 2.7.0.0, Culture = neutral, PublicKeyToken = 31bf3856ad364e35"));
+#pragma warning restore 618
                 if (assembly == null)
                 {
                     const string msg2 = "Failed to find or load Microsoft.WindowsAzure.ServiceRuntime.";

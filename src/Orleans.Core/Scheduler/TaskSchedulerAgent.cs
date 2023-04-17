@@ -104,6 +104,7 @@ namespace Orleans.Runtime
 
         protected abstract Task Run();
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         public virtual void Stop()
         {
             try

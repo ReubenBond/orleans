@@ -305,7 +305,9 @@ namespace Orleans.Serialization.Cloning
                 return result;
             }
 
+#pragma warning disable IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
             return Types.GetOrAdd(type, static (type) => IsShallowCopyableInternal(type));
+#pragma warning restore IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
         }
 
         private static bool IsShallowCopyableInternal([DynamicallyAccessedMembers(All)] Type type)
@@ -334,13 +336,17 @@ namespace Orleans.Serialization.Cloning
                     || def == typeof(Tuple<,,,,,,>)
                     || def == typeof(Tuple<,,,,,,,>))
                 {
+#pragma warning disable IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
                     return Array.TrueForAll(type.GenericTypeArguments, static a => Contains(a));
+#pragma warning restore IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
                 }
             }
 
             if (type.IsValueType && !type.IsGenericTypeDefinition)
             {
+#pragma warning disable IL2072 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.
                 return Array.TrueForAll(type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic), static f => Contains(f.FieldType));
+#pragma warning restore IL2072 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.
             }
 
             if (typeof(Exception).IsAssignableFrom(type))

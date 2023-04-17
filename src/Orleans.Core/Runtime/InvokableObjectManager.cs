@@ -268,6 +268,7 @@ namespace Orleans
                 }
             }
 
+            [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
             private void SendResponseAsync(Message message, Response resultObject)
             {
                 if (message.IsExpired)
@@ -294,6 +295,7 @@ namespace Orleans
                 return;
             }
 
+            [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
             private void ReportException(Message message, Exception exception)
             {
                 var request = (IInvokable)message.BodyObject;

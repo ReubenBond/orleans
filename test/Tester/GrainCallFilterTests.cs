@@ -128,6 +128,7 @@ namespace UnitTests.General
             }
         }
 
+        [SuppressMessage("ReSharper", "NotAccessedField.Local")]
         public class GrainCallFilterWithDependencies : IIncomingGrainCallFilter
         {
             private readonly Silo silo;

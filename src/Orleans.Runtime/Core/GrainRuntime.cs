@@ -78,7 +78,7 @@ namespace Orleans.Runtime
             collectibleContext.DelayDeactivation(timeSpan);
         }
 
-        public IStorage<TGrainState> GetStorage<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] TGrainState>(IGrainContext grainContext)
+        public IStorage<TGrainState> GetStorage<[DynamicallyAccessedMembers(All)] TGrainState>(IGrainContext grainContext)
         {
             if (grainContext is null) throw new ArgumentNullException(nameof(grainContext));
             var grainType = grainContext.GrainInstance?.GetType() ?? throw new ArgumentNullException(nameof(IGrainContext.GrainInstance));

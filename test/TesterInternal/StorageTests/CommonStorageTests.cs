@@ -33,6 +33,7 @@ namespace UnitTests.StorageTests.Relational
         /// <param name="grainId">The grain ID.</param>
         /// <param name="version">The initial version of the state.</param>
         /// <returns>A grain reference and a state pair.</returns>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0022")]
         internal (GrainId GrainId, GrainState<TestState1> GrainState)  GetTestReferenceAndState(long grainId, string version)
         {
             var id = GrainId.Create(GrainType.Create("my-grain-type"), GrainIdKeyExtensions.CreateIntegerKey(grainId));

@@ -54,6 +54,8 @@ namespace Orleans.Serialization.Serializers
             specificSerializer.WriteField(ref writer, fieldIdDelta, expectedType, value);
         }
 
+        [SuppressMessage("Trimming", "IL2072:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
+        [SuppressMessage("Trimming", "IL2077:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The source field does not have matching annotations.", Justification = "<Pending>")]
         public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.IsReference)

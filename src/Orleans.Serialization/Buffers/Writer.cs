@@ -101,10 +101,12 @@ namespace Orleans.Serialization.Buffers
     /// <typeparam name="TBufferWriter">The underlying buffer writer type.</typeparam>
     public ref partial struct Writer<TBufferWriter> where TBufferWriter : IBufferWriter<byte>
     {
+#pragma warning disable IDE0044 // Add readonly modifier        
         /// <summary>
         /// The output buffer writer.
         /// </summary>
         private TBufferWriter _output;
+#pragma warning restore IDE0044 // Add readonly modifier
 
         /// <summary>
         /// The current write span.

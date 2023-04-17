@@ -13,6 +13,6 @@ namespace Orleans.Runtime
         /// <param name="context">The grain context.</param>
         /// <param name="config">The state facet configuration.</param>
         /// <returns>A persistent state instance for the provided grain with the specified configuration.</returns>
-        IPersistentState<TState> Create<[DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)] TState>(IGrainContext context, IPersistentStateConfiguration config);
+        IPersistentState<TState> Create<[DynamicallyAccessedMembers(All)] TState>(IGrainContext context, IPersistentStateConfiguration config);
     }
 }
