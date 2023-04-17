@@ -201,7 +201,6 @@ namespace Orleans.Serialization
 
             public bool IsShallowCopyable() => (Value as IOptionalDeepCopier)?.IsShallowCopyable() ?? false;
 
-            [SuppressMessage("Trimming", "IL2091:Target generic argument does not satisfy 'DynamicallyAccessedMembersAttribute' in target method or type. The generic parameter of the source method or type does not have matching annotations.", Justification = "<Pending>")]
             public IDeepCopier<T> Value => _copier ??= _codecProvider.GetDeepCopier<T>();
         }
 
@@ -217,7 +216,6 @@ namespace Orleans.Serialization
 
             public void DeepCopy(T original, T copy, CopyContext context) => Value.DeepCopy(original, copy, context);
 
-            [SuppressMessage("Trimming", "IL2091:Target generic argument does not satisfy 'DynamicallyAccessedMembersAttribute' in target method or type. The generic parameter of the source method or type does not have matching annotations.", Justification = "<Pending>")]
             public IBaseCopier<T> Value => _copier ??= _codecProvider.GetBaseCopier<T>();
         }
     }

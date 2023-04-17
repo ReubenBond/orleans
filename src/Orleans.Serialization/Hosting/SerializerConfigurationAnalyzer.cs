@@ -25,8 +25,6 @@ namespace Orleans.Serialization
         /// <returns>
         /// A collection of types which have serializability issues.
         /// </returns>
-        [SuppressMessage("Trimming", "IL2075:'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
-        [SuppressMessage("Trimming", "IL2067:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.", Justification = "<Pending>")]
         public static Dictionary<Type, SerializerConfigurationComplaint> AnalyzeSerializerAvailability(ICodecProvider codecProvider, TypeManifestOptions options)
         {
             var allComplaints = new Dictionary<Type, SerializerConfigurationComplaint>();

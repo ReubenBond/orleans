@@ -73,10 +73,7 @@ namespace Orleans.Serialization
 
         private object GetSerializationConstructorDelegate(
             [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]
-            Type owner, Type delegateType)
-#pragma warning disable IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
-            => _constructors.GetOrAdd(owner, static (t, d) => GetSerializationConstructorInvoker(t, t, d), delegateType);
-#pragma warning restore IL2067 // Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
+            Type owner, Type delegateType) => _constructors.GetOrAdd(owner, static (t, d) => GetSerializationConstructorInvoker(t, t, d), delegateType);
 
         private static ConstructorInfo GetSerializationConstructor(
             [DynamicallyAccessedMembers(PublicConstructors | NonPublicConstructors)]

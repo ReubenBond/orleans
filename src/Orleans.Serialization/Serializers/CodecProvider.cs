@@ -87,7 +87,6 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
-        [SuppressMessage("Trimming", "IL2075:'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
         private void ConsumeMetadata(IOptions<TypeManifestOptions> codecConfiguration)
         {
             var metadata = codecConfiguration.Value;
@@ -433,9 +432,7 @@ namespace Orleans.Serialization.Serializers
 
             if (!_activators.TryGetValue(searchType, out var activatorType))
             {
-#pragma warning disable IL2070 // 'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
                 activatorType = typeof(DefaultActivator<>).MakeGenericType(concreteType);
-#pragma warning restore IL2070 // 'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.
             }
             else if (activatorType.IsGenericTypeDefinition)
             {
@@ -486,8 +483,6 @@ namespace Orleans.Serialization.Serializers
             return result;
         }
 
-        [SuppressMessage("Trimming", "IL2075:'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
-        [SuppressMessage("Trimming", "IL2070:'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The parameter of method does not have matching annotations.", Justification = "<Pending>")]
         private IFieldCodec CreateCodecInstance(Type fieldType, Type searchType)
         {
             if (searchType == ObjectType)
@@ -554,7 +549,6 @@ namespace Orleans.Serialization.Serializers
             return codecType != null ? (IFieldCodec)GetServiceOrCreateInstance(codecType, constructorArguments) : null;
         }
 
-        [SuppressMessage("Trimming", "IL2055:Either the type on which the MakeGenericType is called can't be statically determined, or the type parameters to be used for generic arguments can't be statically determined.", Justification = "<Pending>")]
         private bool TryGetSurrogateCodec(Type fieldType, Type searchType, out Type surrogateCodecType, out object[] constructorArguments)
         {
             if (_converters.TryGetValue(searchType, out var converterType))
@@ -615,7 +609,6 @@ namespace Orleans.Serialization.Serializers
             return codecType != null ? (IBaseCodec)GetServiceOrCreateInstance(codecType, constructorArguments) : null;
         }
 
-        [SuppressMessage("Trimming", "IL2075:'this' argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
         private IDeepCopier CreateCopierInstance([DynamicallyAccessedMembers(All)] Type fieldType, Type searchType)
         {
             if (searchType == ObjectType)

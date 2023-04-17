@@ -209,7 +209,6 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
         [MethodImpl(MethodImplOptions.NoInlining)]
-        [SuppressMessage("Trimming", "IL2072:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
         public static TField DeserializeUnexpectedType<TInput, TField>(this ref Reader<TInput> reader, scoped ref Field field) where TField : class
         {
             var specificSerializer = reader.Session.CodecProvider.GetCodec(field.FieldType);

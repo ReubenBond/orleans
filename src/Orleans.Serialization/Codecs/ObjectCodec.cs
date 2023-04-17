@@ -23,7 +23,6 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <param name="field">The field.</param>
         /// <returns>The value.</returns>
-        [SuppressMessage("Trimming", "IL2072:Target parameter argument does not satisfy 'DynamicallyAccessedMembersAttribute' in call to target method. The return value of the source method does not have matching annotations.", Justification = "<Pending>")]
         public static object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
         {
             if (field.IsReference)

@@ -23,7 +23,6 @@ namespace Orleans.Serialization
     [RegisterSerializer]
     [RegisterCopier]
     [Alias("Exception")]
-    [SuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
     public sealed class ExceptionCodec : IFieldCodec<Exception>, IBaseCodec<Exception>, IGeneralizedCodec, IGeneralizedBaseCodec, IBaseCopier<Exception>
     {
         private readonly StreamingContext _streamingContext;
@@ -425,7 +424,6 @@ namespace Orleans.Serialization
     /// Serializer for <see cref="AggregateException"/>.
     /// </summary>
     [RegisterSerializer]
-    [SuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
     internal sealed class AggregateExceptionCodec : GeneralizedReferenceTypeSurrogateCodec<AggregateException, AggregateExceptionSurrogate>
     {
         private readonly ExceptionCodec _baseCodec;

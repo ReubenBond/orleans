@@ -10,8 +10,6 @@ namespace Orleans.Serialization.Codecs
     /// Serializer for <see cref="Type"/>.
     /// </summary>
     [RegisterSerializer]
-    [SuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "<Pending>")]
-    [SuppressMessage("Trimming", "IL2111:Method with parameters or return value with `DynamicallyAccessedMembersAttribute` is accessed via reflection. Trimmer can't guarantee availability of the requirements of the method.", Justification = "<Pending>")]
     public sealed class TypeSerializerCodec : IFieldCodec<Type>, IDerivedTypeCodec
     {
         void IFieldCodec<Type>.WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, Type value)

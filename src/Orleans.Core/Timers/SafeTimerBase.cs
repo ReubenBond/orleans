@@ -108,7 +108,6 @@ namespace Orleans.Runtime
             }
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         internal void DisposeTimer()
         {
             if (timer != null)
@@ -189,7 +188,6 @@ namespace Orleans.Runtime
         /// <param name="newDueTime">A TimeSpan representing the amount of time to delay before invoking the callback method specified when the Timer was constructed. Specify negative one (-1) milliseconds to prevent the timer from restarting. Specify zero (0) to restart the timer immediately.</param>
         /// <param name="period">The time interval between invocations of the callback method specified when the Timer was constructed. Specify negative one (-1) milliseconds to disable periodic signaling.</param>
         /// <returns><c>true</c> if the timer was successfully updated; otherwise, <c>false</c>.</returns>
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         private bool Change(TimeSpan newDueTime, TimeSpan period)
         {
             if (period == TimeSpan.Zero) throw new ArgumentOutOfRangeException("period", period, $"Cannot use TimeSpan.Zero for timer {GetFullName()} period");
@@ -226,7 +224,6 @@ namespace Orleans.Runtime
             }
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         private void HandleSyncTimerCallback(object state)
         {
             try
@@ -278,7 +275,6 @@ namespace Orleans.Runtime
             }
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         private void QueueNextTimerTick()
         {
             try

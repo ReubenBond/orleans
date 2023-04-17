@@ -225,7 +225,6 @@ namespace Orleans.Messaging
             });
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         internal async Task RefreshSnapshotLiveGateways_TimerCallback(object context)
         {
             try
