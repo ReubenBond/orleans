@@ -15,9 +15,6 @@ namespace Orleans.Messaging
 {
     /// <summary>
     /// The GatewayManager class holds the list of known gateways, as well as maintaining the list of "dead" gateways.
-    ///
-    /// The known list can come from one of two places: the full list may appear in the client configuration object, or
-    /// the config object may contain an IGatewayListProvider delegate. If both appear, then the delegate takes priority.
     /// </summary>
     internal class GatewayManager : IDisposable
     {

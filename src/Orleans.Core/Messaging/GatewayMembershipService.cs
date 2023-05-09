@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading;
@@ -13,24 +13,28 @@ using Orleans.Runtime.Utilities;
 
 namespace Orleans.Messaging
 {
+    /// <summary>
+    /// Provides information about the current set of gateways.
+    /// </summary>
     internal sealed class GatewayMembershipService : IGatewayMembershipService, ILifecycleParticipant<IClusterClientLifecycle>, IDisposable
     {
         private readonly AsyncEnumerable<GatewayMembershipSnapshot> _updates;
-        private readonly IMembershipTable _membershipTable;
+        private readonly IGatewayMembershipProvider _gatewayMembershipProvider;
         private readonly PeriodicTimer _timer;
         private readonly ILogger _logger;
         private readonly IOptions<GatewayOptions> _gatewayOptions;
+        private readonly CancellationTokenSource _shutdownCancellation = new();
         private Task _updateTask;
         private GatewayMembershipSnapshot _snapshot;
 
         public GatewayMembershipService(
             IOptions<GatewayOptions> gatewayOptions,
-            IMembershipTable membershipTable,
+            IGatewayMembershipProvider gatewayMembershipProvider,
             ILogger<GatewayMembershipService> logger)
         {
             _logger = logger;
             _gatewayOptions = gatewayOptions;
-            _membershipTable = membershipTable;
+            _gatewayMembershipProvider = gatewayMembershipProvider;
             _timer = new PeriodicTimer(_gatewayOptions.Value.GatewayListRefreshPeriod);
             _snapshot = new GatewayMembershipSnapshot(ImmutableArray<GatewayMember>.Empty, MembershipVersion.MinValue);
             _updates = new AsyncEnumerable<GatewayMembershipSnapshot>(
@@ -88,24 +92,8 @@ namespace Orleans.Messaging
 
         private async Task RefreshInternal()
         {
-            var table = await _membershipTable.ReadAll();
-            if (table.Version.Version > _snapshot.Version.Value)
-            {
-                var members = new List<GatewayMember>();
-                foreach (var member in table.Members)
-                {
-                    // Ignore gateways which aren't currently active.
-                    if (member.Item1.Status is not SiloStatus.Active)
-                    {
-                        continue;
-                    }
-
-                    members.Add(new GatewayMember(member.Item1.SiloAddress, member.Item1.Endpoints.ToImmutableArray()));
-                }
-
-                var newSnapshot = new GatewayMembershipSnapshot(members, new MembershipVersion(table.Version.Version));
-                _updates.TryPublish(newSnapshot);
-            }
+            var snapshot = await _gatewayMembershipProvider.GetGatewaysAsync(_shutdownCancellation.Token);
+            _updates.TryPublish(snapshot);
         }
 
         void ILifecycleParticipant<IClusterClientLifecycle>.Participate(IClusterClientLifecycle observer)

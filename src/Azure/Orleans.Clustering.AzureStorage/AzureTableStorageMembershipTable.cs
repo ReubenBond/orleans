@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Azure;
@@ -17,7 +16,7 @@ using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace Orleans.Runtime.MembershipService
 {
-    internal class AzureBasedMembershipTable : IMembershipTable
+    internal class AzureTableStorageMembershipTable : IMembershipTable
     {
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
@@ -25,13 +24,13 @@ namespace Orleans.Runtime.MembershipService
         private readonly AzureStorageClusteringOptions options;
         private readonly string clusterId;
 
-        public AzureBasedMembershipTable(
+        public AzureTableStorageMembershipTable(
             ILoggerFactory loggerFactory,
             IOptions<AzureStorageClusteringOptions> clusteringOptions,
             IOptions<ClusterOptions> clusterOptions)
         {
             this.loggerFactory = loggerFactory;
-            this.logger = loggerFactory.CreateLogger<AzureBasedMembershipTable>();
+            this.logger = loggerFactory.CreateLogger<AzureTableStorageMembershipTable>();
             this.options = clusteringOptions.Value;
             this.clusterId = clusterOptions.Value.ClusterId;
         }

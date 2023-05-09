@@ -1,11 +1,12 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Net;
 using Orleans.Connections.Transport;
+using Orleans.Connections.Transport.Sockets;
 using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Configuration
 {
@@ -15,7 +16,7 @@ namespace Orleans.Configuration
     /// <remarks>>
     /// See <see cref="ClientBuilderExtensions.UseStaticClustering(IClientBuilder, System.Net.IPEndPoint[])"/> for more information.
     /// </remarks>
-    public class StaticGatewayListProviderOptions
+    public class StaticGatewayMembershipProviderOptions
     {
         /// <summary>
         /// Gets or sets the list of gateways.
@@ -32,9 +33,9 @@ namespace Orleans.Configuration
                 SiloAddress.New(endpoint, 0),
                 new[]
                 {
-                    new EndpointInfo("gw")
+                    new EndpointInfo(ClientOutboundConnectionFactory.DefaultConnectorName)
                     {
-                        ["ep"] = endpoint.ToString()
+                        [TcpMessageTransportConnector.EndpointAddressPropertyName] = endpoint.ToString()
                     }
                 }.ToImmutableArray()));
         }

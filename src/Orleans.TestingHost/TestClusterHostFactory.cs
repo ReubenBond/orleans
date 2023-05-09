@@ -208,9 +208,9 @@ namespace Orleans.TestingHost
         private static void TryConfigureClientMembership(IConfiguration configuration, IServiceCollection services)
         {
             bool.TryParse(configuration[nameof(TestClusterOptions.UseTestClusterMembership)], out bool useTestClusterMembership);
-            if (useTestClusterMembership && services.All(svc => svc.ServiceType != typeof(IGatewayListProvider)))
+            if (useTestClusterMembership && services.All(svc => svc.ServiceType != typeof(IGatewayMembershipProvider)))
             {
-                Action<StaticGatewayListProviderOptions> configureOptions = options =>
+                Action<StaticGatewayMembershipProviderOptions> configureOptions = options =>
                 {
                     int baseGatewayPort = int.Parse(configuration[nameof(TestClusterOptions.BaseGatewayPort)]);
                     int initialSilosCount = int.Parse(configuration[nameof(TestClusterOptions.InitialSilosCount)]);
@@ -218,13 +218,14 @@ namespace Orleans.TestingHost
 
                     if (gatewayPerSilo)
                     {
-                        options.Gateways = Enumerable.Range(baseGatewayPort, initialSilosCount)
-                            .Select(port => new IPEndPoint(IPAddress.Loopback, port).ToGatewayUri())
+                        var gateways = Enumerable.Range(baseGatewayPort, initialSilosCount)
+                            .Select(port => new IPEndPoint(IPAddress.Loopback, port))
                             .ToList();
+                        gateways.ForEach(options.AddTcpGateway);
                     }
                     else
                     {
-                        options.Gateways = new List<Uri> { new IPEndPoint(IPAddress.Loopback, baseGatewayPort).ToGatewayUri() };
+                        options.AddTcpGateway(new IPEndPoint(IPAddress.Loopback, baseGatewayPort));
                     }
                 };
                 if (configureOptions != null)
@@ -232,8 +233,8 @@ namespace Orleans.TestingHost
                     services.Configure(configureOptions);
                 }
 
-                services.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
-                    .ConfigureFormatter<StaticGatewayListProviderOptions>();
+                services.AddSingleton<IGatewayMembershipProvider, StaticGatewayMembershipProvider>()
+                    .ConfigureFormatter<StaticGatewayMembershipProviderOptions>();
             }
         }
 

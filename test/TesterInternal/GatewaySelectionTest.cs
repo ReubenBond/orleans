@@ -13,6 +13,11 @@ using Orleans.Internal;
 using Xunit;
 using Xunit.Abstractions;
 using System.Threading;
+using System.Collections.Immutable;
+using Orleans.Connections.Transport;
+using Orleans.Connections.Transport.Sockets;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Messaging;
 
 namespace UnitTests.MessageCenterTests
 {
@@ -20,12 +25,12 @@ namespace UnitTests.MessageCenterTests
     {
         protected readonly ITestOutputHelper output;
 
-        protected static readonly List<Uri> gatewayAddressUris = new[]
+        protected static readonly List<SiloAddress> gatewayAddresses = new[]
         {
-            new Uri("gwy.tcp://127.0.0.1:1/0"),
-            new Uri("gwy.tcp://127.0.0.1:2/0"),
-            new Uri("gwy.tcp://127.0.0.1:3/0"),
-            new Uri("gwy.tcp://127.0.0.1:4/0")
+            SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 0), 0),
+            SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1), 0),
+            SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 2), 0),
+            SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 3), 0),
         }.ToList();
         
         public GatewaySelectionTest(ITestOutputHelper output)
@@ -36,19 +41,15 @@ namespace UnitTests.MessageCenterTests
         [Fact, TestCategory("BVT"), TestCategory("Gateway")]
         public async Task GatewaySelection()
         {
-            var listProvider = new TestListProvider(gatewayAddressUris);
+            var listProvider = new GatewayMembershipService(Options.Create(new GatewayOptions()), new TestListProvider(gatewayAddresses), NullLoggerFactory.Instance.CreateLogger<GatewayMembershipService>());
             await Test_GatewaySelection(listProvider);
         }
 
         protected async Task Test_GatewaySelection(IGatewayMembershipService gatewayMembershipService)
         {
-            IList<Uri> gatewayUris = await gatewayMembershipService.GetGateways();
-            Assert.True(gatewayUris.Count > 0, $"Found some gateways. Data = {Utils.EnumerableToString(gatewayUris)}");
-
-            var gatewayEndpoints = gatewayUris.Select(uri =>
-            {
-                return uri.ToGatewayAddress().Endpoint;
-            }).ToList();
+            await gatewayMembershipService.Refresh();
+            var snapshot = gatewayMembershipService.CurrentSnapshot;
+            Assert.True(snapshot.Gateways.Count > 0, $"Found some gateways. Data = {snapshot}");
 
             var gatewayManager = new GatewayManager(Options.Create(new GatewayOptions()), gatewayMembershipService, NullLoggerFactory.Instance, null);
             await gatewayManager.StartAsync(CancellationToken.None);
@@ -83,33 +84,26 @@ namespace UnitTests.MessageCenterTests
             Assert.True((low <= counts[3]) && (counts[3] <= up), "Gateway selection is incorrectly skewed. " + counts[3]);
         }
 
-        private class TestListProvider : IGatewayListProvider
+        private class TestListProvider : IGatewayMembershipProvider
         {
-            private readonly IList<Uri> list;
+            private readonly GatewayMembershipSnapshot _snapshot;
 
-            public TestListProvider(List<Uri> gatewayUris)
+            public TestListProvider(List<SiloAddress> gateways)
             {
-                list = gatewayUris;
+                List<GatewayMember> members = new List<GatewayMember>();
+                foreach (var gw in gateways)
+                {
+                    var ep = new EndpointInfo(ClientOutboundConnectionFactory.DefaultConnectorName)
+                {
+                    [TcpMessageTransportConnector.EndpointAddressPropertyName] = gw.Endpoint.ToString(),
+                };
+                    members.Add(new GatewayMember(gw, ImmutableArray.Create(new[] { ep })));
+                }
+
+                _snapshot = new GatewayMembershipSnapshot(members, default(MembershipVersion).Successor());
             }
 
-            public Task<IList<Uri>> GetGateways()
-            {
-                return Task.FromResult(list);
-            }
-
-            public TimeSpan MaxStaleness
-            {
-                get { return TimeSpan.FromMinutes(1); }
-            }
-
-            public bool IsUpdatable
-            {
-                get { return false; }
-            }
-            public Task InitializeGatewayListProvider()
-            {
-                return Task.CompletedTask;
-            }
+            public ValueTask<GatewayMembershipSnapshot> GetGatewaysAsync(CancellationToken cancellationToken) => new(_snapshot);
         }
     }
 }

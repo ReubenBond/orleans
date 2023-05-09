@@ -84,7 +84,8 @@ namespace Orleans.Hosting
                         services.Configure(configureOptions);
                     }
 
-                    services.AddSingleton<IGatewayListProvider, ConsulGatewayListProvider>();
+                    services.AddSingleton<IGatewayMembershipProvider, GatewayMembershipProvider>();
+                    services.AddSingleton<IMembershipTable, ConsulBasedMembershipTable>();
                 });
         }
 
@@ -108,7 +109,8 @@ namespace Orleans.Hosting
                 services =>
                 {
                     configureOptions?.Invoke(services.AddOptions<ConsulClusteringOptions>());
-                    services.AddSingleton<IGatewayListProvider, ConsulGatewayListProvider>();
+                    services.AddSingleton<IGatewayMembershipProvider, GatewayMembershipProvider>();
+                    services.AddSingleton<IMembershipTable, ConsulBasedMembershipTable>();
                 });
         }
     }

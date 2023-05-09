@@ -1,10 +1,9 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Orleans.Messaging;
-using Orleans.Runtime.Membership;
 using Orleans.Runtime.MembershipService;
 using Orleans.Configuration;
+using Orleans.Messaging;
 
 namespace Orleans.Hosting
 {
@@ -100,7 +99,8 @@ namespace Orleans.Hosting
                         services.Configure(configureOptions);
                     }
 
-                    services.AddSingleton<IGatewayListProvider, AdoNetGatewayListProvider>();
+                    services.AddSingleton<IMembershipTable, AdoNetClusteringTable>();
+                    services.AddSingleton<IGatewayMembershipProvider, GatewayMembershipProvider>();
                     services.AddSingleton<IConfigurationValidator, AdoNetClusteringClientOptionsValidator>();
                 });
         }
@@ -128,7 +128,8 @@ namespace Orleans.Hosting
                 services =>
                 {
                     configureOptions?.Invoke(services.AddOptions<AdoNetClusteringClientOptions>());
-                    services.AddSingleton<IGatewayListProvider, AdoNetGatewayListProvider>();
+                    services.AddSingleton<IMembershipTable, AdoNetClusteringTable>();
+                    services.AddSingleton<IGatewayMembershipProvider, GatewayMembershipProvider>();
                     services.AddSingleton<IConfigurationValidator, AdoNetClusteringClientOptionsValidator>();
                 });
         }

@@ -39,6 +39,9 @@ namespace Orleans.Messaging
         bool IsUpdatable { get; }
     }
 
+    /// <summary>
+    /// This implementation of <see cref="IGatewayListProvider"/> is provided only for backwards compatibility with consumers who are relying on that interface.
+    /// </summary>
 #pragma warning disable CS0618 // Type or member is obsolete
     internal sealed class GatewayMembershipServiceGatewayListProvider : IGatewayListProvider
 #pragma warning restore CS0618 // Type or member is obsolete
@@ -55,7 +58,6 @@ namespace Orleans.Messaging
 
         public TimeSpan MaxStaleness => _gatewayOptions.GatewayListRefreshPeriod;
         public bool IsUpdatable => true;
-
         public Task<IList<Uri>> GetGateways() => Task.FromResult<IList<Uri>>(_gatewayMembershipService.CurrentSnapshot.Gateways.Keys.Select(static key => key.ToGatewayUri()).ToList());
         public Task InitializeGatewayListProvider() => _gatewayMembershipService.Refresh().AsTask();
     }

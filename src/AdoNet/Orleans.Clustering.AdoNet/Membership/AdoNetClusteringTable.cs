@@ -1,6 +1,5 @@
 using System;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Clustering.AdoNet.Storage;
@@ -11,18 +10,15 @@ namespace Orleans.Runtime.MembershipService
     public class AdoNetClusteringTable : IMembershipTable
     {
         private string clusterId;
-        private readonly IServiceProvider serviceProvider;
         private ILogger logger;
         private RelationalOrleansQueries orleansQueries;
         private readonly AdoNetClusteringSiloOptions clusteringTableOptions;
 
         public AdoNetClusteringTable(
-            IServiceProvider serviceProvider,
             IOptions<ClusterOptions> clusterOptions,
             IOptions<AdoNetClusteringSiloOptions> clusteringOptions,
             ILogger<AdoNetClusteringTable> logger)
         {
-            this.serviceProvider = serviceProvider;
             this.logger = logger;
             this.clusteringTableOptions = clusteringOptions.Value;
             this.clusterId = clusterOptions.Value.ClusterId;

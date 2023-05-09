@@ -59,7 +59,7 @@ namespace Orleans.Runtime.Membership
         
         public ZooKeeperBasedMembershipTable(
             ILogger<ZooKeeperBasedMembershipTable> logger, 
-            IOptions<ZooKeeperClusteringSiloOptions> membershipTableOptions, 
+            IOptions<ZooKeeperClusteringOptions> membershipTableOptions, 
             IOptions<ClusterOptions> clusterOptions)
         {
             this.logger = logger;
