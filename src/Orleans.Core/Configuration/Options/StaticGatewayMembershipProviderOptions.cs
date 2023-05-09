@@ -21,7 +21,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the list of gateways.
         /// </summary>
-        public List<GatewayMember> Gateways { get; set; }
+        public List<GatewayMember> Gateways { get; set; } = new();
 
         /// <summary>
         /// Adds a gateway described via a TCP endpoint.

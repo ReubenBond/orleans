@@ -124,6 +124,10 @@ namespace Orleans
             services.AddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter);
             services.TryAddFromExisting<IMessageCenter, ClientMessageCenter>();
             services.AddSingleton<GatewayManager>();
+            services.AddSingleton<IGatewayMembershipService, GatewayMembershipService>();
+#pragma warning disable CS0618 // Type or member is obsolete
+            services.AddSingleton<IGatewayListProvider, GatewayMembershipServiceGatewayListProvider>();
+#pragma warning restore CS0618 // Type or member is obsolete
             services.AddSingleton<ConnectionTrace>();
             services.AddSingleton<MessagingTrace>();
 

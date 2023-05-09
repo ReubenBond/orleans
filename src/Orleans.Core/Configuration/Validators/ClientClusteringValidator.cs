@@ -43,7 +43,7 @@ namespace Orleans.Configuration.Validators
         /// <inheritdoc />
         public void ValidateConfiguration()
         {
-            var membershipTable = _serviceProvider.GetService<IMembershipTable>();
+            var membershipTable = _serviceProvider.GetService<IGatewayMembershipProvider>();
             if (membershipTable == null)
             {
                 throw new OrleansConfigurationException(ClusteringNotConfigured);

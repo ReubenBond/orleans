@@ -29,7 +29,7 @@ namespace Orleans.Messaging
         private AsyncTaskSafeTimer gatewayRefreshTimer;
         private List<SiloAddress> cachedLiveGateways;
         private HashSet<SiloAddress> cachedLiveGatewaysSet;
-        private List<SiloAddress> knownGateways;
+        private List<SiloAddress> knownGateways = new List<SiloAddress>();
         private DateTime lastRefreshTime;
         private int roundRobinCounter;
         private bool gatewayRefreshCallInitiated;
@@ -65,10 +65,10 @@ namespace Orleans.Messaging
                 this.gatewayOptions.GatewayListRefreshPeriod,
                 this.gatewayOptions.GatewayListRefreshPeriod);
 
-            while (!cancellationToken.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested && knownGateways.Count == 0)
             {
                 var snapshot = _gatewayMembershipService.CurrentSnapshot;
-                var knownGateways = _gatewayMembershipService.CurrentSnapshot.Gateways.Keys.ToList();
+                knownGateways = _gatewayMembershipService.CurrentSnapshot.Gateways.Keys.ToList();
                 if (knownGateways.Count == 0)
                 {
                     await _gatewayMembershipService.Refresh(snapshot.Version.Successor(), cancellationToken);
