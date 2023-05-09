@@ -87,7 +87,7 @@ namespace Orleans.Runtime.Messaging
                 // Allow for one refresh in the event that the silo is not found in the current membership table.
                 // If silo identity encoded the membership version, then we could do this more intelligently by only refreshing if our current version is below
                 // the silo's joining version.
-                await _clusterMembership.Refresh();
+                await _clusterMembership.Refresh(membershipSnapshot.Version.Successor());
                 membershipSnapshot = _clusterMembership.CurrentSnapshot;
                 didRefresh = true;
             }

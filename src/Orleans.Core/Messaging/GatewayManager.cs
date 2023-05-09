@@ -24,8 +24,8 @@ namespace Orleans.Messaging
         private readonly object lockable = new object();
         private readonly Dictionary<SiloAddress, DateTime> knownDead = new Dictionary<SiloAddress, DateTime>();
         private readonly Dictionary<SiloAddress, DateTime> knownMasked = new Dictionary<SiloAddress, DateTime>();
-        private readonly IGatewayListProvider gatewayListProvider;
         private readonly ILogger logger;
+        private readonly IGatewayMembershipService _gatewayMembershipService;
         private readonly ConnectionManager connectionManager;
         private readonly GatewayOptions gatewayOptions;
         private AsyncTaskSafeTimer gatewayRefreshTimer;
@@ -41,14 +41,14 @@ namespace Orleans.Messaging
 
         public GatewayManager(
             IOptions<GatewayOptions> gatewayOptions,
-            IGatewayListProvider gatewayListProvider,
+            IGatewayMembershipService gatewayMembershipService,
             ILoggerFactory loggerFactory,
             ConnectionManager connectionManager)
         {
             this.gatewayOptions = gatewayOptions.Value;
             this.logger = loggerFactory.CreateLogger<GatewayManager>();
+            _gatewayMembershipService = gatewayMembershipService;
             this.connectionManager = connectionManager;
-            this.gatewayListProvider = gatewayListProvider;
             this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
         }
 
@@ -56,7 +56,7 @@ namespace Orleans.Messaging
         {
             if (!gatewayListProviderInitialized)
             {
-                await this.gatewayListProvider.InitializeGatewayListProvider();
+                await _gatewayMembershipService.Refresh();
                 gatewayListProviderInitialized = true;
             }
 
@@ -67,10 +67,19 @@ namespace Orleans.Messaging
                 this.gatewayOptions.GatewayListRefreshPeriod,
                 this.gatewayOptions.GatewayListRefreshPeriod);
 
-            var knownGateways = await this.gatewayListProvider.GetGateways();
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var snapshot = _gatewayMembershipService.CurrentSnapshot;
+                var knownGateways = _gatewayMembershipService.CurrentSnapshot.Gateways.Keys.ToList();
+                if (knownGateways.Count == 0)
+                {
+                    await _gatewayMembershipService.Refresh(snapshot.Version.Successor(), cancellationToken);
+                }
+            }
+
             if (knownGateways.Count == 0)
             {
-                var err = $"Could not find any gateway in {this.gatewayListProvider.GetType().FullName}. Orleans client cannot initialize.";
+                var err = "Could not find any gateway. Orleans client cannot initialize.";
                 this.logger.LogError((int)ErrorCode.GatewayManager_NoGateways, err);
                 throw new SiloUnavailableException(err);
             }
@@ -82,7 +91,7 @@ namespace Orleans.Messaging
                 Utils.EnumerableToString(knownGateways));
 
             this.roundRobinCounter = this.gatewayOptions.PreferedGatewayIndex >= 0 ? this.gatewayOptions.PreferedGatewayIndex : Random.Shared.Next(knownGateways.Count);
-            this.knownGateways = this.cachedLiveGateways = knownGateways.Select(gw => gw.ToGatewayAddress()).ToList();
+            this.knownGateways = this.cachedLiveGateways = knownGateways;
             this.cachedLiveGatewaysSet = new HashSet<SiloAddress>(cachedLiveGateways);
             this.lastRefreshTime = DateTime.UtcNow;
         }

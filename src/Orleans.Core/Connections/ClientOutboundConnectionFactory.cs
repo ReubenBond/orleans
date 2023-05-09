@@ -18,7 +18,7 @@ namespace Orleans.Runtime.Messaging
     {
         public const string DefaultConnectorName = "gw";
         private readonly object _initializationLock = new();
-        private readonly IGatewayListProvider _gatewayListProvider;
+        private readonly IGatewayMembershipService _gatewayMembershipService;
         private readonly ConnectionCommon _connectionShared;
         private readonly ConnectionOptions _connectionOptions;
         private readonly ClusterOptions _clusterOptions;
@@ -28,7 +28,7 @@ namespace Orleans.Runtime.Messaging
         private ConnectionManager? _connectionManager;
 
         public ClientOutboundConnectionFactory(
-            IGatewayListProvider gatewayListProvider,
+            IGatewayMembershipService gatewayMembershipService,
             IOptions<ConnectionOptions> connectionOptions,
             IOptions<ClusterOptions> clusterOptions,
             IEnumerable<MessageTransportConnector> connectors,
@@ -37,7 +37,7 @@ namespace Orleans.Runtime.Messaging
             : base(connectors.Where(static connector => connector.Features.Get<ITransportProtocolFeature>()?.Protocol == TransportProtocol.Gateway))
         {
             _connectionOptions = connectionOptions.Value;
-            _gatewayListProvider = gatewayListProvider;
+            _gatewayMembershipService = gatewayMembershipService;
             _connectionShared = connectionShared;
             _clusterOptions = clusterOptions.Value;
             _connectionPreambleHelper = connectionPreambleHelper;
@@ -60,21 +60,38 @@ namespace Orleans.Runtime.Messaging
 
         protected override async IAsyncEnumerable<EndpointInfo> GetEndpointInfo(SiloAddress siloAddress, [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            foreach (var uri in await _gatewayListProvider.GetGateways())
-            {
-                var address = uri.ToGatewayAddress();
-                if (address is null)
-                {
-                    continue;
-                }
+            EnsureInitialized();
 
-                if (address.Equals(siloAddress))
+            // Handle the development clustering scenario, where an endpoint IP address is hard-coded with a generation of 0.
+            // This could be made into an abstraction to support non-TCP/IP cases.
+            if (siloAddress.Generation == 0)
+            {
+                yield return new EndpointInfo(DefaultConnectorName)
                 {
-                    // TODO: Enhance IGatewayProvider to support providing EndPointInfo objects
-                    yield return new EndpointInfo(DefaultConnectorName)
-                    {
-                        [TcpMessageTransportConnector.EndpointAddressPropertyName] = address.Endpoint.ToString(),
-                    };
+                    [TcpMessageTransportConnector.EndpointAddressPropertyName] = siloAddress.Endpoint.ToString(),
+                };
+
+                yield break;
+            }
+
+            GatewayMember? member;
+            var didRefresh = false;
+            var membershipSnapshot = _gatewayMembershipService.CurrentSnapshot;
+            while (!membershipSnapshot.Gateways.TryGetValue(siloAddress, out member) && !didRefresh)
+            {
+                // Allow for one refresh in the event that the silo is not found in the current membership table.
+                // If silo identity encoded the membership version, then we could do this more intelligently by only refreshing if our current version is below
+                // the silo's joining version.
+                await _gatewayMembershipService.Refresh(membershipSnapshot.Version.Successor());
+                membershipSnapshot = _gatewayMembershipService.CurrentSnapshot;
+                didRefresh = true;
+            }
+
+            if (member is not null)
+            {
+                foreach (var info in member.Endpoints)
+                {
+                    yield return info;
                 }
             }
         }
