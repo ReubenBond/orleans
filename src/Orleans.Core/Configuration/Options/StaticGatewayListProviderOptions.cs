@@ -1,6 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Net;
+using Orleans.Connections.Transport;
 using Orleans.Hosting;
+using Orleans.Messaging;
+using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {
@@ -13,8 +18,25 @@ namespace Orleans.Configuration
     public class StaticGatewayListProviderOptions
     {
         /// <summary>
-        /// Gets or sets the list of gateway addresses.
+        /// Gets or sets the list of gateways.
         /// </summary>
-        public List<Uri> Gateways { get; set; } = new List<Uri>();
+        public List<GatewayMember> Gateways { get; set; }
+
+        /// <summary>
+        /// Adds a gateway described via a TCP endpoint.
+        /// </summary>
+        /// <param name="endpoint"></param>
+        public void AddTcpGateway(IPEndPoint endpoint)
+        {
+            Gateways.Add(new GatewayMember(
+                SiloAddress.New(endpoint, 0),
+                new[]
+                {
+                    new EndpointInfo("gw")
+                    {
+                        ["ep"] = endpoint.ToString()
+                    }
+                }.ToImmutableArray()));
+        }
     }
 }

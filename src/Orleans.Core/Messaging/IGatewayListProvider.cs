@@ -45,7 +45,69 @@ namespace Orleans.Messaging
         bool IsUpdatable { get; }
     }
 
-    public sealed class GatewayMembershipService : IGatewayMembershipService, ILifecycleParticipant<IClusterClientLifecycle>
+    /*
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+
+TODO: use this GatewayMembershipService in-place of the IGatewayListProvider in the client.
+
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     * 
+     */
+
+    internal sealed class GatewayMembershipServiceGatewayListProvider : IGatewayListProvider
+    {
+        private readonly GatewayOptions _gatewayOptions;
+        private readonly IGatewayMembershipService _gatewayMembershipService;
+        public GatewayMembershipServiceGatewayListProvider(
+            IOptions<GatewayOptions> gatewayOptions,
+            IGatewayMembershipService gatewayMembershipService)
+        {
+            _gatewayOptions = gatewayOptions.Value;
+            _gatewayMembershipService = gatewayMembershipService;
+        }
+
+        public TimeSpan MaxStaleness => _gatewayOptions.GatewayListRefreshPeriod;
+        public bool IsUpdatable => true;
+
+        public Task<IList<Uri>> GetGateways() => Task.FromResult<IList<Uri>>(_gatewayMembershipService.CurrentSnapshot.Gateways.Keys.Select(static key => key.ToGatewayUri()).ToList());
+        public Task InitializeGatewayListProvider() => _gatewayMembershipService.Refresh().AsTask();
+    }
+
+    internal sealed class GatewayMembershipService : IGatewayMembershipService, ILifecycleParticipant<IClusterClientLifecycle>
     {
         private readonly AsyncEnumerable<GatewayMembershipSnapshot> _updates;
         private readonly IMembershipTable _membershipTable;
@@ -105,7 +167,7 @@ namespace Orleans.Messaging
         private async Task PollForUpdates()
         {
             await Task.Yield();
-            do
+            while (await _timer.WaitForNextTickAsync())
             {
                 try
                 {
@@ -115,7 +177,7 @@ namespace Orleans.Messaging
                 {
                     _logger.LogError(exception, "Error refreshing gateways");
                 }
-            } while (await _timer.WaitForNextTickAsync());
+            }
         }
 
         private async Task RefreshInternal()
@@ -129,7 +191,7 @@ namespace Orleans.Messaging
                     members.Add(new GatewayMember(member.Item1.SiloAddress, member.Item1.Endpoints.ToImmutableArray()));
                 }
 
-                var newSnapshot = new GatewayMembershipSnapshot(members.ToImmutableArray(), new MembershipVersion(table.Version.Version));
+                var newSnapshot = new GatewayMembershipSnapshot(members, new MembershipVersion(table.Version.Version));
                 _updates.TryPublish(newSnapshot);
             }
         }
@@ -197,9 +259,14 @@ namespace Orleans.Messaging
     [GenerateSerializer, Immutable]
     public sealed class GatewayMembershipSnapshot
     {
-        public GatewayMembershipSnapshot(ImmutableArray<GatewayMember> entries, MembershipVersion version)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GatewayMembershipSnapshot"/> class.
+        /// </summary>
+        /// <param name="entries">The gateway entries.</param>
+        /// <param name="version">The snapshot version.</param>
+        public GatewayMembershipSnapshot(IEnumerable<GatewayMember> entries, MembershipVersion version)
         {
-            Gateways = entries;
+            Gateways = entries.ToImmutableDictionary(static entry => entry.SiloAddress, static entry => entry);
             Version = version;
         }
 
@@ -207,7 +274,7 @@ namespace Orleans.Messaging
         /// Gets the gateways.
         /// </summary>
         [Id(0)]
-        public ImmutableArray<GatewayMember> Gateways { get; }
+        public ImmutableDictionary<SiloAddress, GatewayMember> Gateways { get; }
 
         /// <summary>
         /// Gets the version of the gateway table.
