@@ -128,7 +128,7 @@ namespace Orleans.Runtime.Messaging
                 if (bodyCodec is not null)
                 {
                     writer = Writer.Create(writer.Output, _serializationSession);
-                    if (rawCodec != null) rawCodec.WriteRaw(ref writer, message._bodyObject);
+                    if (rawCodec != null) rawCodec.WriteRaw(ref writer, message._bodyObject!);
                     else bodyCodec.WriteField(ref writer, 0, null, message._bodyObject);
                     writer.Commit();
                     bodyLength = writer.Position;

@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Orleans.Connections.Transport;
 
@@ -23,4 +24,7 @@ public sealed class EndpointInfo : Dictionary<string, string>
     /// </summary>
     [Newtonsoft.Json.JsonIgnore, System.Text.Json.Serialization.JsonIgnore]
     public string Name { get => this["name"]; init => this["name"] = value; }
+
+    /// <inheritdoc/>
+    public override string ToString() => $"EndpointInfo({string.Join(", ", this.Select(pair => $"[{pair.Key}] = {pair.Value}]"))})";
 }

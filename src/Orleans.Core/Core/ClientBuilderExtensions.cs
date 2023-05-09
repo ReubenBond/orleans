@@ -217,7 +217,16 @@ namespace Orleans.Hosting
         /// </returns>
         public static IClientBuilder UseStaticClustering(this IClientBuilder builder, params IPEndPoint[] endpoints)
         {
-            return builder.UseStaticClustering(options => options.Gateways = endpoints.Select(ep => ep.ToGatewayUri()).ToList());
+            return builder.UseStaticClustering(options =>
+            {
+                if (endpoints is not null)
+                {
+                    foreach (var endpoint in endpoints)
+                    {
+                        options.AddTcpGateway(endpoint);
+                    }
+                }
+            });
         }
 
         /// <summary>

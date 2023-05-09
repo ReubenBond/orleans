@@ -35,7 +35,10 @@ namespace AWSUtils.Tests.MembershipTests
         protected override IMembershipTable CreateMembershipTable(ILogger logger)
         {
             if (!AWSTestConstants.IsDynamoDbAvailable)
+            {
                 throw new SkipException("Unable to connect to AWS DynamoDB simulator");
+            }
+
             var options = new DynamoDBClusteringOptions();
             DynamoDBMembershipHelper.ParseDataConnectionString(this.connectionString, options);
             return new DynamoDBMembershipTable(this.loggerFactory, Options.Create(options), this.clusterOptions);

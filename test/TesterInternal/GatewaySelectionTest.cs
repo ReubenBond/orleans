@@ -40,17 +40,17 @@ namespace UnitTests.MessageCenterTests
             await Test_GatewaySelection(listProvider);
         }
 
-        protected async Task Test_GatewaySelection(IGatewayListProvider listProvider)
+        protected async Task Test_GatewaySelection(IGatewayMembershipService gatewayMembershipService)
         {
-            IList<Uri> gatewayUris = listProvider.GetGateways().GetResult();
+            IList<Uri> gatewayUris = await gatewayMembershipService.GetGateways();
             Assert.True(gatewayUris.Count > 0, $"Found some gateways. Data = {Utils.EnumerableToString(gatewayUris)}");
 
             var gatewayEndpoints = gatewayUris.Select(uri =>
             {
-                return new IPEndPoint(IPAddress.Parse(uri.Host), uri.Port);
+                return uri.ToGatewayAddress().Endpoint;
             }).ToList();
 
-            var gatewayManager = new GatewayManager(Options.Create(new GatewayOptions()), listProvider, NullLoggerFactory.Instance, null);
+            var gatewayManager = new GatewayManager(Options.Create(new GatewayOptions()), gatewayMembershipService, NullLoggerFactory.Instance, null);
             await gatewayManager.StartAsync(CancellationToken.None);
 
             var counts = new int[4];
@@ -60,7 +60,7 @@ namespace UnitTests.MessageCenterTests
                 var ip = gatewayManager.GetLiveGateway();
                 var addr = ip.Endpoint.Address;
                 Assert.Equal(IPAddress.Loopback, addr);  // "Incorrect IP address returned for gateway"
-                Assert.True((0 < ip.Endpoint.Port) && (ip.Endpoint.Port < 5), "Incorrect IP port returned for gateway");
+                Assert.True(0 < ip.Endpoint.Port && ip.Endpoint.Port < 5, "Incorrect IP port returned for gateway");
                 counts[ip.Endpoint.Port - 1]++;
             }
 
