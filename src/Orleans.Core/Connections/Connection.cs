@@ -32,14 +32,9 @@ namespace Orleans.Runtime.Messaging
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _shared = shared;
             _transport.Closed.Register(static state => ((Connection)state).OnTransportConnectionClosed(), this);
-
-            RemoteEndpoint = NormalizeEndpoint(Context.RemoteEndpoint);
-            LocalEndpoint = NormalizeEndpoint(Context.LocalEndpoint);
         }
 
         public string ConnectionId => _id;
-        public virtual EndPoint RemoteEndpoint { get; }
-        public virtual EndPoint LocalEndpoint { get; }
         protected MessageTransport Context => _transport;
         protected ConnectionTrace Log => _shared.ConnectionTrace;
         protected MessagingTrace MessagingTrace => _shared.MessagingTrace;
@@ -193,7 +188,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public override string ToString() => $"[Local: {LocalEndpoint}, Remote: {RemoteEndpoint}, ConnectionId: {_id}]";
+        public override string ToString() => $"{GetType()}(Id: {_id}, Transport: {_transport})";
 
         internal protected abstract void OnReceivedMessage(Message message);
 
@@ -254,8 +249,8 @@ HandleCompletedRequest:
                 {
                     Log.LogWarning(
                         error,
-                        "Exception while processing messages from remote endpoint {Endpoint}",
-                        RemoteEndpoint);
+                        "Exception while processing messages on connection {Connection}",
+                        this);
                 }
 
                 StartClosing(error);
@@ -274,9 +269,9 @@ HandleCompletedRequest:
             if (Log.IsEnabled(LogLevel.Information))
             {
                 Log.LogInformation(
-                    "Rerouting message {Message} from remote endpoint {Endpoint}",
+                    "Rerouting message {Message} from connection {Connection}",
                     message,
-                    RemoteEndpoint?.ToString() ?? "(never connected)");
+                    this);
             }
 
             ThreadPool.UnsafeQueueUserWorkItem(state =>
@@ -284,19 +279,6 @@ HandleCompletedRequest:
                 var (t, msg) = ((Connection, Message))state;
                 t.RetryMessage(msg);
             }, (this, message));
-        }
-
-        private static EndPoint NormalizeEndpoint(EndPoint endpoint)
-        {
-            if (endpoint is not IPEndPoint ep) return endpoint;
-
-            // Normalize endpoints
-            if (ep.Address.IsIPv4MappedToIPv6)
-            {
-                return new IPEndPoint(ep.Address.MapToIPv4(), ep.Port);
-            }
-
-            return ep;
         }
 
         private void OnMessageSerializationFailure(Message message, Exception exception)

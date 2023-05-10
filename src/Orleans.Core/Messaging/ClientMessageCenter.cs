@@ -194,9 +194,9 @@ namespace Orleans.Messaging
                 {
                     this.logger.LogTrace(
                         (int)ErrorCode.ProxyClient_QueueRequest,
-                        "Sending message {Message} via gateway {Gateway}",
+                        "Sending message {Message} via gateway connection {Connection}",
                         msg,
-                        connection.RemoteEndpoint);
+                        connection);
                 }
             }
             else
@@ -218,9 +218,9 @@ namespace Orleans.Messaging
                         {
                             this.logger.LogTrace(
                                 (int)ErrorCode.ProxyClient_QueueRequest,
-                                "Sending message {Message} via gateway {Gateway}",
+                                "Sending message {Message} via gateway connection {Connection}",
                                 message,
-                                connection.RemoteEndpoint);
+                                connection);
                         }
                     }
                     catch (Exception exception)

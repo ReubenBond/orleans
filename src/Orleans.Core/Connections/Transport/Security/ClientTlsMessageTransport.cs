@@ -101,4 +101,6 @@ public class ClientTlsMessageTransport : TlsMessageTransport
             throw new InvalidOperationException($"Invalid client certificate for client authentication: {certificate.Thumbprint}");
         }
     }
+
+    public override string ToString() => $"{nameof(ClientTlsMessageTransport)}(InnerTransport: {InnerTransport})";
 }

@@ -12,6 +12,7 @@ using Orleans.Connections.Transport.Utilities;
 using Orleans.Connections.Sockets;
 using System.Diagnostics;
 using Orleans.Runtime.Internal;
+using System.Net;
 
 namespace Orleans.Connections.Transport.Sockets;
 
@@ -553,5 +554,18 @@ public sealed class TcpMessageTransport : MessageTransportBase
                errorCode == SocketError.InvalidArgument && !IsWindows;
     }
 
-    public override string ToString() => $"[{nameof(TcpMessageTransport)} Id: {_connectionId}, Remote: {_socket.RemoteEndPoint}, Local: {_socket.LocalEndPoint}]";
+    private static EndPoint? NormalizeEndpoint(EndPoint? endpoint)
+    {
+        if (endpoint is not IPEndPoint ep) return endpoint;
+
+        // Normalize endpoints
+        if (ep.Address.IsIPv4MappedToIPv6)
+        {
+            return new IPEndPoint(ep.Address.MapToIPv4(), ep.Port);
+        }
+
+        return ep;
+    }
+
+    public override string ToString() => $"{nameof(TcpMessageTransport)}(Id: {_connectionId}, Remote: {NormalizeEndpoint(_socket.RemoteEndPoint)?.ToString() ?? "null"}, Local: {NormalizeEndpoint(_socket.LocalEndPoint)?.ToString() ?? "null"})";
 }

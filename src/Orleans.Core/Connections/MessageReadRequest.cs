@@ -130,10 +130,9 @@ namespace Orleans.Runtime.Messaging
             {
                 Shared.MessagingTrace.LogWarning(
                     exception,
-                    "Exception reading message {Message} from remote endpoint {Remote} to local endpoint {Local}",
+                    "Exception reading message {Message} from connection {Connection}",
                     message,
-                    _connection.RemoteEndpoint,
-                    _connection.LocalEndpoint);
+                    _connection);
 
                 // If deserialization completely failed, rethrow the exception so that it can be handled at another level.
                 if (message is null)

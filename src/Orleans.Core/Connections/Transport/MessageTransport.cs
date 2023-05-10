@@ -26,24 +26,6 @@ public abstract class MessageTransport : IAsyncDisposable
     public virtual CancellationToken Closed { get; }
 
     /// <summary>
-    /// Gets the endpoint of the local side of the channel, if available.
-    /// </summary>
-    // TODO: REMOVE if not necessary
-    // TODO: REMOVE if not necessary
-    // TODO: REMOVE if not necessary
-    // TODO: REMOVE if not necessary
-    public virtual EndPoint? LocalEndpoint { get; set; }
-
-    /// <summary>
-    /// Gets the <see cref="EndPoint"/> of the remote side of the channel, if available.
-    /// </summary>
-    // TODO: REMOVE if not necessary
-    // TODO: REMOVE if not necessary
-    // TODO: REMOVE if not necessary
-    // TODO: REMOVE if not necessary
-    public virtual EndPoint? RemoteEndpoint { get; set; }
-
-    /// <summary>
     /// Gets a value indicating whether this instance is valid.
     /// </summary>
     public virtual bool IsValid => !Closed.IsCancellationRequested;

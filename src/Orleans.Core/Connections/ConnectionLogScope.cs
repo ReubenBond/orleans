@@ -24,21 +24,11 @@ namespace Orleans.Runtime.Messaging
                     return new KeyValuePair<string, object>(nameof(Connection.ConnectionId), _connection.ConnectionId);
                 }
 
-                if (index == 1)
-                {
-                    return new KeyValuePair<string, object>(nameof(Connection.LocalEndpoint), _connection.LocalEndpoint);
-                }
-
-                if (index == 2)
-                {
-                    return new KeyValuePair<string, object>(nameof(Connection.RemoteEndpoint), _connection.RemoteEndpoint);
-                }
-
                 throw new ArgumentOutOfRangeException(nameof(index));
             }
         }
 
-        public int Count => 3;
+        public int Count => 1;
 
         public IEnumerator<KeyValuePair<string, object>> GetEnumerator()
         {
