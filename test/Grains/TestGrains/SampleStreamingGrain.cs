@@ -34,7 +34,7 @@ namespace UnitTests.Grains
 
         public Task OnErrorAsync(Exception ex)
         {
-            hostingGrain.logger.LogInformation(ex, "OnErrorAsync()", ex);
+            hostingGrain.logger.LogInformation(ex, "OnErrorAsync()");
             return Task.CompletedTask;
         }
     }
@@ -231,7 +231,7 @@ namespace UnitTests.Grains
 
         public Task OnErrorAsync( Exception ex )
         {
-            logger.LogInformation(ex,  "OnErrorAsync()", ex );
+            logger.LogInformation(ex, "OnErrorAsync()");
             return Task.CompletedTask;
         }
 

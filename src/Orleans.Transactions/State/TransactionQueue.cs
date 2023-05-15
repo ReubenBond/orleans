@@ -165,7 +165,7 @@ namespace Orleans.Transactions.State
             }
             catch (Exception exception)
             {
-                logger.LogError(exception, $"Transaction abort due to internal error in {nameof(EnqueueCommit)}", exception);
+                logger.LogError(exception, $"Transaction abort due to internal error in {nameof(EnqueueCommit)}");
                 await NotifyOfAbort(record, TransactionalStatus.UnknownException, exception);
             }
         }
@@ -685,8 +685,8 @@ namespace Orleans.Transactions.State
                                 // send PreparedMessage to remote TM
                                 bottom.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
                                       .Prepared(bottom.TransactionManager.Name, bottom.TransactionId, bottom.Timestamp, resource, TransactionalStatus.Ok)
-                                      .Ignore();                                
-                                    
+                                      .Ignore();
+
                                 bottom.LastSent = now;
 
                                 if (logger.IsEnabled(LogLevel.Trace))

@@ -54,7 +54,7 @@
     <PackageVersion Include="AWSSDK.SQS" Version="3.7.2.119" />
     <PackageVersion Include="Consul" Version="1.6.10.7" />
     <PackageVersion Include="Google.Cloud.PubSub.V1" Version="1.0.0-beta13" />
-    <PackageVersion Include="Google.Protobuf" Version="3.22.0" />
+    <PackageVersion Include="Google.Protobuf" Version="3.22.3" />
     <PackageVersion Include="protobuf-net" Version="3.1.22" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.2" />
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
@@ -63,8 +63,8 @@
     <!-- Test related packages -->
     <PackageVersion Include="FluentAssertions" Version="6.7.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.3.2" />
-    <PackageVersion Include="BenchmarkDotNet" Version="$(BenchmarkDotNetVersion)" />
-    <PackageVersion Include="BenchmarkDotNet.Diagnostics.Windows" Version="$(BenchmarkDotNetVersion)" />
+    <PackageVersion Include="BenchmarkDotNet" Version="0.13.5" />
+    <PackageVersion Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.13.5" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.4.13" />
     <PackageVersion Include="xunit" Version="$(xUnitVersion)" />
     <PackageVersion Include="xunit.assert" Version="$(xUnitVersion)" />
@@ -82,18 +82,18 @@
     <PackageVersion Include="NSubstitute" Version="4.4.0" />
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.15" />
     <PackageVersion Include="CsCheck" Version="2.10.0" />
-    <PackageVersion Include="System.Data.SqlClient" Version="4.8.4" />
+    <PackageVersion Include="System.Data.SqlClient" Version="4.8.5" />
     <PackageVersion Include="Npgsql" Version="6.0.7" />
     <PackageVersion Include="MySql.Data" Version="8.0.31" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.AzureKeyVault" Version="3.1.24" />
     <PackageVersion Include="System.CommandLine" Version="2.0.0-beta1.21308.1" />
     <PackageVersion Include="Microsoft.Crank.EventSources" Version="0.2.0-alpha.21457.1" />
-    <PackageVersion Include="MessagePack" Version="2.4.35" />
+    <PackageVersion Include="MessagePack" Version="2.5.108" />
     <PackageVersion Include="ZeroFormatter" Version="1.6.4" />
     <PackageVersion Include="Utf8Json" Version="1.3.7" />
-    <PackageVersion Include="SpanJson" Version="3.3.1" />
+    <PackageVersion Include="SpanJson" Version="4.0.0" />
     <PackageVersion Include="Hyperion" Version="0.12.2" />
-    <PackageVersion Include="Grpc.Tools" Version="2.52.0" />
+    <PackageVersion Include="Grpc.Tools" Version="2.54.0" />
     <!-- Tooling related packages -->
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="$(SourceLinkVersion)" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="$(SourceLinkVersion)" />
