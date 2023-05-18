@@ -48,7 +48,7 @@ namespace Orleans.TestingHost
                     .Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(30));
             });
 
-            ConfigureAppServices(configuration, hostBuilder);
+            ConfigureSiloHost(configuration, hostBuilder);
 
             hostBuilder.ConfigureServices((context, services) =>
             {
@@ -86,16 +86,13 @@ namespace Orleans.TestingHost
             hostBuilder.UseEnvironment(Environments.Development);
             hostBuilder.Properties["Configuration"] = configuration;
             hostBuilder.ConfigureHostConfiguration(cb => cb.AddConfiguration(configuration))
-                .UseOrleansClient((ctx, clientBuilder) =>
-                {
-                    clientBuilder.Configure<ClusterOptions>(configuration);
-                    ConfigureAppServices(configuration, clientBuilder);
-                })
+                .UseOrleansClient((ctx, clientBuilder) => clientBuilder.Configure<ClusterOptions>(configuration))
                 .ConfigureServices(services =>
                 {
                     TryConfigureClientMembership(configuration, services);
                     TryConfigureFileLogging(configuration, services, hostName);
                 });
+            ConfigureClientHost(configuration, hostBuilder);
 
             postConfigureHostBuilder?.Invoke(hostBuilder);
             var host = hostBuilder.Build();
@@ -156,7 +153,7 @@ namespace Orleans.TestingHost
             });
         }
 
-        private static void ConfigureAppServices(IConfiguration configuration, IHostBuilder hostBuilder)
+        private static void ConfigureSiloHost(IConfiguration configuration, IHostBuilder hostBuilder)
         {
             var builderConfiguratorTypes = configuration.GetSection(nameof(TestClusterOptions.SiloBuilderConfiguratorTypes))?.Get<string[]>();
             if (builderConfiguratorTypes == null) return;
@@ -173,7 +170,7 @@ namespace Orleans.TestingHost
             }
         }
 
-        private static void ConfigureAppServices(IConfiguration configuration, IClientBuilder clientBuilder)
+        private static void ConfigureClientHost(IConfiguration configuration, IHostBuilder hostBuilder)
         {
             var builderConfiguratorTypes = configuration.GetSection(nameof(TestClusterOptions.ClientBuilderConfiguratorTypes))?.Get<string[]>();
             if (builderConfiguratorTypes == null) return;
@@ -182,8 +179,10 @@ namespace Orleans.TestingHost
             {
                 if (!string.IsNullOrWhiteSpace(builderConfiguratorType))
                 {
-                    var builderConfigurator = (IClientBuilderConfigurator)Activator.CreateInstance(Type.GetType(builderConfiguratorType, true));
-                    builderConfigurator?.Configure(configuration, clientBuilder);
+                    var configurator = Activator.CreateInstance(Type.GetType(builderConfiguratorType, true));
+                    (configurator as IHostConfigurator)?.Configure(hostBuilder);
+
+                    hostBuilder.UseOrleansClient((ctx, clientBuilder) => (configurator as IClientBuilderConfigurator)?.Configure(ctx.Configuration, clientBuilder));
                 }
             }
         }
