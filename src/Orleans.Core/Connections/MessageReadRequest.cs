@@ -98,6 +98,7 @@ namespace Orleans.Runtime.Messaging
         void IThreadPoolWorkItem.Execute()
         {
             Message message = null;
+            var shouldReset = true;
             var messageSerializer = Shared.GetMessageSerializer();
             try
             {
@@ -109,11 +110,11 @@ namespace Orleans.Runtime.Messaging
                 {
                     // This instance is owned by the message now, so it will not be reset immediately.
                     message.SetMessageReadRequest(this);
+                    shouldReset = false;
                 }
                 else
                 {
-                    // Otherwise, return this instance to the pool immediately.
-                    Reset();
+                    // Otherwise, return this instance to the pool on exiting this method.
                 }
 
                 _connection.OnReceivedMessage(message);
@@ -123,23 +124,33 @@ namespace Orleans.Runtime.Messaging
             }
             finally
             {
+                if (shouldReset)
+                {
+                    Reset();
+                }
+
                 Shared.Return(messageSerializer);
             }
 
             bool HandleReceiveMessageFailure(Message message, Exception exception)
             {
+                // If deserialization completely failed, rethrow the exception so that it can be handled at another level.
+                if (message is null)
+                {
+                    Shared.MessagingTrace.LogWarning(
+                        exception,
+                        "Exception reading message from connection {Connection}",
+                        _connection);
+
+                    // Returning false here informs the caller that the exception should not be caught.
+                    return false;
+                }
+
                 Shared.MessagingTrace.LogWarning(
                     exception,
                     "Exception reading message {Message} from connection {Connection}",
                     message,
                     _connection);
-
-                // If deserialization completely failed, rethrow the exception so that it can be handled at another level.
-                if (message is null)
-                {
-                    // Returning false here informs the caller that the exception should not be caught.
-                    return false;
-                }
 
                 // The message body was not successfully decoded, but the headers were.
                 MessagingInstruments.OnRejectedMessage(message);
