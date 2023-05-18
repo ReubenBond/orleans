@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Connections.Transport;
 using Orleans.Runtime;
 using Orleans.Runtime.Utilities;
 
@@ -11,7 +12,7 @@ namespace UnitTests.Directory
     internal class MockClusterMembershipService : IClusterMembershipService
     {
         private long version = 0;
-        private Dictionary<SiloAddress, (SiloStatus Status, string Name)> statuses;
+        private Dictionary<SiloAddress, (SiloStatus Status, string Name, List<EndpointInfo> Endpoints)> statuses;
         private ClusterMembershipSnapshot snapshot;
         private readonly AsyncEnumerable<ClusterMembershipSnapshot> updates;
 
@@ -23,9 +24,9 @@ namespace UnitTests.Directory
 
         public IClusterMembershipService Target => this;
 
-        public MockClusterMembershipService(Dictionary<SiloAddress, (SiloStatus Status, string Name)> initialStatuses = null)
+        public MockClusterMembershipService(Dictionary<SiloAddress, (SiloStatus Status, string Name, List<EndpointInfo> Endpoints)> initialStatuses = null)
         {
-            this.statuses = initialStatuses ?? new Dictionary<SiloAddress, (SiloStatus Status, string Name)>();
+            this.statuses = initialStatuses ?? new Dictionary<SiloAddress, (SiloStatus Status, string Name, List<EndpointInfo> Endpoints)>();
             this.snapshot = ToSnapshot(this.statuses, ++version);
             this.updates = this.updates = new AsyncEnumerable<ClusterMembershipSnapshot>(
                 (previous, proposed) => proposed.Version == MembershipVersion.MinValue || proposed.Version > previous.Version,
@@ -33,17 +34,17 @@ namespace UnitTests.Directory
                 update => Interlocked.Exchange(ref this.snapshot, update));
         }
 
-        public void UpdateSiloStatus(SiloAddress siloAddress, SiloStatus siloStatus, string name)
+        public void UpdateSiloStatus(SiloAddress siloAddress, SiloStatus siloStatus, string name, List<EndpointInfo> endpoints = null)
         {
-            this.statuses[siloAddress] = (siloStatus, name);
+            this.statuses[siloAddress] = (siloStatus, name, endpoints ?? new List<EndpointInfo>());
             this.updates.Publish(ToSnapshot(this.statuses, ++version));
         }
 
-        internal static ClusterMembershipSnapshot ToSnapshot(Dictionary<SiloAddress, (SiloStatus Status, string Name)> statuses, long version)
+        internal static ClusterMembershipSnapshot ToSnapshot(Dictionary<SiloAddress, (SiloStatus Status, string Name, List<EndpointInfo> Endpoints)> statuses, long version)
         {
             var dictBuilder = ImmutableDictionary.CreateBuilder<SiloAddress, ClusterMember>();
             foreach (var kvp in statuses)
-                dictBuilder.Add(kvp.Key, new ClusterMember(kvp.Key, kvp.Value.Status, kvp.Value.Name));
+                dictBuilder.Add(kvp.Key, new ClusterMember(kvp.Key, kvp.Value.Status, kvp.Value.Name, kvp.Value.Endpoints));
 
             return new ClusterMembershipSnapshot(dictBuilder.ToImmutable(), new MembershipVersion(version));
         }

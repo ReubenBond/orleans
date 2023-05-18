@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Orleans.Connections.Transport;
 
 namespace Orleans.Runtime
@@ -22,11 +23,12 @@ namespace Orleans.Runtime
         /// <param name="name">
         /// The silo name.
         /// </param>
-        public ClusterMember(SiloAddress siloAddress, SiloStatus status, string name)
+        public ClusterMember(SiloAddress siloAddress, SiloStatus status, string name, IEnumerable<EndpointInfo> endpoints)
         {
             this.SiloAddress = siloAddress ?? throw new ArgumentNullException(nameof(siloAddress));
             this.Status = status;
             this.Name = name;
+            this.Endpoints = endpoints.ToList();
         }
 
         /// <summary>
