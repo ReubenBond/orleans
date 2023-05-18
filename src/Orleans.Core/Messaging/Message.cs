@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Orleans.Runtime.Messaging;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
@@ -37,12 +38,41 @@ namespace Orleans.Runtime
             }
         }
 
+        private object GetBodyObjectSafe()
+        {
+            if (_bodyObject is MessageReadRequest readRequest)
+            {
+                var messageSerializer = readRequest.Shared.GetMessageSerializer();
+                try
+                {
+                    messageSerializer.ReadBodyObject(this, readRequest);
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    readRequest.Shared.Return(messageSerializer);
+                    if (!Equals(_bodyObject, readRequest))
+                    {
+                        readRequest.Reset();
+                    }
+                }
+            }
+
+            return _bodyObject;
+        }
+
         private void DeserializeRequestBody(MessageReadRequest readRequest)
         {
             var messageSerializer = readRequest.Shared.GetMessageSerializer();
             try
             {
                 messageSerializer.ReadBodyObject(this, readRequest);
+            }
+            catch (Exception exception) when (Direction == Directions.Response)
+            {
+                _bodyObject = Response.FromException(exception);
             }
             finally
             {
@@ -54,7 +84,7 @@ namespace Orleans.Runtime
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void SetMessageReadRequest(MessageReadRequest request)
         {
-            if (_bodyObject is MessageReadRequest current && !Equals(current, request))
+            if (_bodyObject is MessageReadRequest current && !ReferenceEquals(current, request))
             {
                 current.Reset();
             }
@@ -319,11 +349,12 @@ namespace Orleans.Runtime
             if (IsReadOnly && !Append(ref dst, "ReadOnly ")) goto grow;
             if (IsAlwaysInterleave && !Append(ref dst, "IsAlwaysInterleave ")) goto grow;
 
+            var bodyObject = GetBodyObjectSafe();
             if (Direction == Directions.Response)
             {
                 switch (Result)
                 {
-                    case ResponseTypes.Rejection when BodyObject is RejectionResponse rejection:
+                    case ResponseTypes.Rejection when bodyObject is RejectionResponse rejection:
                         if (!dst.TryWrite($"{rejection.RejectionType} Rejection (info: {rejection.RejectionInfo}) ", out len)) goto grow;
                         dst = dst[len..];
                         break;
@@ -341,7 +372,7 @@ namespace Orleans.Runtime
             if (!dst.TryWrite($"{Direction} [{SendingSilo} {SendingGrain}]->[{TargetSilo} {TargetGrain}]", out len)) goto grow;
             dst = dst[len..];
 
-            if (BodyObject is { } request)
+            if (bodyObject is { } request)
             {
                 if (!dst.TryWrite($" {request}", out len)) goto grow;
                 dst = dst[len..];
