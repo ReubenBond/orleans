@@ -38,6 +38,8 @@ public sealed class TcpMessageTransport : MessageTransportBase
     private readonly object _shutdownLock = new();
     private readonly object _writesLock = new();
     private readonly object _readsLock = new();
+    private readonly string _remoteEndpointString; // For diagnostics only
+    private readonly string _localEndpointString; // For diagnostics only
     private bool _readsCompleted;
     private bool _writesCompleted;
     private Task? _processingTask;
@@ -48,9 +50,12 @@ public sealed class TcpMessageTransport : MessageTransportBase
     {
         _socket = socket;
         _logger = logger;
+        
         _fireReadSignal = _readSignal.Signal;
         _fireWriteSignal = _writeSignal.Signal;
         _connectionId = CorrelationIdGenerator.GetNextId();
+        _remoteEndpointString = NormalizeEndpoint(_socket.RemoteEndPoint)?.ToString() ?? "null";
+        _localEndpointString = NormalizeEndpoint(_socket.LocalEndPoint)?.ToString() ?? "null";
     }
 
     public override CancellationToken Closed => _connectionClosedCts.Token;
@@ -300,7 +305,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
                         {
                             // FIN
                             SocketsLog.ConnectionReadFin(_logger, this);
-                            error = new ConnectionAbortedException("Connection terminated normally");
+                            error = new ConnectionClosedException("Connection terminated normally");
                             break;
                         }
 
@@ -567,5 +572,5 @@ public sealed class TcpMessageTransport : MessageTransportBase
         return ep;
     }
 
-    public override string ToString() => $"{nameof(TcpMessageTransport)}(Id: {_connectionId}, Remote: {NormalizeEndpoint(_socket.RemoteEndPoint)?.ToString() ?? "null"}, Local: {NormalizeEndpoint(_socket.LocalEndPoint)?.ToString() ?? "null"})";
+    public override string ToString() => $"{nameof(TcpMessageTransport)}(Id: {_connectionId}, Remote: {_remoteEndpointString}, Local: {_localEndpointString})";
 }
