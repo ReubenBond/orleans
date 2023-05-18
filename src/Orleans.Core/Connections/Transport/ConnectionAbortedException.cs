@@ -23,3 +23,26 @@ public class ConnectionAbortedException : Exception
     {
     }
 }
+
+/// <summary>
+/// Indicates that a connection closed normally.
+/// </summary>
+[Serializable]
+public class ConnectionClosedException : Exception
+{
+    public ConnectionClosedException()
+    {
+    }
+
+    public ConnectionClosedException(string? message) : base(message)
+    {
+    }
+
+    public ConnectionClosedException(string? message, Exception? innerException) : base(message, innerException)
+    {
+    }
+
+    protected ConnectionClosedException(SerializationInfo info, StreamingContext context) : base(info, context)
+    {
+    }
+}

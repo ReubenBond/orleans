@@ -95,7 +95,7 @@ namespace Orleans.Runtime.Messaging
 
         private void OnTransportConnectionClosed()
         {
-            StartClosing(new ConnectionAbortedException("Underlying connection closed"));
+            StartClosing(new ConnectionClosedException("Underlying connection closed"));
             _transportConnectionClosed.SetResult(0);
         }
 
@@ -117,7 +117,7 @@ namespace Orleans.Runtime.Messaging
             if (Log.IsEnabled(LogLevel.Information))
             {
                 Log.LogInformation(
-                    exception,
+                    exception is not ConnectionClosedException ? exception : null,
                     "Closing connection {Connection}",
                     this);
             }
@@ -133,7 +133,7 @@ namespace Orleans.Runtime.Messaging
             NetworkingInstruments.OnClosedSocket(ConnectionDirection);
 
             // Close the underlying message transport
-            await _transport.CloseAsync(new ConnectionAbortedException());
+            await _transport.CloseAsync(new ConnectionClosedException());
 
             // Try to gracefully stop the reader/writer loops, if they are running.
             if (_processIncomingTask is { IsCompleted: false } incoming)
@@ -181,7 +181,7 @@ namespace Orleans.Runtime.Messaging
 
             if (!_transport.WriteAsync(handler))
             {
-                StartClosing(new ConnectionAbortedException());
+                StartClosing(new ConnectionClosedException());
                 RerouteMessage(message);
                 handler.Reset();
                 return;
@@ -207,7 +207,7 @@ namespace Orleans.Runtime.Messaging
                     if (!_transport.ReadAsync(readRequest))
                     {
                         // Connection closed.
-                        error = new ConnectionAbortedException();
+                        error = new ConnectionClosedException();
                         break;
                     }
 
@@ -245,7 +245,7 @@ HandleCompletedRequest:
             }
             finally
             {
-                if (error is { })
+                if (error is { } and not ConnectionClosedException)
                 {
                     Log.LogWarning(
                         error,
