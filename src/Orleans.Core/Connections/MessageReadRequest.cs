@@ -11,11 +11,11 @@ using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class MessageReadRequest : ReadRequest, IThreadPoolWorkItem, IValueTaskSource
+    internal sealed class MessageReadRequest : ReadRequest, IThreadPoolWorkItem, IValueTaskSource<bool>
     {
         internal readonly MessageHandlerShared Shared;
 
-        private ManualResetValueTaskSourceCore<int> _completion = new();
+        private ManualResetValueTaskSourceCore<bool> _completion = new();
         private PooledBuffer _buffer = new();
         private Connection _connection;
         private (int HeaderLength, int BodyLength) _messageLength;
@@ -25,7 +25,7 @@ namespace Orleans.Runtime.Messaging
             Shared = shared;
         }
 
-        public ValueTask Completed => new(this, _completion.Version);
+        public ValueTask<bool> Completed => new(this, _completion.Version);
         public override Memory<byte> Buffer => _buffer.GetMemory();
 
         public int FramedLength => Message.LENGTH_HEADER_SIZE + _messageLength.HeaderLength + _messageLength.BodyLength;
@@ -61,6 +61,11 @@ namespace Orleans.Runtime.Messaging
             _completion.SetException(error);
         }
 
+        public override void OnCanceled()
+        {
+            _completion.SetResult(false);
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryDeframeMessage()
         {
@@ -81,7 +86,7 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            _completion.SetResult(0);
+            _completion.SetResult(true);
             return true;
         }
 
@@ -181,8 +186,8 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        void IValueTaskSource.OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags) => _completion.OnCompleted(continuation, state, token, flags);
-        void IValueTaskSource.GetResult(short token) => _completion.GetResult(token);
-        ValueTaskSourceStatus IValueTaskSource.GetStatus(short token) => _completion.GetStatus(token);
+        void IValueTaskSource<bool>.OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags) => _completion.OnCompleted(continuation, state, token, flags);
+        bool IValueTaskSource<bool>.GetResult(short token) => _completion.GetResult(token);
+        ValueTaskSourceStatus IValueTaskSource<bool>.GetStatus(short token) => _completion.GetStatus(token);
     }
 }

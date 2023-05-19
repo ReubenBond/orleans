@@ -135,6 +135,7 @@ namespace Orleans.Runtime.Messaging
 
             public void Dispose() { }
             public override void OnError(Exception error) => _completion.SetException(error);
+            public override void OnCanceled() => _completion.SetException(new OperationCanceledException("Read operation canceled"));
             public override bool OnRead(int bytesRead)
             {
                 _totalBytesRead += bytesRead;

@@ -245,6 +245,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
     private async Task ProcessReads()
     {
         await Task.Yield();
+        bool isGracefulTermination = false;
         Exception? error = null;
         ReadRequest? request = null;
         try
@@ -263,40 +264,8 @@ public sealed class TcpMessageTransport : MessageTransportBase
 
                         if (_socketReceiver.HasError)
                         {
-                            if (IsConnectionResetError(_socketReceiver.SocketError))
-                            {
-                                // This could be ignored if _shutdownReason is already set.
-                                var ex = _socketReceiver.Error;
-                                error = new ConnectionResetException(ex.Message, ex);
-
-                                // There's still a small chance that both DoReceive() and DoSend() can log the same connection reset.
-                                // Both logs will have the same ConnectionId. I don't think it's worthwhile to lock just to avoid this.
-                                if (!_socketDisposed)
-                                {
-                                    SocketsLog.ConnectionReset(_logger, this);
-                                }
-                            }
-                            else if (IsConnectionAbortError(_socketReceiver.SocketError))
-                            {
-                                // This exception should always be ignored because _shutdownReason should be set.
-                                error = _socketReceiver.Error;
-
-                                if (!_socketDisposed)
-                                {
-                                    // This is unexpected if the socket hasn't been disposed yet.
-                                    SocketsLog.ConnectionError(_logger, this, error);
-                                }
-                            }
-                            else
-                            {
-                                // This is unexpected.
-                                error = _socketReceiver.Error;
-                                if (!_socketDisposed)
-                                {
-                                    SocketsLog.ConnectionError(_logger, this, error);
-                                }
-                            }
-
+                            error = _socketReceiver.Error;
+                            isGracefulTermination = HandleReadError(ref error);
                             break;
                         }
 
@@ -305,7 +274,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
                         {
                             // FIN
                             SocketsLog.ConnectionReadFin(_logger, this);
-                            error = new ConnectionClosedException("Connection terminated normally");
+                            isGracefulTermination = true;
                             break;
                         }
 
@@ -315,45 +284,35 @@ public sealed class TcpMessageTransport : MessageTransportBase
                         }
                     }
 
-                    if (error is not null)
+                    if (error is not null || isGracefulTermination)
                     {
-                        // Bubble the error up
                         break;
                     }
                 }
 
-                if (error is not null)
+                if (error is not null || isGracefulTermination)
                 {
-                    // Bubble the error up
                     break;
                 }
 
                 await _readSignal.WaitAsync().ConfigureAwait(false);
             }
         }
-        catch (ObjectDisposedException ex)
+        catch (Exception exception)
         {
-            // This exception should always be ignored because _shutdownReason should be set.
-            error = ex;
-
-            if (!_socketDisposed)
-            {
-                // This is unexpected if the socket hasn't been disposed yet.
-                SocketsLog.ConnectionError(_logger, this, error);
-            }
-        }
-        catch (Exception ex)
-        {
-            // This is unexpected.
-            error = ex;
-            if (!_socketDisposed)
-            {
-                SocketsLog.ConnectionError(_logger, this, error);
-            }
+            error = exception;
+            isGracefulTermination = HandleReadError(ref error);
         }
         finally
         {
-            if (error is { }) request?.OnError(error);
+            if (isGracefulTermination)
+            {
+                request?.OnCanceled();
+            }
+            else if (error is { })
+            {
+                request?.OnError(error);
+            }
 
             _shutdownReason ??= error;
             _connectionClosingCts.Cancel();
@@ -377,6 +336,70 @@ public sealed class TcpMessageTransport : MessageTransportBase
                 return _readRequests.TryDequeue(out request);
             }
         }
+    }
+
+    private bool HandleReadError(ref Exception? error)
+    {
+        bool isGracefulTermination;
+        if (_socketReceiver.HasError)
+        {
+            error = _socketReceiver.Error;
+        }
+
+        if (_socketDisposed)
+        {
+            isGracefulTermination = true;
+            error = null;
+        }
+        else if (error is ObjectDisposedException)
+        {
+            isGracefulTermination = false;
+
+            // This is unexpected if the socket hasn't been disposed yet.
+            SocketsLog.ConnectionError(_logger, this, error);
+        }
+        else if (IsConnectionResetError(_socketReceiver.SocketError))
+        {
+            // This could be ignored if _shutdownReason is already set.
+            isGracefulTermination = true;
+            error = null;
+
+            // There's still a small chance that both DoReceive() and DoSend() can log the same connection reset.
+            // Both logs will have the same ConnectionId. I don't think it's worthwhile to lock just to avoid this.
+            if (!_socketDisposed)
+            {
+                SocketsLog.ConnectionReset(_logger, this);
+            }
+        }
+        else if (IsConnectionAbortError(_socketReceiver.SocketError))
+        {
+            // This exception should always be ignored because _shutdownReason should be set.
+            isGracefulTermination = true;
+            error = null;
+
+            if (!_socketDisposed)
+            {
+                // This is unexpected if the socket hasn't been disposed yet.
+                SocketsLog.ConnectionError(_logger, this, _socketReceiver.Error!);
+            }
+        }
+        else if (error is { })
+        {
+            // This is unexpected.
+            isGracefulTermination = false;
+            error = _socketReceiver.Error!;
+            if (!_socketDisposed)
+            {
+                SocketsLog.ConnectionError(_logger, this, error);
+            }
+        }
+        else
+        {
+            isGracefulTermination = true;
+            error = null;
+        }
+
+        return isGracefulTermination;
     }
 
     private async Task ProcessWrites()

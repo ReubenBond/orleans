@@ -144,6 +144,8 @@ public class MessageTransportStream : Stream
             return true;
         }
 
+        public override void OnCanceled() => _completion.SetResult(0);
+
         public ValueTask<int> OnProgressAsync() => new(this, _completion.Version);
         public override void OnError(Exception error) => _completion.SetException(error);
         void IValueTaskSource<int>.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _completion.OnCompleted(continuation, state, token, flags);

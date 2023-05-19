@@ -112,7 +112,10 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
-            _initializationTcs.TrySetException(exception ?? new ConnectionAbortedException("Connection initialization failed"));
+            if (!_initializationTcs.Task.IsCompleted)
+            {
+                _initializationTcs.TrySetException(exception ?? new ConnectionAbortedException("Connection initialization failed"));
+            }
 
             if (Log.IsEnabled(LogLevel.Information))
             {
@@ -207,11 +210,16 @@ namespace Orleans.Runtime.Messaging
                     if (!_transport.ReadAsync(readRequest))
                     {
                         // Connection closed.
-                        error = new ConnectionClosedException();
+                        readRequest.Reset();
                         break;
                     }
 
-                    await readRequest.Completed.ConfigureAwait(false);
+                    if (!await readRequest.Completed.ConfigureAwait(false))
+                    {
+                        // Connection closed while a read was pending.
+                        readRequest.Reset();
+                        break;
+                    }
 
 HandleCompletedRequest:
                     if (readRequest.UnconsumedLength > 0)
