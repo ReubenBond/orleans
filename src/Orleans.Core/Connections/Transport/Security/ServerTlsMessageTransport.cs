@@ -78,6 +78,4 @@ public class ServerTlsMessageTransport : TlsMessageTransport
             throw new InvalidOperationException($"Invalid server certificate for server authentication: {certificate.Thumbprint}");
         }
     }
-
-    public override string ToString() => $"{nameof(ServerTlsMessageTransport)}(InnerTransport: {InnerTransport})";
 }

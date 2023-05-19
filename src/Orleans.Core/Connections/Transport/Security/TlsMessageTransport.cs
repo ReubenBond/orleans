@@ -165,4 +165,6 @@ public abstract class TlsMessageTransport : StreamMessageTransport
             _ => new X509Certificate2(certificate)
         };
     }
+
+    public override string ToString() => $"Tls({_innerTransport})";
 }

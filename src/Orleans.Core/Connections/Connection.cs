@@ -191,7 +191,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public override string ToString() => $"{GetType()}(Id: {_id}, Transport: {_transport})";
+        public override string ToString() => $"{nameof(Connection)}(Id: {_id}, Transport: {_transport})";
 
         internal protected abstract void OnReceivedMessage(Message message);
 

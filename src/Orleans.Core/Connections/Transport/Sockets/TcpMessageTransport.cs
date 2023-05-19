@@ -32,7 +32,6 @@ public sealed class TcpMessageTransport : MessageTransportBase
     private readonly Action _fireReadSignal;
     private readonly Action _fireWriteSignal;
     private readonly ILogger _logger;
-    private readonly string _connectionId;
     private readonly CancellationTokenSource _connectionClosingCts = new();
     private readonly CancellationTokenSource _connectionClosedCts = new();
     private readonly object _shutdownLock = new();
@@ -53,7 +52,6 @@ public sealed class TcpMessageTransport : MessageTransportBase
         
         _fireReadSignal = _readSignal.Signal;
         _fireWriteSignal = _writeSignal.Signal;
-        _connectionId = CorrelationIdGenerator.GetNextId();
         _remoteEndpointString = NormalizeEndpoint(_socket.RemoteEndPoint)?.ToString() ?? "null";
         _localEndpointString = NormalizeEndpoint(_socket.LocalEndPoint)?.ToString() ?? "null";
     }
@@ -595,5 +593,5 @@ public sealed class TcpMessageTransport : MessageTransportBase
         return ep;
     }
 
-    public override string ToString() => $"{nameof(TcpMessageTransport)}(Id: {_connectionId}, Remote: {_remoteEndpointString}, Local: {_localEndpointString})";
+    public override string ToString() => $"Tcp(Remote: {_remoteEndpointString}, Local: {_localEndpointString})";
 }
