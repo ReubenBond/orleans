@@ -26,14 +26,14 @@ namespace Orleans.Hosting
         {
             if (logger.IsEnabled(LogLevel.Information))
             {
-                this.logger.LogDebug("Starting Orleans Silo.");
+                this.logger.LogInformation("Starting Orleans Silo.");
             }
 
             await this.silo.StartAsync(cancellationToken).ConfigureAwait(false);
 
             if (logger.IsEnabled(LogLevel.Information))
             {
-                this.logger.LogDebug("Orleans Silo started.");
+                this.logger.LogInformation("Orleans Silo started.");
             }
         }
 
@@ -41,14 +41,14 @@ namespace Orleans.Hosting
         {
             if (logger.IsEnabled(LogLevel.Information))
             {
-                this.logger.LogDebug("Stopping Orleans Silo");
+                this.logger.LogInformation("Stopping Orleans Silo");
             }
 
             await this.silo.StopAsync(cancellationToken).ConfigureAwait(false);
 
             if (logger.IsEnabled(LogLevel.Information))
             {
-                this.logger.LogDebug("Orleans Silo stopped.");
+                this.logger.LogInformation("Orleans Silo stopped.");
             }
         }
 
