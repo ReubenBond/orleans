@@ -27,10 +27,10 @@ namespace UnitTests.MessageCenterTests
 
         protected static readonly List<SiloAddress> gatewayAddresses = new[]
         {
-            SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 0), 0),
             SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 1), 0),
             SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 2), 0),
             SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 3), 0),
+            SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 4), 0),
         }.ToList();
         
         public GatewaySelectionTest(ITestOutputHelper output)

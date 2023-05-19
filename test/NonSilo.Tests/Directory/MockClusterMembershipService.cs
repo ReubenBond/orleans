@@ -36,7 +36,7 @@ namespace UnitTests.Directory
 
         public void UpdateSiloStatus(SiloAddress siloAddress, SiloStatus siloStatus, string name, List<EndpointInfo> endpoints = null)
         {
-            this.statuses[siloAddress] = (siloStatus, name, endpoints ?? new List<EndpointInfo>());
+            this.statuses[siloAddress] = (siloStatus, name, endpoints ?? new List<EndpointInfo> { new() { Name = "silo", ["ep"] = siloAddress.Endpoint.ToString() } });
             this.updates.Publish(ToSnapshot(this.statuses, ++version));
         }
 
@@ -49,8 +49,8 @@ namespace UnitTests.Directory
             return new ClusterMembershipSnapshot(dictBuilder.ToImmutable(), new MembershipVersion(version));
         }
 
-        public ValueTask Refresh(MembershipVersion minimumVersion = default) => new ValueTask();
+        public ValueTask Refresh(MembershipVersion minimumVersion = default) => default;
 
-        public Task<bool> TryKill(SiloAddress siloAddress) => throw new NotImplementedException();
+        public Task<bool> TryKill(SiloAddress siloAddress) => Task.FromResult(false);
     }
 }
