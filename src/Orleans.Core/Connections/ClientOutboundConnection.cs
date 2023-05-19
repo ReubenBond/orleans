@@ -66,10 +66,7 @@ namespace Orleans.Runtime.Messaging
                     });
 
                 var preamble = await connectionPreambleHelper.Read(this.Context);
-                this.Log.LogInformation(
-                    "Established connection to {Silo} with protocol version {ProtocolVersion}",
-                    preamble.SiloAddress,
-                    preamble.NetworkProtocolVersion.ToString());
+                this.Log.LogInformation("Established connection to silo {Silo}", preamble.SiloAddress);
 
                 if (preamble.ClusterId != myClusterId)
                 {
