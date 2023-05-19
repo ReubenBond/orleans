@@ -162,12 +162,15 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                this.log.LogInformation(
-                    (int)ErrorCode.MembershipStarting,
-                    "MembershipOracle starting on host {HostName} with SiloAddress {SiloAddress} at {StartTime}",
-                    this.localSiloDetails.DnsHostName,
-                    this.myAddress,
-                    LogFormatter.PrintDate(this.siloStartTime));
+                if (this.log.IsEnabled(LogLevel.Debug))
+                {
+                    this.log.LogDebug(
+                        (int)ErrorCode.MembershipStarting,
+                        $"{nameof(MembershipTableManager)} starting on host {{HostName}} with SiloAddress {{SiloAddress}} at {{StartTime}}",
+                        this.localSiloDetails.DnsHostName,
+                        this.myAddress,
+                        LogFormatter.PrintDate(this.siloStartTime));
+                }
 
                 // Init the membership table.
                 await this.membershipTableProvider.InitializeMembershipTable(true);

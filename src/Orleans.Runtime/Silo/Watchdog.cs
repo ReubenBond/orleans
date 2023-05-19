@@ -30,7 +30,10 @@ namespace Orleans.Runtime
 
         public void Start()
         {
-            logger.LogInformation("Starting Silo Watchdog.");
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug("Starting Silo watchdog");
+            }
 
             if (thread is not null)
             {
