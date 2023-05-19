@@ -28,7 +28,7 @@ namespace Orleans.Runtime
             this.SiloAddress = siloAddress ?? throw new ArgumentNullException(nameof(siloAddress));
             this.Status = status;
             this.Name = name;
-            this.Endpoints = endpoints.ToList();
+            this.Endpoints = endpoints?.ToList() ?? new List<EndpointInfo>();
         }
 
         /// <summary>
