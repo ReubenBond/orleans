@@ -24,14 +24,14 @@ namespace Orleans.Hosting
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            if (logger.IsEnabled(LogLevel.Debug))
+            if (logger.IsEnabled(LogLevel.Information))
             {
                 this.logger.LogDebug("Starting Orleans Silo.");
             }
 
             await this.silo.StartAsync(cancellationToken).ConfigureAwait(false);
 
-            if (logger.IsEnabled(LogLevel.Debug))
+            if (logger.IsEnabled(LogLevel.Information))
             {
                 this.logger.LogDebug("Orleans Silo started.");
             }
@@ -39,14 +39,14 @@ namespace Orleans.Hosting
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            if (logger.IsEnabled(LogLevel.Debug))
+            if (logger.IsEnabled(LogLevel.Information))
             {
                 this.logger.LogDebug("Stopping Orleans Silo");
             }
 
             await this.silo.StopAsync(cancellationToken).ConfigureAwait(false);
 
-            if (logger.IsEnabled(LogLevel.Debug))
+            if (logger.IsEnabled(LogLevel.Information))
             {
                 this.logger.LogDebug("Orleans Silo stopped.");
             }
