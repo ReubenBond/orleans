@@ -72,7 +72,7 @@ namespace Orleans.Runtime.Placement
             {
                 if (_strategies.TryGetValue(placementStrategyId, out var strategyType))
                 {
-                    strategy = _services.GetRequiredServiceByKey<Type, PlacementStrategy>(strategyType);
+                    strategy = (PlacementStrategy)_services.GetRequiredService(strategyType);
                     strategy.Initialize(properties);
                     return true;
                 }
