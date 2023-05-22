@@ -92,8 +92,18 @@ namespace Orleans.Messaging
 
         private async Task RefreshInternal()
         {
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("Refreshing gateway membership");
+            }
+
             var snapshot = await _gatewayMembershipProvider.GetGatewaysAsync(_shutdownCancellation.Token);
             _updates.TryPublish(snapshot);
+
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("Refreshed gateway membership. Current membership: {CurrentSnapshot}", CurrentSnapshot);
+            }
         }
 
         void ILifecycleParticipant<IClusterClientLifecycle>.Participate(IClusterClientLifecycle observer)

@@ -10,10 +10,10 @@ namespace Orleans.Messaging
     /// <summary>
     /// <see cref="IGatewayListProvider"/> implementation which returns a static list, configured via <see cref="StaticGatewayMembershipProviderOptions"/>.
     /// </summary>
-    public class StaticGatewayMembershipProvider : IGatewayMembershipProvider, IDisposable
+    public class StaticGatewayMembershipProvider : IGatewayMembershipProvider
     {
-        private readonly GatewayMembershipSnapshot _snapshot;
-        private readonly IDisposable _optionsMonitor;
+        private readonly IOptionsMonitor<StaticGatewayMembershipProviderOptions> _options;
+        private MembershipVersion _version;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StaticGatewayMembershipProvider"/> class.
@@ -21,22 +21,16 @@ namespace Orleans.Messaging
         /// <param name="options">The specific options.</param>
         public StaticGatewayMembershipProvider(IOptionsMonitor<StaticGatewayMembershipProviderOptions> options)
         {
-            _snapshot = new GatewayMembershipSnapshot(options.CurrentValue.Gateways, default(MembershipVersion).Successor());
-            _optionsMonitor = options.OnChange((options, name) =>
-            {
-                if (!string.Equals(name, Options.DefaultName, StringComparison.Ordinal))
-                {
-                    return;
-                }
-
-                var newVersion = _snapshot.Version.Successor();
-            });
+            _options = options;
         }
 
         /// <inheritdoc />
-        public ValueTask<GatewayMembershipSnapshot> GetGatewaysAsync(CancellationToken cancellationToken) => new(_snapshot);
+        public ValueTask<GatewayMembershipSnapshot> GetGatewaysAsync(CancellationToken cancellationToken) => new(GetSnapshot());
 
-        /// <inheritdoc />
-        public void Dispose() => _optionsMonitor.Dispose();
+        private GatewayMembershipSnapshot GetSnapshot()
+        {
+            var version = _version = _version.Successor();
+            return new GatewayMembershipSnapshot(_options.CurrentValue.Gateways, version);
+        }
     }
 }

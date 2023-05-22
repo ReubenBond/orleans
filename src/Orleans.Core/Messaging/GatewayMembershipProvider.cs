@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -67,8 +67,18 @@ namespace Orleans.Messaging
         {
             try
             {
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("Initializing gateway membership provider");
+                }
+
                 await _membershipTable.InitializeMembershipTable(tryInitTableVersion: true);
                 await RefreshTableInternal();
+
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("Initialized gateway membership provider");
+                }
 
                 // Prevent future callers from re-running the initialization logic.
                 _initTask = Task.CompletedTask;
@@ -78,12 +88,17 @@ namespace Orleans.Messaging
                 // To ensure a retry happens, we need to set the init task to null.
                 _initTask = null;
 
-                _logger.LogError(exception, "Error initializing membership table.");
+                _logger.LogError(exception, "Error initializing gateway membership provider");
             }
         }
 
         private async ValueTask RefreshTableInternal()
         {
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("Refreshing gateway membership table");
+            }
+
             var table = await _membershipTable.ReadAll();
             if (table.Version.Version > _snapshot.Version.Value)
             {
@@ -113,6 +128,11 @@ namespace Orleans.Messaging
 
                 var newSnapshot = new GatewayMembershipSnapshot(members, new MembershipVersion(table.Version.Version));
                 _snapshot = newSnapshot;
+            }
+            
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("Refreshed gateway membership table");
             }
         }
     }
