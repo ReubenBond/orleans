@@ -8,11 +8,11 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Connections.Transport.Utilities;
 using Orleans.Connections.Sockets;
 using System.Diagnostics;
 using Orleans.Runtime.Internal;
 using System.Net;
+using Orleans.Runtime;
 
 namespace Orleans.Connections.Transport.Sockets;
 
@@ -27,8 +27,8 @@ public sealed class SocketMessageTransport : MessageTransportBase
     private readonly Socket _socket;
     private Queue<WriteRequest> _writeRequests = new();
     private readonly Queue<ReadRequest> _readRequests = new();
-    private readonly SingleWaiterInlineSignal _readSignal = new() { RunContinuationsAsynchronously = false };
-    private readonly SingleWaiterInlineSignal _writeSignal = new() { RunContinuationsAsynchronously = true };
+    private readonly SingleWaiterAutoResetEvent _readSignal = new() { RunContinuationsAsynchronously = false };
+    private readonly SingleWaiterAutoResetEvent _writeSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Action _fireReadSignal;
     private readonly Action _fireWriteSignal;
     private readonly ILogger _logger;

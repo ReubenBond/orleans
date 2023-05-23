@@ -1,7 +1,7 @@
 #nullable enable
 
 using Microsoft.Extensions.Logging;
-using Orleans.Connections.Transport.Utilities;
+using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -14,8 +14,8 @@ namespace Orleans.Connections.Transport.Streams;
 public abstract class StreamMessageTransport : MessageTransportBase
 {
     private readonly ILogger _logger;
-    private readonly SingleWaiterInlineSignal _writerSignal = new();
-    private readonly SingleWaiterInlineSignal _readerSignal = new();
+    private readonly SingleWaiterAutoResetEvent _writerSignal = new();
+    private readonly SingleWaiterAutoResetEvent _readerSignal = new();
     private readonly Queue<WriteRequest> _pendingWrites = new();
     private readonly Queue<ReadRequest> _pendingReads = new();
     private readonly CancellationTokenSource _connectionClosingCts = new();

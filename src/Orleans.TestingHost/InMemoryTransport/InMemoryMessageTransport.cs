@@ -9,7 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Connections.Transport;
-using Orleans.Connections.Transport.Utilities;
+using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 
 namespace Orleans.TestingHost.InMemoryTransport;
@@ -19,8 +19,8 @@ internal class InMemoryMessageTransport : MessageTransportBase
     private const int MinReadSize = 256;
     private Queue<WriteRequest> _writeRequests = new();
     private readonly Queue<ReadRequest> _readRequests = new();
-    private readonly SingleWaiterInlineSignal _readSignal = new() { RunContinuationsAsynchronously = false };
-    private readonly SingleWaiterInlineSignal _writeSignal = new() { RunContinuationsAsynchronously = true };
+    private readonly SingleWaiterAutoResetEvent _readSignal = new() { RunContinuationsAsynchronously = false };
+    private readonly SingleWaiterAutoResetEvent _writeSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Action _fireReadSignal;
     private readonly Action _fireWriteSignal;
     private readonly PipeReader _pipeReader;
