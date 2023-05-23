@@ -204,16 +204,9 @@ public abstract class StreamMessageTransport : MessageTransportBase
             {
                 while (TryDequeue(out operation))
                 {
-                    if (operation.IsSingleBuffer)
+                    foreach (var buffer in operation.Buffers)
                     {
-                        await Stream.WriteAsync(operation.Buffer);
-                    }
-                    else
-                    {
-                        foreach (var buffer in operation.Buffers)
-                        {
-                            await Stream.WriteAsync(buffer);
-                        }
+                        await Stream.WriteAsync(buffer);
                     }
 
                     operation.SetResult();

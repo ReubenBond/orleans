@@ -17,7 +17,6 @@ namespace Orleans.TestingHost.InMemoryTransport;
 internal class InMemoryMessageTransport : MessageTransportBase
 {
     private const int MinReadSize = 256;
-    private Queue<WriteRequest> _writeRequests = new();
     private readonly Queue<ReadRequest> _readRequests = new();
     private readonly SingleWaiterAutoResetEvent _readSignal = new() { RunContinuationsAsynchronously = false };
     private readonly SingleWaiterAutoResetEvent _writeSignal = new() { RunContinuationsAsynchronously = true };
@@ -31,6 +30,7 @@ internal class InMemoryMessageTransport : MessageTransportBase
     private readonly object _shutdownLock = new();
     private readonly object _writesLock = new();
     private readonly object _readsLock = new();
+    private Queue<WriteRequest> _writeRequests = new();
     private bool _readsCompleted;
     private bool _writesCompleted;
     private Task? _processingTask;
@@ -191,6 +191,7 @@ internal class InMemoryMessageTransport : MessageTransportBase
         Exception? error = null;
         ReadRequest? request = null;
         ReadOnlySequence<byte> readBuffer = default;
+        bool hasRead = false;
         try
         {
             // Loop until termination.
@@ -206,7 +207,13 @@ internal class InMemoryMessageTransport : MessageTransportBase
                         Debug.Assert(requestBuffer.Length > 0);
                         if (readBuffer.Length == 0)
                         {
+                            if (hasRead)
+                            {
+                                _pipeReader.AdvanceTo(readBuffer.Start, readBuffer.End);
+                            }
+
                             var readResult = await _pipeReader.ReadAsync(_connectionClosingCts.Token);
+                            hasRead = true;
 
                             if (readResult.IsCanceled || readResult.IsCompleted)
                             {
@@ -232,7 +239,6 @@ internal class InMemoryMessageTransport : MessageTransportBase
                             readBuffer = readBuffer.Slice(readBuffer.Length);
                         }
 
-                        _pipeReader.AdvanceTo(readBuffer.Start, readBuffer.End);
                         if (request.OnRead(transferred))
                         {
                             break;
@@ -322,11 +328,12 @@ internal class InMemoryMessageTransport : MessageTransportBase
                 buffers.Clear();
                 processingRequests.Clear();
 
-                while (requests.TryDequeue(out var request))
+                while (processingRequests.Count < SoftBatchMax && requests.TryDequeue(out var request))
                 {
-                    if (request.IsSingleBuffer)
+                    processingRequests.Add(request);
+                    foreach (var buffer in request.Buffers)
                     {
-                        var flushResult = await _pipeWriter.WriteAsync(request.Buffer, _connectionClosingCts.Token);
+                        var flushResult = await _pipeWriter.WriteAsync(buffer, _connectionClosingCts.Token);
                         if (flushResult.IsCanceled)
                         {
                             error = new OperationCanceledException();
@@ -336,23 +343,6 @@ internal class InMemoryMessageTransport : MessageTransportBase
                         if (flushResult.IsCompleted)
                         {
                             break;
-                        }
-                    }
-                    else
-                    {
-                        foreach (var buffer in request.Buffers)
-                        {
-                            var flushResult = await _pipeWriter.WriteAsync(buffer);
-                            if (flushResult.IsCanceled)
-                            {
-                                error = new OperationCanceledException();
-                                break;
-                            }
-
-                            if (flushResult.IsCompleted)
-                            {
-                                break;
-                            }
                         }
                     }
                 }
@@ -369,11 +359,6 @@ internal class InMemoryMessageTransport : MessageTransportBase
                     request.SetResult();
                 }
             }
-        }
-        catch (ObjectDisposedException ex)
-        {
-            // This exception should always be ignored because _shutdownReason should be set.
-            error = ex;
         }
         catch (Exception ex)
         {

@@ -8,6 +8,8 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Connections.Transport;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
@@ -16,21 +18,30 @@ namespace Orleans.TestingHost.InMemoryTransport;
 
 internal static class InMemoryTransportExtensions
 {
-    public static IListenerBuilder UseInMemoryConnectionTransport(this IListenerBuilder builder, InMemoryTransportConnectionHub hub)
+    public static IListenerBuilder UseInMemoryMessageTransport(this IListenerBuilder builder, InMemoryTransportConnectionHub hub)
     {
         // Add a listener and a factory
         builder.Services.AddSingletonNamedService<MessageTransportListener>(
             builder.EndpointName,
-            (sp, name) => new InMemoryTransportListener(
-                name,
-                sp.GetRequiredService<ILocalSiloDetails>().SiloAddress.Endpoint.ToString(),
-                hub,
-                sp.GetRequiredService<ILoggerFactory>()));
+            (sp, name) => {
+                var details = sp.GetRequiredService<ILocalSiloDetails>();
+                var endpointOptions = sp.GetRequiredService<IOptions<EndpointOptions>>().Value;
+                var isSilo = builder.EndpointName == SiloConnectionListener.DefaultListenerName;
+                var endpoint = isSilo switch
+                {
+                    true => endpointOptions.GetListeningSiloEndpoint(),
+                    false => endpointOptions.GetListeningProxyEndpoint()
+                };
+                return new InMemoryTransportListener(
+                    name,
+                    endpoint.ToString(),
+                    hub);
+            });
 
         return builder;
     }
 
-    public static IConnectorBuilder UseInMemoryConnectionTransport(this IConnectorBuilder builder, InMemoryTransportConnectionHub hub)
+    public static IConnectorBuilder UseInMemoryMessageTransport(this IConnectorBuilder builder, InMemoryTransportConnectionHub hub)
     {
         builder.Services.AddSingletonNamedService<MessageTransportConnector>(builder.EndpointName, (sp, name) => new InMemoryTransportConnector(name, hub, sp.GetRequiredService<ILoggerFactory>()));
         return builder;
@@ -42,15 +53,13 @@ internal class InMemoryTransportListener : MessageTransportListener
     private readonly Channel<(InMemoryMessageTransport Connection, TaskCompletionSource<bool> ConnectionAcceptedTcs)> _acceptQueue = Channel.CreateUnbounded<(InMemoryMessageTransport, TaskCompletionSource<bool>)>();
     private readonly string _endpointValue;
     private readonly InMemoryTransportConnectionHub _hub;
-    private readonly ILoggerFactory _loggerFactory;
     private readonly CancellationTokenSource _disposedCts = new();
 
-    public InMemoryTransportListener(string endpointName, string endpointValue, InMemoryTransportConnectionHub hub, ILoggerFactory loggerFactory)
+    public InMemoryTransportListener(string endpointName, string endpointValue, InMemoryTransportConnectionHub hub)
     {
         EndpointName = endpointName;
         _endpointValue = endpointValue;
         _hub = hub;
-        _loggerFactory = loggerFactory;
     }
 
     public CancellationToken OnDisposed => _disposedCts.Token;
@@ -165,10 +174,16 @@ internal class InMemoryTransportConnector : MessageTransportConnector
         }
 
         var listener = _hub.GetConnectionListenerFactory(endpointValue)!;
+        if (listener is null)
+        {
+            throw new ConnectionFailedException($"Could not find a listener for endpoint {endpointValue}");
+        }
 
         var pipePair = DuplexPipe.CreatePair();
         var local = new InMemoryMessageTransport(pipePair.Left, _connectionLogger);
+        local.Start();
         var remote = new InMemoryMessageTransport(pipePair.Right, _connectionLogger);
+        remote.Start();
         await listener.AddConnection(remote);
         return local;
     }

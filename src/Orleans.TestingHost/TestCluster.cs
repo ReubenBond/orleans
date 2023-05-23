@@ -588,7 +588,7 @@ namespace Orleans.TestingHost
                                 // TCP is used by default
                                 break;
                             case ConnectionTransportType.InMemory:
-                                clientBuilder.Transports.AddConnector(ClientOutboundConnectionFactory.DefaultConnectorName).UseInMemoryConnectionTransport(_transportHub);
+                                clientBuilder.Transports.AddConnector(ClientOutboundConnectionFactory.DefaultConnectorName).UseInMemoryMessageTransport(_transportHub);
                                 break;
                             case ConnectionTransportType.UnixSocket:
                                 clientBuilder.Transports.AddConnector(ClientOutboundConnectionFactory.DefaultConnectorName).UseUnixDomainSockets();
@@ -648,9 +648,9 @@ namespace Orleans.TestingHost
                         case ConnectionTransportType.TcpSocket:
                             break;
                         case ConnectionTransportType.InMemory:
-                            siloBuilder.Transports.AddConnector(SiloConnectionListener.DefaultListenerName).SetProtocol(TransportProtocol.Cluster).UseInMemoryConnectionTransport(_transportHub);
-                            siloBuilder.Transports.AddListener(SiloConnectionListener.DefaultListenerName).SetProtocol(TransportProtocol.Cluster).UseInMemoryConnectionTransport(_transportHub);
-                            siloBuilder.Transports.AddListener(GatewayConnectionListener.DefaultListenerName).SetProtocol(TransportProtocol.Gateway).UseInMemoryConnectionTransport(_transportHub);
+                            siloBuilder.Transports.AddConnector(SiloConnectionListener.DefaultListenerName).SetProtocol(TransportProtocol.Cluster).UseInMemoryMessageTransport(_transportHub);
+                            siloBuilder.Transports.AddListener(SiloConnectionListener.DefaultListenerName).SetProtocol(TransportProtocol.Cluster).UseInMemoryMessageTransport(_transportHub);
+                            siloBuilder.Transports.AddListener(GatewayConnectionListener.DefaultListenerName).SetProtocol(TransportProtocol.Gateway).UseInMemoryMessageTransport(_transportHub);
                             break;
                         case ConnectionTransportType.UnixSocket:
                             siloBuilder.Transports.AddConnector(SiloConnectionListener.DefaultListenerName).SetProtocol(TransportProtocol.Cluster).UseUnixDomainSockets();

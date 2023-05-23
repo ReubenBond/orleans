@@ -95,7 +95,7 @@ namespace Orleans.TestingHost
         /// <remarks>
         /// Defaults to InMemory.
         /// </remarks>
-        public ConnectionTransportType ConnectionTransport { get; set; } = ConnectionTransportType.TcpSocket;
+        public ConnectionTransportType ConnectionTransport { get; set; } = ConnectionTransportType.InMemory;
 
         /// <summary>
         /// Converts these options into a dictionary.

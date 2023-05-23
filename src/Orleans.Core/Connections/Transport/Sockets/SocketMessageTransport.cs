@@ -25,7 +25,6 @@ public sealed class SocketMessageTransport : MessageTransportBase
     private readonly SocketSender _socketSender = new();
     private readonly SocketReceiver _socketReceiver = new();
     private readonly Socket _socket;
-    private Queue<WriteRequest> _writeRequests = new();
     private readonly Queue<ReadRequest> _readRequests = new();
     private readonly SingleWaiterAutoResetEvent _readSignal = new() { RunContinuationsAsynchronously = false };
     private readonly SingleWaiterAutoResetEvent _writeSignal = new() { RunContinuationsAsynchronously = true };
@@ -39,6 +38,7 @@ public sealed class SocketMessageTransport : MessageTransportBase
     private readonly object _readsLock = new();
     private readonly string _remoteEndpointString; // For diagnostics only
     private readonly string _localEndpointString; // For diagnostics only
+    private Queue<WriteRequest> _writeRequests = new();
     private bool _readsCompleted;
     private bool _writesCompleted;
     private Task? _processingTask;

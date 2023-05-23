@@ -117,13 +117,14 @@ public class MessageTransportStream : Stream
         {
             RunContinuationsAsynchronously = true
         };
+
         private ReadOnlyMemory<byte> _buffer;
         public StreamWriteRequest()
         {
             IsSingleBuffer = true;
         }
 
-        public override ReadOnlySequence<byte> Buffers => throw null!;
+        public override ReadOnlySequence<byte> Buffers => new(_buffer);
         public void SetBuffer(ReadOnlyMemory<byte> buffer) => _buffer = buffer;
         public override ReadOnlyMemory<byte> Buffer => _buffer;
         public ValueTask OnCompleteAsync() => new(this, _signal.Version);
