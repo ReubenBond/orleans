@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using Orleans.Core.Internal;
 
 namespace Orleans.Runtime
@@ -45,19 +46,19 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
-        /// Allows reentrancy for subsequent calls issued before the returned <see cref="ReentrancySection"/> is disposed.
+        /// Allows reentrancy for subsequent calls issued before the returned <see cref="ReentrantRegion"/> is disposed.
         /// </summary>
-        public static ReentrancySection AllowCallChainReentrancy()
+        public static ReentrantRegion AllowCallChainReentrancy()
         {
             var originalCallChainId = ReentrancyId;
             var newCallChainId = originalCallChainId == Guid.Empty ? Guid.NewGuid() : originalCallChainId;
-            return new ReentrancySection(originalCallChainId, newCallChainId);
+            return new ReentrantRegion(originalCallChainId, newCallChainId);
         }
 
         /// <summary>
-        /// Suppresses reentrancy for subsequent calls issued before the returned <see cref="ReentrancySection"/> is disposed.
+        /// Suppresses reentrancy for subsequent calls issued before the returned <see cref="ReentrantRegion"/> is disposed.
         /// </summary>
-        public static ReentrancySection SuppressCallChainReentrancy() => new(ReentrancyId, Guid.Empty);
+        public static ReentrantRegion SuppressCallChainReentrancy() => new(ReentrancyId, Guid.Empty);
 
         /// <summary>
         /// Retrieves a value from the request context.
@@ -168,12 +169,12 @@ namespace Orleans.Runtime
             public bool IsDefault => Values is null;
         }
 
-        public readonly struct ReentrancySection : IDisposable
+        public readonly struct ReentrantRegion : IDisposable
         {
             private readonly Guid _originalReentrancyId;
             private readonly Guid _newReentrancyId;
 
-            public ReentrancySection(Guid originalReentrancyId, Guid newReentrancyId)
+            public ReentrantRegion(Guid originalReentrancyId, Guid newReentrancyId)
             {
                 _originalReentrancyId = originalReentrancyId;
                 _newReentrancyId = newReentrancyId;
@@ -186,7 +187,7 @@ namespace Orleans.Runtime
                 if (newReentrancyId != Guid.Empty)
                 {
                     var grain = RuntimeContext.Current as ICallChainReentrantGrainContext;
-                    grain?.OnEnterReentrantSection(_newReentrancyId);
+                    grain?.OnEnterReentrantRegion(_newReentrancyId);
                 }
             }
 
@@ -195,13 +196,39 @@ namespace Orleans.Runtime
                 if (_newReentrancyId != Guid.Empty)
                 {
                     var grain = RuntimeContext.Current as ICallChainReentrantGrainContext;
-                    grain?.OnExitReentrantSection(_newReentrancyId);
+                    grain?.OnExitReentrantRegion(_newReentrancyId);
                 }
 
                 if (_newReentrancyId != _originalReentrancyId)
                 {
                     ReentrancyId = _originalReentrancyId;
                 }
+            }
+        }
+
+        public readonly struct CriticalRegion
+        {
+            private readonly Guid _id;
+
+            public CriticalRegion(Guid id)
+            {
+                _id = id;
+            }
+
+            public static async ValueTask<CriticalRegion> EnterCriticalRegionAsync()
+            {
+                var grain = RuntimeContext.Current as ICriticalRegionGrainContext;
+                if (grain is null) return default;
+                var id = Guid.NewGuid();
+                await grain.OnEnterCriticalRegionAsync(id);
+                return new CriticalRegion(id);
+            }
+
+            public void Dispose()
+            {
+                var grain = RuntimeContext.Current as ICriticalRegionGrainContext;
+                if (grain is null) return;
+                grain.OnExitCriticalRegion(_id);
             }
         }
     }

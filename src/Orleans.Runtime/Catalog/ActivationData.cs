@@ -34,7 +34,7 @@ namespace Orleans.Runtime
         private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
         private readonly GrainLifecycle _lifecycle;
         private List<object> _pendingOperations;
-        private Message _blockingRequest;
+        private object _blockingRequest;
         private bool _isInWorkingSet;
         private CoarseStopwatch _busyDuration;
         private CoarseStopwatch _idleDuration;
@@ -496,9 +496,9 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                if (_blockingRequest is not null)
+                if (_blockingRequest is Message)
                 {
-                    var message = _blockingRequest;
+                    var message = (Message)_blockingRequest;
                     TimeSpan? timeSinceQueued = default;
                     if (_runningRequests.TryGetValue(message, out var waitTime))
                     {
@@ -897,8 +897,7 @@ namespace Orleans.Runtime
                 }
 
                 // Handle call-chain reentrancy
-                if (incoming.GetReentrancyId() is Guid id
-                    && IsReentrantSection(id))
+                if (incoming.GetReentrancyId() is Guid id && IsReentrantSection(id))
                 {
                     return true;
                 }
@@ -939,13 +938,16 @@ namespace Orleans.Runtime
                             case Command.UnregisterFromCatalog:
                                 UnregisterMessageTarget();
                                 break;
+                            case Command.EnterCriticalRegion cmd:
+                                await Ente;
+                                break;
                             default:
                                 throw new NotSupportedException($"Encountered unknown operation of type {op?.GetType().ToString() ?? "null"} {op}");
                         }
                     }
                     catch (Exception exception)
                     {
-                        _shared.Logger.LogError(exception, "Error in RunOnInactive for grain activation {Activation}", this);
+                        _shared.Logger.LogError(exception, $"Error in {nameof(ProcessOperationsAsync)} for grain activation {{Activation}}", this);
                     }
                 }
             }
@@ -1527,7 +1529,7 @@ namespace Orleans.Runtime
             }
         }
 
-        void ICallChainReentrantGrainContext.OnEnterReentrantSection(Guid reentrancyId)
+        void ICallChainReentrantGrainContext.OnEnterReentrantRegion(Guid reentrancyId)
         {
             var tracker = GetComponent<ReentrantRequestTracker>();
             if (tracker is null)
@@ -1539,7 +1541,7 @@ namespace Orleans.Runtime
             tracker.EnterReentrantSection(reentrancyId);
         }
 
-        void ICallChainReentrantGrainContext.OnExitReentrantSection(Guid reentrancyId)
+        void ICallChainReentrantGrainContext.OnExitReentrantRegion(Guid reentrancyId)
         {
             var tracker = GetComponent<ReentrantRequestTracker>();
             if (tracker is null)
@@ -1649,6 +1651,16 @@ namespace Orleans.Runtime
 
             public class UnregisterFromCatalog : Command
             {
+            }
+
+            public class EnterCriticalRegion : Command
+            {
+                public Guid RegionId { get; set; }
+            }
+
+            public class ExitCriticalRegion : Command
+            {
+                public Guid RegionId { get; set; }
             }
         }
 
