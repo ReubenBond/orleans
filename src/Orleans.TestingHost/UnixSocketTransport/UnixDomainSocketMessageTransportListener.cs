@@ -1,66 +1,86 @@
-/*
 #nullable enable
 
 using System;
-using System.Diagnostics;
-using System.Net;
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Connections.Sockets;
 using Orleans.Connections.Transport;
 using Orleans.Connections.Transport.Sockets;
 
 namespace Orleans.TestingHost.UnixSocketTransport;
 
-internal class UnixSocketMessageTransportListener : MessageTransportListener
+public class UnixDomainSocketMessageTransportListenerOptions
+{
+    public string Path { get; set; } = CreateDefaultPath();
+    public bool Enabled { get; set; } = true;
+    private static string CreateDefaultPath() => System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"silo_{Guid.NewGuid():N}");
+}
+
+internal class UnixDomainSocketMessageTransportListener : MessageTransportListener
 {
     private Socket? _listenSocket;
+    private IOptionsMonitor<UnixDomainSocketMessageTransportListenerOptions> _listenerOptions;
 
-    internal UnixSocketMessageTransportListener(UnixDomainSocketEndPoint localEndpoint, EndPoint endpoint, ILoggerFactory loggerFactory)
+    internal UnixDomainSocketMessageTransportListener(
+        string endpointName,
+        IOptionsMonitor<UnixDomainSocketMessageTransportListenerOptions> listenerOptions,
+        ILoggerFactory loggerFactory)
     {
-        Debug.Assert(localEndpoint != null);
-        Debug.Assert(loggerFactory != null);
-
-        LocalEndpoint = localEndpoint;
+        EndpointName = endpointName;
+        _listenerOptions = listenerOptions;
         Logger = loggerFactory.CreateLogger("Orleans.Connections.Transport.Sockets");
     }
 
     protected ILogger Logger { get; }
 
-    public override ValueTask BindAsync(CancellationToken cancellationToken = default)
+    /// <inheritdoc/>
+    public override FeatureCollection Features { get; } = new FeatureCollection();
+
+    /// <inheritdoc/>
+    public override bool IsValid => _listenerOptions.Get(EndpointName).Enabled;
+
+    /// <inheritdoc/>
+    public override string EndpointName { get; }
+
+    protected virtual Socket CreateListenSocket()
+    {
+        var listenSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+
+        return listenSocket;
+    }
+
+    public override ValueTask<EndpointInfo> BindAsync(CancellationToken cancellationToken = default)
     {
         if (_listenSocket != null)
         {
             throw new InvalidOperationException("Transport already bound");
         }
 
-        if (LocalEndpoint is null)
-        {
-            throw new ArgumentNullException(nameof(LocalEndpoint));
-        }
+        var listenSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
 
-        var listenSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified)
-        {
-            LingerState = new LingerOption(true, 0),
-            NoDelay = true
-        };
-
+        var options = _listenerOptions.Get(EndpointName);
+        var path = options.Path;
         try
         {
-            listenSocket.Bind(LocalEndpoint);
+            listenSocket.Bind(new UnixDomainSocketEndPoint(path));
         }
         catch (SocketException e) when (e.SocketErrorCode == SocketError.AddressAlreadyInUse)
         {
             throw new AddressInUseException(e.Message, e);
         }
 
-        LocalEndpoint = listenSocket.LocalEndPoint;
-
         listenSocket.Listen(512);
 
         _listenSocket = listenSocket;
-        return default;
+        var epInfo = new EndpointInfo(EndpointName)
+        {
+            [UnixDomainSocketMessageTransportConnector.PathPropertyName] = path,
+        };
+        return new(epInfo);
     }
 
     public override async ValueTask<MessageTransport?> AcceptAsync(CancellationToken cancellationToken = default)
@@ -70,7 +90,7 @@ internal class UnixSocketMessageTransportListener : MessageTransportListener
             try
             {
                 var acceptSocket = await _listenSocket!.AcceptAsync();
-                var connection = new TcpMessageTransport(acceptSocket, Logger);
+                var connection = new SocketMessageTransport(acceptSocket, Logger);
                 connection.Start();
 
                 return connection;
@@ -106,4 +126,3 @@ internal class UnixSocketMessageTransportListener : MessageTransportListener
         await base.DisposeAsync();
     }
 }
-*/

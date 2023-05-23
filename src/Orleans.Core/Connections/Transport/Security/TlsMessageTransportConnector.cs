@@ -12,16 +12,14 @@ namespace Orleans.Connections.Transport.Security;
 /// </summary>
 public class TlsMessageTransportConnector : MessageTransportConnector
 {
-    private readonly string _name;
     private readonly MessageTransportConnector _innerConnector;
     private readonly ILogger<ClientTlsMessageTransport> _logger;
     private readonly IOptionsMonitor<TlsOptions> _tlsOptions;
 
-    public TlsMessageTransportConnector(string name, MessageTransportConnector innerTransportFactory, IOptionsMonitor<TlsOptions> tlsOptions, ILoggerFactory loggerFactory)
+    public TlsMessageTransportConnector(MessageTransportConnector innerTransportFactory, IOptionsMonitor<TlsOptions> tlsOptions, ILoggerFactory loggerFactory)
     {
         _innerConnector = innerTransportFactory;
         _logger = loggerFactory.CreateLogger<ClientTlsMessageTransport>();
-        _name = name;
         _tlsOptions = tlsOptions;
     }
 
@@ -32,10 +30,13 @@ public class TlsMessageTransportConnector : MessageTransportConnector
     public override bool IsValid => _innerConnector.IsValid;
 
     /// <inheritdoc/>
+    public override string EndpointName => _innerConnector.EndpointName;
+
+    /// <inheritdoc/>
     public override async ValueTask<MessageTransport> CreateAsync(EndpointInfo endpointInfo, CancellationToken cancellationToken = default)
     {
         var innerTransport = await _innerConnector.CreateAsync(endpointInfo, cancellationToken);
-        var tlsOptions = _tlsOptions.Get(_name);
+        var tlsOptions = _tlsOptions.Get(EndpointName);
         var transport = new ClientTlsMessageTransport(innerTransport, tlsOptions, _logger);
         transport.Start();
         return transport;

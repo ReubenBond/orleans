@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Diagnostics;
 using Orleans.Connections.Sockets;
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Options;
 
 namespace Orleans.Connections.Transport.Sockets;
@@ -22,13 +21,12 @@ public class TcpMessageTransportListenerOptions
 /// <summary>
 /// <see cref="MessageTransportListener"/> which listens for TCP connections.
 /// </summary>
-public class TcpMessageTransportListener : MessageTransportListener
+public sealed class TcpMessageTransportListener : MessageTransportListener
 {
     private Socket? _listenSocket;
     private readonly IOptionsMonitor<TcpMessageTransportOptions> _tcpOptions;
     private readonly IOptionsMonitor<TcpMessageTransportListenerOptions> _listenerOptions;
 
-    [SetsRequiredMembers]
     internal TcpMessageTransportListener(string endpointName, IOptionsMonitor<TcpMessageTransportOptions> tcpOptions, IOptionsMonitor<TcpMessageTransportListenerOptions> listenerOptions, ILoggerFactory loggerFactory)
     {
         Debug.Assert(loggerFactory != null);
@@ -43,9 +41,13 @@ public class TcpMessageTransportListener : MessageTransportListener
     /// <inheritdoc/>
     public override FeatureCollection Features { get; } = new FeatureCollection();
 
+    /// <inheritdoc/>
     public override bool IsValid => _listenerOptions.Get(EndpointName).Enabled;
 
-    protected virtual Socket CreateListenSocket()
+    /// <inheritdoc/>
+    public override string EndpointName { get; }
+
+    protected Socket CreateListenSocket()
     {
         var options = _tcpOptions.Get(EndpointName);
         var listenerOptions = _listenerOptions.Get(EndpointName);
@@ -71,7 +73,7 @@ public class TcpMessageTransportListener : MessageTransportListener
         return listenSocket;
     }
 
-    protected virtual void OnAcceptSocket(Socket socket)
+    protected void OnAcceptSocket(Socket socket)
     {
         var options = _tcpOptions.Get(EndpointName);
         socket.NoDelay = options.NoDelay;
@@ -115,7 +117,7 @@ public class TcpMessageTransportListener : MessageTransportListener
                 var acceptSocket = await _listenSocket!.AcceptAsync(cancellationToken).ConfigureAwait(false);
                 OnAcceptSocket(acceptSocket);
 
-                var transport = new TcpMessageTransport(acceptSocket, Logger);
+                var transport = new SocketMessageTransport(acceptSocket, Logger);
                 transport.Start();
 
                 return transport;

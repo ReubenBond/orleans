@@ -70,6 +70,11 @@ public abstract class MessageTransport : IAsyncDisposable
 public abstract class MessageTransportConnector : IAsyncDisposable
 {
     /// <summary>
+    /// Gets the endpoint name that this connector connects to.
+    /// </summary>
+    public abstract string EndpointName { get; }
+
+    /// <summary>
     /// Gets the collection of features available on the transport factory.
     /// </summary>
     public abstract IFeatureCollection Features { get; }
@@ -93,22 +98,6 @@ public abstract class MessageTransportConnector : IAsyncDisposable
         GC.SuppressFinalize(this);
         return default;
     }
-}
-
-internal interface IEndpointNameFeature
-{
-    public string EndpointName { get; }
-}
-
-internal class EndpointNameFeature : IEndpointNameFeature
-{
-    [SetsRequiredMembers]
-    public EndpointNameFeature(string endpointName)
-    {
-        EndpointName = endpointName;
-    }
-
-    public required string EndpointName { get; init; }
 }
 
 /// <summary>
@@ -185,7 +174,6 @@ internal class ClientTransportCollection : IClientTransportCollection
     public IConnectorBuilder AddConnector(string endpointName)
     {
         var result = new ConnectorBuilder(endpointName, _services);
-        result.AddMiddleware(factory => factory.Features.Set<IEndpointNameFeature>(new EndpointNameFeature(endpointName)));
         result.SetProtocol(TransportProtocol.Gateway);
         return result;
     }
@@ -248,18 +236,18 @@ internal class ConnectorBuilder : IConnectorBuilder
 
     public string EndpointName { get; }
 
-        private static Func<IServiceProvider, MessageTransportConnector> GetConnectorFunc(string name)
+    private static Func<IServiceProvider, MessageTransportConnector> GetConnectorFunc(string name)
+    {
+        return sp =>
         {
-            return sp =>
+            var connector = sp.GetRequiredServiceByName<MessageTransportConnector>(name);
+            var mw = sp.GetServicesByName<IMessageTransportConnectorMiddleware>(name);
+            foreach (var middleware in mw)
             {
-                var connector = sp.GetRequiredServiceByName<MessageTransportConnector>(name);
-                var mw = sp.GetServicesByName<IMessageTransportConnectorMiddleware>(name);
-                foreach (var middleware in mw)
-                {
-                    connector = middleware.Apply(connector);
-                }
+                connector = middleware.Apply(connector);
+            }
 
-                return connector;
-            };
-        }
+            return connector;
+        };
+    }
 }

@@ -11,19 +11,17 @@ namespace Orleans.Connections.Transport;
 /// </summary>
 public sealed class TlsMessageTransportConnectorMiddleware : IMessageTransportConnectorMiddleware
 {
-    private readonly string _endpointName;
     private readonly IOptionsMonitor<TlsOptions> _tlsOptions;
     private readonly ILoggerFactory _loggerFactory;
 
     public TlsMessageTransportConnectorMiddleware(string endpointName, IOptionsMonitor<TlsOptions> tlsOptions, ILoggerFactory loggerFactory)
     {
-        _endpointName = endpointName;
         _tlsOptions = tlsOptions;
         _loggerFactory = loggerFactory;
     }
 
     /// <inheritdoc/>
-    public MessageTransportConnector Apply(MessageTransportConnector transport) => new TlsMessageTransportConnector(_endpointName, transport, _tlsOptions, _loggerFactory);
+    public MessageTransportConnector Apply(MessageTransportConnector transport) => new TlsMessageTransportConnector(transport, _tlsOptions, _loggerFactory);
 }
 
 /// <summary>
@@ -31,17 +29,15 @@ public sealed class TlsMessageTransportConnectorMiddleware : IMessageTransportCo
 /// </summary>
 public sealed class TlsMessageTransportListenerMiddleware : IMessageTransportListenerMiddleware
 {
-    private readonly string _endpointName;
     private readonly IOptionsMonitor<TlsOptions> _tlsOptions;
     private readonly ILoggerFactory _loggerFactory;
 
-    public TlsMessageTransportListenerMiddleware(string endpointName, IOptionsMonitor<TlsOptions> tlsOptions, ILoggerFactory loggerFactory)
+    public TlsMessageTransportListenerMiddleware(IOptionsMonitor<TlsOptions> tlsOptions, ILoggerFactory loggerFactory)
     {
-        _endpointName = endpointName;
         _tlsOptions = tlsOptions;
         _loggerFactory = loggerFactory;
     }
 
     /// <inheritdoc/>
-    public MessageTransportListener Apply(MessageTransportListener input) => new TlsMessageTransportListener(_endpointName, input, _tlsOptions, _loggerFactory);
+    public MessageTransportListener Apply(MessageTransportListener input) => new TlsMessageTransportListener(input, _tlsOptions, _loggerFactory);
 }

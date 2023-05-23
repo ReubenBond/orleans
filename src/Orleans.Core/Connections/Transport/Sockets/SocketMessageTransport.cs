@@ -16,7 +16,7 @@ using System.Net;
 
 namespace Orleans.Connections.Transport.Sockets;
 
-public sealed class TcpMessageTransport : MessageTransportBase
+public sealed class SocketMessageTransport : MessageTransportBase
 {
     private const int MinReadSize = 256;
     private static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
@@ -45,7 +45,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
     private volatile bool _socketDisposed;
     private volatile Exception? _shutdownReason;
 
-    public TcpMessageTransport(Socket socket, ILogger logger)
+    public SocketMessageTransport(Socket socket, ILogger logger)
     {
         _socket = socket;
         _logger = logger;
@@ -91,7 +91,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
             }
             catch (Exception ex)
             {
-                _logger.LogError(0, ex, $"Unexpected exception in {nameof(TcpMessageTransport)}.{nameof(ProcessReads)}.");
+                _logger.LogError(0, ex, $"Unexpected exception in {nameof(SocketMessageTransport)}.{nameof(ProcessReads)}.");
             }
 
             try
@@ -100,7 +100,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
             }
             catch (Exception ex)
             {
-                _logger.LogError(0, ex, $"Unexpected exception in {nameof(TcpMessageTransport)}.{nameof(ProcessWrites)}.");
+                _logger.LogError(0, ex, $"Unexpected exception in {nameof(SocketMessageTransport)}.{nameof(ProcessWrites)}.");
             }
 
             _socketReceiver.Dispose();
@@ -109,7 +109,7 @@ public sealed class TcpMessageTransport : MessageTransportBase
         catch (Exception ex)
         {
             _shutdownReason ??= ex;
-            _logger.LogError(0, ex, $"Unexpected exception in {nameof(TcpMessageTransport)}.{nameof(StartAsync)}.");
+            _logger.LogError(0, ex, $"Unexpected exception in {nameof(SocketMessageTransport)}.{nameof(StartAsync)}.");
         }
         finally
         {
@@ -593,5 +593,5 @@ public sealed class TcpMessageTransport : MessageTransportBase
         return ep;
     }
 
-    public override string ToString() => $"Tcp(Remote: {_remoteEndpointString}, Local: {_localEndpointString})";
+    public override string ToString() => $"Socket(Remote: {_remoteEndpointString}, Local: {_localEndpointString})";
 }

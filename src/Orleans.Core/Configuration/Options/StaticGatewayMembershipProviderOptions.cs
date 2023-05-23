@@ -26,7 +26,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Adds a gateway described via a TCP endpoint.
         /// </summary>
-        /// <param name="endpoint"></param>
+        /// <param name="endpoint">The endpoint.</param>
         public void AddTcpGateway(IPEndPoint endpoint)
         {
             Gateways.Add(new GatewayMember(

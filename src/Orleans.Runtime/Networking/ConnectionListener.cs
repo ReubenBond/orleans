@@ -19,9 +19,6 @@ using Orleans.Connections.Transport.Security;
 using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Runtime.Messaging;
-using System.Net;
-using System.Collections.Immutable;
-using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Hosting
 {
@@ -39,19 +36,9 @@ namespace Orleans.Runtime.Messaging
         private readonly IServiceCollection _services;
         public SiloTransportCollection(IServiceCollection services) => _services = services;
 
-        public IListenerBuilder AddListener(string endpointName)
-        {
-            var result = new ListenerBuilder(endpointName, _services);
-            result.AddMiddleware(listener => listener.Features.Set<IEndpointNameFeature>(new EndpointNameFeature(endpointName)));
-            return result;
-        }
+        public IListenerBuilder AddListener(string endpointName) => new ListenerBuilder(endpointName, _services);
 
-        public IConnectorBuilder AddConnector(string endpointName)
-        {
-            var result = new ConnectorBuilder(endpointName, _services);
-            result.AddMiddleware(listener => listener.Features.Set<IEndpointNameFeature>(new EndpointNameFeature(endpointName)));
-            return result;
-        }
+        public IConnectorBuilder AddConnector(string endpointName) => new ConnectorBuilder(endpointName, _services);
     }
 
     public static class SiloTransportConnectionExtensions
@@ -273,11 +260,23 @@ namespace Orleans.Runtime.Messaging
         {
 
             // Get the listeners which are valid according to their configuration.
-            _listeners = listeners.Where(static listener => listener.IsValid).ToArray();
+            _listeners = GetListeners(listeners).ToArray();
             _listenerEndpointRegistry = listenerEndpointRegistry;
             _connectionManager = connectionManager;
             ConnectionOptions = connectionOptions.Value;
             _connectionShared = connectionShared;
+
+            static IEnumerable<MessageTransportListener> GetListeners(IEnumerable<MessageTransportListener> registered)
+            {
+                // Filter out duplicates and non-valid listeners
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var listener in registered/*.Reverse()*/)
+                {
+                    if (!listener.IsValid) continue;
+                    if (!seen.Add(listener.EndpointName)) continue;
+                    yield return listener;
+                }
+            }
         }
 
         protected bool HasListeners => _listeners is { Length: > 0 };

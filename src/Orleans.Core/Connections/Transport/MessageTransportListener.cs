@@ -19,7 +19,7 @@ public abstract class MessageTransportListener : IAsyncDisposable
     /// <summary>
     /// Gets the name of the endpoint.
     /// </summary>
-    public required string EndpointName { get; init; }
+    public abstract string EndpointName { get; }
 
     /// <summary>
     /// Gets the collection of features available on the listener.

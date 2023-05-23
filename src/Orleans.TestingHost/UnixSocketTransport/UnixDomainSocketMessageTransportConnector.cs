@@ -1,40 +1,23 @@
 #nullable enable
-
 using System;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using System.Runtime.CompilerServices;
-using System.Net;
-using Microsoft.Extensions.Options;
-using System.Diagnostics.CodeAnalysis;
+using Orleans.Connections.Transport;
+using Orleans.Connections.Transport.Sockets;
 
-namespace Orleans.Connections.Transport.Sockets;
+namespace Orleans.TestingHost.UnixSocketTransport;
 
-public class TcpMessageTransportOptions
+internal class UnixDomainSocketMessageTransportConnector : MessageTransportConnector
 {
-    // We can expose these eventually, if desired.
-    internal LingerOption LingerOption { get; set; } = new LingerOption(true, 0);
-    internal bool NoDelay { get; set; } = true;
-    internal bool FastPath { get; set; } = true;
-    internal bool DualMode { get; set; } = true;
-}
-
-/// <summary>
-/// <see cref="MessageTransportConnector"/> which creates TCP connections.
-/// </summary>
-public class TcpMessageTransportConnector : MessageTransportConnector
-{
-    public const string EndpointAddressPropertyName = "ep";
-    private readonly IOptionsMonitor<TcpMessageTransportOptions> _options;
+    public const string PathPropertyName = "path";
     private readonly ILogger _logger;
 
-    [SetsRequiredMembers]
-    public TcpMessageTransportConnector(string name, IOptionsMonitor<TcpMessageTransportOptions> options, ILoggerFactory loggerFactory)
+    public UnixDomainSocketMessageTransportConnector(string name, ILoggerFactory loggerFactory)
     {
         EndpointName = name;
-        _options = options;
         _logger = loggerFactory.CreateLogger("Orleans.Connections.Transport.Sockets");
     }
 
@@ -44,34 +27,23 @@ public class TcpMessageTransportConnector : MessageTransportConnector
     /// <inheritdoc/>
     public override bool IsValid => true;
 
-    /// <inheritdoc/>
     public override string EndpointName { get; }
 
     /// <inheritdoc/>
     public override async ValueTask<MessageTransport> CreateAsync(EndpointInfo endpointInfo, CancellationToken cancellationToken = default)
     {
-        if (!endpointInfo.TryGetValue(EndpointAddressPropertyName, out var endpointString))
+        if (!endpointInfo.TryGetValue(PathPropertyName, out var path))
         {
-            throw new ConnectionAbortedException($"Endpoint {endpointInfo.Name} is configured for TCP but no destination address was specified");
+            throw new ConnectionAbortedException($"Endpoint {endpointInfo.Name} is configured for Unix Domain Sockets but no destination path was specified");
         }
 
-        var endpoint = IPEndPoint.Parse(endpointString);
-        var options = _options.Get(EndpointName);
-
-        var socket = new Socket(endpoint.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
-        {
-            LingerState = options.LingerOption,
-            NoDelay = options.NoDelay
-        };
-
-        if (options.FastPath)
-        {
-            socket.EnableFastPath(noDelay: options.NoDelay);
-        }
+        var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        var unixEndpoint = new UnixDomainSocketEndPoint(path);
+        await socket.ConnectAsync(unixEndpoint);
 
         var completion = new SingleUseAwaitableSocketAsyncEventArgs
         {
-            RemoteEndPoint = endpoint,
+            RemoteEndPoint = unixEndpoint,
         };
 
         try
@@ -90,7 +62,7 @@ public class TcpMessageTransportConnector : MessageTransportConnector
 
             if (completion.SocketError != SocketError.Success)
             {
-                throw new SocketConnectionException($"Unable to connect to {endpoint}. Error: {completion.SocketError}");
+                throw new SocketConnectionException($"Unable to connect to {path}. Error: {completion.SocketError}");
             }
 
             var connection = new SocketMessageTransport(socket, _logger);

@@ -15,10 +15,22 @@ internal abstract class ConnectionFactory
     protected ConnectionFactory(
         IEnumerable<MessageTransportConnector> transportConnectors)
     {
-        _transportConnectors = transportConnectors
+        _transportConnectors = GetConnectors(transportConnectors)
             .ToDictionary(
-            static connector => connector.Features.Get<IEndpointNameFeature>()?.EndpointName ?? throw new InvalidOperationException($"{nameof(MessageTransportConnector)} {connector} is missing required feature {nameof(IEndpointNameFeature)}"),
-            static connector => connector);
+                static connector => connector.EndpointName,
+                static connector => connector);
+
+        static IEnumerable<MessageTransportConnector> GetConnectors(IEnumerable<MessageTransportConnector> registered)
+        {
+            // Filter out duplicates and non-valid connectors
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var connector in registered/*.Reverse()*/)
+            {
+                if (!connector.IsValid) continue;
+                if (!seen.Add(connector.EndpointName)) continue;
+                yield return connector;
+            }
+        }
     }
 
     protected abstract Connection CreateConnection(SiloAddress address, MessageTransport context);

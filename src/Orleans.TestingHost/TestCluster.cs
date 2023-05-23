@@ -14,10 +14,11 @@ using Microsoft.Extensions.Configuration.Memory;
 using Orleans.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
-/*
-using Orleans.TestingHost.InMemoryTransport;
+using Orleans.Runtime.Messaging;
+using Orleans.Connections.Transport;
 using Orleans.TestingHost.UnixSocketTransport;
-*/
+using Orleans.TestingHost.InMemoryTransport;
+using Orleans.Messaging;
 
 namespace Orleans.TestingHost
 {
@@ -35,7 +36,7 @@ namespace Orleans.TestingHost
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
         private readonly TestClusterOptions options;
         private readonly StringBuilder log = new StringBuilder();
-        //private readonly InMemoryTransportConnectionHub _transportHub = new();
+        private readonly InMemoryTransportConnectionHub _transportHub = new();
         private bool _disposed;
         private int startedInstances;
 
@@ -584,44 +585,13 @@ namespace Orleans.TestingHost
                         switch (transport)
                         {
                             case ConnectionTransportType.TcpSocket:
+                                // TCP is used by default
                                 break;
                             case ConnectionTransportType.InMemory:
+                                clientBuilder.Transports.AddConnector(ClientOutboundConnectionFactory.DefaultConnectorName).UseInMemoryConnectionTransport(_transportHub);
                                 break;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                                /*
-                                clientBuilder.UseInMemoryConnectionTransport(_transportHub);
-                                break;
-                                */
                             case ConnectionTransportType.UnixSocket:
-
-
-
-
-
-
-
-                                //clientBuilder.UseUnixSocketConnection();
+                                clientBuilder.Transports.AddConnector(ClientOutboundConnectionFactory.DefaultConnectorName).UseUnixDomainSockets();
                                 break;
                             default:
                                 throw new ArgumentException($"Unsupported {nameof(ConnectionTransportType)}: {transport}");
@@ -678,25 +648,14 @@ namespace Orleans.TestingHost
                         case ConnectionTransportType.TcpSocket:
                             break;
                         case ConnectionTransportType.InMemory:
+                            siloBuilder.Transports.AddConnector(SiloConnectionListener.DefaultListenerName).SetProtocol(TransportProtocol.Cluster).UseInMemoryConnectionTransport(_transportHub);
+                            siloBuilder.Transports.AddListener(SiloConnectionListener.DefaultListenerName).SetProtocol(TransportProtocol.Cluster).UseInMemoryConnectionTransport(_transportHub);
+                            siloBuilder.Transports.AddListener(GatewayConnectionListener.DefaultListenerName).SetProtocol(TransportProtocol.Gateway).UseInMemoryConnectionTransport(_transportHub);
                             break;
-
-
-
-
-
-
-                            /*
-                            siloBuilder.UseInMemoryConnectionTransport(_transportHub);
-                            break;
-                            */
                         case ConnectionTransportType.UnixSocket:
-
-
-
-
-
-
-                            //siloBuilder.UseUnixSocketConnection();
+                            siloBuilder.Transports.AddConnector(SiloConnectionListener.DefaultListenerName).SetProtocol(TransportProtocol.Cluster).UseUnixDomainSockets();
+                            siloBuilder.Transports.AddListener(SiloConnectionListener.DefaultListenerName).SetProtocol(TransportProtocol.Cluster).UseUnixDomainSockets();
+                            siloBuilder.Transports.AddListener(GatewayConnectionListener.DefaultListenerName).SetProtocol(TransportProtocol.Gateway).UseUnixDomainSockets();
                             break;
                         default:
                             throw new ArgumentException($"Unsupported {nameof(ConnectionTransportType)}: {transport}");

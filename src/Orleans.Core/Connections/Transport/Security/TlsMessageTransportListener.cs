@@ -1,7 +1,5 @@
 #nullable enable
 
-using System.Diagnostics.CodeAnalysis;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -18,10 +16,8 @@ public class TlsMessageTransportListener : MessageTransportListener
     private readonly MessageTransportListener _innerListener;
     private readonly ILogger _logger;
 
-    [SetsRequiredMembers]
-    public TlsMessageTransportListener(string endpointName, MessageTransportListener innerListener, IOptionsMonitor<TlsOptions> tlsOptions, ILoggerFactory loggerFactory)
+    public TlsMessageTransportListener(MessageTransportListener innerListener, IOptionsMonitor<TlsOptions> tlsOptions, ILoggerFactory loggerFactory)
     {
-        EndpointName = endpointName;
         _tlsOptions = tlsOptions;
         _innerListener = innerListener;
         _logger = loggerFactory.CreateLogger<ServerTlsMessageTransport>();
@@ -32,6 +28,9 @@ public class TlsMessageTransportListener : MessageTransportListener
 
     /// <inheritdoc/>
     public override bool IsValid => _innerListener.IsValid;
+
+    /// <inheritdoc/>
+    public override string EndpointName => _innerListener.EndpointName;
 
     /// <inheritdoc/>
     public override async ValueTask<MessageTransport?> AcceptAsync(CancellationToken cancellationToken = default)
