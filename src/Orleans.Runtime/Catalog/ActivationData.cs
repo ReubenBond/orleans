@@ -13,7 +13,6 @@ using Orleans.Core.Internal;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
 using Orleans.Runtime.Scheduler;
-using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.TypeSystem;
 
@@ -32,7 +31,7 @@ namespace Orleans.Runtime
         private readonly List<(Message Message, CoarseStopwatch QueuedTime)> _waitingRequests = new();
         private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new();
         private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
-        private readonly GrainLifecycle _lifecycle;
+        private GrainLifecycle _lifecycle;
         private List<object> _pendingOperations;
         private Message _blockingRequest;
         private bool _isInWorkingSet;
@@ -77,8 +76,8 @@ namespace Orleans.Runtime
         public IServiceProvider ActivationServices => _serviceScope.ServiceProvider;
         public ActivationId ActivationId => Address.ActivationId;
         public IServiceProvider ServiceProvider => _serviceScope?.ServiceProvider;
-        public IGrainLifecycle ObservableLifecycle => _lifecycle;
-        internal ILifecycleObserver Lifecycle => _lifecycle;
+        public IGrainLifecycle ObservableLifecycle => _lifecycle ??= new GrainLifecycle(_shared.Logger);
+        internal ILifecycleObserver Lifecycle => _lifecycle ??= new GrainLifecycle(_shared.Logger);
         public GrainId GrainId => Address.GrainId;
         public bool IsExemptFromCollection => _shared.CollectionAgeLimit == Timeout.InfiniteTimeSpan;
         public DateTime KeepAliveUntil { get; set; } = DateTime.MinValue;
@@ -927,8 +926,14 @@ namespace Orleans.Runtime
                     {
                         switch (op)
                         {
+                            case Command.Rehydrate command:
+                                await RehydrateAsync(command.RequestContext, command.CancellationToken);
+                                break;
                             case Command.Activate activation:
                                 await ActivateAsync(activation.RequestContext, activation.CancellationToken);
+                                break;
+                            case Command.Dehydrate command:
+                                await DehydrateAsync(command.CancellationToken);
                                 break;
                             case Command.Deactivate deactivation:
                                 await FinishDeactivating(deactivation.CancellationToken);
@@ -950,6 +955,14 @@ namespace Orleans.Runtime
                 }
             }
         }
+
+        private ValueTask RehydrateAsync(Dictionary<string, object> requestContext, CancellationToken cancellationToken)
+        {
+            // 
+
+        }
+
+        private ValueTask DehydrateAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
 
         /// <summary>
         /// Handle an incoming message and queue/invoke appropriate handler
@@ -1634,6 +1647,24 @@ namespace Orleans.Runtime
                 }
 
                 public Dictionary<string, object> RequestContext { get; }
+                public CancellationToken CancellationToken { get; }
+            }
+
+            public class Rehydrate : Command
+            {
+                public Rehydrate(Dictionary<string, object> requestContext, CancellationToken cancellationToken)
+                {
+                    RequestContext = requestContext;
+                    CancellationToken = cancellationToken;
+                }
+
+                public Dictionary<string, object> RequestContext { get; }
+                public CancellationToken CancellationToken { get; }
+            }
+
+            public class Dehydrate : Command
+            {
+                public Dehydrate(CancellationToken cancellation) => CancellationToken = cancellation;
                 public CancellationToken CancellationToken { get; }
             }
 
