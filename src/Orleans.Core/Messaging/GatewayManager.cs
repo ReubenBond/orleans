@@ -27,6 +27,7 @@ namespace Orleans.Messaging
         private readonly ConnectionManager connectionManager;
         private readonly GatewayOptions gatewayOptions;
         private readonly CancellationTokenSource _shutdownCancellationSource = new();
+        private readonly PeriodicTimer _refreshTimer;
         private List<SiloAddress> cachedLiveGateways;
         private HashSet<SiloAddress> cachedLiveGatewaysSet;
         private List<SiloAddress> knownGateways = new List<SiloAddress>();
@@ -35,8 +36,6 @@ namespace Orleans.Messaging
         private int roundRobinCounter;
         private bool gatewayRefreshCallInitiated;
         private bool gatewayListProviderInitialized;
-
-        private readonly ILogger<SafeTimer> timerLogger;
 
         public GatewayManager(
             IOptions<GatewayOptions> gatewayOptions,
@@ -48,7 +47,7 @@ namespace Orleans.Messaging
             this.logger = loggerFactory.CreateLogger<GatewayManager>();
             _gatewayMembershipService = gatewayMembershipService;
             this.connectionManager = connectionManager;
-            this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
+            _refreshTimer = new PeriodicTimer(this.gatewayOptions.GatewayListRefreshPeriod);
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -63,7 +62,7 @@ namespace Orleans.Messaging
             void WatchGatewayMembership()
             {
                 using var _ = new ExecutionContextSuppressor();
-                _gatewayMembershipUpdatesTask = ProcessMembershipUpdates();
+                _gatewayMembershipUpdatesTask = Task.WhenAll(ProcessMembershipUpdates(), ReevaluateMembershipSnapshot());
             }
 
             while (!cancellationToken.IsCancellationRequested && knownGateways.Count == 0)
@@ -97,6 +96,7 @@ namespace Orleans.Messaging
 
         public void Stop()
         {
+            _refreshTimer.Dispose();
             _shutdownCancellationSource.Cancel();
         }
 
@@ -250,6 +250,25 @@ namespace Orleans.Messaging
             }
         }
 
+        internal async Task ReevaluateMembershipSnapshot()
+        {
+            await Task.Yield();
+
+            // Force a periodic refresh of the gateway list, since clients will mark gateways as dead locally,
+            // and should retry connection to those gateways after some period has elapsed.
+            while (await _refreshTimer.WaitForNextTickAsync())
+            {
+                try
+                {
+                    await UpdateLiveGatewaysSnapshot(_gatewayMembershipService.CurrentSnapshot);
+                }
+                catch (Exception exc)
+                {
+                    logger.LogError((int)ErrorCode.ProxyClient_GetGateways, exc, "Error reevaluating gateways");
+                }
+            }
+        }
+
         internal async Task RefreshSnapshotLiveGateways_TimerCallback(object context)
         {
             try
@@ -386,6 +405,7 @@ namespace Orleans.Messaging
 
         public async ValueTask DisposeAsync()
         {
+            _refreshTimer.Dispose();
             _shutdownCancellationSource.Dispose();
             if (_gatewayMembershipUpdatesTask is { } task)
             {

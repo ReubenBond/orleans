@@ -3,17 +3,17 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Runtime;
 
 namespace Orleans.Messaging
 {
     /// <summary>
     /// <see cref="IGatewayListProvider"/> implementation which returns a static list, configured via <see cref="StaticGatewayMembershipProviderOptions"/>.
     /// </summary>
-    public class StaticGatewayMembershipProvider : IGatewayMembershipProvider
+    public sealed class StaticGatewayMembershipProvider : IGatewayMembershipProvider, IDisposable
     {
         private readonly IOptionsMonitor<StaticGatewayMembershipProviderOptions> _options;
-        private MembershipVersion _version;
+        private readonly IDisposable _optionsChangeHandler;
+        private GatewayMembershipSnapshot _snapshot;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="StaticGatewayMembershipProvider"/> class.
@@ -22,15 +22,20 @@ namespace Orleans.Messaging
         public StaticGatewayMembershipProvider(IOptionsMonitor<StaticGatewayMembershipProviderOptions> options)
         {
             _options = options;
+            _optionsChangeHandler = _options.OnChange((options, name) => _snapshot = CreateSnapshot(options));
+            _snapshot = CreateSnapshot(_options.CurrentValue);
+
+            GatewayMembershipSnapshot CreateSnapshot(StaticGatewayMembershipProviderOptions options)
+            {
+                var version = _snapshot switch { null => default, { } snapshot => snapshot.Version };
+                return new GatewayMembershipSnapshot(options.Gateways, version.Successor());
+            }
         }
 
         /// <inheritdoc />
-        public ValueTask<GatewayMembershipSnapshot> GetGatewaysAsync(CancellationToken cancellationToken) => new(GetSnapshot());
+        public ValueTask<GatewayMembershipSnapshot> GetGatewaysAsync(CancellationToken cancellationToken) => new(_snapshot);
 
-        private GatewayMembershipSnapshot GetSnapshot()
-        {
-            var version = _version = _version.Successor();
-            return new GatewayMembershipSnapshot(_options.CurrentValue.Gateways, version);
-        }
+        /// <inheritdoc />
+        public void Dispose() => _optionsChangeHandler.Dispose();
     }
 }
