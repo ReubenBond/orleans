@@ -1,4 +1,6 @@
 using System;
+using System.Buffers;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -13,6 +15,7 @@ using Orleans.Core.Internal;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
 using Orleans.Runtime.Scheduler;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.TypeSystem;
 
@@ -1711,6 +1714,72 @@ namespace Orleans.Runtime
             {
                 Debug.Assert(reentrancyId != Guid.Empty);
                 return TryGetValue(reentrancyId, out var count) && count > 0;
+            }
+        }
+    }
+
+    [GenerateSerializer]
+    internal class MigrationContext : IDehydrationContext, IRehydrationContext, IDisposable
+    {
+        private readonly object _lock = new ();
+
+        [Id(0), Immutable]
+        private readonly Dictionary<string, (int Offset, int Length)> _indices = new(StringComparer.Ordinal);
+
+        [Id(1), Immutable]
+        private PooledBuffer _buffer = new();
+
+        public void Add(string key, ReadOnlySpan<byte> value)
+        {
+            lock (_lock)
+            {
+                _indices.Add(key, (_buffer.Length, value.Length));
+                _buffer.Write(value);
+            }
+        }
+
+        public KeyCollection Keys => new (this);
+
+        public void Dispose() => _buffer.Reset();
+
+        public bool TryGetValue(string key, out ReadOnlySequence<byte> value)
+        {
+            if (_indices.TryGetValue(key, out var record))
+            {
+                value = _buffer.AsReadOnlySequence().Slice(record.Offset, record.Length);
+                return true;
+            }
+
+            value = default;
+            return false;
+        }
+
+        public readonly struct KeyCollection : IEnumerable<string>
+        {
+            private readonly MigrationContext _context;
+
+            public KeyCollection(MigrationContext context)
+            {
+                _context = context;
+            }
+
+            public IEnumerator<string> GetEnumerator() => new Enumerator(_context);
+            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+            public struct Enumerator : IEnumerator<string>, IEnumerator
+            {
+                private Dictionary<string, (int Offset, int Length)>.KeyCollection.Enumerator _value;
+                public Enumerator(MigrationContext context) => _value = context._indices.Keys.GetEnumerator();
+                public string Current => _value.Current;
+                object IEnumerator.Current => Current;
+                public void Dispose() => _value.Dispose();
+                public bool MoveNext() => _value.MoveNext();
+                public void Reset()
+                {
+                    var boxed = (IEnumerator)_value;
+                    boxed.Reset();
+                    _value = (Dictionary<string, (int Offset, int Length)>.KeyCollection.Enumerator)boxed;
+                }
             }
         }
     }

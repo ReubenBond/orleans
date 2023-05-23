@@ -1,5 +1,6 @@
 
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 
 namespace Orleans.Runtime
@@ -39,14 +40,13 @@ namespace Orleans.Runtime
 
     public interface IDehydrationContext
     {
-        bool TryAdd(string key, ReadOnlyMemory<byte> value);
+        void Add(string key, ReadOnlySpan<byte> value);
     }
 
     public interface IRehydrationContext
     {
-        bool TryGetValue(string key, out ReadOnlyMemory<byte> value);
+        bool TryGetValue(string key, out ReadOnlySequence<byte> value);
     }
-
 
     public readonly struct MigrationCost
     {

@@ -17,6 +17,7 @@ namespace Orleans.Serialization.Buffers;
 /// A <see cref="IBufferWriter{T}"/> implementation implemented using pooled arrays which is specialized for creating <see cref="ReadOnlySequence{T}"/> instances.
 /// </summary>
 [StructLayout(LayoutKind.Auto)]
+[Immutable]
 public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 {
     internal SequenceSegment _first;
