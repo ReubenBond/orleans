@@ -309,5 +309,8 @@ namespace Orleans.Runtime
                 GrainInstruments.DecrementSystemTargetCounts(Constants.SystemTargetName(GrainId.Type));
             }
         }
+
+        void IGrainContext.Rehydrate(IRehydrationContext context) => throw new NotSupportedException("SystemTargets cannot be migrated");
+        void IGrainContext.Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken) => throw new NotSupportedException("SystemTargets cannot be migrated");
     }
 }

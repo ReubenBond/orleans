@@ -103,5 +103,10 @@ namespace Orleans
         /// The application requested that this activation deactivate.
         /// </summary>
         ApplicationRequested,
+
+        /// <summary>
+        /// This activation is migrating to a new location.
+        /// </summary>
+        Migrating,
     }
 }

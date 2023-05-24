@@ -248,7 +248,8 @@ namespace Orleans.Runtime
         /// <returns></returns>
         public IGrainContext GetOrCreateActivation(
             in GrainId grainId,
-            Dictionary<string, object> requestContextData)
+            Dictionary<string, object> requestContextData,
+            IRehydrationContext rehydrationContext)
         {
             if (TryGetGrainContext(grainId, out var result))
             {
@@ -298,6 +299,12 @@ namespace Orleans.Runtime
             }
             else
             {
+                // Rehydration occurs before activation.
+                if (rehydrationContext is not null)
+                {
+                    result.Rehydrate(rehydrationContext);
+                }
+
                 // Initialize the new activation asynchronously.
                 var cancellation = new CancellationTokenSource(collectionOptions.Value.ActivationTimeout);
                 result.Activate(requestContextData, cancellation.Token);
@@ -467,6 +474,16 @@ namespace Orleans.Runtime
                     StartDeactivatingActivations(reason, activationsToShutdown);
                 }
             }
+        }
+
+        public ValueTask AcceptMigratingGrains(List<GrainMigrationPackage> migratingGrains)
+        {
+            foreach (var package in migratingGrains)
+            {
+                GetOrCreateActivation(package.GrainId, requestContextData: null, package.MigrationContext);
+            }
+
+            return default;
         }
     }
 }

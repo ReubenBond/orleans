@@ -37,7 +37,7 @@ namespace Orleans.Runtime
         // Perhaps this should return an `int` or a `float` to express the migration
         // cost. The interface can be updated later to add this, with a default return
         // value indicating no/minor cost.
-        MigrationCost GetMigrationCost();
+        MigrationCost GetMigrationCost() => MigrationCost.Medium;
     }
 
     public interface IDehydrationContext

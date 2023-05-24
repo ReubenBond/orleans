@@ -490,7 +490,8 @@ namespace Orleans.Runtime.Messaging
                 {
                     var targetActivation = catalog.GetOrCreateActivation(
                         msg.TargetGrain,
-                        msg.RequestContextData);
+                        msg.RequestContextData,
+                        rehydrationContext: null);
 
                     if (targetActivation is null)
                     {

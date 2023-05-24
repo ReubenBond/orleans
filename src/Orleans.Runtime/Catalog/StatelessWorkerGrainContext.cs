@@ -327,6 +327,9 @@ namespace Orleans.Runtime
             }
         }
 
+        void IGrainContext.Rehydrate(IRehydrationContext context) => throw new NotImplementedException();
+        void IGrainContext.Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken) => throw new NotImplementedException();
+
         private enum WorkItemType
         {
             Activate = 0,

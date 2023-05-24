@@ -1,4 +1,5 @@
 
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
@@ -14,7 +15,7 @@ namespace Orleans.Runtime
         {
         }
 
-        public IEnumerable<IGrainMigrationParticipant> GetMigrationParticipants() => _migrationParticipants;
+        public IEnumerable<IGrainMigrationParticipant> GetMigrationParticipants() => _migrationParticipants ?? (IEnumerable<IGrainMigrationParticipant>)Array.Empty<IGrainMigrationParticipant>();
 
         public void AddMigrationParticipant(IGrainMigrationParticipant participant)
         {

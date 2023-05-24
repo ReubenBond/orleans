@@ -16,7 +16,7 @@ namespace Orleans.Runtime
         /// <param name="reasonCode"></param>
         /// <param name="reasonText"></param>
         /// <returns></returns>
-        ValueTask DeleteActivations(List<GrainAddress> activationAddresses, DeactivationReasonCode reasonCode, string reasonText);
+        Task DeleteActivations(List<GrainAddress> activationAddresses, DeactivationReasonCode reasonCode, string reasonText);
 
         /// <summary>
         /// Accepts migrating grains.

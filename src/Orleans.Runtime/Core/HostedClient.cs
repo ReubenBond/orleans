@@ -383,5 +383,7 @@ namespace Orleans.Runtime
         public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null) { }
         public Task Deactivated => Task.CompletedTask;
+        void IGrainContext.Rehydrate(IRehydrationContext context) => throw new NotSupportedException("Clients cannot be migrated");
+        void IGrainContext.Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken) => throw new NotSupportedException("Clients cannot be migrated");
     }
 }

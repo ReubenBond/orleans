@@ -185,6 +185,10 @@ namespace Orleans
 
         public void Activate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) { }
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = null) { }
+
+        public void Rehydrate(IRehydrationContext context) => throw new NotImplementedException();
+        public void Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = null) => throw new NotImplementedException();
+
         public Task Deactivated => Task.CompletedTask;
     }
 }

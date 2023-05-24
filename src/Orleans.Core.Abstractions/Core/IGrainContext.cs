@@ -82,6 +82,16 @@ namespace Orleans.Runtime
         /// <param name="deactivationReason">The reason for deactivation, for informational purposes.</param>
         /// <param name="cancellationToken">A cancellation token which when canceled, indicates that the process should complete promptly.</param>
         void Deactivate(DeactivationReason deactivationReason, CancellationToken? cancellationToken = default);
+
+        /// <summary>
+        /// Start rehydrating this instance from the provided rehydration context.
+        /// </summary>
+        void Rehydrate(IRehydrationContext context);
+
+        /// <summary>
+        /// Starts migrating this instance to another location.
+        /// </summary>
+        void Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = default);
     }
 
     /// <summary>

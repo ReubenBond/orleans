@@ -127,7 +127,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.grainDirectoryOptions = grainDirectoryOptions;
         }
 
-        private bool IsValidSilo(SiloAddress? silo) => siloStatusOracle.IsFunctionalDirectory(silo);
+        private bool IsValidSilo(SiloAddress? silo) => silo is not null && siloStatusOracle.IsFunctionalDirectory(silo);
 
         internal void Clear()
         {
@@ -233,7 +233,7 @@ namespace Orleans.Runtime.GrainDirectory
                 result = new(grainInfo.Activation, grainInfo.VersionTag);
             }
 
-            if (!IsValidSilo(result.Address.SiloAddress))
+            if (!IsValidSilo(result.Address?.SiloAddress))
             {
                 result = new(null, result.VersionTag);
             }
