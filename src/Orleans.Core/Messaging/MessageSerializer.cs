@@ -150,7 +150,7 @@ namespace Orleans.Runtime.Messaging
             return rawCodec;
         }
 
-        public (int HeaderLength, int BodyLength) Write(PipeWriter writer, Message message)
+        public (int HeaderLength, int BodyLength) Write(IBufferWriter<byte> writer, Message message)
         {
             var headers = message.Headers;
             IFieldCodec? bodyCodec = null;

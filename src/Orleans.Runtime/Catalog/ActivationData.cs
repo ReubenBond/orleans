@@ -3,6 +3,7 @@ using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO.Pipelines;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -14,7 +15,9 @@ using Orleans.Configuration;
 using Orleans.Core.Internal;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
+using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.TypeSystem;
@@ -214,7 +217,7 @@ namespace Orleans.Runtime
             {
                 result = contextResult;
             }
-            else if (_extras?.Components is { } components && components.TryGetValue(typeof(TComponent), out var resultObj))
+            else if (_extras is { } components && components.TryGetValue(typeof(TComponent), out var resultObj))
             {
                 result = (TComponent)resultObj;
             }
@@ -247,13 +250,12 @@ namespace Orleans.Runtime
             {
                 if (instance == null)
                 {
-                    _extras?.Components?.Remove(typeof(TComponent));
+                    _extras?.Remove(typeof(TComponent));
                     return;
                 }
 
                 _extras ??= new();
-                var components = _extras.Components ??= new();
-                components[typeof(TComponent)] = instance;
+                _extras[typeof(TComponent)] = instance;
             }
         }
 
@@ -930,13 +932,13 @@ namespace Orleans.Runtime
                         switch (op)
                         {
                             case Command.Rehydrate command:
-                                await RehydrateAsync(command.RequestContext, command.CancellationToken);
+                                Rehydrate(command.Context);
                                 break;
                             case Command.Activate activation:
                                 await ActivateAsync(activation.RequestContext, activation.CancellationToken);
                                 break;
                             case Command.Dehydrate command:
-                                await DehydrateAsync(command.CancellationToken);
+                                Dehydrate(command.Context);
                                 break;
                             case Command.Deactivate deactivation:
                                 await FinishDeactivating(deactivation.CancellationToken);
@@ -959,13 +961,139 @@ namespace Orleans.Runtime
             }
         }
 
-        private ValueTask RehydrateAsync(Dictionary<string, object> requestContext, CancellationToken cancellationToken)
+        private void Rehydrate(IRehydrationContext context)
         {
-            // 
+            if (_shared.Logger.IsEnabled(LogLevel.Debug))
+            {
+                _shared.Logger.LogDebug("Rehydrating grain from previous activation");
+            }
 
+            lock (this)
+            {
+                if (State != ActivationState.Create)
+                {
+                    throw new InvalidOperationException($"Attempted to rehydrate a grain in the {State} state");
+                }
+
+                if (context.TryGetValue("sys.addr", out var directoryRegistrationData))
+                {
+                    // Propagate the previous registration, so that the new activation can atomically replace it with its new address.
+                    var serializer = _shared.Runtime.ServiceProvider.GetRequiredService<Serializer<GrainAddress>>();
+                    var previousRegistration = serializer.Deserialize(directoryRegistrationData);
+                    if (previousRegistration is not null)
+                    {
+                        (_extras ??= new()).PreviousRegistration = previousRegistration;
+                        if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                        {
+                            _shared.Logger.LogDebug("Previous activation address was {PreviousRegistration}", previousRegistration);
+                        }
+                    }
+                }
+
+                if (context.TryGetValue("sys.msgs", out var messages))
+                {
+                    var serializer = _shared.Runtime.ServiceProvider.GetRequiredService<MessageSerializer>();
+                    var messageCount = 0;
+                    bool more;
+                    do
+                    {
+                        try
+                        {
+                            var result = serializer.TryRead(ref messages, out var message);
+                            more = result.RequiredBytes < messages.Length;
+                            ++messageCount;
+                            ReceiveMessage(message);
+                        }
+                        catch (Exception exception)
+                        {
+                            _shared.Logger.LogError(exception, "Error deserializing message from previous activation of {GrainId}", GrainId);
+                            break;
+                        }
+                    } while (more);
+
+                    if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                    {
+                        _shared.Logger.LogDebug("Received {MessageCount} messages from previous activation", messageCount);
+                    }
+                }
+
+                foreach (var participant in _lifecycle.GetMigrationParticipants())
+                {
+                    participant.OnRehydrate(context);
+                }
+                
+                (GrainInstance as IGrainMigrationParticipant)?.OnRehydrate(context);
+            }
+
+            if (_shared.Logger.IsEnabled(LogLevel.Debug))
+            {
+                _shared.Logger.LogDebug("Rehydrated grain from previous activation");
+            }
         }
 
-        private ValueTask DehydrateAsync(CancellationToken cancellationToken) => throw new NotImplementedException();
+        private void Dehydrate(IDehydrationContext context)
+        {
+            if (_shared.Logger.IsEnabled(LogLevel.Debug))
+            {
+                _shared.Logger.LogDebug("Dehydrating grain activation");
+            }
+
+            lock (this)
+            {
+                // Note that these calls are in reverse order from Rehydrate, not for any particular reason other than symmetry.
+                (GrainInstance as IGrainMigrationParticipant)?.OnDehydrate(context);
+
+                foreach (var participant in _lifecycle.GetMigrationParticipants())
+                {
+                    participant.OnDehydrate(context);
+                }
+
+                if (_waitingRequests.Count > 0)
+                {
+                    context.Add(
+                        "sys.msgs",
+                        static (state, bufferWriter) =>
+                        {
+                            var self = (ActivationData)state;
+                            var serializer = self._shared.Runtime.ServiceProvider.GetRequiredService<MessageSerializer>();
+                            var preservedCount = 0;
+                            foreach (var (msg, queued) in self._waitingRequests)
+                            {
+                                if (msg.IsExpired)
+                                {
+                                    continue;
+                                }
+
+                                ++preservedCount;
+                                serializer.Write(bufferWriter, msg);
+                            }
+                            if (self._shared.Logger.IsEnabled(LogLevel.Debug))
+                            {
+                                self._shared.Logger.LogDebug("Preserved {MessageCount} messages", preservedCount);
+                            }
+                        },
+                        this);
+                }
+
+                if (IsUsingGrainDirectory)
+                {
+                    context.Add(
+                        "sys.addr",
+                        static (state, bufferWriter) =>
+                        {
+                            var self = (ActivationData)state;
+                            var serializer = self._shared.Runtime.ServiceProvider.GetRequiredService<Serializer<GrainAddress>>();
+                            serializer.Serialize(self.Address, bufferWriter);
+                        },
+                        this);
+                }
+            }
+
+            if (_shared.Logger.IsEnabled(LogLevel.Debug))
+            {
+                _shared.Logger.LogDebug("Dehydrated grain activation");
+            }
+        }
 
         /// <summary>
         /// Handle an incoming message and queue/invoke appropriate handler
@@ -1302,7 +1430,7 @@ namespace Orleans.Runtime
                 Exception registrationException;
                 try
                 {
-                    var result = await _shared.InternalRuntime.GrainLocator.Register(Address);
+                    var result = await _shared.InternalRuntime.GrainLocator.Register(Address, _extras?.PreviousRegistration);
                     if (Address.Matches(result))
                     {
                         success = true;
@@ -1587,34 +1715,48 @@ namespace Orleans.Runtime
         /// <summary>
         /// Additional properties which are not needed for the majority of an activation's lifecycle.
         /// </summary>
-        private class ActivationDataExtra
+        private class ActivationDataExtra : Dictionary<object, object>
         {
             private const int IsStuckProcessingMessageFlag = 1 << 0;
             private const int IsStuckDeactivatingFlag = 1 << 1;
             private const int IsDisposingFlag = 1 << 2;
             private byte _flags;
 
-            public Dictionary<Type, object> Components { get; set; }
+            public HashSet<IGrainTimer> Timers { get => GetValueOrDefault<HashSet<IGrainTimer>>(nameof(Timers)); set => SetOrRemoveValue(nameof(Timers), value); }
 
-            public HashSet<IGrainTimer> Timers { get; set; }
+            /// <summary>
+            /// During rehydration, this may contain the address for the previous (recently dehydrated) activation of this grain.
+            /// </summary>
+            public GrainAddress PreviousRegistration { get => GetValueOrDefault<GrainAddress>(nameof(PreviousRegistration)); set => SetOrRemoveValue(nameof(PreviousRegistration), value); }
 
             /// <summary>
             /// If State == Invalid, this may contain a forwarding address for incoming messages
             /// </summary>
-            public GrainAddress ForwardingAddress { get; set; }
+            public GrainAddress ForwardingAddress { get => GetValueOrDefault<GrainAddress>(nameof(ForwardingAddress)); set => SetOrRemoveValue(nameof(ForwardingAddress), value); }
 
             /// <summary>
             /// A <see cref="TaskCompletionSource{TResult}"/> which completes when a grain has deactivated.
             /// </summary>
-            public TaskCompletionSource<bool> DeactivationTask { get; set; }
+            public TaskCompletionSource<bool> DeactivationTask { get => GetDeactivationInfoOrDefault()?.DeactivationTask; set => EnsureDeactivationInfo().DeactivationTask = value; }
 
-            public DateTime? DeactivationStartTime { get; set; }
+            public DateTime? DeactivationStartTime { get => GetDeactivationInfoOrDefault()?.DeactivationStartTime; set => EnsureDeactivationInfo().DeactivationStartTime = value; }
+
+            public DeactivationReason DeactivationReason { get => GetDeactivationInfoOrDefault()?.DeactivationReason ?? default; set => EnsureDeactivationInfo().DeactivationReason = value; }
+
+            private DeactivationInfo GetDeactivationInfoOrDefault() => GetValueOrDefault<DeactivationInfo>(nameof(DeactivationInfo));
+            private DeactivationInfo EnsureDeactivationInfo()
+            {
+                if (!TryGetValue(nameof(DeactivationInfo), out var info))
+                {
+                    info = base[nameof(DeactivationInfo)] = new DeactivationInfo();
+                }
+
+                return (DeactivationInfo)info;
+            }
 
             public bool IsStuckProcessingMessage { get => GetFlag(IsStuckProcessingMessageFlag); set => SetFlag(IsStuckProcessingMessageFlag, value); }
             public bool IsStuckDeactivating { get => GetFlag(IsStuckDeactivatingFlag); set => SetFlag(IsStuckDeactivatingFlag, value); }
             public bool IsDisposing { get => GetFlag(IsDisposingFlag); set => SetFlag(IsDisposingFlag, value); }
-
-            public DeactivationReason DeactivationReason { get; set; }
 
             private void SetFlag(int flag, bool value)
             {
@@ -1629,6 +1771,30 @@ namespace Orleans.Runtime
             }
 
             private bool GetFlag(int flag) => (_flags & flag) != 0;
+            private T GetValueOrDefault<T>(object key)
+            {
+                TryGetValue(key, out var result);
+                return (T)result;
+            }
+
+            private void SetOrRemoveValue(object key, object value)
+            {
+                if (value is null)
+                {
+                    Remove(key);
+                }
+                else
+                {
+                    base[key] = value;
+                }
+            }
+
+            private sealed class DeactivationInfo
+            {
+                public DateTime? DeactivationStartTime;
+                public DeactivationReason DeactivationReason;
+                public TaskCompletionSource<bool> DeactivationTask;
+            }
         }
 
         private class Command
@@ -1655,20 +1821,22 @@ namespace Orleans.Runtime
 
             public class Rehydrate : Command
             {
-                public Rehydrate(Dictionary<string, object> requestContext, CancellationToken cancellationToken)
-                {
-                    RequestContext = requestContext;
-                    CancellationToken = cancellationToken;
-                }
+                public readonly IRehydrationContext Context;
 
-                public Dictionary<string, object> RequestContext { get; }
-                public CancellationToken CancellationToken { get; }
+                public Rehydrate(IRehydrationContext context)
+                {
+                    Context = context;
+                }
             }
 
             public class Dehydrate : Command
             {
-                public Dehydrate(CancellationToken cancellation) => CancellationToken = cancellation;
-                public CancellationToken CancellationToken { get; }
+                public readonly IDehydrationContext Context;
+
+                public Dehydrate(IDehydrationContext context)
+                {
+                    Context = context;
+                }
             }
 
             public class Delay : Command
@@ -1714,72 +1882,6 @@ namespace Orleans.Runtime
             {
                 Debug.Assert(reentrancyId != Guid.Empty);
                 return TryGetValue(reentrancyId, out var count) && count > 0;
-            }
-        }
-    }
-
-    [GenerateSerializer]
-    internal class MigrationContext : IDehydrationContext, IRehydrationContext, IDisposable
-    {
-        private readonly object _lock = new ();
-
-        [Id(0), Immutable]
-        private readonly Dictionary<string, (int Offset, int Length)> _indices = new(StringComparer.Ordinal);
-
-        [Id(1), Immutable]
-        private PooledBuffer _buffer = new();
-
-        public void Add(string key, ReadOnlySpan<byte> value)
-        {
-            lock (_lock)
-            {
-                _indices.Add(key, (_buffer.Length, value.Length));
-                _buffer.Write(value);
-            }
-        }
-
-        public KeyCollection Keys => new (this);
-
-        public void Dispose() => _buffer.Reset();
-
-        public bool TryGetValue(string key, out ReadOnlySequence<byte> value)
-        {
-            if (_indices.TryGetValue(key, out var record))
-            {
-                value = _buffer.AsReadOnlySequence().Slice(record.Offset, record.Length);
-                return true;
-            }
-
-            value = default;
-            return false;
-        }
-
-        public readonly struct KeyCollection : IEnumerable<string>
-        {
-            private readonly MigrationContext _context;
-
-            public KeyCollection(MigrationContext context)
-            {
-                _context = context;
-            }
-
-            public IEnumerator<string> GetEnumerator() => new Enumerator(_context);
-            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-
-            public struct Enumerator : IEnumerator<string>, IEnumerator
-            {
-                private Dictionary<string, (int Offset, int Length)>.KeyCollection.Enumerator _value;
-                public Enumerator(MigrationContext context) => _value = context._indices.Keys.GetEnumerator();
-                public string Current => _value.Current;
-                object IEnumerator.Current => Current;
-                public void Dispose() => _value.Dispose();
-                public bool MoveNext() => _value.MoveNext();
-                public void Reset()
-                {
-                    var boxed = (IEnumerator)_value;
-                    boxed.Reset();
-                    _value = (Dictionary<string, (int Offset, int Length)>.KeyCollection.Enumerator)boxed;
-                }
             }
         }
     }

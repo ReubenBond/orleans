@@ -43,9 +43,10 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public GrainAddress TryAddSingleActivation(GrainAddress address)
+        public GrainAddress TryAddSingleActivation(GrainAddress address, GrainAddress? previousAddress)
         {
-            if (Activation is { } existing)
+            // If there is an existing address which does not match the 'previousAddress' then we cannot add the new address.
+            if (Activation is { } existing && (previousAddress is null || !previousAddress.Equals(existing)))
             {
                 return existing;
             }
@@ -152,7 +153,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// Adds a new activation to the directory partition
         /// </summary>
         /// <returns>The registered ActivationAddress and version associated with this directory mapping</returns>
-        internal AddressAndTag AddSingleActivation(GrainAddress address)
+        internal AddressAndTag AddSingleActivation(GrainAddress address, GrainAddress? previousAddress)
         {
             if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Adding single activation for grain {SiloAddress} {GrainId} {ActivationId}", address.SiloAddress, address.GrainId, address.ActivationId);
 
@@ -171,6 +172,7 @@ namespace Orleans.Runtime.GrainDirectory
                 else
                 {
                     var siloAddress = grainInfo.Activation?.SiloAddress;
+
                     // If there is an existing entry pointing to an invalid silo then remove it 
                     if (siloAddress != null && !IsValidSilo(siloAddress))
                     {
@@ -178,7 +180,7 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
 
-                return new(grainInfo.TryAddSingleActivation(address), grainInfo.VersionTag);
+                return new(grainInfo.TryAddSingleActivation(address, previousAddress), grainInfo.VersionTag);
             }
         }
 

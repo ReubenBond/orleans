@@ -10,6 +10,11 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
 {
+    internal interface IMessagingSystemTarget : ISystemTarget
+    {
+        ValueTask OnMessagesForwarded(List<(GrainId TargetGrainId, CorrelationId CorrelationId, SiloAddress From, SiloAddress To)> forwards);
+    }
+
     internal class MessageCenter : IMessageCenter, IAsyncDisposable
     {
         private readonly ISiloStatusOracle siloStatusOracle;
@@ -315,7 +320,7 @@ namespace Orleans.Runtime.Messaging
 
         internal void TryForwardRequest(Message message, GrainAddress oldAddress, GrainAddress forwardingAddress, string failedOperation = null, Exception exc = null)
         {
-            bool forwardingSucceded = false;
+            bool forwardingSucceeded = false;
             try
             {
                 this.messagingTrace.OnDispatcherForwarding(message, oldAddress, forwardingAddress, failedOperation, exc);
@@ -325,11 +330,11 @@ namespace Orleans.Runtime.Messaging
                     message.AddToCacheInvalidationHeader(oldAddress);
                 }
 
-                forwardingSucceded = this.TryForwardMessage(message, forwardingAddress);
+                forwardingSucceeded = this.TryForwardMessage(message, forwardingAddress);
             }
             catch (Exception exc2)
             {
-                forwardingSucceded = false;
+                forwardingSucceeded = false;
                 exc = exc2;
             }
             finally
@@ -347,7 +352,7 @@ namespace Orleans.Runtime.Messaging
                     sentRejection = true;
                 }
 
-                if (!forwardingSucceded)
+                if (!forwardingSucceeded)
                 {
                     this.messagingTrace.OnDispatcherForwardingFailed(message, oldAddress, forwardingAddress, failedOperation, exc);
                     if (!sentRejection)

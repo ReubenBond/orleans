@@ -31,7 +31,7 @@ namespace Orleans.Runtime.Messaging
         /// <summary>
         /// The underlying buffer writer.
         /// </summary>
-        private PipeWriter innerWriter;
+        private IBufferWriter<byte> innerWriter;
 
         /// <summary>
         /// The memory reserved for the header from the <see cref="innerWriter"/>.
@@ -171,7 +171,7 @@ namespace Orleans.Runtime.Messaging
         /// Sets this instance to a usable state.
         /// </summary>
         /// <param name="writer">The underlying writer that should ultimately receive the prefix and payload.</param>
-        public void Init(PipeWriter writer) => innerWriter = writer;
+        public void Init(IBufferWriter<byte> writer) => innerWriter = writer;
 
         /// <summary>
         /// Resets this instance to a reusable state.

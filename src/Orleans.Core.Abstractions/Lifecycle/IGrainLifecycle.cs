@@ -2,6 +2,8 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
@@ -41,6 +43,7 @@ namespace Orleans.Runtime
     public interface IDehydrationContext
     {
         void Add(string key, ReadOnlySpan<byte> value);
+        void Add(string key, Action<object, IBufferWriter<byte>> valueWriter, object value);
     }
 
     public interface IRehydrationContext
