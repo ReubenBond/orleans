@@ -44,12 +44,6 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="rehydrationContext">The rehydration context.</param>
         void OnRehydrate(IRehydrationContext rehydrationContext);
-
-        /// <summary>
-        /// Called to get the cost of migrating this activation.
-        /// </summary>
-        /// <returns>The cost of migrating this activation.</returns>
-        MigrationCost GetMigrationCost() => MigrationCost.Medium;
     }
 
     /// <summary>
@@ -95,61 +89,5 @@ namespace Orleans.Runtime
         /// <param name="value">The value, if present.</param>
         /// <returns><see langword="true"/> if the key exists in the context, otherwise <see langword="false"/>.</returns>
         bool TryGetValue(string key, out ReadOnlySequence<byte> value);
-    }
-
-    /// <summary>
-    /// Describes the cost of migrating a grain.
-    /// </summary>
-    public readonly struct MigrationCost
-    {
-        private MigrationCost(int value)
-        {
-            Value = value;
-        }
-
-        internal int Value { get; }
-
-        /// <summary>
-        /// Gets a value describing a very low migration cost.
-        /// </summary>
-        public static MigrationCost VeryLow => new (0);
-
-        /// <summary>
-        /// Gets a value describing a low migration cost.
-        /// </summary>
-        public static MigrationCost Low => new (250);
-
-        /// <summary>
-        /// Gets a value describing a medium migration cost.
-        /// </summary>
-        public static MigrationCost Medium => new (500);
-
-        /// <summary>
-        /// Gets a value describing a medium migration cost.
-        /// </summary>
-        public static MigrationCost Default => Medium;
-
-        /// <summary>
-        /// Gets a value describing a high migration cost.
-        /// </summary>
-        public static MigrationCost High => new (750);
-
-        /// <summary>
-        /// Gets a value describing a very high migration cost.
-        /// </summary>
-        public static MigrationCost VeryHigh => new (1000);
-
-        /// <summary>
-        /// Gets a value indicating that this instance cannot be moved.
-        /// </summary>
-        public static MigrationCost Immovable => new (int.MaxValue);
-
-        /// <summary>
-        /// Returns the maximum of the provided values.
-        /// </summary>
-        /// <param name="left">The first value.</param>
-        /// <param name="right">The second value.</param>
-        /// <returns>The maximum of the provided value.</returns>
-        internal static MigrationCost Max(MigrationCost left, MigrationCost right) => new(Math.Max(left.Value, right.Value));
     }
 }
