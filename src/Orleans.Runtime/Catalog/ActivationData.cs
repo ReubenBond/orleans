@@ -937,15 +937,12 @@ namespace Orleans.Runtime
 
                 if (DeactivationException is null || ForwardingAddress is { })
                 {
-                    _shared.Logger.LogError("Forwarding1 {Self} to {ForwardingAddress}", this, ForwardingAddress);
                     // Either this was a duplicate activation or it was at some point successfully activated
                     // Forward all pending messages
                     RerouteAllQueuedMessages();
                 }
                 else
                 {
-                    _shared.Logger.LogError("Forwarding2 {Self}", this);
-
                     // Reject all pending messages
                     RejectAllQueuedMessages();
                 }

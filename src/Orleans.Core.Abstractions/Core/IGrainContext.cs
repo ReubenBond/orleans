@@ -90,7 +90,8 @@ namespace Orleans.Runtime
 
         /// <summary>
         /// Starts an attempt to migrating this instance to another location.
-        /// Migration will not occur if the activation's placement director does not select an alternative location.
+        /// Migration captures the current <see cref="RequestContext"/>, making it available to the activation's placement director so that it can consider it when selecting a new location.
+        /// Migration will occur asynchronously, when no requests are executing, and will not occur if the activation's placement director does not select an alternative location.
         /// </summary>
         /// <param name="requestContext">The request context, which is provided to the placement director so that it can be examined when selecting a new location.</param>
         /// <param name="cancellationToken">A cancellation token which, when canceled, indicates that the process should complete promptly.</param>

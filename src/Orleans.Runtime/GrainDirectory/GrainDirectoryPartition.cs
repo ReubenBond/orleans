@@ -43,17 +43,15 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public GrainAddress TryAddSingleActivation(GrainAddress address, GrainAddress? previousAddress, ILogger logger)
+        public GrainAddress TryAddSingleActivation(GrainAddress address, GrainAddress? previousAddress)
         {
             // If there is an existing address which does not match the 'previousAddress' then we cannot add the new address.
             if (Activation is { } existing && (previousAddress is null || !previousAddress.Equals(existing)))
             {
-                logger.LogWarning("Trying to register {Address}, but existing address {Existing} does not match comperand {Previous}", address, existing, previousAddress);
                 return existing;
             }
             else
             {
-                logger.LogWarning("Registering {Address}, existing address {Existing} comperand {Previous}", address, Activation, previousAddress);
                 Activation = address;
                 TimeCreated = DateTime.UtcNow;
                 VersionTag = Random.Shared.Next();
@@ -182,7 +180,7 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
 
-                return new(grainInfo.TryAddSingleActivation(address, previousAddress, log), grainInfo.VersionTag);
+                return new(grainInfo.TryAddSingleActivation(address, previousAddress), grainInfo.VersionTag);
             }
         }
 
