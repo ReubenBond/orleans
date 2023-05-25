@@ -43,15 +43,17 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public GrainAddress TryAddSingleActivation(GrainAddress address, GrainAddress? previousAddress)
+        public GrainAddress TryAddSingleActivation(GrainAddress address, GrainAddress? previousAddress, ILogger logger)
         {
             // If there is an existing address which does not match the 'previousAddress' then we cannot add the new address.
             if (Activation is { } existing && (previousAddress is null || !previousAddress.Equals(existing)))
             {
+                logger.LogWarning("Trying to register {Address}, but existing address {Existing} does not match comperand {Previous}", address, existing, previousAddress);
                 return existing;
             }
             else
             {
+                logger.LogWarning("Registering {Address}, existing address {Existing} comperand {Previous}", address, Activation, previousAddress);
                 Activation = address;
                 TimeCreated = DateTime.UtcNow;
                 VersionTag = Random.Shared.Next();
@@ -105,7 +107,7 @@ namespace Orleans.Runtime.GrainDirectory
     internal sealed class GrainDirectoryPartition
     {
         // Should we change this to SortedList<> or SortedDictionary so we can extract chunks better for shipping the full
-        // parition to a follower, or should we leave it as a Dictionary to get O(1) lookups instead of O(log n), figuring we do
+        // partition to a follower, or should we leave it as a Dictionary to get O(1) lookups instead of O(log n), figuring we do
         // a lot more lookups and so can sort periodically?
         /// <summary>
         /// contains a map from grain to its list of activations along with the version (etag) counter for the list
@@ -180,10 +182,9 @@ namespace Orleans.Runtime.GrainDirectory
                     }
                 }
 
-                return new(grainInfo.TryAddSingleActivation(address, previousAddress), grainInfo.VersionTag);
+                return new(grainInfo.TryAddSingleActivation(address, previousAddress, log), grainInfo.VersionTag);
             }
         }
-
 
         /// <summary>
         /// Removes an activation of the given grain from the partition

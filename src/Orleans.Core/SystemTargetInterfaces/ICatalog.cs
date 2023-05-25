@@ -31,6 +31,6 @@ namespace Orleans.Runtime
         public GrainId GrainId { get; set; }
 
         [Id(1)]
-        public ActivationMigrationContext MigrationContext { get; set; }
+        public MigrationContext MigrationContext { get; set; }
     }
 }

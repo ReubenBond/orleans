@@ -249,14 +249,16 @@ namespace Orleans.Runtime
         public IGrainContext GetOrCreateActivation(
             in GrainId grainId,
             Dictionary<string, object> requestContextData,
-            IRehydrationContext rehydrationContext)
+            MigrationContext rehydrationContext)
         {
             if (TryGetGrainContext(grainId, out var result))
             {
+                rehydrationContext?.Dispose();
                 return result;
             }
             else if (grainId.IsSystemTarget())
             {
+                rehydrationContext?.Dispose();
                 return null;
             }
 
@@ -265,6 +267,7 @@ namespace Orleans.Runtime
             {
                 if (TryGetGrainContext(grainId, out result))
                 {
+                    rehydrationContext?.Dispose();
                     return result;
                 }
 
@@ -278,38 +281,49 @@ namespace Orleans.Runtime
 
             if (result is null)
             {
-                // Did not find and did not start placing new
-                if (logger.IsEnabled(LogLevel.Debug))
-                {
-                    logger.LogDebug((int)ErrorCode.CatalogNonExistingActivation2, "Non-existent activation for grain {GrainId}", grainId);
-                }
-
-                CatalogInstruments.NonExistentActivations.Add(1);
-
-                this.directory.InvalidateCacheEntry(grainId);
-
-                // Unregister the target activation so we don't keep getting spurious messages.
-                // The time delay (one minute, as of this writing) is to handle the unlikely but possible race where
-                // this request snuck ahead of another request, with new placement requested, for the same activation.
-                // If the activation registration request from the new placement somehow sneaks ahead of this unregistration,
-                // we want to make sure that we don't unregister the activation we just created.
-                var address = new GrainAddress { SiloAddress = Silo, GrainId = grainId };
-                _ = this.UnregisterNonExistentActivation(address);
-                return null;
+                rehydrationContext?.Dispose();
+                return UnableToCreateActivation(grainId);
             }
-            else
+
+            // Rehydration occurs before activation.
+            if (rehydrationContext is not null)
             {
-                // Rehydration occurs before activation.
-                if (rehydrationContext is not null)
-                {
-                    result.Rehydrate(rehydrationContext);
-                }
-
-                // Initialize the new activation asynchronously.
-                var cancellation = new CancellationTokenSource(collectionOptions.Value.ActivationTimeout);
-                result.Activate(requestContextData, cancellation.Token);
-                return result;
+                result.Rehydrate(rehydrationContext);
             }
+
+            // Initialize the new activation asynchronously.
+            var cancellation = new CancellationTokenSource(collectionOptions.Value.ActivationTimeout);
+            result.Activate(requestContextData, cancellation.Token);
+            return result;
+        }
+
+        private IGrainContext UnableToCreateActivation(GrainId grainId)
+        {
+            // Did not find and did not start placing new
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                if (SiloStatusOracle.CurrentStatus.IsTerminating())
+                {
+                    logger.LogDebug((int)ErrorCode.CatalogNonExistingActivation2, "Unable to create activation for grain {GrainId} because this silo is terminating", grainId);
+                }
+                else
+                {
+                    logger.LogDebug((int)ErrorCode.CatalogNonExistingActivation2, "Unable to create activation for grain {GrainId}", grainId);
+                }
+            }
+
+            CatalogInstruments.NonExistentActivations.Add(1);
+
+            this.directory.InvalidateCacheEntry(grainId);
+
+            // Unregister the target activation so we don't keep getting spurious messages.
+            // The time delay (one minute, as of this writing) is to handle the unlikely but possible race where
+            // this request snuck ahead of another request, with new placement requested, for the same activation.
+            // If the activation registration request from the new placement somehow sneaks ahead of this unregistration,
+            // we want to make sure that we don't unregister the activation we just created.
+            var address = new GrainAddress { SiloAddress = Silo, GrainId = grainId };
+            _ = this.UnregisterNonExistentActivation(address);
+            return null;
         }
 
         private async Task UnregisterNonExistentActivation(GrainAddress address)
@@ -480,6 +494,8 @@ namespace Orleans.Runtime
         {
             foreach (var package in migratingGrains)
             {
+                // If the activation does not exist, create it and provide it with the migration context while doing so.
+                // If the activation already exists or cannot be created, it is too late to perform migration, so ignore the request.
                 GetOrCreateActivation(package.GrainId, requestContextData: null, package.MigrationContext);
             }
 

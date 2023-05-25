@@ -1,9 +1,9 @@
 
 using System;
 using System.Buffers;
+using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
@@ -16,41 +16,90 @@ namespace Orleans.Runtime
     /// </remarks>
     public interface IGrainLifecycle : ILifecycleObservable
     {
+        /// <summary>
+        /// Registers a grain migration participant.
+        /// </summary>
+        /// <param name="participant">The participant.</param>
         void AddMigrationParticipant(IGrainMigrationParticipant participant);
+
+        /// <summary>
+        /// Unregisters a grain migration participant.
+        /// </summary>
+        /// <param name="participant">The participant.</param>
         void RemoveMigrationParticipant(IGrainMigrationParticipant participant);
     }
 
     public interface IGrainMigrationParticipant
     {
-        // Called on the original activation when migration is initiated, before OnDeactivateAsync.
-        // The participant can access and update the migration context dictionary.
-        // Methods are void, since we do not want components to perform any IO before
-        // the grain is activated.
-        void OnDehydrate(IDehydrationContext migrationContext);
+        /// <summary>
+        /// Called on the original activation when migration is initiated, before <see cref="IGrainBase.OnDeactivateAsync(DeactivationReason, CancellationToken)"/>.
+        /// The participant can access and update the dehydration context.
+        /// </summary>
+        /// <param name="dehydrationContext"></param>
+        void OnDehydrate(IDehydrationContext dehydrationContext);
 
-        // Called on the new activation after a migration, before OnActivateAsync.
-        // The participant can restore state from the migration context dictionary.
-        // Method is void since we only want to set in-memory context here and do 
-        void OnRehydrate(IRehydrationContext migrationContext);
+        /// <summary>
+        /// Called on the new activation after a migration, before <see cref="IGrainBase.OnActivateAsync(CancellationToken)"/>.
+        /// The participant can restore state from the migration context.
+        /// </summary>
+        /// <param name="rehydrationContext">The rehydration context.</param>
+        void OnRehydrate(IRehydrationContext rehydrationContext);
 
-        // Future work:
-        // Perhaps this should return an `int` or a `float` to express the migration
-        // cost. The interface can be updated later to add this, with a default return
-        // value indicating no/minor cost.
+        /// <summary>
+        /// Called to get the cost of migrating this activation.
+        /// </summary>
+        /// <returns>The cost of migrating this activation.</returns>
         MigrationCost GetMigrationCost() => MigrationCost.Medium;
     }
 
+    /// <summary>
+    /// Records the state of a grain activation for migration.
+    /// </summary>
     public interface IDehydrationContext
     {
+        /// <summary>
+        /// Gets the keys in the context.
+        /// </summary>
+        IEnumerable<string> Keys { get; }
+
+        /// <summary>
+        /// Adds a value to the dehydration context, associated with the provided key.
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <param name="value">The value.</param>
         void Add(string key, ReadOnlySpan<byte> value);
+
+        /// <summary>
+        /// Adds a value to the dehydration context, associated with the provided key.
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <param name="valueWriter">A delegate used to write the provided value to the context.</param>
+        /// <param name="value">The value to provide to <paramref name="valueWriter"/>.</param>
         void Add(string key, Action<object, IBufferWriter<byte>> valueWriter, object value);
     }
 
+    /// <summary>
+    /// Contains the state of a grain activation for migration.
+    /// </summary>
     public interface IRehydrationContext
     {
+        /// <summary>
+        /// Gets the keys in the context.
+        /// </summary>
+        IEnumerable<string> Keys { get; }
+
+        /// <summary>
+        /// Tries to get a value from the rehydration context, associated with the provided key.
+        /// </summary>
+        /// <param name="key">The key.</param>
+        /// <param name="value">The value, if present.</param>
+        /// <returns><see langword="true"/> if the key exists in the context, otherwise <see langword="false"/>.</returns>
         bool TryGetValue(string key, out ReadOnlySequence<byte> value);
     }
 
+    /// <summary>
+    /// Describes the cost of migrating a grain.
+    /// </summary>
     public readonly struct MigrationCost
     {
         private MigrationCost(int value)
@@ -60,18 +109,47 @@ namespace Orleans.Runtime
 
         internal int Value { get; }
 
+        /// <summary>
+        /// Gets a value describing a very low migration cost.
+        /// </summary>
         public static MigrationCost VeryLow => new (0);
 
+        /// <summary>
+        /// Gets a value describing a low migration cost.
+        /// </summary>
         public static MigrationCost Low => new (250);
 
+        /// <summary>
+        /// Gets a value describing a medium migration cost.
+        /// </summary>
         public static MigrationCost Medium => new (500);
 
+        /// <summary>
+        /// Gets a value describing a medium migration cost.
+        /// </summary>
+        public static MigrationCost Default => Medium;
+
+        /// <summary>
+        /// Gets a value describing a high migration cost.
+        /// </summary>
         public static MigrationCost High => new (750);
 
+        /// <summary>
+        /// Gets a value describing a very high migration cost.
+        /// </summary>
         public static MigrationCost VeryHigh => new (1000);
 
+        /// <summary>
+        /// Gets a value indicating that this instance cannot be moved.
+        /// </summary>
         public static MigrationCost Immovable => new (int.MaxValue);
 
-        public static MigrationCost Max(MigrationCost left, MigrationCost right) => new(Math.Max(left.Value, right.Value));
+        /// <summary>
+        /// Returns the maximum of the provided values.
+        /// </summary>
+        /// <param name="left">The first value.</param>
+        /// <param name="right">The second value.</param>
+        /// <returns>The maximum of the provided value.</returns>
+        internal static MigrationCost Max(MigrationCost left, MigrationCost right) => new(Math.Max(left.Value, right.Value));
     }
 }

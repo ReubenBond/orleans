@@ -3,13 +3,12 @@ using System;
 using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
-using Orleans.Runtime;
 using Orleans.Serialization.Buffers;
 
-namespace Orleans;
+namespace Orleans.Runtime;
 
-[GenerateSerializer, Immutable]
-internal class ActivationMigrationContext : IDehydrationContext, IRehydrationContext, IDisposable, IEnumerable<string>, IBufferWriter<byte>
+[GenerateSerializer, Immutable, Alias("MigrationCtx")]
+internal sealed class MigrationContext : IDehydrationContext, IRehydrationContext, IDisposable, IEnumerable<string>, IBufferWriter<byte>
 {
     private readonly object _lock = new ();
 
@@ -39,7 +38,7 @@ internal class ActivationMigrationContext : IDehydrationContext, IRehydrationCon
         }
     }
 
-    public IEnumerable Keys => this;
+    public IEnumerable<string> Keys => this;
 
     public void Dispose() => _buffer.Reset();
 
@@ -66,7 +65,7 @@ internal class ActivationMigrationContext : IDehydrationContext, IRehydrationCon
     private sealed class Enumerator : IEnumerator<string>, IEnumerator
     {
         private Dictionary<string, (int Offset, int Length)>.KeyCollection.Enumerator _value;
-        public Enumerator(ActivationMigrationContext context) => _value = context._indices.Keys.GetEnumerator();
+        public Enumerator(MigrationContext context) => _value = context._indices.Keys.GetEnumerator();
         public string Current => _value.Current;
         object IEnumerator.Current => Current;
         public void Dispose() => _value.Dispose();

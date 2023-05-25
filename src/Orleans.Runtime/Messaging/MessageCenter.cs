@@ -266,7 +266,7 @@ namespace Orleans.Runtime.Messaging
         internal void ProcessRequestsToInvalidActivation(
             List<Message> messages,
             GrainAddress oldAddress,
-            GrainAddress forwardingAddress,
+            SiloAddress forwardingAddress,
             string failedOperation = null,
             Exception exc = null,
             bool rejectMessages = false)
@@ -296,7 +296,7 @@ namespace Orleans.Runtime.Messaging
         internal void ProcessRequestToInvalidActivation(
             Message message,
             GrainAddress oldAddress,
-            GrainAddress forwardingAddress,
+            SiloAddress forwardingAddress,
             string failedOperation,
             Exception exc = null,
             bool rejectMessages = false)
@@ -318,7 +318,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal void TryForwardRequest(Message message, GrainAddress oldAddress, GrainAddress forwardingAddress, string failedOperation = null, Exception exc = null)
+        internal void TryForwardRequest(Message message, GrainAddress oldAddress, SiloAddress forwardingAddress, string failedOperation = null, Exception exc = null)
         {
             bool forwardingSucceeded = false;
             try
@@ -373,7 +373,7 @@ namespace Orleans.Runtime.Messaging
             ResendMessageImpl(message);
         }
 
-        internal bool TryForwardMessage(Message message, GrainAddress forwardingAddress)
+        internal bool TryForwardMessage(Message message, SiloAddress forwardingAddress)
         {
             if (!MayForward(message, this.messagingOptions)) return false;
 
@@ -383,7 +383,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        private void ResendMessageImpl(Message message, GrainAddress forwardingAddress = null)
+        private void ResendMessageImpl(Message message, SiloAddress forwardingAddress = null)
         {
             if (log.IsEnabled(LogLevel.Debug)) log.LogDebug("Resend {Message}", message);
 
@@ -394,7 +394,7 @@ namespace Orleans.Runtime.Messaging
             }
             else if (forwardingAddress != null)
             {
-                message.TargetSilo = forwardingAddress.SiloAddress;
+                message.TargetSilo = forwardingAddress;
                 SendMessage(message);
             }
             else

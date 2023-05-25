@@ -16,20 +16,22 @@ namespace DefaultCluster.Tests.General
         [Fact, TestCategory("BVT")]
         public async Task BasicGrainMigrationTest()
         {
-            var x = GetRandomGrainId();
-            var grain = GrainFactory.GetGrain<IMigrationTestGrain>(x);
-            var expectedState = Random.Shared.Next();
-            await grain.SetState(expectedState);
-            var originalHost = await grain.GetHostAddress();
-            SiloAddress newHost;
-            do
+            for (var i = 1; i < 100; ++i)
             {
-                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
-                newHost = await grain.GetHostAddress();
-            } while (newHost == originalHost);
+                var grain = GrainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
+                var expectedState = Random.Shared.Next();
+                await grain.SetState(expectedState);
+                var originalHost = await grain.GetHostAddress();
+                SiloAddress newHost;
+                do
+                {
+                    await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+                    newHost = await grain.GetHostAddress();
+                } while (newHost == originalHost);
 
-            var newState = await grain.GetState();
-            Assert.Equal(expectedState, newState);
+                var newState = await grain.GetState();
+                Assert.Equal(expectedState, newState);
+            }
         }
     }
 

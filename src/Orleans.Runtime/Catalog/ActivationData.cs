@@ -1,9 +1,6 @@
 using System;
-using System.Buffers;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO.Pipelines;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -15,7 +12,6 @@ using Orleans.Configuration;
 using Orleans.Core.Internal;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
-using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
@@ -104,7 +100,7 @@ namespace Orleans.Runtime
         public IWorkItemScheduler Scheduler => _workItemGroup;
         public Task Deactivated => GetDeactivationCompletionSource().Task;
 
-        public GrainAddress ForwardingAddress
+        public SiloAddress ForwardingAddress
         {
             get => _extras?.ForwardingAddress;
             set
@@ -408,27 +404,66 @@ namespace Orleans.Runtime
             _workSignal.Signal();
         }
 
-        public void Migrate(Dictionary<string, object> requestContext, CancellationToken? token = null)
+        public void Migrate(Dictionary<string, object> requestContext, CancellationToken? cancellationToken = default)
         {
+            if (!cancellationToken.HasValue)
+            {
+                cancellationToken = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout).Token;
+            }
+
+            ScheduleOperation(new Command.Migrate(requestContext, cancellationToken.Value));
+        }
+
+        private async Task StartMigratingAsync(Dictionary<string, object> requestContext, CancellationToken cancellationToken)
+        {
+            // Run placement to select a new host. If a new (different) host is not selected, do not migrate.
+            var placementService = _shared.Runtime.ServiceProvider.GetRequiredService<PlacementService>();
+            var newLocation = await placementService.PlaceGrainAsync(GrainId, requestContext, PlacementStrategy);
+            if (newLocation == Address.SiloAddress || newLocation is null)
+            {
+                // No more appropriate silo was selected for this grain, but we cannot cancel migration now, so we must continue to deactivate and reactivate the grain.
+                // This could be because this is the only (compatible) silo for the grain or because the placement director chose this
+                // silo for some other reason.
+                if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                {
+                    if (newLocation is null)
+                    {
+                        _shared.Logger.LogDebug("Placement strategy {PlacementStrategy} failed to select a destination for migration of {GrainId}", PlacementStrategy, GrainId);
+                    }
+                    else
+                    {
+                        _shared.Logger.LogDebug("Placement strategy {PlacementStrategy} selected the current silo as the destination for migration of {GrainId}", PlacementStrategy, GrainId);
+                    }
+                }
+
+                // Will not deactivate/migrate.
+                return;
+            }
+
             lock (this)
             {
                 if (DehydrationContext is not null)
                 {
+                    // Migration has already occurred.
                     return;
                 }
 
                 // Set a migration context to capture any state which should be transferred.
                 // Doing this signals to the deactivation process that a migration is occurring, so it is important that this happens before we begin deactivation.
                 DehydrationContext = new(requestContext);
+                ForwardingAddress = newLocation;
             }
 
             if (_shared.Logger.IsEnabled(LogLevel.Debug))
             {
-                _shared.Logger.LogDebug("Migrating {GrainId} to a new location", GrainId);
+                _shared.Logger.LogDebug("Migrating {GrainId} to {SiloAddress}", GrainId, newLocation);
             }
 
-            // Start deactivation, which will complete the migration process.
-            Deactivate(new DeactivationReason(DeactivationReasonCode.Migrating, "Migrating to a new location"), token);
+            // Start deactivation to prevent any other.
+            if (StartDeactivating(new DeactivationReason(DeactivationReasonCode.Migrating, "Migrating to a new location")))
+            {
+                ScheduleOperation(new Command.Deactivate(cancellationToken));
+            }
         }
 
         public void Deactivate(DeactivationReason reason, CancellationToken? token = default)
@@ -902,12 +937,15 @@ namespace Orleans.Runtime
 
                 if (DeactivationException is null || ForwardingAddress is { })
                 {
+                    _shared.Logger.LogError("Forwarding1 {Self} to {ForwardingAddress}", this, ForwardingAddress);
                     // Either this was a duplicate activation or it was at some point successfully activated
                     // Forward all pending messages
                     RerouteAllQueuedMessages();
                 }
                 else
                 {
+                    _shared.Logger.LogError("Forwarding2 {Self}", this);
+
                     // Reject all pending messages
                     RejectAllQueuedMessages();
                 }
@@ -970,14 +1008,17 @@ namespace Orleans.Runtime
                             case Command.Rehydrate command:
                                 RehydrateInternal(command.Context);
                                 break;
-                            case Command.Activate activation:
-                                await ActivateAsync(activation.RequestContext, activation.CancellationToken);
+                            case Command.Activate command:
+                                await ActivateAsync(command.RequestContext, command.CancellationToken);
                                 break;
-                            case Command.Deactivate deactivation:
-                                await FinishDeactivating(deactivation.CancellationToken);
+                            case Command.Deactivate command:
+                                await FinishDeactivating(command.CancellationToken);
                                 break;
-                            case Command.Delay delay:
-                                await Task.Delay(delay.Duration);
+                            case Command.Migrate command:
+                                await StartMigratingAsync(command.RequestContext, command.CancellationToken);
+                                break;
+                            case Command.Delay command:
+                                await Task.Delay(command.Duration);
                                 break;
                             case Command.UnregisterFromCatalog:
                                 UnregisterMessageTarget();
@@ -996,73 +1037,84 @@ namespace Orleans.Runtime
 
         private void RehydrateInternal(IRehydrationContext context)
         {
-            if (_shared.Logger.IsEnabled(LogLevel.Debug))
+            try
             {
-                _shared.Logger.LogDebug("Rehydrating grain from previous activation");
-            }
-
-            lock (this)
-            {
-                if (State != ActivationState.Create)
+                if (_shared.Logger.IsEnabled(LogLevel.Debug))
                 {
-                    throw new InvalidOperationException($"Attempted to rehydrate a grain in the {State} state");
+                    _shared.Logger.LogDebug("Rehydrating grain from previous activation");
                 }
 
-                if (context.TryGetValue("sys.addr", out var directoryRegistrationData))
+                lock (this)
                 {
-                    // Propagate the previous registration, so that the new activation can atomically replace it with its new address.
-                    var serializer = _shared.Runtime.ServiceProvider.GetRequiredService<Serializer<GrainAddress>>();
-                    var previousRegistration = serializer.Deserialize(directoryRegistrationData);
-                    if (previousRegistration is not null)
+                    if (State != ActivationState.Create)
                     {
-                        (_extras ??= new()).PreviousRegistration = previousRegistration;
+                        throw new InvalidOperationException($"Attempted to rehydrate a grain in the {State} state");
+                    }
+
+                    if (context.TryGetValue("sys.addr", out var directoryRegistrationData))
+                    {
+                        // Propagate the previous registration, so that the new activation can atomically replace it with its new address.
+                        var serializer = _shared.Runtime.ServiceProvider.GetRequiredService<Serializer<GrainAddress>>();
+                        var previousRegistration = serializer.Deserialize(directoryRegistrationData);
+                        if (previousRegistration is not null)
+                        {
+                            (_extras ??= new()).PreviousRegistration = previousRegistration;
+                            if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                            {
+                                _shared.Logger.LogDebug("Previous activation address was {PreviousRegistration}", previousRegistration);
+                            }
+                        }
+                    }
+
+                    /*
+                    if (context.TryGetValue("sys.msgs", out var messages))
+                    {
+                        var serializer = _shared.Runtime.ServiceProvider.GetRequiredService<MessageSerializer>();
+                        var messageCount = 0;
+                        bool more;
+                        do
+                        {
+                            try
+                            {
+                                var result = serializer.TryRead(ref messages, out var message);
+                                more = result.RequiredBytes < messages.Length;
+                                ++messageCount;
+                                ReceiveMessage(message);
+                            }
+                            catch (Exception exception)
+                            {
+                                _shared.Logger.LogError(exception, "Error deserializing message from previous activation of {GrainId}", GrainId);
+                                break;
+                            }
+                        } while (more);
+
                         if (_shared.Logger.IsEnabled(LogLevel.Debug))
                         {
-                            _shared.Logger.LogDebug("Previous activation address was {PreviousRegistration}", previousRegistration);
+                            _shared.Logger.LogDebug("Received {MessageCount} messages from previous activation", messageCount);
                         }
                     }
-                }
+                    */
 
-                /*
-                if (context.TryGetValue("sys.msgs", out var messages))
-                {
-                    var serializer = _shared.Runtime.ServiceProvider.GetRequiredService<MessageSerializer>();
-                    var messageCount = 0;
-                    bool more;
-                    do
+                    foreach (var participant in _lifecycle.GetMigrationParticipants())
                     {
-                        try
-                        {
-                            var result = serializer.TryRead(ref messages, out var message);
-                            more = result.RequiredBytes < messages.Length;
-                            ++messageCount;
-                            ReceiveMessage(message);
-                        }
-                        catch (Exception exception)
-                        {
-                            _shared.Logger.LogError(exception, "Error deserializing message from previous activation of {GrainId}", GrainId);
-                            break;
-                        }
-                    } while (more);
-
-                    if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                    {
-                        _shared.Logger.LogDebug("Received {MessageCount} messages from previous activation", messageCount);
+                        participant.OnRehydrate(context);
                     }
-                }
-                */
 
-                foreach (var participant in _lifecycle.GetMigrationParticipants())
-                {
-                    participant.OnRehydrate(context);
+                    (GrainInstance as IGrainMigrationParticipant)?.OnRehydrate(context);
                 }
-                
-                (GrainInstance as IGrainMigrationParticipant)?.OnRehydrate(context);
+
+                if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                {
+                    _shared.Logger.LogDebug("Rehydrated grain from previous activation");
+                }
             }
-
-            if (_shared.Logger.IsEnabled(LogLevel.Debug))
+            catch (Exception exception)
             {
-                _shared.Logger.LogDebug("Rehydrated grain from previous activation");
+                _shared.Logger.LogError(exception, "Error while rehydrating activation");
+            }
+            finally
+            {
+                (context as IDisposable)?.Dispose();
             }
         }
 
@@ -1291,7 +1343,7 @@ namespace Orleans.Runtime
                 _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(
                     msgs,
                     Address,
-                    forwardingAddress: null,
+                    forwardingAddress: ForwardingAddress,
                     failedOperation: DeactivationReason.Description,
                     exc: DeactivationException,
                     rejectMessages: true);
@@ -1483,7 +1535,7 @@ namespace Orleans.Runtime
                     {
                         // Set the forwarding address so that messages enqueued on this activation can be forwarded to
                         // the existing activation.
-                        ForwardingAddress = result;
+                        ForwardingAddress = result?.SiloAddress;
                         DeactivationReason = new(DeactivationReasonCode.DuplicateActivation, "This grain has been activated elsewhere.");
                         success = false;
                         CatalogInstruments.ActivationConcurrentRegistrationAttempts.Add(1);
@@ -1491,7 +1543,7 @@ namespace Orleans.Runtime
                         {
                             // If this was a duplicate, it's not an error, just a race.
                             // Forward on all of the pending messages, and then forget about this activation.
-                            var primary = _shared.InternalRuntime.LocalGrainDirectory.GetPrimaryForGrain(ForwardingAddress.GrainId);
+                            var primary = _shared.InternalRuntime.LocalGrainDirectory.GetPrimaryForGrain(GrainId);
                             _shared.Logger.LogDebug(
                                 (int)ErrorCode.Catalog_DuplicateActivation,
                                 "Tried to create a duplicate activation {Address}, but we'll use {ForwardingAddress} instead. "
@@ -1536,13 +1588,13 @@ namespace Orleans.Runtime
         /// <summary>
         /// Starts the deactivation process.
         /// </summary>
-        public void StartDeactivating(DeactivationReason reason)
+        public bool StartDeactivating(DeactivationReason reason)
         {
             lock (this)
             {
                 if (State is ActivationState.Deactivating or ActivationState.Invalid or ActivationState.FailedToActivate)
                 {
-                    return;
+                    return false;
                 }
 
                 if (State is ActivationState.Activating or ActivationState.Create)
@@ -1564,6 +1616,8 @@ namespace Orleans.Runtime
 
                 _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
             }
+
+            return true;
         }
 
         /// <summary>
@@ -1588,43 +1642,22 @@ namespace Orleans.Runtime
 
                 if (DehydrationContext is { } context)
                 {
-                    // Run placement to select a new host: set ForwardingAddress
-                    var placementService = _shared.Runtime.ServiceProvider.GetRequiredService<PlacementService>();
-                    var newLocation = await placementService.PlaceGrainAsync(GrainId, context.RequestContext, PlacementStrategy);
-                    if (newLocation == Address.SiloAddress || newLocation is null)
-                    {
-                        // No more appropriate silo was selected for this grain, but we cannot cancel migration now, so we must continue to deactivate and reactivate the grain.
-                        // This could be because this is the only (compatible) silo for the grain or because the placement director chose this
-                        // silo for some other reason.
-                        if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                        {
-                            if (newLocation is null)
-                            {
-                                _shared.Logger.LogDebug("Placement strategy {PlacementStrategy} failed to select a destination for migration of {GrainId}", PlacementStrategy, GrainId);
-                            }
-                            else
-                            {
-                                _shared.Logger.LogDebug("Placement strategy {PlacementStrategy} selected the current silo as the destination for migration of {GrainId}", PlacementStrategy, GrainId);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        try
-                        {
-                            // Populate the dehydration context.
-                            OnDehydrate(context.Value);
+                    Debug.Assert(ForwardingAddress is not null);
 
-                            // Send the dehydration context to the target host
-                            // TODO: Coalesce concurrent requests into fewer calls by delegating to a shared service.
-                            var remoteCatalog = _shared.Runtime.ServiceProvider.GetRequiredService<IInternalGrainFactory>().GetSystemTarget<ICatalog>(Constants.CatalogType, newLocation);
-                            await remoteCatalog.AcceptMigratingGrains(new List<GrainMigrationPackage>() { new GrainMigrationPackage() { GrainId = GrainId, MigrationContext = context.Value } });
-                            migrated = true;
-                        }
-                        catch (Exception exception)
-                        {
-                            _shared.Logger.LogWarning(exception, "Failed to migrate grain {GrainId} to {SiloAddress}", GrainId, newLocation);
-                        }
+                    try
+                    {
+                        // Populate the dehydration context.
+                        OnDehydrate(context.Value);
+
+                        // Send the dehydration context to the target host
+                        // TODO: Coalesce concurrent requests into fewer calls by delegating to a shared service.
+                        var remoteCatalog = _shared.Runtime.ServiceProvider.GetRequiredService<IInternalGrainFactory>().GetSystemTarget<ICatalog>(Constants.CatalogType, ForwardingAddress);
+                        await remoteCatalog.AcceptMigratingGrains(new List<GrainMigrationPackage>() { new GrainMigrationPackage() { GrainId = GrainId, MigrationContext = context.Value } });
+                        migrated = true;
+                    }
+                    catch (Exception exception)
+                    {
+                        _shared.Logger.LogWarning(exception, "Failed to migrate grain {GrainId} to {SiloAddress}", GrainId, ForwardingAddress);
                     }
                 }
 
@@ -1833,7 +1866,7 @@ namespace Orleans.Runtime
             /// <summary>
             /// If State == Invalid, this may contain a forwarding address for incoming messages
             /// </summary>
-            public GrainAddress ForwardingAddress { get => GetValueOrDefault<GrainAddress>(nameof(ForwardingAddress)); set => SetOrRemoveValue(nameof(ForwardingAddress), value); }
+            public SiloAddress ForwardingAddress { get => GetValueOrDefault<SiloAddress>(nameof(ForwardingAddress)); set => SetOrRemoveValue(nameof(ForwardingAddress), value); }
 
             /// <summary>
             /// A <see cref="TaskCompletionSource{TResult}"/> which completes when a grain has deactivated.
@@ -1948,6 +1981,18 @@ namespace Orleans.Runtime
             public class UnregisterFromCatalog : Command
             {
             }
+
+            public class Migrate
+            {
+                public Migrate(Dictionary<string, object> requestContext, CancellationToken cancellationToken)
+                {
+                    RequestContext = requestContext;
+                    CancellationToken = cancellationToken;
+                }
+
+                public Dictionary<string, object> RequestContext { get; }
+                public CancellationToken CancellationToken { get; }
+            }
         }
 
         internal class ReentrantRequestTracker : Dictionary<Guid, int>
@@ -1983,7 +2028,7 @@ namespace Orleans.Runtime
 
         private class DehydrationContextHolder
         {
-            public readonly ActivationMigrationContext Value = new();
+            public readonly MigrationContext Value = new();
             public readonly Dictionary<string, object> RequestContext;
             public DehydrationContextHolder(Dictionary<string, object> requestContext) { RequestContext = requestContext; }
         }

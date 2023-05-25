@@ -59,6 +59,7 @@ namespace TestExtensions
             public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
+                    //.ConfigureLogging(l => l.SetMinimumLevel(LogLevel.Debug))
                     .Configure<SiloMessagingOptions>(o => o.ClientGatewayShutdownNotificationTimeout = default)
                     .UseInMemoryReminderService()
                     .AddMemoryGrainStorageAsDefault()
