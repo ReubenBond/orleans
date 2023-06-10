@@ -9,12 +9,12 @@ public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<
 
     [Id(0)]
     private readonly HierarchicalKey? _key;
-    
+
     private TaskId(string value)
     {
         _key = HierarchicalKey.CreateEscaped(value);
     }
-    
+
     private TaskId(HierarchicalKey key)
     {
         _key = key;
@@ -40,7 +40,7 @@ public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<
     public override bool Equals(object? obj) => obj is TaskId id && Equals(id);
     public bool Equals(TaskId other) => _key is null && other._key is null || _key is not null && _key.Equals(other._key);
 
-    public static TaskId Parse(string s, IFormatProvider? provider) => new(HierarchicalKey.Parse(s, provider));
+    public static TaskId Parse(string s, IFormatProvider? provider = null) => new(HierarchicalKey.Parse(s, provider));
 
     public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, [MaybeNullWhen(false)] out TaskId result)
     {
@@ -57,7 +57,7 @@ public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<
     public static bool operator ==(TaskId left, TaskId right) => left.Equals(right);
     public static bool operator !=(TaskId left, TaskId right) => !left.Equals(right);
     public bool IsAncestorOf(TaskId other) => _key is not null && _key.IsPrefixOf(other._key);
-    public bool IsDecendantOf(TaskId other) => other._key is not null && other._key.IsPrefixOf(_key);
+    public bool IsDescendantOf(TaskId other) => other._key is not null && other._key.IsPrefixOf(_key);
     public bool IsParentOf(TaskId other) => _key is not null && _key.IsParentOf(other._key);
     public bool IsChildOf(TaskId other) => _key is not null && _key.IsChildOf(other._key);
     public TaskId Parent() => _key?.GetParent() is { } parent ? new(parent) : None;
