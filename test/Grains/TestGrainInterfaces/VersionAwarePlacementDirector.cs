@@ -18,5 +18,8 @@ namespace UnitTests.GrainInterfaces
     public class VersionAwarePlacementStrategy : PlacementStrategy
     {
         internal static VersionAwarePlacementStrategy Singleton { get; } = new VersionAwarePlacementStrategy();
+
+        /// <inheritdoc />
+        public override bool IsGrain => true;
     }
 }
