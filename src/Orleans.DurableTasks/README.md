@@ -1,3 +1,18 @@
+# TODO
+
+* [ ] Implement Azure Table Storage support for grains
+* [ ] Enhance reminders to poll/trigger pending workflows
+  * [ ] Also improve reminder scalability
+* [ ] Implement Cosmos DB Document storage for grains (so we have multiple models)
+* [ ] Add samples for common Workflow patterns
+    * [ ] Human-in-the-loop
+    * [ ] Subscription (repeated)
+        * [ ] Large delay
+        * Include cancellation
+    * [ ] Provisioning (eg, Azure infra)
+    * [ ] Fan-out/fan-in
+    * [ ] ETL/Batch
+    * [ ] Saga (show the unwinding pattern)
 
 ### Overview
 
