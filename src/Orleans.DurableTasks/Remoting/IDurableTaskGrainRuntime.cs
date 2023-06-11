@@ -29,8 +29,8 @@ public interface IDurableTaskServer
 public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServer, IDurableTaskClient
 {
     // TODO: implement. This will require making a serializable implementation of ScheduledTask<T>
-    ValueTask<(bool Exists, ScheduledTask<T> Task)> TryGetScheduledTaskAsync<T>(TaskId taskId);
-    ValueTask<(bool Exists, ScheduledTask Task)> TryGetScheduledTaskAsync(TaskId taskId);
+    //ValueTask<(bool Exists, ScheduledTask<T> Task)> TryGetScheduledTaskAsync<T>(TaskId taskId);
+    //ValueTask<(bool Exists, ScheduledTask Task)> TryGetScheduledTaskAsync(TaskId taskId);
 }
 
 public interface IDurableTaskGrainRuntime

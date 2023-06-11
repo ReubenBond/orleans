@@ -3,6 +3,9 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;
 
+/// <summary>
+/// Represents an operation which is scheduled and will complete at an indefinite point in the future.
+/// </summary>
 public abstract class ScheduledTask
 {
     public abstract TaskId TaskId { get; }
@@ -16,7 +19,7 @@ public abstract class ScheduledTask
     public ScheduledTaskAwaiter GetAwaiter() => new(this);
     protected internal abstract ValueTask AsUntypedValueTask();
 }
-
+// TODO: Make abstract and push implementation down into ~"GrainCallDurableTaskScheduledTask" or something
 public class ScheduledTask<TResult> : ScheduledTask
 {
     private readonly DurableTaskExecutionContext _executionContext;
