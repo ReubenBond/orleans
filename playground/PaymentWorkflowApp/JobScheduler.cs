@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
@@ -283,6 +284,97 @@ public class JobScheduler
             await _storage.WriteAsync();
             executionContext.SetResponse(response);
         }
+    }
+
+    public async Task PurgeCompletedJobsAsync(TimeSpan cleanupAge)
+    {
+        try
+        {
+            await _asyncLock.WaitAsync();
+            await _storage.ReadAsync();
+            PruneCompletedTasks(DateTime.UtcNow, cleanupAge);
+            await _storage.WriteAsync();
+        }
+        finally
+        {
+            _asyncLock.Release();
+        }
+    }
+
+    private bool PruneCompletedTasks(DateTime now, TimeSpan cleanupAge)
+    {
+        // Prune all tasks which:
+        // * Have a response
+        // * Have no remaining clients to notify
+        // * Have no parents waiting on them within this context
+        // * Have been completed for more than a configured period of time
+        var allTasks = _storage.Tasks.ToDictionary(static task => task.Id, static task => task.State);
+        HashSet<TaskId>? completedTaskIds = default;
+        Dictionary<TaskId, HashSet<TaskId>>? waitingOnParent = default;
+        foreach (var (taskId, state) in allTasks)
+        {
+            if (state.Result is null)
+            {
+                // The task is incomplete.
+                continue;
+            }
+
+            /*
+            if (state.Clients is { Count: > 0 })
+            {
+                // There are still unacknowledged clients.
+                continue;
+            }
+            */
+
+            if (state.CompletedAt is not { } completedAt || now.Subtract(completedAt) < cleanupAge)
+            {
+                // The task is being retained for at least the specified period of time.
+                continue;
+            }
+
+            if (taskId.Parent() is { } parent && parent != TaskId.None && allTasks.ContainsKey(parent))
+            {
+                // There is a local parent task which this task is waiting on, and that is the last thing keeping this task alive.
+                waitingOnParent ??= new();
+                ref var waiters = ref CollectionsMarshal.GetValueRefOrAddDefault(waitingOnParent, parent, out var exists);
+                waiters ??= new();
+                waiters.Add(taskId);
+                continue;
+            }
+
+            completedTaskIds ??= new();
+            completedTaskIds.Add(taskId);
+        }
+
+        if (completedTaskIds is not null)
+        {
+            foreach (var taskId in completedTaskIds)
+            {
+                // Prune all otherwise-completed children.
+                if (waitingOnParent is not null && waitingOnParent.TryGetValue(taskId, out var childTaskIds))
+                {
+                    foreach (var childTaskId in childTaskIds)
+                    {
+                        if (_logger.IsEnabled(LogLevel.Trace))
+                        {
+                            _logger.LogTrace("Pruning completed child task {TaskId}", childTaskId);
+                        }
+
+                        _storage.RemoveTask(childTaskId);
+                    }
+                }
+
+                // Prune the task.
+                if (_logger.IsEnabled(LogLevel.Trace))
+                {
+                    _logger.LogTrace("Pruning completed task {TaskId}", taskId);
+                }
+                _storage.RemoveTask(taskId);
+            }
+        }
+
+        return completedTaskIds is not null;
     }
 
     internal class JobTask : DurableTask<string>, ISchedulableTask

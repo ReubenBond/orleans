@@ -18,6 +18,9 @@ await host.StartAsync();
 
 var jobScheduler = host.Services.GetRequiredService<JobScheduler>();
 
+// Cleanup completed jobs which completed at least a second ago.
+await jobScheduler.PurgeCompletedJobsAsync(TimeSpan.FromMinutes(5));
+
 jobScheduler.AddHandler("stringJoin", args => new(string.Join(", ", args))); 
 
 // During program config. This could be ASP.NET route mapping
@@ -39,9 +42,9 @@ jobScheduler.AddHandler("SayHello", async args =>
 await jobScheduler.StartAsync();
 
 // Later, or somewhere else:
-var job1 = await jobScheduler.GetOrCreateJob("SayHello", "Bob").ScheduleAsync("job-1");
-var job2 = await jobScheduler.GetOrCreateJob("SayHello", "Brian", "Mary", "Jehoshaphat").ScheduleAsync("job-2");
-var job3 = await jobScheduler.GetOrCreateJob("SayHello", "Brian", "Mary", "Jehoshaphat").ScheduleAsync("job-3");
+var job1 = await jobScheduler.GetOrCreateJob("SayHello", "Xiao").ScheduleAsync("job-1");
+var job2 = await jobScheduler.GetOrCreateJob("SayHello", "Julian", "Benjamin", "Phil").ScheduleAsync("job-2");
+var job3 = await jobScheduler.GetOrCreateJob("SayHello", "Sergey", "Gabriel", "Jason").ScheduleAsync("job-3");
 var result3 = await job3;
 
 // Some time later, maybe an app crash happens in between.
@@ -56,8 +59,20 @@ var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
 
 while (!lifetime.ApplicationStopping.IsCancellationRequested)
 {
-    Console.WriteLine("What would you like to do? list, create, approve <TaskId>, cancel <TaskId>");
+    Console.WriteLine("What would you like to do? list, create, approve <TaskId>, cancel <TaskId>, exit");
     var cmd = Console.ReadLine();
+
+    if (cmd == "exit")
+    {
+        lifetime.StopApplication();
+        break;
+    }
+
+    if (cmd == "prune")
+    {
+        await jobScheduler.PurgeCompletedJobsAsync(TimeSpan.Zero);
+    }
+
     if (cmd == "list")
     {
         await foreach (var job in jobScheduler.GetJobsAsync())
