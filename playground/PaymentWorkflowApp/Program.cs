@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Orleans.DurableTasks;
 using Orleans.Serialization;
 
@@ -8,10 +9,11 @@ using var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices(services =>
     {
         services.AddSingleton<JobScheduler>();
-        services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<JobScheduler>());
         services.AddSingleton<IJobStorage, LiteDbJobStorage>();
         services.AddSerializer();
-    }).UseConsoleLifetime().Build();
+    })
+    .ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Trace))
+    .UseConsoleLifetime().Build();
 await host.StartAsync();
 
 var jobScheduler = host.Services.GetRequiredService<JobScheduler>();
@@ -33,6 +35,8 @@ jobScheduler.AddHandler("SayHello", async args =>
 
     return $"hello, {result}";
 });
+
+await jobScheduler.StartAsync();
 
 // Later, or somewhere else:
 var job1 = await jobScheduler.GetOrCreateJob("SayHello", "Bob").ScheduleAsync("job-1");

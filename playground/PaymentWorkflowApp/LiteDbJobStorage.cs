@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using LiteDB;
 using Orleans.DurableTasks;
 using Orleans.Serialization;
@@ -7,6 +7,7 @@ public sealed class LiteDbJobStorage : IJobStorage
 {
     private readonly Serializer<JobTaskState> _serializer;
     private readonly DeepCopier<JobTaskState> _copier;
+    private readonly object _lock = new();
 
     private LiteDatabase _db;
     private Dictionary<TaskId, JobTaskState> _workingCopy = new();
@@ -19,24 +20,45 @@ public sealed class LiteDbJobStorage : IJobStorage
         _db = new LiteDatabase(@"jobs.db");
     }
 
-    public IEnumerable<(TaskId Id, JobTaskState State)> Tasks => _workingCopy.Select(static pair => (pair.Key, pair.Value));
+    public IEnumerable<(TaskId Id, JobTaskState State)> Tasks
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _workingCopy.Select(static pair => (pair.Key, pair.Value)).ToList();
+            }
+        }
+    }
 
-    public void AddOrUpdateTask(TaskId taskId, JobTaskState state) => _workingCopy[taskId] = _copier.Copy(state);
+    public void AddOrUpdateTask(TaskId taskId, JobTaskState state)
+    {
+        lock (_lock)
+        {
+            _workingCopy[taskId] = _copier.Copy(state);
+        }
+    }
     public bool RemoveTask(TaskId taskId)
     {
-        if (_workingCopy.Remove(taskId))
+        lock (_lock)
         {
-            return _removed.Add(taskId);
+            if (_workingCopy.Remove(taskId))
+            {
+                return _removed.Add(taskId);
+            }
+            return false;
         }
-        return false;
     }
 
     public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out JobTaskState? state)
     {
-        if (_workingCopy.TryGetValue(taskId, out var internalState))
+        lock (_lock)
         {
-            state = _copier.Copy(internalState);
-            return true;
+            if (_workingCopy.TryGetValue(taskId, out var internalState))
+            {
+                state = _copier.Copy(internalState);
+                return true;
+            }
         }
 
         state = null;
@@ -45,39 +67,46 @@ public sealed class LiteDbJobStorage : IJobStorage
 
     public ValueTask ReadAsync()
     {
-        var collection = _db.GetCollection<JobEntity>("jobs");
-
-        _workingCopy = new Dictionary<TaskId, JobTaskState>();
-        foreach (var entry in collection.FindAll())
+        lock (_lock)
         {
-            var taskId = TaskId.Parse(entry.Id!);
+            var collection = _db.GetCollection<JobEntity>("jobs");
 
-            _workingCopy.Add(taskId, _serializer.Deserialize(entry.Payload));
+            _workingCopy = new Dictionary<TaskId, JobTaskState>();
+            foreach (var entry in collection.FindAll())
+            {
+                var taskId = TaskId.Parse(entry.Id!);
+
+                _workingCopy.Add(taskId, _serializer.Deserialize(entry.Payload));
+            }
         }
-        
+
         return default;
     }
 
     public ValueTask WriteAsync()
     {
-        var collection = _db.GetCollection<JobEntity>("jobs");
-        foreach (var (id, task) in _workingCopy)
+        lock (_lock)
         {
-            var entry = new JobEntity
+            var collection = _db.GetCollection<JobEntity>("jobs");
+            foreach (var (id, task) in _workingCopy)
             {
-                Id = id.ToString(),
-                Payload = _serializer.SerializeToArray(task),
-            };
+                var entry = new JobEntity
+                {
+                    Id = id.ToString(),
+                    Payload = _serializer.SerializeToArray(task),
+                };
 
-            collection.Upsert(entry);
+                collection.Upsert(entry);
+            }
+
+            foreach (var id in _removed)
+            {
+                collection.Delete(id.ToString());
+            }
+
+            _removed.Clear();
         }
 
-        foreach (var id in _removed)
-        {
-            collection.Delete(id.ToString());
-        }
-
-        _removed.Clear();
         return default;
     }
 

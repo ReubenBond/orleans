@@ -25,7 +25,7 @@ public class JobDescription
     public override string? ToString() => $"[Id: {JobId}, Status: {Status}, Type: {Type}, Arguments: {string.Join(", ", Arguments ?? Array.Empty<string>())}, CreatedAt: {CreatedAt}, CompletedAt: {CompletedAt}, Result: {Result}, Exception: {Exception?.GetType()}]";
 }
 
-public class JobScheduler : IHostedService
+public class JobScheduler
 {
     private readonly Dictionary<string, object> _handlers = new();
     private readonly Dictionary<TaskId, JobDurableTaskExecutionContext> _tasks = new();
@@ -40,9 +40,23 @@ public class JobScheduler : IHostedService
         _logger = logger;
     }
 
-    public ValueTask InitializeAsync()
+    public async ValueTask StartAsync()
     {
-        return _storage.ReadAsync();
+        await RecoverAsync();
+    }
+
+    private async ValueTask RecoverAsync()
+    {
+        await _storage.ReadAsync();
+        foreach (var (taskId, taskState) in _storage.Tasks)
+        {
+            if (taskState.Result is null)
+            {
+                var job = new JobTask(taskState.Type!, taskState.Arguments, this);
+                var executionContext = RehydrateTaskFromStorage(taskId, taskState);
+                InvokeRequestMethod(job, taskId, executionContext);
+            }
+        }
     }
 
     /// <summary>
@@ -69,21 +83,27 @@ public class JobScheduler : IHostedService
 
         if (_storage.TryGetTask(taskId, out var state))
         {
-            // Rehydrate the execution context from its persisted state.
-            executionContext = new JobDurableTaskExecutionContext(taskId, this, state);
-
-            // If the task has completed, set the result now.
-            if (state.Result is { } response)
-            {
-                executionContext.SetResponse(response);
-            }
-
-            // Move the task into the list of active tasks.
-            _tasks[taskId] = executionContext;
+            executionContext = RehydrateTaskFromStorage(taskId, state);
             return true;
         }
 
         return false;
+    }
+
+    private JobDurableTaskExecutionContext RehydrateTaskFromStorage(TaskId taskId, JobTaskState state)
+    {
+        // Rehydrate the execution context from its persisted state.
+        var executionContext = new JobDurableTaskExecutionContext(taskId, this, state);
+
+        // If the task has completed, set the result now.
+        if (state.Result is { } response)
+        {
+            executionContext.SetResponse(response);
+        }
+
+        // Move the task into the list of active tasks.
+        _tasks[taskId] = executionContext;
+        return executionContext;
     }
 
     private async Task<JobDurableTaskExecutionContext> CreateExecutionContextAsync(TaskId taskId, string? type, string[]? arguments)
@@ -101,10 +121,13 @@ public class JobScheduler : IHostedService
         return CreateExecutionContext(taskId, newTaskState);
     }
 
-    public void AddHandler(string jobType, Func<string[], DurableTask<string>> handler) => _handlers[jobType] = handler;
+    public void AddHandler(string jobType, Func<string[], DurableTask<string>> handler)
+    {
+        _handlers[jobType] = handler;
+    }
     public void AddHandler(string jobType, Func<string[], string> handler) => _handlers[jobType] = handler;
 
-    public DurableTask<string> GetOrCreateJob(string jobType, params string[] args) => new JobTask(jobType, args, this);
+    public DurableTask<string> GetOrCreateJob(string jobType, params string[]? args) => new JobTask(jobType, args, this);
 
     public async IAsyncEnumerable<JobDescription> GetJobsAsync(bool includeCompleted = true)
     {
@@ -139,6 +162,7 @@ public class JobScheduler : IHostedService
         }
     }
 
+    /*
     public async ValueTask Cancel(TaskId jobId)
     {
         if (!_tasks.TryGetValue(jobId, out var jobContext))
@@ -148,6 +172,7 @@ public class JobScheduler : IHostedService
 
         jobContext.
     }
+    */
 
     internal async ValueTask<DurableTaskExecutionContext> ScheduleAsync(JobTask job, TaskId taskId, SchedulingOptions? options)
     {
@@ -260,16 +285,13 @@ public class JobScheduler : IHostedService
         }
     }
 
-    async Task IHostedService.StartAsync(CancellationToken cancellationToken) => await InitializeAsync();
-    Task IHostedService.StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-
     internal class JobTask : DurableTask<string>, ISchedulableTask
     {
         private readonly JobScheduler _jobScheduler;
-        public string[] Arguments { get; }
+        public string[]? Arguments { get; }
         public string Type { get; }
 
-        public JobTask(string type, string[] args, JobScheduler jobScheduler)
+        public JobTask(string type, string[]? args, JobScheduler jobScheduler)
         {
             Arguments = args;
             Type = type;
@@ -285,13 +307,13 @@ public class JobScheduler : IHostedService
         {
             var handler = _jobScheduler._handlers[Type];
             Response response;
-            if (handler is Func<string[], string> funcJob)
+            if (handler is Func<string[]?, string> funcJob)
             {
                 DurableTaskExecutionContext.SetCurrentContext(executionContext);
                 response = Response.FromResult(funcJob(Arguments));
 
             }
-            else if (handler is Func<string[], DurableTask<string>> durableTaskJob)
+            else if (handler is Func<string[]?, DurableTask<string>> durableTaskJob)
             {
                 // This might be a bit confusing: we are forwarding the invocation on to the async method.
                 response = await DurableTaskInternal.InvokeAsync(durableTaskJob(Arguments), executionContext);
@@ -303,6 +325,133 @@ public class JobScheduler : IHostedService
             }
 
             return response;
+        }
+    }
+}
+
+public sealed class SingleThreadedJobScheduler : SynchronizationContext, IThreadPoolWorkItem
+{
+    private static int NextSchedulerId = 0;
+    private enum RunState
+    {
+        Waiting = 0,
+        Runnable = 1,
+        Running = 2
+    }
+
+    private readonly Queue<(object Callback, object? State)> _workItems = new();
+    private readonly object _lock = new();
+    private readonly ILogger<JobScheduler> _logger;
+    private readonly int _id;
+    private RunState _state;
+
+    public SingleThreadedJobScheduler(ILogger<JobScheduler> logger)
+    {
+        _logger = logger;
+        _id = Interlocked.Increment(ref NextSchedulerId);
+    }
+
+    public override string ToString() => $"{nameof(SingleThreadedJobScheduler)}-{_id}";
+
+    public override void Post(SendOrPostCallback callback, object? state) => Schedule(callback, state);
+    public override void Send(SendOrPostCallback callback, object? state) => Schedule(callback, state);
+
+    public void Schedule(object callback, object? state)
+    {
+        lock (_lock)
+        {
+            _workItems.Enqueue((callback, state));
+            if (_state is not RunState.Waiting)
+            {
+                return;
+            }
+
+            _state = RunState.Runnable;
+        }
+
+        ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: true);
+    }
+
+    public void ScheduleOrRunInline(object callback, object? state)
+    {
+        lock (_lock)
+        {
+            if (_state is not RunState.Running)
+            {
+                // Note that this holds the lock for the duration of the task execution, which is hopefully short.
+                RunTaskInline(callback, state);
+            }
+            else
+            {
+                _workItems.Enqueue((callback, state));
+                _state = RunState.Runnable;
+            }
+        }
+    }
+
+    private void RunTaskInline(object callback, object? state)
+    {
+        if (callback is SendOrPostCallback sendOrPostCallback)
+        {
+            var existing = Current;
+            SetSynchronizationContext(this);
+            try
+            {
+                sendOrPostCallback(state);
+            }
+            finally
+            {
+                SetSynchronizationContext(existing);
+            }
+        }
+        else
+        {
+            throw new InvalidOperationException($"Unknown task type for callback {callback} ({callback.GetType()})");
+        }
+    }
+
+    void IThreadPoolWorkItem.Execute()
+    {
+        try
+        {
+            while (true)
+            {
+                lock (_lock)
+                {
+                    _state = RunState.Running;
+                }
+
+                // Get the first work item from the queue
+                (object Callback, object? State) item;
+                lock (_lock)
+                {
+                    if (!_workItems.TryDequeue(out item))
+                    {
+                        break;
+                    }
+                }
+
+                RunTaskInline(item.Callback, item.State);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error invoking scheduled callback");
+        }
+        finally
+        {
+            lock (_lock)
+            {
+                if (_workItems.Count > 0)
+                {
+                    _state = RunState.Runnable;
+                    ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: true);
+                }
+                else
+                {
+                    _state = RunState.Waiting;
+                }
+            }
         }
     }
 }
