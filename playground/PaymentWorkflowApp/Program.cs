@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.DurableTasks;
@@ -51,6 +52,24 @@ var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
 
 while (!lifetime.ApplicationStopping.IsCancellationRequested)
 {
+    Console.WriteLine("What would you like to do? list, create, approve <TaskId>, cancel <TaskId>");
+    var cmd = Console.ReadLine();
+    if (cmd == "list")
+    {
+        await foreach (var job in jobScheduler.GetJobsAsync())
+        {
+            Console.WriteLine(job);
+        }
+    }
+
+    if (cmd == "create")
+    {
+        var names = new[] { "Bob", "Mary", "Ted", "Alice", "Jehoshaphat", "Brian" };
+        var jobType = "SayHello";
+        var jobArgs = Enumerable.Range(0, Random.Shared.Next(3)).Select(_ => names[Random.Shared.Next(names.Length)]).ToArray();
+        var jobId = $"jeb-{Random.Shared.Next(0, int.MaxValue):X}";
+        await jobScheduler.GetOrCreateJob(jobType, jobArgs).ScheduleAsync(jobId);
+    }
 }
 
 await host.WaitForShutdownAsync();

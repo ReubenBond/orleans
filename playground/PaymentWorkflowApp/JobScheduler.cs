@@ -2,14 +2,33 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Orleans.Concurrency;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Remoting;
 using Orleans.Serialization.Invocation;
 
+public class JobDescription
+{
+    public TaskId JobId { get; set; }
+    public string? Status { get; set; }
+    public string? Result { get; set; }
+    public Exception? Exception { get; set; }
+
+    public string? Type { get; set; }
+
+    public string[]? Arguments { get; set; }
+
+    public DateTime? CompletedAt { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public override string? ToString() => $"[Id: {JobId}, Status: {Status}, Type: {Type}, Arguments: {string.Join(", ", Arguments ?? Array.Empty<string>())}, CreatedAt: {CreatedAt}, CompletedAt: {CompletedAt}, Result: {Result}, Exception: {Exception?.GetType()}]";
+}
+
 public class JobScheduler : IHostedService
 {
     private readonly Dictionary<string, object> _handlers = new();
-    private readonly Dictionary<TaskId, JobDurableTaskExecutionContext> _pendingTasks = new();
+    private readonly Dictionary<TaskId, JobDurableTaskExecutionContext> _tasks = new();
     private readonly Dictionary<TaskId, Task> _runningTasks = new();
     private readonly IJobStorage _storage;
     private readonly ILogger<JobScheduler> _logger;
@@ -32,7 +51,7 @@ public class JobScheduler : IHostedService
     /// <param name="taskId">The task id.</param>
     /// <param name="state">The task state.</param>
     /// <returns>The new execution context.</returns>
-    private JobDurableTaskExecutionContext CreateExecutionContext(TaskId taskId, JobTaskState state) => _pendingTasks[taskId] = new JobDurableTaskExecutionContext(taskId, this, state);
+    private JobDurableTaskExecutionContext CreateExecutionContext(TaskId taskId, JobTaskState state) => _tasks[taskId] = new JobDurableTaskExecutionContext(taskId, this, state);
 
     /// <summary>
     /// Gets the execution context corresponding to the provided task, if it exists, and returns it.
@@ -43,7 +62,7 @@ public class JobScheduler : IHostedService
     private bool TryGetExecutionContext(TaskId taskId, [NotNullWhen(true)] out JobDurableTaskExecutionContext? executionContext)
     {
         // Is an active method already waiting for this?
-        if (_pendingTasks.TryGetValue(taskId, out executionContext))
+        if (_tasks.TryGetValue(taskId, out executionContext))
         {
             return true;
         }
@@ -60,7 +79,7 @@ public class JobScheduler : IHostedService
             }
 
             // Move the task into the list of active tasks.
-            _pendingTasks[taskId] = executionContext;
+            _tasks[taskId] = executionContext;
             return true;
         }
 
@@ -86,6 +105,49 @@ public class JobScheduler : IHostedService
     public void AddHandler(string jobType, Func<string[], string> handler) => _handlers[jobType] = handler;
 
     public DurableTask<string> GetOrCreateJob(string jobType, params string[] args) => new JobTask(jobType, args, this);
+
+    public async IAsyncEnumerable<JobDescription> GetJobsAsync(bool includeCompleted = true)
+    {
+        await Task.Yield();
+        foreach (var (taskId, job) in _tasks)
+        {
+            var (result, error) = job.State.Result switch
+            {
+                { Exception: Exception exception } => (null, exception),
+                { Result: object res } => (res, null),
+                _ => (default(object), default(Exception)),
+            };
+
+            if ((result is not null || error is not null) && !includeCompleted)
+            {
+                continue;
+            }
+
+            var isRunning = _runningTasks.ContainsKey(taskId);
+            var description = new JobDescription
+            {
+                JobId = taskId,
+                Arguments = job.State.Arguments,
+                Type = job.State.Type,
+                Status = (result, error) switch { (null, null) when isRunning => "Running", (null, null) => "Pending", (not null, null) => "Completed", (null, not null) => "Faulted", _ => "Internal Error" },
+                Exception = error,
+                Result = result?.ToString(),
+                CreatedAt = job.State.CreatedAt,
+                CompletedAt = job.State.CompletedAt,
+            };
+            yield return description;
+        }
+    }
+
+    public async ValueTask Cancel(TaskId jobId)
+    {
+        if (!_tasks.TryGetValue(jobId, out var jobContext))
+        {
+            return;
+        }
+
+        jobContext.
+    }
 
     internal async ValueTask<DurableTaskExecutionContext> ScheduleAsync(JobTask job, TaskId taskId, SchedulingOptions? options)
     {
