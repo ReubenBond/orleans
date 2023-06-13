@@ -19,7 +19,7 @@ await host.StartAsync();
 var jobScheduler = host.Services.GetRequiredService<JobScheduler>();
 
 // Cleanup completed jobs which completed at least a second ago.
-await jobScheduler.PurgeCompletedJobsAsync(TimeSpan.FromMinutes(5));
+await jobScheduler.PruneCompletedTasksAsync(TimeSpan.FromMinutes(5));
 
 jobScheduler.AddHandler("stringJoin", args => new(string.Join(", ", args))); 
 
@@ -59,7 +59,7 @@ var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
 
 while (!lifetime.ApplicationStopping.IsCancellationRequested)
 {
-    Console.WriteLine("What would you like to do? list, create, approve <TaskId>, cancel <TaskId>, exit");
+    Console.WriteLine("What would you like to do? list, create, pending, approve <TaskId>, cancel <TaskId>, exit");
     var cmd = Console.ReadLine();
 
     if (cmd == "exit")
@@ -70,10 +70,18 @@ while (!lifetime.ApplicationStopping.IsCancellationRequested)
 
     if (cmd == "prune")
     {
-        await jobScheduler.PurgeCompletedJobsAsync(TimeSpan.Zero);
+        await jobScheduler.PruneCompletedTasksAsync(TimeSpan.Zero);
     }
 
     if (cmd == "list")
+    {
+        await foreach (var job in jobScheduler.GetJobsAsync())
+        {
+            Console.WriteLine(job);
+        }
+    }
+
+    if (cmd == "pending")
     {
         await foreach (var job in jobScheduler.GetJobsAsync())
         {

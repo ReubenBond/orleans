@@ -286,14 +286,21 @@ public class JobScheduler
         }
     }
 
-    public async Task PurgeCompletedJobsAsync(TimeSpan cleanupAge)
+    public async Task PruneCompletedTasksAsync(TimeSpan cleanupAge)
     {
         try
         {
             await _asyncLock.WaitAsync();
             await _storage.ReadAsync();
-            PruneCompletedTasks(DateTime.UtcNow, cleanupAge);
-            await _storage.WriteAsync();
+            if (PruneInternal(DateTime.UtcNow, cleanupAge))
+            {
+                _logger.LogInformation("Pruned expired, completed tasks");
+                await _storage.WriteAsync();
+            }
+            else
+            {
+                _logger.LogInformation("No expired, completed tasks to prune");
+            }
         }
         finally
         {
@@ -301,11 +308,10 @@ public class JobScheduler
         }
     }
 
-    private bool PruneCompletedTasks(DateTime now, TimeSpan cleanupAge)
+    private bool PruneInternal(DateTime now, TimeSpan cleanupAge)
     {
         // Prune all tasks which:
         // * Have a response
-        // * Have no remaining clients to notify
         // * Have no parents waiting on them within this context
         // * Have been completed for more than a configured period of time
         var allTasks = _storage.Tasks.ToDictionary(static task => task.Id, static task => task.State);
@@ -318,14 +324,6 @@ public class JobScheduler
                 // The task is incomplete.
                 continue;
             }
-
-            /*
-            if (state.Clients is { Count: > 0 })
-            {
-                // There are still unacknowledged clients.
-                continue;
-            }
-            */
 
             if (state.CompletedAt is not { } completedAt || now.Subtract(completedAt) < cleanupAge)
             {
