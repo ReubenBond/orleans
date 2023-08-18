@@ -114,6 +114,7 @@ namespace UnitTests.Grains
             {
             }
 
+            [Obsolete]
             protected MyDomainSpecificException(SerializationInfo info, StreamingContext context) : base(info, context)
             {
             }
