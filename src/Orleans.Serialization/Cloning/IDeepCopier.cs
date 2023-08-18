@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -31,7 +32,7 @@ namespace Orleans.Serialization.Cloning
         /// </summary>
         /// <typeparam name="T">The type supported by the copier.</typeparam>
         /// <returns>A deep copier capable of copying instances of type <typeparamref name="T"/>, or <see langword="null"/> if an appropriate copier was not found.</returns>
-        IDeepCopier<T> TryGetDeepCopier<T>();
+        IDeepCopier<T>? TryGetDeepCopier<T>();
 
         /// <summary>
         /// Gets a deep copier capable of copying instances of type <paramref name="type"/>.
@@ -49,7 +50,7 @@ namespace Orleans.Serialization.Cloning
         /// The type supported by the returned copier.
         /// </param>
         /// <returns>A deep copier capable of copying instances of type <paramref name="type"/>, or <see langword="null"/> if an appropriate copier was not found.</returns>
-        IDeepCopier TryGetDeepCopier(Type type);
+        IDeepCopier? TryGetDeepCopier(Type type);
 
         /// <summary>
         /// Gets a base type copier capable of copying instances of type <typeparamref name="T"/>.
@@ -69,7 +70,7 @@ namespace Orleans.Serialization.Cloning
         /// <summary>
         /// Creates a deep copy of the provided untyped input. The type must still match the copier instance!
         /// </summary>
-        object DeepCopy(object input, CopyContext context);
+        object? DeepCopy(object? input, CopyContext context);
     }
 
     /// <summary>
@@ -88,7 +89,7 @@ namespace Orleans.Serialization.Cloning
         public static readonly ShallowCopier Instance = new();
 
         public bool IsShallowCopyable() => true;
-        public object DeepCopy(object input, CopyContext _) => input;
+        public object? DeepCopy(object? input, CopyContext _) => input;
     }
 
     /// <summary>
@@ -99,10 +100,10 @@ namespace Orleans.Serialization.Cloning
         public bool IsShallowCopyable() => true;
 
         /// <summary>Returns the input value.</summary>
-        public T DeepCopy(T input, CopyContext _) => input;
+        public T? DeepCopy(T? input, CopyContext _) => input;
 
         /// <summary>Returns the input value.</summary>
-        public object DeepCopy(object input, CopyContext _) => input;
+        public object? DeepCopy(object? input, CopyContext _) => input;
     }
 
     /// <summary>
@@ -118,9 +119,9 @@ namespace Orleans.Serialization.Cloning
         /// <param name="input">The input.</param>
         /// <param name="context">The context.</param>
         /// <returns>A copy of <paramref name="input"/>.</returns>
-        T DeepCopy(T input, CopyContext context);
+        T? DeepCopy(T? input, CopyContext context);
 
-        object IDeepCopier.DeepCopy(object input, CopyContext context) => DeepCopy((T)input, context);
+        object? IDeepCopier.DeepCopy(object? input, CopyContext context) => DeepCopy((T?)input, context);
     }
 
     /// <summary>
@@ -214,7 +215,7 @@ namespace Orleans.Serialization.Cloning
         /// <param name="original">The original object.</param>
         /// <param name="result">The previously recorded copy of <paramref name="original"/>.</param>
         /// <returns><see langword="true"/> if a copy of <paramref name="original"/> has been recorded, <see langword="false"/> otherwise.</returns>
-        public bool TryGetCopy<T>(object original, [NotNullWhen(true)] out T result) where T : class
+        public bool TryGetCopy<T>(object? original, out T? result) where T : class
         {
             if (original is null)
             {
@@ -253,15 +254,15 @@ namespace Orleans.Serialization.Cloning
         /// <typeparam name="T">The value type.</typeparam>
         /// <param name="value">The value.</param>
         /// <returns>A copy of the provided value.</returns>
-        public T DeepCopy<T>(T value)
+        public T? DeepCopy<T>(T? value)
         {
             if (!typeof(T).IsValueType)
             {
                 if (value is null) return default;
             }
 
-            var copier = _copierProvider.GetDeepCopier(value.GetType());
-            return (T)copier.DeepCopy(value, this);
+            var copier = _copierProvider.GetDeepCopier(value!.GetType());
+            return (T?)copier.DeepCopy(value, this);
         }
 
         /// <inheritdoc/>
@@ -363,9 +364,9 @@ namespace Orleans.Serialization.Cloning
 
         public UntypedCopierWrapper(IDeepCopier copier) => _copier = copier;
 
-        public T DeepCopy(T original, CopyContext context) => (T)_copier.DeepCopy(original, context);
+        public T? DeepCopy(T? original, CopyContext context) => (T?)_copier.DeepCopy(original, context);
 
-        public object DeepCopy(object original, CopyContext context) => _copier.DeepCopy(original, context);
+        public object? DeepCopy(object? original, CopyContext context) => _copier.DeepCopy(original, context);
     }
 
     /// <summary>

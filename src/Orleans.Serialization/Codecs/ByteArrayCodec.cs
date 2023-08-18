@@ -301,7 +301,7 @@ namespace Orleans.Serialization.Codecs
         public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, scoped ref PooledBuffer value) where TBufferWriter : IBufferWriter<byte>
         {
             writer.WriteVarUInt32((uint)value.Length);
-            foreach (var segment in value)
+            foreach (var segment in value.GetEnumerator())
             {
                 writer.Write(segment);
             }

@@ -227,7 +227,7 @@ namespace UnitTests.Grains
 
         public Task OnErrorAsync( Exception ex )
         {
-            logger.LogInformation(ex,  "OnErrorAsync()");
+            logger.LogInformation(ex, "OnErrorAsync()");
             return Task.CompletedTask;
         }
 

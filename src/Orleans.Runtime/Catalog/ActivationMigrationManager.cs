@@ -311,7 +311,11 @@ internal class ActivationMigrationManager : SystemTarget, IActivationMigrationMa
         private GrainMigrationPackage _migrationPackage;
 
         public void Initialize(GrainMigrationPackage package) => _migrationPackage = package;
-        public void Reset() => _core.Reset();
+        public void Reset()
+        {
+            _core.Reset();
+            _migrationPackage = default;
+        }
 
         public GrainMigrationPackage Value => _migrationPackage;
 

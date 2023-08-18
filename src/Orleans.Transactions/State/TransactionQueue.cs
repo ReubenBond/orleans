@@ -701,8 +701,8 @@ namespace Orleans.Transactions.State
                                 // send PreparedMessage to remote TM
                                 bottom.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
                                       .Prepared(bottom.TransactionManager.Name, bottom.TransactionId, bottom.Timestamp, resource, TransactionalStatus.Ok)
-                                      .Ignore();                                
-                                    
+                                      .Ignore();
+
                                 bottom.LastSent = now;
 
                                 if (logger.IsEnabled(LogLevel.Trace))
