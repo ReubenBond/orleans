@@ -99,7 +99,7 @@ namespace Benchmarks.Transactions
             }
         }
 
-        public Task RunAsync() => Run2(runs, ((InProcessSiloHandle)host.Primary).SiloHost.Services.GetRequiredService<IGrainFactory>(), 10);
+        public Task RunAsync() => Run(runs, ((InProcessSiloHandle)host.Primary).SiloHost.Services.GetRequiredService<IGrainFactory>(), 10);
 
         private async Task Run(int runs, IGrainFactory grainFactory, int blocksPerWorker)
         {
