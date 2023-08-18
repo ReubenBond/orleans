@@ -12,6 +12,7 @@ using Orleans.Runtime;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using System.Text;
+using Benchmarks.Ping;
 
 namespace Benchmarks.Transactions
 {
@@ -31,7 +32,7 @@ namespace Benchmarks.Transactions
 
         public void MemorySetup()
         {
-            var builder = new TestClusterBuilder(4);
+            var builder = new TestClusterBuilder(1);
             builder.AddSiloBuilderConfigurator<SiloMemoryStorageConfigurator>();
             builder.AddSiloBuilderConfigurator<SiloTransactionConfigurator>();
             this.host = builder.Build();
@@ -98,15 +99,18 @@ namespace Benchmarks.Transactions
             }
         }
 
-        public async Task RunAsync()
+        public Task RunAsync() => Run(runs, host.Client, 10);
+        
+        private async Task Run(int runs, IGrainFactory grainFactory, int blocksPerWorker)
         {
-            Console.WriteLine($"Cold Run.");
-            await FullRunAsync();
-            for(int i=0; i<runs; i++)
-            {
-                Console.WriteLine($"Warm Run {i+1}.");
-                await FullRunAsync();
-            }
+            var loadGenerator = new ConcurrentLoadGenerator<ITransactionGrain>(
+                maxConcurrency: 250,
+                blocksPerWorker: blocksPerWorker,
+                requestsPerBlock: 500,
+                issueRequest: g => g.Run(),
+                getStateForWorker: workerId => grainFactory.GetGrain<ITransactionGrain>(workerId));
+            await loadGenerator.Warmup();
+            while (runs-- > 0) await loadGenerator.Run();
         }
 
         private async Task FullRunAsync()

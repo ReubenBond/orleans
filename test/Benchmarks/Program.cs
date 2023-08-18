@@ -34,7 +34,7 @@ namespace Benchmarks
                 "Running Transactions benchmark",
                 () =>
                 {
-                    var benchmark = new TransactionBenchmark(2, 20000, 5000);
+                    var benchmark = new TransactionBenchmark(20, 20000, 5000);
                     benchmark.MemorySetup();
                     return benchmark;
                 },
