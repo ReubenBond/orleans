@@ -1,4 +1,4 @@
-﻿using Orleans.Concurrency;
+using Orleans.Concurrency;
 using BenchmarkGrainInterfaces.Transaction;
 
 namespace BenchmarkGrains.Transaction
@@ -9,7 +9,7 @@ namespace BenchmarkGrains.Transaction
     {
         public Task Run(List<int> grains)
         {
-            return Task.WhenAll(grains.Select(id => GrainFactory.GetGrain<ITransactionGrain>(id).Run()));
+            return Task.WhenAll(grains.Select(id => GrainFactory.GetGrain<ITransactionGrain>(id).Run().AsTask()));
         }
     }
 }
