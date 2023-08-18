@@ -99,8 +99,8 @@ namespace Benchmarks.Transactions
             }
         }
 
-        public Task RunAsync() => Run(runs, host.Client, 10);
-        
+        public Task RunAsync() => Run2(runs, ((InProcessSiloHandle)host.Primary).SiloHost.Services.GetRequiredService<IGrainFactory>(), 10);
+
         private async Task Run(int runs, IGrainFactory grainFactory, int blocksPerWorker)
         {
             var loadGenerator = new ConcurrentLoadGenerator<ITransactionGrain>(
@@ -109,6 +109,25 @@ namespace Benchmarks.Transactions
                 requestsPerBlock: 500,
                 issueRequest: g => g.Run(),
                 getStateForWorker: workerId => grainFactory.GetGrain<ITransactionGrain>(workerId));
+            await loadGenerator.Warmup();
+            while (runs-- > 0) await loadGenerator.Run();
+        }
+        private async Task Run2(int runs, IGrainFactory grainFactory, int blocksPerWorker)
+        {
+            var transactionClient = ((InProcessSiloHandle)host.Primary).SiloHost.Services.GetRequiredService<ITransactionClient>();
+            var loadGenerator = new ConcurrentLoadGenerator<(ITransactionGrain A, ITransactionGrain B)>(
+                maxConcurrency: 250,
+                blocksPerWorker: blocksPerWorker,
+                requestsPerBlock: 500,
+                issueRequest: g => new(transactionClient.RunTransaction(TransactionOption.Create, async () =>
+                {
+                    var a = g.A.Run();
+                    var b = g.B.Run();
+                    await a;
+                    await b;
+                    return true;
+                })),
+                getStateForWorker: workerId => (grainFactory.GetGrain<ITransactionGrain>(workerId * 2), grainFactory.GetGrain<ITransactionGrain>(workerId * 2 + 1)));
             await loadGenerator.Warmup();
             while (runs-- > 0) await loadGenerator.Run();
         }
