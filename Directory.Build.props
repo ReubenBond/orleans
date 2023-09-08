@@ -106,6 +106,7 @@
     <AzureMessagingEventHubs>5.6.2</AzureMessagingEventHubs>
     <AzureStorageBlobsVersion>12.10.0</AzureStorageBlobsVersion>
     <AzureStorageQueuesVersion>12.8.0</AzureStorageQueuesVersion>
+    <MicrosoftAzureCosmosVersion>3.35.3</MicrosoftAzureCosmosVersion>
     <MicrosoftDataSQLiteVersion>6.0.0</MicrosoftDataSQLiteVersion>
     <MicrosoftDataSqlClientVersion>4.0.0</MicrosoftDataSqlClientVersion>
     <MicrosoftServiceFabricServicesVersion>5.2.1235</MicrosoftServiceFabricServicesVersion>
