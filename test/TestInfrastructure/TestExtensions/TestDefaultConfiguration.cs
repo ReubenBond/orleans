@@ -43,6 +43,8 @@ namespace TestExtensions
         public static string EventHubFullyQualifiedNamespace => defaultConfiguration[nameof(EventHubFullyQualifiedNamespace)];
         public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
         public static string RedisConnectionString => defaultConfiguration[nameof(RedisConnectionString)];
+        public static string CosmosDBAccountEndpoint => defaultConfiguration[nameof(CosmosDBAccountEndpoint)];
+        public static string CosmosDBAccountKey => defaultConfiguration[nameof(CosmosDBAccountKey)];
 
         public static bool GetValue(string key, out string value)
         {

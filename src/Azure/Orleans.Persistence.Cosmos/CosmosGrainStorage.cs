@@ -16,9 +16,9 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
     private const string DEFAULT_PARTITION_KEY_PATH = "/PartitionKey";
     private const string GRAINTYPE_PARTITION_KEY_PATH = "/GrainType";
     private const HttpStatusCode TOO_MANY_REQUESTS = (HttpStatusCode)429;
-    private static readonly MethodInfo ReadStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(ReadStateAsyncCore), BindingFlags.NonPublic | BindingFlags.Instance)!;
-    private static readonly MethodInfo WriteStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(WriteStateAsyncCore), BindingFlags.NonPublic | BindingFlags.Instance)!;
-    private static readonly MethodInfo ClearStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(ClearStateAsyncCore), BindingFlags.NonPublic | BindingFlags.Instance)!;
+    private static readonly MethodInfo ReadStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(ReadStateAsyncCore), 1, BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(string), typeof(GrainId), typeof(IGrainState) }, null)!;
+    private static readonly MethodInfo WriteStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(WriteStateAsyncCore), 1, BindingFlags.NonPublic | BindingFlags.Instance, null,new Type[] { typeof(string), typeof(GrainId), typeof(IGrainState) }, null)!;
+    private static readonly MethodInfo ClearStateAsyncCoreMethodInfo = typeof(CosmosGrainStorage).GetMethod(nameof(ClearStateAsyncCore), 1, BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(string), typeof(GrainId), typeof(IGrainState) }, null)!;
     private readonly IGrainActivationContextAccessor _contextAccessor;
     private readonly ILogger _logger;
     private readonly CosmosGrainStorageOptions _options;
@@ -303,7 +303,7 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
             var grainContext = _contextAccessor.GrainActivationContext;
             if (grainContext is null)
             {
-                throw new InvalidOperationException($"${nameof(IGrainActivationContextAccessor)}.{nameof(IGrainActivationContextAccessor.GrainActivationContext)} is not initialized. This likely indicates a concurrency issue, such as attempting to access storage from a non-grain thread.");
+                throw new InvalidOperationException($"{nameof(IGrainActivationContextAccessor)}.{nameof(IGrainActivationContextAccessor.GrainActivationContext)} is not initialized. This likely indicates a concurrency issue, such as attempting to access storage from a non-grain thread.");
             }
 
             var grainClass = grainContext.GrainType;
@@ -318,9 +318,9 @@ internal class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLi
             var grainKeyFormatter = GetGrainKeyFormatter(grainClass);
 
             // Create methods for reading/writing/clearing the state based on the grain state type.
-            var readStateAsync = ReadStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>();
-            var writeStateAsync = WriteStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>();
-            var clearStateAsync = ClearStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>();
+            var readStateAsync = ReadStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(this);
+            var writeStateAsync = WriteStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(this);
+            var clearStateAsync = ClearStateAsyncCoreMethodInfo.MakeGenericMethod(grainStateType).CreateDelegate<Func<string, GrainId, IGrainState, Task>>(this);
 
             grainStateTypeInfo = _grainStateTypeInfo[(typeCode, grainStateType)] = new(grainTypeName, grainKeyFormatter, readStateAsync, writeStateAsync, clearStateAsync);
         }
