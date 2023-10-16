@@ -64,7 +64,7 @@ namespace Orleans.TestingHost
                 if (Debugger.IsAttached)
                 {
                     // Test is running inside debugger - Make timeout ~= infinite
-                    services.Configure<SiloMessagingOptions>(op => op.ResponseTimeout = TimeSpan.FromMilliseconds(1000000));
+                    services.Configure<SiloMessagingOptions>(op => op.ResponseTimeout = TimeSpan.FromSeconds(1000000));
                 }
             });
 
