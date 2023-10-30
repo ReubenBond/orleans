@@ -21,9 +21,22 @@ public static class CakeShop
 
     public static async Task Run(IGrainFactory grainFactory)
     {
-        var buyer = grainFactory.GetGrain<IBuyerAccount>(Guid.NewGuid());
+        await grainFactory.GetGrain<ICakeShopGrain>(0).Run();
+    }
+}
+
+public interface ICakeShopGrain : IGrainWithIntegerKey
+{
+    Task Run();
+}
+
+public class CakeShopGrain : DurableGrain, ICakeShopGrain
+{
+    public async Task Run()
+    {
+        var buyer = GrainFactory.GetGrain<IBuyerAccount>(Guid.NewGuid());
         var order = new Order();
-        var orderProcessor = grainFactory.GetGrain<IOrderProcessor>(Guid.NewGuid());
+        var orderProcessor = GrainFactory.GetGrain<IOrderProcessor>(Guid.NewGuid());
         var orderTask = await orderProcessor.ProcessOrderAsync(buyer, order).ScheduleAsync("order-66");
         var res = orderTask.AsTask();
         while (!res.IsCompleted)
@@ -102,6 +115,8 @@ public record class OrderState
     public OrderStatus Status { get; set; }
 }
 
+public class BuyerAccountGrain : DurableGrain, IBuyerAccount { }
+
 public class OrderProcessorGrain : DurableGrain, IOrderProcessor
 {
     private readonly IPaymentService _paymentService;
@@ -120,7 +135,7 @@ public class OrderProcessorGrain : DurableGrain, IOrderProcessor
         _catalogService = catalogService;
         _logisticsService = logisticsService;
 
-        _cancellation = GetOrCreateTaskCompletionSource<bool>("cancellation");
+        _cancellation = null!; //GetOrCreateTaskCompletionSource<bool>("cancellation");
         _status = GetOrCreateValue<OrderStatus>("order");
     }
 

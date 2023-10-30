@@ -15,6 +15,7 @@ public static class HostingExtensions
         builder.Services.TryAddTransient(typeof(DurableSet<>));
         builder.Services.TryAddTransient(typeof(DurableQueue<>));
         builder.Services.TryAddTransient(typeof(DurableValue<>));
+        builder.Services.TryAddTransient(typeof(DurableTaskCompletionSource<>));
         return builder;
     }
 }

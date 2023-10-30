@@ -14,6 +14,7 @@ public abstract class DurableGrain : Grain, IGrainBase
         {
             participant.Participate(((IGrainBase)this).GrainContext.ObservableLifecycle);
         }
+        var taskStorage = ServiceProvider.GetRequiredService<DurableTaskGrainStorage>();
     }
     
     protected IStateMachineManager StateMachineManager { get; }

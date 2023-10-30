@@ -157,6 +157,7 @@ public class Program
         var hostBuilder = Host.CreateDefaultBuilder(args)
             .UseOrleans(siloBuilder =>
             {
+                CakeShop.Setup(siloBuilder.Services);
                 siloBuilder.UseLocalhostClustering();
                 siloBuilder.AddDurableTasks();
                 siloBuilder.AddStateMachineStorage();
@@ -178,7 +179,6 @@ public class Program
                 //logging.AddFilter((category, level) => category is not null && category.StartsWith("Orleans.DurableTasks"));
             })
             .UseConsoleLifetime();
-        hostBuilder.ConfigureServices(CakeShop.Setup);
         using var host = hostBuilder.Build();
         await host.StartAsync();
 
