@@ -178,9 +178,13 @@ public class Program
                 //logging.AddFilter((category, level) => category is not null && category.StartsWith("Orleans.DurableTasks"));
             })
             .UseConsoleLifetime();
+        hostBuilder.ConfigureServices(CakeShop.Setup);
         using var host = hostBuilder.Build();
         await host.StartAsync();
 
+        await CakeShop.Run(host.Services.GetRequiredService<IGrainFactory>());
+
+#if false
         var client = host.Services.GetRequiredService<IClusterClient>();
 
         /*
@@ -231,6 +235,7 @@ public class Program
         await await clientGrain.RunWorkflow().ScheduleAsync("my-client-wf");
         */
 
+#endif
         Console.WriteLine("Done!");
 
         await host.WaitForShutdownAsync();
@@ -552,119 +557,6 @@ public class SubscriptionProcessor : DurableTaskOrchestrator
 }
 #endif
 
-// Example: eShop order process
-public interface IBuyerAccount : IGrain { }
-
-[GenerateSerializer]
-public record class Invoice();
-
-[GenerateSerializer]
-public record class PaymentResult()
-{
-    public bool IsSuccess { get; internal set; }
-}
-
-public interface IPaymentService
-{
-    DurableTask<Invoice> CreateInvoice(IBuyerAccount buyer, Order order);
-    DurableTask<PaymentResult> WaitForPayment(Invoice invoice);
-}
-
-[GenerateSerializer]
-public record class StockCheckResult(bool HasStock);
-
-[GenerateSerializer]
-public record class CreateShipmentResult(bool IsSuccess);
-
-public interface ICatalogService
-{
-    DurableTask<List<StockCheckResult>> CheckOrderStock(Order order);
-}
-public interface ILogisticsService
-{
-    DurableTask<CreateShipmentResult> CreateShipment(Order order);
-    DurableTask WaitForDelivery(CreateShipmentResult shipmentDetails);
-}
-[GenerateSerializer]
-public record class Order();
-public interface IOrderProcessor : IGrain
-{
-    DurableTask ProcessOrderAsync(IBuyerAccount buyer, Order order);
-}
-
-[GenerateSerializer]
-public enum OrderStatus
-{
-    None,
-    Created,
-    Confirmed,
-    Canceled,
-    Paid,
-    Shipped,
-    Delivered,
-    InsufficientStock,
-    PaymentFailed,
-    ShipmentFailed,
-}
-
-[GenerateSerializer]
-public class OrderState
-{
-    [Id(0)]
-    public OrderStatus Status { get; set; }
-}
-
-public class OrderProcessorGrain(
-    IPaymentService paymentService,
-    ICatalogService catalogService,
-    ILogisticsService logisticsService) : Grain<OrderState>, IOrderProcessor
-{
-    private readonly IPaymentService _paymentService = paymentService;
-    private readonly ICatalogService _catalogService = catalogService;
-    private readonly ILogisticsService _logisticsService = logisticsService;
-
-    public async DurableTask ProcessOrderAsync(IBuyerAccount buyer, Order order)
-    {
-        var confirmed = await DurableTask.Delay(TimeSpan.FromMinutes(1)).AsStep("wait-for-confirmation");
-        if (!confirmed)
-        {
-            // The order was canceled using task management APIs within the grace period.
-            State.Status = OrderStatus.Canceled;
-            return;
-        }
-
-        var stockLevelResult = await _catalogService.CheckOrderStock(order).AsStep("check-stock");
-        if (stockLevelResult.Any(item => !item.HasStock))
-        {
-            // There is insufficient stock. No charge has been made yet, but we would likely need to notify the user before terminating.
-            State.Status = OrderStatus.InsufficientStock;
-            return;
-        }
-
-        var invoice = await _paymentService.CreateInvoice(buyer, order).AsStep("create-invoice");
-
-        // This might take a very long time (hours, days, indefinite)
-        var paymentResult = await _paymentService.WaitForPayment(invoice).AsStep("process-payment");
-        if (!paymentResult.IsSuccess)
-        {
-            State.Status = OrderStatus.PaymentFailed;
-            return;
-        }
-
-        State.Status = OrderStatus.Paid;
-        var shipmentDetails = await _logisticsService.CreateShipment(order).AsStep("create-shipment");
-        if (!shipmentDetails.IsSuccess)
-        {
-            State.Status = OrderStatus.ShipmentFailed;
-            return;
-        }
-
-        await _logisticsService.WaitForDelivery(shipmentDetails).AsStep("wait-for-delivery");
-        State.Status = OrderStatus.Delivered;
-
-        // Done...
-    }
-}
 
 /*
 public class TransferGrain : ITransferGrain
@@ -776,7 +668,7 @@ public static class TransactionalStateExtensions
 }
 
 #endif
-*/
+        */
 
 
 public interface IMyGrainWithDurableTasks : IGrain

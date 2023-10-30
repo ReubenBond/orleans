@@ -46,3 +46,18 @@ public abstract partial class DurableTask
     }
 }
 
+public abstract partial class DurableTask
+{
+    public static async DurableTask<T> WhenAny<T>(params ScheduledTask<T>[] tasks)
+    {
+        List<Task<T>> taskList = [];
+        foreach (var task in tasks)
+        {
+            taskList.Add(task.AsTask());    
+        }
+
+        var winningTask = await Task.WhenAny(taskList).ConfigureAwait(false);
+        return await winningTask;
+    }
+}
+
