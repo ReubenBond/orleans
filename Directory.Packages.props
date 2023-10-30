@@ -66,10 +66,10 @@
     <PackageVersion Include="BenchmarkDotNet" Version="0.13.9" />
     <PackageVersion Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.13.9" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.4.13" />
-    <PackageVersion Include="xunit" Version="2.5.2" />
-    <PackageVersion Include="xunit.assert" Version="2.5.2" />
-    <PackageVersion Include="xunit.extensibility.core" Version="2.5.2" />
-    <PackageVersion Include="xunit.extensibility.execution" Version="2.5.2" />
+    <PackageVersion Include="xunit" Version="$(xUnitVersion)" />
+    <PackageVersion Include="xunit.assert" Version="$(xUnitVersion)" />
+    <PackageVersion Include="xunit.extensibility.core" Version="$(xUnitVersion)" />
+    <PackageVersion Include="xunit.extensibility.execution" Version="$(xUnitVersion)" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="$(xUnitRunnerVersion)" />
     <PackageVersion Include="NodaTime" Version="3.1.9" />
     <PackageVersion Include="Autofac.Extensions.DependencyInjection" Version="8.0.0" />
