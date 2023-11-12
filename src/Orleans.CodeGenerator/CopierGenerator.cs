@@ -55,7 +55,7 @@ namespace Orleans.CodeGenerator
 
             var isExceptionType = type.IsExceptionType && type.SerializationHooks.Count == 0;
 
-            var baseType = isExceptionType ? QualifiedName(IdentifierName("OrleansGeneratedCodeHelper"), GenericName(Identifier("ExceptionCopier"), TypeArgumentList(SeparatedList(new[] { type.TypeSyntax, type.BaseType.ToTypeSyntax() }))))
+            var baseType = isExceptionType ? QualifiedName(AliasQualifiedName("global", IdentifierName("Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper")), GenericName(Identifier("ExceptionCopier"), TypeArgumentList(SeparatedList(new[] { type.TypeSyntax, type.BaseType.ToTypeSyntax() }))))
                 : (isShallowCopyable ? libraryTypes.ShallowCopier : libraryTypes.DeepCopier_1).ToTypeSyntax(type.TypeSyntax);
 
             var classDeclaration = ClassDeclaration(simpleClassName)

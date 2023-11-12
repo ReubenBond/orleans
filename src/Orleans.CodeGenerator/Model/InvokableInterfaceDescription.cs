@@ -10,6 +10,7 @@ namespace Orleans.CodeGenerator
 {
     internal class InvokableInterfaceDescription
     {
+        private static readonly char[] FilteredNameChars = new char[] { '`', '.' };
         public InvokableInterfaceDescription(
             CodeGenerator generator,
             SemanticModel semanticModel,
@@ -28,9 +29,12 @@ namespace Orleans.CodeGenerator
             Name = name;
 
             // If the name is a user-defined name which specified a generic arity, strip the arity backtick now
-            if (Name.Contains("`"))
+            if (Name.IndexOfAny(FilteredNameChars) >= 0)
             {
-                Name = Name.Replace('`', '_');
+                foreach (var c in FilteredNameChars)
+                {
+                    Name = Name.Replace(c, '_');
+                }
             }
 
             GeneratedNamespace = InterfaceType.GetNamespaceAndNesting() switch
