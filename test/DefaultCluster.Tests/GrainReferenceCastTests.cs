@@ -174,29 +174,32 @@ namespace DefaultCluster.Tests
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public void FailSideCastAfterContinueWith()
         {
-            Assert.Throws<InvalidCastException>(() =>
+            IGeneratorTestDerivedGrain1 grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
+            IGeneratorTestDerivedGrain2 cast = null;
+            Task<bool> av = grain.StringIsNullOrEmpty();
+            Task<bool> av2 = av.ContinueWith((Task<bool> t) => Assert.True(t.Result)).ContinueWith((_AppDomain) =>
             {
-                // GeneratorTestDerivedGrain1Reference extends GeneratorTestGrainReference
-                // GeneratorTestDerivedGrain2Reference extends GeneratorTestGrainReference
-                try
-                {
-                    IGeneratorTestDerivedGrain1 grain = this.GrainFactory.GetGrain<IGeneratorTestDerivedGrain1>(GetRandomGrainId());
-                    IGeneratorTestDerivedGrain2 cast = null;
-                    Task<bool> av = grain.StringIsNullOrEmpty();
-                    Task<bool> av2 = av.ContinueWith((Task<bool> t) => Assert.True(t.Result)).ContinueWith((_AppDomain) =>
-                    {
-                        cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
-                    }).ContinueWith((_) => cast.StringConcat("a", "b", "c")).ContinueWith((_) => cast.StringIsNullOrEmpty().Result);
-                    Assert.False(av2.Result);
-                }
-                catch (AggregateException ae)
-                {
-                    Exception ex = ae.InnerException;
-                    while (ex is AggregateException) ex = ex.InnerException;
-                    throw ex;
-                }
-                Assert.True(false, "Exception should have been raised");
+                // Casting is always allowed, so this should succeed.
+                cast = grain.AsReference<IGeneratorTestDerivedGrain2>();
+            })
+            .ContinueWith(t =>
+            {
+                // Call a method which the grain does not implement, resulting in a cast failure.
+                Assert.True(t.IsCompletedSuccessfully);
+                return cast.StringConcat("a", "b", "c");
+            })
+            .Unwrap()
+            .ContinueWith(t =>
+            {
+                // Call a method on the common interface, which the grain implements.
+                // This should not throw.
+                Assert.True(t.IsFaulted);
+                return cast.StringIsNullOrEmpty().Result;
             });
+
+            // Ensure that the last task did not throw.
+            var av2Result = av2.Result;
+            Assert.True(av2Result);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
