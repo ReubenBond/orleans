@@ -6,11 +6,13 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Reflection.Metadata.Ecma335;
+using System.Text.RegularExpressions;
 
 namespace Orleans.Analyzers;
 
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
+public partial class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
 {
     private readonly record struct AliasBag(string Name, Location Location);
 
@@ -73,31 +75,23 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
 
             if (duplicateCount > 1)
             {
-                var suffix = 1;
+                var (prefix, suffix) = ParsePrefixAndNumericSuffix(duplicateAlias);
+
                 filteredBags = filteredBags.Skip(1);
 
                 foreach (var bag in filteredBags)
                 {
-                    var condition = true;
-                    while (condition)
+                    string newAlias;
+                    do
                     {
-                        var newAlias = $"{duplicateAlias}{suffix}";
-                        var exists = bags.Any(x => x.Value.Equals(newAlias, StringComparison.Ordinal));
-
-                        if (exists)
-                        {
-                            suffix++;
-                        }
-                        else
-                        {
-                            condition = false;
-                        }
-                    }
+                        ++suffix;
+                        newAlias = $"{prefix}{suffix}";
+                    } while (bags.Any(x => x.Value.Equals(newAlias, StringComparison.Ordinal)));
 
                     var builder = ImmutableDictionary.CreateBuilder<string, string>();
 
-                    builder.Add("AliasName", duplicateAlias);
-                    builder.Add("AliasSuffix", suffix.ToString());
+                    builder.Add("AliasName", prefix);
+                    builder.Add("AliasSuffix", suffix.ToString(System.Globalization.CultureInfo.InvariantCulture));
 
                     context.ReportDiagnostic(Diagnostic.Create(
                        descriptor: Rule,
@@ -108,5 +102,32 @@ public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
                 }
             }
         }
+    }
+
+    private static (string Prefix, ulong Suffix) ParsePrefixAndNumericSuffix(string input)
+    {
+        var suffixLength = GetNumericSuffixLength(input);
+        if (suffixLength == 0)
+        {
+            return (input, 0);
+        }
+
+        return (input.Substring(0, input.Length - suffixLength), ulong.Parse(input.Substring(input.Length - suffixLength)));
+    }
+
+    private static int GetNumericSuffixLength(string input)
+    {
+        var suffixLength = 0;
+        for (var c = input.Length - 1; c > 0; --c)
+        {
+            if (!char.IsDigit(input[c]))
+            {
+                break;
+            }
+
+            ++suffixLength;
+        }
+
+        return suffixLength;
     }
 }
