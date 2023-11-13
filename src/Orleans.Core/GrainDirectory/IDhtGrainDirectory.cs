@@ -81,6 +81,7 @@ namespace Orleans.GrainDirectory
     /// Represents the address of a grain as well as a version tag.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.GrainDirectory.AddressAndTag")]
     internal readonly struct AddressAndTag
     {
         /// <summary>

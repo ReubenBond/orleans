@@ -9,6 +9,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Runtime.InvalidSchedulingContextException")]
     internal sealed class InvalidSchedulingContextException : OrleansException
     {
         /// <summary>

@@ -8,6 +8,7 @@ namespace Orleans.Providers
     /// Exception thrown whenever a provider has failed to be initialized.
     /// </summary>
     [Serializable, GenerateSerializer]
+    [Alias("Orleans.Providers.ProviderInitializationException")]
     public sealed class ProviderInitializationException : OrleansException
     {
         /// <summary>

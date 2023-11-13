@@ -3,6 +3,7 @@ using UnitTests.GrainInterfaces;
 namespace Tester.Redis.Persistence
 {
     [GenerateSerializer]
+    [Alias("Tester.Redis.Persistence.GrainState")]
     public class GrainState
     {
         [Id(0)]

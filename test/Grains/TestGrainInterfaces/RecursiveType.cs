@@ -1,7 +1,9 @@
 namespace UnitTests.GrainInterfaces
 {
+    [Alias("UnitTests.GrainInterfaces.IReferenceRecursiveTypeGrain")]
     public interface IReferenceRecursiveTypeGrain : IGrainWithGuidKey
     {
+        [Alias("Echo")]
         Task<RecursiveType> Echo(RecursiveType arg);
     }
 
@@ -11,11 +13,13 @@ namespace UnitTests.GrainInterfaces
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.RecursiveType")]
     public class RecursiveType : SelfTyped<RecursiveType>
     {
     }
 
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.SelfTyped`1")]
     public abstract class SelfTyped<T> where T : SelfTyped<T>
     {
     }

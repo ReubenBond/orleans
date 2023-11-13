@@ -13,6 +13,7 @@ namespace Orleans.Runtime
     /// </remarks>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Runtime.GatewayTooBusyException")]
     public sealed class GatewayTooBusyException : OrleansException
     {
         /// <summary>

@@ -39,6 +39,7 @@ namespace Orleans.Transactions.TestKit
 
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.Transactions.TestKit.RandomErrorInjector.RandomlyInjectedStorageException")]
         public class RandomlyInjectedStorageException : Exception
         {
             public RandomlyInjectedStorageException() : base("injected fault") { }
@@ -51,6 +52,7 @@ namespace Orleans.Transactions.TestKit
 
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.Transactions.TestKit.RandomErrorInjector.RandomlyInjectedInconsistentStateException")]
         public class RandomlyInjectedInconsistentStateException : InconsistentStateException
         {
             public RandomlyInjectedInconsistentStateException() : base("injected fault") { }

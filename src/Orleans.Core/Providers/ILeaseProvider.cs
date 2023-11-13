@@ -7,6 +7,7 @@ namespace Orleans.LeaseProviders
     /// Acquired lease
     /// </summary>
     [GenerateSerializer, Immutable]
+    [Alias("Orleans.LeaseProviders.AcquiredLease")]
     public sealed class AcquiredLease
     {
         /// <summary>
@@ -62,6 +63,7 @@ namespace Orleans.LeaseProviders
     /// AcquireLeaseResult class, which demonstrates result of acquiring or renewing lease operation
     /// </summary>
     [GenerateSerializer, Immutable]
+    [Alias("Orleans.LeaseProviders.AcquireLeaseResult")]
     public sealed class AcquireLeaseResult
     {
         /// <summary>
@@ -115,6 +117,7 @@ namespace Orleans.LeaseProviders
     /// Lease request where you can specify ResourceKey and duration of your lease. 
     /// </summary>
     [GenerateSerializer, Immutable]
+    [Alias("Orleans.LeaseProviders.LeaseRequest")]
     public sealed class LeaseRequest
     {
         /// <summary>

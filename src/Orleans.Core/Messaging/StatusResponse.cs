@@ -4,6 +4,7 @@ using System.Collections.Generic;
 namespace Orleans.Runtime
 {
     [Id(103), Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.StatusResponse")]
     internal sealed class StatusResponse
     {
         [Id(0)]

@@ -12,6 +12,7 @@ namespace Orleans.Streams
     [Immutable]
     [GenerateSerializer]
     [SerializationCallbacks(typeof(OnDeserializedCallbacks))]
+    [Alias("Orleans.Streams.StreamImpl`1")]
     internal sealed class StreamImpl<T> : IAsyncStream<T>, IStreamControl, IOnDeserialized
     {
         [Id(0)]

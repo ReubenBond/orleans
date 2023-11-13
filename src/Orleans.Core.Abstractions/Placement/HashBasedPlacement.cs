@@ -6,6 +6,7 @@ namespace Orleans.Runtime
     /// Places activations on compatible silos by hashing the grain identifier using a stable hash and selecting a silo from a sorted set using a modulo operation.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable, SuppressReferenceTracking]
+    [Alias("Orleans.Runtime.HashBasedPlacement")]
     public sealed class HashBasedPlacement : PlacementStrategy
     {
         internal static HashBasedPlacement Singleton { get; } = new HashBasedPlacement();

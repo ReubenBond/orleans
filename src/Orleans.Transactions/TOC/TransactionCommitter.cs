@@ -155,6 +155,7 @@ namespace Orleans.Transactions
 
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.Transactions.TransactionCommitter.OperationState`1")]
         public sealed class OperationState
         {
             [Id(0)]

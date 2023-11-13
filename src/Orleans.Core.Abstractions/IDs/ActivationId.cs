@@ -14,6 +14,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
     [JsonConverter(typeof(ActivationIdConverter))]
+    [Alias("Orleans.Runtime.ActivationId")]
     public readonly struct ActivationId : IEquatable<ActivationId>, ISpanFormattable
     {
         [DataMember(Order = 0)]

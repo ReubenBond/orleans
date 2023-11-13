@@ -128,6 +128,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
     }
 
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.ProgrammaticSubscribe.Apple")]
     public class Apple : IFruit
     {
         [Id(0)]

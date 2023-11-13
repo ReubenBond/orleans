@@ -8,6 +8,7 @@ namespace UnitTests.GrainInterfaces
     [Serializable]
     [Orleans.GenerateSerializer]
     [Orleans.SerializationCallbacks(typeof(Orleans.Runtime.OnDeserializedCallbacks))]
+    [Alias("UnitTests.GrainInterfaces.TypeWithOnDeserializedHook")]
     public class TypeWithOnDeserializedHook : IOnDeserialized
     {
         [NonSerialized]
@@ -24,6 +25,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.BaseClassWithAutoProp")]
     public class BaseClassWithAutoProp
     {
         [Orleans.Id(0)]
@@ -36,6 +38,7 @@ namespace UnitTests.GrainInterfaces
     /// </summary>
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.SubClassOverridingAutoProp")]
     public class SubClassOverridingAutoProp : BaseClassWithAutoProp
     {
         public new string AutoProp { get => base.AutoProp.ToString(); set => base.AutoProp = int.Parse(value); }

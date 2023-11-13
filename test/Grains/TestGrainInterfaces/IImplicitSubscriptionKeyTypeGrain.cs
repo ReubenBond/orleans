@@ -5,6 +5,7 @@ namespace UnitTests.GrainInterfaces
         Task<int> GetValue();
     }
 
+    [Alias("UnitTests.GrainInterfaces.IImplicitSubscriptionLongKeyGrain")]
     public interface IImplicitSubscriptionLongKeyGrain : IImplicitSubscriptionKeyTypeGrain, IGrainWithIntegerKey
     { }
 }

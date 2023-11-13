@@ -6,6 +6,7 @@ namespace Orleans.Streams
     /// Stream namespace predicate which matches exactly one, specified
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Streams.ExactMatchStreamNamespacePredicate")]
     internal sealed class ExactMatchStreamNamespacePredicate : IStreamNamespacePredicate
     {
         internal const string Prefix = "namespace:";

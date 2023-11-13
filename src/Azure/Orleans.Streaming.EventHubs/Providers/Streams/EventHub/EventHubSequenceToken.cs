@@ -33,6 +33,7 @@ namespace Orleans.Streaming.EventHubs
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streaming.EventHubs.EventHubSequenceToken")]
     public class EventHubSequenceToken : EventSequenceToken, IEventHubPartitionLocation
     {
         /// <summary>

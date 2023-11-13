@@ -10,6 +10,7 @@ namespace Orleans.Hosting
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Hosting.SimpleGeneratorOptions")]
     public sealed class SimpleGeneratorOptions : IStreamGeneratorConfig
     {
         /// <summary>

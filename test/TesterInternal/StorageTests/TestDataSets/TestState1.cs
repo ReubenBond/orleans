@@ -5,6 +5,7 @@
     /// </summary>
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("UnitTests.StorageTests.Relational.TestDataSets.TestState1")]
     public class TestState1: IEquatable<TestState1>
     {
         [Orleans.Id(0)]

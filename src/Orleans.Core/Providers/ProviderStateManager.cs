@@ -72,6 +72,7 @@ namespace Orleans.Providers
     }
 
     [Serializable, GenerateSerializer]
+    [Alias("Orleans.Providers.ProviderStateException")]
     public sealed class ProviderStateException : OrleansException
     {
         public ProviderStateException() : base("Unexpected provider state")

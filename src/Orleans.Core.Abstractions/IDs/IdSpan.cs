@@ -9,6 +9,7 @@ namespace Orleans.Runtime
     /// Primitive type for identities, representing a sequence of bytes.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.IdSpan")]
     public readonly struct IdSpan : IEquatable<IdSpan>, IComparable<IdSpan>, ISerializable, ISpanFormattable
     {
         /// <summary>

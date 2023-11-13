@@ -11,6 +11,7 @@ namespace Orleans.Runtime
     /// placed on a random, compatible server.
     /// </remarks>
     [Serializable, GenerateSerializer, Immutable, SuppressReferenceTracking]
+    [Alias("Orleans.Runtime.PreferLocalPlacement")]
     public sealed class PreferLocalPlacement : PlacementStrategy
     {
         /// <summary>

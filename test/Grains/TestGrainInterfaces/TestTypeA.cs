@@ -2,6 +2,7 @@
 {
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.TestTypeA")]
     public class TestTypeA
     {
         [Orleans.Id(0)]

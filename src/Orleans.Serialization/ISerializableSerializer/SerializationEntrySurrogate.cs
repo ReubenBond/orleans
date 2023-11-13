@@ -3,6 +3,7 @@ using System;
 namespace Orleans.Serialization
 {
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.SerializationEntrySurrogate")]
     internal struct SerializationEntrySurrogate
     {
         [Id(0)]

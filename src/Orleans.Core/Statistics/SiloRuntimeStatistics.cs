@@ -9,6 +9,7 @@ namespace Orleans.Runtime
     /// Snapshot of current runtime statistics for a silo
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.SiloRuntimeStatistics")]
     public sealed class SiloRuntimeStatistics
     {
         /// <summary>
@@ -101,6 +102,7 @@ namespace Orleans.Runtime
     /// Simple snapshot of current statistics for a given grain type on a given silo.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.SimpleGrainStatistic")]
     public sealed class SimpleGrainStatistic
     {
         /// <summary>
@@ -128,6 +130,7 @@ namespace Orleans.Runtime
     }
 
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.DetailedGrainStatistic")]
     public sealed class DetailedGrainStatistic
     {
         /// <summary>
@@ -150,6 +153,7 @@ namespace Orleans.Runtime
     }
 
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.DetailedGrainReport")]
     internal sealed class DetailedGrainReport
     {
         [Id(0)]

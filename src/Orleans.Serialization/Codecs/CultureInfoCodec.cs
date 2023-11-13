@@ -29,6 +29,7 @@ namespace Orleans.Serialization.Codecs
     /// Surrogate type used by <see cref="CultureInfoCodec"/>.
     /// </summary>
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.Codecs.CultureInfoSurrogate")]
     public struct CultureInfoSurrogate
     {
         /// <summary>

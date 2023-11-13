@@ -38,8 +38,10 @@ namespace UnitTests.OrleansRuntime
         }
     }
 
+    [Alias("UnitTests.OrleansRuntime.IDumbWorker")]
     public interface IDumbWorker : IGrainWithIntegerKey
     {
+        [Alias("DoNothing")]
         Task DoNothing();
     }
 
@@ -49,8 +51,10 @@ namespace UnitTests.OrleansRuntime
         public Task DoNothing() => Task.CompletedTask;
     }
 
+    [Alias("UnitTests.OrleansRuntime.IDumbGrain")]
     public interface IDumbGrain : IGrainWithGuidKey
     {
+        [Alias("DoNothing")]
         Task DoNothing();
     }
 

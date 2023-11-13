@@ -14,6 +14,7 @@ namespace Orleans.Streams
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streams.StreamConsumerData")]
     internal sealed class StreamConsumerData
     {
         [Id(0)]

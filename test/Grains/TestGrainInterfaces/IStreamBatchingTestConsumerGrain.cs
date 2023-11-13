@@ -8,6 +8,7 @@ namespace UnitTests.GrainInterfaces
     }
 
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.ConsumptionReport")]
     public class ConsumptionReport
     {
         [Id(0)]
@@ -17,8 +18,10 @@ namespace UnitTests.GrainInterfaces
         public int MaxBatchSize { get; set; }
     }
 
+    [Alias("UnitTests.GrainInterfaces.IStreamBatchingTestConsumerGrain")]
     public interface IStreamBatchingTestConsumerGrain : IGrainWithGuidKey
     {
+        [Alias("GetConsumptionReport")]
         Task<ConsumptionReport> GetConsumptionReport();
     }
 }

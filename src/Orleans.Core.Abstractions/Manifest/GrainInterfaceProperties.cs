@@ -10,6 +10,7 @@ namespace Orleans.Metadata
     /// Information about a communication interface.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Metadata.GrainInterfaceProperties")]
     public sealed class GrainInterfaceProperties
     {
         /// <summary>

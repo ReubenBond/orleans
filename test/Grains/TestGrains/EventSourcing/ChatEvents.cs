@@ -12,6 +12,7 @@ namespace TestGrains
 
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.CreatedEvent")]
     public class CreatedEvent : IChatEvent
     {
         [Orleans.Id(0)]
@@ -28,6 +29,7 @@ namespace TestGrains
 
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.PostedEvent")]
     public class PostedEvent : IChatEvent
     {
         [Orleans.Id(0)]
@@ -49,6 +51,7 @@ namespace TestGrains
 
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.DeletedEvent")]
     public class DeletedEvent : IChatEvent
     {
         [Orleans.Id(0)]
@@ -62,6 +65,7 @@ namespace TestGrains
 
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.EditedEvent")]
     public class EditedEvent : IChatEvent
     {
         [Orleans.Id(0)]

@@ -23,6 +23,7 @@ namespace TestGrains
         /// </summary>
         [Serializable]
         [Orleans.GenerateSerializer]
+        [Alias("TestGrains.AccountGrain.GrainState")]
         public class GrainState
         {
             [Orleans.Id(0)]

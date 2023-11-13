@@ -45,6 +45,7 @@ namespace ServiceBus.Tests.MonitorTests
 
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("ServiceBus.Tests.MonitorTests.CacheMonitorCounters")]
     public class CacheMonitorCounters
     {
         [Orleans.Id(0)]

@@ -7,6 +7,7 @@ namespace Orleans.Persistence.Redis
     /// Exception for throwing from Redis grain storage.
     /// </summary>
     [GenerateSerializer]
+    [Alias("Orleans.Persistence.Redis.RedisStorageException")]
     public class RedisStorageException : Exception
     {
         /// <summary>

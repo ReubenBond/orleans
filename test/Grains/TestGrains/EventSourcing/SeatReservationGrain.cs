@@ -43,6 +43,7 @@ namespace TestGrains
     /// </summary>
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.ReservationState")]
     public class ReservationState
     {
         [Orleans.Id(0)]
@@ -68,6 +69,7 @@ namespace TestGrains
     /// </summary>
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.SeatReservation")]
     public class SeatReservation
     {
         [Orleans.Id(0)]

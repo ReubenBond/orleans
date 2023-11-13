@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
+    [Alias("Orleans.Runtime.IMembershipService")]
     internal interface IMembershipService : ISystemTarget
     {
         /// <summary>
@@ -11,14 +12,17 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="snapshot">Snapshot of the membership table</param>
         /// <returns></returns>
+        [Alias("MembershipChangeNotification")]
         Task MembershipChangeNotification(MembershipTableSnapshot snapshot);
 
         /// <summary>
         /// Ping request from another silo that probes the liveness of the recipient silo.
         /// </summary>
         /// <param name="pingNumber">A unique sequence number for ping message, to facilitate testing and debugging.</param>
+        [Alias("Ping")]
         Task Ping(int pingNumber);
 
+        [Alias("ProbeIndirectly")]
         Task<IndirectProbeResponse> ProbeIndirectly(SiloAddress target, TimeSpan probeTimeout, int probeNumber);
     }
 
@@ -26,6 +30,7 @@ namespace Orleans.Runtime
     /// Represents the result of probing a node via an intermediary node.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.IndirectProbeResponse")]
     public readonly struct IndirectProbeResponse
     {
         /// <summary>

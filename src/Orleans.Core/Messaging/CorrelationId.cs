@@ -4,6 +4,7 @@ using System;
 namespace Orleans.Runtime
 {
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.CorrelationId")]
     internal readonly struct CorrelationId : IEquatable<CorrelationId>, IComparable<CorrelationId>, ISpanFormattable
     {
         [Id(0)]

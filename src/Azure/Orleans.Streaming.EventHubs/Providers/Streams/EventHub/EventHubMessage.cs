@@ -10,6 +10,7 @@ namespace Orleans.Streaming.EventHubs
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streaming.EventHubs.EventHubMessage")]
     public class EventHubMessage
     {
         /// <summary>

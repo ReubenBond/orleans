@@ -6,6 +6,7 @@ namespace Orleans.Versions.Compatibility
     /// A grain interface version compatibility strategy which treats all versions of an interface compatible only with equal and lower requested versions.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable, SuppressReferenceTracking]
+    [Alias("Orleans.Versions.Compatibility.BackwardCompatible")]
     public sealed class BackwardCompatible : CompatibilityStrategy
     {
         /// <summary>

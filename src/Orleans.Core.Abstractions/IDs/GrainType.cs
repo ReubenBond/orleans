@@ -9,6 +9,7 @@ namespace Orleans.Runtime
     /// Represents the type of a grain.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.GrainType")]
     public readonly struct GrainType : IEquatable<GrainType>, IComparable<GrainType>, ISerializable, ISpanFormattable
     {
         [Id(0)]

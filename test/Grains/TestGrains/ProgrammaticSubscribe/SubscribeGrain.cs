@@ -4,8 +4,10 @@ using Orleans.Streams.PubSub;
 
 namespace UnitTests.Grains.ProgrammaticSubscribe
 {
+    [Alias("UnitTests.Grains.ProgrammaticSubscribe.ISubscribeGrain")]
     public interface ISubscribeGrain : IGrainWithGuidKey
     {
+        [Alias("CanGetSubscriptionManager")]
         Task<bool> CanGetSubscriptionManager(string providerName);
     }
 
@@ -19,6 +21,7 @@ namespace UnitTests.Grains.ProgrammaticSubscribe
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.ProgrammaticSubscribe.FullStreamIdentity")]
     public class FullStreamIdentity : IStreamIdentity
     {
         public FullStreamIdentity(Guid streamGuid, string streamNamespace, string providerName)

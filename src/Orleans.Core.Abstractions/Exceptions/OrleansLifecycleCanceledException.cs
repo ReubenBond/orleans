@@ -8,6 +8,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Runtime.OrleansLifecycleCanceledException")]
     public sealed class OrleansLifecycleCanceledException : OrleansException
     {
         /// <summary>

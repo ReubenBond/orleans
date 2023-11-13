@@ -10,6 +10,7 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streams.FaultedSubscriptionException")]
     public sealed class FaultedSubscriptionException : OrleansException
     {
         private const string ErrorStringFormat =

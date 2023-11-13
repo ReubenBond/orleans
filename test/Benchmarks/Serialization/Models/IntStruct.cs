@@ -9,6 +9,7 @@ namespace Benchmarks.Models
     [ProtoContract]
     [ZeroFormattable]
     [MessagePackObject]
+    [Alias("Benchmarks.Models.IntStruct")]
     public struct IntStruct
     {
         public static IntStruct Create()

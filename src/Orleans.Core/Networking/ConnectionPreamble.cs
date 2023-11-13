@@ -9,6 +9,7 @@ using Orleans.Serialization;
 namespace Orleans.Runtime.Messaging
 {
     [GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.Messaging.ConnectionPreamble")]
     internal sealed class ConnectionPreamble
     {
         [Id(0)]

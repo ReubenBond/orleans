@@ -10,6 +10,7 @@ namespace Orleans.Streams
     [Serializable]
     [Immutable]
     [GenerateSerializer]
+    [Alias("Orleans.Streams.QueueId")]
     public readonly struct QueueId : IEquatable<QueueId>, IComparable<QueueId>, ISpanFormattable
     {
         [Id(0)]

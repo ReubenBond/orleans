@@ -9,18 +9,21 @@ namespace Orleans
     /// <summary>
     /// Functionality for managing reminders.
     /// </summary>
+    [Alias("Orleans.IReminderService")]
     public interface IReminderService : IGrainService
     {
         /// <summary>
         /// Starts the service.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
+        [Alias("Start")]
         Task Start();
 
         /// <summary>
         /// Stops the service.
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
+        [Alias("Stop")]
         Task Stop();
 
         /// <summary>
@@ -31,6 +34,7 @@ namespace Orleans
         /// <param name="dueTime">The amount of time to delay before firing the reminder initially.</param>
         /// <param name="period">The time interval between invocations of the reminder.</param>
         /// <returns>The reminder.</returns>
+        [Alias("RegisterOrUpdateReminder")]
         Task<IGrainReminder> RegisterOrUpdateReminder(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period);
 
         /// <summary>
@@ -38,6 +42,7 @@ namespace Orleans
         /// </summary>
         /// <param name="reminder">The reminder.</param>
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
+        [Alias("UnregisterReminder")]
         Task UnregisterReminder(IGrainReminder reminder);
 
         /// <summary>
@@ -46,6 +51,7 @@ namespace Orleans
         /// <param name="grainId">A reference to the grain which the reminder is registered on.</param>
         /// <param name="reminderName">The name of the reminder.</param>
         /// <returns>The reminder.</returns>
+        [Alias("GetReminder")]
         Task<IGrainReminder> GetReminder(GrainId grainId, string reminderName);
 
         /// <summary>
@@ -53,6 +59,7 @@ namespace Orleans
         /// </summary>
         /// <param name="grainId">A reference to the grain.</param>
         /// <returns>A list of all registered reminders for the specified grain.</returns>
+        [Alias("GetReminders")]
         Task<List<IGrainReminder>> GetReminders(GrainId grainId);
     }
 }

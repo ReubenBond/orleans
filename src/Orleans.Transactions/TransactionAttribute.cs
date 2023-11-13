@@ -58,6 +58,7 @@ namespace Orleans
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.TransactionRequestBase")]
     public abstract class TransactionRequestBase : RequestBase, IOutgoingGrainCallFilter, IOnDeserialized
     {
         [NonSerialized]
@@ -253,6 +254,7 @@ namespace Orleans
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.TransactionResponse")]
     public sealed class TransactionResponse : Response
     {
         [Id(0)]

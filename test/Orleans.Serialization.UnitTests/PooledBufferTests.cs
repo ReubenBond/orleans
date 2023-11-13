@@ -127,6 +127,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [GenerateSerializer]
+        [Alias("Orleans.Serialization.UnitTests.PooledBufferTests.LargeObject")]
         public readonly record struct LargeObject(
             [property: Id(0)] Guid Id,
             [property: Id(1)] (Guid, Guid)[] Values)

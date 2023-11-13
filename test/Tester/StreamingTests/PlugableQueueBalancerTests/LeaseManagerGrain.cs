@@ -5,15 +5,24 @@ using Orleans.Streams;
 namespace Tester.StreamingTests
 {
     //one lease manager grain per stream provider, so its key is stream provider name
+    [Alias("Tester.StreamingTests.ILeaseManagerGrain")]
     public interface ILeaseManagerGrain : IGrainWithStringKey
     {
+        [Alias("Acquire")]
         Task<QueueId> Acquire();
+        [Alias("Renew")]
         Task<bool> Renew(QueueId leaseNumber);
+        [Alias("Release")]
         Task Release(QueueId leaseNumber);
+        [Alias("GetLeaseResposibility")]
         Task<int> GetLeaseResposibility();
+        [Alias("SetQueuesAsLeases")]
         Task SetQueuesAsLeases(IEnumerable<QueueId> queues);
+
         //methods used in test asserts
+        [Alias("RecordBalancerResponsibility")]
         Task RecordBalancerResponsibility(string balancerId, int ownedQueues);
+        [Alias("GetResponsibilityMap")]
         Task<Dictionary<string, int>> GetResponsibilityMap();
 
     }

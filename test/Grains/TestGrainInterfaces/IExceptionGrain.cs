@@ -10,56 +10,87 @@ namespace UnitTests.GrainInterfaces
     /// <summary>
     /// The ExceptionGrain interface.
     /// </summary>
+    [Alias("UnitTests.GrainInterfaces.IExceptionGrain")]
     public interface IExceptionGrain : IGrainWithIntegerKey
     {
+        [Alias("Canceled")]
         Task Canceled();
 
+        [Alias("ThrowsInvalidOperationException")]
         Task ThrowsInvalidOperationException();
 
+        [Alias("ThrowsNullReferenceException")]
         Task ThrowsNullReferenceException();
 
+        [Alias("ThrowsAggregateExceptionWrappingInvalidOperationException")]
         Task ThrowsAggregateExceptionWrappingInvalidOperationException();
 
+        [Alias("ThrowsNestedAggregateExceptionsWrappingInvalidOperationException")]
         Task ThrowsNestedAggregateExceptionsWrappingInvalidOperationException();
 
+        [Alias("GrainCallToThrowsInvalidOperationException")]
         Task GrainCallToThrowsInvalidOperationException(long otherGrainId);
 
+        [Alias("GrainCallToThrowsAggregateExceptionWrappingInvalidOperationException")]
         Task GrainCallToThrowsAggregateExceptionWrappingInvalidOperationException(long otherGrainId);
 
+        [Alias("ThrowsSynchronousInvalidOperationException")]
         Task ThrowsSynchronousInvalidOperationException();
 
+        [Alias("ThrowsSynchronousExceptionObjectTask")]
         Task<object> ThrowsSynchronousExceptionObjectTask();
 
+        [Alias("ThrowsMultipleExceptionsAggregatedInFaultedTask")]
         Task ThrowsMultipleExceptionsAggregatedInFaultedTask();
 
+        [Alias("ThrowsSynchronousAggregateExceptionWithMultipleInnerExceptions")]
         Task ThrowsSynchronousAggregateExceptionWithMultipleInnerExceptions();
     }
 
+    [Alias("UnitTests.GrainInterfaces.IMessageSerializationGrain")]
     public interface IMessageSerializationGrain : IGrainWithIntegerKey
     {
+        [Alias("SendUnserializable")]
         Task SendUnserializable(UnserializableType input);
+        [Alias("SendUndeserializable")]
         Task SendUndeserializable(UndeserializableType input);
+        [Alias("GetUnserializable")]
         Task<UnserializableType> GetUnserializable();
+        [Alias("GetUndeserializable")]
         Task<UndeserializableType> GetUndeserializable();
 
+        [Alias("SendUnserializableToOtherSilo")]
         Task SendUnserializableToOtherSilo();
+        [Alias("SendUndeserializableToOtherSilo")]
         Task SendUndeserializableToOtherSilo();
+        [Alias("GetUnserializableFromOtherSilo")]
         Task GetUnserializableFromOtherSilo();
+        [Alias("GetUndeserializableFromOtherSilo")]
         Task GetUndeserializableFromOtherSilo();
 
+        [Alias("SendUnserializableToClient")]
         Task SendUnserializableToClient(IMessageSerializationClientObject obj);
+        [Alias("SendUndeserializableToClient")]
         Task SendUndeserializableToClient(IMessageSerializationClientObject obj);
+        [Alias("GetUnserializableFromClient")]
         Task GetUnserializableFromClient(IMessageSerializationClientObject obj);
+        [Alias("GetUndeserializableFromClient")]
         Task GetUndeserializableFromClient(IMessageSerializationClientObject obj);
 
+        [Alias("GetSiloIdentity")]
         Task<string> GetSiloIdentity();
     }
 
+    [Alias("UnitTests.GrainInterfaces.IMessageSerializationClientObject")]
     public interface IMessageSerializationClientObject : IAddressable
     {
+        [Alias("SendUnserializable")]
         Task SendUnserializable(UnserializableType input);
+        [Alias("SendUndeserializable")]
         Task SendUndeserializable(UndeserializableType input);
+        [Alias("GetUnserializable")]
         Task<UnserializableType> GetUnserializable();
+        [Alias("GetUndeserializable")]
         Task<UndeserializableType> GetUndeserializable();
     }
 

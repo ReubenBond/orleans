@@ -11,6 +11,7 @@ namespace Orleans.Providers.Streams.Generator
     /// <see cref="IBatchContainer"/> implementation for generated event payloads.
     /// </summary>
     [GenerateSerializer]
+    [Alias("Orleans.Providers.Streams.Generator.GeneratedBatchContainer")]
     public sealed class GeneratedBatchContainer : IBatchContainer
     {
         /// <inheritdoc />

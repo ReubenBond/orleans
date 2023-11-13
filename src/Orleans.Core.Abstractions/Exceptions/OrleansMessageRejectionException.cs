@@ -8,6 +8,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Runtime.OrleansMessageRejectionException")]
     public class OrleansMessageRejectionException : OrleansException
     {
         /// <summary>

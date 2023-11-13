@@ -4,6 +4,7 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.SqlUtils.StorageProvider.GrainClasses.CustomerState")]
     public class CustomerState
     {
         [Id(0)]

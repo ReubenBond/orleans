@@ -73,6 +73,7 @@ namespace Orleans.EventSourcing.CustomStorage
 
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.EventSourcing.CustomStorage.CustomStorageAdaptor.ReadRequest`2")]
         internal sealed class ReadRequest : ILogConsistencyProtocolMessage
         {
             [Id(0)]
@@ -81,6 +82,7 @@ namespace Orleans.EventSourcing.CustomStorage
 
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.EventSourcing.CustomStorage.CustomStorageAdaptor.ReadResponse`3")]
         internal sealed class ReadResponse<ViewType> : ILogConsistencyProtocolMessage
         {
             [Id(0)]
@@ -230,6 +232,7 @@ namespace Orleans.EventSourcing.CustomStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.EventSourcing.CustomStorage.CustomStorageAdaptor.UpdatePrimaryFailed`2")]
         public sealed class UpdatePrimaryFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
@@ -245,6 +248,7 @@ namespace Orleans.EventSourcing.CustomStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.EventSourcing.CustomStorage.CustomStorageAdaptor.ReadFromPrimaryFailed`2")]
         public sealed class ReadFromPrimaryFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
@@ -261,6 +265,7 @@ namespace Orleans.EventSourcing.CustomStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.EventSourcing.CustomStorage.CustomStorageAdaptor.UpdateNotificationMessage`2")]
         protected internal sealed class UpdateNotificationMessage : INotificationMessage
         {
             /// <inheritdoc/>

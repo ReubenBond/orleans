@@ -6,12 +6,14 @@ namespace Orleans.ClientObservers
     /// <summary>
     /// Handles gateway notifications which are sent to connected clients.
     /// </summary>
+    [Alias("Orleans.ClientObservers.IClientGatewayObserver")]
     internal interface IClientGatewayObserver : IGrainObserver
     {
         /// <summary>
         /// Signals a client that it should stop sending messages to the specified gateway.
         /// </summary>
         /// <param name="gateway">The gateway</param>
+        [Alias("StopSendingToGateway")]
         void StopSendingToGateway(SiloAddress gateway);
     }
 

@@ -8,22 +8,35 @@ namespace Tester.CodeGenTests
     using Orleans;
     using Orleans.Providers;
 
+    [Alias("Tester.CodeGenTests.IGrainWithGenericMethods")]
     public interface IGrainWithGenericMethods : IGrainWithGuidKey
     {
+        [Alias("GetTypesExplicit")]
         Task<Type[]> GetTypesExplicit<T, U, V>();
+        [Alias("GetTypesInferred")]
         Task<Type[]> GetTypesInferred<T, U, V>(T t, U u, V v);
+        [Alias("GetTypesInferred1")]
         Task<Type[]> GetTypesInferred<T, U>(T t, U u, int v);
+        [Alias("RoundTrip")]
         Task<T> RoundTrip<T>(T val);
+        [Alias("RoundTrip1")]
         Task<int> RoundTrip(int val);
+        [Alias("Default")]
         Task<T> Default<T>();
+        [Alias("Default1")]
         Task<string> Default();
+        [Alias("Constraints")]
         Task<TGrain> Constraints<TGrain>(TGrain grain) where TGrain : IGrain;
+        [Alias("SetValueOnObserver")]
         Task SetValueOnObserver<T>(IGrainObserverWithGenericMethods observer, T value);
+        [Alias("ValueTaskMethod")]
         ValueTask<int> ValueTaskMethod(bool useCache);
     }
 
+    [Alias("Tester.CodeGenTests.IGrainObserverWithGenericMethods")]
     public interface IGrainObserverWithGenericMethods : IGrainObserver
     {
+        [Alias("SetValue")]
         void SetValue<T>(T value);
     }
 
@@ -95,10 +108,13 @@ namespace Tester.CodeGenTests
         }
     }
 
+    [Alias("Tester.CodeGenTests.IGenericGrainWithGenericMethods`1")]
     public interface IGenericGrainWithGenericMethods<T> : IGrainWithGuidKey
     {
+        [Alias("Method")]
         Task<T> Method(T value);
 #pragma warning disable 693
+        [Alias("Method1")]
         Task<T> Method<T>(T value);
 #pragma warning restore 693
     }
@@ -127,6 +143,7 @@ namespace Tester.CodeGenTests
         }
     }
 
+    [Alias("Tester.CodeGenTests.IRuntimeCodeGenGrain`1")]
     public interface IRuntimeCodeGenGrain<T> : IGrainWithGuidKey
     {
         /// <summary>
@@ -134,17 +151,20 @@ namespace Tester.CodeGenTests
         /// </summary>
         /// <param name="value">The new state.</param>
         /// <returns>The current state.</returns>
+        [Alias("SetState")]
         Task<T> SetState(T value);
 
         /// <summary>
         /// Tests that code generation correctly handles methods with reserved keyword identifiers.
         /// </summary>
         /// <returns>The current state's event.</returns>
+        [Alias("@static")]
         Task<@event> @static();
     }
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("Tester.CodeGenTests.GenericGrainState`1")]
     public class GenericGrainState<T>
     {
         [Id(0)]
@@ -155,6 +175,7 @@ namespace Tester.CodeGenTests
     /// A class designed to test that code generation correctly handles reserved keywords.
     /// </summary>
     [GenerateSerializer]
+    [Alias("Tester.CodeGenTests.@event")]
     public class @event : IEquatable<@event>
     {
         private static readonly IEqualityComparer<@event> EventComparerInstance = new EventEqualityComparer();
@@ -294,12 +315,14 @@ namespace Tester.CodeGenTests
     }
 
     [GenerateSerializer]
+    [Alias("Tester.CodeGenTests.NestedGeneric`1")]
     public class NestedGeneric<T>
     {
         [Id(0)]
         public Nested Payload { get; set; }
 
         [GenerateSerializer]
+        [Alias("Tester.CodeGenTests.NestedGeneric.Nested`1")]
         public class Nested
         {
             [Id(0)]
@@ -308,12 +331,14 @@ namespace Tester.CodeGenTests
     }
 
     [GenerateSerializer]
+    [Alias("Tester.CodeGenTests.NestedConstructedGeneric")]
     public class NestedConstructedGeneric
     {
         [Id(0)]
         public Nested<int> Payload { get; set; }
 
         [GenerateSerializer]
+        [Alias("Tester.CodeGenTests.NestedConstructedGeneric.Nested`1")]
         public class Nested<T>
         {
             [Id(0)]
@@ -321,9 +346,12 @@ namespace Tester.CodeGenTests
         }
     }
 
+    [Alias("Tester.CodeGenTests.INestedGenericGrain")]
     public interface INestedGenericGrain : IGrainWithGuidKey
     {
+        [Alias("Do")]
         Task<int> Do(NestedGeneric<int> value);
+        [Alias("Do1")]
         Task<int> Do(NestedConstructedGeneric value);
     }
 
@@ -343,6 +371,7 @@ namespace Tester.CodeGenTests
         }
     }
 
+    [Alias("Tester.CodeGenTests.IGrainWithStaticMembers")]
     public interface IGrainWithStaticMembers : IGrainWithGuidKey
     {
         public static int StaticMethodWithNonAsyncReturnType(int a) => 0;

@@ -7,6 +7,7 @@ namespace Orleans.Providers
     /// <summary>
     /// Interface for In-memory stream queue grain.
     /// </summary>
+    [Alias("Orleans.Providers.IMemoryStreamQueueGrain")]
     public interface IMemoryStreamQueueGrain : IGrainWithGuidKey
     {
         /// <summary>
@@ -14,6 +15,7 @@ namespace Orleans.Providers
         /// </summary>
         /// <param name="data">The data.</param>
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
+        [Alias("Enqueue")]
         Task Enqueue(MemoryMessageData data);
 
         /// <summary>
@@ -23,6 +25,7 @@ namespace Orleans.Providers
         /// The maximum number of events to dequeue.
         /// </param>
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
+        [Alias("Dequeue")]
         Task<List<MemoryMessageData>> Dequeue(int maxCount);
     }
 }

@@ -19,6 +19,7 @@ namespace Orleans.Serialization.Codecs
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.Codecs.ReadOnlyDictionarySurrogate`2")]
     public struct ReadOnlyDictionarySurrogate<TKey, TValue>
     {
         [Id(0)]

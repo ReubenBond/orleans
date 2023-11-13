@@ -7,6 +7,7 @@ namespace Orleans.Streams
     [Serializable]
     [JsonObject(MemberSerialization.OptIn)]
     [GenerateSerializer]
+    [Alias("Orleans.Streams.PubSubPublisherState")]
     internal sealed class PubSubPublisherState : IEquatable<PubSubPublisherState>
     {
         // IMPORTANT!!!!!

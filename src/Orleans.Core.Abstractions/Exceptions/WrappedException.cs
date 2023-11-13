@@ -15,6 +15,7 @@ namespace Orleans.Runtime
     /// </remarks>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Runtime.WrappedException")]
     public class WrappedException : OrleansException
     {
         /// <summary>

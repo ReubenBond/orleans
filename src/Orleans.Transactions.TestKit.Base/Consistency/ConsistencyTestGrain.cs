@@ -16,6 +16,7 @@ namespace Orleans.Transactions.TestKit.Consistency
 
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.Transactions.TestKit.Consistency.ConsistencyTestGrain.State")]
         public class State
         {
             [Id(0)]

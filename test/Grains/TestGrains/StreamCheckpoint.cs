@@ -4,6 +4,7 @@ namespace TestGrains
 {
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.StreamCheckpoint`1")]
     public class StreamCheckpoint<TState>
     {
         [Orleans.Id(0)]

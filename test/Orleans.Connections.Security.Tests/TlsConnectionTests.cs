@@ -121,8 +121,10 @@ namespace Orleans.Connections.Security.Tests
         }
     }
 
+    [Alias("Orleans.Connections.Security.Tests.IPingGrain")]
     public interface IPingGrain : IGrainWithStringKey
     {
+        [Alias("Echo")]
         Task<string> Echo(string value);
     }
 

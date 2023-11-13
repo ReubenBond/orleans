@@ -7,6 +7,7 @@ namespace UnitTests.GrainInterfaces
     namespace One
     {
         [GenerateSerializer]
+        [Alias("UnitTests.GrainInterfaces.One.Command")]
         public class Command
         {
         }
@@ -15,6 +16,7 @@ namespace UnitTests.GrainInterfaces
     namespace Two
     {
         [GenerateSerializer]
+        [Alias("UnitTests.GrainInterfaces.Two.Command")]
         public class Command
         {
         }
@@ -26,49 +28,68 @@ namespace UnitTests.GrainInterfaces
     /// name would cause a code generation failure because only one of the
     /// methods would be implemented in the generated GrainReference.
     /// </summary>
+    [Alias("UnitTests.GrainInterfaces.ISameNameParameterTypeGrain")]
     internal interface ISameNameParameterTypeGrain : IGrainWithIntegerKey
     {
+        [Alias("ExecuteCommand")]
         Task ExecuteCommand(One.Command command);
+        [Alias("ExecuteCommand1")]
         Task ExecuteCommand(Two.Command command);
     }
 
+    [Alias("UnitTests.GrainInterfaces.IInternalPingGrain")]
     internal interface IInternalPingGrain : IGrainWithIntegerKey
     {
+        [Alias("Ping")]
         Task Ping();
     }
 
+    [Alias("UnitTests.GrainInterfaces.ISomeGrain")]
     public interface ISomeGrain : IGrainWithIntegerKey
     {
+        [Alias("Do")]
         Task Do(Outsider o);
     }
 
     [Unordered]
+    [Alias("UnitTests.GrainInterfaces.ISomeGrainWithInvocationOptions")]
     public interface ISomeGrainWithInvocationOptions : IGrainWithIntegerKey
     {
         [AlwaysInterleave]
+        [Alias("AlwaysInterleave")]
         Task AlwaysInterleave();
     }
 
+    [Alias("UnitTests.GrainInterfaces.ISerializationGenerationGrain")]
     public interface ISerializationGenerationGrain : IGrainWithIntegerKey
     {
+        [Alias("RoundTripObject")]
         Task<object> RoundTripObject(object input);
+        [Alias("RoundTripStruct")]
         Task<SomeStruct> RoundTripStruct(SomeStruct input);
+        [Alias("RoundTripClass")]
         Task<SomeAbstractClass> RoundTripClass(SomeAbstractClass input);
+        [Alias("RoundTripInterface")]
         Task<ISomeInterface> RoundTripInterface(ISomeInterface input);
+        [Alias("RoundTripEnum")]
         Task<SomeAbstractClass.SomeEnum> RoundTripEnum(SomeAbstractClass.SomeEnum input);
 
+        [Alias("SetState")]
         Task SetState(SomeAbstractClass input);
+        [Alias("GetState")]
         Task<SomeAbstractClass> GetState();
     }
 }
 
 [GenerateSerializer]
+[Alias("Outsider")]
 public class Outsider { }
 
 namespace UnitTests.GrainInterfaces
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.CaseInsensitiveStringEquality")]
     public class CaseInsensitiveStringEquality : EqualityComparer<string>
     {
         public override bool Equals(string x, string y)
@@ -84,6 +105,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.Mod5IntegerComparer")]
     public class Mod5IntegerComparer : EqualityComparer<int>
     {
         public override bool Equals(int x, int y)
@@ -99,6 +121,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.CaseInsensitiveStringComparer")]
     public class CaseInsensitiveStringComparer : Comparer<string>
     {
         public override int Compare(string x, string y)
@@ -111,6 +134,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.RootType")]
     public class RootType
     {
         public RootType()
@@ -149,6 +173,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.SomeStruct")]
     public struct SomeStruct
     {
         [Id(0)]
@@ -199,6 +224,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.SomeAbstractClass")]
     public abstract class SomeAbstractClass : ISomeInterface
     {
         [NonSerialized]
@@ -260,6 +286,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.AnotherConcreteClass")]
     public class AnotherConcreteClass : SomeAbstractClass
     {
         [Id(0)]
@@ -271,6 +298,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.InnerType")]
     public class InnerType
     {
         public InnerType()
@@ -302,6 +330,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.ClassWithStructConstraint`1")]
     public class ClassWithStructConstraint<T>
         where T : struct
     {
@@ -331,6 +360,7 @@ namespace UnitTests.GrainInterfaces
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.ReadOnlyStructWithReadOnlyArray")]
     public readonly struct ReadOnlyStructWithReadOnlyArray
     {
 #pragma warning disable IDE0032 // Use auto property

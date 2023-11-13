@@ -2,6 +2,7 @@ namespace UnitTests.TestHelper
 {
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("UnitTests.TestHelper.InterlockedFlag")]
     public sealed class InterlockedFlag
     {
         [Orleans.Id(0)]

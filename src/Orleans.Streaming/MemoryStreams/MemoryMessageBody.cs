@@ -32,6 +32,7 @@ namespace Orleans.Providers
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
     [SerializationCallbacks(typeof(Runtime.OnDeserializedCallbacks))]
+    [Alias("Orleans.Providers.DefaultMemoryMessageBodySerializer")]
     public sealed class DefaultMemoryMessageBodySerializer : IMemoryMessageBodySerializer, IOnDeserialized
     {
         [NonSerialized]
@@ -70,6 +71,7 @@ namespace Orleans.Providers
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Providers.MemoryMessageBody")]
     public sealed class MemoryMessageBody
     {        
         /// <summary>

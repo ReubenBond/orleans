@@ -104,11 +104,13 @@ namespace Orleans
     /// Membership table interface for system target based implementation.
     /// </summary>
     [Unordered]
+    [Alias("Orleans.IMembershipTableSystemTarget")]
     public interface IMembershipTableSystemTarget : IMembershipTable, ISystemTarget
     {
     }
 
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.TableVersion")]
     public sealed class TableVersion : ISpanFormattable, IEquatable<TableVersion>
     {
         /// <summary>
@@ -146,6 +148,7 @@ namespace Orleans
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.MembershipTableData")]
     public sealed class MembershipTableData
     {
         [Id(0)]
@@ -248,6 +251,7 @@ namespace Orleans
 
     [GenerateSerializer]
     [Serializable]
+    [Alias("Orleans.MembershipEntry")]
     public sealed class MembershipEntry
     {
         /// <summary>

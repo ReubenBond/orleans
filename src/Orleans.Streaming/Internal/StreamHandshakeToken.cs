@@ -4,6 +4,7 @@ namespace Orleans.Streams
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streams.StreamHandshakeToken")]
     internal abstract class StreamHandshakeToken : IEquatable<StreamHandshakeToken>
     {
         [Id(0)]
@@ -48,9 +49,11 @@ namespace Orleans.Streams
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streams.StartToken")]
     internal sealed class StartToken : StreamHandshakeToken { }
     
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streams.DeliveryToken")]
     internal sealed class DeliveryToken : StreamHandshakeToken { }
 }

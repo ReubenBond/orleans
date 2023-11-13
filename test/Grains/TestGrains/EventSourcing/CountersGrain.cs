@@ -17,6 +17,7 @@ namespace TestGrains
         /// </summary>
         [Serializable]
         [GenerateSerializer]
+        [Alias("TestGrains.CountersGrain.GrainState")]
         public class GrainState
         {
             /// <summary>  the current count </summary>
@@ -47,6 +48,7 @@ namespace TestGrains
         /// </summary>
         [Serializable]
         [GenerateSerializer]
+        [Alias("TestGrains.CountersGrain.UpdatedEvent")]
         public class UpdatedEvent
         {
             [Id(0)]
@@ -60,6 +62,7 @@ namespace TestGrains
         /// </summary>
         [Serializable]
         [GenerateSerializer]
+        [Alias("TestGrains.CountersGrain.ResetAllEvent")]
         public class ResetAllEvent
         {
         }

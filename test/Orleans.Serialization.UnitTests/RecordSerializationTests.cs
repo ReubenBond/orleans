@@ -242,11 +242,13 @@ public class RecordSerializationTests
 }
 
 [GenerateSerializer]
+[Alias("EmptyAbstractRecord")]
 public abstract record EmptyAbstractRecord
 {
 }
 
 [GenerateSerializer]
+[Alias("DerivedFromEmptyAbstractRecord")]
 public record DerivedFromEmptyAbstractRecord : EmptyAbstractRecord
 {
     [Id(0)]
@@ -259,6 +261,7 @@ public record DerivedFromEmptyAbstractRecord : EmptyAbstractRecord
 }
 
 [GenerateSerializer]
+[Alias("NonEmptyAbstractRecord")]
 public abstract record NonEmptyAbstractRecord
 {
     [Id(0)]
@@ -271,6 +274,7 @@ public abstract record NonEmptyAbstractRecord
 }
 
 [GenerateSerializer]
+[Alias("DerivedFromNonEmptyAbstractRecord")]
 public record DerivedFromNonEmptyAbstractRecord : NonEmptyAbstractRecord
 {
     [Id(0)]
@@ -283,21 +287,25 @@ public record DerivedFromNonEmptyAbstractRecord : NonEmptyAbstractRecord
 }
 
 [GenerateSerializer]
+[Alias("RecordHierarchyDerived")]
 public record RecordHierarchyDerived([property: Id(1)] string Message) : RecordHierarchyMiddle
 {
     public override string Type => "Foo";
 }
 
 [GenerateSerializer]
+[Alias("RecordHierarchyMiddle")]
 public abstract record RecordHierarchyMiddle : RecordHierarchyBase;
 
 [GenerateSerializer]
+[Alias("RecordHierarchyBase")]
 public abstract record RecordHierarchyBase
 {
     public abstract string Type { get; }
 }
 
 [GenerateSerializer]
+[Alias("FooWithListOfObject")]
 public class FooWithListOfObject
 {
     [Id(1)]
@@ -308,6 +316,7 @@ public class FooWithListOfObject
 }
 
 [GenerateSerializer]
+[Alias("TwoObjects")]
 public class TwoObjects
 {
     [Id(0)]
@@ -318,6 +327,7 @@ public class TwoObjects
 }
 
 [GenerateSerializer]
+[Alias("FooWithListOfFruit")]
 public class FooWithListOfFruit
 {
     [Id(1)]
@@ -328,6 +338,7 @@ public class FooWithListOfFruit
 }
 
 [GenerateSerializer]
+[Alias("FooWithListOfApple")]
 public class FooWithListOfApple
 {
     [Id(1)]
@@ -338,10 +349,13 @@ public class FooWithListOfApple
 }
 
 [GenerateSerializer]
+[Alias("FruitRecord")]
 public record FruitRecord(string Name);
 
 [GenerateSerializer]
+[Alias("AppleRecord")]
 public record AppleRecord(string Name) : FruitRecord(Name);
 
 [GenerateSerializer]
+[Alias("FooRecord")]
 public record FooRecord([property: Id(0)] Guid Id);

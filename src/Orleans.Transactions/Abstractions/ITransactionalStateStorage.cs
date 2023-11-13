@@ -30,6 +30,7 @@ namespace Orleans.Transactions.Abstractions
     }
 
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Transactions.Abstractions.PendingTransactionState`1")]
     public sealed class PendingTransactionState<TState>
         where TState : class, new()
     {
@@ -70,6 +71,7 @@ namespace Orleans.Transactions.Abstractions
     }
 
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse`1")]
     public sealed class TransactionalStorageLoadResponse<TState>
         where TState : class, new()
     {
@@ -114,6 +116,7 @@ namespace Orleans.Transactions.Abstractions
     /// </summary>
     [GenerateSerializer]
     [Serializable]
+    [Alias("Orleans.Transactions.Abstractions.TransactionalStateMetaData")]
     public sealed class TransactionalStateMetaData
     {
         [Id(0)]
@@ -124,6 +127,7 @@ namespace Orleans.Transactions.Abstractions
     }
 
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Transactions.Abstractions.CommitRecord")]
     public sealed class CommitRecord
     {
         [Id(0)]

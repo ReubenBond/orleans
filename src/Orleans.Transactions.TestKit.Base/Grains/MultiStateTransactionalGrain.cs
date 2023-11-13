@@ -10,6 +10,7 @@ namespace Orleans.Transactions.TestKit
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.TestKit.GrainData")]
     public class GrainData
     {
         [Id(0)]
@@ -145,6 +146,7 @@ namespace Orleans.Transactions.TestKit
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.TestKit.AddAndThrowException")]
     public class AddAndThrowException : Exception
     {
         public AddAndThrowException() : base("Unexpected error.") { }

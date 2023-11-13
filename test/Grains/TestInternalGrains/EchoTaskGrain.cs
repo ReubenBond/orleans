@@ -11,6 +11,7 @@ namespace UnitTests.Grains
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.EchoTaskGrainState")]
     public class EchoTaskGrainState
     {
         [Id(0)]

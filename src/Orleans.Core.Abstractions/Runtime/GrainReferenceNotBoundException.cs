@@ -7,6 +7,7 @@ namespace Orleans.Runtime
     /// Indicates that a <see cref="GrainReference"/> was not bound to the runtime before being used.
     /// </summary>
     [Serializable, GenerateSerializer]
+    [Alias("Orleans.Runtime.GrainReferenceNotBoundException")]
     public sealed class GrainReferenceNotBoundException : OrleansException
     {
         /// <summary>

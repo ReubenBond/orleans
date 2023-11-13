@@ -10,6 +10,7 @@ namespace Orleans.Providers.Streams.AzureQueue
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Providers.Streams.AzureQueue.AzureQueueBatchContainer")]
     internal class AzureQueueBatchContainer : IBatchContainer
     {
         [JsonProperty]

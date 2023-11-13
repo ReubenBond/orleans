@@ -13,6 +13,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.SerializerException")]
     public class SerializerException : Exception
     {
         /// <summary>
@@ -54,6 +55,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.FieldIdNotPresentException")]
     public sealed class FieldIdNotPresentException : SerializerException
     {
         /// <summary>
@@ -78,6 +80,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.SchemaTypeInvalidException")]
     public sealed class SchemaTypeInvalidException : SerializerException
     {
         /// <summary>
@@ -102,6 +105,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.FieldTypeInvalidException")]
     public sealed class FieldTypeInvalidException : SerializerException
     {
         /// <summary>
@@ -126,6 +130,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.FieldTypeMissingException")]
     public sealed class FieldTypeMissingException : SerializerException
     {
         /// <summary>
@@ -151,6 +156,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.ExtendedWireTypeInvalidException")]
     public sealed class ExtendedWireTypeInvalidException : SerializerException
     {
         /// <summary>
@@ -176,6 +182,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnsupportedWireTypeException")]
     public sealed class UnsupportedWireTypeException : SerializerException
     {
         /// <summary>
@@ -208,6 +215,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.ReferenceNotFoundException")]
     public sealed class ReferenceNotFoundException : SerializerException
     {
         /// <summary>
@@ -261,6 +269,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnknownReferencedTypeException")]
     public sealed class UnknownReferencedTypeException : SerializerException
     {
         /// <summary>
@@ -302,6 +311,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.ReferenceFieldNotSupportedException")]
     public sealed class ReferenceFieldNotSupportedException : SerializerException
     {
         /// <summary>
@@ -344,6 +354,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnknownWellKnownTypeException")]
     public sealed class UnknownWellKnownTypeException : SerializerException
     {
         /// <summary>
@@ -385,6 +396,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.IllegalTypeException")]
     public sealed class IllegalTypeException : SerializerException
     {
         /// <summary>
@@ -426,6 +438,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.TypeMissingException")]
     public sealed class TypeMissingException : SerializerException
     {
         /// <summary>
@@ -450,6 +463,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.RequiredFieldMissingException")]
     public sealed class RequiredFieldMissingException : SerializerException
     {
         /// <summary>
@@ -475,6 +489,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.CodecNotFoundException")]
     public sealed class CodecNotFoundException : SerializerException
     {
         /// <summary>
@@ -500,6 +515,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnexpectedLengthPrefixValueException")]
     public sealed class UnexpectedLengthPrefixValueException : SerializerException
     {
         /// <summary>

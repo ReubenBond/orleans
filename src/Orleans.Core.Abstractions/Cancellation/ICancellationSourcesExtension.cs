@@ -7,6 +7,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Extension used by the grain cancellation runtime to propagate cancellation notifications to grains.
     /// </summary>
+    [Alias("Orleans.Runtime.ICancellationSourcesExtension")]
     internal interface ICancellationSourcesExtension : IGrainExtension
     {
         /// <summary>
@@ -19,6 +20,7 @@ namespace Orleans.Runtime
         /// A <see cref="Task"/> representing the operation.
         /// </returns>
         [AlwaysInterleave]
+        [Alias("CancelRemoteToken")]
         Task CancelRemoteToken(Guid tokenId);
     }
 }

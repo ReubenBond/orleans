@@ -238,6 +238,7 @@ public class NumericsWideningAndNarrowingTests
     }
 
     [GenerateSerializer]
+    [Alias("NumericsWideningAndNarrowingTests.ValueHolder`1")]
     public sealed class ValueHolder<T>
     {
         [Id(0)]
@@ -470,6 +471,7 @@ public class NumericsWideningAndNarrowingTests
     }
 
     [GenerateSerializer]
+    [Alias("NumericsWideningAndNarrowingTests.ValueHolder`1")]
     public sealed class ValueHolder<T>
     {
         [Id(0)]

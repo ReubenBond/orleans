@@ -4,6 +4,7 @@ namespace UnitTests.Persistence
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Persistence.TestStoreGrainState")]
     public class TestStoreGrainState
     {
         [Id(0)]

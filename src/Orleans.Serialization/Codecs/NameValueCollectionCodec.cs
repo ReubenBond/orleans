@@ -48,6 +48,7 @@ namespace Orleans.Serialization.Codecs
     /// Surrogate type used by <see cref="NameValueCollectionCodec"/>.
     /// </summary>
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.Codecs.NameValueCollectionSurrogate")]
     public struct NameValueCollectionSurrogate
     {
         /// <summary>

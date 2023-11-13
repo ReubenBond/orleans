@@ -9,6 +9,7 @@ namespace Orleans.Runtime
     /// The stateless worker placement strategy allows multiple instances of a given grain to co-exist simultaneously on any host and is reserved for stateless worker grains.
     /// </summary>
     [Serializable, GenerateSerializer]
+    [Alias("Orleans.Runtime.StatelessWorkerPlacement")]
     internal sealed class StatelessWorkerPlacement : PlacementStrategy
     {
         private const string MaxLocalPropertyKey = "max-local-instances";

@@ -853,6 +853,7 @@ namespace Orleans.Serialization
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.FSharpRefSurrogate`1")]
     public struct FSharpRefSurrogate<T>
     {
         [Id(0)]
@@ -905,6 +906,7 @@ namespace Orleans.Serialization
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.FSharpListSurrogate`1")]
     public struct FSharpListSurrogate<T>
     {
         [Id(0)]
@@ -959,6 +961,7 @@ namespace Orleans.Serialization
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.FSharpSetSurrogate`1")]
     public struct FSharpSetSurrogate<T>
     {
         [Id(0)]
@@ -1016,6 +1019,7 @@ namespace Orleans.Serialization
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.FSharpMapSurrogate`2")]
     public struct FSharpMapSurrogate<TKey, TValue>
     {
         [Id(0)]

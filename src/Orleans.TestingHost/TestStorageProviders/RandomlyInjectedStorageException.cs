@@ -9,6 +9,7 @@ namespace Orleans.TestingHost
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.TestingHost.RandomlyInjectedStorageException")]
     public sealed class RandomlyInjectedStorageException : Exception
     {
         /// <summary>
@@ -32,6 +33,7 @@ namespace Orleans.TestingHost
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.TestingHost.RandomlyInjectedInconsistentStateException")]
     public sealed class RandomlyInjectedInconsistentStateException : InconsistentStateException
     {
         /// <summary>

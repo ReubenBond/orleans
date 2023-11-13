@@ -3,36 +3,55 @@ using Orleans.Streams;
 
 namespace UnitTests.GrainInterfaces
 {
+    [Alias("UnitTests.GrainInterfaces.IStreamLifecycleConsumerGrain")]
     public interface IStreamLifecycleConsumerGrain : IGrainWithGuidKey
     {
+        [Alias("GetReceivedCount")]
         Task<int> GetReceivedCount();
+        [Alias("GetErrorsCount")]
         Task<int> GetErrorsCount();
 
+        [Alias("Ping")]
         Task Ping();
+        [Alias("BecomeConsumer")]
         Task BecomeConsumer(StreamId streamId, string providerName);
+        [Alias("TestBecomeConsumerSlim")]
         Task TestBecomeConsumerSlim(StreamId streamId, string providerName);
+        [Alias("RemoveConsumer")]
         Task RemoveConsumer(StreamId streamId, string providerName, StreamSubscriptionHandle<int> consumerHandle);
+        [Alias("ClearGrain")]
         Task ClearGrain();
     }
 
+    [Alias("UnitTests.GrainInterfaces.IFilteredStreamConsumerGrain")]
     public interface IFilteredStreamConsumerGrain : IStreamLifecycleConsumerGrain
     {
+        [Alias("BecomeConsumer")]
         Task BecomeConsumer(StreamId streamId, string providerName, bool sendEvensOnly);
+        [Alias("SubscribeWithBadFunc")]
         Task SubscribeWithBadFunc(StreamId streamId, string providerName);
     }
 
+    [Alias("UnitTests.GrainInterfaces.IStreamLifecycleProducerGrain")]
     public interface IStreamLifecycleProducerGrain : IGrainWithGuidKey
     {
+        [Alias("GetSendCount")]
         Task<int> GetSendCount();
+        [Alias("GetErrorsCount")]
         Task<int> GetErrorsCount();
 
+        [Alias("Ping")]
         Task Ping();
 
+        [Alias("BecomeProducer")]
         Task BecomeProducer(StreamId streamId, string providerName);
+        [Alias("ClearGrain")]
         Task ClearGrain();
 
+        [Alias("DoDeactivateNoClose")]
         Task DoDeactivateNoClose();
 
+        [Alias("SendItem")]
         Task SendItem(int item);
     }
 

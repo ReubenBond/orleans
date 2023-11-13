@@ -111,6 +111,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.MyCompoundTypeAliasBaseClass")]
     public class MyCompoundTypeAliasBaseClass
     {
         [Id(0)]
@@ -119,6 +120,7 @@ namespace Orleans.Serialization.UnitTests
 
     [GenerateSerializer]
     [CompoundTypeAlias("xx_test_xx", typeof(MyTypeAliasClass), typeof(int), "1")]
+    [Alias("Orleans.Serialization.UnitTests.MyCompoundTypeAliasClass")]
     public class MyCompoundTypeAliasClass : MyCompoundTypeAliasBaseClass
     {
         [Id(0)]

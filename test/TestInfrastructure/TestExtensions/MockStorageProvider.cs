@@ -48,6 +48,7 @@ namespace UnitTests.StorageTests
         }
         [Serializable]
         [GenerateSerializer]
+        [Alias("UnitTests.StorageTests.MockStorageProvider.StateForTest")]
         public class StateForTest 
         {
             [Id(0)]
@@ -116,6 +117,7 @@ namespace UnitTests.StorageTests
 
         [Serializable]
         [GenerateSerializer]
+        [Alias("UnitTests.StorageTests.MockStorageProvider.SetValueArgs")]
         public class SetValueArgs
         {
             [Id(0)]

@@ -109,6 +109,7 @@ namespace DefaultCluster.Tests.StorageTests
 
         [Serializable]
         [GenerateSerializer]
+        [Alias("DefaultCluster.Tests.StorageTests.MemoryStorageProviderTests.TestGrainState")]
         public class TestGrainState : IGrainState<object>
         {
             public static IGrainState<object> CreateRandom()

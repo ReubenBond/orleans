@@ -2208,6 +2208,7 @@ namespace Orleans.Serialization.UnitTests
         protected override bool Equals(Dictionary<string, int> left, Dictionary<string, int> right) => object.ReferenceEquals(left, right) || left.SequenceEqual(right);
 
         [GenerateSerializer]
+        [Alias("Orleans.Serialization.UnitTests.DictionaryWithComparerCodecTests.CaseInsensitiveEqualityComparer")]
         public class CaseInsensitiveEqualityComparer : IEqualityComparer<string>
         {
             public bool Equals(string left, string right)

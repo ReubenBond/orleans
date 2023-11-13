@@ -2,19 +2,26 @@ using Orleans.BroadcastChannel;
 
 namespace UnitTests.Grains.BroadcastChannel
 {
+    [Alias("UnitTests.Grains.BroadcastChannel.ISubscriberGrain")]
     public interface ISubscriberGrain : IGrainWithStringKey
     {
+        [Alias("GetErrors")]
         Task<List<Exception>> GetErrors(ChannelId streamId);
 
+        [Alias("GetValues")]
         Task<List<int>> GetValues(ChannelId streamId);
 
+        [Alias("GetOnPublishedCounter")]
         Task<int> GetOnPublishedCounter();
 
+        [Alias("ThrowsOnReceive")]
         Task ThrowsOnReceive(bool throwsOnReceive);
     }
 
+    [Alias("UnitTests.Grains.BroadcastChannel.ISimpleSubscriberGrain")]
     public interface ISimpleSubscriberGrain : ISubscriberGrain { }
 
+    [Alias("UnitTests.Grains.BroadcastChannel.IRegexNamespaceSubscriberGrain")]
     public interface IRegexNamespaceSubscriberGrain : ISubscriberGrain { }
 
     public abstract class SubscriberGrainBase : Grain, ISubscriberGrain, IOnBroadcastChannelSubscribed

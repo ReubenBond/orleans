@@ -7,24 +7,30 @@ namespace UnitTests.StorageTests.Relational.TestDataSets
         /// </summary>
         private class NotApplicable { };
 
+        [Alias("UnitTests.StorageTests.Relational.TestDataSets.GrainTypeGenerator.ITestGrainWithIntegerKey")]
         public interface ITestGrainWithIntegerKey: IGrainWithIntegerKey { }
 
+        [Alias("UnitTests.StorageTests.Relational.TestDataSets.GrainTypeGenerator.ITestGrainGenericWithIntegerKey`1")]
         public interface ITestGrainGenericWithIntegerKey<T>: IGrainWithIntegerKey { }
 
         public class TestGrainWithIntegerKey: Grain, ITestGrainWithIntegerKey { }
 
         public class TestGrainGenericWithIntegerKey<T>: Grain, ITestGrainGenericWithIntegerKey<T> { }
 
+        [Alias("UnitTests.StorageTests.Relational.TestDataSets.GrainTypeGenerator.ITestGrainWithGuidKey")]
         public interface ITestGrainWithGuidKey: IGrainWithGuidKey { }
 
+        [Alias("UnitTests.StorageTests.Relational.TestDataSets.GrainTypeGenerator.ITestGrainGenericWithGuidKey`1")]
         public interface ITestGrainGenericWithGuidKey<T>: IGrainWithGuidKey { }
 
         public class TestGrainWithGuidKey: Grain, ITestGrainWithGuidKey { }
 
         public class TestGrainGenericWithGuidKey<T>: Grain, ITestGrainGenericWithGuidKey<T> { }
 
+        [Alias("UnitTests.StorageTests.Relational.TestDataSets.GrainTypeGenerator.ITestGrainWithStringKey")]
         public interface ITestGrainWithStringKey: IGrainWithStringKey { }
 
+        [Alias("UnitTests.StorageTests.Relational.TestDataSets.GrainTypeGenerator.ITestGrainGenericWithStringKey`1")]
         public interface ITestGrainGenericWithStringKey<T>: IGrainWithStringKey { }
 
         public class TestGrainWithStringKey: Grain, ITestGrainWithStringKey { }

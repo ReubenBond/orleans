@@ -12,6 +12,7 @@ namespace Orleans.Runtime
     /// </remarks>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Runtime.OrleansException")]
     public class OrleansException : Exception
     {
         /// <summary>

@@ -8,6 +8,7 @@ namespace Orleans.Runtime
     /// Interface for system management functions of silos,
     /// exposed as a grain for receiving remote requests / commands.
     /// </summary>
+    [Alias("Orleans.Runtime.IManagementGrain")]
     public interface IManagementGrain : IGrainWithIntegerKey, IVersionManager
     {
         /// <summary>
@@ -16,6 +17,7 @@ namespace Orleans.Runtime
         /// <param name="onlyActive">Whether data on just current active silos should be returned,
         /// or by default data for all current and previous silo instances [including those in Joining or Dead status].</param>
         /// <returns>The hosts and their corresponding statuses.</returns>
+        [Alias("GetHosts")]
         Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false);
 
         /// <summary>
@@ -24,6 +26,7 @@ namespace Orleans.Runtime
         /// <param name="onlyActive">Whether data on just current active silos should be returned,
         /// or by default data for all current and previous silo instances [including those in Joining or Dead status].</param>
         /// <returns>The host entries.</returns>
+        [Alias("GetDetailedHosts")]
         Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false);
 
         /// <summary>
@@ -31,12 +34,14 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        [Alias("ForceGarbageCollection")]
         Task ForceGarbageCollection(SiloAddress[] hostsIds);
 
         /// <summary>Perform a run of the Orleans activation collector in the specified silos.</summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
         /// <param name="ageLimit">Maximum idle time of activations to be collected.</param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        [Alias("ForceActivationCollection")]
         Task ForceActivationCollection(SiloAddress[] hostsIds, TimeSpan ageLimit);
 
         /// <summary>
@@ -44,11 +49,13 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="ageLimit">The age limit. Grains which have been idle for longer than this period of time will be eligible for collection.</param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        [Alias("ForceActivationCollection1")]
         Task ForceActivationCollection(TimeSpan ageLimit);
 
         /// <summary>Perform a run of the silo statistics collector in the specified silos.</summary>
         /// <param name="siloAddresses">List of silos this command is to be sent to.</param>
         /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        [Alias("ForceRuntimeStatisticsCollection")]
         Task ForceRuntimeStatisticsCollection(SiloAddress[] siloAddresses);
 
         /// <summary>
@@ -56,6 +63,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
         /// <returns>Runtime statistics from the specified hosts.</returns>
+        [Alias("GetRuntimeStatistics")]
         Task<SiloRuntimeStatistics[]> GetRuntimeStatistics(SiloAddress[] hostsIds);
 
         /// <summary>
@@ -63,12 +71,14 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
         /// <returns>Simple grain statistics for the specified hosts.</returns>
+        [Alias("GetSimpleGrainStatistics")]
         Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics(SiloAddress[] hostsIds);
 
         /// <summary>
         /// Return the most recent grain statistics information, amalgamated across all silos.
         /// </summary>
         /// <returns>Simple grain statistics.</returns>
+        [Alias("GetSimpleGrainStatistics1")]
         Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics();
 
         /// <summary>
@@ -77,17 +87,22 @@ namespace Orleans.Runtime
         /// <param name="hostsIds">List of silos this command is to be sent to.</param>
         /// <param name="types">Array of grain types to filter the results with</param>
         /// <returns>Detailed grain statistics.</returns>
+        [Alias("GetDetailedGrainStatistics")]
         Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[] types = null, SiloAddress[] hostsIds = null);
+
         /// <summary>
         /// Gets the grain activation count for a specific grain type.
         /// </summary>
         /// <param name="grainReference">The grain reference.</param>
         /// <returns>Gets the number of activations of grains with the same type as the provided grain reference.</returns>
+        [Alias("GetGrainActivationCount")]
         Task<int> GetGrainActivationCount(GrainReference grainReference);
+
         /// <summary>
         /// Return the total count of all current grain activations across all silos.
         /// </summary>
         /// <returns>The total number of grain activations across all silos.</returns>
+        [Alias("GetTotalActivationCount")]
         Task<int> GetTotalActivationCount();
 
         /// <summary>
@@ -105,6 +120,7 @@ namespace Orleans.Runtime
         /// <param name="arg">An opaque command argument.
         /// This is an opaque value to the Orleans runtime - the control protocol semantics are decided between the sender and provider.</param>
         /// <returns>Completion promise for this operation.</returns>
+        [Alias("SendControlCommandToProvider")]
         Task<object[]> SendControlCommandToProvider(string providerTypeFullName, string providerName, int command, object arg = null);
 
         /// <summary>
@@ -116,6 +132,7 @@ namespace Orleans.Runtime
         /// </remarks>
         /// <param name="reference">The <see cref="Orleans.Runtime.IAddressable"/> to look up.</param>
         /// <returns>The <see cref="Orleans.Runtime.SiloAddress"/> where the Grain is activated or null if not activated taken from a snapshot of the last known state of the Grain Catalog.</returns>
+        [Alias("GetActivationAddress")]
         ValueTask<SiloAddress> GetActivationAddress(IAddressable reference);
 
         /// <summary>
@@ -123,6 +140,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns>A list of all active grains of the specified type.</returns>
+        [Alias("GetActiveGrains")]
         ValueTask<List<GrainId>> GetActiveGrains(GrainType type);
     }
 }

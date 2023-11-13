@@ -69,18 +69,25 @@ namespace Orleans
     /// Reminder table interface for grain based implementation.
     /// </summary>
     [Unordered]
+    [Alias("Orleans.IReminderTableGrain")]
     internal interface IReminderTableGrain : IGrainWithIntegerKey
     {
+        [Alias("ReadRows")]
         Task<ReminderTableData> ReadRows(GrainId grainId);
 
+        [Alias("ReadRows1")]
         Task<ReminderTableData> ReadRows(uint begin, uint end);
 
+        [Alias("ReadRow")]
         Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName);
 
+        [Alias("UpsertRow")]
         Task<string> UpsertRow(ReminderEntry entry);
 
+        [Alias("RemoveRow")]
         Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag);
 
+        [Alias("TestOnlyClearTable")]
         Task TestOnlyClearTable();
     }
 
@@ -89,6 +96,7 @@ namespace Orleans
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.ReminderTableData")]
     public sealed class ReminderTableData
     {
         /// <summary>
@@ -136,6 +144,7 @@ namespace Orleans
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.ReminderEntry")]
     public sealed class ReminderEntry
     {
         /// <summary>
@@ -182,6 +191,7 @@ namespace Orleans
     }
 
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.ReminderData")]
     internal sealed class ReminderData : IGrainReminder
     {
         [Id(0)]

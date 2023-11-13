@@ -51,6 +51,7 @@ namespace Orleans.Runtime
     }
 
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.SingleRange")]
     internal sealed class SingleRange : IRingRangeInternal, IEquatable<SingleRange>, ISingleRange, ISpanFormattable
     {
         [Id(0)]
@@ -236,6 +237,7 @@ namespace Orleans.Runtime
     }
 
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.GeneralMultiRange")]
     internal sealed class GeneralMultiRange : IRingRangeInternal, ISpanFormattable
     {
         [Id(0)]

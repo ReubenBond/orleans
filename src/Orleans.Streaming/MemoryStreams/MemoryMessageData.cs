@@ -9,6 +9,7 @@ namespace Orleans.Providers
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Providers.MemoryMessageData")]
     public struct MemoryMessageData
     {
         /// <summary>

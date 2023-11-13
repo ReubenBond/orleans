@@ -5,18 +5,22 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.TestKit
 {
-
+    [Alias("Orleans.Transactions.TestKit.IFaultInjectionTransactionTestGrain")]
     public interface IFaultInjectionTransactionTestGrain : IGrainWithGuidKey
     {
         [Transaction(TransactionOption.CreateOrJoin)]
+        [Alias("Set")]
         Task Set(int newValue);
 
         [Transaction(TransactionOption.CreateOrJoin)]
+        [Alias("Add")]
         Task Add(int numberToAdd, FaultInjectionControl faultInjectionControl = null);
 
         [Transaction(TransactionOption.CreateOrJoin)]
+        [Alias("Get")]
         Task<int> Get();
 
+        [Alias("Deactivate")]
         Task Deactivate();
     }
 

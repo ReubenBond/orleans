@@ -8,6 +8,7 @@ namespace Orleans.Runtime;
 /// Represents a directive to update an invalid, cached <see cref="GrainAddress"/> to a valid <see cref="GrainAddress"/>.
 /// </summary>
 [GenerateSerializer, Immutable]
+[Alias("GrainAddressCacheUpdate")]
 public sealed class GrainAddressCacheUpdate : ISpanFormattable
 {
     [Id(0)]

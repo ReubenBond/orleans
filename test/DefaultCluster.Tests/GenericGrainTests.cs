@@ -890,9 +890,11 @@ namespace DefaultCluster.Tests.General
                 Assert.Equal("Hello!", response);
             }
 
+            [Alias("DefaultCluster.Tests.General.Generic.EdgeCases.GenericEdgeCaseTests.IFullySpecifiedGenericInterface`1")]
             public interface IFullySpecifiedGenericInterface<T> : IBasicGrain
             { }
 
+            [Alias("DefaultCluster.Tests.General.Generic.EdgeCases.GenericEdgeCaseTests.IDerivedFromMultipleSpecializationsOfSameInterface")]
             public interface IDerivedFromMultipleSpecializationsOfSameInterface : IFullySpecifiedGenericInterface<int>, IFullySpecifiedGenericInterface<long>
             { }
 

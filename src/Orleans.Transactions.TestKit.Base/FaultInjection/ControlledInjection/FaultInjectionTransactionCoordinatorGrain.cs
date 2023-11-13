@@ -4,12 +4,15 @@ using System.Threading.Tasks;
 
 namespace Orleans.Transactions.TestKit
 {
+    [Alias("Orleans.Transactions.TestKit.IFaultInjectionTransactionCoordinatorGrain")]
     public interface IFaultInjectionTransactionCoordinatorGrain : IGrainWithGuidKey
     {
         [Transaction(TransactionOption.Create)]
+        [Alias("MultiGrainSet")]
         Task MultiGrainSet(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd);
 
         [Transaction(TransactionOption.Create)]
+        [Alias("MultiGrainAddAndFaultInjection")]
         Task MultiGrainAddAndFaultInjection(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd, 
             FaultInjectionControl faultInjection = null);
     }

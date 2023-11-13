@@ -36,6 +36,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.Codecs.SortedSetSurrogate`1")]
     public struct SortedSetSurrogate<T>
     {
         /// <summary>

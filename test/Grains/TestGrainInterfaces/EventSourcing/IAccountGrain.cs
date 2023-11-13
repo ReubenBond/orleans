@@ -3,14 +3,19 @@
     /// <summary>
     /// A grain that models a bank account
     /// </summary>
+    [Alias("TestGrainInterfaces.IAccountGrain")]
     public interface IAccountGrain : IGrainWithStringKey
     {
+        [Alias("Balance")]
         Task<uint> Balance();
 
+        [Alias("Deposit")]
         Task Deposit(uint amount, Guid guid, string desc);
 
+        [Alias("Withdraw")]
         Task<bool> Withdraw(uint amount, Guid guid, string desc);
 
+        [Alias("GetTransactionLog")]
         Task<IReadOnlyList<Transaction>> GetTransactionLog();
     }
 
@@ -21,6 +26,7 @@
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("TestGrainInterfaces.Transaction")]
     public abstract class Transaction
     {
         /// <summary> A unique identifier for this transaction  </summary>
@@ -38,6 +44,7 @@
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("TestGrainInterfaces.DepositTransaction")]
     public class DepositTransaction : Transaction
     {
         [Id(0)]
@@ -46,6 +53,7 @@
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("TestGrainInterfaces.WithdrawalTransaction")]
     public class WithdrawalTransaction : Transaction
     {
         [Id(0)]

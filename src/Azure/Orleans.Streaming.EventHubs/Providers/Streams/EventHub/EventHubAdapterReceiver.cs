@@ -286,6 +286,7 @@ namespace Orleans.Streaming.EventHubs
         }
 
         [GenerateSerializer]
+        [Alias("Orleans.Streaming.EventHubs.EventHubAdapterReceiver.StreamActivityNotificationBatch")]
         internal class StreamActivityNotificationBatch : IBatchContainer
         {
             [Id(0)]

@@ -35,6 +35,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.Unrecognized")]
     public class Unrecognized
     {
         [Id(0)]
@@ -45,6 +46,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.ClassWithCustomSerializer")]
     public class ClassWithCustomSerializer
     {
         [Id(0)]

@@ -4,6 +4,7 @@ namespace TesterInternal
 {
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TesterInternal.GrainStateContainingGrainReferences")]
     public class GrainStateContainingGrainReferences
     {
         [Orleans.Id(0)]

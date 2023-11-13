@@ -37,6 +37,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.PersistenceTestGrainState")]
     public class PersistenceTestGrainState
     {
         public PersistenceTestGrainState()
@@ -54,6 +55,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.PersistenceGenericGrainState`1")]
     public class PersistenceGenericGrainState<T>
     {
         [Id(0)]
@@ -567,6 +569,7 @@ namespace UnitTests.Grains
 
         [Serializable]
         [GenerateSerializer]
+        [Alias("UnitTests.Grains.MemoryStorageTestGrain.NestedPersistenceTestGrainState")]
         public class NestedPersistenceTestGrainState
         {
             [Id(0)]
@@ -580,6 +583,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.UserState")]
     public class UserState
     {
         public UserState()
@@ -597,6 +601,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.DerivedUserState")]
     public class DerivedUserState : UserState
     {
         [Id(0)]
@@ -671,6 +676,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.StateForIReentrentGrain")]
     public class StateForIReentrentGrain
     {
         public StateForIReentrentGrain()
@@ -1016,6 +1022,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.InternalGrainStateData")]
     public class InternalGrainStateData
     {
         [Id(0)]
@@ -1047,6 +1054,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.StateInheritanceTestGrainData")]
     public class StateInheritanceTestGrainData : IBaseStateData
     {
         [Id(0)]
@@ -1130,6 +1138,7 @@ namespace UnitTests.Grains
     }
 
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.ExternalTypeWithoutPublicConstructorSurrogate")]
     public struct ExternalTypeWithoutPublicConstructorSurrogate
     {
         [Id(0)] public int Field1;
@@ -1179,6 +1188,7 @@ namespace UnitTests.Grains
     }
 
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.RecordTypeWithoutPublicParameterlessConstructor")]
     public record class RecordTypeWithoutPublicParameterlessConstructor
     (
         [property: Id(0)] int Field

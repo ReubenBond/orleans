@@ -7,6 +7,7 @@ namespace Orleans.Reminders.Redis
     /// Exception thrown from <see cref="RedisReminderTable"/>.
     /// </summary>
     [GenerateSerializer]
+    [Alias("Orleans.Reminders.Redis.RedisRemindersException")]
     public class RedisRemindersException : Exception
     {
         /// <summary>

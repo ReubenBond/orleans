@@ -7,6 +7,7 @@ namespace Orleans
     /// Observers are used to receive notifications from grains; that is, they represent the subscriber side of a 
     /// publisher/subscriber interface.
     /// </summary>
+    [Alias("Orleans.IGrainObserver")]
     public interface IGrainObserver : IAddressable
     {
     }

@@ -9,6 +9,7 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streams.QueueCacheMissException")]
     public sealed class QueueCacheMissException : DataNotAvailableException
     {
         private const string MESSAGE_FORMAT = "Item not found in cache.  Requested: {0}, Low: {1}, High: {2}";

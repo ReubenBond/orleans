@@ -10,6 +10,7 @@ namespace Orleans.Runtime
     [Serializable]
     [Immutable]
     [GenerateSerializer]
+    [Alias("Orleans.Runtime.GuidId")]
     public sealed class GuidId : IEquatable<GuidId>, IComparable<GuidId>, ISerializable
     {
         private static readonly Interner<Guid, GuidId> guidIdInternCache = new Interner<Guid, GuidId>(InternerConstants.SIZE_LARGE);

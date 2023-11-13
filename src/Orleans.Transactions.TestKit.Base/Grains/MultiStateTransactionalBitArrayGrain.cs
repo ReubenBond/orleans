@@ -13,6 +13,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.TestKit.Correctnesss.BitArrayState")]
     public class BitArrayState
     {
         protected bool Equals(BitArrayState other)

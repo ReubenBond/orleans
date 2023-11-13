@@ -8,6 +8,7 @@ namespace Orleans.Runtime
 {
     [Serializable, GenerateSerializer, Immutable]
     [SuppressReferenceTracking]
+    [Alias("Orleans.Runtime.UniqueKey")]
     public sealed class UniqueKey : IComparable<UniqueKey>, IEquatable<UniqueKey>
     {
         /// <summary>

@@ -8,6 +8,7 @@ using Orleans.Transactions.State;
 namespace Orleans.Transactions.TestKit
 {
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.TestKit.FaultInjectionControl")]
     public class FaultInjectionControl
     {
         [Id(0)]

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 namespace Orleans.Serialization.Invocation
 {
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.Invocation.UnitTestRequestBase")]
     public abstract class UnitTestRequestBase : IInvokable
     {
         public virtual int GetArgumentCount() => 0;
@@ -26,6 +27,7 @@ namespace Orleans.Serialization.Invocation
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.Invocation.UnitTestRequest")]
     public abstract class UnitTestRequest : UnitTestRequestBase
     {
         public sealed override ValueTask<Response> Invoke()
@@ -65,6 +67,7 @@ namespace Orleans.Serialization.Invocation
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.Invocation.UnitTestRequest`1")]
     public abstract class UnitTestRequest<TResult> : UnitTestRequestBase
     {
         public sealed override ValueTask<Response> Invoke()
@@ -103,6 +106,7 @@ namespace Orleans.Serialization.Invocation
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.Invocation.UnitTestTaskRequest`1")]
     public abstract class UnitTestTaskRequest<TResult> : UnitTestRequestBase
     {
         public sealed override ValueTask<Response> Invoke()
@@ -142,6 +146,7 @@ namespace Orleans.Serialization.Invocation
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.Invocation.UnitTestTaskRequest")]
     public abstract class UnitTestTaskRequest : UnitTestRequestBase
     {
         public sealed override ValueTask<Response> Invoke()
@@ -182,6 +187,7 @@ namespace Orleans.Serialization.Invocation
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.Invocation.UnitTestVoidRequest")]
     public abstract class UnitTestVoidRequest : UnitTestRequestBase
     {
         public sealed override ValueTask<Response> Invoke()

@@ -5,9 +5,12 @@ using Orleans.Runtime;
 
 namespace Orleans.BroadcastChannel
 {
+    [Alias("Orleans.BroadcastChannel.IBroadcastChannelConsumerExtension")]
     internal interface IBroadcastChannelConsumerExtension : IGrainExtension
     {
+        [Alias("OnError")]
         Task OnError(InternalChannelId streamId, Exception exception);
+        [Alias("OnPublished")]
         Task OnPublished(InternalChannelId streamId, object item);
     }
 

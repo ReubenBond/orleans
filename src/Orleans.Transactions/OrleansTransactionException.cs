@@ -9,6 +9,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.OrleansTransactionException")]
     public class OrleansTransactionException : OrleansException
     {
         public OrleansTransactionException() : base("Orleans transaction error.") { }
@@ -28,6 +29,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.OrleansTransactionsDisabledException")]
     public sealed class OrleansTransactionsDisabledException : OrleansTransactionException
     {
         public OrleansTransactionsDisabledException()
@@ -46,6 +48,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.OrleansStartTransactionFailedException")]
     public sealed class OrleansStartTransactionFailedException : OrleansTransactionException
     {
         public OrleansStartTransactionFailedException(Exception innerException)
@@ -64,6 +67,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.OrleansTransactionOverloadException")]
     public sealed class OrleansTransactionOverloadException : OrleansTransactionException
     {
         public OrleansTransactionOverloadException()
@@ -78,6 +82,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.OrleansTransactionInDoubtException")]
     public sealed class OrleansTransactionInDoubtException : OrleansTransactionException
     {
         [Id(0)]
@@ -116,6 +121,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.OrleansTransactionAbortedException")]
     public class OrleansTransactionAbortedException : OrleansTransactionException
     {
         /// <summary>
@@ -158,6 +164,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.OrleansCascadingAbortException")]
     public sealed class OrleansCascadingAbortException : OrleansTransactionTransientFailureException
     {
         [Id(0)]
@@ -197,6 +204,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.OrleansOrphanCallException")]
     public sealed class OrleansOrphanCallException : OrleansTransactionAbortedException
     {
         public OrleansOrphanCallException(string transactionId, int pendingCalls)
@@ -217,6 +225,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.OrleansReadOnlyViolatedException")]
     public sealed class OrleansReadOnlyViolatedException : OrleansTransactionAbortedException
     {
         public OrleansReadOnlyViolatedException(string transactionId)
@@ -232,6 +241,7 @@ namespace Orleans.Transactions
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.OrleansTransactionServiceNotAvailableException")]
     public sealed class OrleansTransactionServiceNotAvailableException : OrleansTransactionException
     {
         public OrleansTransactionServiceNotAvailableException() : base("Transaction service not available")
@@ -249,6 +259,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.OrleansBrokenTransactionLockException")]
     public sealed class OrleansBrokenTransactionLockException : OrleansTransactionTransientFailureException
     {
         public OrleansBrokenTransactionLockException(string transactionId, string situation)
@@ -272,6 +283,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.OrleansTransactionLockUpgradeException")]
     public sealed class OrleansTransactionLockUpgradeException : OrleansTransactionTransientFailureException
     {
         public OrleansTransactionLockUpgradeException(string transactionId) :
@@ -290,6 +302,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.OrleansTransactionPrepareTimeoutException")]
     public sealed class OrleansTransactionPrepareTimeoutException : OrleansTransactionTransientFailureException
     {
         public OrleansTransactionPrepareTimeoutException(string transactionId, Exception innerException)
@@ -309,6 +322,7 @@ namespace Orleans.Transactions
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.OrleansTransactionTransientFailureException")]
     public class OrleansTransactionTransientFailureException : OrleansTransactionAbortedException
     {
         public OrleansTransactionTransientFailureException(string transactionId, string msg, Exception innerException)

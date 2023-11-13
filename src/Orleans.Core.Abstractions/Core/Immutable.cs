@@ -13,6 +13,7 @@ namespace Orleans.Concurrency
     /// </remarks>
     /// <typeparam name="T">Type of data to be wrapped by this Immutable</typeparam>
     [GenerateSerializer, Immutable]
+    [Alias("Orleans.Concurrency.Immutable`1")]
     public readonly struct Immutable<T>
     {
         /// <summary> Return reference to the original value stored in this Immutable wrapper. </summary>

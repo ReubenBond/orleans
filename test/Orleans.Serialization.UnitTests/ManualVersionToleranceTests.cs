@@ -327,6 +327,7 @@ namespace Orleans.Serialization.UnitTests
         }
 
         [GenerateSerializer]
+        [Alias("Orleans.Serialization.UnitTests.ManualVersionToleranceTests.ObjectWithNewField")]
         public class ObjectWithNewField
         {
             [Id(0)]
@@ -363,6 +364,7 @@ namespace Orleans.Serialization.UnitTests
 
 
         [GenerateSerializer]
+        [Alias("Orleans.Serialization.UnitTests.ManualVersionToleranceTests.ObjectWithoutNewField")]
         public class ObjectWithoutNewField
         {
             [Id(0)]

@@ -9,6 +9,7 @@ namespace Orleans.Streams
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streams.StreamSubscriptionHandleImpl`1")]
     internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamSubscriptionHandle 
     {
         [Id(0)]

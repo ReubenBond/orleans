@@ -7,6 +7,7 @@ using Orleans.Transactions.Abstractions;
 namespace Orleans.Transactions
 {
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Transactions.ParticipantId")]
     public readonly struct ParticipantId
     {
         public static readonly IEqualityComparer<ParticipantId> Comparer = new IdComparer();
@@ -42,6 +43,7 @@ namespace Orleans.Transactions
         }
 
         [GenerateSerializer, Immutable]
+        [Alias("Orleans.Transactions.ParticipantId.IdComparer")]
         public sealed class IdComparer : IEqualityComparer<ParticipantId>
         {
             public bool Equals(ParticipantId x, ParticipantId y)

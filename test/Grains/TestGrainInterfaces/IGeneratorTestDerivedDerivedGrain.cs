@@ -2,6 +2,7 @@
 {
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.ReplaceArguments")]
     public class ReplaceArguments
     {
         [Orleans.Id(0)]
@@ -16,9 +17,12 @@
         }
     }
 
+    [Alias("UnitTests.GrainInterfaces.IGeneratorTestDerivedDerivedGrain")]
     public interface IGeneratorTestDerivedDerivedGrain : IGeneratorTestDerivedGrain2
     {
+        [Alias("StringNConcat")]
         Task<string> StringNConcat(string[] strArray);
+        [Alias("StringReplace")]
         Task<string> StringReplace(ReplaceArguments strs);
     }
 }

@@ -24,6 +24,7 @@ namespace ServiceBus.Tests.MonitorTests
 
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("ServiceBus.Tests.MonitorTests.ObjectPoolMonitorCounters")]
     public class ObjectPoolMonitorCounters
     {
         [Orleans.Id(0)]

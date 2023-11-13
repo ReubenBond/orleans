@@ -6,6 +6,7 @@ namespace Orleans.Versions.Selector
     /// Grain interface version selector which always selects the lowest compatible version.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable, SuppressReferenceTracking]
+    [Alias("Orleans.Versions.Selector.MinimumVersion")]
     public sealed class MinimumVersion : VersionSelectorStrategy
     {
         /// <summary>

@@ -62,12 +62,14 @@ namespace Orleans.Runtime.Development
         }
     }
 
+    [Alias("Orleans.Runtime.Development.IDevelopmentLeaseProviderGrain")]
     internal interface IDevelopmentLeaseProviderGrain : ILeaseProvider, IGrainWithIntegerKey
     {
         /// <summary>
         /// Forgets about all leases.  Used to simulate loss of this grain or to force rebalance of queues
         /// </summary>
         /// <returns></returns>
+        [Alias("Reset")]
         Task Reset();
     }
 

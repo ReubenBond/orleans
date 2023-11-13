@@ -10,6 +10,7 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Providers.Streams.Common.EventSequenceToken")]
     public class EventSequenceToken : StreamSequenceToken
     {
         /// <summary>

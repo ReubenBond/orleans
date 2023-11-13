@@ -48,6 +48,7 @@ namespace Orleans.Transactions.TestKit
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.TestKit.PassOperation")]
     public class PassOperation : ITransactionCommitOperation<IRemoteCommitService>
     {
         [Id(0)]
@@ -66,6 +67,7 @@ namespace Orleans.Transactions.TestKit
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.TestKit.FailOperation")]
     public class FailOperation : ITransactionCommitOperation<IRemoteCommitService>
     {
         [Id(0)]
@@ -84,6 +86,7 @@ namespace Orleans.Transactions.TestKit
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.TestKit.ThrowOperation")]
     public class ThrowOperation : ITransactionCommitOperation<IRemoteCommitService>
     {
         [Id(0)]

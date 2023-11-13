@@ -9,6 +9,7 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streams.DataNotAvailableException")]
     public class DataNotAvailableException : OrleansException
     {
         /// <summary>
@@ -45,6 +46,7 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streams.CacheFullException")]
     public sealed class CacheFullException : OrleansException
     {
         /// <summary>

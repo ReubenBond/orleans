@@ -13,6 +13,7 @@ namespace Orleans.Streaming.EventHubs
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streaming.EventHubs.EventHubSequenceTokenV2")]
     public class EventHubSequenceTokenV2 : EventHubSequenceToken
     {
         /// <summary>

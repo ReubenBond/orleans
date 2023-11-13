@@ -10,6 +10,7 @@ namespace UnitTests.Grains
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.StreamReliabilityTestGrainState")]
     public class StreamReliabilityTestGrainState
     {
         // For producer and consumer

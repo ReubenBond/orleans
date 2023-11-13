@@ -14,6 +14,7 @@ namespace OrleansAWSUtils.Streams
 {
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Orleans.Alias("OrleansAWSUtils.Streams.SQSBatchContainer")]
     internal class SQSBatchContainer : IBatchContainer
     {
         [JsonProperty]

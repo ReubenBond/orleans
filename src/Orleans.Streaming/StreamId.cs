@@ -14,6 +14,7 @@ namespace Orleans.Runtime
     [Immutable]
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Runtime.StreamId")]
     public readonly struct StreamId : IEquatable<StreamId>, IComparable<StreamId>, ISerializable, ISpanFormattable
     {
         [Id(0)]

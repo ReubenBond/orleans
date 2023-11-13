@@ -9,6 +9,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
     [JsonConverter(typeof(MembershipVersionConverter))]
+    [Alias("Orleans.Runtime.MembershipVersion")]
     public readonly struct MembershipVersion : IComparable<MembershipVersion>, IEquatable<MembershipVersion>
     {
         /// <summary>

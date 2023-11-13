@@ -41,6 +41,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.Codecs.ConcurrentDictionarySurrogate`2")]
     public struct ConcurrentDictionarySurrogate<TKey, TValue>
     {
         /// <summary>

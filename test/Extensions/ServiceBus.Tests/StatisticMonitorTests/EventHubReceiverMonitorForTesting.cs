@@ -29,6 +29,7 @@ namespace ServiceBus.Tests.MonitorTests
 
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("ServiceBus.Tests.MonitorTests.EventHubReceiverMonitorCounters")]
     public class EventHubReceiverMonitorCounters 
     {
         [Orleans.Id(0)]

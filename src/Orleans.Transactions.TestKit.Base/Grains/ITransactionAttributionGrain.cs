@@ -4,44 +4,58 @@ using System.Threading.Tasks;
 
 namespace Orleans.Transactions.TestKit
 {
+    [Alias("Orleans.Transactions.TestKit.INoAttributionGrain")]
     public interface INoAttributionGrain : IGrainWithGuidKey
     {
+        [Alias("GetNestedTransactionIds")]
         Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
+    [Alias("Orleans.Transactions.TestKit.ISuppressAttributionGrain")]
     public interface ISuppressAttributionGrain : IGrainWithGuidKey
     {
         [Transaction(TransactionOption.Suppress)]
+        [Alias("GetNestedTransactionIds")]
         Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
+    [Alias("Orleans.Transactions.TestKit.ICreateOrJoinAttributionGrain")]
     public interface ICreateOrJoinAttributionGrain : IGrainWithGuidKey
     {
         [Transaction(TransactionOption.CreateOrJoin)]
+        [Alias("GetNestedTransactionIds")]
         Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
+    [Alias("Orleans.Transactions.TestKit.ICreateAttributionGrain")]
     public interface ICreateAttributionGrain : IGrainWithGuidKey
     {
         [Transaction(TransactionOption.Create)]
+        [Alias("GetNestedTransactionIds")]
         Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
+    [Alias("Orleans.Transactions.TestKit.IJoinAttributionGrain")]
     public interface IJoinAttributionGrain : IGrainWithGuidKey
     {
         [Transaction(TransactionOptionAlias.Mandatory)]
+        [Alias("GetNestedTransactionIds")]
         Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
+    [Alias("Orleans.Transactions.TestKit.ISupportedAttributionGrain")]
     public interface ISupportedAttributionGrain : IGrainWithGuidKey
     {
         [Transaction(TransactionOption.Supported)]
+        [Alias("GetNestedTransactionIds")]
         Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
+    [Alias("Orleans.Transactions.TestKit.INotAllowedAttributionGrain")]
     public interface INotAllowedAttributionGrain : IGrainWithGuidKey
     {
         [Transaction(TransactionOption.NotAllowed)]
+        [Alias("GetNestedTransactionIds")]
         Task<List<string>[]> GetNestedTransactionIds(int tier, List<ITransactionAttributionGrain>[] tiers);
     }
 
@@ -79,6 +93,7 @@ namespace Orleans.Transactions.TestKit
         }
 
         [GenerateSerializer]
+        [Alias("Orleans.Transactions.TestKit.TransactionAttributionGrainExtensions.NoAttributionGrain")]
         public class NoAttributionGrain : ITransactionAttributionGrain
         {
             [Id(0)]
@@ -96,6 +111,7 @@ namespace Orleans.Transactions.TestKit
         }
 
         [GenerateSerializer]
+        [Alias("Orleans.Transactions.TestKit.TransactionAttributionGrainExtensions.SuppressAttributionGrain")]
         public class SuppressAttributionGrain : ITransactionAttributionGrain
         {
             [Id(0)]
@@ -113,6 +129,7 @@ namespace Orleans.Transactions.TestKit
         }
 
         [GenerateSerializer]
+        [Alias("Orleans.Transactions.TestKit.TransactionAttributionGrainExtensions.CreateOrJoinAttributionGrain")]
         public class CreateOrJoinAttributionGrain : ITransactionAttributionGrain
         {
             [Id(0)]
@@ -130,6 +147,7 @@ namespace Orleans.Transactions.TestKit
         }
 
         [GenerateSerializer]
+        [Alias("Orleans.Transactions.TestKit.TransactionAttributionGrainExtensions.CreateAttributionGrain")]
         public class CreateAttributionGrain : ITransactionAttributionGrain
         {
             [Id(0)]
@@ -147,6 +165,7 @@ namespace Orleans.Transactions.TestKit
         }
 
         [GenerateSerializer]
+        [Alias("Orleans.Transactions.TestKit.TransactionAttributionGrainExtensions.JoinAttributionGrain")]
         public class JoinAttributionGrain : ITransactionAttributionGrain
         {
             [Id(0)]
@@ -164,6 +183,7 @@ namespace Orleans.Transactions.TestKit
         }
 
         [GenerateSerializer]
+        [Alias("Orleans.Transactions.TestKit.TransactionAttributionGrainExtensions.SupportedAttributionGrain")]
         public class SupportedAttributionGrain : ITransactionAttributionGrain
         {
             [Id(0)]
@@ -181,6 +201,7 @@ namespace Orleans.Transactions.TestKit
         }
 
         [GenerateSerializer]
+        [Alias("Orleans.Transactions.TestKit.TransactionAttributionGrainExtensions.NotAllowedAttributionGrain")]
         public class NotAllowedAttributionGrain : ITransactionAttributionGrain
         {
             [Id(0)]

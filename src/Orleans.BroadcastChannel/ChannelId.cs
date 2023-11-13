@@ -12,6 +12,7 @@ namespace Orleans.BroadcastChannel
     /// Identifies a Channel within a provider
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.BroadcastChannel.ChannelId")]
     public readonly struct ChannelId : IEquatable<ChannelId>, IComparable<ChannelId>, ISerializable, ISpanFormattable
     {
         [Id(0)]
@@ -210,6 +211,7 @@ namespace Orleans.BroadcastChannel
     }
 
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.BroadcastChannel.InternalChannelId")]
     internal readonly struct InternalChannelId : IEquatable<InternalChannelId>, IComparable<InternalChannelId>, ISerializable, ISpanFormattable
     {
         [Id(0)]

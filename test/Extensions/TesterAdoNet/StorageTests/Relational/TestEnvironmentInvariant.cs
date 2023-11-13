@@ -12,6 +12,7 @@ namespace UnitTests.StorageTests.Relational
     [Serializable]
     [DebuggerDisplay("StorageInvariant = {StorageInvariant}, ConnectionString = {ConnectionString}")]
     [Orleans.GenerateSerializer]
+    [Alias("UnitTests.StorageTests.Relational.StorageConnection")]
     public struct StorageConnection
     {
         [Orleans.Id(0)]
@@ -23,6 +24,7 @@ namespace UnitTests.StorageTests.Relational
 
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("UnitTests.StorageTests.Relational.TestEnvironmentSettings")]
     public class TestEnvironmentSettings
     {
         [Orleans.Id(0)]

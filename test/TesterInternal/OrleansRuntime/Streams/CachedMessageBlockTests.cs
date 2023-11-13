@@ -17,6 +17,7 @@ namespace UnitTests.OrleansRuntime.Streams
         }
 
         [GenerateSerializer]
+        [Alias("UnitTests.OrleansRuntime.Streams.CachedMessageBlockTests.TestBatchContainer")]
         public class TestBatchContainer : IBatchContainer
         {
             [Id(0)]

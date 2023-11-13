@@ -3,6 +3,7 @@ using System;
 namespace Orleans.Runtime
 {
     [Id(102), GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.RejectionResponse")]
     internal sealed class RejectionResponse
     {
         [Id(0)]

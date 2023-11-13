@@ -8,6 +8,7 @@ namespace AWSUtils.Tests.StorageTests
 {
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("AWSUtils.Tests.StorageTests.UnitTestDynamoDBTableData")]
     internal class UnitTestDynamoDBTableData
     {
         private const string DATA_FIELD = "Data";

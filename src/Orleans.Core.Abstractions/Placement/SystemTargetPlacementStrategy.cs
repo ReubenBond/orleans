@@ -4,6 +4,7 @@ namespace Orleans.Runtime
     /// The placement strategy used by system targets.
     /// </summary>
     [GenerateSerializer, Immutable, SuppressReferenceTracking]
+    [Alias("Orleans.Runtime.SystemTargetPlacementStrategy")]
     public sealed class SystemTargetPlacementStrategy : PlacementStrategy
     {
         public static SystemTargetPlacementStrategy Instance { get; } = new();

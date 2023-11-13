@@ -56,6 +56,7 @@ namespace Orleans.EventSourcing
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.EventSourcing.ProtocolTransportException")]
     public sealed class ProtocolTransportException : OrleansException
     {
         public ProtocolTransportException()

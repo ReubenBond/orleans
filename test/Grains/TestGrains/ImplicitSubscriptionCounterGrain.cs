@@ -12,6 +12,7 @@ namespace UnitTests.Grains
         private bool deactivateOnEvent;
 
         [GenerateSerializer]
+        [Alias("UnitTests.Grains.ImplicitSubscriptionCounterGrain.MyState")]
         public class MyState
         {
             [Id(0)]

@@ -2,6 +2,7 @@ namespace Benchmarks.Models
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("Benchmarks.Models.SimpleStruct")]
     public struct SimpleStruct
     {
         [Id(0)]

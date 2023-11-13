@@ -3,35 +3,47 @@ using Orleans.Streams;
 
 namespace UnitTests.GrainInterfaces
 {
+    [Alias("UnitTests.GrainInterfaces.IStreaming_ConsumerGrain")]
     public interface IStreaming_ConsumerGrain : IGrainWithGuidKey
     {
+        [Alias("BecomeConsumer")]
         Task BecomeConsumer(Guid streamId, string providerToUse, string streamNamespace);
+        [Alias("StopBeingConsumer")]
         Task StopBeingConsumer();
+        [Alias("GetItemsConsumed")]
         Task<int> GetItemsConsumed();
+        [Alias("GetConsumerCount")]
         Task<int> GetConsumerCount();
+        [Alias("DeactivateConsumerOnIdle")]
         Task DeactivateConsumerOnIdle();
     }
 
+    [Alias("UnitTests.GrainInterfaces.IPersistentStreaming_ProducerGrain")]
     public interface IPersistentStreaming_ProducerGrain : IStreaming_ProducerGrain
     {
     }
 
+    [Alias("UnitTests.GrainInterfaces.IPersistentStreaming_ConsumerGrain")]
     public interface IPersistentStreaming_ConsumerGrain : IStreaming_ConsumerGrain
     {
     }
 
+    [Alias("UnitTests.GrainInterfaces.IStreaming_ProducerConsumerGrain")]
     public interface IStreaming_ProducerConsumerGrain : IGrainWithIntegerKey, IStreaming_ProducerGrain, IStreaming_ConsumerGrain
     {
     }
 
+    [Alias("UnitTests.GrainInterfaces.IStreaming_Reentrant_ProducerConsumerGrain")]
     public interface IStreaming_Reentrant_ProducerConsumerGrain : IGrainWithIntegerKey, IStreaming_ProducerGrain, IStreaming_ConsumerGrain
     {
     }
 
+    [Alias("UnitTests.GrainInterfaces.IStreaming_ImplicitlySubscribedConsumerGrain")]
     public interface IStreaming_ImplicitlySubscribedConsumerGrain : IGrainWithIntegerKey, IStreaming_ConsumerGrain
     {
     }
 
+    [Alias("UnitTests.GrainInterfaces.IStreaming_ImplicitlySubscribedGenericConsumerGrain`1")]
     public interface IStreaming_ImplicitlySubscribedGenericConsumerGrain<T> : IGrainWithIntegerKey, IStreaming_ConsumerGrain
     {
     }
@@ -41,6 +53,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.Streaming_ProducerGrain_State")]
     public class Streaming_ProducerGrain_State
     {
         [Id(0)]
@@ -49,6 +62,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.Streaming_ConsumerGrain_State")]
     public class Streaming_ConsumerGrain_State
     {
         [Id(0)]
@@ -57,6 +71,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.Streaming_ProducerConsumerGrain_State")]
     public class Streaming_ProducerConsumerGrain_State
     {
         [Id(0)]

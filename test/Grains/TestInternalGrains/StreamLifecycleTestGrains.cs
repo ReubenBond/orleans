@@ -10,6 +10,7 @@ namespace UnitTests.Grains
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.StreamLifecycleTestGrainState")]
     public class StreamLifecycleTestGrainState
     {
         // For producer and consumer
@@ -386,6 +387,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.MyStreamObserver`1")]
     public class MyStreamObserver<T> : IAsyncObserver<T>
     {
         [Id(0)]

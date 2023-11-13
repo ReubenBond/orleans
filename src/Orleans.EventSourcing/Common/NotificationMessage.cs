@@ -20,6 +20,7 @@ namespace Orleans.EventSourcing.Common
     /// <summary>A simple notification message containing only the version.</summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.EventSourcing.Common.VersionNotificationMessage")]
     public sealed class VersionNotificationMessage : INotificationMessage
     {
         /// <inheritdoc/>
@@ -31,6 +32,7 @@ namespace Orleans.EventSourcing.Common
     /// <summary>A notification message containing a batch of notification messages.</summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.EventSourcing.Common.BatchedNotificationMessage")]
     public sealed class BatchedNotificationMessage : INotificationMessage
     {
         /// <summary>The notification messages contained in this batch.</summary>

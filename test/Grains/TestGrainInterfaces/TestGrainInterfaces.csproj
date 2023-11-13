@@ -3,6 +3,7 @@
     <RootNamespace>UnitTests.GrainInterfaces</RootNamespace>
     <TargetFramework>$(MinTestTargetFramework)</TargetFramework>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <Orleans_AttachDebugger>false</Orleans_AttachDebugger>
   </PropertyGroup>
 
   <ItemGroup>

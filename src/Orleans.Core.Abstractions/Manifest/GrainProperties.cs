@@ -11,6 +11,7 @@ namespace Orleans.Metadata
     /// Information about a logical grain type <see cref="GrainType"/>.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Metadata.GrainProperties")]
     public sealed class GrainProperties
     {
         /// <summary>

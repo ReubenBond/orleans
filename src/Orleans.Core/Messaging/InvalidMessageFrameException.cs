@@ -9,6 +9,7 @@ namespace Orleans.Runtime.Messaging;
 /// Indicates that a message frame is invalid, either when sending a message or receiving a message.
 /// </summary>
 [GenerateSerializer]
+[Alias("InvalidMessageFrameException")]
 public sealed class InvalidMessageFrameException : OrleansException
 {
     /// <summary>

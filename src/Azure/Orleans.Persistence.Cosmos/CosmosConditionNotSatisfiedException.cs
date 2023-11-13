@@ -8,6 +8,7 @@ namespace Orleans.Persistence.Cosmos;
 /// </summary>
 [Serializable]
 [GenerateSerializer]
+[Alias("CosmosConditionNotSatisfiedException")]
 public class CosmosConditionNotSatisfiedException : InconsistentStateException
 {
     private const string DefaultMessageFormat = "Cosmos DB condition not satisfied. GrainType: {0}, GrainId: {1}, TableName: {2}, StoredETag: {3}, CurrentETag: {4}";

@@ -44,6 +44,7 @@ namespace Orleans.Transactions.Abstractions
     /// </summary>
     [GenerateSerializer]
     [Serializable]
+    [Alias("Orleans.Transactions.Abstractions.AccessCounter")]
     public struct AccessCounter
     {
         [Id(0)]

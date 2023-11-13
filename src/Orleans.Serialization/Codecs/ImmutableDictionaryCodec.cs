@@ -37,6 +37,7 @@ namespace Orleans.Serialization.Codecs
     /// <typeparam name="TKey">The key type.</typeparam>
     /// <typeparam name="TValue">The value type.</typeparam>
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.Codecs.ImmutableDictionarySurrogate`2")]
     public struct ImmutableDictionarySurrogate<TKey, TValue>
     {
         /// <summary>

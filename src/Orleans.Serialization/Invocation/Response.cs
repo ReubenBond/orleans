@@ -66,6 +66,7 @@ namespace Orleans.Serialization.Invocation
     /// Represents a completed <see cref="Response"/>.
     /// </summary>
     [GenerateSerializer, Immutable, UseActivator, SuppressReferenceTracking]
+    [Alias("Orleans.Serialization.Invocation.CompletedResponse")]
     public sealed class CompletedResponse : Response
     {
         /// <summary>
@@ -103,6 +104,7 @@ namespace Orleans.Serialization.Invocation
     /// A <see cref="Response"/> which represents an exception, a broken promise.
     /// </summary>
     [GenerateSerializer, Immutable]
+    [Alias("Orleans.Serialization.Invocation.ExceptionResponse")]
     public sealed class ExceptionResponse : Response
     {
         /// <inheritdoc/>

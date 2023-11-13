@@ -29,6 +29,7 @@ namespace UnitTests.Grains
     }
 
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.ThirdGrainState")]
     public class ThirdGrainState
     {
     }

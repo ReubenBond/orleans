@@ -6,6 +6,7 @@ namespace Orleans.Runtime
     /// Represents a cluster member.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.ClusterMember")]
     public sealed class ClusterMember : IEquatable<ClusterMember>
     {                
         /// <summary>

@@ -8,6 +8,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Runtime.GrainExtensionNotInstalledException")]
     public sealed class GrainExtensionNotInstalledException : OrleansException
     {
         /// <summary>

@@ -13,6 +13,7 @@ namespace Orleans.Streams
     /// Use <see cref="StreamId"/> where possible, instead.
     /// </remarks>
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Streams.StreamIdentity")]
     public sealed class StreamIdentity : IStreamIdentity
     {
         /// <summary>

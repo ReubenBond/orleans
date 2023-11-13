@@ -6,6 +6,7 @@ namespace UnitTests.GrainInterfaces
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.ValueTypeTestData")]
     public struct ValueTypeTestData
     {
         [Id(0)]
@@ -39,6 +40,7 @@ namespace UnitTests.GrainInterfaces
     }
 
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.ClassWithEnumTestData")]
     public class ClassWithEnumTestData
     {
         [Id(0)]
@@ -51,6 +53,7 @@ namespace UnitTests.GrainInterfaces
     [ProtoContract]
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.LargeTestData")]
     public class LargeTestData
     {
         [ProtoMember(1)]
@@ -112,6 +115,7 @@ namespace UnitTests.GrainInterfaces
         // nested generic classes. If it doesn't, then the generated serializer for this class will fail to compile.
         [Serializable]
         [GenerateSerializer]
+        [Alias("UnitTests.GrainInterfaces.LargeTestData.NestedGeneric`1")]
         public class NestedGeneric<T>
         {
             [Id(0)]
@@ -138,31 +142,41 @@ namespace UnitTests.GrainInterfaces
         }
     }
 
+    [Alias("UnitTests.GrainInterfaces.IValueTypeTestGrain")]
     public interface IValueTypeTestGrain : IGrainWithGuidKey
     {
+        [Alias("GetStateData")]
         Task<ValueTypeTestData> GetStateData();
 
+        [Alias("SetStateData")]
         Task SetStateData(ValueTypeTestData d);
     }
 
+    [Alias("UnitTests.GrainInterfaces.IRoundtripSerializationGrain")]
     public interface IRoundtripSerializationGrain : IGrainWithIntegerKey
     {
+        [Alias("GetEnemyType")]
         Task<CampaignEnemyTestType> GetEnemyType();
 
+        [Alias("GetClosedGenericValue")]
         Task<object> GetClosedGenericValue();
 
+        [Alias("GetRetValForParamVal")]
         Task<RetVal> GetRetValForParamVal(ParamVal param);
     }
 
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.ParamVal")]
     public record ParamVal([field: Id(0)] int Value);
 
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.RetVal")]
     public record RetVal([field: Id(0)] int Value);
 
     [Serializable]
     [Immutable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.ImmutableType")]
     public class ImmutableType
     {
         [Id(0)]
@@ -182,6 +196,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.EmbeddedImmutable")]
     public class EmbeddedImmutable
     {
         [Id(0)]
@@ -201,6 +216,7 @@ namespace UnitTests.GrainInterfaces
     }
 
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.ClassWithEmbeddedImmutable")]
     public sealed class ClassWithEmbeddedImmutable
     {
         [Id(1), Immutable] public IEnumerable<byte> Immutable;
@@ -208,6 +224,7 @@ namespace UnitTests.GrainInterfaces
     }
 
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.StructWithEmbeddedImmutable")]
     public struct StructWithEmbeddedImmutable
     {
         [Id(1), Immutable] public byte[] Immutable;
@@ -216,6 +233,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.DefaultActivatorValueTypeWithRequiredField")]
     public struct DefaultActivatorValueTypeWithRequiredField
     {
         [Id(0)] public required int Value;
@@ -230,6 +248,7 @@ namespace UnitTests.GrainInterfaces
     [UseActivator]
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.DefaultActivatorValueTypeWithUseActivator")]
     public struct DefaultActivatorValueTypeWithUseActivator
     {
         [Id(0)] public int Value;

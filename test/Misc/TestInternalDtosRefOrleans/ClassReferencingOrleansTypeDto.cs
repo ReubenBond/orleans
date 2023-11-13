@@ -2,6 +2,7 @@ namespace UnitTests.DtosRefOrleans
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.DtosRefOrleans.ClassReferencingOrleansTypeDto")]
     public class ClassReferencingOrleansTypeDto
     {
         static ClassReferencingOrleansTypeDto()

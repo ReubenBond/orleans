@@ -12,6 +12,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
     [JsonConverter(typeof(GrainIdJsonConverter))]
+    [Alias("Orleans.Runtime.GrainId")]
     public readonly struct GrainId : IEquatable<GrainId>, IComparable<GrainId>, ISerializable, ISpanFormattable, ISpanParsable<GrainId>
     {
         [Id(0)]

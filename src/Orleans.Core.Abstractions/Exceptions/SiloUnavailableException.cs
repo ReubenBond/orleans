@@ -8,6 +8,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Runtime.SiloUnavailableException")]
     public sealed class SiloUnavailableException : OrleansMessageRejectionException
     {
         /// <summary>

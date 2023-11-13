@@ -72,6 +72,7 @@ namespace Orleans.Networking.Shared
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Networking.Shared.SocketConnectionException")]
     public sealed class SocketConnectionException : OrleansException
     {
         public SocketConnectionException(string message) : base(message) { }

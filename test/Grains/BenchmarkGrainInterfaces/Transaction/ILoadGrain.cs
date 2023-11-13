@@ -1,6 +1,7 @@
 namespace BenchmarkGrainInterfaces.Transaction
 {
     [GenerateSerializer]
+    [Alias("BenchmarkGrainInterfaces.Transaction.Report")]
     public class Report
     {
         [Id(1)]
@@ -16,9 +17,12 @@ namespace BenchmarkGrainInterfaces.Transaction
         public TimeSpan Elapsed { get; set; }
     }
 
+    [Alias("BenchmarkGrainInterfaces.Transaction.ILoadGrain")]
     public interface ILoadGrain : IGrainWithGuidKey
     {
+        [Alias("Generate")]
         Task Generate(int run, int transactions, int conncurrent);
+        [Alias("TryGetReport")]
         Task<Report> TryGetReport();
     }
 }

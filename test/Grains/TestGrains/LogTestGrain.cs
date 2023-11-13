@@ -11,6 +11,7 @@ namespace TestGrains
     /// </summary>
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.MyGrainState")]
     public class MyGrainState
     {
         [Orleans.Id(0)]
@@ -42,18 +43,23 @@ namespace TestGrains
 
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.UpdateA")]
     public class UpdateA {[Orleans.Id(0)] public int Val; }
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.UpdateB")]
     public class UpdateB  {[Orleans.Id(0)] public int Val; }
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.IncrementA")]
     public class IncrementA  {[Orleans.Id(0)] public int Val; }
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.AddReservation")]
     public class AddReservation {[Orleans.Id(0)] public int Val; }
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.RemoveReservation")]
     public class RemoveReservation {[Orleans.Id(0)] public int Val; }
 
 

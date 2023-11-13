@@ -53,6 +53,7 @@ namespace Orleans.Serialization.Codecs
     /// Surrogate type for <see cref="VersionCodec"/>.
     /// </summary>
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.Codecs.VersionSurrogate")]
     public struct VersionSurrogate
     {
         /// <summary>

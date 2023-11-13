@@ -6,19 +6,29 @@ using Orleans.Versions.Selector;
 
 namespace Orleans.Runtime.Versions
 {
+    [Alias("Orleans.Runtime.Versions.IVersionStoreGrain")]
     internal interface IVersionStoreGrain : IGrainWithStringKey
     {
+        [Alias("GetCompatibilityStrategies")]
         Task<Dictionary<GrainInterfaceType, CompatibilityStrategy>> GetCompatibilityStrategies();
+        [Alias("GetSelectorStrategies")]
         Task<Dictionary<GrainInterfaceType, VersionSelectorStrategy>> GetSelectorStrategies();
+        [Alias("GetCompatibilityStrategy")]
         Task<CompatibilityStrategy> GetCompatibilityStrategy();
+        [Alias("GetSelectorStrategy")]
         Task<VersionSelectorStrategy> GetSelectorStrategy();
+        [Alias("SetCompatibilityStrategy")]
         Task SetCompatibilityStrategy(CompatibilityStrategy strategy);
+        [Alias("SetSelectorStrategy")]
         Task SetSelectorStrategy(VersionSelectorStrategy strategy);
+        [Alias("SetCompatibilityStrategy1")]
         Task SetCompatibilityStrategy(GrainInterfaceType interfaceType, CompatibilityStrategy strategy);
+        [Alias("SetSelectorStrategy1")]
         Task SetSelectorStrategy(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy);
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Runtime.Versions.VersionStoreGrainState")]
     internal sealed class VersionStoreGrainState
     {
         [Id(0)]

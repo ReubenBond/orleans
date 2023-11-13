@@ -10,6 +10,7 @@ namespace Orleans.EventSourcing
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.EventSourcing.ConnectionIssue")]
     public abstract class ConnectionIssue
     {
         /// <summary>

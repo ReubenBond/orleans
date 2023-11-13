@@ -110,6 +110,7 @@ namespace Orleans.Transactions
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.TransactionalStateRecord`1")]
     public sealed class TransactionalStateRecord<TState>
         where TState : class, new()
     {

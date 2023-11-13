@@ -7,6 +7,7 @@ namespace Orleans.Streams
     [Serializable]
     [JsonObject(MemberSerialization.OptIn)]
     [GenerateSerializer]
+    [Alias("Orleans.Streams.PubSubSubscriptionState")]
     public sealed class PubSubSubscriptionState : IEquatable<PubSubSubscriptionState>
     {
         public enum SubscriptionStates

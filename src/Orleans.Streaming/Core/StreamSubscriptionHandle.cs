@@ -11,6 +11,7 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streams.StreamSubscriptionHandle`1")]
     public abstract class StreamSubscriptionHandle<T> : IEquatable<StreamSubscriptionHandle<T>>
     {
         /// <summary>

@@ -127,6 +127,7 @@ namespace Orleans.Streaming.EventHubs.Testing
         /// </summary>
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.StreamRandomPlacementArg")]
         public class StreamRandomPlacementArg
         {
             /// <summary>

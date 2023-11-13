@@ -8,14 +8,16 @@ namespace Orleans.Runtime
     /// <summary>
     /// Per-silo system interface for managing the distributed, partitioned grain-silo-activation directory.
     /// </summary>
+    [Alias("Orleans.Runtime.IRemoteGrainDirectory")]
     internal interface IRemoteGrainDirectory : ISystemTarget, IDhtGrainDirectory
-    {        
+    {
         /// <summary>
         /// Records a bunch of new grain activations.
         /// This method should be called only remotely during handoff.
         /// </summary>
         /// <param name="addresses">The addresses of the grains to register</param>
         /// <returns></returns>
+        [Alias("RegisterMany")]
         Task RegisterMany(List<GrainAddress> addresses);
 
         /// <summary>
@@ -27,6 +29,7 @@ namespace Orleans.Runtime
         /// <returns>list of tuples holding a grain, generation number of the list of activations, and the list of activations. 
         /// If the generation number of the invoker matches the number of the destination, the list is null. If the destination does not
         /// hold the information on the grain, generation counter -1 is returned (and the list of activations is null)</returns>
+        [Alias("LookUpMany")]
         Task<List<AddressAndTag>> LookUpMany(List<(GrainId GrainId, int Version)> grainAndETagList);
 
         /// <summary>
@@ -34,6 +37,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="singleActivations">The single-activation registrations from the split partition.</param>
         /// <returns></returns>
+        [Alias("AcceptSplitPartition")]
         Task AcceptSplitPartition(List<GrainAddress> singleActivations);
     }
 }

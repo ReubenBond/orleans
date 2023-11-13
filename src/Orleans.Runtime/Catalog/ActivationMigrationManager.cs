@@ -17,15 +17,18 @@ namespace Orleans.Runtime;
 /// <summary>
 /// Remote interface for migrating grain activations to a silo.
 /// </summary>
+[Alias("IActivationMigrationManagerSystemTarget")]
 internal interface IActivationMigrationManagerSystemTarget : ISystemTarget
 {
     /// <summary>
     /// Accepts migrating grains on a best-effort basis.
     /// </summary>
+    [Alias("AcceptMigratingGrains")]
     ValueTask AcceptMigratingGrains([Immutable] List<GrainMigrationPackage> migratingGrains);
 }
 
 [GenerateSerializer, Immutable]
+[Alias("GrainMigrationPackage")]
 internal struct GrainMigrationPackage
 {
     [Id(0)]

@@ -8,6 +8,7 @@ namespace Orleans.Metadata
     /// Information about types which are available in the cluster.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Metadata.ClusterManifest")]
     public sealed class ClusterManifest
     {
         /// <summary>

@@ -19,6 +19,7 @@ namespace UnitTests.StorageTests
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.StorageTests.ErrorInjectionBehavior")]
     public struct ErrorInjectionBehavior
     {
         public static readonly ErrorInjectionBehavior None = new ErrorInjectionBehavior { ErrorInjectionPoint = ErrorInjectionPoint.None };
@@ -31,6 +32,7 @@ namespace UnitTests.StorageTests
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.StorageTests.StorageProviderInjectedError")]
     public class StorageProviderInjectedError : OrleansException
     {
         [Id(0)]

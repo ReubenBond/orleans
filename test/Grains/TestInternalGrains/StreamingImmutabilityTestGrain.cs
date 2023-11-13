@@ -54,6 +54,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.StreamImmutabilityTestObject")]
     public class StreamImmutabilityTestObject
     {
         [Id(0)]

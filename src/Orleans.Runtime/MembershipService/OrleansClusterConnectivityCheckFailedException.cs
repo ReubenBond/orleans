@@ -9,6 +9,7 @@ namespace Orleans.Runtime.MembershipService
     /// <seealso cref="Orleans.Runtime.OrleansException" />
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Runtime.MembershipService.OrleansClusterConnectivityCheckFailedException")]
     public sealed class OrleansClusterConnectivityCheckFailedException : OrleansException
     {
         /// <summary>

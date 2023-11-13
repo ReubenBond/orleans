@@ -7,6 +7,7 @@ namespace Orleans.EventSourcing.Common
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.EventSourcing.Common.PrimaryOperationFailed")]
     public abstract class PrimaryOperationFailed : ConnectionIssue
     {
         /// <summary>

@@ -17,6 +17,7 @@ namespace Orleans.Runtime.TestHooks
         Task<Dictionary<SiloAddress, SiloStatus>> GetApproximateSiloStatuses();
     }
 
+    [Alias("Orleans.Runtime.TestHooks.ITestHooksSystemTarget")]
     internal interface ITestHooksSystemTarget : ITestHooks, ISystemTarget
     {
     }

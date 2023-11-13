@@ -4,13 +4,17 @@ using Orleans.Runtime;
 
 namespace UnitTests.GrainInterfaces
 {
+    [Alias("UnitTests.GrainInterfaces.ICustomPlacementTestGrain")]
     public interface ICustomPlacementTestGrain : IGrainWithGuidKey
     {
+        [Alias("GetRuntimeInstanceId")]
         Task<string> GetRuntimeInstanceId();
     }
 
+    [Alias("UnitTests.GrainInterfaces.IHashBasedPlacementGrain")]
     public interface IHashBasedPlacementGrain : IGrainWithGuidKey
     {
+        [Alias("GetSiloAddress")]
         Task<SiloAddress> GetSiloAddress();
     }
 
@@ -24,6 +28,7 @@ namespace UnitTests.GrainInterfaces
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.TestCustomPlacementStrategy")]
     public class TestCustomPlacementStrategy : PlacementStrategy
     {
         private const string ScenarioKey = "test-placement-scenario";

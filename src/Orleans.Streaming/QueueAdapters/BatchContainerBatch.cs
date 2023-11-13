@@ -10,6 +10,7 @@ namespace Orleans.Streams
     /// PersistenStreamPullingAgent from it's underlying cache
     /// </summary>
     [GenerateSerializer]
+    [Alias("Orleans.Streams.BatchContainerBatch")]
     public sealed class BatchContainerBatch : IBatchContainerBatch
     {
         /// <summary>

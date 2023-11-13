@@ -6,6 +6,7 @@ namespace Orleans.Storage.Internal
     /// <summary>Exception used to communicate with the storage provider, so that it throws this exception to its caller.</summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Storage.Internal.MemoryStorageEtagMismatchException")]
     internal sealed class MemoryStorageEtagMismatchException : Exception
     {
         /// <summary>Gets the Etag value currently held in persistent storage.</summary>

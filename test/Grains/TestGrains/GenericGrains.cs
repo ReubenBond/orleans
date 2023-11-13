@@ -10,6 +10,7 @@ namespace UnitTests.Grains
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.SimpleGenericGrainState`1")]
     public class SimpleGenericGrainState<T>
     {
         [Id(0)]
@@ -85,6 +86,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.SimpleGenericGrainUState`1")]
     public class SimpleGenericGrainUState<U>
     {
         [Id(0)]
@@ -128,6 +130,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.SimpleGenericGrain2State`2")]
     public class SimpleGenericGrain2State<T, U>
     {
         [Id(0)]
@@ -188,6 +191,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.IGrainWithListFieldsState")]
     public class IGrainWithListFieldsState
     {
         [Id(0)]
@@ -218,6 +222,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.GenericGrainWithListFieldsState`1")]
     public class GenericGrainWithListFieldsState<T>
     {
         [Id(0)]
@@ -249,6 +254,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.GenericReaderWriterState`1")]
     public class GenericReaderWriterState<T>
     {
         [Id(0)]
@@ -257,6 +263,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.GenericReader2State`2")]
     public class GenericReader2State<TOne, TTwo>
     {
         [Id(0)]
@@ -267,6 +274,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.GenericReaderWriterGrain2State`2")]
     public class GenericReaderWriterGrain2State<TOne, TTwo>
     {
         [Id(0)]
@@ -277,6 +285,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.GenericReader3State`3")]
     public class GenericReader3State<TOne, TTwo, TThree>
     {
         [Id(0)]
@@ -783,10 +792,12 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.Reducer1Action")]
     public class Reducer1Action { }
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.Reducer2Action")]
     public class Reducer2Action { }
 
     public class Reducer1 : IReducer<string, Reducer1Action>
@@ -799,11 +810,16 @@ namespace UnitTests.Grains
         public Task<int> Handle(int prevState, Reducer2Action act) => Task.FromResult(prevState + act.ToString().Length);
     }
 
+    [Alias("UnitTests.Grains.IUnmanagedArgGrain`1")]
     public interface IUnmanagedArgGrain<T> : IGrainWithGuidKey where T : unmanaged
     {
+        [Alias("Echo")]
         ValueTask<T> Echo(T value);
+        [Alias("EchoNonNullable")]
         ValueTask<U> EchoNonNullable<U>(U value) where U : notnull;
+        [Alias("EchoReference")]
         ValueTask<U> EchoReference<U>(U value) where U : class;
+        [Alias("EchoValue")]
         ValueTask<U> EchoValue<U>(U value) where U : struct;
     }
 
@@ -815,8 +831,10 @@ namespace UnitTests.Grains
         public ValueTask<U> EchoValue<U>(U value) where U : struct => new(value);
     }
 
+    [Alias("UnitTests.Grains.IReducerGameGrain`2")]
     public interface IReducerGameGrain<TState, TAction> : IGrainWithStringKey
     {
+        [Alias("Go")]
         Task<TState> Go(TState prevState, TAction act);
     }
 

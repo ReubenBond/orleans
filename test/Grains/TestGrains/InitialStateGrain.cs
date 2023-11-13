@@ -4,6 +4,7 @@ namespace UnitTests.Grains
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.Initialized_State")]
     public class Initialized_State
     {
         [Id(0)]

@@ -1,6 +1,7 @@
 namespace BenchmarkGrainInterfaces.Ping;
 
 [GenerateSerializer]
+[Alias("UserProfile")]
 public class UserProfile
 {
     [Id(0)]

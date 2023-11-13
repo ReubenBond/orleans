@@ -11,6 +11,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.Codecs.ReadOnlyCollectionSurrogate`1")]
     public struct ReadOnlyCollectionSurrogate<T>
     {
         /// <summary>

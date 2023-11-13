@@ -13,6 +13,7 @@ namespace Orleans.Runtime
     /// </remarks>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Runtime.LimitExceededException")]
     public sealed class LimitExceededException : OrleansException
     {
         /// <summary>

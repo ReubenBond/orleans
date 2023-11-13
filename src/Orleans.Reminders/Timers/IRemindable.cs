@@ -7,6 +7,7 @@ namespace Orleans
     /// <summary>
     /// Callback interface that grains must implement in order to be able to register and receive Reminders.
     /// </summary>
+    [Alias("Orleans.IRemindable")]
     public interface IRemindable : IGrain
     {
         /// <summary>
@@ -15,6 +16,7 @@ namespace Orleans
         /// <param name="reminderName">Name of this Reminder</param>
         /// <param name="status">Status of this Reminder tick</param>
         /// <returns>Completion promise which the grain will resolve when it has finished processing this Reminder tick.</returns>
+        [Alias("ReceiveReminder")]
         Task ReceiveReminder(string reminderName, Runtime.TickStatus status);
     }
 
@@ -40,6 +42,7 @@ namespace Orleans
         /// Thereafter, the app can set count = curCount
         /// </summary>
         [Serializable, GenerateSerializer, Immutable]
+        [Alias("Orleans.Runtime.TickStatus")]
         public readonly struct TickStatus
         {
             /// <summary>
@@ -82,6 +85,7 @@ namespace Orleans
         /// Exception related to Orleans Reminder functions or Reminder service.
         /// </summary>
         [Serializable, GenerateSerializer]
+        [Alias("Orleans.Runtime.ReminderException")]
         public sealed class ReminderException : OrleansException
         {
             /// <summary>

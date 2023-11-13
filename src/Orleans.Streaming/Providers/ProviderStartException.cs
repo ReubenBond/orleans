@@ -9,6 +9,7 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streams.ProviderStartException")]
     public sealed class ProviderStartException : OrleansException
     {
         /// <summary>

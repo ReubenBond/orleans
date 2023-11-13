@@ -10,6 +10,7 @@ namespace TestGrains
 
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.PersonRegistered")]
     public class PersonRegistered : IPersonEvent
     {
         [Orleans.Id(0)]
@@ -29,6 +30,7 @@ namespace TestGrains
 
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.PersonMarried")]
     public class PersonMarried : IPersonEvent
     {
         [Orleans.Id(0)]
@@ -48,6 +50,7 @@ namespace TestGrains
 
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.PersonLastNameChanged")]
     public class PersonLastNameChanged : IPersonEvent
     {
         [Orleans.Id(0)]

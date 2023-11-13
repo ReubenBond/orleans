@@ -4,6 +4,7 @@ namespace TestGrains
 {
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrains.PersonState")]
     public class PersonState
     {
         [Orleans.Id(0)]

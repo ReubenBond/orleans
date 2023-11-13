@@ -8,6 +8,7 @@ namespace Orleans.Runtime
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Runtime.OrleansConfigurationException")]
     public sealed class OrleansConfigurationException : Exception
     {
         /// <inheritdoc />

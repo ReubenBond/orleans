@@ -5,6 +5,7 @@ namespace UnitTests.Grains
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.MultifacetTestGrainState")]
     public class MultifacetTestGrainState
     {
         [Id(0)]

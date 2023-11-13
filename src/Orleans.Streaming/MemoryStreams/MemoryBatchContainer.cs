@@ -11,6 +11,7 @@ namespace Orleans.Providers
     [Serializable]
     [GenerateSerializer]
     [SerializationCallbacks(typeof(OnDeserializedCallbacks))]
+    [Alias("Orleans.Providers.MemoryBatchContainer`1")]
     internal sealed class MemoryBatchContainer<TSerializer> : IBatchContainer, IOnDeserialized
         where TSerializer : class, IMemoryMessageBodySerializer
     {

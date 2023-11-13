@@ -2,6 +2,7 @@ namespace Benchmarks.Models
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("Benchmarks.Models.ComplexClass")]
     public class ComplexClass : SimpleClass
     {
         [Id(0)]

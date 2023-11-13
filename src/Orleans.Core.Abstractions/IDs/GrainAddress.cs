@@ -9,6 +9,7 @@ namespace Orleans.Runtime
     /// Represents an entry in a <see cref="IGrainDirectory"/>
     /// </summary>
     [GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.GrainAddress")]
     public sealed class GrainAddress : IEquatable<GrainAddress>, ISpanFormattable
     {
         [Id(0)]

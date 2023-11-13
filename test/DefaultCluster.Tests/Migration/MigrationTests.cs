@@ -198,10 +198,14 @@ namespace DefaultCluster.Tests.General
         }
     }
 
+    [Alias("DefaultCluster.Tests.General.IMigrationTestGrain")]
     public interface IMigrationTestGrain : IGrainWithIntegerKey
     {
+        [Alias("GetGrainAddress")]
         ValueTask<GrainAddress> GetGrainAddress();
+        [Alias("SetState")]
         ValueTask SetState(int state);
+        [Alias("GetState")]
         ValueTask<int> GetState();
     }
 
@@ -248,10 +252,14 @@ namespace DefaultCluster.Tests.General
         public ValueTask<GrainAddress> GetGrainAddress() => new(GrainContext.Address);
     }
 
+    [Alias("DefaultCluster.Tests.General.IMigrationTestGrain_GrainOfT")]
     public interface IMigrationTestGrain_GrainOfT : IGrainWithIntegerKey
     {
+        [Alias("SetState")]
         ValueTask SetState(int state);
+        [Alias("GetState")]
         ValueTask<int> GetState();
+        [Alias("GetGrainAddress")]
         ValueTask<GrainAddress> GetGrainAddress();
     }
 
@@ -269,16 +277,21 @@ namespace DefaultCluster.Tests.General
     }
 
     [GenerateSerializer]
+    [Alias("DefaultCluster.Tests.General.MyMigrationStateClass")]
     public class MyMigrationStateClass
     {
         [Id(0)]
         public int Value { get; set; }
     }
 
+    [Alias("DefaultCluster.Tests.General.IMigrationTestGrain_IPersistentStateOfT")]
     public interface IMigrationTestGrain_IPersistentStateOfT : IGrainWithIntegerKey
     {
+        [Alias("SetState")]
         ValueTask SetState(int a, int b);
+        [Alias("GetState")]
         ValueTask<(int A, int B)> GetState();
+        [Alias("GetGrainAddress")]
         ValueTask<GrainAddress> GetGrainAddress();
     }
 

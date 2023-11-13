@@ -99,6 +99,7 @@ namespace UnitTests.Grains
 
         [Serializable]
         [GenerateSerializer]
+        [Alias("UnitTests.Grains.MethodInterceptionGrain.MyDomainSpecificException")]
         public class MyDomainSpecificException : Exception
         {
             public MyDomainSpecificException()

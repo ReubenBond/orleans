@@ -219,6 +219,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.EventSourcing.LogStorage.LogViewAdaptor.UpdateLogStorageFailed`2")]
         public sealed class UpdateLogStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
@@ -234,6 +235,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.EventSourcing.LogStorage.LogViewAdaptor.ReadFromLogStorageFailed`2")]
         public sealed class ReadFromLogStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
@@ -249,6 +251,7 @@ namespace Orleans.EventSourcing.LogStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.EventSourcing.LogStorage.LogViewAdaptor.UpdateNotificationMessage`2")]
         protected internal sealed class UpdateNotificationMessage : INotificationMessage 
         {
             /// <inheritdoc/>

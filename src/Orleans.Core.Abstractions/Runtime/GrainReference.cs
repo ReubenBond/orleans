@@ -225,6 +225,7 @@ namespace Orleans.Runtime
     /// A surrogate used to represent <see cref="GrainReference"/> implementations for serialization.
     /// </summary>
     [GenerateSerializer]
+    [Alias("Orleans.Runtime.GrainReferenceSurrogate")]
     internal struct GrainReferenceSurrogate
     {
         /// <summary>

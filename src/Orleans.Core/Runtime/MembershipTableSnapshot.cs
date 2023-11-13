@@ -5,6 +5,7 @@ using System.Text;
 namespace Orleans.Runtime
 {
     [GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.MembershipTableSnapshot")]
     internal sealed class MembershipTableSnapshot
     {
         public MembershipTableSnapshot(

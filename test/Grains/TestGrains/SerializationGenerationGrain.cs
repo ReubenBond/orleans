@@ -45,6 +45,7 @@
 
         [Serializable]
         [GenerateSerializer]
+        [Alias("TestGrains.SerializationGenerationGrain.MyState")]
         public class MyState
         {
             [Id(0)]

@@ -9,6 +9,7 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
+    [Alias("DefaultCluster.Tests.General.IFooGrain")]
     public interface IFooGrain : IGrain { }
 
     [GrainType("foo`1")]
@@ -125,6 +126,7 @@ namespace DefaultCluster.Tests.General
 
         [Serializable]
         [GenerateSerializer]
+        [Alias("DefaultCluster.Tests.General.GrainReferenceTest.GenericGrainReferenceHolder")]
         public class GenericGrainReferenceHolder
         {
             [JsonProperty]

@@ -179,6 +179,7 @@ namespace UnitTests.StreamingTests
 
         [Serializable]
         [Orleans.GenerateSerializer]
+        [Alias("UnitTests.StreamingTests.PubSubRendezvousGrainTests.DummyStreamProducerExtension")]
         public class DummyStreamProducerExtension : IStreamProducerExtension
         {
             [Orleans.Id(0)]

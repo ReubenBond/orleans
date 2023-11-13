@@ -5,6 +5,7 @@ namespace BenchmarkGrains.Transaction
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("BenchmarkGrains.Transaction.Info")]
     public class Info
     {
         [Id(0)]

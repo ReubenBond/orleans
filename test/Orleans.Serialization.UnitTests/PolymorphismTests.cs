@@ -11,6 +11,7 @@ namespace Orleans.Serialization.UnitTests
 {
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.CustomException")]
     public class CustomException : Exception
     {
         public CustomException() { }
@@ -257,6 +258,7 @@ namespace Orleans.Serialization.UnitTests
 
         [Id(1000)]
         [GenerateSerializer]
+        [Alias("Orleans.Serialization.UnitTests.PolymorphismTests.SomeBaseClass")]
         public class SomeBaseClass
         {
             [Id(0)]
@@ -268,6 +270,7 @@ namespace Orleans.Serialization.UnitTests
 
         [Id(1001)]
         [GenerateSerializer]
+        [Alias("Orleans.Serialization.UnitTests.PolymorphismTests.SomeSubClass")]
         public class SomeSubClass : SomeBaseClass
         {
             [Id(0)]
@@ -279,6 +282,7 @@ namespace Orleans.Serialization.UnitTests
 
         [Id(1002)]
         [GenerateSerializer]
+        [Alias("Orleans.Serialization.UnitTests.PolymorphismTests.OtherSubClass")]
         public class OtherSubClass : SomeBaseClass
         {
             [Id(0)]
@@ -290,6 +294,7 @@ namespace Orleans.Serialization.UnitTests
 
         [Id(1003)]
         [GenerateSerializer]
+        [Alias("Orleans.Serialization.UnitTests.PolymorphismTests.SomeSubClassChild")]
         public class SomeSubClassChild : SomeSubClass
         {
             [Id(0)]

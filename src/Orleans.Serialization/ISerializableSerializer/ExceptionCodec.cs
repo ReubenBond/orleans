@@ -473,6 +473,7 @@ namespace Orleans.Serialization
     /// Surrogate type for <see cref="AggregateExceptionCodec"/>.
     /// </summary>
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.AggregateExceptionSurrogate")]
     internal struct AggregateExceptionSurrogate
     {
         [Id(0)]

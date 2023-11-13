@@ -8,6 +8,7 @@ using System.Text;
 namespace Orleans.Runtime
 {
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.LegacyGrainId")]
     public sealed class LegacyGrainId : IEquatable<LegacyGrainId>, IComparable<LegacyGrainId>
     {
         private static readonly Interner<UniqueKey, LegacyGrainId> grainIdInternCache = new Interner<UniqueKey, LegacyGrainId>(InternerConstants.SIZE_LARGE);

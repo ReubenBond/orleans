@@ -7,6 +7,7 @@ namespace Orleans.Streams.Core
     /// Represents a subscription to a stream.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Streams.Core.StreamSubscription")]
     public sealed class StreamSubscription
     {
         /// <summary>

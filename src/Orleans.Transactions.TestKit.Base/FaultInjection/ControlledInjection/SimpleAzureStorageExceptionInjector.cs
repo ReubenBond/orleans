@@ -43,6 +43,7 @@ namespace Orleans.Transactions.TestKit
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.TestKit.SimpleAzureStorageException")]
     public class SimpleAzureStorageException : RequestFailedException
     {
         public SimpleAzureStorageException(string message) : base(message)

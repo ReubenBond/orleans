@@ -4,6 +4,7 @@ namespace Orleans.Transactions.TestKit.Consistency
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Transactions.TestKit.Consistency.Observation")]
     public struct Observation
     {
         [Id(0)]

@@ -28,6 +28,7 @@ namespace Orleans.Streams
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streams.StreamConsumerExtension")]
     internal sealed class StreamConsumerExtension : IStreamConsumerExtension
     {
         [Id(0)]

@@ -64,6 +64,7 @@ namespace Orleans.Streams
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streams.PubSubGrainState")]
     internal sealed class PubSubGrainState
     {
         [Id(0)]

@@ -4,6 +4,7 @@ namespace UnitTests.Grains
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.SimpleGrainState")]
     public class SimpleGrainState
     {
         [Id(0)]

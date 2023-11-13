@@ -14,6 +14,7 @@ namespace Orleans.Streaming.EventHubs
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Streaming.EventHubs.EventHubBatchContainer")]
     public class EventHubBatchContainer : IBatchContainer
     {
         [JsonProperty]
@@ -46,6 +47,7 @@ namespace Orleans.Streaming.EventHubs
 
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.Streaming.EventHubs.EventHubBatchContainer.Body")]
         internal class Body
         {
             [Id(0)]

@@ -8,18 +8,23 @@ namespace TestGrainInterfaces
     /// <summary>
     /// The grain interface for the chat grain.
     /// </summary>
+    [Alias("TestGrainInterfaces.IChatGrain")]
     public interface IChatGrain : IGrainWithStringKey
     {
         /// <summary> Return the current content of the chat room. </summary>
+        [Alias("GetChat")]
         Task<XDocument> GetChat();
 
         /// <summary> Add a new post. </summary>
+        [Alias("Post")]
         Task Post(Guid guid, string user, string text);
 
         /// <summary> Delete a specific post. </summary>
+        [Alias("Delete")]
         Task Delete(Guid guid);
 
         /// <summary> Edit a specific post. </summary>
+        [Alias("Edit")]
         Task Edit(Guid guid, string text);
     }
 
@@ -40,6 +45,7 @@ namespace TestGrainInterfaces
     }
 
     [GenerateSerializer]
+    [Alias("TestGrainInterfaces.XDocumentSurrogate")]
     public struct XDocumentSurrogate
     {
         [Id(0)]

@@ -6,6 +6,7 @@ namespace Benchmarks.Serialization.Models;
 [MessagePackObject]
 [ProtoContract]
 [GenerateSerializer]
+[Alias("MyVector3")]
 public struct MyVector3
 {
     [Key(0)]
@@ -26,6 +27,7 @@ public struct MyVector3
 
 [Immutable]
 [GenerateSerializer]
+[Alias("ImmutableVector3")]
 public struct ImmutableVector3
 {
     [Id(0)]

@@ -10,8 +10,10 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
 {
+    [Alias("Orleans.Runtime.Messaging.IMessagingSystemTarget")]
     internal interface IMessagingSystemTarget : ISystemTarget
     {
+        [Alias("OnMessagesForwarded")]
         ValueTask OnMessagesForwarded(List<(GrainId TargetGrainId, CorrelationId CorrelationId, SiloAddress From, SiloAddress To)> forwards);
     }
 

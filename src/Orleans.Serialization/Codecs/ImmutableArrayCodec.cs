@@ -35,6 +35,7 @@ namespace Orleans.Serialization.Codecs
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.Codecs.ImmutableArraySurrogate`1")]
     public struct ImmutableArraySurrogate<T>
     {
         /// <summary>

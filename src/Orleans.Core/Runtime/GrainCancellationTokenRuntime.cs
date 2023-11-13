@@ -91,6 +91,7 @@ namespace Orleans.Runtime
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Runtime.GrainCancellationTokenSurrogate")]
     internal struct GrainCancellationTokenSurrogate
     {
         [Id(0)]

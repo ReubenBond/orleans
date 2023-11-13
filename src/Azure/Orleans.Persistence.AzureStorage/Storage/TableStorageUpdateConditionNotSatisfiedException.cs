@@ -8,6 +8,7 @@ namespace Orleans.Storage
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException")]
     public class TableStorageUpdateConditionNotSatisfiedException : InconsistentStateException
     {
         private const string DefaultMessageFormat = "Table storage condition not Satisfied.  GrainType: {0}, GrainId: {1}, TableName: {2}, StoredETag: {3}, CurrentETag: {4}";

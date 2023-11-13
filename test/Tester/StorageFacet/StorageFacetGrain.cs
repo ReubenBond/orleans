@@ -3,9 +3,12 @@ using Tester.StorageFacet.Abstractions;
 
 namespace Tester
 {
+    [Alias("Tester.IStorageFacetGrain")]
     public interface IStorageFacetGrain : IGrainWithIntegerKey
     {
+        [Alias("GetNames")]
         Task<string[]> GetNames();
+        [Alias("GetExtendedInfo")]
         Task<string[]> GetExtendedInfo();
     }
 
@@ -33,6 +36,7 @@ namespace Tester
         }
     }
 
+    [Alias("Tester.IStorageFactoryGrain")]
     public interface IStorageFactoryGrain : IStorageFacetGrain
     {
     }
@@ -59,6 +63,7 @@ namespace Tester
         }
     }
 
+    [Alias("Tester.IStorageDefaultFactoryGrain")]
     public interface IStorageDefaultFactoryGrain : IStorageFacetGrain
     {
     }
@@ -86,6 +91,7 @@ namespace Tester
         }
     }
 
+    [Alias("Tester.IStorageDefaultFacetGrain")]
     public interface IStorageDefaultFacetGrain : IStorageFacetGrain
     {
     }

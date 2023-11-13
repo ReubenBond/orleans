@@ -30,6 +30,7 @@ namespace Orleans
     /// <typeparam name="T">The type of application level payload.</typeparam>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.GrainState`1")]
     public sealed class GrainState<T> : IGrainState<T>
     {
         /// <inheritdoc />

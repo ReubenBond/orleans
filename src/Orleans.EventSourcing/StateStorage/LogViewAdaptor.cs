@@ -189,6 +189,7 @@ namespace Orleans.EventSourcing.StateStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.EventSourcing.StateStorage.LogViewAdaptor.UpdateStateStorageFailed`2")]
         public sealed class UpdateStateStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
@@ -204,6 +205,7 @@ namespace Orleans.EventSourcing.StateStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.EventSourcing.StateStorage.LogViewAdaptor.ReadFromStateStorageFailed`2")]
         public sealed class ReadFromStateStorageFailed : PrimaryOperationFailed
         {
             /// <inheritdoc/>
@@ -219,6 +221,7 @@ namespace Orleans.EventSourcing.StateStorage
         /// </summary>
         [Serializable]
         [GenerateSerializer]
+        [Alias("Orleans.EventSourcing.StateStorage.LogViewAdaptor.UpdateNotificationMessage`2")]
         protected internal sealed class UpdateNotificationMessage : INotificationMessage 
         {
             /// <inheritdoc/>

@@ -8,6 +8,7 @@ namespace Orleans.Metadata
     /// Information about available grains.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Metadata.GrainManifest")]
     public sealed class GrainManifest
     {
         /// <summary>

@@ -58,6 +58,7 @@ namespace Orleans.Storage
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Storage.InconsistentStateException")]
     public class InconsistentStateException : OrleansException
     {
         /// <summary>

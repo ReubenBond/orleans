@@ -7,6 +7,7 @@ namespace Orleans.Providers.Streams.Generator
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Providers.Streams.Generator.GeneratedEvent")]
     public sealed class GeneratedEvent
     {
         /// <summary>

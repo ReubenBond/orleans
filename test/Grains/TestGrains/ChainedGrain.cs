@@ -7,6 +7,7 @@ namespace UnitTests.Grains
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.ChainedGrainState")]
     public class ChainedGrainState
     {
         [Id(0)]

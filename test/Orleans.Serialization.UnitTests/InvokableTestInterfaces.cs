@@ -239,6 +239,7 @@ namespace Orleans.Serialization.UnitTests
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.GenericGrainState`1")]
     public class GenericGrainState<T>
     {
         [Id(1)]
@@ -249,6 +250,7 @@ namespace Orleans.Serialization.UnitTests
     /// A class designed to test that code generation correctly handles reserved keywords.
     /// </summary>
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.@event")]
     public class @event : IEquatable<@event>
     {
         private static readonly IEqualityComparer<@event> EventComparerInstance = new EventEqualityComparer();
@@ -388,12 +390,14 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.NestedGeneric`1")]
     public class NestedGeneric<T>
     {
         [Id(0)]
         public Nested Payload { get; set; }
 
         [GenerateSerializer]
+        [Alias("Orleans.Serialization.UnitTests.NestedGeneric.Nested`1")]
         public class Nested
         {
             [Id(0)]
@@ -402,12 +406,14 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.NestedConstructedGeneric")]
     public class NestedConstructedGeneric
     {
         [Id(0)]
         public Nested<int> Payload { get; set; }
 
         [GenerateSerializer]
+        [Alias("Orleans.Serialization.UnitTests.NestedConstructedGeneric.Nested`1")]
         public class Nested<T>
         {
             [Id(0)]

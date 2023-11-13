@@ -5,6 +5,7 @@ using UnitTests.FSharpInterfaces;
 
 namespace UnitTests.GrainInterfaces
 {
+    [Alias("UnitTests.GrainInterfaces.IFSharpParametersGrain`2")]
     public interface IFSharpParametersGrain<T,U> : IGrainWithGuidKey, IFSharpParameters<T>
     {
     }

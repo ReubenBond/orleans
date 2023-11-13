@@ -8,6 +8,7 @@ namespace TestGrainInterfaces
 
     [Serializable]
     [Orleans.GenerateSerializer]
+    [Alias("TestGrainInterfaces.PersonAttributes")]
     public class PersonAttributes
     {
         [Orleans.Id(0)]
@@ -21,15 +22,20 @@ namespace TestGrainInterfaces
     /// <summary>
     /// Orleans grain communication interface IPerson
     /// </summary>
+    [Alias("TestGrainInterfaces.IPersonGrain")]
     public interface IPersonGrain : Orleans.IGrainWithGuidKey
     {
+        [Alias("RegisterBirth")]
         Task RegisterBirth(PersonAttributes person);
+        [Alias("Marry")]
         Task Marry(IPersonGrain spouse);
 
+        [Alias("GetTentativePersonalAttributes")]
         Task<PersonAttributes> GetTentativePersonalAttributes();
 
         // Tests
 
+        [Alias("RunTentativeConfirmedStateTest")]
         Task RunTentativeConfirmedStateTest();
     }
 }

@@ -8,6 +8,7 @@
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.MemberVariables")]
     public struct MemberVariables
     {
         [Id(0)]
@@ -25,12 +26,18 @@
         }
     }
 
+    [Alias("UnitTests.GrainInterfaces.IGeneratorTestGrain")]
     public interface IGeneratorTestGrain : IGrainWithIntegerKey
     {
+        [Alias("ByteSet")]
         Task<byte[]> ByteSet(byte[] data);
+        [Alias("StringSet")]
         Task StringSet(string str);
+        [Alias("StringIsNullOrEmpty")]
         Task<bool> StringIsNullOrEmpty();
+        [Alias("GetMemberVariables")]
         Task<MemberVariables> GetMemberVariables();
+        [Alias("SetMemberVariables")]
         Task SetMemberVariables(MemberVariables x);
 
     }

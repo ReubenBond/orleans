@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using Orleans;
 
 [GenerateSerializer]
+[Alias("Person")]
 public record Person([property: Id(0)] int Age, [property: Id(1)] string Name)
 {
     [Id(2)]
@@ -18,6 +19,7 @@ public record Person([property: Id(0)] int Age, [property: Id(1)] string Name)
 }
 
 [GenerateSerializer]
+[Alias("Person2")]
 public record Person2(int Age, string Name)
 {
     [Id(0)]
@@ -28,6 +30,7 @@ public record Person2(int Age, string Name)
 }
 
 [GenerateSerializer(IncludePrimaryConstructorParameters = false)]
+[Alias("Person3")]
 public record Person3(int Age, string Name)
 {
     [Id(0)]
@@ -38,9 +41,11 @@ public record Person3(int Age, string Name)
 }
 
 [GenerateSerializer]
+[Alias("Person4")]
 public record Person4(int Age, string Name);
 
 [GenerateSerializer(IncludePrimaryConstructorParameters = false)]
+[Alias("Person5")]
 public record Person5([property: Id(0)] int Age, [property: Id(1)] string Name)
 {
     [Id(2)]
@@ -51,6 +56,7 @@ public record Person5([property: Id(0)] int Age, [property: Id(1)] string Name)
 }
 
 [GenerateSerializer]
+[Alias("Person5_Class")]
 public class Person5_Class
 {
     [Id(0)] public int Age { get; init; }
@@ -75,6 +81,7 @@ internal interface IMySub : IMyBase
 }
 
 [GenerateSerializer]
+[Alias("MyValue")]
 public class MyValue : IEquatable<MyValue>
 {
     [Id(0)]
@@ -100,6 +107,7 @@ public class MyValue : IEquatable<MyValue>
 
 [GenerateSerializer]
 [Immutable]
+[Alias("MyImmutableBase")]
 public class MyImmutableBase : IMyBase
 {
     [Id(0)]
@@ -107,6 +115,7 @@ public class MyImmutableBase : IMyBase
 }
 
 [GenerateSerializer]
+[Alias("MyMutableSub")]
 public sealed class MyMutableSub : MyImmutableBase, IMySub
 {
     [Id(0)]
@@ -115,6 +124,7 @@ public sealed class MyMutableSub : MyImmutableBase, IMySub
 
 [GenerateSerializer]
 [Immutable]
+[Alias("MyImmutableSub")]
 public sealed class MyImmutableSub : MyImmutableBase, IMySub
 {
     [Id(0)]
@@ -122,6 +132,7 @@ public sealed class MyImmutableSub : MyImmutableBase, IMySub
 }
 
 [GenerateSerializer]
+[Alias("MyMutableBase")]
 public class MyMutableBase : IMyBase
 {
     [Id(0)]
@@ -129,6 +140,7 @@ public class MyMutableBase : IMyBase
 }
 
 [GenerateSerializer]
+[Alias("MySealedSub")]
 public sealed class MySealedSub : MyMutableBase, IMySub
 {
     [Id(0)]
@@ -137,6 +149,7 @@ public sealed class MySealedSub : MyMutableBase, IMySub
 
 [GenerateSerializer]
 [Immutable]
+[Alias("MySealedImmutableSub")]
 public sealed class MySealedImmutableSub : MyMutableBase, IMySub
 {
     [Id(0)]
@@ -145,6 +158,7 @@ public sealed class MySealedImmutableSub : MyMutableBase, IMySub
 
 [GenerateSerializer]
 [Immutable]
+[Alias("MyUnsealedImmutableSub")]
 public class MyUnsealedImmutableSub : MyMutableBase, IMySub
 {
     [Id(0)]
@@ -153,6 +167,7 @@ public class MyUnsealedImmutableSub : MyMutableBase, IMySub
 
 [GenerateSerializer]
 [SuppressReferenceTracking]
+[Alias("MySuppressReferenceTrackingValue")]
 public class MySuppressReferenceTrackingValue : MyValue
 {
     public MySuppressReferenceTrackingValue(int value) : base(value)
@@ -161,6 +176,7 @@ public class MySuppressReferenceTrackingValue : MyValue
 }
 
 [GenerateSerializer]
+[Alias("MyCustomException")]
 public class MyCustomException : Exception
 {
     public MyCustomException() { }
@@ -186,6 +202,7 @@ public class MyCustomForeignException : Exception
 }
 
 [GenerateSerializer]
+[Alias("MyCustomForeignExceptionSurrogate")]
 public struct MyCustomForeignExceptionSurrogate
 {
     [Id(0)]
@@ -208,6 +225,7 @@ public sealed class MyCustomForeignExceptionSurrogateConverter : IConverter<MyCu
 }
 
 [GenerateSerializer]
+[Alias("SomeClassWithSerializers")]
 public class SomeClassWithSerializers
 {
     [Id(0)]
@@ -249,6 +267,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.MyForeignLibraryTypeSurrogate")]
     public struct MyForeignLibraryTypeSurrogate
     {
         [Id(0)]
@@ -278,6 +297,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.WrapsMyForeignLibraryType")]
     public class WrapsMyForeignLibraryType
     {
         [Id(0)]
@@ -294,6 +314,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.DerivedFromMyForeignLibraryType")]
     public class DerivedFromMyForeignLibraryType : MyForeignLibraryType
     {
         public DerivedFromMyForeignLibraryType() { }
@@ -332,6 +353,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.MyForeignLibraryValueTypeSurrogate")]
     public struct MyForeignLibraryValueTypeSurrogate
     {
         [Id(0)]
@@ -355,6 +377,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.WrapsMyForeignLibraryValueType")]
     public struct WrapsMyForeignLibraryValueType
     {
         [Id(0)]
@@ -371,6 +394,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.MyNonJsonBaseClass")]
     public class MyNonJsonBaseClass : IEquatable<MyNonJsonBaseClass>
     {
         [Id(0)]
@@ -500,6 +524,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.RecursiveClass")]
     public class RecursiveClass
     {
         [Id(0)]
@@ -511,6 +536,7 @@ namespace Orleans.Serialization.UnitTests
 
     [GenerateSerializer]
     [Id(3201)]
+    [Alias("Orleans.Serialization.UnitTests.SomeClassWithSerializers")]
     public class SomeClassWithSerializers
     {
         [Id(0)]
@@ -531,6 +557,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer(GenerateFieldIds = GenerateFieldIds.PublicProperties)]
+    [Alias("Orleans.Serialization.UnitTests.PocoWithAutogeneratedIds")]
     public class PocoWithAutogeneratedIds : IEquatable<PocoWithAutogeneratedIds>
     {
         public int A { get; set; }
@@ -590,6 +617,7 @@ namespace Orleans.Serialization.UnitTests
 
 #if NET6_0_OR_GREATER
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.ClassWithRequiredMembers")]
     public class ClassWithRequiredMembers
     {
         [Id(0)]
@@ -600,12 +628,14 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.SubClassWithRequiredMembersInBase")]
     public class SubClassWithRequiredMembersInBase : ClassWithRequiredMembers
     {
     }
 #endif
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.DerivedFromDictionary`2")]
     public sealed class DerivedFromDictionary<TKey, TValue> : Dictionary<TKey, TValue>
     {
         public DerivedFromDictionary(IEqualityComparer<TKey> comparer) : base(comparer)
@@ -655,6 +685,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.ArrayPoco`1")]
     public class ArrayPoco<T>
     {
         [Id(0)]
@@ -677,6 +708,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.ImmutableClass")]
     public class ImmutableClass
     {
         public ImmutableClass(int intProperty, int intField, int unmarkedField, int unmarkedProperty)
@@ -702,6 +734,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.ImmutableStruct")]
     public struct ImmutableStruct
     {
         public ImmutableStruct(int intProperty, int intField)
@@ -720,6 +753,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.SystemCollectionsClass")]
     public class SystemCollectionsClass
     {
         [Id(0)]
@@ -742,6 +776,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.ClassWithLargeCollectionAndUri")]
     public class ClassWithLargeCollectionAndUri
     {
         [Id(0)]
@@ -752,6 +787,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.ClassWithManualSerializableProperty")]
     public class ClassWithManualSerializableProperty
     {
         private string _stringPropertyValue;
@@ -776,6 +812,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer(GenerateFieldIds = GenerateFieldIds.PublicProperties), Immutable]
+    [Alias("Orleans.Serialization.UnitTests.ClassWithImplicitFieldIds")]
     public class ClassWithImplicitFieldIds
     {
         public string StringValue { get; }
@@ -792,6 +829,7 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.ClassWithTypeFields")]
     public sealed class ClassWithTypeFields
     {
         [Id(1)] public Type Type1;

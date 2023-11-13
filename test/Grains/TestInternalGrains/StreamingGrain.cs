@@ -11,6 +11,7 @@ namespace UnitTests.Grains
 {
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.StreamItem")]
     public class StreamItem
     {
         [Id(0)]
@@ -32,6 +33,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.ConsumerObserver")]
     public class ConsumerObserver : IAsyncObserver<StreamItem>, IConsumerObserver
     {
         [NonSerialized]
@@ -148,6 +150,7 @@ namespace UnitTests.Grains
 
     [Serializable]
     [GenerateSerializer]
+    [Alias("UnitTests.Grains.ProducerObserver")]
     public class ProducerObserver : IProducerObserver
     {
         [NonSerialized]

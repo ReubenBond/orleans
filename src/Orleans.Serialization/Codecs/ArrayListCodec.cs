@@ -29,6 +29,7 @@ namespace Orleans.Serialization.Codecs
     /// Surrogate type used by <see cref="ArrayListCodec"/>.
     /// </summary>
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.Codecs.ArrayListSurrogate")]
     public struct ArrayListSurrogate
     {
         /// <summary>

@@ -1,11 +1,14 @@
 namespace UnitTests.GrainInterfaces
 {
+    [Alias("UnitTests.GrainInterfaces.IActivityGrain")]
     public interface IActivityGrain : IGrainWithIntegerKey
     {
+        [Alias("GetActivityId")]
         Task<ActivityData> GetActivityId();
     }
 
     [GenerateSerializer]
+    [Alias("UnitTests.GrainInterfaces.ActivityData")]
     public class ActivityData
     {
         [Id(0)]
