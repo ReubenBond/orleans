@@ -133,7 +133,7 @@ namespace Orleans.CodeGenerator
             {
                 if (value is not null && existing.Value is not null)
                 {
-                    throw new ArgumentException("A key with this value already exists");
+                    throw new ArgumentException($"A key with the value '{key}' already exists. Existing value: '{existing.Value}', new value: '{value}'");
                 }
 
                 existing.Value = value;
@@ -180,6 +180,8 @@ namespace Orleans.CodeGenerator
             public bool Equals(CompoundTypeAliasComponent x, CompoundTypeAliasComponent y) => x.Equals(y);
             public int GetHashCode(CompoundTypeAliasComponent obj) => obj.GetHashCode();
         }
+
+        public override string ToString() => _value.RawValue?.ToString();
     }
 
     internal readonly struct Either<T, U> where T : class where U : class

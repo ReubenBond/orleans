@@ -10,11 +10,12 @@ namespace Orleans.CodeGenerator
     {
         private readonly InvokableInterfaceDescription _iface;
 
-        public MethodDescription(InvokableInterfaceDescription containingType, IMethodSymbol method, string methodId, bool hasCollision)
+        public MethodDescription(InvokableInterfaceDescription containingType, IMethodSymbol method, string methodId, bool hasCollision, bool hasAlias)
         {
             _iface = containingType;
             Method = method;
             MethodId = methodId;
+            HasAlias = hasAlias;
             HasCollision = hasCollision;
 
             var names = new HashSet<string>(StringComparer.Ordinal);
@@ -64,6 +65,8 @@ namespace Orleans.CodeGenerator
                 return result.EscapeIdentifier();
             }
         }
+
+        public bool HasAlias { get; }
 
         private void PopulateOverrides(InvokableInterfaceDescription containingType, IMethodSymbol method)
         {

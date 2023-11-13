@@ -94,10 +94,11 @@ namespace Orleans.CodeGenerator
             foreach (var pair in methods)
             {
                 var method = pair.Key;
-                var methodId = CodeGenerator.GetId(method)?.ToString(CultureInfo.InvariantCulture)
-                    ?? CodeGenerator.GetAlias(method)
-                    ?? CodeGenerator.CreateHashedMethodId(method);
-                res.Add(new(this, method, methodId, hasCollision: pair.Value));
+                var methodAlias = CodeGenerator.GetId(method)?.ToString(CultureInfo.InvariantCulture)
+                    ?? CodeGenerator.GetAlias(method);
+                var hasAlias = !string.IsNullOrEmpty(methodAlias);
+                var methodId = methodAlias ?? CodeGenerator.CreateHashedMethodId(method);
+                res.Add(new(this, method, methodId, hasCollision: pair.Value, hasAlias: hasAlias));
             }
 
             return res;

@@ -173,13 +173,27 @@ namespace Orleans.CodeGenerator
 
         internal static CompoundTypeAliasComponent[] GetCompoundTypeAliasAttributeArguments(MethodDescription methodDescription)
         {
-            return new CompoundTypeAliasComponent[4]
+            if (methodDescription.HasAlias)
             {
-                    new CompoundTypeAliasComponent("inv"),
-                    new CompoundTypeAliasComponent(methodDescription.ContainingInterface.ProxyBaseType),
-                    new CompoundTypeAliasComponent(methodDescription.ContainingInterface.InterfaceType),
-                    new CompoundTypeAliasComponent(methodDescription.MethodId)
-            };
+                return new CompoundTypeAliasComponent[]
+                {
+                        new("inv"),
+                        new(methodDescription.ContainingInterface.ProxyBaseType),
+                        new(methodDescription.ContainingInterface.InterfaceType),
+                        new(methodDescription.Method.OriginalDefinition.ContainingType),
+                        new(methodDescription.MethodId)
+                };
+            }
+            else
+            {
+                return new CompoundTypeAliasComponent[]
+                {
+                    new("inv"),
+                    new(methodDescription.ContainingInterface.ProxyBaseType),
+                    new(methodDescription.ContainingInterface.InterfaceType),
+                    new(methodDescription.MethodId)
+                };
+            }
         }
 
         private static INamedTypeSymbol GetBaseClassType(MethodDescription method)
@@ -527,7 +541,17 @@ namespace Orleans.CodeGenerator
         {
             var genericArity = method.AllTypeParameters.Count;
             var typeArgs = genericArity > 0 ? "_" + genericArity : string.Empty;
-            return $"Invokable_{interfaceDescription.Name}_{interfaceDescription.ProxyBaseType.Name}_{method.MethodId}{typeArgs}";
+            if (method.HasAlias)
+            {
+                if (method.Method.Name == "Eat")
+                {
+                }
+                return $"Invokable_{interfaceDescription.Name}_{method.Method.ReceiverType.Name}_{interfaceDescription.ProxyBaseType.Name}_{method.MethodId}{typeArgs}";
+            }
+            else
+            {
+                return $"Invokable_{interfaceDescription.Name}_{interfaceDescription.ProxyBaseType.Name}_{method.MethodId}{typeArgs}";
+            }
         }
 
         private static MemberDeclarationSyntax[] GetFieldDeclarations(
