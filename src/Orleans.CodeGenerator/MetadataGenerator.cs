@@ -61,7 +61,7 @@ namespace Orleans.CodeGenerator
             }
 
             var addInvokableInterfaceMethod = configParam.Member("Interfaces").Member("Add");
-            foreach (var type in metadataModel.InvokableInterfaces)
+            foreach (var type in metadataModel.InvokableInterfaces.Values)
             {
                 body.Add(ExpressionStatement(InvocationExpression(addInvokableInterfaceMethod,
                     ArgumentList(SingletonSeparatedList(Argument(TypeOfExpression(type.InterfaceType.ToOpenTypeSyntax())))))));

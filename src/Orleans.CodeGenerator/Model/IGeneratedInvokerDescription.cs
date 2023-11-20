@@ -19,24 +19,28 @@ namespace Orleans.CodeGenerator
             MethodDescription methodDescription,
             Accessibility accessibility,
             string generatedClassName,
+            string generatedNamespaceName,
             List<IMemberDescription> members,
             List<INamedTypeSymbol> serializationHooks,
             INamedTypeSymbol baseType,
             List<TypeSyntax> constructorArguments,
-            CompoundTypeAliasComponent[] compoundTypeAliasArguments,
-            string returnValueInitializerMethod)
+            List<CompoundTypeAliasComponent[]> compoundTypeAliases,
+            string returnValueInitializerMethod,
+            ClassDeclarationSyntax classDeclarationSyntax)
         {
             InterfaceDescription = interfaceDescription;
             _methodDescription = methodDescription;
             BaseType = baseType;
             Name = generatedClassName;
+            GeneratedNamespace = generatedNamespaceName;
             Members = members;
 
             Accessibility = accessibility;
             SerializationHooks = serializationHooks;
             ActivatorConstructorParameters = constructorArguments;
-            CompoundTypeAliasArguments = compoundTypeAliasArguments;
+            CompoundTypeAliases = compoundTypeAliases;
             ReturnValueInitializerMethod = returnValueInitializerMethod;
+            ClassDeclarationSyntax = classDeclarationSyntax;
         }
 
         public Accessibility Accessibility { get; }
@@ -47,7 +51,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol BaseType { get; }
         public TypeSyntax BaseTypeSyntax => _baseTypeSyntax ??= BaseType.ToTypeSyntax(_methodDescription.TypeParameterSubstitutions);
         public string Namespace => GeneratedNamespace;
-        public string GeneratedNamespace => InterfaceDescription.GeneratedNamespace;
+        public string GeneratedNamespace { get; }
         public string Name { get; }
         public bool IsValueType => false;
         public bool IsSealedType => true;
@@ -56,7 +60,7 @@ namespace Orleans.CodeGenerator
         public bool IsGenericType => TypeParameters.Count > 0;
         public List<IMemberDescription> Members { get; }
         public InvokableInterfaceDescription InterfaceDescription { get; }
-        public SemanticModel SemanticModel => InterfaceDescription.SemanticModel;
+        public Compilation Compilation => InterfaceDescription.CodeGenerator.Compilation;
         public bool IsEmptyConstructable => ActivatorConstructorParameters is not { Count: > 0 };
         public bool UseActivator => ActivatorConstructorParameters is { Count: > 0 };
         public bool TrackReferences => false;
@@ -69,14 +73,15 @@ namespace Orleans.CodeGenerator
         public bool IsExceptionType => false;
         public List<TypeSyntax> ActivatorConstructorParameters { get; }
         public bool HasActivatorConstructor => UseActivator;
-        public CompoundTypeAliasComponent[] CompoundTypeAliasArguments {get;}
+        public List<CompoundTypeAliasComponent[]> CompoundTypeAliases {get;}
+        public ClassDeclarationSyntax ClassDeclarationSyntax { get; }
         public string ReturnValueInitializerMethod { get; }
 
         public ExpressionSyntax GetObjectCreationExpression(LibraryTypes libraryTypes) => ObjectCreationExpression(TypeSyntax, ArgumentList(), null);
 
         private TypeSyntax CreateTypeSyntax()
         {
-            var simpleName = InvokableGenerator.GetSimpleClassName(InterfaceDescription, _methodDescription);
+            var simpleName = InvokableGenerator.GetSimpleClassName(_methodDescription.GetOriginalMethodDescription());
             return (TypeParameters, Namespace) switch
             {
                 ({ Count: > 0 }, { Length: > 0 }) => QualifiedName(ParseName(Namespace), GenericName(Identifier(simpleName), TypeArgumentList(SeparatedList<TypeSyntax>(TypeParameters.Select(p => IdentifierName(p.Name)))))),
@@ -88,7 +93,7 @@ namespace Orleans.CodeGenerator
 
         private TypeSyntax CreateOpenTypeSyntax()
         {
-            var simpleName = InvokableGenerator.GetSimpleClassName(InterfaceDescription, _methodDescription);
+            var simpleName = InvokableGenerator.GetSimpleClassName(_methodDescription.GetOriginalMethodDescription());
             return (TypeParameters, Namespace) switch
             {
                 ({ Count: > 0 }, { Length: > 0 }) => QualifiedName(ParseName(Namespace), GenericName(Identifier(simpleName), TypeArgumentList(SeparatedList<TypeSyntax>(TypeParameters.Select(p => OmittedTypeArgument()))))),

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Orleans.CodeGenerator.Diagnostics;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using System.ComponentModel;
 
 namespace Orleans.CodeGenerator
 {
@@ -15,18 +16,30 @@ namespace Orleans.CodeGenerator
     /// </summary>
     internal static class InvokableGenerator
     {
-        public static (ClassDeclarationSyntax Syntax, GeneratedInvokerDescription InvokerDescription) Generate(
+        public static GeneratedInvokerDescription Generate(
             LibraryTypes libraryTypes,
             InvokableInterfaceDescription interfaceDescription,
             MethodDescription method)
         {
-            var generatedClassName = GetSimpleClassName(interfaceDescription, method);
-            INamedTypeSymbol baseClassType = GetBaseClassType(method);
+            var originalMethod = method.GetOriginalMethodDescription();
+            var generatedClassName = GetSimpleClassName(originalMethod);
+
+            var baseClassType = GetBaseClassType(originalMethod);
             var fieldDescriptions = GetFieldDescriptions(method, interfaceDescription);
             var fields = GetFieldDeclarations(method, fieldDescriptions, libraryTypes);
             var (ctor, ctorArgs) = GenerateConstructor(libraryTypes, generatedClassName, method, baseClassType);
+            var accessibility = GetAccessibility(interfaceDescription);
+            var compoundTypeAliases = GetCompoundTypeAliasAttributeArguments(method);
 
-            Accessibility accessibility = GetAccessibility(interfaceDescription);
+            List<INamedTypeSymbol> serializationHooks = new();
+            if (baseClassType.GetAttributes(libraryTypes.SerializationCallbacksAttribute, out var hookAttributes))
+            {
+                foreach (var hookAttribute in hookAttributes)
+                {
+                    var hookType = (INamedTypeSymbol)hookAttribute.ConstructorArguments[0].Value;
+                    serializationHooks.Add(hookType);
+                }
+            }
 
             var targetField = fieldDescriptions.OfType<TargetFieldDescription>().Single();
 
@@ -35,14 +48,88 @@ namespace Orleans.CodeGenerator
                 Accessibility.Public => SyntaxKind.PublicKeyword,
                 _ => SyntaxKind.InternalKeyword,
             };
-            var compoundTypeAliasArgs = GetCompoundTypeAliasAttributeArguments(method);
+
+            var classDeclaration = method.IsInheritedFromInvokableInterface ? null : GetClassDeclarationSyntax(
+                libraryTypes,
+                interfaceDescription,
+                method,
+                generatedClassName,
+                baseClassType,
+                fieldDescriptions,
+                fields,
+                ctor,
+                compoundTypeAliases,
+                targetField,
+                accessibilityKind);
+
+            string returnValueInitializerMethod = null;
+            if (baseClassType.GetAttribute(libraryTypes.ReturnValueProxyAttribute) is { ConstructorArguments: { Length: > 0 } attrArgs })
+            {
+                returnValueInitializerMethod = (string)attrArgs[0].Value;
+            }
+
+            while (baseClassType.HasAttribute(libraryTypes.SerializerTransparentAttribute))
+            {
+                baseClassType = baseClassType.BaseType;
+            }
+
+            var invokerDescription = new GeneratedInvokerDescription(
+                interfaceDescription,
+                method,
+                accessibility,
+                generatedClassName,
+                originalMethod.ContainingInterface.GeneratedNamespace,
+                fieldDescriptions.OfType<IMemberDescription>().ToList(),
+                serializationHooks,
+                baseClassType,
+                ctorArgs,
+                compoundTypeAliases,
+                returnValueInitializerMethod,
+                classDeclaration);
+            return invokerDescription;
+
+            static Accessibility GetAccessibility(InvokableInterfaceDescription interfaceDescription)
+            {
+                var t = interfaceDescription.InterfaceType;
+                Accessibility accessibility = t.DeclaredAccessibility;
+                while (t is not null)
+                {
+                    if ((int)t.DeclaredAccessibility < (int)accessibility)
+                    {
+                        accessibility = t.DeclaredAccessibility;
+                    }
+
+                    t = t.ContainingType;
+                }
+
+                return accessibility;
+            }
+        }
+
+        private static ClassDeclarationSyntax GetClassDeclarationSyntax(
+            LibraryTypes libraryTypes,
+            InvokableInterfaceDescription interfaceDescription,
+            MethodDescription method,
+            string generatedClassName,
+            INamedTypeSymbol baseClassType,
+            List<InvokerFieldDescripton> fieldDescriptions,
+            MemberDeclarationSyntax[] fields,
+            ConstructorDeclarationSyntax ctor,
+            List<CompoundTypeAliasComponent[]> compoundTypeAliases,
+            TargetFieldDescription targetField,
+            SyntaxKind accessibilityKind)
+        {
             var classDeclaration = ClassDeclaration(generatedClassName)
                 .AddBaseListTypes(SimpleBaseType(baseClassType.ToTypeSyntax(method.TypeParameterSubstitutions)))
                 .AddModifiers(Token(accessibilityKind), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(
-                    AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())),
-                    AttributeList(SingletonSeparatedList(GetCompoundTypeAliasAttribute(libraryTypes, compoundTypeAliasArgs))))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetGeneratedCodeAttributeSyntax())))
                 .AddMembers(fields);
+
+            foreach (var alias in compoundTypeAliases)
+            {
+                classDeclaration = classDeclaration.AddAttributeLists(
+                    AttributeList(SingletonSeparatedList(GetCompoundTypeAliasAttribute(libraryTypes, alias))));
+            }
 
             if (ctor != null)
             {
@@ -68,62 +155,12 @@ namespace Orleans.CodeGenerator
                     GenerateSetArgumentMethod(method, fieldDescriptions),
                     GenerateInvokeInnerMethod(libraryTypes, method, fieldDescriptions, targetField));
 
-            var typeParametersWithNames = method.AllTypeParameters;
-            if (typeParametersWithNames.Count > 0)
+            if (method.AllTypeParameters.Count > 0)
             {
-                classDeclaration = SyntaxFactoryUtility.AddGenericTypeParameters(classDeclaration, typeParametersWithNames);
+                classDeclaration = SyntaxFactoryUtility.AddGenericTypeParameters(classDeclaration, method.AllTypeParameters);
             }
 
-            List<INamedTypeSymbol> serializationHooks = new();
-            if (baseClassType.GetAttributes(libraryTypes.SerializationCallbacksAttribute, out var hookAttributes))
-            {
-                foreach (var hookAttribute in hookAttributes)
-                {
-                    var hookType = (INamedTypeSymbol)hookAttribute.ConstructorArguments[0].Value;
-                    serializationHooks.Add(hookType);
-                }
-            }
-
-            string returnValueInitializerMethod = null;
-            if (baseClassType.GetAttribute(libraryTypes.ReturnValueProxyAttribute) is { ConstructorArguments: { Length: > 0 } attrArgs })
-            {
-                returnValueInitializerMethod = (string)attrArgs[0].Value;
-            }
-
-            while (baseClassType.HasAttribute(libraryTypes.SerializerTransparentAttribute))
-            {
-                baseClassType = baseClassType.BaseType;
-            }
-
-            var invokerDescription = new GeneratedInvokerDescription(
-                interfaceDescription,
-                method,
-                accessibility,
-                generatedClassName,
-                fieldDescriptions.OfType<IMemberDescription>().ToList(),
-                serializationHooks,
-                baseClassType,
-                ctorArgs,
-                compoundTypeAliasArgs,
-                returnValueInitializerMethod);
-            return (classDeclaration, invokerDescription);
-
-            static Accessibility GetAccessibility(InvokableInterfaceDescription interfaceDescription)
-            {
-                var t = interfaceDescription.InterfaceType;
-                Accessibility accessibility = t.DeclaredAccessibility;
-                while (t is not null)
-                {
-                    if ((int)t.DeclaredAccessibility < (int)accessibility)
-                    {
-                        accessibility = t.DeclaredAccessibility;
-                    }
-
-                    t = t.ContainingType;
-                }
-
-                return accessibility;
-            }
+            return classDeclaration;
         }
 
         private static MemberDeclarationSyntax[] GenerateResponseTimeoutPropertyMembers(LibraryTypes libraryTypes, long value)
@@ -171,29 +208,28 @@ namespace Orleans.CodeGenerator
             return Attribute(libraryTypes.CompoundTypeAliasAttribute.ToNameSyntax()).AddArgumentListArguments(args);
         }
 
-        internal static CompoundTypeAliasComponent[] GetCompoundTypeAliasAttributeArguments(MethodDescription methodDescription)
+        internal static List<CompoundTypeAliasComponent[]> GetCompoundTypeAliasAttributeArguments(MethodDescription methodDescription)
         {
+            var result = new List<CompoundTypeAliasComponent[]>(2);
             if (methodDescription.HasAlias)
             {
-                return new CompoundTypeAliasComponent[]
+                result.Add(new CompoundTypeAliasComponent[]
                 {
                         new("inv"),
                         new(methodDescription.ContainingInterface.ProxyBaseType),
                         new(methodDescription.ContainingInterface.InterfaceType),
-                        new(methodDescription.Method.OriginalDefinition.ContainingType),
                         new(methodDescription.MethodId)
-                };
+                });
             }
-            else
+
+            result.Add(new CompoundTypeAliasComponent[]
             {
-                return new CompoundTypeAliasComponent[]
-                {
-                    new("inv"),
-                    new(methodDescription.ContainingInterface.ProxyBaseType),
-                    new(methodDescription.ContainingInterface.InterfaceType),
-                    new(methodDescription.MethodId)
-                };
-            }
+                new("inv"),
+                new(methodDescription.ContainingInterface.ProxyBaseType),
+                new(methodDescription.ContainingInterface.InterfaceType),
+                new(methodDescription.GeneratedMethodId)
+            });
+            return result;
         }
 
         private static INamedTypeSymbol GetBaseClassType(MethodDescription method)
@@ -537,21 +573,11 @@ namespace Orleans.CodeGenerator
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
 
-        public static string GetSimpleClassName(InvokableInterfaceDescription interfaceDescription, MethodDescription method)
+        public static string GetSimpleClassName(MethodDescription method)
         {
             var genericArity = method.AllTypeParameters.Count;
             var typeArgs = genericArity > 0 ? "_" + genericArity : string.Empty;
-            if (method.HasAlias)
-            {
-                if (method.Method.Name == "Eat")
-                {
-                }
-                return $"Invokable_{interfaceDescription.Name}_{method.Method.ReceiverType.Name}_{interfaceDescription.ProxyBaseType.Name}_{method.MethodId}{typeArgs}";
-            }
-            else
-            {
-                return $"Invokable_{interfaceDescription.Name}_{interfaceDescription.ProxyBaseType.Name}_{method.MethodId}{typeArgs}";
-            }
+            return $"Invokable_{method.ContainingInterface.Name}_{method.ContainingInterface.ProxyBaseType.Name}_{method.GeneratedMethodId}{typeArgs}";
         }
 
         private static MemberDeclarationSyntax[] GetFieldDeclarations(

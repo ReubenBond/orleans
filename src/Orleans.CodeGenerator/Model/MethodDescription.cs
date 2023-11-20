@@ -3,6 +3,8 @@ using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
+using System.Linq;
 
 namespace Orleans.CodeGenerator
 {
@@ -10,13 +12,23 @@ namespace Orleans.CodeGenerator
     {
         private readonly InvokableInterfaceDescription _iface;
 
-        public MethodDescription(InvokableInterfaceDescription containingType, IMethodSymbol method, string methodId, bool hasCollision, bool hasAlias)
+        public MethodDescription(InvokableInterfaceDescription containingType, IMethodSymbol method, bool hasCollision)
         {
+            var codeGenerator = containingType.CodeGenerator;
+            var methodAlias = codeGenerator.GetId(method)?.ToString(CultureInfo.InvariantCulture) ?? codeGenerator.GetAlias(method);
             _iface = containingType;
             Method = method;
-            MethodId = methodId;
-            HasAlias = hasAlias;
+            GeneratedMethodId = CodeGenerator.CreateHashedMethodId(method);
+            MethodId = methodAlias ?? GeneratedMethodId;
             HasCollision = hasCollision;
+
+            DeclaringInterface = method.ConstructedFrom.ContainingType;
+            if (!SymbolEqualityComparer.Default.Equals(DeclaringInterface, containingType.InterfaceType))
+            {
+                IsInheritedFromInvokableInterface = DeclaringInterface.HasAttribute(
+                            containingType.CodeGenerator.LibraryTypes.GenerateMethodSerializersAttribute,
+                            inherited: true);
+            }
 
             var names = new HashSet<string>(StringComparer.Ordinal);
             AllTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
@@ -66,7 +78,24 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        public bool HasAlias { get; }
+        public MethodDescription GetOriginalMethodDescription()
+        {
+            if (IsInheritedFromInvokableInterface)
+            {
+                var invokableDescription = ContainingInterface.CodeGenerator.MetadataModel.TryGetInvokableInterfaceDescription(DeclaringInterface);
+                foreach (var method in invokableDescription.Methods)
+                {
+                    if (SymbolEqualityComparer.Default.Equals(Method.OriginalDefinition, method.Method))
+                    {
+                        return method;
+                    }
+                }
+            }
+
+            return this;
+        }
+
+        public bool HasAlias => !string.Equals(MethodId, GeneratedMethodId, StringComparison.Ordinal);
 
         private void PopulateOverrides(InvokableInterfaceDescription containingType, IMethodSymbol method)
         {
@@ -151,11 +180,12 @@ namespace Orleans.CodeGenerator
         public string MethodId { get; }
 
         public IMethodSymbol Method { get; }
+        public string GeneratedMethodId { get; }
 
         public InvokableInterfaceDescription ContainingInterface => _iface;
 
         public bool HasCollision { get; }
-
+        public INamedTypeSymbol DeclaringInterface { get; }
         public List<(string Name, ITypeParameterSymbol Parameter)> AllTypeParameters { get; }
 
         public List<(string Name, ITypeParameterSymbol Parameter)> MethodTypeParameters { get; }
@@ -173,6 +203,8 @@ namespace Orleans.CodeGenerator
         /// Gets the response timeout ticks, if set.
         /// </summary>
         public long? ResponseTimeoutTicks { get; private set; }
+
+        public bool IsInheritedFromInvokableInterface { get; }
 
         public override int GetHashCode() => SymbolEqualityComparer.Default.GetHashCode(Method);
     }

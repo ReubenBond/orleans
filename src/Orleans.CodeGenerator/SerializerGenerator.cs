@@ -1172,7 +1172,7 @@ namespace Orleans.CodeGenerator
         /// </summary>
         internal class SerializableMember : ISerializableMember
         {
-            private readonly SemanticModel _model;
+            private readonly Compilation _compilation;
             private readonly LibraryTypes _libraryTypes;
             private IPropertySymbol _property;
             private readonly IMemberDescription _member;
@@ -1185,7 +1185,7 @@ namespace Orleans.CodeGenerator
             public SerializableMember(LibraryTypes libraryTypes, ISerializableTypeDescription type, IMemberDescription member, int ordinal)
             {
                 _libraryTypes = libraryTypes;
-                _model = type.SemanticModel;
+                _compilation = type.Compilation;
                 _ordinal = ordinal;
                 _member = member;
             }
@@ -1225,7 +1225,7 @@ namespace Orleans.CodeGenerator
             /// <summary>
             /// Gets a value indicating whether or not this member represents an accessible field.
             /// </summary>
-            private bool IsGettableField => Field is { } field && _model.IsAccessible(0, field) && !IsObsolete;
+            private bool IsGettableField => Field is { } field && _compilation.IsSymbolAccessibleWithin(field, _compilation.Assembly) && !IsObsolete;
 
             /// <summary>
             /// Gets a value indicating whether or not this member represents an accessible, mutable field.
@@ -1235,12 +1235,12 @@ namespace Orleans.CodeGenerator
             /// <summary>
             /// Gets a value indicating whether or not this member represents a property with an accessible, non-obsolete getter.
             /// </summary>
-            private bool IsGettableProperty => Property?.GetMethod is { } getMethod && _model.IsAccessible(0, getMethod) && !IsObsolete;
+            private bool IsGettableProperty => Property?.GetMethod is { } getMethod && _compilation.IsSymbolAccessibleWithin(getMethod, _compilation.Assembly) && !IsObsolete;
 
             /// <summary>
             /// Gets a value indicating whether or not this member represents a property with an accessible, non-obsolete setter.
             /// </summary>
-            private bool IsSettableProperty => Property?.SetMethod is { } setMethod && _model.IsAccessible(0, setMethod) && !setMethod.IsInitOnly && !IsObsolete;
+            private bool IsSettableProperty => Property?.SetMethod is { } setMethod && _compilation.IsSymbolAccessibleWithin(setMethod, _compilation.Assembly) && !setMethod.IsInitOnly && !IsObsolete;
 
             /// <summary>
             /// Gets syntax representing the type of this field.

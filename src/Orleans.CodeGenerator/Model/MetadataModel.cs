@@ -2,13 +2,22 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
+using Orleans.CodeGenerator.SyntaxGeneration;
+using System.Linq;
+using Orleans.CodeGenerator.Diagnostics;
 
 namespace Orleans.CodeGenerator
 {
     internal class MetadataModel
     {
+        private readonly CodeGenerator _codeGenerator;
+        public MetadataModel(CodeGenerator codeGenerator)
+        {
+            _codeGenerator = codeGenerator;
+        }
+
         public List<ISerializableTypeDescription> SerializableTypes { get; } = new(1024);
-        public List<InvokableInterfaceDescription> InvokableInterfaces { get; } = new(1024);
+        public Dictionary<INamedTypeSymbol, InvokableInterfaceDescription> InvokableInterfaces { get; } = new(SymbolEqualityComparer.Default);
         public List<INamedTypeSymbol> InvokableInterfaceImplementations { get; } = new(1024);
         public Dictionary<MethodDescription, GeneratedInvokerDescription> GeneratedInvokables { get; } = new();
         public List<GeneratedProxyDescription> GeneratedProxies { get; } = new(1024);
@@ -22,6 +31,67 @@ namespace Orleans.CodeGenerator
         public CompoundTypeAliasTree CompoundTypeAliases { get; } = CompoundTypeAliasTree.Create();
         public List<(TypeSyntax Type, uint Id)> WellKnownTypeIds { get; } = new(1024);
         public HashSet<string> ApplicationParts { get; } = new();
+        internal Dictionary<INamedTypeSymbol, Dictionary<INamedTypeSymbol, INamedTypeSymbol>> ProxyBaseTypeInvokableBaseTypes { get; } = new (SymbolEqualityComparer.Default);
+
+        public InvokableInterfaceDescription TryGetInvokableInterfaceDescription(INamedTypeSymbol symbol)
+        {
+            if (InvokableInterfaces.TryGetValue(symbol, out var description))
+            {
+                return description;
+            }
+
+            var attribute = symbol.GetAttribute(
+                _codeGenerator.LibraryTypes.GenerateMethodSerializersAttribute,
+                inherited: true);
+            if (attribute != null)
+            {
+                var prop = symbol.GetAllMembers<IPropertySymbol>().FirstOrDefault();
+                if (prop is { })
+                {
+                    throw new OrleansGeneratorDiagnosticAnalysisException(RpcInterfacePropertyDiagnostic.CreateDiagnostic(symbol, prop));
+                }
+
+                var baseClass = (INamedTypeSymbol)attribute.ConstructorArguments[0].Value;
+                var isExtension = (bool)attribute.ConstructorArguments[1].Value;
+                var invokableBaseTypes = GetInvokableBaseTypes(baseClass);
+
+                description = new InvokableInterfaceDescription(
+                    _codeGenerator,
+                    symbol,
+                    _codeGenerator.GetAlias(symbol) ?? symbol.Name,
+                    baseClass,
+                    isExtension,
+                    invokableBaseTypes);
+                InvokableInterfaces.Add(symbol, description);
+                return description;
+            }
+
+            return null;
+
+            Dictionary<INamedTypeSymbol, INamedTypeSymbol> GetInvokableBaseTypes(INamedTypeSymbol baseClass)
+            {
+                // Set the base invokable types which are used if attributes on individual methods do not override them.
+                if (!ProxyBaseTypeInvokableBaseTypes.TryGetValue(baseClass, out var invokableBaseTypes))
+                {
+                    invokableBaseTypes = new Dictionary<INamedTypeSymbol, INamedTypeSymbol>(SymbolEqualityComparer.Default);
+                    if (baseClass.GetAttributes(_codeGenerator.LibraryTypes.DefaultInvokableBaseTypeAttribute, out var invokableBaseTypeAttributes))
+                    {
+                        foreach (var attr in invokableBaseTypeAttributes)
+                        {
+                            var ctorArgs = attr.ConstructorArguments;
+                            var returnType = (INamedTypeSymbol)ctorArgs[0].Value;
+                            var invokableBaseType = (INamedTypeSymbol)ctorArgs[1].Value;
+                            invokableBaseTypes[returnType] = invokableBaseType;
+                        }
+                    }
+
+                    ProxyBaseTypeInvokableBaseTypes[baseClass] = invokableBaseTypes;
+                }
+
+                return invokableBaseTypes;
+            }
+
+        }
     }
 
     /// <summary>

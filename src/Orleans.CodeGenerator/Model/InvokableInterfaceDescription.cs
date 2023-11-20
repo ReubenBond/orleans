@@ -2,7 +2,6 @@ using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using Orleans.CodeGenerator.Diagnostics;
 using System.Linq;
 
@@ -13,7 +12,6 @@ namespace Orleans.CodeGenerator
         private static readonly char[] FilteredNameChars = new char[] { '`', '.' };
         public InvokableInterfaceDescription(
             CodeGenerator generator,
-            SemanticModel semanticModel,
             INamedTypeSymbol interfaceType,
             string name,
             INamedTypeSymbol proxyBaseType,
@@ -22,7 +20,6 @@ namespace Orleans.CodeGenerator
         {
             ValidateBaseClass(generator.LibraryTypes, proxyBaseType);
             CodeGenerator = generator;
-            SemanticModel = semanticModel;
             InterfaceType = interfaceType;
             ProxyBaseType = proxyBaseType;
             IsExtension = isExtension;
@@ -94,16 +91,12 @@ namespace Orleans.CodeGenerator
             foreach (var pair in methods)
             {
                 var method = pair.Key;
-                var methodAlias = CodeGenerator.GetId(method)?.ToString(CultureInfo.InvariantCulture)
-                    ?? CodeGenerator.GetAlias(method);
-                var hasAlias = !string.IsNullOrEmpty(methodAlias);
-                var methodId = methodAlias ?? CodeGenerator.CreateHashedMethodId(method);
-                res.Add(new(this, method, methodId, hasCollision: pair.Value, hasAlias: hasAlias));
+                res.Add(new(this, method, hasCollision: pair.Value));
             }
 
             return res;
 
-            IEnumerable<INamedTypeSymbol> GetAllInterfaces(INamedTypeSymbol s)
+            static IEnumerable<INamedTypeSymbol> GetAllInterfaces(INamedTypeSymbol s)
             {
                 if (s.TypeKind == TypeKind.Interface)
                 {

@@ -41,7 +41,7 @@ namespace UnitTests.GrainInterfaces
     [Alias("UnitTests.GrainInterfaces.IGenericMethodInterceptionGrain`1")]
     public interface IGenericMethodInterceptionGrain<in T> : IGrainWithIntegerKey, IMethodFromAnotherInterface
     {
-        //[Alias("GetInputAsString")]
+        [Alias("GetInputAsString")]
         Task<string> GetInputAsString(T input);
     }
 

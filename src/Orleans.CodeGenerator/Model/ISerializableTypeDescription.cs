@@ -22,7 +22,7 @@ namespace Orleans.CodeGenerator
         bool IsGenericType { get; }
         List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters { get; }
         List<IMemberDescription> Members { get; }
-        SemanticModel SemanticModel { get; }
+        Compilation Compilation { get; }
         bool UseActivator { get; }
         bool IsEmptyConstructable { get; }
         bool HasActivatorConstructor { get; }

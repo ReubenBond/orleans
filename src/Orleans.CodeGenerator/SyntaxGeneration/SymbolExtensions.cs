@@ -28,6 +28,38 @@ namespace Orleans.CodeGenerator.SyntaxGeneration
             public bool IncludeNamespace { get; set; } = true;
         }
 
+        public static bool HasAttribute(this INamedTypeSymbol symbol, INamedTypeSymbol attributeType, bool inherited) => GetAttribute(symbol, attributeType, inherited) is not null;
+
+        public static AttributeData? GetAttribute(this INamedTypeSymbol symbol, INamedTypeSymbol attributeType, bool inherited)
+        {
+            var s = symbol;
+            if (s.GetAttribute(attributeType) is { } attribute)
+            {
+                return attribute;
+            }
+
+            if (inherited)
+            {
+                foreach (var iface in symbol.AllInterfaces)
+                {
+                    if (iface.GetAttribute(attributeType) is { } iattr)
+                    {
+                        return iattr;
+                    }
+                }
+
+                while ((s = s.BaseType) != null)
+                {
+                    if (s.GetAttribute(attributeType) is { } attr)
+                    {
+                        return attr;
+                    }
+                }
+            }
+
+            return null;
+        }
+
         public static TypeSyntax ToTypeSyntax(this ITypeSymbol typeSymbol)
         {
             if (typeSymbol.SpecialType == SpecialType.System_Void)
