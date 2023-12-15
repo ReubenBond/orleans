@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
@@ -59,7 +60,7 @@ namespace Orleans.Runtime
         void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo);
 
         // For testing purposes only.
-        int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType);
+        Task<int> GetRunningRequestsCount(GrainInterfaceType grainInterfaceType);
     }
 
     /// <summary>

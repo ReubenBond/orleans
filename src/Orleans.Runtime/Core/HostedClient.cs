@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainReferences;
 using Orleans.Internal;
+using Orleans.Placement.Repartitioning;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
@@ -19,7 +20,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// A client which is hosted within a silo.
     /// </summary>
-    internal sealed class HostedClient : IGrainContext, IGrainExtensionBinder, IDisposable, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed class HostedClient : IGrainContext, IGrainExtensionBinder, IDisposable, ILifecycleParticipant<ISiloLifecycle>, IMessageReceiver
     {
         private readonly object lockObj = new object();
         private readonly Channel<Message> incomingMessages;
@@ -30,6 +31,7 @@ namespace Orleans.Runtime
         private readonly IInternalGrainFactory grainFactory;
         private readonly MessageCenter siloMessageCenter;
         private readonly MessagingTrace messagingTrace;
+        private readonly Action<Message>? _incomingRequestObserver;
         private readonly ConcurrentDictionary<Type, (object Implementation, IAddressable Reference)> _extensions = new ConcurrentDictionary<Type, (object, IAddressable)>();
         private readonly ConcurrentDictionary<Type, object> _components = new();
         private readonly IServiceScope _serviceProviderScope;
@@ -46,6 +48,7 @@ namespace Orleans.Runtime
             MessagingTrace messagingTrace,
             DeepCopier deepCopier,
             GrainReferenceActivator referenceActivator,
+            IMessageStatisticsSink messageStatisticsSink,
             InterfaceToImplementationMappingCache interfaceToImplementationMappingCache)
         {
             this.incomingMessages = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
@@ -68,6 +71,7 @@ namespace Orleans.Runtime
                 logger);
             this.siloMessageCenter = messageCenter;
             this.messagingTrace = messagingTrace;
+            _incomingRequestObserver = messageStatisticsSink.GetMessageObserver();
             this.logger = logger;
 
             this.ClientId = CreateHostedClientGrainId(siloDetails.SiloAddress);
@@ -204,12 +208,13 @@ namespace Orleans.Runtime
 
             if (msg.Direction == Message.Directions.Response)
             {
-                // Requests are made through the runtime client, so deliver responses to the rutnime client so that the request callback can be executed.
+                // Requests are made through the runtime client, so deliver responses to the runtime client so that the request callback can be executed.
                 this.runtimeClient.ReceiveResponse(msg);
             }
             else
             {
                 // Requests against client objects are scheduled for execution on the client.
+                _incomingRequestObserver?.Invoke(msg);
                 this.incomingMessages.Writer.TryWrite(msg);
             }
         }
@@ -397,6 +402,11 @@ namespace Orleans.Runtime
         public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
         {
             // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
+        }
+
+        void IMessageReceiver.ReceiveMessage(Message message, IMessageTargetCache cache)
+        {
+            ReceiveMessage(message);
         }
     }
 }

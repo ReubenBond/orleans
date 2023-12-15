@@ -6,17 +6,14 @@ namespace Orleans.Runtime
 {
     internal class SharedCallbackData
     {
-        public readonly Action<Message> Unregister;
         public readonly ILogger Logger;
         private TimeSpan responseTimeout;
         public long ResponseTimeoutStopwatchTicks;
 
         public SharedCallbackData(
-            Action<Message> unregister,
             ILogger logger,
             TimeSpan responseTimeout)
         {
-            this.Unregister = unregister;
             this.Logger = logger;
             this.ResponseTimeout = responseTimeout;
         }
@@ -27,7 +24,7 @@ namespace Orleans.Runtime
             set
             {
                 this.responseTimeout = value;
-                this.ResponseTimeoutStopwatchTicks = (long)(value.TotalSeconds * Stopwatch.Frequency);
+                this.ResponseTimeoutStopwatchTicks = (long)value.TotalMilliseconds;
             }
         }
     }

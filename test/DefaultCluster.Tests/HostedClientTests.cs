@@ -110,12 +110,12 @@ namespace DefaultCluster.Tests.General
                         })
                     .WithTimeout(maxTimeout);
 
-                Assert.Equal(expected: 1, actual: runtimeClient.GetRunningRequestsCount(stuckGrainType));
+                Assert.Equal(expected: 1, actual: await runtimeClient.GetRunningRequestsCount(stuckGrainType));
 
                 await assertionTask;
                 stopwatch.Stop();
 
-                Assert.Equal(expected: 0, actual: runtimeClient.GetRunningRequestsCount(stuckGrainType));
+                Assert.Equal(expected: 0, actual: await runtimeClient.GetRunningRequestsCount(stuckGrainType));
 
                 Assert.True(stopwatch.Elapsed >= timeout, $"Waited less than {timeout}. Waited {stopwatch.Elapsed}");
                 Assert.True(stopwatch.Elapsed <= maxTimeout, $"Waited longer than {maxTimeout}. Waited {stopwatch.Elapsed}");

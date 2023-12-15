@@ -11,28 +11,20 @@ builder.UseOrleans(orleans =>
     orleans.AddActivationRepartitioner<HardLimitRule>();
     orleans.Configure<ActivationRepartitionerOptions>(o =>
     {
+        o.AnchoringFilterEnabled = false;
         o.MinRoundPeriod = TimeSpan.FromSeconds(5);
         o.MaxRoundPeriod = TimeSpan.FromSeconds(15);
         o.RecoveryPeriod = TimeSpan.FromSeconds(2);
     });
+    orleans.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.Placement.Repartitioning.ActivationRepartitioner", LogLevel.Trace));
 });
 #pragma warning restore ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 
-// Add services to the container.
-builder.Services.AddSingleton<ClusterDiagnosticsService>();
-
 var app = builder.Build();
 
-var clusterDiagnosticsService = app.Services.GetRequiredService<ClusterDiagnosticsService>();
-app.MapGet("/data.json", ([FromServices] ClusterDiagnosticsService clusterDiagnosticsService) => clusterDiagnosticsService.GetGrainCallFrequencies());
-app.MapPost("/reset", async ([FromServices] IGrainFactory grainFactory) =>
-{
-    await grainFactory.GetGrain<ILoaderGrain>("root").Reset();
-});
-app.MapPost("/add", async ([FromServices] IGrainFactory grainFactory) =>
-{
-    await grainFactory.GetGrain<ILoaderGrain>("root").AddForest();
-});
+app.MapGet("/data.json", ([FromServices] IGrainFactory grainFactory) => grainFactory.GetGrain<IClusterDiagnosticsGrain>("default").GetGrainCallFrequencies());
+app.MapPost("/reset", ([FromServices] IGrainFactory grainFactory) => grainFactory.GetGrain<ILoaderGrain>("root").Reset());
+app.MapPost("/add", ([FromServices] IGrainFactory grainFactory) => grainFactory.GetGrain<ILoaderGrain>("root").AddForest());
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -81,7 +73,7 @@ public class LoaderGrain : Grain, ILoaderGrain
     {
         ++_resetCount;
         _numForests = 0;
-        await ServiceProvider.GetRequiredService<ClusterDiagnosticsService>().ResetAsync();
+        await GrainFactory.GetGrain<IClusterDiagnosticsGrain>("default").ResetAsync();
         await GrainFactory.GetGrain<IManagementGrain>(0).ResetGrainCallFrequencies();
     }
 

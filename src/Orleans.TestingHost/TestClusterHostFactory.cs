@@ -6,6 +6,7 @@ using System.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
@@ -228,7 +229,11 @@ namespace Orleans.TestingHost
             if (configureFileLogging)
             {
                 var fileName = TestingUtils.CreateTraceFileName(name, configuration[nameof(TestClusterOptions.ClusterId)]);
-                services.AddLogging(loggingBuilder => loggingBuilder.AddFile(fileName));
+                services.AddLogging(loggingBuilder =>
+                {
+                    //loggingBuilder.SetMinimumLevel(LogLevel.Trace);
+                    loggingBuilder.AddFile(fileName);
+                });
             }
         }
 

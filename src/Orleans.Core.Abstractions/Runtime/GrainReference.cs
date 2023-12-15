@@ -250,7 +250,7 @@ namespace Orleans.Runtime
     [DefaultInvokableBaseType(typeof(Task), typeof(TaskRequest))]
     [DefaultInvokableBaseType(typeof(void), typeof(VoidRequest))]
     [DefaultInvokableBaseType(typeof(IAsyncEnumerable<>), typeof(AsyncEnumerableRequest<>))]
-    public class GrainReference : IAddressable, IEquatable<GrainReference>, ISpanFormattable
+    public class GrainReference : IAddressable, IEquatable<GrainReference>, ISpanFormattable, IMessageTargetCache
     {
         /// <summary>
         /// The grain reference functionality which is shared by all grain references of a given type.
@@ -263,6 +263,14 @@ namespace Orleans.Runtime
         /// </summary>
         [NonSerialized]
         private readonly IdSpan _key;
+
+        /// <summary>
+        /// Gets or sets a cached recipient which can be used to handle messages sent to the target represented by this instance.
+        /// </summary>
+        object IMessageTargetCache.MessageReceiver { get => MessageReceiver; set => MessageReceiver = value; }
+
+        [field: NonSerialized]
+        internal object MessageReceiver { get; set; }
 
         /// <summary>
         /// Gets the grain reference functionality which is shared by all grain references of a given type.
@@ -478,7 +486,7 @@ namespace Orleans.Runtime
                     result.Append(", ");
                 }
 
-                result.Append(request.GetArgument(n));
+                result.Append(request.GetArgument(n)?.GetType().ToString() ?? "null");
             }
 
             result.Append(')');
