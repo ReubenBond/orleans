@@ -14,9 +14,14 @@ using Microsoft.Extensions.Configuration.Memory;
 using Orleans.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
-using Orleans.TestingHost.InMemoryTransport;
+using Orleans.Runtime.Messaging;
+using Orleans.Connections.Transport;
 using Orleans.TestingHost.UnixSocketTransport;
 using System.Net;
+using Orleans.TestingHost.InMemoryTransport;
+using Orleans.Messaging;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Orleans.TestingHost
 {
@@ -606,13 +611,22 @@ namespace Orleans.TestingHost
                         switch (transport)
                         {
                             case ConnectionTransportType.TcpSocket:
+                                // TCP is used by default
                                 break;
                             case ConnectionTransportType.InMemory:
-                                clientBuilder.UseInMemoryConnectionTransport(_transportHub);
-                                break;
+                                {
+                                    clientBuilder.Services.RemoveAll<MessageTransportConnector>();
+                                    clientBuilder.Services.AddSingleton<MessageTransportConnector>(sp => new InMemoryTransportConnector(_transportHub, sp.GetRequiredService<ILoggerFactory>()));
+                                    break;
+                                }
                             case ConnectionTransportType.UnixSocket:
-                                clientBuilder.UseUnixSocketConnection();
-                                break;
+                                {
+                                    clientBuilder.Services.RemoveAll<MessageTransportConnector>();
+                                    clientBuilder.Services.AddSingleton<MessageTransportConnector>(sp => new UnixDomainSocketMessageTransportConnector(
+                                        sp.GetRequiredService<IOptions<UnixSocketConnectionOptions>>(),
+                                        sp.GetRequiredService<ILoggerFactory>()));
+                                    break;
+                                }
                             default:
                                 throw new ArgumentException($"Unsupported {nameof(ConnectionTransportType)}: {transport}");
                         }
@@ -668,11 +682,47 @@ namespace Orleans.TestingHost
                         case ConnectionTransportType.TcpSocket:
                             break;
                         case ConnectionTransportType.InMemory:
-                            siloBuilder.UseInMemoryConnectionTransport(_transportHub);
-                            break;
+                            {
+                                siloBuilder.Services.RemoveAll<MessageTransportConnector>();
+                                siloBuilder.Services.RemoveAll<MessageTransportListener>();
+                                siloBuilder.Services.AddSingleton<MessageTransportConnector>(sp => new InMemoryTransportConnector(_transportHub, sp.GetRequiredService<ILoggerFactory>()));
+                                siloBuilder.Services.AddSingleton<MessageTransportListener>(sp => new InMemoryTransportListener(
+                                    "gateway",
+                                    sp.GetRequiredService<IOptions<EndpointOptions>>().Value.GetListeningProxyEndpoint().ToString(),
+                                    _transportHub));
+                                siloBuilder.Services.AddSingleton<MessageTransportListener>(sp => new InMemoryTransportListener(
+                                    "silo",
+                                    sp.GetRequiredService<IOptions<EndpointOptions>>().Value.GetListeningSiloEndpoint().ToString(),
+                                    _transportHub));
+                               break;
+                            }
                         case ConnectionTransportType.UnixSocket:
-                            siloBuilder.UseUnixSocketConnection();
-                            break;
+                            {
+                                siloBuilder.Services.RemoveAll<MessageTransportConnector>();
+                                siloBuilder.Services.RemoveAll<MessageTransportListener>();
+                                siloBuilder.Services.AddSingleton<MessageTransportConnector>(sp => new UnixDomainSocketMessageTransportConnector(
+                                    sp.GetRequiredService<IOptions<UnixSocketConnectionOptions>>(),
+                                    sp.GetRequiredService<ILoggerFactory>()));
+                                siloBuilder.Services.AddSingleton<MessageTransportListener>(sp => new UnixDomainSocketMessageTransportListener(
+                                    "gateway",
+                                    sp.GetRequiredService<IOptionsMonitor<UnixDomainSocketMessageTransportListenerOptions>>(),
+                                    sp.GetRequiredService<ILoggerFactory>()));
+                                siloBuilder.Services.AddOptions<UnixDomainSocketMessageTransportListenerOptions>("gateway").Configure<IOptions<EndpointOptions>, IOptions<UnixSocketConnectionOptions>>(
+                                    (listenerOptions, endPointOptions, connectionOptions) =>
+                                {
+                                    listenerOptions.Path = connectionOptions.Value.ConvertEndpointToPath(endPointOptions.Value.GetListeningProxyEndpoint());
+                                });
+                                siloBuilder.Services.AddSingleton<MessageTransportListener>(sp => new UnixDomainSocketMessageTransportListener(
+                                    "silo",
+                                    sp.GetRequiredService<IOptionsMonitor<UnixDomainSocketMessageTransportListenerOptions>>(),
+                                    sp.GetRequiredService<ILoggerFactory>()));
+                                siloBuilder.Services.AddOptions<UnixDomainSocketMessageTransportListenerOptions>("silo").Configure<IOptions<EndpointOptions>, IOptions<UnixSocketConnectionOptions>>(
+                                    (listenerOptions, endPointOptions, connectionOptions) =>
+                                {
+                                    listenerOptions.Path = connectionOptions.Value.ConvertEndpointToPath(endPointOptions.Value.GetListeningSiloEndpoint());
+                                });
+                                break;
+                            }
                         default:
                             throw new ArgumentException($"Unsupported {nameof(ConnectionTransportType)}: {transport}");
                     }

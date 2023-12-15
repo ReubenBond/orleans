@@ -225,6 +225,11 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     }
 
     /// <summary>
+    /// Returns a sequence of array segments representing the committed data.
+    /// </summary>
+    public readonly BufferSlice.ArraySegmentEnumerator ArraySegments => new(Slice());
+
+    /// <summary>
     /// Returns a new <see cref="ReadOnlySequence{T}"/> which must not be accessed after disposing this instance.
     /// </summary>
     public ReadOnlySequence<byte> AsReadOnlySequence()
@@ -578,6 +583,113 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                 return false;
             }
         }
+
+        /// <summary>
+        /// Enumerates over spans of bytes in a <see cref="BufferSlice"/>.
+        /// </summary>
+        /// <remarks>
+        /// Initializes a new instance of the <see cref="ArraySegmentEnumerator"/> type.
+        /// </remarks>
+        /// <param name="slice">The slice to enumerate.</param>
+        public struct ArraySegmentEnumerator(BufferSlice slice)
+        {
+            private static readonly SequenceSegment InitialSegmentSentinel = new();
+            private static readonly SequenceSegment FinalSegmentSentinel = new();
+            private readonly BufferSlice _slice = slice;
+            private int _position;
+            private SequenceSegment _segment = InitialSegmentSentinel;
+
+            internal readonly PooledBuffer Buffer => _slice._buffer;
+            internal readonly int Offset => _slice._offset;
+            internal readonly int Length => _slice._length;
+
+            /// <summary>
+            /// Gets the element in the collection at the current position of the enumerator.
+            /// </summary>
+            public ArraySegment<byte> Current { get; private set; } = ArraySegment<byte>.Empty;
+
+            /// <summary>
+            /// Returns an enumerator which can be used to enumerate the data referenced by this instance.
+            /// </summary>
+            /// <returns>An enumerator for the data contained in this instance.</returns>
+            public readonly ArraySegmentEnumerator GetEnumerator() => this;
+
+            /// <summary>
+            /// Advances the enumerator to the next element of the collection.
+            /// </summary>
+            /// <returns><see langword="true"/> if the enumerator was successfully advanced to the next element; <see langword="false"/> if the enumerator has passed the end of the collection.</returns>
+            public bool MoveNext()
+            {
+                if (ReferenceEquals(_segment, InitialSegmentSentinel))
+                {
+                    _segment = Buffer.First;
+                }
+
+                var endPosition = Offset + Length;
+                while (_segment != null && _segment != FinalSegmentSentinel)
+                {
+                    var segment = _segment.CommittedArraySegment;
+
+                    // Find the starting segment and the offset to copy from.
+                    int segmentOffset;
+                    if (_position < Offset)
+                    {
+                        if (_position + segment.Count <= Offset)
+                        {
+                            // Start is in a subsequent segment
+                            _position += segment.Count;
+                            _segment = _segment.Next as SequenceSegment;
+                            continue;
+                        }
+                        else
+                        {
+                            // Start is in this segment
+                            segmentOffset = Offset;
+                        }
+                    }
+                    else
+                    {
+                        segmentOffset = 0;
+                    }
+
+                    var segmentLength = Math.Min(segment.Count - segmentOffset, endPosition - (_position + segmentOffset));
+                    if (segmentLength == 0)
+                    {
+                        Current = ArraySegment<byte>.Empty;
+                        _segment = FinalSegmentSentinel;
+                        return false;
+                    }
+
+                    Current = segment.Slice(segmentOffset, segmentLength);
+                    _position += segmentOffset + segmentLength;
+                    _segment = _segment.Next as SequenceSegment;
+                    return true;
+                }
+
+                // Account for the uncommitted data at the end of the buffer.
+                // The write head is only linked to the previous buffers when Commit() is called and it is set to null afterwards,
+                // meaning that if the write head is not null, the other buffers are not linked to it and it therefore has not been enumerated.
+                if (_segment != FinalSegmentSentinel && Buffer.CurrentPosition > 0 && Buffer.WriteHead is { } head && _position < endPosition)
+                {
+                    var finalOffset = Math.Max(Offset - _position, 0);
+                    var finalLength = Math.Min(Buffer.CurrentPosition, endPosition - (_position + finalOffset));
+                    if (finalLength == 0)
+                    {
+                        Current = ArraySegment<byte>.Empty;
+                        _segment = FinalSegmentSentinel;
+                        return false;
+                    }
+
+                    Current = new (head.Array, finalOffset, finalLength);
+                    _position += finalOffset + finalLength;
+                    Debug.Assert(_position == endPosition);
+                    _segment = FinalSegmentSentinel;
+                    return true;
+                }
+
+                return false;
+            }
+        }
     }
 
     private sealed class SequenceSegmentPool
@@ -680,6 +792,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         public byte[] Array { get; private set; }
 
         public ReadOnlyMemory<byte> CommittedMemory => Memory;
+        public ArraySegment<byte> CommittedArraySegment => new(Array, 0, Memory.Length);
 
         public bool IsValid => Array is { Length: > 0 };
         public bool IsMinimumSize => Array.Length == SequenceSegmentPool.MinimumBlockSize;
