@@ -1,10 +1,12 @@
 using System;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.IO.Pipelines;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
+using Orleans.Connections.Transport;
 using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Session;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -28,97 +30,152 @@ namespace Orleans.Runtime.Messaging
     {
         private const int MaxPreambleLength = 1024;
         private readonly Serializer<ConnectionPreamble> _preambleSerializer;
-        public ConnectionPreambleHelper(Serializer<ConnectionPreamble> preambleSerializer)
+        private readonly SerializerSessionPool _serializerSessionPool;
+
+        public ConnectionPreambleHelper(Serializer<ConnectionPreamble> preambleSerializer, SerializerSessionPool serializerSessionPool)
         {
             _preambleSerializer = preambleSerializer;
+            _serializerSessionPool = serializerSessionPool;
         }
 
-        internal async ValueTask Write(ConnectionContext connection, ConnectionPreamble preamble)
+        internal async ValueTask Write(MessageTransport transport, ConnectionPreamble preamble)
         {
-            var output = connection.Transport.Output;
-            using var outputWriter = new PrefixingBufferWriter(sizeof(int), 1024, MemoryPool<byte>.Shared);
-            outputWriter.Init(output);
-            _preambleSerializer.Serialize(
-                preamble,
-                outputWriter);
-
-            var length = outputWriter.CommittedBytes;
-
-            if (length > MaxPreambleLength)
+            using var writeRequest = PreambleWriteRequest.Create(preamble, _preambleSerializer, _serializerSessionPool);
+            if (!transport.WriteAsync(writeRequest))
             {
-                throw new InvalidOperationException($"Created preamble of length {length}, which is greater than maximum allowed size of {MaxPreambleLength}.");
+                throw new ConnectionAbortedException();
             }
 
-            WriteLength(outputWriter, length);
-
-            var flushResult = await output.FlushAsync();
-            if (flushResult.IsCanceled)
-            {
-                throw new OperationCanceledException("Flush canceled");
-            }
+            await writeRequest.Completion;
 
             return;
         }
 
-        private static void WriteLength(PrefixingBufferWriter outputWriter, int length)
+        internal async ValueTask<ConnectionPreamble> Read(MessageTransport transport)
         {
-            Span<byte> lengthSpan = stackalloc byte[4];
-            BinaryPrimitives.WriteInt32LittleEndian(lengthSpan, length);
-            outputWriter.Complete(lengthSpan);
+            using var readRequest = PreambleReadRequest.Create(_preambleSerializer);
+            if (!transport.ReadAsync(readRequest))
+            {
+                throw new ConnectionAbortedException();
+            }
+
+            var result = await readRequest.Completion;
+            return result;
         }
 
-        internal async ValueTask<ConnectionPreamble> Read(ConnectionContext connection)
+        private sealed class PreambleWriteRequest : WriteRequest, IDisposable
         {
-            var input = connection.Transport.Input;
+            private readonly TaskCompletionSource _completion = new();
+            private PooledBuffer _buffer;
 
-            var readResult = await input.ReadAsync();
-            var buffer = readResult.Buffer;
-            CheckForCompletion(ref readResult);
-            while (buffer.Length < 4)
+            private PreambleWriteRequest(PooledBuffer buffer)
             {
-                input.AdvanceTo(buffer.Start, buffer.End);
-                readResult = await input.ReadAsync();
-                buffer = readResult.Buffer;
-                CheckForCompletion(ref readResult);
+                IsSingleBuffer = false;
+                _buffer = buffer;
             }
 
-            int ReadLength(ref ReadOnlySequence<byte> b)
+            public static PreambleWriteRequest Create(ConnectionPreamble preamble, Serializer<ConnectionPreamble> preambleSerializer, SerializerSessionPool serializerSessionPool)
             {
-                Span<byte> lengthBytes = stackalloc byte[4];
-                b.Slice(0, 4).CopyTo(lengthBytes);
-                b = b.Slice(4);
-                return BinaryPrimitives.ReadInt32LittleEndian(lengthBytes);
+                // Reserve space for framing
+                var buffer = new PooledBuffer();
+                var framingBytes = buffer.GetSpan(sizeof(int));
+                buffer.Advance(sizeof(int));
+
+                // Serialize the preamble.
+                using var session = serializerSessionPool.GetSession();
+                var writer = Writer.Create(buffer, session);
+                preambleSerializer.Serialize(preamble, ref writer);
+
+                // Write framing
+                var length = writer.Position;
+                BinaryPrimitives.WriteInt32LittleEndian(framingBytes, length);
+
+                if (length > MaxPreambleLength)
+                {
+                    throw new InvalidOperationException($"Created preamble of length {length}, which is greater than maximum allowed size of {MaxPreambleLength}.");
+                }
+
+                return new(writer.Output);
             }
 
-            var length = ReadLength(ref buffer);
-            if (length > MaxPreambleLength)
+            public void SetPreamble(in PooledBuffer buffer) => _buffer = buffer;
+
+            public override ReadOnlyMemory<byte> Buffer => throw new NotImplementedException();
+            public override ReadOnlySequence<byte> Buffers => _buffer.AsReadOnlySequence();
+
+            public override void SetResult() => _completion.SetResult();
+            public override void SetException(Exception error) => _completion.SetException(error);
+
+            public void Dispose() => _buffer.Reset();
+
+            public Task Completion => _completion.Task;
+        }
+
+        private sealed class PreambleReadRequest : ReadRequest, IDisposable
+        {
+            private readonly Serializer<ConnectionPreamble> _preambleSerializer;
+            private readonly TaskCompletionSource<ConnectionPreamble> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private byte[] _preambleBuffer = new byte[MaxPreambleLength + sizeof(int)];
+            private int _totalBytesRead;
+            private int _preambleLength = -1;
+            private Memory<byte> _buffer;
+
+            private PreambleReadRequest(Serializer<ConnectionPreamble> preambleSerializer)
             {
-                throw new InvalidOperationException($"Remote connection sent preamble length of {length}, which is greater than maximum allowed size of {MaxPreambleLength}.");
+                _preambleSerializer = preambleSerializer;
+
+                // The initial read must be precisely the framing size to prevent over-reading.
+                _buffer = _preambleBuffer.AsMemory(0, sizeof(int));
             }
 
-            while (buffer.Length < length)
-            {
-                input.AdvanceTo(buffer.Start, buffer.End);
-                readResult = await input.ReadAsync();
-                buffer = readResult.Buffer;
-                CheckForCompletion(ref readResult);
-            }
+            public override Memory<byte> Buffer => _buffer;
+            public Task<ConnectionPreamble> Completion => _completion.Task;
 
-            var payloadBuffer = buffer.Slice(0, length);
+            public static PreambleReadRequest Create(Serializer<ConnectionPreamble> preambleSerializer) => new (preambleSerializer);
 
-            try
+            public void Dispose() { }
+            public override void OnError(Exception error) => _completion.SetException(error);
+            public override void OnCanceled() => _completion.SetException(new OperationCanceledException("Read operation canceled"));
+            public override bool OnRead(int bytesRead)
             {
-                var preamble = _preambleSerializer.Deserialize(payloadBuffer);
-                return preamble;
-            }
-            finally
-            {
-                input.AdvanceTo(payloadBuffer.End);
-            }
+                _totalBytesRead += bytesRead;
 
-            void CheckForCompletion(ref ReadResult r)
-            {
-                if (r.IsCanceled || r.IsCompleted) throw new InvalidOperationException("Connection terminated prematurely");
+                if (_totalBytesRead < sizeof(int))
+                {
+                    _buffer = _buffer[bytesRead..];
+                    return false;
+                }
+
+                if (_preambleLength < 0)
+                {
+                    _preambleLength = BinaryPrimitives.ReadInt32LittleEndian(_preambleBuffer.AsSpan(0, sizeof(int)));
+
+                    if (_preambleLength > MaxPreambleLength)
+                    {
+                        throw new InvalidOperationException($"Read preamble length of {_preambleLength}, which is greater than maximum allowed size of {MaxPreambleLength}.");
+                    }
+
+                    if (_preambleLength <= 0)
+                    {
+                        throw new InvalidOperationException($"Read preamble length of {_preambleLength}, which is less than or equal to zero.");
+                    }
+
+                    // Limit the maximum amount of data which can be read to the specified preamble length.
+                    _buffer = _preambleBuffer.AsMemory(sizeof(int), _preambleLength);
+                    return false;
+                }
+
+                if (_totalBytesRead == _preambleLength + sizeof(int))
+                {
+                    var payload = _preambleBuffer.AsMemory(sizeof(int), _preambleLength);
+                    var preamble = _preambleSerializer.Deserialize(payload);
+                    _completion.SetResult(preamble);
+
+                    return true;
+                }
+
+                _buffer = _buffer[bytesRead..];
+                return false;
             }
         }
     }

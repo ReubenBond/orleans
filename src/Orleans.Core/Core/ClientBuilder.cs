@@ -16,7 +16,7 @@ namespace Orleans.Hosting
         public ClientBuilder(IServiceCollection services)
         {
             Services = services;
-            DefaultClientServices.AddDefaultServices(services);
+            DefaultClientServices.AddDefaultServices(this);
         }
 
         /// <inheritdoc/>
