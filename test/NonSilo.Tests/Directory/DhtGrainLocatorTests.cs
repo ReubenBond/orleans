@@ -31,7 +31,7 @@ namespace UnitTests.Directory
             this.localGrainDirectory = new MockLocalGrainDirectory(
                 TimeSpan.FromMilliseconds(100),
                 TimeSpan.FromMilliseconds(200));
-            this.target = new DhtGrainLocator(this.localGrainDirectory, this.rootContext);
+            this.target = new DhtGrainLocator(this.localGrainDirectory, this.rootContext, this.loggerFactory);
         }
 
         [Fact]

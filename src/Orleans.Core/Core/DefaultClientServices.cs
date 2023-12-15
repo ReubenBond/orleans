@@ -1,5 +1,4 @@
 using Orleans.Configuration;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -8,7 +7,6 @@ using Orleans.Configuration.Validators;
 using Orleans.GrainReferences;
 using Orleans.Messaging;
 using Orleans.Metadata;
-using Orleans.Networking.Shared;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
@@ -19,6 +17,10 @@ using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
 using Microsoft.Extensions.Hosting;
 using System.Runtime.InteropServices;
+using Orleans.Connections;
+using Orleans.Hosting;
+using Orleans.Connections.Transport;
+using Orleans.Connections.Transport.Sockets;
 
 namespace Orleans
 {
@@ -32,9 +34,10 @@ namespace Orleans
         /// <summary>
         /// Configures the default services for a client.
         /// </summary>
-        /// <param name="services">The service collection.</param>
-        public static void AddDefaultServices(IServiceCollection services)
+        /// <param name="clientBuilder">The client builder.</param>
+        public static void AddDefaultServices(this IClientBuilder clientBuilder)
         {
+            var services = clientBuilder.Services;
             if (services.Contains(ServiceDescriptor))
             {
                 return;
@@ -99,19 +102,12 @@ namespace Orleans
             services.AddTransient<IConfigurationValidator, ClientClusteringValidator>();
             services.AddTransient<IConfigurationValidator, SerializerConfigurationValidator>();
 
-            // TODO: abstract or move into some options.
-            services.AddSingleton<SocketSchedulers>();
-            services.AddSingleton<SharedMemoryPool>();
-
             // Networking
+            services.AddSingleton<MessageHandlerShared>();
             services.TryAddSingleton<ConnectionCommon>();
             services.TryAddSingleton<ConnectionManager>();
             services.TryAddSingleton<ConnectionPreambleHelper>();
             services.AddSingleton<ILifecycleParticipant<IClusterClientLifecycle>, ConnectionManagerLifecycleAdapter<IClusterClientLifecycle>>();
-
-            services.AddSingletonKeyedService<object, IConnectionFactory>(
-                ClientOutboundConnectionFactory.ServicesKey,
-                (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionFactory>(sp));
 
             services.AddSerializer();
             services.AddSingleton<ITypeNameFilter, AllowOrleansTypes>();
@@ -121,14 +117,14 @@ namespace Orleans
             services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, ConfigureOrleansJsonSerializerOptions>();
             services.AddSingleton<OrleansJsonSerializer>();
 
-            services.TryAddTransient(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
+            services.TryAddTransient<MessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
                 sp,
                 sp.GetRequiredService<IOptions<ClientMessagingOptions>>().Value));
             services.TryAddSingleton<ConnectionFactory, ClientOutboundConnectionFactory>();
-            services.TryAddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter);
+            services.AddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter);
             services.TryAddFromExisting<IMessageCenter, ClientMessageCenter>();
             services.AddSingleton<GatewayManager>();
-            services.AddSingleton<NetworkingTrace>();
+            services.AddSingleton<ConnectionTrace>();
             services.AddSingleton<MessagingTrace>();
 
             // Type metadata
@@ -146,6 +142,8 @@ namespace Orleans
             services.AddSingleton<IGrainInterfacePropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, ImplementedInterfaceProvider>();
+
+            services.AddSingleton<MessageTransportConnector, TcpMessageTransportConnector>();
         }
 
         /// <summary>
@@ -166,7 +164,7 @@ namespace Orleans
         }
 
         /// <summary>
-        /// A marker type used to determine
+        /// A marker type used to determine whether the default services have been added.
         /// </summary>
         private class ServicesAdded { }
     }

@@ -16,7 +16,7 @@ using Orleans.Runtime.MembershipService;
 using Orleans.Runtime.TestHooks;
 using Orleans.Statistics;
 using Orleans.TestingHost.Logging;
-using Orleans.Configuration.Internal;
+using Orleans.TestingHost.Utils;
 
 namespace Orleans.TestingHost
 {

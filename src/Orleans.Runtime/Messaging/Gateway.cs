@@ -5,11 +5,11 @@ using System.Collections.Generic;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.ClientObservers;
 using Orleans.Configuration;
+using Orleans.Connections.Transport;
 using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.Messaging
@@ -122,7 +122,7 @@ namespace Orleans.Runtime.Messaging
 
         internal void RecordOpenedConnection(GatewayInboundConnection connection, ClientGrainId clientId)
         {
-            logger.LogInformation((int)ErrorCode.GatewayClientOpenedSocket, "Recorded opened connection from endpoint {EndPoint}, client ID {ClientId}.", connection.RemoteEndPoint, clientId);
+            logger.LogInformation((int)ErrorCode.GatewayClientOpenedSocket, "Recorded opened connection {Connection}. Client Id {ClientId}.", connection, clientId);
             lock (clients)
             {
                 if (clients.TryGetValue(clientId, out var clientState))
@@ -161,8 +161,8 @@ namespace Orleans.Runtime.Messaging
 
             logger.LogInformation(
                 (int)ErrorCode.GatewayClientClosedSocket,
-                "Recorded closed socket from endpoint {Endpoint}, client ID {clientId}.",
-                connection.RemoteEndPoint?.ToString() ?? "null",
+                "Recorded closed connection: {Connection}. Client Id: {ClientId}.",
+                connection,
                 clientState.Id);
         }
 

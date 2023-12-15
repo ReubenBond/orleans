@@ -2,15 +2,11 @@
 
 using System;
 using System.Buffers;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO.Pipelines;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text;
 using Orleans.Configuration;
-using Orleans.Networking.Shared;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
@@ -18,13 +14,12 @@ using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using static Orleans.Runtime.Message;
+using static Orleans.Serialization.Buffers.PooledBuffer;
 
 namespace Orleans.Runtime.Messaging
 {
     internal sealed class MessageSerializer
     {
-        private const int FramingLength = Message.LENGTH_HEADER_SIZE;
-        private const int MessageSizeHint = 4096;
         private readonly Dictionary<Type, ResponseCodec> _rawResponseCodecs = new();
         private readonly CodecProvider _codecProvider;
         private readonly IFieldCodec<GrainAddress> _activationAddressCodec;
@@ -35,12 +30,9 @@ namespace Orleans.Runtime.Messaging
         private readonly SerializerSession _deserializationSession;
         private readonly int _maxHeaderLength;
         private readonly int _maxBodyLength;
-        private readonly DictionaryCodec<string, object> _requestContextCodec;
-        private readonly PrefixingBufferWriter _bufferWriter;
 
         public MessageSerializer(
             SerializerSessionPool sessionPool,
-            SharedMemoryPool memoryPool,
             MessagingOptions options)
         {
             _serializationSession = sessionPool.GetSession();
@@ -48,98 +40,54 @@ namespace Orleans.Runtime.Messaging
             _maxHeaderLength = options.MaxMessageHeaderSize;
             _maxBodyLength = options.MaxMessageBodySize;
             _codecProvider = sessionPool.CodecProvider;
-            _requestContextCodec = OrleansGeneratedCodeHelper.GetService<DictionaryCodec<string, object>>(this, sessionPool.CodecProvider);
             _activationAddressCodec = OrleansGeneratedCodeHelper.GetService<IFieldCodec<GrainAddress>>(this, sessionPool.CodecProvider);
-            _bufferWriter = new(FramingLength, MessageSizeHint, memoryPool.Pool);
         }
 
-        public (int RequiredBytes, int HeaderLength, int BodyLength) TryRead(ref ReadOnlySequence<byte> input, out Message? message)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ReadHeaders(BufferSlice buffer, int headerLength, int bodyLength, out Message message)
         {
-            if (input.Length < FramingLength)
-            {
-                message = default;
-                return (FramingLength, 0, 0);
-            }
-
-            Span<byte> lengthBytes = stackalloc byte[FramingLength];
-            input.Slice(input.Start, FramingLength).CopyTo(lengthBytes);
-            var headerLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes);
-            var bodyLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes.Slice(4));
-
             // Check lengths
             ThrowIfLengthsInvalid(headerLength, bodyLength);
-
-            var requiredBytes = FramingLength + headerLength + bodyLength;
-            if (input.Length < requiredBytes)
-            {
-                message = default;
-                return (requiredBytes, 0, 0);
-            }
 
             try
             {
                 // Decode header
-                var header = input.Slice(FramingLength, headerLength);
-
-                // Decode body
-                int bodyOffset = FramingLength + headerLength;
-                var body = input.Slice(bodyOffset, bodyLength);
+                var header = buffer.Slice(0, headerLength);
 
                 // Build message
                 message = new();
-                if (header.IsSingleSegment)
-                {
-                    var headersReader = Reader.Create(header.First.Span, _deserializationSession);
-                    Deserialize(ref headersReader, message);
-                }
-                else
-                {
-                    var headersReader = Reader.Create(header, _deserializationSession);
-                    Deserialize(ref headersReader, message);
-                }
-
-                if (bodyLength != 0)
-                {
-                    _deserializationSession.PartialReset();
-
-                    // Body deserialization is more likely to fail than header deserialization.
-                    // Separating the two allows for these kinds of errors to be propagated back to the caller.
-                    if (body.IsSingleSegment)
-                    {
-                        var reader = Reader.Create(body.First.Span, _deserializationSession);
-                        ReadBodyObject(message, ref reader);
-                    }
-                    else
-                    {
-                        var reader = Reader.Create(body, _deserializationSession);
-                        ReadBodyObject(message, ref reader);
-                    }
-                }
-
-                return (0, headerLength, bodyLength);
+                var headersReader = Reader.Create(header, _deserializationSession);
+                DeserializeHeaders(ref headersReader, message);
             }
             finally
             {
-                input = input.Slice(requiredBytes);
                 _deserializationSession.Reset();
             }
         }
 
-        private void ReadBodyObject<TInput>(Message message, ref Reader<TInput> reader)
+        internal void ReadBodyObject(Message message, MessageReadRequest readRequest)
         {
-            var field = reader.ReadFieldHeader();
+            try
+            {
+                var reader = Reader.Create(readRequest.Body, _deserializationSession);
+                var field = reader.ReadFieldHeader();
 
-            if (message.Result == ResponseTypes.Success)
-            {
-                message.Result = ResponseTypes.None; // reset raw response indicator
-                if (!_rawResponseCodecs.TryGetValue(field.FieldType, out var rawCodec))
-                    rawCodec = GetRawCodec(field.FieldType);
-                message.BodyObject = rawCodec.ReadRaw(ref reader, ref field);
+                if (message.Result == ResponseTypes.Success)
+                {
+                    message.Result = ResponseTypes.None; // reset raw response indicator
+                    if (!_rawResponseCodecs.TryGetValue(field.FieldType, out var rawCodec))
+                        rawCodec = GetRawCodec(field.FieldType);
+                    message._bodyObject = rawCodec.ReadRaw(ref reader, ref field);
+                }
+                else
+                {
+                    var bodyCodec = _codecProvider.GetCodec(field.FieldType);
+                    message._bodyObject = bodyCodec.ReadValue(ref reader, field);
+                }
             }
-            else
+            finally
             {
-                var bodyCodec = _codecProvider.GetCodec(field.FieldType);
-                message.BodyObject = bodyCodec.ReadValue(ref reader, field);
+                _deserializationSession.Reset();
             }
         }
 
@@ -150,14 +98,14 @@ namespace Orleans.Runtime.Messaging
             return rawCodec;
         }
 
-        public (int HeaderLength, int BodyLength) Write(PipeWriter writer, Message message)
+        public (int HeaderLength, int BodyLength) Write(ref PooledBuffer buffer, Message message)
         {
             var headers = message.Headers;
             IFieldCodec? bodyCodec = null;
             ResponseCodec? rawCodec = null;
-            if (message.BodyObject is not null)
+            if (message._bodyObject is not null and not MessageReadRequest)
             {
-                bodyCodec = _codecProvider.GetCodec(message.BodyObject.GetType());
+                bodyCodec = _codecProvider.GetCodec(message._bodyObject.GetType());
                 if (headers.ResponseType is ResponseTypes.None && bodyCodec is ResponseCodec responseCodec)
                 {
                     rawCodec = responseCodec;
@@ -169,43 +117,42 @@ namespace Orleans.Runtime.Messaging
 
             try
             {
-                var bufferWriter = _bufferWriter;
-                bufferWriter.Init(writer);
+                var writer = Writer.Create(buffer, _serializationSession);
+                SerializeHeaders(ref writer, message, headers);
+                writer.Commit();
+                buffer = writer.Output;
+                var headerLength = writer.Position;
+                _serializationSession.Reset();
 
-                var innerWriter = Writer.Create(new MessageBufferWriter(bufferWriter), _serializationSession);
-                Serialize(ref innerWriter, message, headers);
-                innerWriter.Commit();
-
-                var headerLength = bufferWriter.CommittedBytes;
-
-                _serializationSession.PartialReset();
-
+                int bodyLength = 0;
                 if (bodyCodec is not null)
                 {
-                    innerWriter = Writer.Create(new MessageBufferWriter(bufferWriter), _serializationSession);
-                    if (rawCodec != null) rawCodec.WriteRaw(ref innerWriter, message.BodyObject!);
-                    else bodyCodec.WriteField(ref innerWriter, 0, null, message.BodyObject);
-                    innerWriter.Commit();
+                    writer = Writer.Create(writer.Output, _serializationSession);
+                    if (rawCodec != null) rawCodec.WriteRaw(ref writer, message._bodyObject!);
+                    else bodyCodec.WriteField(ref writer, 0, null, message._bodyObject);
+                    writer.Commit();
+                    bodyLength = writer.Position;
+                    buffer = writer.Output;
+                }
+                else if (message._bodyObject is MessageReadRequest readRequest)
+                {
+                    bodyLength = readRequest.BodyLength;
+                    if (bodyLength > 0)
+                    {
+                        readRequest.Body.CopyTo(ref buffer);
+                    }
+
+                    message._bodyObject = null;
+                    readRequest.Reset();
                 }
 
-                var bodyLength = bufferWriter.CommittedBytes - headerLength;
                 // Before completing, check lengths
                 ThrowIfLengthsInvalid(headerLength, bodyLength);
-
-                // Write length prefixes, first header length then body length.
-                var lengthFields = (headerLength, bodyLength);
-                if (!BitConverter.IsLittleEndian)
-                {
-                    lengthFields.headerLength = BinaryPrimitives.ReverseEndianness(headerLength);
-                    lengthFields.bodyLength = BinaryPrimitives.ReverseEndianness(bodyLength);
-                }
-                bufferWriter.Complete(MemoryMarshal.AsBytes(new Span<(int, int)>(ref lengthFields)));
 
                 return (headerLength, bodyLength);
             }
             finally
             {
-                _bufferWriter.Reset();
                 _serializationSession.Reset();
             }
         }
@@ -220,7 +167,7 @@ namespace Orleans.Runtime.Messaging
         private void ThrowInvalidHeaderLength(int headerLength) => throw new OrleansException($"Invalid header size: {headerLength} (max configured value is {_maxHeaderLength}, see {nameof(MessagingOptions.MaxMessageHeaderSize)})");
         private void ThrowInvalidBodyLength(int bodyLength) => throw new OrleansException($"Invalid body size: {bodyLength} (max configured value is {_maxBodyLength}, see {nameof(MessagingOptions.MaxMessageBodySize)})");
 
-        private void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, Message value, PackedHeaders headers) where TBufferWriter : IBufferWriter<byte>
+        private void SerializeHeaders<TBufferWriter>(ref Writer<TBufferWriter> writer, Message value, PackedHeaders headers) where TBufferWriter : IBufferWriter<byte>
         {
             writer.WriteUInt32((uint)headers);
 
@@ -257,7 +204,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private void Deserialize<TInput>(ref Reader<TInput> reader, Message result)
+        private void DeserializeHeaders<TInput>(ref Reader<TInput> reader, Message result)
         {
             var headers = (PackedHeaders)reader.ReadUInt32();
 
@@ -394,14 +341,5 @@ namespace Orleans.Runtime.Messaging
             _idSpanCodec.WriteRaw(ref writer, value.Type.Value);
             IdSpanCodec.WriteRaw(ref writer, value.Key);
         }
-    }
-
-    internal readonly struct MessageBufferWriter : IBufferWriter<byte>
-    {
-        private readonly PrefixingBufferWriter _buffer;
-        public MessageBufferWriter(PrefixingBufferWriter buffer) => _buffer = buffer;
-        public void Advance(int count) => _buffer.Advance(count);
-        public Memory<byte> GetMemory(int sizeHint = 0) => _buffer.GetMemory(sizeHint);
-        public Span<byte> GetSpan(int sizeHint = 0) => _buffer.GetSpan(sizeHint);
     }
 }

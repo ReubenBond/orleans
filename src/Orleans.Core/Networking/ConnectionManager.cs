@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Connections;
 using Orleans.Internal;
 
 namespace Orleans.Runtime.Messaging
@@ -20,7 +21,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ConcurrentDictionary<SiloAddress, ConnectionEntry> connections = new();
         private readonly ConnectionOptions connectionOptions;
         private readonly ConnectionFactory connectionFactory;
-        private readonly NetworkingTrace trace;
+        private readonly ConnectionTrace trace;
         private readonly CancellationTokenSource shutdownCancellation = new();
         private readonly object lockObj = new object();
         private readonly TaskCompletionSource<int> closedTaskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -28,7 +29,7 @@ namespace Orleans.Runtime.Messaging
         public ConnectionManager(
             IOptions<ConnectionOptions> connectionOptions,
             ConnectionFactory connectionFactory,
-            NetworkingTrace trace)
+            ConnectionTrace trace)
         {
             if (trace == null) throw new ArgumentNullException(nameof(trace));
             this.connectionOptions = connectionOptions.Value;
@@ -182,7 +183,7 @@ namespace Orleans.Runtime.Messaging
                 if (this.trace.IsEnabled(LogLevel.Information))
                 {
                     this.trace.LogInformation(
-                        "Establishing connection to endpoint {EndPoint}",
+                        "Establishing connection to endpoint {Endpoint}",
                         address);
                 }
 
@@ -195,7 +196,7 @@ namespace Orleans.Runtime.Messaging
                 if (this.trace.IsEnabled(LogLevel.Information))
                 {
                     this.trace.LogInformation(
-                        "Connected to endpoint {EndPoint}",
+                        "Connected to endpoint {Endpoint}",
                         address);
                 }
 
@@ -212,7 +213,7 @@ namespace Orleans.Runtime.Messaging
 
                 this.trace.LogWarning(
                     exception,
-                    "Connection attempt to endpoint {EndPoint} failed",
+                    "Connection attempt to endpoint {Endpoint} failed",
                     address);
 
                 if (exception is OperationCanceledException && openConnectionCancellation?.IsCancellationRequested == true && !shutdownCancellation.IsCancellationRequested)
@@ -336,7 +337,7 @@ namespace Orleans.Runtime.Messaging
             {
                 using (this.BeginConnectionScope(connection))
                 {
-                    await connection.Run();
+                    await connection.RunAsync();
                 }
             }
             catch (Exception exception)
