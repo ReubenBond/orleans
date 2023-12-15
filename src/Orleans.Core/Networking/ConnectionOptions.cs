@@ -31,6 +31,6 @@ namespace Orleans.Configuration
         /// <summary>
         /// The default value for <see cref="OpenConnectionTimeout"/>.
         /// </summary>
-        public static readonly TimeSpan DEFAULT_OPENCONNECTION_TIMEOUT = TimeSpan.FromSeconds(5);
+        public static readonly TimeSpan DEFAULT_OPENCONNECTION_TIMEOUT = TimeSpan.FromSeconds(300);
     }
 }

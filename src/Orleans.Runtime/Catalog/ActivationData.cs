@@ -12,6 +12,7 @@ using Orleans.Configuration;
 using Orleans.Core.Internal;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
@@ -25,7 +26,7 @@ namespace Orleans.Runtime
     /// MUST lock this object for any concurrent access
     /// Consider: compartmentalize by usage, e.g., using separate interfaces for data for catalog, etc.
     /// </summary>
-    internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, IGrainExtensionBinder, IActivationWorkingSetMember, IGrainTimerRegistry, IGrainManagementExtension, ICallChainReentrantGrainContext, IAsyncDisposable
+    internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, IGrainExtensionBinder, IActivationWorkingSetMember, IGrainTimerRegistry, IGrainManagementExtension, ICallChainReentrantGrainContext, IAsyncDisposable, IMessageReceiver
     {
         private const string GrainAddressMigrationContextKey = "sys.addr";
         private readonly GrainTypeSharedContext _shared;
@@ -613,7 +614,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public void AnalyzeWorkload(DateTime now, IMessageCenter messageCenter, MessageFactory messageFactory, SiloMessagingOptions options)
+        public void AnalyzeWorkload(DateTime now, MessageCenter messageCenter, MessageFactory messageFactory, SiloMessagingOptions options)
         {
             var slowRunningRequestDuration = options.RequestProcessingWarningTime;
             var longQueueTimeDuration = options.RequestQueueDelayWarningTime;
@@ -649,7 +650,7 @@ namespace Orleans.Runtime
                         }
 
                         var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, diagnostics);
-                        messageCenter.SendMessage(response);
+                        messageCenter.SendMessage(response, targetCache: message);
                     }
                 }
 
@@ -671,7 +672,7 @@ namespace Orleans.Runtime
                         };
 
                         var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, messageDiagnostics);
-                        messageCenter.SendMessage(response);
+                        messageCenter.SendMessage(response, targetCache: message);
                     }
                 }
 
@@ -690,7 +691,7 @@ namespace Orleans.Runtime
                         };
 
                         var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: false, isWaiting: true, messageDiagnostics);
-                        messageCenter.SendMessage(response);
+                        messageCenter.SendMessage(response, targetCache: message);
                     }
 
                     queueLength++;
@@ -1876,6 +1877,16 @@ namespace Orleans.Runtime
             }
 
             return tracker.IsReentrantSectionActive(reentrancyId);
+        }
+
+        public void ReceiveMessage(Message message, IMessageTargetCache cache)
+        {
+            if (!IsValid)
+            {
+                cache.MessageReceiver = null;
+            }
+
+            ReceiveMessage(message);
         }
 
         #endregion

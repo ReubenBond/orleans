@@ -67,11 +67,19 @@ namespace Orleans.Runtime.Messaging
 
         public void SetHostedClient(HostedClient client) => this.hostedClient = client;
 
-        public bool TryDeliverToProxy(Message msg)
+        public bool TryDeliverToProxy(Message msg, IMessageTargetCache targetCache)
         {
             if (!msg.TargetGrain.IsClient()) return false;
             if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)) return true;
-            return this.hostedClient is HostedClient client && client.TryDispatchToClient(msg);
+            if (this.hostedClient is HostedClient hostedClient && hostedClient.TryDispatchToClient(msg))
+            {
+                if (targetCache is not null)
+                {
+                    targetCache.MessageReceiver = hostedClient;
+                }
+            }
+
+            return false;
         }
 
         public async Task StopAsync()
@@ -134,7 +142,7 @@ namespace Orleans.Runtime.Messaging
             get => this.sniffIncomingMessageHandler;
         }
 
-        public void SendMessage(Message msg)
+        public void SendMessage(Message msg, IMessageTargetCache targetCache)
         {
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
             if (IsBlockingApplicationMessages && !msg.IsSystemMessage && msg.Result is not Message.ResponseTypes.Rejection && !Constants.SystemMembershipTableType.Equals(msg.TargetGrain))
@@ -145,6 +153,11 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 msg.SendingSilo ??= _siloAddress;
+                if (targetCache?.MessageReceiver is IMessageReceiver receiver)
+                {
+                    receiver.ReceiveMessage(msg, targetCache);
+                    return;
+                }
 
                 if (stopped)
                 {
@@ -161,7 +174,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 // First check to see if it's really destined for a proxied client, instead of a local grain.
-                if (TryDeliverToProxy(msg))
+                if (TryDeliverToProxy(msg, targetCache))
                 {
                     // Message was successfully delivered to the proxy.
                     return;
@@ -184,7 +197,7 @@ namespace Orleans.Runtime.Messaging
 
                     MessagingInstruments.LocalMessagesSentCounterAggregator.Add(1);
 
-                    this.ReceiveMessage(msg);
+                    this.ReceiveMessage(msg, targetCache);
                 }
                 else
                 {
@@ -198,6 +211,11 @@ namespace Orleans.Runtime.Messaging
                     if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection))
                     {
                         existingConnection.Send(msg);
+                        if (targetCache is not null)
+                        {
+                            targetCache.MessageReceiver = existingConnection;
+                        }
+
                         return;
                     }
                     else if (this.siloStatusOracle.IsDeadSilo(targetSilo))
@@ -212,19 +230,27 @@ namespace Orleans.Runtime.Messaging
                         var connectionTask = this.connectionManager.GetConnection(targetSilo);
                         if (connectionTask.IsCompletedSuccessfully)
                         {
-                            var sender = connectionTask.Result;
-                            sender.Send(msg);
+                            var connection = connectionTask.Result;
+                            connection.Send(msg);
+                            if (targetCache is not null)
+                            {
+                                targetCache.MessageReceiver = connection;
+                            }
                         }
                         else
                         {
-                            _ = SendAsync(this, connectionTask, msg);
+                            _ = SendAsync(this, connectionTask, msg, targetCache);
 
-                            static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg)
+                            static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg, IMessageTargetCache targetCache)
                             {
                                 try
                                 {
-                                    var sender = await connectionTask;
-                                    sender.Send(msg);
+                                    var connection = await connectionTask;
+                                    connection.Send(msg);
+                                    if (targetCache is not null)
+                                    {
+                                        targetCache.MessageReceiver = connection;
+                                    }
                                 }
                                 catch (Exception exception)
                                 {
@@ -237,7 +263,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        public void DispatchLocalMessage(Message message) => ReceiveMessage(message);
+        public void DispatchLocalMessage(Message message) => ReceiveMessage(message, targetCache: null);
 
         public void RejectMessage(
             Message message,
@@ -252,7 +278,7 @@ namespace Orleans.Runtime.Messaging
 
                 var str = $"{rejectInfo} {exc}";
                 var rejection = this.messageFactory.CreateRejectionResponse(message, rejectionType, str, exc);
-                SendMessage(rejection);
+                SendMessage(rejection, targetCache: null);
             }
             else
             {
@@ -417,17 +443,17 @@ namespace Orleans.Runtime.Messaging
             if (message.TargetGrain.IsSystemTarget())
             {
                 message.IsSystemMessage = true;
-                SendMessage(message);
+                SendMessage(message, targetCache: null);
             }
             else if (forwardingAddress != null)
             {
                 message.TargetSilo = forwardingAddress;
-                SendMessage(message);
+                SendMessage(message, targetCache: null);
             }
             else
             {
                 message.TargetSilo = null;
-                _ = AddressAndSendMessage(message);
+                _ = AddressAndSendMessage(message, targetCache: null);
             }
         }
 
@@ -445,17 +471,17 @@ namespace Orleans.Runtime.Messaging
         /// - add ordering info and maintain send order
         ///
         /// </summary>
-        internal Task AddressAndSendMessage(Message message)
+        internal Task AddressAndSendMessage(Message message, IMessageTargetCache targetCache)
         {
             try
             {
                 var messageAddressingTask = placementService.AddressMessage(message);
                 if (messageAddressingTask.Status != TaskStatus.RanToCompletion)
                 {
-                    return SendMessageAsync(messageAddressingTask, message);
+                    return SendMessageAsync(messageAddressingTask, message, targetCache);
                 }
 
-                SendMessage(message);
+                SendMessage(message, targetCache: targetCache);
             }
             catch (Exception ex)
             {
@@ -464,7 +490,7 @@ namespace Orleans.Runtime.Messaging
 
             return Task.CompletedTask;
 
-            async Task SendMessageAsync(Task addressMessageTask, Message m)
+            async Task SendMessageAsync(Task addressMessageTask, Message message, IMessageTargetCache targetCache)
             {
                 try
                 {
@@ -472,11 +498,11 @@ namespace Orleans.Runtime.Messaging
                 }
                 catch (Exception ex)
                 {
-                    OnAddressingFailure(m, ex);
+                    OnAddressingFailure(message, ex);
                     return;
                 }
 
-                SendMessage(m);
+                SendMessage(message, targetCache: targetCache);
             }
 
             void OnAddressingFailure(Message m, Exception ex)
@@ -497,15 +523,15 @@ namespace Orleans.Runtime.Messaging
                 message.IsSystemMessage = true;
             }
 
-            SendMessage(message);
+            SendMessage(message, targetCache: null);
         }
 
-        public void ReceiveMessage(Message msg)
+        public void ReceiveMessage(Message msg, IMessageTargetCache targetCache)
         {
             try
             {
                 this.messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);
-                if (TryDeliverToProxy(msg))
+                if (TryDeliverToProxy(msg, targetCache: null))
                 {
                     return;
                 }
@@ -527,6 +553,10 @@ namespace Orleans.Runtime.Messaging
                     }
 
                     targetActivation.ReceiveMessage(msg);
+                    if (targetCache is not null)
+                    {
+                        targetCache.MessageReceiver = targetActivation;
+                    }
                 }
             }
             catch (Exception ex)
@@ -569,7 +599,7 @@ namespace Orleans.Runtime.Messaging
                         Message.RejectionTypes.Unrecoverable,
                         $"SystemTarget {msg.TargetGrain} not active on this silo. Msg={msg}");
 
-                    SendMessage(response);
+                    SendMessage(response, targetCache: null);
                 }
             }
             else
@@ -600,7 +630,7 @@ namespace Orleans.Runtime.Messaging
                 if (string.IsNullOrEmpty(reason)) reason = $"Rejection from silo {this._siloAddress} - Unknown reason.";
                 var error = this.messageFactory.CreateRejectionResponse(msg, rejectionType, reason);
                 // rejection msgs are always originated in the local silo, they are never remote.
-                this.ReceiveMessage(error);
+                this.ReceiveMessage(error, targetCache: null);
             }
         }
 
