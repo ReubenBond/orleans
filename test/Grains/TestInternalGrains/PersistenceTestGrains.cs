@@ -24,13 +24,13 @@ namespace UnitTests.Grains
                 "   TaskScheduler={0}" + Environment.NewLine
                 + "   RuntimeContext={1}" + Environment.NewLine
                 + "   WorkerPoolThread={2}" + Environment.NewLine
-                + "   Thread.CurrentThread.ManagedThreadId={4}" + Environment.NewLine
+                + "   ManagedThreadId={4}" + Environment.NewLine
                 + "   StackTrace=" + Environment.NewLine
                 + "   {5}",
                 TaskScheduler.Current,
                 RuntimeContext.Current,
                 Thread.CurrentThread.Name,
-                Thread.CurrentThread.ManagedThreadId,
+                Environment.CurrentManagedThreadId,
                 callStack);
         }
     }

@@ -8,26 +8,26 @@ namespace Orleans.Runtime
     internal readonly struct CorrelationId : IEquatable<CorrelationId>, IComparable<CorrelationId>, ISpanFormattable
     {
         [Id(0)]
-        private readonly long id;
+        public readonly long Value;
         private static long lastUsed;
 
-        public CorrelationId(long value) => id = value;
+        public CorrelationId(long value) => Value = value;
 
-        public CorrelationId(CorrelationId other) => id = other.id;
+        public CorrelationId(CorrelationId other) => Value = other.Value;
 
         public static CorrelationId GetNext() => new(System.Threading.Interlocked.Increment(ref lastUsed));
 
-        public override int GetHashCode() => id.GetHashCode();
+        public override int GetHashCode() => Value.GetHashCode();
 
         public override bool Equals(object? obj) => obj is CorrelationId correlationId && Equals(correlationId);
 
-        public bool Equals(CorrelationId other) => id == other.id;
+        public bool Equals(CorrelationId other) => Value == other.Value;
 
-        public static bool operator ==(CorrelationId lhs, CorrelationId rhs) => rhs.id == lhs.id;
+        public static bool operator ==(CorrelationId lhs, CorrelationId rhs) => rhs.Value == lhs.Value;
 
-        public static bool operator !=(CorrelationId lhs, CorrelationId rhs) => rhs.id != lhs.id;
+        public static bool operator !=(CorrelationId lhs, CorrelationId rhs) => rhs.Value != lhs.Value;
 
-        public int CompareTo(CorrelationId other) => id.CompareTo(other.id);
+        public int CompareTo(CorrelationId other) => Value.CompareTo(other.Value);
 
         public override string ToString() => id.ToString("X16");
 

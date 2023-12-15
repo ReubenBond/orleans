@@ -10,7 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Configuration.Memory;
 using Orleans.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
@@ -25,6 +24,7 @@ using Orleans.Hosting;
 using Orleans.Runtime.TestHooks;
 using Orleans.Configuration.Internal;
 using Orleans.TestingHost.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.TestingHost;
 
@@ -504,7 +504,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 clientBuilder.Services.AddSingleton<IGatewayListProvider>(_membershipTable);
             }
 
-            clientBuilder.UseInMemoryConnectionTransport(_transportHub);
+            clientBuilder.UseInMemoryTransport(_transportHub);
         });
 
         TryConfigureFileLogging(Options, hostBuilder.Services, "TestClusterClient");
@@ -554,7 +554,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             if (Debugger.IsAttached)
             {
                 // Test is running inside debugger - Make timeout ~= infinite
-                services.Configure<SiloMessagingOptions>(op => op.ResponseTimeout = TimeSpan.FromMilliseconds(1000000));
+                services.Configure((Action<SiloMessagingOptions>)(op => op.ResponseTimeout = TimeSpan.FromMilliseconds(1000000)));
             }
 
             appBuilder.UseOrleans(siloBuilder =>
@@ -580,7 +580,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                     siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (_, _) => _grainDirectory);
                 }
 
-                siloBuilder.UseInMemoryConnectionTransport(_transportHub);
+                siloBuilder.UseInMemoryTransport(_transportHub);
 
                 services.AddSingleton<TestHooksEnvironmentStatisticsProvider>();
                 services.AddSingleton<TestHooksSystemTarget>();

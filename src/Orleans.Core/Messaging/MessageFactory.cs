@@ -9,7 +9,7 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
-    internal class MessageFactory
+    internal sealed class MessageFactory
     {
         [ThreadStatic]
         private static ulong _nextId;
@@ -78,6 +78,7 @@ namespace Orleans.Runtime
                 RequestContextData = RequestContextExtensions.Export(_deepCopier),
             };
 
+            response.SetTimeToLive(request);
             _messagingTrace.OnCreateMessage(response);
             return response;
         }

@@ -25,7 +25,7 @@ public sealed class ActivationRepartitionerOptions
     /// <summary>
     /// The default value of <see cref="MaxEdgeCount"/>.
     /// </summary>
-    public const int DEFAULT_MAX_EDGE_COUNT = 10_000;
+    public const int DEFAULT_MAX_EDGE_COUNT = 1_000_000;
 
     /// <summary>
     /// The minimum time between initiating a repartitioning round.

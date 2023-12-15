@@ -186,6 +186,36 @@ namespace DefaultCluster.Tests.General
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Echo")]
+        public async Task EchoGrain_PingLoop()
+        {
+            Stopwatch clock = new Stopwatch();
+
+            string what = "CreateGrain";
+            clock.Start();
+            var grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
+            this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
+
+            what = "EchoGrain.Ping";
+            clock.Restart();
+            for (var i = 0; i < 10_000; i++)
+            {
+                try
+                {
+                    //Logger.LogInformation("Attempting ping grain #{Num}", i);
+                    await grain.PingAsync().WaitAsync(timeout);
+                    //Logger.LogInformation("Completed ping grain #{Num}", i);
+                }
+                catch (Exception e)
+                {
+                    Logger.LogError(e, "err");
+                    throw;
+                }
+            }
+
+            this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Echo")]
         public async Task EchoGrain_Ping()
         {
             Stopwatch clock = new Stopwatch();

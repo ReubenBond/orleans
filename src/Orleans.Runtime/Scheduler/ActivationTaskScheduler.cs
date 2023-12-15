@@ -1,5 +1,6 @@
 #nullable enable
 
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -113,7 +114,7 @@ namespace Orleans.Runtime.Scheduler
                     "{TaskScheduler} TryExecuteTaskInline Task Id={TaskId} Thread={Thread} Execute=Yes",
                     myId,
                     task.Id,
-                    Thread.CurrentThread.ManagedThreadId);
+                    Environment.CurrentManagedThreadId);
 #endif
             // Try to run the task.
             bool done = TryExecuteTask(task);
@@ -129,7 +130,7 @@ namespace Orleans.Runtime.Scheduler
                     "{TaskScheduler} Completed TryExecuteTaskInline Task Id={TaskId} Thread={Thread} Execute=Done Ok={Ok}",
                     myId,
                     task.Id,
-                    Thread.CurrentThread.ManagedThreadId,
+                    Environment.CurrentManagedThreadId,
                     done);
 #endif
             return done;

@@ -6,6 +6,7 @@ var redis = builder.AddRedis("orleans-redis");
 
 var orleans = builder.AddOrleans("cluster")
     .WithClustering(redis);
+orleans.EnableDistributedTracing = false;
 
 builder.AddProject<DashboardToy_Frontend>("frontend")
     .WithReference(orleans)

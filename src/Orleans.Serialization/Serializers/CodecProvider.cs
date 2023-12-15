@@ -22,6 +22,7 @@ namespace Orleans.Serialization.Serializers
 
         private readonly object _initializationLock = new();
 
+        //private readonly ConcurrentDictionary<(Type, Type), Delegate> _delegateCache = new();
         private readonly ConcurrentDictionary<Type, IFieldCodec> _untypedCodecs = new();
         private readonly ConcurrentDictionary<Type, IFieldCodec> _typedCodecs = new();
         private readonly ConcurrentDictionary<Type, IBaseCodec> _typedBaseCodecs = new();
@@ -162,6 +163,21 @@ namespace Orleans.Serialization.Serializers
             if (res is null) ThrowCodecNotFound(fieldType);
             return res;
         }
+
+        /*
+        /// <inheritdoc/>
+        public IFieldCodec GetWriter(Type fieldType, Type outputType)
+        {
+            if (!_delegateCache.TryGetValue((fieldType, outputType), out var result))
+            {
+                var res = TryGetCodec(fieldType);
+                if (res is null) ThrowCodecNotFound(fieldType);
+                _delegateCache.TryAdd(
+            }
+
+            return res;
+        }
+        */
 
         /// <inheritdoc/>
         public IFieldCodec TryGetCodec(Type fieldType)

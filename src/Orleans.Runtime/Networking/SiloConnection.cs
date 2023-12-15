@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
+using Orleans.Connections.Transport;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
@@ -25,8 +26,7 @@ namespace Orleans.Runtime.Messaging
 
         public SiloConnection(
             SiloAddress remoteSiloAddress,
-            ConnectionContext connection,
-            ConnectionDelegate middleware,
+            MessageTransport transport,
             MessageCenter messageCenter,
             ILocalSiloDetails localSiloDetails,
             ConnectionManager connectionManager,
@@ -34,7 +34,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionCommon connectionShared,
             ProbeRequestMonitor probeMonitor,
             ConnectionPreambleHelper connectionPreambleHelper)
-            : base(connection, middleware, connectionShared)
+            : base(transport, connectionShared)
         {
             this.messageCenter = messageCenter;
             this.connectionManager = connectionManager;
@@ -54,19 +54,9 @@ namespace Orleans.Runtime.Messaging
 
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
 
-        protected override IMessageCenter MessageCenter => this.messageCenter;
+        protected override MessageCenter MessageCenter => this.messageCenter;
 
-        protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
-        {
-            MessagingInstruments.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
-        }
-
-        protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes)
-        {
-            MessagingInstruments.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
-        }
-
-        protected override void OnReceivedMessage(Message msg)
+        protected internal override void OnReceivedMessage(Message msg)
         {
             // See it's a Ping message, and if so, short-circuit it
             if (msg.IsPing())
@@ -184,13 +174,13 @@ namespace Orleans.Runtime.Messaging
             this.FailMessage(message, error);
         }
 
-        protected override async Task RunInternal()
+        protected override async Task RunAsyncCore()
         {
             Exception? error = default;
             try
             {
                 await Task.WhenAll(ReadPreamble(), WritePreamble());
-                await base.RunInternal();
+                await base.RunAsyncCore();
             }
             catch (Exception exception) when ((error = exception) is null)
             {

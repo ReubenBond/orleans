@@ -60,7 +60,7 @@ namespace UnitTests.SchedulerTests
         void IGrainContext.Rehydrate(IRehydrationContext context) => throw new NotImplementedException();
         void IGrainContext.Migrate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) => throw new NotImplementedException();
     }
-    
+
     [TestCategory("BVT"), TestCategory("Scheduler")]
     public class OrleansTaskSchedulerBasicTests : IDisposable
     {
@@ -75,7 +75,7 @@ namespace UnitTests.SchedulerTests
             this.loggerFactory = InitSchedulerLogging();
             this.rootContext = UnitTestSchedulingContext.Create(loggerFactory);
         }
-        
+
         public void Dispose()
         {
             SynchronizationContext.SetSynchronizationContext(null);
@@ -237,7 +237,7 @@ namespace UnitTests.SchedulerTests
             Assert.False(t1.IsFaulted, "Task-1 faulted: " + t1.Exception);
             Assert.True(await result1.Task, "Task-1 completed");
         }
-                
+
         [Fact]
         public async Task Sched_Task_SubTaskExecutionSequencing()
         {
@@ -291,7 +291,7 @@ namespace UnitTests.SchedulerTests
             Assert.True(n != 0, "Work items did not get executed");
             Assert.Equal(10, n);  // "Work items executed concurrently"
         }
-        
+
         [Fact]
         public async Task Sched_AC_RequestContext_StartNew_ContinueWith()
         {

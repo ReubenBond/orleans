@@ -355,7 +355,7 @@ namespace UnitTests.General
         {
             RequestContext.Set("threadId", i);
             int contextId = (int)(RequestContext.Get("threadId") ?? -1);
-            output.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, contextId);
+            output.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Environment.CurrentManagedThreadId, contextId);
             await FrameworkContextVerification(i).ConfigureAwait(false);
         }
 
@@ -365,7 +365,7 @@ namespace UnitTests.General
             {
                 await Task.Delay(10);
                 int contextId = (int)(RequestContext.Get("threadId") ?? -1);
-                output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
+                output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Environment.CurrentManagedThreadId, id, contextId);
                 Assert.Equal(id, contextId);
             }
         }
@@ -402,7 +402,7 @@ namespace UnitTests.General
         {
             threadId.Value = i;
             int contextId = threadId.Value;
-            output.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, contextId);
+            output.WriteLine("ExplicitId={0}, ContextId={2}, ManagedThreadId={1}", i, Environment.CurrentManagedThreadId, contextId);
             await FrameworkContextVerification(i).ConfigureAwait(false);
         }
 
@@ -412,7 +412,7 @@ namespace UnitTests.General
             {
                 await Task.Delay(10);
                 int contextId = threadId.Value;
-                output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Thread.CurrentThread.ManagedThreadId, id, contextId);
+                output.WriteLine("Inner, in loop {0}, Explicit Id={2}, ContextId={3}, ManagedThreadId={1}", i, Environment.CurrentManagedThreadId, id, contextId);
                 Assert.Equal(id, contextId);
             }
         }

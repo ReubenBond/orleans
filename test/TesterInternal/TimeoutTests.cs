@@ -68,9 +68,9 @@ namespace UnitTests
             Assert.True(stopwatch.Elapsed <= timeout.Multiply(3.5), "Waited longer than " + timeout.Multiply(3.5) + ". Waited " + stopwatch.Elapsed);
             Assert.True(promise.Status == TaskStatus.Faulted);
 
-            Assert.Equal(expected: 0, actual: this.runtimeClient.GetRunningRequestsCount(errorGrainType));
+            Assert.Equal(expected: 0, actual: await this.runtimeClient.GetRunningRequestsCount(errorGrainType));
 
-            // try to re-use the promise and should fail immideately.
+            // try to re-use the promise and should fail immediately.
             try
             {
                 stopwatch = new Stopwatch();

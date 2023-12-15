@@ -608,7 +608,7 @@ namespace Orleans.Runtime
     /// Base class for requests for methods which return <see cref="ValueTask"/>.
     /// </summary>
     [SerializerTransparent]
-    public abstract class Request : RequestBase 
+    public abstract class Request : RequestBase
     {
         public sealed override ValueTask<Response> Invoke()
         {

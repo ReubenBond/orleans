@@ -20,7 +20,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// A client which is hosted within a silo.
     /// </summary>
-    internal sealed class HostedClient : IGrainContext, IGrainExtensionBinder, IDisposable, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed class HostedClient : IGrainContext, IGrainExtensionBinder, IDisposable, ILifecycleParticipant<ISiloLifecycle>, IMessageReceiver
     {
         private readonly object lockObj = new object();
         private readonly Channel<Message> incomingMessages;
@@ -403,6 +403,11 @@ namespace Orleans.Runtime
         public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
         {
             // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
+        }
+
+        void IMessageReceiver.ReceiveMessage(Message message, IMessageTargetCache cache)
+        {
+            ReceiveMessage(message);
         }
     }
 }

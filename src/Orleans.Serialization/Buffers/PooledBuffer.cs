@@ -104,6 +104,17 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     /// <inheritdoc/>
     public void Dispose() => Reset();
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Memory<byte> GetExactMemory(int length)
+    {
+        if (WriteHead is null || length >= WriteHead.Array.Length - CurrentPosition)
+        {
+            return GetExactMemorySlow(length);
+        }
+
+        return WriteHead.AsMemory(CurrentPosition, length);
+    }
+
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Memory<byte> GetMemory(int sizeHint = 0)
@@ -114,6 +125,17 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         }
 
         return WriteHead.AsMemory(CurrentPosition);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Memory<byte> GetLimitedMemory(int length)
+    {
+        if (WriteHead is null || WriteHead.Array.Length == CurrentPosition)
+        {
+            return GetMemorySlow(0);
+        }
+
+        return WriteHead.AsLimitedMemory(CurrentPosition, length);
     }
 
     /// <inheritdoc/>
@@ -165,64 +187,10 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         }
     }
 
-    /// <summary>Copies the contents of this writer to another writer.</summary>
-    public readonly void CopyTo<TBufferWriter>(ref TBufferWriter writer) where TBufferWriter : IBufferWriter<byte>
-    {
-        var current = First;
-        while (current != null)
-        {
-            var span = current.CommittedMemory.Span;
-            writer.Write(span);
-            current = current.Next as SequenceSegment;
-        }
-
-        if (CurrentPosition > 0 && WriteHead is not null)
-        {
-            Write(ref writer, WriteHead.Array.AsSpan(0, CurrentPosition));
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void Write<TBufferWriter>(ref TBufferWriter writer, ReadOnlySpan<byte> value) where TBufferWriter : IBufferWriter<byte>
-    {
-        Span<byte> destination = writer.GetSpan();
-
-        // Fast path, try copying to the available memory directly
-        if (value.Length <= destination.Length)
-        {
-            value.CopyTo(destination);
-            writer.Advance(value.Length);
-        }
-        else
-        {
-            WriteMultiSegment(ref writer, value, destination);
-        }
-    }
-
-    private static void WriteMultiSegment<TBufferWriter>(ref TBufferWriter writer, in ReadOnlySpan<byte> source, Span<byte> destination) where TBufferWriter : IBufferWriter<byte>
-    {
-        ReadOnlySpan<byte> input = source;
-        while (true)
-        {
-            int writeSize = Math.Min(destination.Length, input.Length);
-            input[..writeSize].CopyTo(destination);
-            writer.Advance(writeSize);
-            input = input[writeSize..];
-            if (input.Length > 0)
-            {
-                destination = writer.GetSpan();
-
-                if (destination.IsEmpty)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(writer));
-                }
-
-                continue;
-            }
-
-            return;
-        }
-    }
+    /// <summary>
+    /// Returns a sequence of array segments representing the committed data.
+    /// </summary>
+    public readonly BufferSlice.ArraySegmentEnumerator ArraySegments => new(Slice());
 
     /// <summary>
     /// Returns a new <see cref="ReadOnlySequence{T}"/> which must not be accessed after disposing this instance.
@@ -335,6 +303,9 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private Memory<byte> GetMemorySlow(int sizeHint) => Grow(sizeHint).AsMemory(0);
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private Memory<byte> GetExactMemorySlow(int length) => Grow(length).AsMemory(0, length);
 
     private SequenceSegment Grow(int sizeHint)
     {
@@ -578,6 +549,113 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                 return false;
             }
         }
+
+        /// <summary>
+        /// Enumerates over spans of bytes in a <see cref="BufferSlice"/>.
+        /// </summary>
+        /// <remarks>
+        /// Initializes a new instance of the <see cref="ArraySegmentEnumerator"/> type.
+        /// </remarks>
+        /// <param name="slice">The slice to enumerate.</param>
+        public struct ArraySegmentEnumerator(BufferSlice slice)
+        {
+            private static readonly SequenceSegment InitialSegmentSentinel = new();
+            private static readonly SequenceSegment FinalSegmentSentinel = new();
+            private readonly BufferSlice _slice = slice;
+            private int _position;
+            private SequenceSegment _segment = InitialSegmentSentinel;
+
+            internal readonly PooledBuffer Buffer => _slice._buffer;
+            internal readonly int Offset => _slice._offset;
+            internal readonly int Length => _slice._length;
+
+            /// <summary>
+            /// Gets the element in the collection at the current position of the enumerator.
+            /// </summary>
+            public ArraySegment<byte> Current { get; private set; } = ArraySegment<byte>.Empty;
+
+            /// <summary>
+            /// Returns an enumerator which can be used to enumerate the data referenced by this instance.
+            /// </summary>
+            /// <returns>An enumerator for the data contained in this instance.</returns>
+            public readonly ArraySegmentEnumerator GetEnumerator() => this;
+
+            /// <summary>
+            /// Advances the enumerator to the next element of the collection.
+            /// </summary>
+            /// <returns><see langword="true"/> if the enumerator was successfully advanced to the next element; <see langword="false"/> if the enumerator has passed the end of the collection.</returns>
+            public bool MoveNext()
+            {
+                if (ReferenceEquals(_segment, InitialSegmentSentinel))
+                {
+                    _segment = Buffer.First;
+                }
+
+                var endPosition = Offset + Length;
+                while (_segment != null && _segment != FinalSegmentSentinel)
+                {
+                    var segment = _segment.CommittedArraySegment;
+
+                    // Find the starting segment and the offset to copy from.
+                    int segmentOffset;
+                    if (_position < Offset)
+                    {
+                        if (_position + segment.Count <= Offset)
+                        {
+                            // Start is in a subsequent segment
+                            _position += segment.Count;
+                            _segment = _segment.Next as SequenceSegment;
+                            continue;
+                        }
+                        else
+                        {
+                            // Start is in this segment
+                            segmentOffset = Offset;
+                        }
+                    }
+                    else
+                    {
+                        segmentOffset = 0;
+                    }
+
+                    var segmentLength = Math.Min(segment.Count - segmentOffset, endPosition - (_position + segmentOffset));
+                    if (segmentLength == 0)
+                    {
+                        Current = ArraySegment<byte>.Empty;
+                        _segment = FinalSegmentSentinel;
+                        return false;
+                    }
+
+                    Current = segment.Slice(segmentOffset, segmentLength);
+                    _position += segmentOffset + segmentLength;
+                    _segment = _segment.Next as SequenceSegment;
+                    return true;
+                }
+
+                // Account for the uncommitted data at the end of the buffer.
+                // The write head is only linked to the previous buffers when Commit() is called and it is set to null afterwards,
+                // meaning that if the write head is not null, the other buffers are not linked to it and it therefore has not been enumerated.
+                if (_segment != FinalSegmentSentinel && Buffer.CurrentPosition > 0 && Buffer.WriteHead is { } head && _position < endPosition)
+                {
+                    var finalOffset = Math.Max(Offset - _position, 0);
+                    var finalLength = Math.Min(Buffer.CurrentPosition, endPosition - (_position + finalOffset));
+                    if (finalLength == 0)
+                    {
+                        Current = ArraySegment<byte>.Empty;
+                        _segment = FinalSegmentSentinel;
+                        return false;
+                    }
+
+                    Current = new (head.Array, finalOffset, finalLength);
+                    _position += finalOffset + finalLength;
+                    Debug.Assert(_position == endPosition);
+                    _segment = FinalSegmentSentinel;
+                    return true;
+                }
+
+                return false;
+            }
+        }
     }
 
     private sealed class SequenceSegmentPool
@@ -680,6 +758,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         public byte[] Array { get; private set; }
 
         public ReadOnlyMemory<byte> CommittedMemory => Memory;
+        public ArraySegment<byte> CommittedArraySegment => new(Array, 0, Memory.Length);
 
         public bool IsValid => Array is { Length: > 0 };
         public bool IsMinimumSize => Array.Length == SequenceSegmentPool.MinimumBlockSize;
@@ -698,6 +777,19 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 
         public Memory<byte> AsMemory(int offset, int length)
         {
+#if NET6_0_OR_GREATER
+            if (IsMinimumSize)
+            {
+                return MemoryMarshal.CreateFromPinnedArray(Array, offset, length);
+            }
+#endif
+
+            return Array.AsMemory(offset, length);
+        }
+
+        public Memory<byte> AsLimitedMemory(int offset, int limit)
+        {
+            var length = Math.Min(Array.Length - offset, limit);
 #if NET6_0_OR_GREATER
             if (IsMinimumSize)
             {

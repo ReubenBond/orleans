@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,12 +26,12 @@ namespace Orleans
         private readonly ILogger logger;
         private readonly ClientMessagingOptions clientMessagingOptions;
 
-        private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private InvokableObjectManager localObjects;
         private bool disposing;
         private bool disposed;
 
         private readonly MessagingTrace messagingTrace;
+        private readonly CallbackWorker[] _callbacks;
         private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
         private IClusterConnectionStatusObserver[] _statusObservers;
 
@@ -50,6 +51,7 @@ namespace Orleans
             get;
             private set;
         }
+
         public ClientGatewayObserver gatewayObserver { get; private set; }
 
         public string CurrentActivationIdentity
@@ -73,13 +75,17 @@ namespace Orleans
             InterfaceToImplementationMappingCache interfaceToImplementationMapping)
         {
             TimeProvider = timeProvider;
+            _callbacks = new CallbackWorker[16];
+            for (var i = 0; i < _callbacks.Length; i++)
+            {
+                _callbacks[i] = new(loggerFactory.CreateLogger<CallbackWorker>());
+            }
             _interfaceToImplementationMapping = interfaceToImplementationMapping;
             this.ServiceProvider = serviceProvider;
             _localClientDetails = localClientDetails;
             this.loggerFactory = loggerFactory;
             this.messagingTrace = messagingTrace;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
-            callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
             var period = Max(
                 TimeSpan.FromMilliseconds(1),
@@ -88,7 +94,6 @@ namespace Orleans
                     TimeSpan.FromSeconds(1)));
             this.callbackTimer = new PeriodicTimer(period, timeProvider);
             this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.clientMessagingOptions.ResponseTimeout);
         }
@@ -277,7 +282,7 @@ namespace Orleans
             if (!oneWay)
             {
                 var callbackData = new CallbackData(this.sharedCallbackData, context, message);
-                callbacks.TryAdd(message.Id, callbackData);
+                _callbacks[message.Id.Value & 0xf].RegisterCallback(callbackData);
             }
             else
             {
@@ -294,51 +299,7 @@ namespace Orleans
 
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Received {Message}", response);
 
-            if (response.Result is Message.ResponseTypes.Status)
-            {
-                var status = (StatusResponse)response.BodyObject;
-                callbacks.TryGetValue(response.Id, out var callback);
-                var request = callback?.Message;
-                if (!(request is null))
-                {
-                    callback.OnStatusUpdate(status);
-
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
-                    {
-                        var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        this.logger.LogInformation("Received status update for pending request, Request: {RequestMessage}. Status: {Diagnostics}", request, diagnosticsString);
-                    }
-                }
-                else
-                {
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
-                    {
-                        var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        this.logger.LogInformation("Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}", response, diagnosticsString);
-                    }
-                }
-
-                return;
-            }
-
-            CallbackData callbackData;
-            var found = callbacks.TryRemove(response.Id, out callbackData);
-            if (found)
-            {
-                // We need to import the RequestContext here as well.
-                // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
-                // RequestContextExtensions.Import(response.RequestContextData);
-                callbackData.DoCallback(response);
-            }
-            else
-            {
-                logger.LogWarning((int)ErrorCode.Runtime_Error_100011, "No callback for response message {ResponseMessage}", response);
-            }
-        }
-
-        private void UnregisterCallback(CorrelationId id)
-        {
-            callbacks.TryRemove(id, out _);
+            _callbacks[response.Id.Value & 0xf].ReceiveResponse(response);
         }
 
         private void ConstructorReset()
@@ -406,17 +367,23 @@ namespace Orleans
 
         public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
         {
-            foreach (var callback in callbacks)
+            foreach (var callbackManager in _callbacks)
             {
-                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
-                {
-                    callback.Value.OnTargetSiloFail();
-                }
+                callbackManager.BreakOutstandingMessagesToDeadSilo(deadSilo);
             }
         }
 
-        public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
-            => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
+        public async Task<int> GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
+        {
+            var tasks = new List<Task<int>>();
+            foreach (var worker in _callbacks)
+            {
+                tasks.Add(worker.GetRunningRequestCount(grainInterfaceType));
+            }
+
+            await Task.WhenAll(tasks);
+            return tasks.Sum(t => t.Result);
+        }
 
         /// <inheritdoc />
         public void NotifyClusterConnectionLost()
@@ -457,25 +424,9 @@ namespace Orleans
         {
             while (await callbackTimer.WaitForNextTickAsync())
             {
-                try
+                foreach (var callbackManager in _callbacks)
                 {
-                    var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
-                    foreach (var (_, callback) in callbacks)
-                    {
-                        if (callback.IsCompleted)
-                        {
-                            continue;
-                        }
-
-                        if (callback.IsExpired(currentStopwatchTicks))
-                        {
-                            callback.OnTimeout();
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Error while processing callback expiry.");
+                    callbackManager.CheckForExpiredCallbacks();
                 }
             }
         }

@@ -12,8 +12,8 @@ namespace Orleans.Runtime
         internal static long _headerBytesReceived;
         internal static readonly ObservableCounter<long> HeaderBytesSentCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_SENT_BYTES_HEADER, () => _headerBytesSent, "bytes");
         internal static readonly ObservableCounter<long> HeaderBytesReceivedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_RECEIVED_BYTES_HEADER, () => _headerBytesReceived, "bytes");
-        internal static readonly CounterAggregator LocalMessagesSentCounterAggregator = new();
-        private static readonly ObservableCounter<long> LocalMessagesSentCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_SENT_LOCALMESSAGES, LocalMessagesSentCounterAggregator.Collect);
+        //internal static readonly Counter<int> LocalMessagesSentCounterAggregator = n
+        internal static readonly Counter<long> LocalMessagesSentCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.MESSAGING_SENT_LOCALMESSAGES);
 
         internal static readonly Counter<int> FailedSentMessagesCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_SENT_FAILED);
         internal static readonly Counter<int> DroppedSentMessagesCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_SENT_DROPPED);
@@ -46,38 +46,43 @@ namespace Orleans.Runtime
 
         internal static void OnMessageExpired(Phase phase)
         {
+            if (!ExpiredMessagesCounter.Enabled) return;
             ExpiredMessagesCounter.Add(1, new KeyValuePair<string, object>("Phase", phase));
         }
 
         internal static void OnPingSend(SiloAddress destination)
         {
+            if (!PingSendCounter.Enabled) return;
             PingSendCounter.Add(1, new KeyValuePair<string, object>("Destination", destination.ToString()));
         }
 
         internal static void OnPingReceive(SiloAddress destination)
         {
+            if (!PingReceivedCounter.Enabled) return;
             PingReceivedCounter.Add(1, new KeyValuePair<string, object>("Destination", destination.ToString()));
         }
 
         internal static void OnPingReplyReceived(SiloAddress replier)
         {
+            if (!PingReplyReceivedCounter.Enabled) return;
             PingReplyReceivedCounter.Add(1, new KeyValuePair<string, object>("Destination", replier.ToString()));
         }
 
         internal static void OnPingReplyMissed(SiloAddress replier)
         {
+            if (!PingReplyMissedCounter.Enabled) return;
             PingReplyMissedCounter.Add(1, new KeyValuePair<string, object>("Destination", replier.ToString()));
         }
 
         internal static void OnFailedSentMessage(Message msg)
         {
-            if (msg == null || !msg.HasDirection) return;
+            if (!FailedSentMessagesCounter.Enabled || msg == null || !msg.HasDirection) return;
             FailedSentMessagesCounter.Add(1, new KeyValuePair<string, object>("Direction", msg.Direction.ToString()));
         }
 
         internal static void OnDroppedSentMessage(Message msg)
         {
-            if (msg == null || !msg.HasDirection) return;
+            if (!DroppedSentMessagesCounter.Enabled || msg == null || !msg.HasDirection) return;
             DroppedSentMessagesCounter.Add(1, new KeyValuePair<string, object>("Direction", msg.Direction.ToString()));
         }
 
@@ -89,6 +94,7 @@ namespace Orleans.Runtime
 
         internal static void OnMessageReRoute(Message msg)
         {
+            if (!ReroutedMessagesCounter.Enabled) return;
             ReroutedMessagesCounter.Add(1, new KeyValuePair<string, object>("Direction", msg.Direction.ToString()));
         }
 

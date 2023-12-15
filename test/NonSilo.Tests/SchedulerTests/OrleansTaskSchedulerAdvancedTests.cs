@@ -648,7 +648,7 @@ namespace UnitTests.SchedulerTests
         {
             this.output.WriteLine("#{0} - {1} -- Thread={2} Worker={3} TaskScheduler.Current={4}",
                 level, what,
-                Thread.CurrentThread.ManagedThreadId,
+                Environment.CurrentManagedThreadId,
                 Thread.CurrentThread.Name,
                 TaskScheduler.Current);
         }
