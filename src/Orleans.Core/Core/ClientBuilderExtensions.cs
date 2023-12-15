@@ -217,7 +217,16 @@ namespace Orleans.Hosting
         /// </returns>
         public static IClientBuilder UseStaticClustering(this IClientBuilder builder, params IPEndPoint[] endpoints)
         {
-            return builder.UseStaticClustering(options => options.Gateways = endpoints.Select(ep => ep.ToGatewayUri()).ToList());
+            return builder.UseStaticClustering(options =>
+            {
+                if (endpoints is not null)
+                {
+                    foreach (var endpoint in endpoints)
+                    {
+                        options.AddTcpGateway(endpoint);
+                    }
+                }
+            });
         }
 
         /// <summary>
@@ -232,7 +241,7 @@ namespace Orleans.Hosting
         /// <returns>
         /// The <see cref="IClientBuilder"/>.
         /// </returns>
-        public static IClientBuilder UseStaticClustering(this IClientBuilder builder, Action<StaticGatewayListProviderOptions> configureOptions)
+        public static IClientBuilder UseStaticClustering(this IClientBuilder builder, Action<StaticGatewayMembershipProviderOptions> configureOptions)
         {
             return builder.ConfigureServices(
                 collection =>
@@ -242,8 +251,8 @@ namespace Orleans.Hosting
                         collection.Configure(configureOptions);
                     }
 
-                    collection.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
-                        .ConfigureFormatter<StaticGatewayListProviderOptions>();
+                    collection.AddSingleton<IGatewayMembershipProvider, StaticGatewayMembershipProvider>()
+                        .ConfigureFormatter<StaticGatewayMembershipProviderOptions>();
                 });
         }
 
@@ -259,14 +268,14 @@ namespace Orleans.Hosting
         /// <returns>
         /// The <see cref="IClientBuilder"/>.
         /// </returns>
-        public static IClientBuilder UseStaticClustering(this IClientBuilder builder, Action<OptionsBuilder<StaticGatewayListProviderOptions>> configureOptions)
+        public static IClientBuilder UseStaticClustering(this IClientBuilder builder, Action<OptionsBuilder<StaticGatewayMembershipProviderOptions>> configureOptions)
         {
             return builder.ConfigureServices(
                 collection =>
                 {
-                    configureOptions?.Invoke(collection.AddOptions<StaticGatewayListProviderOptions>());
-                    collection.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
-                        .ConfigureFormatter<StaticGatewayListProviderOptions>();
+                    configureOptions?.Invoke(collection.AddOptions<StaticGatewayMembershipProviderOptions>());
+                    collection.AddSingleton<IGatewayMembershipProvider, StaticGatewayMembershipProvider>()
+                        .ConfigureFormatter<StaticGatewayMembershipProviderOptions>();
                 });
         }
     }

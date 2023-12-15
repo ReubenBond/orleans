@@ -37,7 +37,12 @@ namespace TestExtensions
 
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
             {
-                this.output.WriteLine($"{logLevel} [{this.category}.{eventId.Name ?? eventId.Id.ToString()}] {formatter(state, exception)}");
+                var exceptionString = exception switch
+                {
+                    { } => $"\n{exception}",
+                    null => null
+                };
+                this.output.WriteLine($"{logLevel} [{this.category}.{eventId.Name ?? eventId.Id.ToString()}] {formatter(state, exception)}{exceptionString}");
             }
         }
     }

@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 
@@ -37,10 +38,18 @@ namespace Orleans.Hosting
             return builder.ConfigureServices(services => services.AddPlacementDirector<TStrategy>(createDirector));
         }
 
-        internal static void AddPlacementDirector<TStrategy, TDirector>(this IServiceCollection services)
+        /// <summary>
+        /// Adds a placement director.
+        /// </summary>
+        /// <typeparam name="TStrategy">The placement strategy.</typeparam>
+        /// <typeparam name="TDirector">The placement director.</typeparam>
+        /// <param name="services">The service collection.</param>
+        /// <returns>The service director, for method chaining.</returns>
+        public static void AddPlacementDirector<TStrategy, TDirector>(this IServiceCollection services)
             where TStrategy : PlacementStrategy, new()
             where TDirector : class, IPlacementDirector
         {
+            services.TryAddTransient<TStrategy>();
             services.AddSingletonNamedService<PlacementStrategy, TStrategy>(typeof(TStrategy).Name);
             services.AddSingletonKeyedService<Type, IPlacementDirector, TDirector>(typeof(TStrategy));
         }
@@ -48,6 +57,7 @@ namespace Orleans.Hosting
         private static void AddPlacementDirector<TStrategy>(this IServiceCollection services, Func<IServiceProvider, IPlacementDirector> createDirector)
             where TStrategy : PlacementStrategy, new()
         {
+            services.TryAddTransient<TStrategy>();
             services.AddSingletonNamedService<PlacementStrategy, TStrategy>(typeof(TStrategy).Name);
             services.AddSingletonKeyedService<Type, IPlacementDirector>(typeof(TStrategy), (sp, type) => createDirector(sp));
         }

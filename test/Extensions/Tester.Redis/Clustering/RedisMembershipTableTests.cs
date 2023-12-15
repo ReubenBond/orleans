@@ -44,14 +44,6 @@ namespace Tester.Redis.Clustering
             return membershipTable;
         }
 
-        protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
-        {
-            return new RedisGatewayListProvider(
-                //(RedisMembershipTable)this.membershipTable,
-                (RedisMembershipTable)CreateMembershipTable(logger),
-                this.gatewayOptions);
-        }
-
         protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString);
 
         [SkippableFact]

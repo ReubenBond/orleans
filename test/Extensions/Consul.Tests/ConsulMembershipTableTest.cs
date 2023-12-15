@@ -39,17 +39,6 @@ namespace Consul.Tests
             return new ConsulBasedMembershipTable(loggerFactory.CreateLogger<ConsulBasedMembershipTable>(), Options.Create(options), this.clusterOptions);
         }
 
-        protected override IGatewayListProvider CreateGatewayListProvider(ILogger logger)
-        {
-            ConsulTestUtils.EnsureConsul();
-            var options = new ConsulClusteringOptions();
-            var address = new Uri(this.connectionString);
-
-            options.ConfigureConsulClient(address);
-            
-            return new ConsulGatewayListProvider(loggerFactory.CreateLogger<ConsulGatewayListProvider>(), Options.Create(options), this.gatewayOptions, this.clusterOptions);
-        }
-
         protected override async Task<string> GetConnectionString()
         {
             return await ConsulTestUtils.EnsureConsulAsync() ? ConsulTestUtils.ConsulConnectionString : null;

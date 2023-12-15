@@ -449,7 +449,7 @@ namespace Orleans.Runtime
                 {
                     logger.LogInformation(
                         (int)ErrorCode.Catalog_SiloStatusChangeNotification,
-                        "Catalog is deactivating {Count} activations due to a failure of silo {Silo}, since it is a primary directory partition to these grain ids.",
+                    "Catalog is deactivating {Count} activations due to the eviction of silo {Silo}, since it is a primary directory partition to these grain ids.",
                         activationsToShutdown.Count,
                         updatedSilo.ToStringWithHashCode());
                 }
@@ -459,7 +459,7 @@ namespace Orleans.Runtime
                 // outside the lock.
                 if (activationsToShutdown.Count > 0)
                 {
-                    var reasonText = $"This activation is being deactivated due to a failure of server {updatedSilo}, since it was responsible for this activation's grain directory registration.";
+                    var reasonText = $"This activation is being deactivated due to the eviction of silo {updatedSilo}, since it was responsible for this activation's grain directory registration.";
                     var reason = new DeactivationReason(DeactivationReasonCode.InternalFailure, reasonText);
                     StartDeactivatingActivations(reason, activationsToShutdown);
                 }

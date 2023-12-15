@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Hosting
 {
@@ -9,11 +10,15 @@ namespace Orleans.Hosting
     {
         public SiloBuilder(IServiceCollection services)
         {
-            DefaultSiloServices.AddDefaultServices(services);
             Services = services;
+            Transports = new SiloTransportCollection(services);
+            DefaultSiloServices.AddDefaultServices(this);
         }
 
         /// <inheritdoc/>
         public IServiceCollection Services { get; }
+
+        /// <inheritdoc/>
+        public ISiloTransportCollection Transports { get; }
     }
 }

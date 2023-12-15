@@ -8,68 +8,75 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Runtime.Internal;
 using Orleans.Runtime.Messaging;
 
 namespace Orleans.Messaging
 {
     /// <summary>
     /// The GatewayManager class holds the list of known gateways, as well as maintaining the list of "dead" gateways.
-    ///
-    /// The known list can come from one of two places: the full list may appear in the client configuration object, or
-    /// the config object may contain an IGatewayListProvider delegate. If both appear, then the delegate takes priority.
     /// </summary>
-    internal class GatewayManager : IDisposable
+    internal class GatewayManager : IAsyncDisposable
     {
         private readonly object lockable = new object();
         private readonly Dictionary<SiloAddress, DateTime> knownDead = new Dictionary<SiloAddress, DateTime>();
         private readonly Dictionary<SiloAddress, DateTime> knownMasked = new Dictionary<SiloAddress, DateTime>();
-        private readonly IGatewayListProvider gatewayListProvider;
         private readonly ILogger logger;
+        private readonly IGatewayMembershipService _gatewayMembershipService;
         private readonly ConnectionManager connectionManager;
         private readonly GatewayOptions gatewayOptions;
-        private AsyncTaskSafeTimer gatewayRefreshTimer;
+        private readonly CancellationTokenSource _shutdownCancellationSource = new();
+        private readonly PeriodicTimer _refreshTimer;
         private List<SiloAddress> cachedLiveGateways;
         private HashSet<SiloAddress> cachedLiveGatewaysSet;
-        private List<SiloAddress> knownGateways;
+        private List<SiloAddress> knownGateways = new List<SiloAddress>();
+        private Task _gatewayMembershipUpdatesTask;
         private DateTime lastRefreshTime;
         private int roundRobinCounter;
         private bool gatewayRefreshCallInitiated;
         private bool gatewayListProviderInitialized;
 
-        private readonly ILogger<SafeTimer> timerLogger;
-
         public GatewayManager(
             IOptions<GatewayOptions> gatewayOptions,
-            IGatewayListProvider gatewayListProvider,
+            IGatewayMembershipService gatewayMembershipService,
             ILoggerFactory loggerFactory,
             ConnectionManager connectionManager)
         {
             this.gatewayOptions = gatewayOptions.Value;
             this.logger = loggerFactory.CreateLogger<GatewayManager>();
+            _gatewayMembershipService = gatewayMembershipService;
             this.connectionManager = connectionManager;
-            this.gatewayListProvider = gatewayListProvider;
-            this.timerLogger = loggerFactory.CreateLogger<SafeTimer>();
+            _refreshTimer = new PeriodicTimer(this.gatewayOptions.GatewayListRefreshPeriod);
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             if (!gatewayListProviderInitialized)
             {
-                await this.gatewayListProvider.InitializeGatewayListProvider();
+                await _gatewayMembershipService.Refresh();
                 gatewayListProviderInitialized = true;
             }
 
-            this.gatewayRefreshTimer = new AsyncTaskSafeTimer(
-                this.timerLogger,
-                RefreshSnapshotLiveGateways_TimerCallback,
-                null,
-                this.gatewayOptions.GatewayListRefreshPeriod,
-                this.gatewayOptions.GatewayListRefreshPeriod);
+            WatchGatewayMembership();
+            void WatchGatewayMembership()
+            {
+                using var _ = new ExecutionContextSuppressor();
+                _gatewayMembershipUpdatesTask = Task.WhenAll(ProcessMembershipUpdates(), ReevaluateMembershipSnapshot());
+            }
 
-            var knownGateways = await this.gatewayListProvider.GetGateways();
+            while (!cancellationToken.IsCancellationRequested && knownGateways.Count == 0)
+            {
+                var snapshot = _gatewayMembershipService.CurrentSnapshot;
+                knownGateways = _gatewayMembershipService.CurrentSnapshot.Gateways.Keys.ToList();
+                if (knownGateways.Count == 0)
+                {
+                    await _gatewayMembershipService.Refresh(snapshot.Version.Successor(), cancellationToken);
+                }
+            }
+
             if (knownGateways.Count == 0)
             {
-                var err = $"Could not find any gateway in {this.gatewayListProvider.GetType().FullName}. Orleans client cannot initialize.";
+                var err = "Could not find any gateway. Orleans client cannot initialize.";
                 this.logger.LogError((int)ErrorCode.GatewayManager_NoGateways, err);
                 throw new SiloUnavailableException(err);
             }
@@ -80,20 +87,16 @@ namespace Orleans.Messaging
                 knownGateways.Count,
                 Utils.EnumerableToString(knownGateways));
 
-            this.roundRobinCounter = this.gatewayOptions.PreferedGatewayIndex >= 0 ? this.gatewayOptions.PreferedGatewayIndex : Random.Shared.Next(knownGateways.Count);
-            this.knownGateways = this.cachedLiveGateways = knownGateways.Select(gw => gw.ToGatewayAddress()).ToList();
+            this.roundRobinCounter = this.gatewayOptions.PreferredGatewayIndex >= 0 ? this.gatewayOptions.PreferredGatewayIndex : Random.Shared.Next(knownGateways.Count);
+            this.knownGateways = this.cachedLiveGateways = knownGateways;
             this.cachedLiveGatewaysSet = new HashSet<SiloAddress>(cachedLiveGateways);
             this.lastRefreshTime = DateTime.UtcNow;
         }
 
         public void Stop()
         {
-            if (gatewayRefreshTimer != null)
-            {
-                Utils.SafeExecute(gatewayRefreshTimer.Dispose, logger);
-            }
-
-            gatewayRefreshTimer = null;
+            _refreshTimer.Dispose();
+            _shutdownCancellationSource.Cancel();
         }
 
         public void MarkAsDead(SiloAddress gateway)
@@ -204,7 +207,7 @@ namespace Orleans.Messaging
         {
             // If there is already an expedited refresh call in place, don't call again, until the previous one is finished.
             // We don't want to issue too many Gateway refresh calls.
-            if (gatewayListProvider == null || gatewayRefreshCallInitiated) return;
+            if (gatewayRefreshCallInitiated) return;
 
             // Initiate gateway list refresh asynchronously. The Refresh timer will keep ticking regardless.
             // We don't want to block the client with synchronously Refresh call.
@@ -215,37 +218,75 @@ namespace Orleans.Messaging
                 try
                 {
                     await RefreshSnapshotLiveGateways_TimerCallback(null);
-                    gatewayRefreshCallInitiated = false;
                 }
                 catch
                 {
                     // Intentionally ignore any exceptions here.
                 }
+                finally
+                {
+                    gatewayRefreshCallInitiated = false;
+                }
             });
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
+        internal async Task ProcessMembershipUpdates()
+        {
+            await Task.Yield();
+            while (!_shutdownCancellationSource.IsCancellationRequested)
+            {
+                try
+                {
+                    await foreach (var snapshot in _gatewayMembershipService.GetMembershipUpdatesAsync(_shutdownCancellationSource.Token))
+                    {
+                        await UpdateLiveGatewaysSnapshot(snapshot);
+                    }
+                }
+                catch (Exception exc)
+                {
+                    logger.LogError((int)ErrorCode.ProxyClient_GetGateways, exc, "Error refreshing gateways");
+                }
+            }
+        }
+
+        internal async Task ReevaluateMembershipSnapshot()
+        {
+            await Task.Yield();
+
+            // Force a periodic refresh of the gateway list, since clients will mark gateways as dead locally,
+            // and should retry connection to those gateways after some period has elapsed.
+            while (await _refreshTimer.WaitForNextTickAsync())
+            {
+                try
+                {
+                    await UpdateLiveGatewaysSnapshot(_gatewayMembershipService.CurrentSnapshot);
+                }
+                catch (Exception exc)
+                {
+                    logger.LogError((int)ErrorCode.ProxyClient_GetGateways, exc, "Error reevaluating gateways");
+                }
+            }
+        }
+
         internal async Task RefreshSnapshotLiveGateways_TimerCallback(object context)
         {
             try
             {
-                if (gatewayListProvider is null) return;
-
-                // the listProvider.GetGateways() is not under lock.
-                var allGateways = await gatewayListProvider.GetGateways();
-                var refreshedGateways = allGateways.Select(gw => gw.ToGatewayAddress()).ToList();
-
-                await UpdateLiveGatewaysSnapshot(refreshedGateways, gatewayListProvider.MaxStaleness);
+                var snapshot = _gatewayMembershipService.CurrentSnapshot;
+                await _gatewayMembershipService.Refresh(snapshot.Version.Successor(), _shutdownCancellationSource.Token);
+                snapshot = _gatewayMembershipService.CurrentSnapshot;
+                await UpdateLiveGatewaysSnapshot(snapshot);
             }
             catch (Exception exc)
             {
-                logger.LogError((int)ErrorCode.ProxyClient_GetGateways, exc, "Exception occurred during RefreshSnapshotLiveGateways_TimerCallback -> listProvider.GetGateways()");
+                logger.LogError((int)ErrorCode.ProxyClient_GetGateways, exc, "Error refreshing gateways");
             }
         }
 
         // This function is called asynchronously from gateway refresh timer.
-        private async Task UpdateLiveGatewaysSnapshot(IEnumerable<SiloAddress> refreshedGateways, TimeSpan maxStaleness)
+        private async Task UpdateLiveGatewaysSnapshot(GatewayMembershipSnapshot snapshot)
         {
+            var maxStaleness = gatewayOptions.GatewayListRefreshPeriod;
             List<SiloAddress> connectionsToKeepAlive;
 
             // This is a short lock, protecting the access to knownDead, knownMasked and cachedLiveGateways.
@@ -255,17 +296,15 @@ namespace Orleans.Messaging
                 var live = new List<SiloAddress>();
                 var now = DateTime.UtcNow;
 
-                this.knownGateways = refreshedGateways as List<SiloAddress> ?? refreshedGateways.ToList();
-                foreach (SiloAddress trial in knownGateways)
+                this.knownGateways = snapshot.Gateways.Keys.ToList();
+                foreach (SiloAddress gateway in knownGateways)
                 {
-                    var address = trial.Generation == 0 ? trial : SiloAddress.New(trial.Endpoint, 0);
-
                     // We consider a node to be dead if we recorded it is dead due to socket error
                     // and it was recorded (diedAt) not too long ago (less than maxStaleness ago).
                     // The latter is to cover the case when the Gateway provider returns an outdated list that does not yet reflect the actually recently died Gateway.
                     // If it has passed more than maxStaleness - we assume maxStaleness is the upper bound on Gateway provider freshness.
                     var isDead = false;
-                    if (knownDead.TryGetValue(address, out var diedAt))
+                    if (knownDead.TryGetValue(gateway, out var diedAt))
                     {
                         if (now.Subtract(diedAt) < maxStaleness)
                         {
@@ -274,10 +313,11 @@ namespace Orleans.Messaging
                         else
                         {
                             // Remove stale entries.
-                            knownDead.Remove(address);
+                            knownDead.Remove(gateway);
                         }
                     }
-                    if (knownMasked.TryGetValue(address, out var maskedAt))
+
+                    if (knownMasked.TryGetValue(gateway, out var maskedAt))
                     {
                         if (now.Subtract(maskedAt) < maxStaleness)
                         {
@@ -286,13 +326,13 @@ namespace Orleans.Messaging
                         else
                         {
                             // Remove stale entries.
-                            knownMasked.Remove(address);
+                            knownMasked.Remove(gateway);
                         }
                     }
 
                     if (!isDead)
                     {
-                        live.Add(address);
+                        live.Add(gateway);
                     }
                 }
 
@@ -325,7 +365,7 @@ namespace Orleans.Messaging
 
                 // Close connections to known dead connections, but keep the "masked" ones.
                 // Client will not send any new request to the "masked" connections, but might still
-                // receive responses
+                // receive responses.
                 connectionsToKeepAlive = new List<SiloAddress>(live);
                 connectionsToKeepAlive.AddRange(knownMasked.Select(e => e.Key));
             }
@@ -362,9 +402,14 @@ namespace Orleans.Messaging
             }
         }
 
-        public void Dispose()
+        public async ValueTask DisposeAsync()
         {
-            this.gatewayRefreshTimer?.Dispose();
+            _refreshTimer.Dispose();
+            _shutdownCancellationSource.Dispose();
+            if (_gatewayMembershipUpdatesTask is { } task)
+            {
+                await task;
+            }
         }
     }
 }

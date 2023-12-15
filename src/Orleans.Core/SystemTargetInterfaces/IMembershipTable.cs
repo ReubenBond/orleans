@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
+using Orleans.Connections.Transport;
 using Orleans.Runtime;
 
 namespace Orleans
@@ -302,6 +303,9 @@ namespace Orleans
         /// </summary>
         [Id(10)]
         public DateTime IAmAliveTime { get; set; }
+
+        [Id(11)]
+        public EndpointInfo[] Endpoints { get; set; }
 
         public void AddOrUpdateSuspector(SiloAddress localSilo, DateTime voteTime, int maxVotes)
         {

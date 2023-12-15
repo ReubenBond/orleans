@@ -26,7 +26,7 @@ namespace Microsoft.Extensions.Hosting
 
                 services
                     .AddRedisClustering()
-                    .AddSingleton<IGatewayListProvider, RedisGatewayListProvider>();
+                    .AddSingleton<IGatewayMembershipProvider, GatewayMembershipProvider>();
             });
         }
 
@@ -41,8 +41,7 @@ namespace Microsoft.Extensions.Hosting
                     opt.ConfigurationOptions = ConfigurationOptions.Parse(redisConnectionString);
                 })
                 .AddRedisClustering()
-                .AddSingleton<IGatewayListProvider, RedisGatewayListProvider>());
+                .AddSingleton<IGatewayMembershipProvider, GatewayMembershipProvider>());
         }
-
     }
 }
