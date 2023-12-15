@@ -7,7 +7,7 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
-    internal class MessageFactory
+    internal sealed class MessageFactory
     {
         private readonly DeepCopier deepCopier;
         private readonly ILogger logger;

@@ -9,8 +9,8 @@ namespace Orleans.Hosting
     {
         public SiloBuilder(IServiceCollection services)
         {
-            DefaultSiloServices.AddDefaultServices(services);
             Services = services;
+            DefaultSiloServices.AddDefaultServices(this);
         }
 
         /// <inheritdoc/>
