@@ -26,7 +26,7 @@ internal class InMemoryMessageTransport : MessageTransportBase
     private readonly PipeWriter _pipeWriter;
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _connectionClosingCts = new();
-    private readonly CancellationTokenSource _connectionClosedCts = new();
+    private readonly CancellationTokenSource _processingCompleted = new();
     private readonly object _shutdownLock = new();
     private readonly object _writesLock = new();
     private readonly object _readsLock = new();
@@ -46,18 +46,18 @@ internal class InMemoryMessageTransport : MessageTransportBase
         _fireWriteSignal = _writeSignal.Signal;
     }
 
-    public override CancellationToken Closed => _connectionClosedCts.Token;
+    public override CancellationToken Closed => _processingCompleted.Token;
 
     public void Start()
     {
         using var _ = new ExecutionContextSuppressor();
-        _processingTask = StartAsync();
+        _processingTask = ProcessConnectionAsync();
     }
 
-    private async Task StartAsync()
+    private async Task ProcessConnectionAsync()
     {
         // Return immediately to the synchronous caller.
-        await Task.Yield();
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
 
         try
         {
@@ -96,13 +96,12 @@ internal class InMemoryMessageTransport : MessageTransportBase
         catch (Exception ex)
         {
             _shutdownReason ??= ex;
-            _logger.LogError(0, ex, $"Unexpected exception in {nameof(InMemoryMessageTransport)}.{nameof(StartAsync)}.");
+            _logger.LogError(0, ex, $"Unexpected exception in {nameof(InMemoryMessageTransport)}.{nameof(ProcessConnectionAsync)}.");
         }
         finally
         {
-            await CloseAsync();
-
-            _connectionClosedCts.Cancel();
+            _processingCompleted.Cancel();
+            await CloseCoreAsync();
         }
     }
 
@@ -150,18 +149,13 @@ internal class InMemoryMessageTransport : MessageTransportBase
 
     public override async ValueTask CloseAsync(Exception? closeReason = null)
     {
-        if (_connectionClosedCts.IsCancellationRequested)
+        if (_processingCompleted.IsCancellationRequested)
         {
             return;
         }
 
         _shutdownReason ??= closeReason;
-        await _pipeReader.CompleteAsync();
-        await _pipeWriter.CompleteAsync();
-
-        _connectionClosingCts.Cancel();
-        _readSignal.Signal();
-        _writeSignal.Signal();
+        await CloseCoreAsync();
 
         if (_processingTask is null)
         {
@@ -169,7 +163,7 @@ internal class InMemoryMessageTransport : MessageTransportBase
         }
 
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        _connectionClosedCts.Token.Register(OnClosed, completion, useSynchronizationContext: false);
+        _processingCompleted.Token.Register(OnClosed, completion, useSynchronizationContext: false);
         await completion.Task;
 
         static void OnClosed(object? state)
@@ -179,6 +173,16 @@ internal class InMemoryMessageTransport : MessageTransportBase
         }
     }
 
+    private async Task CloseCoreAsync()
+    {
+        await _pipeReader.CompleteAsync();
+        await _pipeWriter.CompleteAsync();
+
+        _connectionClosingCts.Cancel();
+        _readSignal.Signal();
+        _writeSignal.Signal();
+    }
+
     public override async ValueTask DisposeAsync()
     {
         await CloseAsync(null);
@@ -186,7 +190,7 @@ internal class InMemoryMessageTransport : MessageTransportBase
 
     private async Task ProcessReads()
     {
-        await Task.Yield();
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         bool isGracefulTermination = false;
         Exception? error = null;
         ReadRequest? request = null;
@@ -301,8 +305,9 @@ internal class InMemoryMessageTransport : MessageTransportBase
 
     private async Task ProcessWrites()
     {
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
         const int SoftBatchMax = 32;
-        await Task.Yield();
         Exception? error = null;
         Queue<WriteRequest> requests = new();
         List<ArraySegment<byte>> buffers = new(capacity: SoftBatchMax);
