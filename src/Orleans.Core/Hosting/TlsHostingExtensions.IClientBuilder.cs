@@ -124,7 +124,8 @@ namespace Orleans.Hosting
                 ThrowNoPrivateKey(certificate, $"{nameof(TlsOptions)}.{nameof(TlsOptions.LocalCertificate)}");
             }
 
-            return builder;
+            throw new NotImplementedException("ADD TLS CONNECTORS TO ALL THINGS");
+            //return builder;
         }
 
         internal static void ThrowNoPrivateKey(X509Certificate2 certificate, string parameterName)
