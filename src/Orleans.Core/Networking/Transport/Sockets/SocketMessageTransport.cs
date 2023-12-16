@@ -12,7 +12,6 @@ using Orleans.Connections.Sockets;
 using System.Diagnostics;
 using Orleans.Runtime.Internal;
 using System.Net;
-using Orleans.Connections.Transport.Streams;
 using Orleans.Runtime;
 
 namespace Orleans.Connections.Transport.Sockets;
@@ -62,13 +61,13 @@ public sealed class SocketMessageTransport : MessageTransportBase
     public void Start()
     {
         using var _ = new ExecutionContextSuppressor();
-        _processingTask = StartAsync();
+        _processingTask = ProcessConnectionAsync();
     }
 
-    private async Task StartAsync()
+    private async Task ProcessConnectionAsync()
     {
         // Return immediately to the synchronous caller.
-        await Task.Yield();
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
 
         try
         {
@@ -110,7 +109,7 @@ public sealed class SocketMessageTransport : MessageTransportBase
         catch (Exception ex)
         {
             _shutdownReason ??= ex;
-            _logger.LogError(0, ex, $"Unexpected exception in {nameof(SocketMessageTransport)}.{nameof(StartAsync)}.");
+            _logger.LogError(0, ex, $"Unexpected exception in {nameof(SocketMessageTransport)}.{nameof(ProcessConnectionAsync)}.");
         }
         finally
         {
@@ -243,7 +242,7 @@ public sealed class SocketMessageTransport : MessageTransportBase
 
     private async Task ProcessReads()
     {
-        await Task.Yield();
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         bool isGracefulTermination = false;
         Exception? error = null;
         ReadRequest? request = null;
@@ -403,8 +402,9 @@ public sealed class SocketMessageTransport : MessageTransportBase
 
     private async Task ProcessWrites()
     {
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
         const int SoftBatchMax = 32;
-        await Task.Yield();
         Exception? error = null;
         Queue<WriteRequest> requests = new();
         List<ArraySegment<byte>> buffers = new(capacity: SoftBatchMax);

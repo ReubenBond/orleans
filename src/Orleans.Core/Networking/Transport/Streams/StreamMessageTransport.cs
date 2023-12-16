@@ -102,8 +102,8 @@ public abstract class StreamMessageTransport : MessageTransportBase
         }
         finally
         {
-            await DisposeAsync();
             _connectionClosedCts.Cancel();
+            await DisposeAsync();
         }
     }
 
@@ -124,7 +124,7 @@ public abstract class StreamMessageTransport : MessageTransportBase
 
     private async Task ProcessReads()
     {
-        await Task.Yield();
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         Exception? error = default;
         ReadRequest? operation = default;
         try
@@ -195,7 +195,7 @@ public abstract class StreamMessageTransport : MessageTransportBase
 
     private async Task ProcessWrites()
     {
-        await Task.Yield();
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         Exception? error = default;
         WriteRequest? operation = default;
         try
