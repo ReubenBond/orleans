@@ -127,8 +127,8 @@ internal abstract class ConnectionListener
                 return;
             }
 
-            _shutdownCancellation.Cancel();
             await Task.WhenAll(_listeners.Select(listener => listener.UnbindAsync(cancellationToken).AsTask())).ConfigureAwait(false);
+            _shutdownCancellation.Cancel();
 
             if (_acceptLoopTask is not null)
             {

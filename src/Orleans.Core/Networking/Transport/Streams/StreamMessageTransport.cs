@@ -2,6 +2,7 @@
 
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
+using Orleans.Runtime.Internal;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -35,7 +36,8 @@ public abstract class StreamMessageTransport : MessageTransportBase
 
     public virtual void Start()
     {
-        _runTask = RunAsync();
+        using var _ = new ExecutionContextSuppressor();
+        _runTask = Task.Run(RunAsync);
     }
 
     public override CancellationToken Closed => _connectionClosedCts.Token;
@@ -58,7 +60,6 @@ public abstract class StreamMessageTransport : MessageTransportBase
 
     public override async ValueTask DisposeAsync()
     {
-        await CloseAsync(null);
         await base.DisposeAsync();
         GC.SuppressFinalize(this);
     }
@@ -97,13 +98,14 @@ public abstract class StreamMessageTransport : MessageTransportBase
 
     private async Task RunAsync()
     {
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+
         try
         {
             await RunAsyncCore();
         }
         finally
         {
-            _connectionClosedCts.Cancel();
             await DisposeAsync();
         }
     }
@@ -120,6 +122,10 @@ public abstract class StreamMessageTransport : MessageTransportBase
         catch (Exception exception)
         {
             _shutdownReason ??= exception;
+        }
+        finally
+        {
+            _connectionClosedCts.Cancel();
         }
     }
 
@@ -171,6 +177,7 @@ gracefulTermination:
         finally
         {
             _shutdownReason ??= error;
+            _connectionClosingCts.Cancel();
             if (isGracefulTermination)
             {
                 operation?.OnCanceled();
@@ -194,12 +201,12 @@ gracefulTermination:
                 }
             }
 
+            _writerSignal.Signal();
+
             if (error is not null)
             {
                 _logger.LogError(0, error, $"Unexpected exception in {nameof(StreamMessageTransport)}.{nameof(ProcessReads)}.");
             }
-
-            _connectionClosingCts.Cancel();
         }
 
         bool TryDequeue([NotNullWhen(true)] out ReadRequest? operation)
@@ -240,17 +247,22 @@ gracefulTermination:
         finally
         {
             _shutdownReason ??= error;
-            if ((error ?? _shutdownReason) is { } reason)
-            {
-                operation?.SetException(reason);
-            }
+            _connectionClosingCts.Cancel();
+            var requestError = _shutdownReason ?? new ConnectionClosedException();
+            operation?.SetException(requestError);
 
             if (error is not null)
             {
                 _logger.LogError(0, error, $"Unexpected exception in {nameof(StreamMessageTransport)}.{nameof(ProcessWrites)}.");
             }
 
-            _connectionClosingCts.Cancel();
+            lock (_writesLock)
+            {
+                while (_pendingWrites.TryDequeue(out operation))
+                {
+                    operation.SetException(requestError);
+                }
+            }
         }
 
         bool TryDequeue([NotNullWhen(true)] out WriteRequest? operation)

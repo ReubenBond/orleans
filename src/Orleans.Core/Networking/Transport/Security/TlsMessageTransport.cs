@@ -103,7 +103,7 @@ public abstract class TlsMessageTransport : StreamMessageTransport
         }
         finally
         {
-            await DisposeAsync();
+            await CloseAsync(closeException: null);
         }
     }
 

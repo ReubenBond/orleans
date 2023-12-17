@@ -311,6 +311,9 @@ public sealed class SocketMessageTransport : MessageTransportBase
         }
         finally
         {
+            _shutdownReason ??= error;
+            _connectionClosingCts.Cancel();
+
             if (isGracefulTermination)
             {
                 request?.OnCanceled();
@@ -321,8 +324,6 @@ public sealed class SocketMessageTransport : MessageTransportBase
                 request?.OnError(error);
             }
 
-            _shutdownReason ??= error;
-            _connectionClosingCts.Cancel();
             _writeSignal.Signal();
 
             lock (_readsLock)
@@ -507,17 +508,15 @@ public sealed class SocketMessageTransport : MessageTransportBase
         }
         finally
         {
-            if (error is { })
-            {
-                foreach (var request in processingRequests)
-                {
-                    request.SetException(error);
-                }
-            }
-
             _shutdownReason ??= error;
             _connectionClosingCts.Cancel();
             _readSignal.Signal();
+
+            var requestError = _shutdownReason ?? new ConnectionClosedException();
+            foreach (var request in processingRequests)
+            {
+                request.SetException(requestError);
+            }
 
             lock (_writesLock)
             {
@@ -527,7 +526,7 @@ public sealed class SocketMessageTransport : MessageTransportBase
             // Drain requests.
             while (requests.TryDequeue(out var request) || _writeRequests.TryDequeue(out request))
             {
-                request.SetException(_shutdownReason!);
+                request.SetException(requestError);
             }
         }
 
