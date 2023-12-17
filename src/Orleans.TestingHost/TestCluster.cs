@@ -695,7 +695,7 @@ namespace Orleans.TestingHost
                                 siloBuilder.Services.AddOptions<UnixDomainSocketMessageTransportListenerOptions>("silo").Configure<IOptions<EndpointOptions>, IOptions<UnixSocketConnectionOptions>>(
                                     (listenerOptions, endPointOptions, connectionOptions) =>
                                 {
-                                    listenerOptions.Path = connectionOptions.Value.ConvertEndpointToPath(endPointOptions.Value.GetListeningProxyEndpoint());
+                                    listenerOptions.Path = connectionOptions.Value.ConvertEndpointToPath(endPointOptions.Value.GetListeningSiloEndpoint());
                                 });
                                 break;
                             }
