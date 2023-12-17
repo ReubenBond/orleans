@@ -8,7 +8,10 @@ using Orleans.Runtime.Messaging;
 
 namespace Orleans.Hosting
 {
-    public static partial class TlsHostingExtensions
+    /// <summary>
+    /// Extensions for configuring a silo with TLS.
+    /// </summary>
+    public static partial class SiloTlsHostingExtensions
     {
         /// <summary>
         /// Configures TLS.
@@ -28,10 +31,7 @@ namespace Orleans.Hosting
             StoreLocation location,
             Action<TlsOptions> configureOptions)
         {
-            if (configureOptions is null)
-            {
-                throw new ArgumentNullException(nameof(configureOptions));
-            }
+            ArgumentNullException.ThrowIfNull(configureOptions);
 
             return builder.UseTls(
                 CertificateLoader.LoadFromStoreCert(subject, storeName.ToString(), location, allowInvalid, server: true),
@@ -50,19 +50,13 @@ namespace Orleans.Hosting
             X509Certificate2 certificate,
             Action<TlsOptions> configureOptions)
         {
-            if (certificate is null)
-            {
-                throw new ArgumentNullException(nameof(certificate));
-            }
+            ArgumentNullException.ThrowIfNull(certificate);
 
-            if (configureOptions is null)
-            {
-                throw new ArgumentNullException(nameof(configureOptions));
-            }
+            ArgumentNullException.ThrowIfNull(configureOptions);
 
             if (!certificate.HasPrivateKey)
             {
-                ThrowNoPrivateKey(certificate, nameof(certificate));
+                throw new ArgumentException($"Certificate {certificate.ToString(verbose: true)} does not contain a private key", nameof(certificate));
             }
 
             return builder.UseTls(options =>
@@ -82,14 +76,11 @@ namespace Orleans.Hosting
             this ISiloBuilder builder,
             X509Certificate2 certificate)
         {
-            if (certificate is null)
-            {
-                throw new ArgumentNullException(nameof(certificate));
-            }
+            ArgumentNullException.ThrowIfNull(certificate);
 
             if (!certificate.HasPrivateKey)
             {
-                ThrowNoPrivateKey(certificate, nameof(certificate));
+                throw new ArgumentException($"Certificate {certificate.ToString(verbose: true)} does not contain a private key", nameof(certificate));
             }
 
             return builder.UseTls(options =>
@@ -108,38 +99,25 @@ namespace Orleans.Hosting
             this ISiloBuilder builder,
             Action<TlsOptions> configureOptions)
         {
-            if (configureOptions is null)
-            {
-                throw new ArgumentNullException(nameof(configureOptions));
-            }
-
-            var options = new TlsOptions();
-            configureOptions(options);
-            if (options.LocalCertificate is null && options.LocalServerCertificateSelector is null)
-            {
-                throw new InvalidOperationException("No certificate specified");
-            }
-
-            if (options.LocalCertificate is X509Certificate2 certificate && !certificate.HasPrivateKey)
-            {
-                ThrowNoPrivateKey(certificate, $"{nameof(TlsOptions)}.{nameof(TlsOptions.LocalCertificate)}");
-            }
+            ArgumentNullException.ThrowIfNull(configureOptions);
 
             var services = builder.Services;
 
             // Configure TLS options for each of the connection types.
-            services.AddOptions<TlsOptions>().Configure(configureOptions);
+            services.Configure<TlsOptions>(configureOptions);
+            builder.Services.AddSingleton<IConfigurationValidator>(sp => new ClientTlsHostingExtensions.TlsOptionsValidator(sp.GetRequiredService<IOptions<TlsOptions>>().Value));
             services.AddOptions<TlsOptions>(SiloConnectionListener.DefaultListenerName).Configure(configureOptions);
+            builder.Services.AddSingleton<IConfigurationValidator>(
+                sp => new ClientTlsHostingExtensions.TlsOptionsValidator(
+                    sp.GetRequiredService<IOptionsMonitor<TlsOptions>>().Get(SiloConnectionListener.DefaultListenerName)));
             services.AddOptions<TlsOptions>(GatewayConnectionListener.DefaultListenerName).Configure(configureOptions);
+            builder.Services.AddSingleton<IConfigurationValidator>(
+                sp => new ClientTlsHostingExtensions.TlsOptionsValidator(
+                    sp.GetRequiredService<IOptionsMonitor<TlsOptions>>().Get(GatewayConnectionListener.DefaultListenerName)));
 
-            throw new NotImplementedException("ADD TLS LISTENERS AND CONNECTORS TO ALL THINGS");
-
-//            return builder;
-        }
-
-        internal static void ThrowNoPrivateKey(X509Certificate2 certificate, string parameterName)
-        {
-            throw new ArgumentException($"Certificate {certificate.ToString(verbose: true)} does not contain a private key", parameterName);
+            builder.Services.AddSingleton<IMessageTransportConnectorMiddleware, TlsMessageTransportConnectorMiddleware>();
+            builder.Services.AddSingleton<IMessageTransportListenerMiddleware, TlsMessageTransportListenerMiddleware>();
+            return builder;
         }
     }
 }

@@ -26,7 +26,6 @@ public class MessageTransportStream : Stream
         _readRequest = new();
     }
 
-
     /// <inheritdoc/>
     public override bool CanTimeout => true;
 
@@ -72,6 +71,7 @@ public class MessageTransportStream : Stream
     /// <inheritdoc/>
     public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
     {
+        _readRequest.Reset();
         _readRequest.SetBuffer(buffer);
         _transport.ReadAsync(_readRequest);
         return _readRequest.OnProgressAsync();
@@ -89,6 +89,7 @@ public class MessageTransportStream : Stream
     /// <inheritdoc/>
     public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
+        _writeRequest.Reset();
         _writeRequest.SetBuffer(buffer);
         if (!_transport.WriteAsync(_writeRequest))
         {
@@ -133,6 +134,7 @@ public class MessageTransportStream : Stream
         public void GetResult(short token) => _signal.GetResult(token);
         public ValueTaskSourceStatus GetStatus(short token) => _signal.GetStatus(token);
         public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _signal.OnCompleted(continuation, state, token, flags);
+        public void Reset() => _signal.Reset();
     }
 
     private sealed class StreamReadRequest : ReadRequest, IValueTaskSource<int>
@@ -157,5 +159,6 @@ public class MessageTransportStream : Stream
         void IValueTaskSource<int>.OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _completion.OnCompleted(continuation, state, token, flags);
         int IValueTaskSource<int>.GetResult(short token) => _completion.GetResult(token);
         ValueTaskSourceStatus IValueTaskSource<int>.GetStatus(short token) => _completion.GetStatus(token);
+        public void Reset() => _completion.Reset();
     }
 }

@@ -10,18 +10,14 @@ namespace Orleans.Connections.Transport.Security;
 /// <summary>
 /// Message transport listener which configures transports for TLS.
 /// </summary>
-public class TlsMessageTransportListener : MessageTransportListener
+public class TlsMessageTransportListener(
+    MessageTransportListener innerListener,
+    IOptionsMonitor<TlsOptions> tlsOptions,
+    ILoggerFactory loggerFactory) : MessageTransportListener
 {
-    private readonly IOptionsMonitor<TlsOptions> _tlsOptions;
-    private readonly MessageTransportListener _innerListener;
-    private readonly ILogger _logger;
-
-    public TlsMessageTransportListener(MessageTransportListener innerListener, IOptionsMonitor<TlsOptions> tlsOptions, ILoggerFactory loggerFactory)
-    {
-        _tlsOptions = tlsOptions;
-        _innerListener = innerListener;
-        _logger = loggerFactory.CreateLogger<ServerTlsMessageTransport>();
-    }
+    private readonly IOptionsMonitor<TlsOptions> _tlsOptions = tlsOptions;
+    private readonly MessageTransportListener _innerListener = innerListener;
+    private readonly ILogger _logger = loggerFactory.CreateLogger<ServerTlsMessageTransport>();
 
     /// <inheritdoc/>
     public override IFeatureCollection Features => _innerListener.Features;

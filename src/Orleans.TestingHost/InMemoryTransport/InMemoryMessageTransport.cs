@@ -208,7 +208,6 @@ internal class InMemoryMessageTransport : MessageTransportBase
                     while (true)
                     {
                         var requestBuffer = request.Buffer;
-                        Debug.Assert(requestBuffer.Length > 0);
                         if (readBuffer.Length == 0)
                         {
                             if (hasRead)
@@ -274,8 +273,9 @@ internal class InMemoryMessageTransport : MessageTransportBase
             {
                 request?.OnCanceled();
             }
-            else if (error is { })
+            else
             {
+                Debug.Assert(error is not null);
                 request?.OnError(error);
             }
 
@@ -290,7 +290,15 @@ internal class InMemoryMessageTransport : MessageTransportBase
 
             while (TryDequeue(out request))
             {
-                request.OnError(_shutdownReason!);
+                if (isGracefulTermination)
+                {
+                    request.OnCanceled();
+                }
+                else
+                {
+                    Debug.Assert(error is not null);
+                    request.OnError(error);
+                }
             }
         }
 

@@ -4,10 +4,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Connections.Transport;
 using Orleans.Connections.Transport.Security;
+using Orleans.Runtime;
 
 namespace Orleans.Hosting
 {
-    public static partial class TlsHostingExtensions
+    public static partial class ClientTlsHostingExtensions
     {
         /// <summary>
         /// Configures TLS.
@@ -27,10 +28,7 @@ namespace Orleans.Hosting
             StoreLocation location,
             Action<TlsOptions> configureOptions)
         {
-            if (configureOptions is null)
-            {
-                throw new ArgumentNullException(nameof(configureOptions));
-            }
+            ArgumentNullException.ThrowIfNull(configureOptions);
 
             return builder.UseTls(
                 CertificateLoader.LoadFromStoreCert(subject, storeName.ToString(), location, allowInvalid, server: false),
@@ -49,19 +47,12 @@ namespace Orleans.Hosting
             X509Certificate2 certificate,
             Action<TlsOptions> configureOptions)
         {
-            if (certificate is null)
-            {
-                throw new ArgumentNullException(nameof(certificate));
-            }
-
-            if (configureOptions is null)
-            {
-                throw new ArgumentNullException(nameof(configureOptions));
-            }
+            ArgumentNullException.ThrowIfNull(certificate);
+            ArgumentNullException.ThrowIfNull(configureOptions);
 
             if (!certificate.HasPrivateKey)
             {
-                ThrowNoPrivateKey(certificate, nameof(certificate));
+                throw new ArgumentException($"Certificate {certificate.ToString(verbose: true)} does not contain a private key", nameof(certificate));
             }
 
             return builder.UseTls(options =>
@@ -81,14 +72,11 @@ namespace Orleans.Hosting
             this IClientBuilder builder,
             X509Certificate2 certificate)
         {
-            if (certificate is null)
-            {
-                throw new ArgumentNullException(nameof(certificate));
-            }
+            ArgumentNullException.ThrowIfNull(certificate);
 
             if (!certificate.HasPrivateKey)
             {
-                ThrowNoPrivateKey(certificate, nameof(certificate));
+                throw new ArgumentException($"Certificate {certificate.ToString(verbose: true)} does not contain a private key", nameof(certificate));
             }
 
             return builder.UseTls(options =>
@@ -110,27 +98,24 @@ namespace Orleans.Hosting
             ArgumentNullException.ThrowIfNull(configureOptions);
 
             builder.Configure<TlsOptions>(configureOptions);
-            builder.Services.AddSingleton<IValidateOptions<TlsOptions>, TlsClientOptionsValidator>();
+            builder.Services.AddSingleton<IConfigurationValidator>(sp => new TlsOptionsValidator(sp.GetRequiredService<IOptions<TlsOptions>>().Value));
             builder.Services.AddSingleton<IMessageTransportConnectorMiddleware, TlsMessageTransportConnectorMiddleware>();
-            builder.Services.AddSingleton<IMessageTransportListenerMiddleware, TlsMessageTransportListenerMiddleware>();
             return builder;
         }
 
-        private sealed class TlsClientOptionsValidator : IValidateOptions<TlsOptions>
+        internal sealed class TlsOptionsValidator(TlsOptions options) : IConfigurationValidator
         {
-            public ValidateOptionsResult Validate(string name, TlsOptions options)
+            public void ValidateConfiguration()
             {
                 if (options.LocalCertificate is null && options.ClientCertificateMode == RemoteCertificateMode.RequireCertificate)
                 {
-                    return ValidateOptionsResult.Fail("No certificate specified");
+                    throw new OrleansConfigurationException("No certificate specified");
                 }
 
                 if (options.LocalCertificate is X509Certificate2 certificate && !certificate.HasPrivateKey)
                 {
-                    return ValidateOptionsResult.Fail($"Certificate {certificate.ToString(verbose: true)} does not contain a private key");
+                    throw new OrleansConfigurationException($"Certificate {certificate.ToString(verbose: true)} does not contain a private key");
                 }
-
-                return ValidateOptionsResult.Success;
             }
         }
     }
