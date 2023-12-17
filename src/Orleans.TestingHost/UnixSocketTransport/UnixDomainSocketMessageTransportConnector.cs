@@ -39,7 +39,6 @@ internal class UnixDomainSocketMessageTransportConnector : MessageTransportConne
         }
 
         var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-        await socket.ConnectAsync(unixEndPoint);
 
         var completion = new SingleUseAwaitableSocketAsyncEventArgs
         {
