@@ -124,8 +124,12 @@ namespace Orleans.Runtime.Messaging
 
                 _connection.OnReceivedMessage(message);
             }
-            catch (Exception exception) when (HandleReceiveMessageFailure(message, exception))
+            catch (Exception exception)
             {
+                if (!HandleReceiveMessageFailure(message, exception))
+                {
+                    throw;
+                }
             }
             finally
             {

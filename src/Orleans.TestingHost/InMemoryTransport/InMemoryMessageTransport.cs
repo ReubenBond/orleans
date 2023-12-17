@@ -220,8 +220,7 @@ internal class InMemoryMessageTransport : MessageTransportBase
 
                             if (readResult.IsCanceled || readResult.IsCompleted)
                             {
-                                isGracefulTermination = true;
-                                break;
+                                goto gracefulTermination;
                             }
 
                             readBuffer = readResult.Buffer;
@@ -247,20 +246,13 @@ internal class InMemoryMessageTransport : MessageTransportBase
                             break;
                         }
                     }
-
-                    if (isGracefulTermination)
-                    {
-                        break;
-                    }
-                }
-
-                if (isGracefulTermination)
-                {
-                    break;
                 }
 
                 await _readSignal.WaitAsync().ConfigureAwait(false);
             }
+
+gracefulTermination:
+            isGracefulTermination = true;
         }
         catch (Exception exception)
         {
@@ -372,6 +364,8 @@ internal class InMemoryMessageTransport : MessageTransportBase
                     request.SetResult();
                 }
             }
+
+            processingRequests.Clear();
         }
         catch (Exception ex)
         {
@@ -380,16 +374,15 @@ internal class InMemoryMessageTransport : MessageTransportBase
         }
         finally
         {
-            if (error is { })
-            {
-                foreach (var request in processingRequests)
-                {
-                    request.SetException(error);
-                }
-            }
-
             _shutdownReason ??= error;
             _connectionClosingCts.Cancel();
+
+            var requestError = _shutdownReason ?? new ConnectionClosedException();
+            foreach (var request in processingRequests)
+            {
+                request.SetException(requestError);
+            }
+
             _readSignal.Signal();
 
             lock (_writesLock)
@@ -400,7 +393,7 @@ internal class InMemoryMessageTransport : MessageTransportBase
             // Drain requests.
             while (requests.TryDequeue(out var request) || _writeRequests.TryDequeue(out request))
             {
-                request.SetException(_shutdownReason!);
+                request.SetException(requestError);
             }
         }
 
