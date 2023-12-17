@@ -1,6 +1,8 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -84,6 +86,34 @@ public abstract class MessageTransportConnector : IAsyncDisposable
     {
         GC.SuppressFinalize(this);
         return default;
+    }
+}
+
+internal sealed class MessageTransportConnectorFactory(MessageTransportConnector connector, IEnumerable<TlsMessageTransportConnectorMiddleware> middlewares)
+{
+    public MessageTransportConnector GetMessageTransportConnector()
+    {
+        var result = connector;
+        foreach (var middleware in middlewares.Reverse())
+        {
+            result = middleware.Apply(result);
+        }
+
+        return result;
+    }
+}
+
+internal sealed class MessageTransportListenerFactory(MessageTransportListener connector, IEnumerable<TlsMessageTransportListenerMiddleware> middlewares)
+{
+    public MessageTransportListener GetMessageTransportListener()
+    {
+        var result = connector;
+        foreach (var middleware in middlewares.Reverse())
+        {
+            result = middleware.Apply(result);
+        }
+
+        return result;
     }
 }
 

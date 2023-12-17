@@ -107,30 +107,31 @@ namespace Orleans.Hosting
             this IClientBuilder builder,
             Action<TlsOptions> configureOptions)
         {
-            if (configureOptions is null)
-            {
-                throw new ArgumentNullException(nameof(configureOptions));
-            }
+            ArgumentNullException.ThrowIfNull(configureOptions);
 
-            var options = new TlsOptions();
-            configureOptions(options);
-            if (options.LocalCertificate is null && options.ClientCertificateMode == RemoteCertificateMode.RequireCertificate)
-            {
-                throw new InvalidOperationException("No certificate specified");
-            }
-
-            if (options.LocalCertificate is X509Certificate2 certificate && !certificate.HasPrivateKey)
-            {
-                ThrowNoPrivateKey(certificate, $"{nameof(TlsOptions)}.{nameof(TlsOptions.LocalCertificate)}");
-            }
-
-            throw new NotImplementedException("ADD TLS CONNECTORS TO ALL THINGS");
-            //return builder;
+            builder.Configure<TlsOptions>(configureOptions);
+            builder.Services.AddSingleton<IValidateOptions<TlsOptions>, TlsClientOptionsValidator>();
+            builder.Services.AddSingleton<IMessageTransportConnectorMiddleware, TlsMessageTransportConnectorMiddleware>();
+            builder.Services.AddSingleton<IMessageTransportListenerMiddleware, TlsMessageTransportListenerMiddleware>();
+            return builder;
         }
 
-        internal static void ThrowNoPrivateKey(X509Certificate2 certificate, string parameterName)
+        private sealed class TlsClientOptionsValidator : IValidateOptions<TlsOptions>
         {
-            throw new ArgumentException($"Certificate {certificate.ToString(verbose: true)} does not contain a private key", parameterName);
+            public ValidateOptionsResult Validate(string name, TlsOptions options)
+            {
+                if (options.LocalCertificate is null && options.ClientCertificateMode == RemoteCertificateMode.RequireCertificate)
+                {
+                    return ValidateOptionsResult.Fail("No certificate specified");
+                }
+
+                if (options.LocalCertificate is X509Certificate2 certificate && !certificate.HasPrivateKey)
+                {
+                    return ValidateOptionsResult.Fail($"Certificate {certificate.ToString(verbose: true)} does not contain a private key");
+                }
+
+                return ValidateOptionsResult.Success;
+            }
         }
     }
 }
