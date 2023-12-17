@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
@@ -10,37 +11,27 @@ using Orleans.Connections.Transport;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class SiloConnectionFactory : ConnectionFactory
+    internal sealed class SiloConnectionFactory(
+        IServiceProvider serviceProvider,
+        IOptions<ConnectionOptions> connectionOptions,
+        MessageTransportConnector connector,
+        IEnumerable<IMessageTransportConnectorMiddleware> connectorMiddleware,
+        ILocalSiloDetails localSiloDetails,
+        ConnectionCommon connectionShared,
+        ProbeRequestMonitor probeRequestMonitor,
+        ConnectionPreambleHelper connectionPreambleHelper) : ConnectionFactory(connector, connectorMiddleware)
     {
-        private readonly ILocalSiloDetails _localSiloDetails;
-        private readonly ConnectionCommon _connectionShared;
-        private readonly ProbeRequestMonitor _probeRequestMonitor;
-        private readonly ConnectionPreambleHelper _connectionPreambleHelper;
-        private readonly ConnectionOptions _connectionOptions;
-        private readonly IServiceProvider _serviceProvider;
+        private readonly ILocalSiloDetails _localSiloDetails = localSiloDetails;
+        private readonly ConnectionCommon _connectionShared = connectionShared;
+        private readonly ProbeRequestMonitor _probeRequestMonitor = probeRequestMonitor;
+        private readonly ConnectionPreambleHelper _connectionPreambleHelper = connectionPreambleHelper;
+        private readonly ConnectionOptions _connectionOptions = connectionOptions.Value;
+        private readonly IServiceProvider _serviceProvider = serviceProvider;
         private readonly object _initializationLock = new ();
         private bool _isInitialized;
         private ConnectionManager? _connectionManager;
         private MessageCenter? _messageCenter;
         private ClusterMembershipService? _clusterMembership;
-
-        public SiloConnectionFactory(
-            IServiceProvider serviceProvider,
-            IOptions<ConnectionOptions> connectionOptions,
-            MessageTransportConnector connector,
-            ILocalSiloDetails localSiloDetails,
-            ConnectionCommon connectionShared,
-            ProbeRequestMonitor probeRequestMonitor,
-            ConnectionPreambleHelper connectionPreambleHelper)
-            : base(connector)
-        {
-            _connectionOptions = connectionOptions.Value;
-            _serviceProvider = serviceProvider;
-            _localSiloDetails = localSiloDetails;
-            _connectionShared = connectionShared;
-            _probeRequestMonitor = probeRequestMonitor;
-            _connectionPreambleHelper = connectionPreambleHelper;
-        }
 
         protected override Connection CreateConnection(SiloAddress address, MessageTransport transport)
         {

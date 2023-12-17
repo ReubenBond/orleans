@@ -14,7 +14,7 @@ public sealed class TlsMessageTransportConnectorMiddleware : IMessageTransportCo
     private readonly IOptionsMonitor<TlsOptions> _tlsOptions;
     private readonly ILoggerFactory _loggerFactory;
 
-    public TlsMessageTransportConnectorMiddleware(string endpointName, IOptionsMonitor<TlsOptions> tlsOptions, ILoggerFactory loggerFactory)
+    public TlsMessageTransportConnectorMiddleware(IOptionsMonitor<TlsOptions> tlsOptions, ILoggerFactory loggerFactory)
     {
         _tlsOptions = tlsOptions;
         _loggerFactory = loggerFactory;

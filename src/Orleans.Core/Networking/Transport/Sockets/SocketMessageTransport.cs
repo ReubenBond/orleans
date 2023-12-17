@@ -257,7 +257,6 @@ public sealed class SocketMessageTransport : MessageTransportBase
                     // Process the request to completion.
                     while (true)
                     {
-                        Debug.Assert(request.Buffer.Length > 0);
                         await _socketReceiver.ReceiveAsync(_socket, request.Buffer).ConfigureAwait(false);
 
                         if (_socketReceiver.HasError)
@@ -268,7 +267,7 @@ public sealed class SocketMessageTransport : MessageTransportBase
                         }
 
                         var transferred = _socketReceiver.BytesTransferred;
-                        if (transferred == 0)
+                        if (transferred == 0 && request.Buffer.Length > 0)
                         {
                             // FIN
                             SocketsLog.ConnectionReadFin(_logger, this);
@@ -295,11 +294,20 @@ public sealed class SocketMessageTransport : MessageTransportBase
 
                 await _readSignal.WaitAsync().ConfigureAwait(false);
             }
+
+            isGracefulTermination = true;
         }
         catch (Exception exception)
         {
-            error = exception;
-            isGracefulTermination = HandleReadError(ref error);
+            if (_connectionClosingCts.IsCancellationRequested)
+            {
+                isGracefulTermination = true;
+            }
+            else
+            {
+                error = exception;
+                isGracefulTermination = HandleReadError(ref error);
+            }
         }
         finally
         {
@@ -307,8 +315,9 @@ public sealed class SocketMessageTransport : MessageTransportBase
             {
                 request?.OnCanceled();
             }
-            else if (error is { })
+            else
             {
+                Debug.Assert(error is not null);
                 request?.OnError(error);
             }
 
@@ -323,7 +332,15 @@ public sealed class SocketMessageTransport : MessageTransportBase
 
             while (TryDequeue(out request))
             {
-                request.OnError(_shutdownReason!);
+                if (isGracefulTermination)
+                {
+                    request.OnCanceled();
+                }
+                else
+                {
+                    Debug.Assert(error is not null);
+                    request.OnError(error);
+                }
             }
         }
 

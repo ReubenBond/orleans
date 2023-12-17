@@ -7,33 +7,26 @@ using Orleans.Connections.Transport;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using System.Net;
+using System.Collections.Generic;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class ClientOutboundConnectionFactory : ConnectionFactory
+    internal sealed class ClientOutboundConnectionFactory(
+        IOptions<ConnectionOptions> connectionOptions,
+        IOptions<ClusterOptions> clusterOptions,
+        MessageTransportConnector connector,
+        IEnumerable<IMessageTransportConnectorMiddleware> connectorMiddleware,
+        ConnectionCommon connectionShared,
+        ConnectionPreambleHelper connectionPreambleHelper) : ConnectionFactory(connector, connectorMiddleware)
     {
         private readonly object _initializationLock = new();
-        private readonly ConnectionCommon _connectionShared;
-        private readonly ConnectionOptions _connectionOptions;
-        private readonly ClusterOptions _clusterOptions;
-        private readonly ConnectionPreambleHelper _connectionPreambleHelper;
+        private readonly ConnectionCommon _connectionShared = connectionShared;
+        private readonly ConnectionOptions _connectionOptions = connectionOptions.Value;
+        private readonly ClusterOptions _clusterOptions = clusterOptions.Value;
+        private readonly ConnectionPreambleHelper _connectionPreambleHelper = connectionPreambleHelper;
         private volatile bool _isInitialized;
         private ClientMessageCenter? _messageCenter;
         private ConnectionManager? _connectionManager;
-
-        public ClientOutboundConnectionFactory(
-            IOptions<ConnectionOptions> connectionOptions,
-            IOptions<ClusterOptions> clusterOptions,
-            MessageTransportConnector connector,
-            ConnectionCommon connectionShared,
-            ConnectionPreambleHelper connectionPreambleHelper)
-            : base(connector)
-        {
-            _connectionOptions = connectionOptions.Value;
-            _connectionShared = connectionShared;
-            _clusterOptions = clusterOptions.Value;
-            _connectionPreambleHelper = connectionPreambleHelper;
-        }
 
         protected override Connection CreateConnection(SiloAddress address, MessageTransport transport)
         {

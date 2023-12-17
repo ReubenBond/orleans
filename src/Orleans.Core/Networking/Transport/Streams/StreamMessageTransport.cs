@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading;
@@ -127,6 +128,7 @@ public abstract class StreamMessageTransport : MessageTransportBase
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         Exception? error = default;
         ReadRequest? operation = default;
+        bool isGracefulTermination = false;
         try
         {
             while (!_connectionClosingCts.IsCancellationRequested)
@@ -135,11 +137,10 @@ public abstract class StreamMessageTransport : MessageTransportBase
                 {
                     while (true)
                     {
-                        var bytesRead = await Stream.ReadAsync(operation.Buffer);
-                        if (bytesRead == 0)
+                        var bytesRead = await Stream.ReadAsync(operation.Buffer, _connectionClosingCts.Token);
+                        if (bytesRead == 0 && operation.Buffer.Length > 0)
                         {
-                            error = new EndOfStreamException();
-                            break;
+                            goto gracefulTermination;
                         }
 
                         if (operation.OnRead(bytesRead))
@@ -147,33 +148,50 @@ public abstract class StreamMessageTransport : MessageTransportBase
                             break;
                         }
                     }
-
-                    if (error is not null)
-                    {
-                        // Bubble the error up
-                        break;
-                    }
-                }
-
-                if (error is not null)
-                {
-                    // Bubble the error up
-                    break;
                 }
 
                 await _readerSignal.WaitAsync();
             }
+
+gracefulTermination:
+            isGracefulTermination = true;
         }
         catch (Exception exception)
         {
-            error ??= exception;
+            if (_connectionClosingCts.IsCancellationRequested)
+            {
+                isGracefulTermination = true;
+            }
+            else
+            {
+                error ??= exception;
+                isGracefulTermination = false;
+            }
         }
         finally
         {
             _shutdownReason ??= error;
-            if ((error ?? _shutdownReason) is { } reason)
+            if (isGracefulTermination)
             {
-                operation?.OnError(reason);
+                operation?.OnCanceled();
+            }
+            else
+            {
+                Debug.Assert(error is not null);
+                operation?.OnError(error);
+            }
+
+            while (TryDequeue(out operation))
+            {
+                if (isGracefulTermination)
+                {
+                    operation.OnCanceled();
+                }
+                else
+                {
+                    Debug.Assert(error is not null);
+                    operation.OnError(error);
+                }
             }
 
             if (error is not null)
@@ -206,7 +224,7 @@ public abstract class StreamMessageTransport : MessageTransportBase
                 {
                     foreach (var buffer in operation.Buffers)
                     {
-                        await Stream.WriteAsync(buffer);
+                        await Stream.WriteAsync(buffer, _connectionClosingCts.Token);
                     }
 
                     operation.SetResult();
