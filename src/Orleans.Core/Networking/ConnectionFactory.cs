@@ -1,4 +1,5 @@
 #nullable enable
+using System.Collections.Generic;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,9 +11,15 @@ internal abstract class ConnectionFactory
 {
     private readonly MessageTransportConnector _transportConnector;
 
-    protected ConnectionFactory(MessageTransportConnector transportConnector)
+    protected ConnectionFactory(MessageTransportConnector transportConnector, IEnumerable<IMessageTransportConnectorMiddleware> middleware)
     {
-        _transportConnector = transportConnector;
+        var connector = transportConnector;
+        foreach (var mw in middleware)
+        {
+            connector = mw.Apply(connector);
+        }
+
+        _transportConnector = connector;
     }
 
     protected abstract Connection CreateConnection(SiloAddress address, MessageTransport context);

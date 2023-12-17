@@ -27,26 +27,34 @@ internal abstract class ConnectionListener
 
     protected ConnectionListener(
         IEnumerable<MessageTransportListener> listeners,
+        IEnumerable<IMessageTransportListenerMiddleware> middleware,
         IOptions<ConnectionOptions> connectionOptions,
         ConnectionManager connectionManager,
         ConnectionCommon connectionShared)
     {
 
         // Get the listeners which are valid according to their configuration.
-        _listeners = GetListeners(listeners).ToArray();
+        _listeners = GetListeners(listeners, middleware).ToArray();
         _connectionManager = connectionManager;
         ConnectionOptions = connectionOptions.Value;
         _connectionShared = connectionShared;
 
-        static IEnumerable<MessageTransportListener> GetListeners(IEnumerable<MessageTransportListener> registered)
+        static IEnumerable<MessageTransportListener> GetListeners(IEnumerable<MessageTransportListener> registered, IEnumerable<IMessageTransportListenerMiddleware> middleware)
         {
             // Filter out duplicates and non-valid listeners
             var seen = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var listener in registered/*.Reverse()*/)
+            foreach (var listener in registered)
             {
                 if (!listener.IsValid) continue;
                 if (!seen.Add(listener.ListenerName)) continue;
-                yield return listener;
+                var result = listener; 
+
+                foreach (var mw in middleware)
+                {
+                    result = mw.Apply(result);
+                }
+
+                yield return result;
             }
         }
     }
