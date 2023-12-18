@@ -186,6 +186,7 @@ internal class InMemoryMessageTransport : MessageTransportBase
     public override async ValueTask DisposeAsync()
     {
         await CloseAsync(null);
+        await base.DisposeAsync();
     }
 
     private async Task ProcessReads()

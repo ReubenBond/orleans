@@ -36,16 +36,9 @@ namespace Orleans.Runtime.Messaging
         public PooledBuffer.BufferSlice Body => _buffer.Slice(Message.LENGTH_HEADER_SIZE + _messageLength.HeaderLength, _messageLength.BodyLength);
         public int BodyLength => _messageLength.BodyLength;
 
-        public void SetConnection(Connection connection)
-        {
-            _connection = connection;
-        }
+        public void SetConnection(Connection connection) => _connection = connection;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetBuffer(in PooledBuffer buffer)
-        {
-            _buffer = buffer;
-        }
+        public void SetBuffer(PooledBuffer buffer) => _buffer = buffer;
 
         public void Reset()
         {

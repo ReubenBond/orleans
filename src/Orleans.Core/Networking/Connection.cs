@@ -233,7 +233,7 @@ HandleCompletedRequest:
 
                         // Assign the excess data to the next request.
                         readRequest = RentHandler();
-                        readRequest.SetBuffer(in excessBuffer);
+                        readRequest.SetBuffer(excessBuffer);
                         if (readRequest.OnRead(0))
                         {
                             goto HandleCompletedRequest;
