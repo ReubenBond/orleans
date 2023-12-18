@@ -73,7 +73,12 @@ public class MessageTransportStream : Stream
     {
         _readRequest.Reset();
         _readRequest.SetBuffer(buffer);
-        _transport.ReadAsync(_readRequest);
+        if (!_transport.ReadAsync(_readRequest))
+        {
+            _readRequest.Reset();
+            return new ValueTask<int>(0);
+        }
+
         return _readRequest.OnProgressAsync();
     }
 

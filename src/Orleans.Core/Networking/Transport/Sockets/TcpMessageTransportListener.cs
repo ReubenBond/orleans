@@ -23,9 +23,10 @@ public class TcpMessageTransportListenerOptions
 /// </summary>
 public sealed class TcpMessageTransportListener : MessageTransportListener
 {
-    private Socket? _listenSocket;
     private readonly IOptionsMonitor<TcpMessageTransportOptions> _tcpOptions;
     private readonly IOptionsMonitor<TcpMessageTransportListenerOptions> _listenerOptions;
+    private readonly CancellationTokenSource _closingCts = new();
+    private Socket? _listenSocket;
 
     internal TcpMessageTransportListener(string endpointName, IOptionsMonitor<TcpMessageTransportOptions> tcpOptions, IOptionsMonitor<TcpMessageTransportListenerOptions> listenerOptions, ILoggerFactory loggerFactory)
     {
@@ -106,11 +107,12 @@ public sealed class TcpMessageTransportListener : MessageTransportListener
 
     public override async ValueTask<MessageTransport?> AcceptAsync(CancellationToken cancellationToken = default)
     {
-        while (!cancellationToken.IsCancellationRequested)
+        using var ct = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _closingCts.Token);
+        while (!ct.IsCancellationRequested)
         {
             try
             {
-                var acceptSocket = await _listenSocket!.AcceptAsync(cancellationToken).ConfigureAwait(false);
+                var acceptSocket = await _listenSocket!.AcceptAsync(ct.Token).ConfigureAwait(false);
                 OnAcceptSocket(acceptSocket);
 
                 var transport = new SocketMessageTransport(acceptSocket, Logger);
@@ -143,16 +145,22 @@ public sealed class TcpMessageTransportListener : MessageTransportListener
         return null;
     }
 
+    private void DisposeCore()
+    {
+        _closingCts.Cancel();
+        _listenSocket?.Dispose();
+    }
+
     public override ValueTask UnbindAsync(CancellationToken cancellationToken)
     {
-        _listenSocket?.Dispose();
+        DisposeCore();
         return default;
     }
 
     public override async ValueTask DisposeAsync()
     {
-        _listenSocket?.Dispose();
-        GC.SuppressFinalize(this);
+        DisposeCore();
         await base.DisposeAsync();
+        GC.SuppressFinalize(this);
     }
 }
