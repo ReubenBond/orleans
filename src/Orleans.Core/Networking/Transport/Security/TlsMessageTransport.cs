@@ -149,6 +149,7 @@ public abstract class TlsMessageTransport : StreamMessageTransport
     /// <inheritdoc/>
     public override async ValueTask DisposeAsync()
     {
+        await CloseAsync(null);
         await _innerTransport.DisposeAsync();
         await _networkTransportStream.DisposeAsync();
         await _sslStream.DisposeAsync();

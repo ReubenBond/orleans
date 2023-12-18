@@ -108,7 +108,7 @@ public abstract class StreamMessageTransport : MessageTransportBase
         }
         finally
         {
-            await DisposeAsync();
+            await CloseAsync(null);
         }
     }
 

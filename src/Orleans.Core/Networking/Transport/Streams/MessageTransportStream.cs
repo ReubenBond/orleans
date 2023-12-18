@@ -12,19 +12,11 @@ namespace Orleans.Connections.Transport.Streams;
 /// <summary>
 /// <see cref="Stream"/> implementation which reads and writes to a <see cref="MessageTransport"/>.
 /// </summary>
-public class MessageTransportStream : Stream
+public class MessageTransportStream(MessageTransport transport, MemoryPool<byte> memoryPool) : Stream
 {
-    private readonly MessageTransport _transport;
-    private readonly StreamWriteRequest _writeRequest;
-    private readonly StreamReadRequest _readRequest;
-
-    public MessageTransportStream(MessageTransport transport, MemoryPool<byte> memoryPool)
-    {
-        _transport = transport;
-        MemoryPool = memoryPool;
-        _writeRequest = new();
-        _readRequest = new();
-    }
+    private readonly MessageTransport _transport = transport;
+    private readonly StreamWriteRequest _writeRequest = new();
+    private readonly StreamReadRequest _readRequest = new();
 
     /// <inheritdoc/>
     public override bool CanTimeout => true;
@@ -45,7 +37,7 @@ public class MessageTransportStream : Stream
     public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 
     /// <inheritdoc/>
-    public MemoryPool<byte> MemoryPool { get; }
+    public MemoryPool<byte> MemoryPool { get; } = memoryPool;
 
     /// <inheritdoc/>
     public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
@@ -106,10 +98,7 @@ public class MessageTransportStream : Stream
     }
 
     /// <inheritdoc/>
-    public override async ValueTask DisposeAsync()
-    {
-        await _transport.DisposeAsync();
-    }
+    public override ValueTask DisposeAsync() => default;
 
     /// <inheritdoc/>
     public override Task FlushAsync(CancellationToken cancellationToken) => Task.CompletedTask;
