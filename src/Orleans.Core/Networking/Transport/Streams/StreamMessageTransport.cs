@@ -46,6 +46,8 @@ public abstract class StreamMessageTransport : MessageTransportBase
     {
         _shutdownReason ??= closeException;
         _connectionClosingCts.Cancel();
+        _readerSignal.Signal();
+        _writerSignal.Signal();
 
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _connectionClosedCts.Token.Register(OnClosed, completion, useSynchronizationContext: false);

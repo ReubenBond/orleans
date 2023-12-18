@@ -50,4 +50,11 @@ public class TlsMessageTransportListener(
 
     /// <inheritdoc/>
     public override ValueTask UnbindAsync(CancellationToken cancellationToken = default) => _innerListener.UnbindAsync(cancellationToken);
+
+    /// <inheritdoc/>
+    public override async ValueTask DisposeAsync()
+    {
+        await _innerListener.DisposeAsync();
+        await base.DisposeAsync();
+    }
 }

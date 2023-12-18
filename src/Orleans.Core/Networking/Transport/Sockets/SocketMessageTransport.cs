@@ -113,17 +113,20 @@ public sealed class SocketMessageTransport : MessageTransportBase
         }
         finally
         {
-            if (!_socketDisposed)
-            {
-                Shutdown();
-            }
+            Shutdown();
 
+            _connectionClosingCts.Cancel();
             _connectionClosedCts.Cancel();
         }
     }
 
     private void Shutdown()
     {
+        if (_socketDisposed)
+        {
+            return;
+        }
+
         lock (_shutdownLock)
         {
             try
@@ -207,13 +210,13 @@ public sealed class SocketMessageTransport : MessageTransportBase
 
     public override async ValueTask CloseAsync(Exception? closeReason)
     {
+        _shutdownReason ??= closeReason;
+        Shutdown();
+
         if (_connectionClosedCts.IsCancellationRequested)
         {
             return;
         }
-
-        _shutdownReason ??= closeReason;
-        Shutdown();
 
         _connectionClosingCts.Cancel();
         _readSignal.Signal();
@@ -238,12 +241,13 @@ public sealed class SocketMessageTransport : MessageTransportBase
     public override async ValueTask DisposeAsync()
     {
         await CloseAsync(null);
+        await base.DisposeAsync();
     }
 
     private async Task ProcessReads()
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
-        bool isGracefulTermination = false;
+        var isGracefulTermination = false;
         Exception? error = null;
         ReadRequest? request = null;
         try
@@ -329,18 +333,17 @@ public sealed class SocketMessageTransport : MessageTransportBase
             lock (_readsLock)
             {
                 _readsCompleted = true;
-            }
-
-            while (TryDequeue(out request))
-            {
-                if (isGracefulTermination)
+                while (_readRequests.TryDequeue(out request))
                 {
-                    request.OnCanceled();
-                }
-                else
-                {
-                    Debug.Assert(error is not null);
-                    request.OnError(error);
+                    if (isGracefulTermination)
+                    {
+                        request.OnCanceled();
+                    }
+                    else
+                    {
+                        Debug.Assert(error is not null);
+                        request.OnError(error);
+                    }
                 }
             }
         }
@@ -485,21 +488,11 @@ public sealed class SocketMessageTransport : MessageTransportBase
                     request.SetResult();
                 }
             }
-        }
-        catch (ObjectDisposedException ex)
-        {
-            // This exception should always be ignored because _shutdownReason should be set.
-            error = ex;
 
-            if (!_socketDisposed)
-            {
-                // This is unexpected if the socket hasn't been disposed yet.
-                SocketsLog.ConnectionError(_logger, this, error);
-            }
+            processingRequests.Clear();
         }
         catch (Exception ex)
         {
-            // This is unexpected.
             error = ex;
             if (!_socketDisposed)
             {
@@ -544,7 +537,7 @@ public sealed class SocketMessageTransport : MessageTransportBase
         Exception error;
         if (IsConnectionResetError(_socketSender.SocketError))
         {
-            // This could be ignored if _shutdownReason is alwritey set.
+            // This could be ignored if _shutdownReason is already set.
             var ex = _socketSender.Error!;
             error = new ConnectionResetException(ex.Message, ex);
 
