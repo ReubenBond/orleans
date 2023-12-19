@@ -29,4 +29,8 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Analyzers\Orleans.Analyzers.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Serialization.UnitTests"/>
+  </ItemGroup>
+
 </Project>

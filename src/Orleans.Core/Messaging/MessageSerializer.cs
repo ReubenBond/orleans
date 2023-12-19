@@ -14,7 +14,6 @@ using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using static Orleans.Runtime.Message;
-using static Orleans.Serialization.Buffers.PooledBuffer;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -44,19 +43,16 @@ namespace Orleans.Runtime.Messaging
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void ReadHeaders(BufferSlice buffer, int headerLength, int bodyLength, out Message message)
+        public void ReadHeaders(ArcBuffer buffer, int headerLength, int bodyLength, out Message message)
         {
             // Check lengths
             ThrowIfLengthsInvalid(headerLength, bodyLength);
 
             try
             {
-                // Decode header
-                var header = buffer.Slice(0, headerLength);
-
                 // Build message
                 message = new();
-                var headersReader = Reader.Create(header, _deserializationSession);
+                var headersReader = Reader.Create(buffer.AsReadOnlySequence(), _deserializationSession);
                 DeserializeHeaders(ref headersReader, message);
             }
             finally
@@ -69,7 +65,7 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                var reader = Reader.Create(readRequest.Body, _deserializationSession);
+                var reader = Reader.Create(readRequest.Body.AsReadOnlySequence(), _deserializationSession);
                 var field = reader.ReadFieldHeader();
 
                 if (message.Result == ResponseTypes.Success)
@@ -103,9 +99,10 @@ namespace Orleans.Runtime.Messaging
             var headers = message.Headers;
             IFieldCodec? bodyCodec = null;
             ResponseCodec? rawCodec = null;
-            if (message._bodyObject is not null and not MessageReadRequest)
+            var bodyObject = message.BodyObject;
+            if (bodyObject is not null and not MessageReadRequest)
             {
-                bodyCodec = _codecProvider.GetCodec(message._bodyObject.GetType());
+                bodyCodec = _codecProvider.GetCodec(bodyObject.GetType());
                 if (headers.ResponseType is ResponseTypes.None && bodyCodec is ResponseCodec responseCodec)
                 {
                     rawCodec = responseCodec;
@@ -134,6 +131,11 @@ namespace Orleans.Runtime.Messaging
                     bodyLength = writer.Position;
                     buffer = writer.Output;
                 }
+                else if (bodyObject is not null)
+                {
+                    Debug.Fail("body no null");
+                }
+                /*
                 else if (message._bodyObject is MessageReadRequest readRequest)
                 {
                     bodyLength = readRequest.BodyLength;
@@ -145,6 +147,7 @@ namespace Orleans.Runtime.Messaging
                     message._bodyObject = null;
                     readRequest.Reset();
                 }
+                */
 
 
                 // Before completing, check lengths
