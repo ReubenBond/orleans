@@ -8,6 +8,7 @@ namespace Orleans.Runtime.MembershipService
     internal class RemoteSiloProber : IRemoteSiloProber
     {
         private readonly IServiceProvider serviceProvider;
+        private MembershipSystemTarget _membershipSystemTarget;
 
         public RemoteSiloProber(IServiceProvider serviceProvider)
         {
@@ -17,14 +18,14 @@ namespace Orleans.Runtime.MembershipService
         /// <inheritdoc />
         public Task Probe(SiloAddress remoteSilo, int probeNumber)
         {
-            var systemTarget = this.serviceProvider.GetRequiredService<MembershipSystemTarget>();
+            var systemTarget = _membershipSystemTarget ??= this.serviceProvider.GetRequiredService<MembershipSystemTarget>();
             return systemTarget.ProbeRemoteSilo(remoteSilo, probeNumber);
         }
 
         /// <inheritdoc />
         public Task<IndirectProbeResponse> ProbeIndirectly(SiloAddress intermediary, SiloAddress target, TimeSpan probeTimeout, int probeNumber)
         {
-            var systemTarget = this.serviceProvider.GetRequiredService<MembershipSystemTarget>();
+            var systemTarget = _membershipSystemTarget ??= this.serviceProvider.GetRequiredService<MembershipSystemTarget>();
             return systemTarget.ProbeRemoteSiloIndirectly(intermediary, target, probeTimeout, probeNumber);
         }
     }

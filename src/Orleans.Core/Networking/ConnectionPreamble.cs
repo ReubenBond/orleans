@@ -115,20 +115,13 @@ namespace Orleans.Runtime.Messaging
         {
             private readonly Serializer<ConnectionPreamble> _preambleSerializer;
             private readonly TaskCompletionSource<ConnectionPreamble> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-            private byte[] _preambleBuffer = new byte[MaxPreambleLength + sizeof(int)];
-            private int _totalBytesRead;
             private int _preambleLength = -1;
-            private Memory<byte> _buffer;
 
             private PreambleReadRequest(Serializer<ConnectionPreamble> preambleSerializer)
             {
                 _preambleSerializer = preambleSerializer;
-
-                // The initial read must be precisely the framing size to prevent over-reading.
-                _buffer = _preambleBuffer.AsMemory(0, sizeof(int));
             }
 
-            public override Memory<byte> Buffer => _buffer;
             public Task<ConnectionPreamble> Completion => _completion.Task;
 
             public static PreambleReadRequest Create(Serializer<ConnectionPreamble> preambleSerializer) => new (preambleSerializer);
@@ -136,19 +129,18 @@ namespace Orleans.Runtime.Messaging
             public void Dispose() { }
             public override void OnError(Exception error) => _completion.SetException(error);
             public override void OnCanceled() => _completion.SetException(new OperationCanceledException("Read operation canceled"));
-            public override bool OnRead(int bytesRead)
+            public override bool OnRead(ArcBufferReader buffer)
             {
-                _totalBytesRead += bytesRead;
-
-                if (_totalBytesRead < sizeof(int))
+                if (buffer.Length < sizeof(int))
                 {
-                    _buffer = _buffer[bytesRead..];
                     return false;
                 }
 
                 if (_preambleLength < 0)
                 {
-                    _preambleLength = BinaryPrimitives.ReadInt32LittleEndian(_preambleBuffer.AsSpan(0, sizeof(int)));
+                    Span<byte> preambleBytes = stackalloc byte[sizeof(int)];
+                    var preambleBuffer = buffer.Peek(in preambleBytes);
+                    _preambleLength = BinaryPrimitives.ReadInt32LittleEndian(preambleBuffer);
 
                     if (_preambleLength > MaxPreambleLength)
                     {
@@ -159,22 +151,18 @@ namespace Orleans.Runtime.Messaging
                     {
                         throw new InvalidOperationException($"Read preamble length of {_preambleLength}, which is less than or equal to zero.");
                     }
-
-                    // Limit the maximum amount of data which can be read to the specified preamble length.
-                    _buffer = _preambleBuffer.AsMemory(sizeof(int), _preambleLength);
-                    return false;
                 }
 
-                if (_totalBytesRead == _preambleLength + sizeof(int))
+                if (buffer.Length >= _preambleLength + sizeof(int))
                 {
-                    var payload = _preambleBuffer.AsMemory(sizeof(int), _preambleLength);
-                    var preamble = _preambleSerializer.Deserialize(payload);
+                    buffer.Skip(sizeof(int));
+                    using var preambleBuffer = buffer.ConsumeSlice(_preambleLength);
+                    var preamble = _preambleSerializer.Deserialize(preambleBuffer);
                     _completion.SetResult(preamble);
 
                     return true;
                 }
 
-                _buffer = _buffer[bytesRead..];
                 return false;
             }
         }

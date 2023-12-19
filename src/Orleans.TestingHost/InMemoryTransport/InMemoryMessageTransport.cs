@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Connections.Transport;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.TestingHost.InMemoryTransport;
 
@@ -196,6 +197,7 @@ internal class InMemoryMessageTransport : MessageTransportBase
         Exception? error = null;
         ReadRequest? request = null;
         ReadOnlySequence<byte> readBuffer = default;
+        using ArcBufferWriter bufferWriter = new();
         bool hasRead = false;
         try
         {
@@ -208,41 +210,23 @@ internal class InMemoryMessageTransport : MessageTransportBase
                     // Process the request to completion.
                     while (true)
                     {
-                        var requestBuffer = request.Buffer;
-                        if (readBuffer.Length == 0)
+                        if (hasRead)
                         {
-                            if (hasRead)
-                            {
-                                _pipeReader.AdvanceTo(readBuffer.Start, readBuffer.End);
-                            }
-
-                            var readResult = await _pipeReader.ReadAsync(_connectionClosingCts.Token);
-                            hasRead = true;
-
-                            if (readResult.IsCanceled || readResult.IsCompleted)
-                            {
-                                goto gracefulTermination;
-                            }
-
-                            readBuffer = readResult.Buffer;
+                            _pipeReader.AdvanceTo(readBuffer.Start, readBuffer.End);
                         }
 
-                        int transferred;
-                        if (readBuffer.Length > requestBuffer.Length)
+                        var readResult = await _pipeReader.ReadAsync(_connectionClosingCts.Token);
+                        hasRead = true;
+
+                        if (readResult.IsCanceled || readResult.IsCompleted)
                         {
-                            var sliced = readBuffer.Slice(0, requestBuffer.Length);
-                            sliced.CopyTo(requestBuffer.Span);
-                            transferred = (int)sliced.Length;
-                            readBuffer = readBuffer.Slice(requestBuffer.Length);
-                        }
-                        else
-                        {
-                            readBuffer.CopyTo(requestBuffer.Span);
-                            transferred = (int)readBuffer.Length;
-                            readBuffer = readBuffer.Slice(readBuffer.Length);
+                            goto gracefulTermination;
                         }
 
-                        if (request.OnRead(transferred))
+                        bufferWriter.Write(readResult.Buffer);
+                        readBuffer = readResult.Buffer.Slice(readResult.Buffer.Length);
+
+                        if (request.OnRead(new ArcBufferReader(bufferWriter)))
                         {
                             break;
                         }

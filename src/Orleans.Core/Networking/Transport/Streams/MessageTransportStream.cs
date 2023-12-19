@@ -137,12 +137,16 @@ public class MessageTransportStream(MessageTransport transport, MemoryPool<byte>
         private ManualResetValueTaskSourceCore<int> _completion = new();
         private Memory<byte> _buffer;
 
-        public override Memory<byte> Buffer => _buffer;
-
         public void SetBuffer(Memory<byte> buffer) => _buffer = buffer;
 
-        public override bool OnRead(int bytesRead)
+        public override bool OnRead(ArcBufferReader bufferReader)
         {
+            var bytesRead = Math.Min(bufferReader.Length, _buffer.Length);
+            if (bytesRead > 0)
+            {
+                bufferReader.Consume(_buffer.Span[..bytesRead]);
+            }
+
             _completion.SetResult(bytesRead);
             return true;
         }

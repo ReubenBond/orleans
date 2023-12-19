@@ -3,6 +3,7 @@
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
+using Orleans.Serialization.Buffers;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -137,6 +138,7 @@ public abstract class StreamMessageTransport : MessageTransportBase
         Exception? error = default;
         ReadRequest? operation = default;
         bool isGracefulTermination = false;
+        using ArcBufferWriter bufferWriter = new();
         try
         {
             while (!_connectionClosingCts.IsCancellationRequested)
@@ -145,13 +147,14 @@ public abstract class StreamMessageTransport : MessageTransportBase
                 {
                     while (true)
                     {
-                        var bytesRead = await Stream.ReadAsync(operation.Buffer, _connectionClosingCts.Token);
-                        if (bytesRead == 0 && operation.Buffer.Length > 0)
+                        var bytesRead = await Stream.ReadAsync(bufferWriter.GetMemory(), _connectionClosingCts.Token);
+                        bufferWriter.AdvanceReader(bytesRead);
+                        if (bytesRead == 0)
                         {
                             goto gracefulTermination;
                         }
 
-                        if (operation.OnRead(bytesRead))
+                        if (operation.OnRead(new ArcBufferReader(bufferWriter)))
                         {
                             break;
                         }
