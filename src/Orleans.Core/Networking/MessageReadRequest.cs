@@ -1,110 +1,109 @@
 using System;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Buffers;
 using System.Buffers.Binary;
 using Orleans.Connections.Transport;
-using System.Threading.Tasks.Sources;
-using System.Runtime.CompilerServices;
+using System.Diagnostics;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class MessageReadRequest : ReadRequest, IThreadPoolWorkItem, IValueTaskSource<bool>
+    internal sealed class MessageReadRequest(MessageHandlerShared shared) : ReadRequest, IThreadPoolWorkItem
     {
-        internal readonly MessageHandlerShared Shared;
+        internal readonly MessageHandlerShared Shared = shared;
 
-        private ManualResetValueTaskSourceCore<bool> _completion = new();
-        private PooledBuffer _buffer = new();
         private Connection _connection;
-        private (int HeaderLength, int BodyLength) _messageLength;
+        internal int _headerLength;
+        internal int _bodyLength;
+        internal ArcBuffer _headers;
+        private ArcBuffer _body;
 
-        public MessageReadRequest(MessageHandlerShared shared)
+        public int FramedLength => Message.LENGTH_HEADER_SIZE + PayloadLength;
+        public int PayloadLength => _headerLength + _bodyLength;
+
+        internal Message.PackedHeaders _originalHeaders;
+        public ref ArcBuffer Headers => ref _headers;
+        public ref ArcBuffer Body => ref _body;
+        public int BodyLength => _bodyLength;
+
+        public void SetConnection(Connection connection)
         {
-            Shared = shared;
+            Debug.Assert(_connection is null);
+            _connection = connection;
         }
-
-        public ValueTask<bool> Completed => new(this, _completion.Version);
-        public override Memory<byte> Buffer => _buffer.GetMemory();
-
-        public int FramedLength => Message.LENGTH_HEADER_SIZE + _messageLength.HeaderLength + _messageLength.BodyLength;
-        public int UnconsumedLength => _buffer.Length > FramedLength ? _buffer.Length - FramedLength : 0;
-
-        public PooledBuffer.BufferSlice Payload => _buffer.Slice(Message.LENGTH_HEADER_SIZE, _messageLength.HeaderLength + _messageLength.BodyLength);
-        public PooledBuffer.BufferSlice Unconsumed => _buffer.Slice(FramedLength);
-        public PooledBuffer.BufferSlice Body => _buffer.Slice(Message.LENGTH_HEADER_SIZE + _messageLength.HeaderLength, _messageLength.BodyLength);
-        public int BodyLength => _messageLength.BodyLength;
-
-        public void SetConnection(Connection connection) => _connection = connection;
-
-        public void SetBuffer(PooledBuffer buffer) => _buffer = buffer;
 
         public void Reset()
         {
-            _messageLength = default;
+            Debug.Assert(_connection is not null);
+            _headerLength = default;
+            _bodyLength = default;
             _connection = default;
-            _completion.Reset();
-            _buffer.Reset();
+            _headers.Dispose();
+            _body.Dispose();
+            _headers = default;
+            _body = default;
             Shared.Return(this);
         }
 
         public override void OnError(Exception error)
         {
-            _completion.SetException(error);
+            var connection = _connection;
+            Reset();
+            connection.OnReadCompleted(error);
         }
 
         public override void OnCanceled()
         {
-            _completion.SetResult(false);
+            OnError(new OperationCanceledException());
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryDeframeMessage()
+        public override bool OnRead(ArcBufferReader bufferReader)
         {
-            if (_buffer.Length < Message.LENGTH_HEADER_SIZE)
+            Debug.Assert(_connection is not null);
+
+            if (bufferReader.Length < Message.LENGTH_HEADER_SIZE)
             {
                 return false;
             }
 
-            if (_messageLength.HeaderLength == 0)
+            if (_headerLength == 0)
             {
-                Span<byte> lengthBytes = stackalloc byte[Message.LENGTH_HEADER_SIZE];
-                _buffer.CopyTo(lengthBytes);
-                _messageLength = (BinaryPrimitives.ReadInt32LittleEndian(lengthBytes), BinaryPrimitives.ReadInt32LittleEndian(lengthBytes[sizeof(int)..]));
+                Span<byte> scratch = stackalloc byte[Message.LENGTH_HEADER_SIZE];
+                var lengthBytes = bufferReader.Peek(in scratch);
+                _headerLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes);
+                _bodyLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes[sizeof(int)..]);
+                bufferReader.Skip(Message.LENGTH_HEADER_SIZE);
             }
 
-            if (_buffer.Length < FramedLength)
+            if (bufferReader.Length < PayloadLength)
             {
                 return false;
             }
 
-            _completion.SetResult(true);
+            _headers = bufferReader.ConsumeSlice(_headerLength);
+            _body = bufferReader.ConsumeSlice(_bodyLength);
+            Debug.Assert(_headers.Length == _headerLength);
+            Debug.Assert(_body.Length == _bodyLength);
+            
+            _connection.EnqueueRead();
+            ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: true);
             return true;
-        }
-
-        public override bool OnRead(int bytesRead)
-        {
-            if (bytesRead > 0)
-            {
-                _buffer.Advance(bytesRead);
-            }
-
-            return TryDeframeMessage();
         }
 
         void IThreadPoolWorkItem.Execute()
         {
             Message message = null;
+            var connection = _connection;
             var shouldReset = true;
             var messageSerializer = Shared.GetMessageSerializer();
             try
             {
-                messageSerializer.ReadHeaders(Payload, _messageLength.HeaderLength, _messageLength.BodyLength, out message);
+                messageSerializer.ReadHeaders(this, out message);
 
                 // Body deserialization is more likely to fail than header deserialization.
                 // Separating the two allows for these kinds of errors to be propagated back to the caller.
-                if (_messageLength.BodyLength > 0)
+                if (_bodyLength > 0)
                 {
                     // This instance is owned by the message now, so it will not be reset immediately.
                     message.SetMessageReadRequest(this);
@@ -115,7 +114,7 @@ namespace Orleans.Runtime.Messaging
                     // Otherwise, return this instance to the pool on exiting this method.
                 }
 
-                _connection.OnReceivedMessage(message);
+                connection.OnReceivedMessage(message);
             }
             catch (Exception exception)
             {
@@ -142,7 +141,7 @@ namespace Orleans.Runtime.Messaging
                     Shared.MessagingTrace.LogWarning(
                         exception,
                         "Exception reading message from connection {Connection}",
-                        _connection);
+                        connection);
 
                     // Returning false here informs the caller that the exception should not be caught.
                     return false;
@@ -152,7 +151,7 @@ namespace Orleans.Runtime.Messaging
                     exception,
                     "Exception reading message {Message} from connection {Connection}",
                     message,
-                    _connection);
+                    connection);
 
                 // The message body was not successfully decoded, but the headers were.
                 MessagingInstruments.OnRejectedMessage(message);
@@ -167,7 +166,7 @@ namespace Orleans.Runtime.Messaging
                         response.BodyObject = Response.FromException(exception);
 
                         // Send the error response and continue processing the next message.
-                        _connection.Send(response);
+                        connection.Send(response);
                     }
                     else if (message.Direction == Message.Directions.Response)
                     {
@@ -182,9 +181,5 @@ namespace Orleans.Runtime.Messaging
                 return true;
             }
         }
-
-        void IValueTaskSource<bool>.OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags) => _completion.OnCompleted(continuation, state, token, flags);
-        bool IValueTaskSource<bool>.GetResult(short token) => _completion.GetResult(token);
-        ValueTaskSourceStatus IValueTaskSource<bool>.GetStatus(short token) => _completion.GetStatus(token);
     }
 }

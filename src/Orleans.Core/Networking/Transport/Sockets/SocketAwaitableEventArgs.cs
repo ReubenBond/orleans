@@ -18,8 +18,7 @@ namespace Orleans.Connections.Transport.Sockets;
 // 4. Doesn't use cancellation tokens
 internal class SocketAwaitableEventArgs : SocketAsyncEventArgs, IValueTaskSource
 {
-    private static readonly Action<object?> _continuationCompleted = _ => { };
-
+    private static readonly Action<object?> ContinuationCompleted = _ => { };
     private Action<object?>? _continuation;
 
     public SocketAwaitableEventArgs()
@@ -39,11 +38,11 @@ internal class SocketAwaitableEventArgs : SocketAsyncEventArgs, IValueTaskSource
         IsCompleted = true;
         var continuation = _continuation;
 
-        if (continuation != null || (continuation = Interlocked.CompareExchange(ref _continuation, _continuationCompleted, null)) != null)
+        if (continuation != null || (continuation = Interlocked.CompareExchange(ref _continuation, ContinuationCompleted, null)) != null)
         {
             var state = UserToken;
             UserToken = null;
-            _continuation = _continuationCompleted; // in case someone's polling IsCompleted
+            _continuation = ContinuationCompleted; // in case someone's polling IsCompleted
 
             // Execute the continuation inline.
             continuation(state);
@@ -67,7 +66,7 @@ internal class SocketAwaitableEventArgs : SocketAsyncEventArgs, IValueTaskSource
 
     public ValueTaskSourceStatus GetStatus(short token)
     {
-        return !ReferenceEquals(_continuation, _continuationCompleted) ? ValueTaskSourceStatus.Pending :
+        return !ReferenceEquals(_continuation, ContinuationCompleted) ? ValueTaskSourceStatus.Pending :
                 SocketError == SocketError.Success ? ValueTaskSourceStatus.Succeeded :
                 ValueTaskSourceStatus.Faulted;
     }
@@ -76,7 +75,7 @@ internal class SocketAwaitableEventArgs : SocketAsyncEventArgs, IValueTaskSource
     {
         UserToken = state;
         var prevContinuation = Interlocked.CompareExchange(ref _continuation, continuation, null);
-        if (ReferenceEquals(prevContinuation, _continuationCompleted))
+        if (ReferenceEquals(prevContinuation, ContinuationCompleted))
         {
             UserToken = null;
 

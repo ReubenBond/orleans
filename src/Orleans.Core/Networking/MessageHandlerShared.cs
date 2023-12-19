@@ -41,7 +41,10 @@ namespace Orleans.Runtime.Messaging
             return new(this);
         }
 
-        internal void Return(MessageReadRequest handler) => _receivePool.Enqueue(handler);
+        internal void Return(MessageReadRequest handler)
+        {
+            _receivePool.Enqueue(handler);
+        }
 
         internal MessageWriteRequest GetSendMessageHandler()
         {

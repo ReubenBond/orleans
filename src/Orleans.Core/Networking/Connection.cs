@@ -1,5 +1,9 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.Net;
+using System.Numerics;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -11,11 +15,15 @@ using Orleans.Serialization.Buffers;
 using Orleans.Connections.Transport;
 using Orleans.Connections;
 using Orleans.Runtime.Internal;
+using System.Collections.Concurrent;
 
 namespace Orleans.Runtime.Messaging
 {
     internal abstract class Connection
     {
+        private static readonly Counter<long> OverReadBytes;
+        private static readonly Counter<int> NumOverReads;
+
         private readonly ConnectionCommon _shared;
         private readonly TaskCompletionSource<int> _transportConnectionClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<int> _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -24,10 +32,22 @@ namespace Orleans.Runtime.Messaging
         private Task _processIncomingTask;
         private Task _closeTask;
 
+        static Connection()
+        {
+            OverReadBytes = Instruments.Meter.CreateCounter<long>("orleans-networking-over-read-bytes");
+            NumOverReads = Instruments.Meter.CreateCounter<int>("orleans-networking-over-read-count");
+        }
+
         protected Connection(
             MessageTransport transport,
             ConnectionCommon shared)
         {
+            _sendWorker = new SendWorker[16];
+            for (int i = 0; i < _sendWorker.Length; i++)
+            {
+                _sendWorker[i] = new(this);
+            }
+
             _id = CorrelationIdGenerator.GetNextId();
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _shared = shared;
@@ -165,29 +185,98 @@ namespace Orleans.Runtime.Messaging
 
         public virtual void Send(Message message)
         {
-            if (!PrepareMessageForSend(message))
+            _sendWorker[Interlocked.Increment(ref _nextWorker) & 0x7].Schedule(message);
+        }
+
+        private int _nextWorker;
+        private SendWorker[] _sendWorker;
+
+        private sealed class SendWorker(Connection connection) : IThreadPoolWorkItem
+        {
+            private readonly ConcurrentQueue<Message> _workItems = new ConcurrentQueue<Message>();
+            private readonly Connection _connection = connection;
+            private int _doingWork;
+
+            public void Schedule(Message message)
             {
-                return;
+                _workItems.Enqueue(message);
+
+                // Set working if it wasn't (via atomic Interlocked).
+                if (Interlocked.CompareExchange(ref _doingWork, 1, 0) == 0)
+                {
+                    // Wasn't working, schedule.
+                    ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: false);
+                }
             }
 
-            var handler = _shared.MessageHandlerShared.GetSendMessageHandler();
-            try
+            void IThreadPoolWorkItem.Execute()
             {
-                handler.Initialize(message);
-            }
-            catch (Exception exception)
-            {
-                handler.Reset();
-                OnMessageSerializationFailure(message, exception);
-                return;
-            }
+                while (true)
+                {
+                    var handler = _connection._shared.MessageHandlerShared.GetSendMessageHandler();
+                    var success = true;
+                    while (_workItems.TryDequeue(out var message))
+                    {
+                        if (!_connection.PrepareMessageForSend(message))
+                        {
+                            continue;
+                        }
 
-            if (!_transport.WriteAsync(handler))
-            {
-                StartClosing(new ConnectionClosedException());
-                RerouteMessage(message);
-                handler.Reset();
-                return;
+                        try
+                        {
+                            handler.AddMessage(message);
+                        }
+                        catch (Exception exception)
+                        {
+                            foreach (var msg in handler.Messages)
+                            {
+                                _connection.OnMessageSerializationFailure(msg, exception);
+                            }
+
+                            success = false;
+                            handler.Reset();
+                            break;
+                        }
+                    }
+
+                    if (success && !_connection._transport.EnqueueWrite(handler))
+                    {
+                        _connection.StartClosing(new ConnectionClosedException());
+                        foreach (var msg in handler.Messages)
+                        {
+                            _connection.RerouteMessage(msg);
+                        }
+
+                        handler.Reset();
+                        break;
+                    }
+
+                    // All work done.
+
+                    // Set _doingWork (0 == false) prior to checking IsEmpty to catch any missed work in interim.
+                    // This doesn't need to be volatile due to the following barrier (i.e. it is volatile).
+                    _doingWork = 0;
+
+                    // Ensure _doingWork is written before IsEmpty is read.
+                    // As they are two different memory locations, we insert a barrier to guarantee ordering.
+                    Thread.MemoryBarrier();
+
+                    // Check if there is work to do
+                    if (_workItems.IsEmpty)
+                    {
+                        // Nothing to do, exit.
+                        break;
+                    }
+
+                    // Is work, can we set it as active again (via atomic Interlocked), prior to scheduling?
+                    if (Interlocked.Exchange(ref _doingWork, 1) == 1)
+                    {
+                        // Execute has been rescheduled already, exit.
+                        break;
+                    }
+
+                    // Is work, wasn't already scheduled so continue loop.
+                }
             }
         }
 
@@ -197,79 +286,37 @@ namespace Orleans.Runtime.Messaging
 
         protected abstract void OnSendMessageFailure(Message message, string error);
 
+        private readonly TaskCompletionSource _startedClosing = new (TaskCreationOptions.RunContinuationsAsynchronously);
+        public void OnReadCompleted(Exception error)
+        {
+            if (error is not null)
+            {
+                StartClosing(error);
+                _startedClosing.TrySetResult();
+                return;
+            }
+
+            EnqueueRead();
+        }
+
+        public void EnqueueRead()
+        {
+            var request = _shared.MessageHandlerShared.GetReceiveMessageHandler();
+            request.SetConnection(this);
+            if (!_transport.EnqueueRead(request))
+            {
+                // Connection closed.
+                request.Reset();
+                StartClosing(new ConnectionClosedException());
+                _startedClosing.TrySetResult();
+            }
+        }
+
         private async Task ProcessIncoming()
         {
             await Task.Yield();
-
-            Exception error = default;
-            MessageReadRequest readRequest = RentHandler();
-            try
-            {
-                while (true)
-                {
-                    if (!_transport.ReadAsync(readRequest))
-                    {
-                        // Connection closed.
-                        readRequest.Reset();
-                        break;
-                    }
-
-                    if (!await readRequest.Completed.ConfigureAwait(false))
-                    {
-                        // Connection closed while a read was pending.
-                        readRequest.Reset();
-                        break;
-                    }
-
-HandleCompletedRequest:
-                    if (readRequest.UnconsumedLength > 0)
-                    {
-                        // Copy the excess data for the next request.
-                        var excessBuffer = new PooledBuffer();
-                        readRequest.Unconsumed.CopyTo(ref excessBuffer);
-
-                        // Dispatch the current request.
-                        ThreadPool.UnsafeQueueUserWorkItem(readRequest, preferLocal: false);
-
-                        // Assign the excess data to the next request.
-                        readRequest = RentHandler();
-                        readRequest.SetBuffer(excessBuffer);
-                        if (readRequest.OnRead(0))
-                        {
-                            goto HandleCompletedRequest;
-                        }
-                    }
-                    else
-                    {
-                        // Dispatch the request.
-                        ThreadPool.UnsafeQueueUserWorkItem(readRequest, preferLocal: false);
-                        readRequest = RentHandler();
-                    }
-                }
-            }
-            catch (Exception exception)
-            {
-                error = exception;
-            }
-            finally
-            {
-                if (error is { } and not ConnectionClosedException)
-                {
-                    Log.LogWarning(
-                        error,
-                        "Exception while processing messages on connection {Connection}",
-                        this);
-                }
-
-                StartClosing(error);
-            }
-
-            MessageReadRequest RentHandler()
-            {
-                MessageReadRequest readRequest = _shared.MessageHandlerShared.GetReceiveMessageHandler();
-                readRequest.SetConnection(this);
-                return readRequest;
-            }
+            EnqueueRead();
+            await _startedClosing.Task.ConfigureAwait(false);
         }
 
         private void RerouteMessage(Message message)

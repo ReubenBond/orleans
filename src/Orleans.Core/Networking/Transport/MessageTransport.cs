@@ -34,14 +34,14 @@ public abstract class MessageTransport : IAsyncDisposable
     /// </summary>
     /// <param name="request">The read request.</param>
     /// <returns><see langword="true"/> if the read request was accepted by the channel, <see langword="false"/> if it was rejected.</returns>
-    public abstract bool ReadAsync(ReadRequest request);
+    public abstract bool EnqueueRead(ReadRequest request);
 
     /// <summary>
     /// Submits a write request to the channel.
     /// </summary>
     /// <param name="request">The write request.</param>
     /// <returns><see langword="true"/> if the read request was accepted by the channel, <see langword="false"/> if it was rejected.</returns>
-    public abstract bool WriteAsync(WriteRequest request);
+    public abstract bool EnqueueWrite(WriteRequest request);
 
     /// <summary>
     /// Closes the channel, optionally with a provided exception.

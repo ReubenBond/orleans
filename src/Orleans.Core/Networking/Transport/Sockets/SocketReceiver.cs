@@ -4,6 +4,7 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 
@@ -15,21 +16,9 @@ internal sealed class SocketReceiver : SocketAwaitableEventArgs
     {
     }
 
-    public ValueTask WaitForDataAsync(Socket socket)
+    public ValueTask ReceiveAsync(Socket socket, List<ArraySegment<byte>> buffers)
     {
-        SetBuffer(Memory<byte>.Empty);
-
-        if (socket.ReceiveAsync(this))
-        {
-            return new ValueTask(this, 0);
-        }
-
-        return Error is not null ? ValueTask.FromException(Error) : default;
-    }
-
-    public ValueTask ReceiveAsync(Socket socket, Memory<byte> buffer)
-    {
-        SetBuffer(buffer);
+        BufferList = buffers;
 
         if (socket.ReceiveAsync(this))
         {
