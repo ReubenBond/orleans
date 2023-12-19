@@ -1,24 +1,16 @@
 using System;
-using System.Buffers;
-using System.Threading.Tasks;
 using Orleans.Serialization.Buffers;
 using System.Buffers.Binary;
 using Orleans.Connections.Transport;
-using System.Threading.Tasks.Sources;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class MessageWriteRequest : WriteRequest//, IValueTaskSource
+    internal sealed class MessageWriteRequest(MessageHandlerShared shared) : WriteRequest//, IValueTaskSource
     {
-        private readonly MessageHandlerShared _shared;
+        private readonly MessageHandlerShared _shared = shared;
         //private ManualResetValueTaskSourceCore<int> _completion = new();
         private PooledBuffer _buffer = new();
-
-        public MessageWriteRequest(MessageHandlerShared shared)
-        {
-            _shared = shared;
-        }
 
         public Message Message { get; private set; }
 
@@ -30,7 +22,7 @@ namespace Orleans.Runtime.Messaging
 
         public override ReadOnlyMemory<byte> Buffer => throw new InvalidOperationException();
 
-        public override ReadOnlySequence<byte> Buffers => _buffer.AsReadOnlySequence();
+        public override ref PooledBuffer Buffers => ref _buffer;
 
         private void SerializeAndFrameMessage()
         {

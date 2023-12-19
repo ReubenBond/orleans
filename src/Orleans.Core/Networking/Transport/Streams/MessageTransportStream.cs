@@ -6,6 +6,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Connections.Transport.Streams;
 
@@ -119,7 +120,7 @@ public class MessageTransportStream(MessageTransport transport, MemoryPool<byte>
             IsSingleBuffer = true;
         }
 
-        public override ReadOnlySequence<byte> Buffers => new(_buffer);
+        public override ref PooledBuffer Buffers => throw new InvalidOperationException();
         public void SetBuffer(ReadOnlyMemory<byte> buffer) => _buffer = buffer;
         public override ReadOnlyMemory<byte> Buffer => _buffer;
         public ValueTask OnCompleteAsync() => new(this, _signal.Version);
