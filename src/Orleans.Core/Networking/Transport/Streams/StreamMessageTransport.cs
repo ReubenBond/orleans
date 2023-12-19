@@ -231,7 +231,7 @@ gracefulTermination:
             {
                 while (TryDequeue(out operation))
                 {
-                    foreach (var buffer in operation.Buffers.AsReadOnlySequence())
+                    foreach (var buffer in operation.Buffers.MemorySegments)
                     {
                         await Stream.WriteAsync(buffer, _connectionClosingCts.Token);
                     }

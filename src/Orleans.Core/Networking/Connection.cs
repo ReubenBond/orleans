@@ -1,5 +1,9 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.Net;
+using System.Numerics;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -16,6 +20,9 @@ namespace Orleans.Runtime.Messaging
 {
     internal abstract class Connection
     {
+        private static readonly Counter<long> OverReadBytes;
+        private static readonly Counter<int> NumOverReads;
+
         private readonly ConnectionCommon _shared;
         private readonly TaskCompletionSource<int> _transportConnectionClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<int> _initializationTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -23,6 +30,12 @@ namespace Orleans.Runtime.Messaging
         private readonly MessageTransport _transport;
         private Task _processIncomingTask;
         private Task _closeTask;
+
+        static Connection()
+        {
+            OverReadBytes = Instruments.Meter.CreateCounter<long>("orleans-networking-over-read-bytes");
+            NumOverReads = Instruments.Meter.CreateCounter<int>("orleans-networking-over-read-count");
+        }
 
         protected Connection(
             MessageTransport transport,
@@ -197,79 +210,37 @@ namespace Orleans.Runtime.Messaging
 
         protected abstract void OnSendMessageFailure(Message message, string error);
 
+        private readonly TaskCompletionSource _startedClosing = new (TaskCreationOptions.RunContinuationsAsynchronously);
+        public void OnReadCompleted(Exception error)
+        {
+            if (error is not null)
+            {
+                StartClosing(error);
+                _startedClosing.TrySetResult();
+                return;
+            }
+
+            EnqueueRead();
+        }
+
+        public void EnqueueRead()
+        {
+            var request = _shared.MessageHandlerShared.GetReceiveMessageHandler();
+            request.SetConnection(this);
+            if (!_transport.ReadAsync(request))
+            {
+                // Connection closed.
+                request.Reset();
+                StartClosing(new ConnectionClosedException());
+                _startedClosing.TrySetResult();
+            }
+        }
+
         private async Task ProcessIncoming()
         {
             await Task.Yield();
-
-            Exception error = default;
-            MessageReadRequest readRequest = RentHandler();
-            try
-            {
-                while (true)
-                {
-                    if (!_transport.ReadAsync(readRequest))
-                    {
-                        // Connection closed.
-                        readRequest.Reset();
-                        break;
-                    }
-
-                    if (!await readRequest.Completed.ConfigureAwait(false))
-                    {
-                        // Connection closed while a read was pending.
-                        readRequest.Reset();
-                        break;
-                    }
-
-HandleCompletedRequest:
-                    if (readRequest.UnconsumedLength > 0)
-                    {
-                        // Copy the excess data for the next request.
-                        var excessBuffer = new PooledBuffer();
-                        readRequest.Unconsumed.CopyTo(ref excessBuffer);
-
-                        // Dispatch the current request.
-                        ThreadPool.UnsafeQueueUserWorkItem(readRequest, preferLocal: false);
-
-                        // Assign the excess data to the next request.
-                        readRequest = RentHandler();
-                        readRequest.SetBuffer(excessBuffer);
-                        if (readRequest.OnRead(0))
-                        {
-                            goto HandleCompletedRequest;
-                        }
-                    }
-                    else
-                    {
-                        // Dispatch the request.
-                        ThreadPool.UnsafeQueueUserWorkItem(readRequest, preferLocal: false);
-                        readRequest = RentHandler();
-                    }
-                }
-            }
-            catch (Exception exception)
-            {
-                error = exception;
-            }
-            finally
-            {
-                if (error is { } and not ConnectionClosedException)
-                {
-                    Log.LogWarning(
-                        error,
-                        "Exception while processing messages on connection {Connection}",
-                        this);
-                }
-
-                StartClosing(error);
-            }
-
-            MessageReadRequest RentHandler()
-            {
-                MessageReadRequest readRequest = _shared.MessageHandlerShared.GetReceiveMessageHandler();
-                readRequest.SetConnection(this);
-                return readRequest;
-            }
+            EnqueueRead();
+            await _startedClosing.Task.ConfigureAwait(false);
         }
 
         private void RerouteMessage(Message message)

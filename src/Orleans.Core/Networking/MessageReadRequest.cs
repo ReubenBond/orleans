@@ -1,62 +1,58 @@
 using System;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Buffers;
 using System.Buffers.Binary;
 using Orleans.Connections.Transport;
-using System.Threading.Tasks.Sources;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class MessageReadRequest : ReadRequest, IThreadPoolWorkItem, IValueTaskSource<bool>
+    internal sealed class MessageReadRequest(MessageHandlerShared shared) : ReadRequest, IThreadPoolWorkItem
     {
-        internal readonly MessageHandlerShared Shared;
+        internal readonly MessageHandlerShared Shared = shared;
 
-        private ManualResetValueTaskSourceCore<bool> _completion = new();
         private PooledBuffer _buffer = new();
         private Connection _connection;
         private (int HeaderLength, int BodyLength) _messageLength;
 
-        public MessageReadRequest(MessageHandlerShared shared)
+        public override Memory<byte> Buffer
         {
-            Shared = shared;
+            get
+            {
+                if (_messageLength.HeaderLength == 0) return _buffer.GetExactMemory(Message.LENGTH_HEADER_SIZE);
+                return _buffer.GetLimitedMemory(_messageLength.HeaderLength + _messageLength.BodyLength);
+            }
         }
-
-        public ValueTask<bool> Completed => new(this, _completion.Version);
-        public override Memory<byte> Buffer => _buffer.GetMemory();
 
         public int FramedLength => Message.LENGTH_HEADER_SIZE + _messageLength.HeaderLength + _messageLength.BodyLength;
         public int UnconsumedLength => _buffer.Length > FramedLength ? _buffer.Length - FramedLength : 0;
 
         public PooledBuffer.BufferSlice Payload => _buffer.Slice(Message.LENGTH_HEADER_SIZE, _messageLength.HeaderLength + _messageLength.BodyLength);
-        public PooledBuffer.BufferSlice Unconsumed => _buffer.Slice(FramedLength);
         public PooledBuffer.BufferSlice Body => _buffer.Slice(Message.LENGTH_HEADER_SIZE + _messageLength.HeaderLength, _messageLength.BodyLength);
         public int BodyLength => _messageLength.BodyLength;
 
         public void SetConnection(Connection connection) => _connection = connection;
 
-        public void SetBuffer(PooledBuffer buffer) => _buffer = buffer;
-
         public void Reset()
         {
             _messageLength = default;
             _connection = default;
-            _completion.Reset();
             _buffer.Reset();
             Shared.Return(this);
         }
 
         public override void OnError(Exception error)
         {
-            _completion.SetException(error);
+            var connection = _connection;
+            Reset();
+            connection.OnReadCompleted(error);
         }
 
         public override void OnCanceled()
         {
-            _completion.SetResult(false);
+            OnError(new OperationCanceledException());
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -79,7 +75,8 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            _completion.SetResult(true);
+            _connection.EnqueueRead();
+            ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: true);
             return true;
         }
 
@@ -182,9 +179,5 @@ namespace Orleans.Runtime.Messaging
                 return true;
             }
         }
-
-        void IValueTaskSource<bool>.OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags) => _completion.OnCompleted(continuation, state, token, flags);
-        bool IValueTaskSource<bool>.GetResult(short token) => _completion.GetResult(token);
-        ValueTaskSourceStatus IValueTaskSource<bool>.GetStatus(short token) => _completion.GetStatus(token);
     }
 }

@@ -337,7 +337,7 @@ gracefulTermination:
                 while (processingRequests.Count < SoftBatchMax && requests.TryDequeue(out var request))
                 {
                     processingRequests.Add(request);
-                    foreach (var buffer in request.Buffers.AsReadOnlySequence())
+                    foreach (var buffer in request.Buffers.MemorySegments)
                     {
                         var flushResult = await _pipeWriter.WriteAsync(buffer, _connectionClosingCts.Token);
                         if (flushResult.IsCanceled)
