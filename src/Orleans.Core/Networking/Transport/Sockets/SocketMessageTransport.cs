@@ -412,7 +412,6 @@ exit:
         Queue<WriteRequest> requests = new();
         List<ArraySegment<byte>> buffers = new(capacity: SoftBatchMax);
         List<WriteRequest> processingRequests = new(capacity: SoftBatchMax);
-        byte[] buffer = new byte[1024 * 1024];
 
         try
         {
@@ -432,55 +431,29 @@ exit:
                 }
 
                 buffers.Clear();
-                processingRequests.Clear();
 
-                var bufferLength = Copy();
-
-                int Copy()
+                while (buffers.Count < SoftBatchMax && requests.TryDequeue(out var request))
                 {
-                    var buf = buffer.AsSpan();
-                    int wrote = 0;
-                    int len;
-
-                    while (requests.TryPeek(out var request))
+                    processingRequests.Add(request);
+                    if (request.IsSingleBuffer)
                     {
-                        if (request.IsSingleBuffer)
-                        {
-                            len = request.Buffer.Length;
-                            if (len > buf.Length)
-                            {
-                                break;
-                            }
-
-                            request.Buffer.Span.CopyTo(buf);
-                        }
-                        else
-                        {
-                            len = request.Buffers.Length;
-                            if (len > buf.Length)
-                            {
-                                break;
-                            }
-
-                            request.Buffers.CopyTo(buf);
-                        }
-
-                        processingRequests.Add(request);
-                        wrote += len;
-                        buf = buf[len..];
-                        requests.Dequeue();
+                        buffers.Add(request.Buffer.GetArray());
                     }
-
-                    return wrote;
+                    else
+                    {
+                        foreach (var b in new PooledBuffer.BufferSlice.ArraySegmentEnumerator(request.Buffers.Slice()))
+                        {
+                            buffers.Add(b);
+                        }
+                    }
                 }
 
-                //_socketSender.Reset();
-                await _socketSender.SendAsync(_socket, buffer.AsMemory(0, bufferLength)).ConfigureAwait(false);
+                await _socketSender.SendAsync(_socket, buffers).ConfigureAwait(false);
 
                 if (_socketSender.HasError)
                 {
                     error = GetSendAsyncError();
-                    goto exit;
+                    break;
                 }
 
                 // Signal that the requests are completed
@@ -488,11 +461,9 @@ exit:
                 {
                     request.SetResult();
                 }
-            }
 
-            processingRequests.Clear();
-exit:
-            /* no-op */;
+                processingRequests.Clear();
+            }
         }
         catch (Exception ex)
         {
@@ -504,7 +475,6 @@ exit:
         }
         finally
         {
-            _socketSender.Reset();
             _shutdownReason ??= error;
             _connectionClosingCts.Cancel();
             _readSignal.Signal();
