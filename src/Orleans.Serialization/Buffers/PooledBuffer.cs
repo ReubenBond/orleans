@@ -104,6 +104,17 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     /// <inheritdoc/>
     public void Dispose() => Reset();
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Memory<byte> GetExactMemory(int length)
+    {
+        if (WriteHead is null || length >= WriteHead.Array.Length - CurrentPosition)
+        {
+            return GetExactMemorySlow(length);
+        }
+
+        return WriteHead.AsMemory(CurrentPosition, length);
+    }
+
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Memory<byte> GetMemory(int sizeHint = 0)
@@ -114,6 +125,17 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         }
 
         return WriteHead.AsMemory(CurrentPosition);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Memory<byte> GetLimitedMemory(int length)
+    {
+        if (WriteHead is null || WriteHead.Array.Length == CurrentPosition)
+        {
+            return GetMemorySlow(0);
+        }
+
+        return WriteHead.AsLimitedMemory(CurrentPosition, length);
     }
 
     /// <inheritdoc/>
@@ -340,6 +362,9 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private Memory<byte> GetMemorySlow(int sizeHint) => Grow(sizeHint).AsMemory(0);
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private Memory<byte> GetExactMemorySlow(int length) => Grow(length).AsMemory(0, length);
 
     private SequenceSegment Grow(int sizeHint)
     {
@@ -811,6 +836,19 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 
         public Memory<byte> AsMemory(int offset, int length)
         {
+#if NET6_0_OR_GREATER
+            if (IsMinimumSize)
+            {
+                return MemoryMarshal.CreateFromPinnedArray(Array, offset, length);
+            }
+#endif
+
+            return Array.AsMemory(offset, length);
+        }
+
+        public Memory<byte> AsLimitedMemory(int offset, int limit)
+        {
+            var length = Math.Min(Array.Length - offset, limit);
 #if NET6_0_OR_GREATER
             if (IsMinimumSize)
             {
