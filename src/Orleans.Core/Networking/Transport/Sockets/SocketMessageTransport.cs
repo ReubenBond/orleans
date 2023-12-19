@@ -14,6 +14,7 @@ using Orleans.Runtime.Internal;
 using System.Net;
 using Orleans.Runtime;
 using System.Runtime.CompilerServices;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Connections.Transport.Sockets;
 
@@ -29,6 +30,8 @@ public sealed class SocketMessageTransport : MessageTransportBase
     private readonly Queue<ReadRequest> _readRequests = new();
     private readonly SingleWaiterAutoResetEvent _readSignal = new() { RunContinuationsAsynchronously = false };
     private readonly SingleWaiterAutoResetEvent _writeSignal = new() { RunContinuationsAsynchronously = true };
+    private readonly Action _fireReadSignal;
+    private readonly Action _fireWriteSignal;
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _connectionClosingCts = new();
     private readonly CancellationTokenSource _connectionClosedCts = new();
@@ -49,6 +52,8 @@ public sealed class SocketMessageTransport : MessageTransportBase
         _socket = socket;
         _logger = logger;
         
+        _fireReadSignal = _readSignal.Signal;
+        _fireWriteSignal = _writeSignal.Signal;
         _remoteEndpointString = NormalizeEndpoint(_socket.RemoteEndPoint)?.ToString() ?? "null";
         _localEndpointString = NormalizeEndpoint(_socket.LocalEndPoint)?.ToString() ?? "null";
     }
@@ -244,43 +249,30 @@ public sealed class SocketMessageTransport : MessageTransportBase
             while (!_connectionClosingCts.IsCancellationRequested)
             {
                 // Handle each request.
-                var offset = 0;
-                var length = 0;
-                var buffer = _socketReceiver.Array;
                 while (TryDequeue(out request))
                 {
                     // Process the request to completion.
-                    int copyLength;
+                    int transferred;
                     do
                     {
-                        var requestBuffer = request.Buffer;
-                        if (length == 0 && requestBuffer.Length > 0) 
+                        await _socketReceiver.ReceiveAsync(_socket, request.Buffer).ConfigureAwait(false);
+
+                        if (_socketReceiver.HasError)
                         {
-                            offset = 0;
-                            await _socketReceiver.ReceiveAsync(_socket).ConfigureAwait(false);
-
-                            if (_socketReceiver.HasError)
-                            {
-                                error = _socketReceiver.Error;
-                                isGracefulTermination = HandleReadError(ref error);
-                                goto exit;
-                            }
-
-                            length = _socketReceiver.BytesTransferred;
-                            if (length == 0)
-                            {
-                                // FIN
-                                SocketsLog.ConnectionReadFin(_logger, this);
-                                isGracefulTermination = true;
-                                goto exit;
-                            }
+                            error = _socketReceiver.Error;
+                            isGracefulTermination = HandleReadError(ref error);
+                            goto exit;
                         }
 
-                        copyLength = Math.Min(length, requestBuffer.Length);
-                        buffer.AsMemory(offset, copyLength).CopyTo(requestBuffer);
-                        length -= copyLength;
-                        offset += copyLength;
-                    } while (!request.OnRead(copyLength));
+                        transferred = _socketReceiver.BytesTransferred;
+                        if (transferred == 0 && request.Buffer.Length > 0)
+                        {
+                            // FIN
+                            SocketsLog.ConnectionReadFin(_logger, this);
+                            isGracefulTermination = true;
+                            goto exit;
+                        }
+                    } while (!request.OnRead(transferred));
                 }
 
                 await _readSignal.WaitAsync().ConfigureAwait(false);
