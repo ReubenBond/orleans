@@ -441,7 +441,7 @@ exit:
                     }
                     else
                     {
-                        foreach (var b in new PooledBuffer.BufferSlice.ArraySegmentEnumerator(request.Buffers.Slice()))
+                        foreach (var b in request.Buffers.ArraySegments)
                         {
                             buffers.Add(b);
                         }

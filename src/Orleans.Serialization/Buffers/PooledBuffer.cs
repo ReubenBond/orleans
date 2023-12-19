@@ -225,6 +225,11 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     }
 
     /// <summary>
+    /// Returns a sequence of array segments representing the committed data.
+    /// </summary>
+    public readonly BufferSlice.ArraySegmentEnumerator ArraySegments => new(Slice());
+
+    /// <summary>
     /// Returns a new <see cref="ReadOnlySequence{T}"/> which must not be accessed after disposing this instance.
     /// </summary>
     public ReadOnlySequence<byte> AsReadOnlySequence()
