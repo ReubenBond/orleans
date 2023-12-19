@@ -13,6 +13,7 @@ using System.Diagnostics;
 using Orleans.Runtime.Internal;
 using System.Net;
 using Orleans.Runtime;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Connections.Transport.Sockets;
 
@@ -72,17 +73,8 @@ public sealed class SocketMessageTransport : MessageTransportBase
         try
         {
             // Spawn send and receive logic
-            (var receiveTask, var sendTask) = StartProcessing();
-
-            (Task ReceiveTask, Task SendTask) StartProcessing()
-            {
-                using (new ExecutionContextSuppressor())
-                {
-                    var receiveTask = ProcessReads();
-                    var sendTask = ProcessWrites();
-                    return (receiveTask, sendTask);
-                }
-            }
+            var receiveTask = ProcessReads();
+            var sendTask = ProcessWrites();
 
             // Wait for both to complete
             try
@@ -259,7 +251,8 @@ public sealed class SocketMessageTransport : MessageTransportBase
                 while (TryDequeue(out request))
                 {
                     // Process the request to completion.
-                    while (true)
+                    int transferred;
+                    do
                     {
                         await _socketReceiver.ReceiveAsync(_socket, request.Buffer).ConfigureAwait(false);
 
@@ -267,39 +260,26 @@ public sealed class SocketMessageTransport : MessageTransportBase
                         {
                             error = _socketReceiver.Error;
                             isGracefulTermination = HandleReadError(ref error);
-                            break;
+                            goto exit;
                         }
 
-                        var transferred = _socketReceiver.BytesTransferred;
+                        transferred = _socketReceiver.BytesTransferred;
                         if (transferred == 0 && request.Buffer.Length > 0)
                         {
                             // FIN
                             SocketsLog.ConnectionReadFin(_logger, this);
                             isGracefulTermination = true;
-                            break;
+                            goto exit;
                         }
-
-                        if (request.OnRead(transferred))
-                        {
-                            break;
-                        }
-                    }
-
-                    if (error is not null || isGracefulTermination)
-                    {
-                        break;
-                    }
-                }
-
-                if (error is not null || isGracefulTermination)
-                {
-                    break;
+                    } while (!request.OnRead(transferred));
                 }
 
                 await _readSignal.WaitAsync().ConfigureAwait(false);
             }
 
             isGracefulTermination = true;
+exit:
+            /* no op */; 
         }
         catch (Exception exception)
         {
@@ -348,6 +328,7 @@ public sealed class SocketMessageTransport : MessageTransportBase
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool TryDequeue([NotNullWhen(true)] out ReadRequest? request)
         {
             lock (_readsLock)
