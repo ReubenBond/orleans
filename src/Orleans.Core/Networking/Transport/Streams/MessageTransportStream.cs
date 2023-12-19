@@ -66,7 +66,7 @@ public class MessageTransportStream(MessageTransport transport, MemoryPool<byte>
     {
         _readRequest.Reset();
         _readRequest.SetBuffer(buffer);
-        if (!_transport.ReadAsync(_readRequest))
+        if (!_transport.EnqueueRead(_readRequest))
         {
             _readRequest.Reset();
             return new ValueTask<int>(0);
@@ -88,8 +88,8 @@ public class MessageTransportStream(MessageTransport transport, MemoryPool<byte>
     public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
         _writeRequest.Reset();
-        _writeRequest.SetBuffer(buffer);
-        if (!_transport.WriteAsync(_writeRequest))
+        _writeRequest.Write(buffer);
+        if (!_transport.EnqueueWrite(_writeRequest))
         {
             return ValueTask.FromException(new ObjectDisposedException("Network transport is unable to satisfy the request"));
         }
@@ -114,15 +114,13 @@ public class MessageTransportStream(MessageTransport transport, MemoryPool<byte>
             RunContinuationsAsynchronously = true
         };
 
-        private ReadOnlyMemory<byte> _buffer;
+        private readonly ArcBufferWriter _bufferWriter = new();
         public StreamWriteRequest()
         {
-            IsSingleBuffer = true;
+            Buffers = new(_bufferWriter);
         }
 
-        public override ref PooledBuffer Buffers => throw new InvalidOperationException();
-        public void SetBuffer(ReadOnlyMemory<byte> buffer) => _buffer = buffer;
-        public override ReadOnlyMemory<byte> Buffer => _buffer;
+        public void Write(ReadOnlyMemory<byte> buffer) => _bufferWriter.Write(buffer.Span);
         public ValueTask OnCompleteAsync() => new(this, _signal.Version);
         public override void SetResult() => _signal.SetResult(true);
         public override void SetException(Exception error) => _signal.SetException(error);
@@ -137,12 +135,16 @@ public class MessageTransportStream(MessageTransport transport, MemoryPool<byte>
         private ManualResetValueTaskSourceCore<int> _completion = new();
         private Memory<byte> _buffer;
 
-        public override Memory<byte> Buffer => _buffer;
-
         public void SetBuffer(Memory<byte> buffer) => _buffer = buffer;
 
-        public override bool OnRead(int bytesRead)
+        public override bool OnRead(ArcBufferReader bufferReader)
         {
+            var bytesRead = Math.Min(bufferReader.Length, _buffer.Length);
+            if (bytesRead > 0)
+            {
+                bufferReader.Consume(_buffer.Span[..bytesRead]);
+            }
+
             _completion.SetResult(bytesRead);
             return true;
         }

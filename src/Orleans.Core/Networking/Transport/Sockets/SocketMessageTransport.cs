@@ -29,9 +29,7 @@ public sealed class SocketMessageTransport : MessageTransportBase
     private readonly Socket _socket;
     private readonly Queue<ReadRequest> _readRequests = new();
     private readonly SingleWaiterAutoResetEvent _readSignal = new() { RunContinuationsAsynchronously = false };
-    private readonly SingleWaiterAutoResetEvent _writeSignal = new() { RunContinuationsAsynchronously = true };
-    private readonly Action _fireReadSignal;
-    private readonly Action _fireWriteSignal;
+    private readonly SingleWaiterAutoResetEvent _writeSignal = new() { RunContinuationsAsynchronously = false };
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _connectionClosingCts = new();
     private readonly CancellationTokenSource _connectionClosedCts = new();
@@ -52,8 +50,6 @@ public sealed class SocketMessageTransport : MessageTransportBase
         _socket = socket;
         _logger = logger;
         
-        _fireReadSignal = _readSignal.Signal;
-        _fireWriteSignal = _writeSignal.Signal;
         _remoteEndpointString = NormalizeEndpoint(_socket.RemoteEndPoint)?.ToString() ?? "null";
         _localEndpointString = NormalizeEndpoint(_socket.LocalEndPoint)?.ToString() ?? "null";
     }
@@ -159,7 +155,7 @@ public sealed class SocketMessageTransport : MessageTransportBase
         }
     }
 
-    public override bool ReadAsync(ReadRequest request)
+    public override bool EnqueueRead(ReadRequest request)
     {
         if (_connectionClosingCts.IsCancellationRequested)
         {
@@ -180,7 +176,7 @@ public sealed class SocketMessageTransport : MessageTransportBase
         return true;
     }
 
-    public override bool WriteAsync(WriteRequest request)
+    public override bool EnqueueWrite(WriteRequest request)
     {
         if (_connectionClosingCts.IsCancellationRequested)
         {
@@ -243,6 +239,16 @@ public sealed class SocketMessageTransport : MessageTransportBase
         var isGracefulTermination = false;
         Exception? error = null;
         ReadRequest? request = null;
+        using ArcBufferWriter bufferWriter = new();
+        var reader = new ArcBufferReader(bufferWriter);
+
+        // Note that socket APIs can generally only accept a maximum number of buffers.
+        // For example on Linux, the maximum is defined via IOV_MAX in <limits.h> and is typically 16.
+        // See https://www.man7.org/linux/man-pages/man0/limits.h.0p.html
+        // Here, we choose 8 as the maximum number of buffers which CoreCLR will stackalloc on *nix,
+        // see: https://github.com/dotnet/runtime/blob/0cf461b302f58c7add3f6dc405873fb2212b513f/src/libraries/System.Net.Sockets/src/System/Net/Sockets/SocketPal.Unix.cs#L24
+        List<ArraySegment<byte>> networkBuffers = new(capacity: 8);
+
         try
         {
             // Loop until termination.
@@ -252,10 +258,17 @@ public sealed class SocketMessageTransport : MessageTransportBase
                 while (TryDequeue(out request))
                 {
                     // Process the request to completion.
-                    int transferred;
-                    do
+                    while (true)
                     {
-                        await _socketReceiver.ReceiveAsync(_socket, request.Buffer).ConfigureAwait(false);
+                        if (request.OnRead(reader))
+                        {
+                            // This request is complete, move on to the next one.
+                            break;
+                        }
+
+                        bufferWriter.ReplenishBuffers(networkBuffers);
+                        Debug.Assert(networkBuffers.Count == networkBuffers.Capacity);
+                        await _socketReceiver.ReceiveAsync(_socket, networkBuffers).ConfigureAwait(false);
 
                         if (_socketReceiver.HasError)
                         {
@@ -264,15 +277,19 @@ public sealed class SocketMessageTransport : MessageTransportBase
                             goto exit;
                         }
 
-                        transferred = _socketReceiver.BytesTransferred;
-                        if (transferred == 0 && request.Buffer.Length > 0)
+                        var transferred = _socketReceiver.BytesTransferred;
+
+                        MaintainBufferList(networkBuffers, transferred);
+                        bufferWriter.AdvanceWriter(transferred);
+
+                        if (transferred == 0)
                         {
                             // FIN
                             SocketsLog.ConnectionReadFin(_logger, this);
                             isGracefulTermination = true;
                             goto exit;
                         }
-                    } while (!request.OnRead(transferred));
+                    }
                 }
 
                 await _readSignal.WaitAsync().ConfigureAwait(false);
@@ -335,6 +352,28 @@ exit:
             lock (_readsLock)
             {
                 return _readRequests.TryDequeue(out request);
+            }
+        }
+
+        static void MaintainBufferList(List<ArraySegment<byte>> buffers, int readSize)
+        {
+            while (readSize > 0)
+            {
+                Debug.Assert(buffers.Count > 0);
+                var bufferSize = buffers[0].Count;
+                if (bufferSize <= readSize)
+                {
+                    // Consume the buffer completely.
+                    readSize -= bufferSize;
+                    buffers.RemoveAt(0);
+                }
+                else
+                {
+                    // Consume the buffer partially.
+                    buffers[0] = new(buffers[0].Array!, buffers[0].Offset + readSize, bufferSize - readSize);
+                    Debug.Assert(buffers[0].Count > 0);
+                    break;
+                }
             }
         }
     }
@@ -407,48 +446,63 @@ exit:
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
 
-        const int SoftBatchMax = 32;
+        const int MaxBuffersPerSend = 32;
         Exception? error = null;
         Queue<WriteRequest> requests = new();
-        List<ArraySegment<byte>> buffers = new(capacity: SoftBatchMax);
-        List<WriteRequest> processingRequests = new(capacity: SoftBatchMax);
+        List<ArraySegment<byte>> buffers = new(capacity: MaxBuffersPerSend);
+        List<(WriteRequest, ArcBuffer)> processingRequests = new(capacity: MaxBuffersPerSend);
+        ArcBuffer.ArraySegmentEnumerator enumerator = default;
 
         try
         {
             // Loop until termination.
             while (!_connectionClosingCts.IsCancellationRequested)
             {
-                if (requests.Count == 0)
+                while (buffers.Count < MaxBuffersPerSend)
                 {
-                    // Check for pending messages before waiting.
-                    RefreshRequestQueue(ref requests);
-
-                    if (requests.Count == 0)
+                    // Try to consume a buffer from the current enumerator.
+                    if (enumerator.MoveNext())
                     {
-                        await _writeSignal.WaitAsync().ConfigureAwait(false);
-                        continue;
-                    }
-                }
-
-                buffers.Clear();
-
-                while (buffers.Count < SoftBatchMax && requests.TryDequeue(out var request))
-                {
-                    processingRequests.Add(request);
-                    if (request.IsSingleBuffer)
-                    {
-                        buffers.Add(request.Buffer.GetArray());
+                        Debug.Assert(enumerator.Current.Count > 0);
+                        buffers.Add(enumerator.Current);
                     }
                     else
                     {
-                        foreach (var b in request.Buffers.ArraySegments)
+DequeueRequest:
+                        // Try to get the next request and consume that.
+                        if (requests.TryDequeue(out var request))
                         {
-                            buffers.Add(b);
+                            // Start enumerating the next request.
+                            var slice = request.Buffers.ConsumeSlice(request.Buffers.Length);
+                            processingRequests.Add((request, slice));
+                            enumerator = slice.ArraySegments;
+                        }
+                        else if (buffers.Count == 0)
+                        {
+RefreshRequestQueue:
+                            // Check for pending messages before waiting.
+                            RefreshRequestQueue(ref requests);
+
+                            // Wait for more requests.
+                            if (requests.Count == 0)
+                            {
+                                await _writeSignal.WaitAsync().ConfigureAwait(false);
+                                goto RefreshRequestQueue;
+                            }
+
+                            goto DequeueRequest;
+                        }
+                        else
+                        {
+                            // Send the current buffers.
+                            enumerator = default;
+                            break;
                         }
                     }
                 }
 
                 await _socketSender.SendAsync(_socket, buffers).ConfigureAwait(false);
+                buffers.Clear();
 
                 if (_socketSender.HasError)
                 {
@@ -457,12 +511,27 @@ exit:
                 }
 
                 // Signal that the requests are completed
-                foreach (var request in processingRequests)
+                for (var i = 0; i < processingRequests.Count - 1; i++)
                 {
+                    var (request, slice) = processingRequests[i];   
                     request.SetResult();
+                    slice.Dispose();
                 }
 
+                var last = processingRequests[^1];
                 processingRequests.Clear();
+
+                // Avoid disposing the last item unless enumeration has completed.
+                if (enumerator.IsCompleted)
+                {
+                    var (request, slice) = last;
+                    request.SetResult();
+                    slice.Dispose();
+                }
+                else
+                {
+                    processingRequests.Add(last);
+                }
             }
         }
         catch (Exception ex)
@@ -480,9 +549,10 @@ exit:
             _readSignal.Signal();
 
             var requestError = _shutdownReason ?? new ConnectionClosedException();
-            foreach (var request in processingRequests)
+            foreach (var (request, slice) in processingRequests)
             {
                 request.SetException(requestError);
+                slice.Dispose();
             }
 
             lock (_writesLock)

@@ -1,4 +1,7 @@
 using System;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -230,7 +233,7 @@ namespace Orleans.Runtime.MembershipService
             var id = ++_nextProbeId;
             if (_log.IsEnabled(LogLevel.Trace))
             {
-                _log.LogTrace("Going to send Ping #{Id} to probe silo {Silo}", id, SiloAddress);
+                _log.LogTrace("Going to send Ping #{Id} to probe silo {Silo}.", id, SiloAddress);
             }
 
             var roundTripTimer = ValueStopwatch.StartNew();
@@ -245,12 +248,22 @@ namespace Orleans.Runtime.MembershipService
                 if (ReferenceEquals(task, probeCancellation) && probeTask.Status != TaskStatus.RanToCompletion)
                 {
                     probeTask.Ignore();
-                    failureException = new OperationCanceledException($"The ping attempt was cancelled after {roundTripTimer.Elapsed}. Ping #{id}");
+                    failureException = new OperationCanceledException($"The ping attempt was cancelled after {roundTripTimer.Elapsed}. Ping #{id}.");
+
+                    if (_log.IsEnabled(LogLevel.Trace))
+                    {
+                        _log.LogTrace("Ping #{Id} to silo {Silo} timed out.", id, SiloAddress);
+                    }
                 }
                 else
                 {
                     await probeTask;
                     failureException = null;
+
+                    if (_log.IsEnabled(LogLevel.Trace))
+                    {
+                        _log.LogTrace("Received response to Ping #{Id} to silo {Silo}.", id, SiloAddress);
+                    }
                 }
             }
             catch (Exception exception)

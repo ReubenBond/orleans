@@ -8,7 +8,7 @@ using Orleans.Serialization.Invocation;
 namespace Orleans.Runtime
 {
     [Id(101)]
-    internal sealed class Message : ISpanFormattable, IDisposable
+    internal sealed class Message : ISpanFormattable
     {
         public const int LENGTH_HEADER_SIZE = 8;
 

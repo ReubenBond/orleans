@@ -3,6 +3,7 @@
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
+using Orleans.Serialization.Buffers;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -66,7 +67,7 @@ public abstract class StreamMessageTransport : MessageTransportBase
         GC.SuppressFinalize(this);
     }
 
-    public override bool ReadAsync(ReadRequest request)
+    public override bool EnqueueRead(ReadRequest request)
     {
         if (_connectionClosingCts.IsCancellationRequested)
         {
@@ -82,7 +83,7 @@ public abstract class StreamMessageTransport : MessageTransportBase
         return true;
     }
 
-    public override bool WriteAsync(WriteRequest request)
+    public override bool EnqueueWrite(WriteRequest request)
     {
         if (_connectionClosingCts.IsCancellationRequested)
         {
@@ -137,6 +138,7 @@ public abstract class StreamMessageTransport : MessageTransportBase
         Exception? error = default;
         ReadRequest? operation = default;
         bool isGracefulTermination = false;
+        using ArcBufferWriter bufferWriter = new();
         try
         {
             while (!_connectionClosingCts.IsCancellationRequested)
@@ -145,13 +147,14 @@ public abstract class StreamMessageTransport : MessageTransportBase
                 {
                     while (true)
                     {
-                        var bytesRead = await Stream.ReadAsync(operation.Buffer, _connectionClosingCts.Token);
-                        if (bytesRead == 0 && operation.Buffer.Length > 0)
+                        var bytesRead = await Stream.ReadAsync(bufferWriter.GetMemory(), _connectionClosingCts.Token);
+                        bufferWriter.AdvanceReader(bytesRead);
+                        if (bytesRead == 0)
                         {
                             goto gracefulTermination;
                         }
 
-                        if (operation.OnRead(bytesRead))
+                        if (operation.OnRead(new ArcBufferReader(bufferWriter)))
                         {
                             break;
                         }
@@ -231,7 +234,8 @@ gracefulTermination:
             {
                 while (TryDequeue(out operation))
                 {
-                    foreach (var buffer in operation.Buffers.AsReadOnlySequence())
+                    using var slice = operation.Buffers.ConsumeSlice(operation.Buffers.Length);
+                    foreach (var buffer in slice.MemorySegments)
                     {
                         await Stream.WriteAsync(buffer, _connectionClosingCts.Token);
                     }

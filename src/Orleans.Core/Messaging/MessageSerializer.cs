@@ -14,7 +14,6 @@ using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using static Orleans.Runtime.Message;
-using static Orleans.Serialization.Buffers.PooledBuffer;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -44,20 +43,18 @@ namespace Orleans.Runtime.Messaging
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void ReadHeaders(BufferSlice buffer, int headerLength, int bodyLength, out Message message)
+        public void ReadHeaders(MessageReadRequest readRequest, out Message message)
         {
             // Check lengths
-            ThrowIfLengthsInvalid(headerLength, bodyLength);
+            ThrowIfLengthsInvalid(readRequest._headerLength, readRequest._bodyLength);
 
             try
             {
-                // Decode header
-                var header = buffer.Slice(0, headerLength);
-
                 // Build message
                 message = new();
-                var headersReader = Reader.Create(header, _deserializationSession);
+                var headersReader = Reader.Create(readRequest._headers, _deserializationSession);
                 DeserializeHeaders(ref headersReader, message);
+                readRequest._originalHeaders = message._headers;
             }
             finally
             {
@@ -98,14 +95,21 @@ namespace Orleans.Runtime.Messaging
             return rawCodec;
         }
 
-        public (int HeaderLength, int BodyLength) Write(ref PooledBuffer buffer, Message message)
+        public (int HeaderLength, int BodyLength) Write(ArcBufferWriter buffer, Message message)
         {
             var headers = message.Headers;
             IFieldCodec? bodyCodec = null;
             ResponseCodec? rawCodec = null;
-            if (message._bodyObject is not null and not MessageReadRequest)
+            var bodyObject = message._bodyObject;
+            var readRequest = bodyObject as MessageReadRequest;
+            if (readRequest is not null && headers.ResponseType is ResponseTypes.None)
             {
-                bodyCodec = _codecProvider.GetCodec(message._bodyObject.GetType());
+                var originalHeaders = readRequest._originalHeaders;
+                headers.ResponseType = originalHeaders.ResponseType;
+            }
+            else if (bodyObject is not null)
+            {
+                bodyCodec = _codecProvider.GetCodec(bodyObject.GetType());
                 if (headers.ResponseType is ResponseTypes.None && bodyCodec is ResponseCodec responseCodec)
                 {
                     rawCodec = responseCodec;
@@ -120,32 +124,26 @@ namespace Orleans.Runtime.Messaging
                 var writer = Writer.Create(buffer, _serializationSession);
                 SerializeHeaders(ref writer, message, headers);
                 writer.Commit();
-                buffer = writer.Output;
                 var headerLength = writer.Position;
                 _serializationSession.Reset();
 
-                int bodyLength = 0;
-                if (bodyCodec is not null)
-                {
-                    writer = Writer.Create(writer.Output, _serializationSession);
-                    if (rawCodec != null) rawCodec.WriteRaw(ref writer, message._bodyObject!);
-                    else bodyCodec.WriteField(ref writer, 0, null, message._bodyObject);
-                    writer.Commit();
-                    bodyLength = writer.Position;
-                    buffer = writer.Output;
-                }
-                else if (message._bodyObject is MessageReadRequest readRequest)
+                var bodyLength = 0;
+                if (readRequest is not null)
                 {
                     bodyLength = readRequest.BodyLength;
-                    if (bodyLength > 0)
-                    {
-                        readRequest.Body.CopyTo(ref buffer);
-                    }
-
+                    readRequest.Body.CopyTo(buffer);
                     message._bodyObject = null;
                     readRequest.Reset();
                 }
-
+                else if (bodyCodec is not null)
+                {
+                    Debug.Assert(bodyObject is not null);
+                    writer = Writer.Create(buffer, _serializationSession);
+                    if (rawCodec != null) rawCodec.WriteRaw(ref writer, bodyObject);
+                    else bodyCodec.WriteField(ref writer, 0, null, bodyObject);
+                    writer.Commit();
+                    bodyLength = writer.Position;
+                }
 
                 // Before completing, check lengths
                 ThrowIfLengthsInvalid(headerLength, bodyLength);

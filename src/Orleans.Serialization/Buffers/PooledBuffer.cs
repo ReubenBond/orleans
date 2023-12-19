@@ -187,65 +187,6 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
         }
     }
 
-    /// <summary>Copies the contents of this writer to another writer.</summary>
-    public readonly void CopyTo<TBufferWriter>(ref TBufferWriter writer) where TBufferWriter : IBufferWriter<byte>
-    {
-        var current = First;
-        while (current != null)
-        {
-            var span = current.CommittedMemory.Span;
-            writer.Write(span);
-            current = current.Next as SequenceSegment;
-        }
-
-        if (CurrentPosition > 0 && WriteHead is not null)
-        {
-            Write(ref writer, WriteHead.Array.AsSpan(0, CurrentPosition));
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void Write<TBufferWriter>(ref TBufferWriter writer, ReadOnlySpan<byte> value) where TBufferWriter : IBufferWriter<byte>
-    {
-        Span<byte> destination = writer.GetSpan();
-
-        // Fast path, try copying to the available memory directly
-        if (value.Length <= destination.Length)
-        {
-            value.CopyTo(destination);
-            writer.Advance(value.Length);
-        }
-        else
-        {
-            WriteMultiSegment(ref writer, value, destination);
-        }
-    }
-
-    private static void WriteMultiSegment<TBufferWriter>(ref TBufferWriter writer, in ReadOnlySpan<byte> source, Span<byte> destination) where TBufferWriter : IBufferWriter<byte>
-    {
-        ReadOnlySpan<byte> input = source;
-        while (true)
-        {
-            int writeSize = Math.Min(destination.Length, input.Length);
-            input[..writeSize].CopyTo(destination);
-            writer.Advance(writeSize);
-            input = input[writeSize..];
-            if (input.Length > 0)
-            {
-                destination = writer.GetSpan();
-
-                if (destination.IsEmpty)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(writer));
-                }
-
-                continue;
-            }
-
-            return;
-        }
-    }
-
     /// <summary>
     /// Returns a sequence of array segments representing the committed data.
     /// </summary>
