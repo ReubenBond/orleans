@@ -14,6 +14,7 @@ using Orleans.Runtime.Internal;
 using System.Net;
 using Orleans.Runtime;
 using System.Runtime.CompilerServices;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Connections.Transport.Sockets;
 
@@ -411,6 +412,7 @@ exit:
         Queue<WriteRequest> requests = new();
         List<ArraySegment<byte>> buffers = new(capacity: SoftBatchMax);
         List<WriteRequest> processingRequests = new(capacity: SoftBatchMax);
+        byte[] buffer = new byte[1024 * 1024];
 
         try
         {
@@ -432,35 +434,53 @@ exit:
                 buffers.Clear();
                 processingRequests.Clear();
 
-                while (buffers.Count < SoftBatchMax && requests.TryDequeue(out var request))
+                var bufferLength = Copy();
+
+                int Copy()
                 {
-                    processingRequests.Add(request);
-                    if (request.IsSingleBuffer)
+                    var buf = buffer.AsSpan();
+                    int wrote = 0;
+                    int len;
+
+                    while (requests.TryPeek(out var request))
                     {
-                        buffers.Add(request.Buffer.GetArray());
-                    }
-                    else
-                    {
-                        foreach (var b in request.Buffers)
+                        if (request.IsSingleBuffer)
                         {
-                            buffers.Add(b.GetArray());
+                            len = request.Buffer.Length;
+                            if (len > buf.Length)
+                            {
+                                break;
+                            }
+
+                            request.Buffer.Span.CopyTo(buf);
                         }
+                        else
+                        {
+                            len = request.Buffers.Length;
+                            if (len > buf.Length)
+                            {
+                                break;
+                            }
+
+                            request.Buffers.CopyTo(buf);
+                        }
+
+                        processingRequests.Add(request);
+                        wrote += len;
+                        buf = buf[len..];
+                        requests.Dequeue();
                     }
+
+                    return wrote;
                 }
 
-                _socketSender.Reset();
-                await _socketSender.SendAsync(_socket, buffers).ConfigureAwait(false);
+                //_socketSender.Reset();
+                await _socketSender.SendAsync(_socket, buffer.AsMemory(0, bufferLength)).ConfigureAwait(false);
 
                 if (_socketSender.HasError)
                 {
                     error = GetSendAsyncError();
-                    break;
-                }
-
-                if (error is not null)
-                {
-                    // Bubble the error up
-                    break;
+                    goto exit;
                 }
 
                 // Signal that the requests are completed
@@ -471,6 +491,8 @@ exit:
             }
 
             processingRequests.Clear();
+exit:
+            /* no-op */;
         }
         catch (Exception ex)
         {
@@ -482,6 +504,7 @@ exit:
         }
         finally
         {
+            _socketSender.Reset();
             _shutdownReason ??= error;
             _connectionClosingCts.Cancel();
             _readSignal.Signal();
