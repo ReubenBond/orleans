@@ -25,25 +25,37 @@ public partial struct ArcBufferWriter : IBufferWriter<byte>, IDisposable
 {
     // The first page. This is the page which consumers will consume from.
     // This may be equal to the current page, or it may be a previous page.
-    internal ArcPage First;
+    private ArcPage _first;
 
     // The current page. This is the page which will be written to when the next write occurs.
-    internal ArcPage Current;
+    private ArcPage _current;
 
     // The offset into the first page which has been consumed already. When this reaches the end of the page, the page can be unpinned.
-    private int _consumerCursor;
+    private int _consumedLength;
+
+    // The total length of the buffer.
+    private int _totalLength;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ArcBufferWriter"/> struct.
     /// </summary>
     public ArcBufferWriter()
     {
-        First = Current = ArcBufferPagePool.Shared.Rent();
+        _first = _current = ArcBufferPagePool.Shared.Rent();
     }
+
+    /// <summary>
+    /// Gets the number of unconsumed bytes.
+    /// </summary>
+    public readonly int UnconsumedLength => _totalLength - _consumedLength;
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public readonly void Advance(int bytes) => Current.Advance(bytes);
+    public void Advance(int bytes)
+    {
+        _current.Advance(bytes);
+        _totalLength += bytes;
+    }
 
     /// <summary>
     /// Resets this instance, returning all memory.
@@ -51,46 +63,46 @@ public partial struct ArcBufferWriter : IBufferWriter<byte>, IDisposable
     public void Reset()
     {
         UnpinAll();
-        _consumerCursor = 0;
-        First = Current = ArcBufferPagePool.Shared.Rent();
+        _totalLength = _consumedLength = 0;
+        _first = _current = ArcBufferPagePool.Shared.Rent();
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
         UnpinAll();
-        _consumerCursor = 0;
-        First = Current = null!;
+        _totalLength = _consumedLength = 0;
+        _first = _current = null!;
     }
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Memory<byte> GetMemory(int sizeHint = 0)
     {
-        if (sizeHint >= Current.WritableCapacity)
+        if (sizeHint >= _current.WritableCapacity)
         {
             return GetMemorySlow(sizeHint);
         }
 
-        return Current.WritableMemory;
+        return _current.WritableMemory;
     }
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Span<byte> GetSpan(int sizeHint = 0)
     {
-        if (sizeHint >= Current.WritableCapacity)
+        if (sizeHint >= _current.WritableCapacity)
         {
             return GetSpanSlow(sizeHint);
         }
 
-        return Current.WritableSpan;
+        return _current.WritableSpan;
     }
 
     /// <summary>Copies the contents of this writer to a span.</summary>
     public readonly void CopyTo(Span<byte> output)
     {
-        var current = First;
+        var current = _first;
         while (output.Length > 0 && current != null)
         {
             var segment = current.ReadableMemory.Span;
@@ -104,7 +116,7 @@ public partial struct ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// <summary>Copies the contents of this writer to another writer.</summary>
     public readonly void CopyTo<TBufferWriter>(ref Writer<TBufferWriter> writer) where TBufferWriter : IBufferWriter<byte>
     {
-        var current = First;
+        var current = _first;
         while (current != null)
         {
             var span = current.ReadableMemory.Span;
@@ -116,7 +128,7 @@ public partial struct ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// <summary>Copies the contents of this writer to another writer.</summary>
     public readonly void CopyTo<TBufferWriter>(ref TBufferWriter writer) where TBufferWriter : IBufferWriter<byte>
     {
-        var current = First;
+        var current = _first;
         while (current != null)
         {
             var span = current.ReadableMemory.Span;
@@ -226,7 +238,7 @@ public partial struct ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// </summary>
     private readonly void UnpinAll()
     {
-        var current = First;
+        var current = _first;
         while (current != null)
         {
             var previous = current;
@@ -242,7 +254,7 @@ public partial struct ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// <returns>A slice of unconsumed data.</returns>
     public readonly ArcBuffer PeekSlice(int length)
         // Note that a token of -1 is used to prevent accidental unpinning of the page from the returned buffer.
-        => new (First, token: -1, offset: _consumerCursor, length);
+        => new (_first, token: -1, offset: _consumedLength, length);
 
     /// <summary>
     /// Consumes a slice of the provided length.
@@ -252,7 +264,7 @@ public partial struct ArcBufferWriter : IBufferWriter<byte>, IDisposable
     public ArcBuffer ConsumeSlice(int length)
     {
         // Create a new slice and pin it.
-        var result = new ArcBuffer(First, token: First.Version, offset: _consumerCursor, length);
+        var result = new ArcBuffer(_first, token: _first.Version, offset: _consumedLength, length);
         result.Pin();
 
         AdvanceConsumerCursor(length);
@@ -263,23 +275,25 @@ public partial struct ArcBufferWriter : IBufferWriter<byte>, IDisposable
 
     private void AdvanceConsumerCursor(int length)
     {
-        _consumerCursor += length;
+        _consumedLength += length;
 
         // If this call would consume the entire first page and the page is not the last page, unpin it.
-        while (_consumerCursor > First.Length && Current != First)
+        while (_consumedLength > _first.Length && _current != _first)
         {
-            // Advance the consumed length;
-            _consumerCursor -= First.Length;
+            // Advance the consumed length.
+            _consumedLength -= _first.Length;
+            _totalLength -= _first.Length;
 
-            // Unpin the page
-            First.Unpin(First.Version);
+            // Advance to the next page
+            Debug.Assert(_first.Next is not null);
+            _first = _first.Next!;
 
-            // Move to the next page
-            Debug.Assert(First.Next is not null);
-            First = First.Next!;
+            // Unpin the page.
+            _first.Unpin(_first.Version);
         }
 
-        Debug.Assert(_consumerCursor < First.Length);
+        Debug.Assert(_first is not null);
+        Debug.Assert(_consumedLength < _first.Length);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -295,8 +309,8 @@ public partial struct ArcBufferWriter : IBufferWriter<byte>, IDisposable
     {
         var newBuffer = ArcBufferPagePool.Shared.Rent(sizeHint);
         newBuffer.Pin(newBuffer.Version);
-        Current.SetNext(newBuffer);
-        Current = newBuffer;
+        _current.SetNext(newBuffer);
+        _current = newBuffer;
         return newBuffer;
     }
 }
@@ -363,6 +377,9 @@ public sealed class ArcPage
 
     internal ArcPage(int length)
     {
+#if !NET6_0_OR_GREATER
+        Array = [];
+#endif
         InitializeArray(length);
     }
 
