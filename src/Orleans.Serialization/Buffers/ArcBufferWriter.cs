@@ -21,7 +21,7 @@ namespace Orleans.Serialization.Buffers;
 /// </summary>
 [StructLayout(LayoutKind.Auto)]
 [Immutable]
-public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
+public partial struct ArcBufferWriter : IBufferWriter<byte>, IDisposable
 {
     // The first page. This is the page which consumers will consume from.
     // This may be equal to the current page, or it may be a previous page.
@@ -34,11 +34,11 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
     private int _consumerCursor;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="ArcBuffer"/> struct.
+    /// Initializes a new instance of the <see cref="ArcBufferWriter"/> struct.
     /// </summary>
-    public ArcBuffer()
+    public ArcBufferWriter()
     {
-        First = Current = SequenceSegmentPool.Shared.Rent();
+        First = Current = ArcBufferPagePool.Shared.Rent();
     }
 
     /// <inheritdoc/>
@@ -51,11 +51,17 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
     public void Reset()
     {
         UnpinAll();
-        First = Current = SequenceSegmentPool.Shared.Rent();
+        _consumerCursor = 0;
+        First = Current = ArcBufferPagePool.Shared.Rent();
     }
 
     /// <inheritdoc/>
-    public readonly void Dispose() => UnpinAll();
+    public void Dispose()
+    {
+        UnpinAll();
+        _consumerCursor = 0;
+        First = Current = null!;
+    }
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -215,6 +221,9 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
         }
     }
 
+    /// <summary>
+    /// Unpins all pages.
+    /// </summary>
     private readonly void UnpinAll()
     {
         var current = First;
@@ -227,16 +236,23 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
     }
 
     /// <summary>
-    /// Returns an unpinned slice and does not advance the consumer cursor.
+    /// Returns a slice of the provided length without marking the data referred to it as consumed.
     /// </summary>
     /// <param name="length">The length to consume.</param>
     /// <returns>A slice of unconsumed data.</returns>
-    public readonly ArcBufferSlice PeekSlice(int length) => new ArcBufferSlice(First, _consumerCursor, length);
+    public readonly ArcBuffer PeekSlice(int length)
+        // Note that a token of -1 is used to prevent accidental unpinning of the page from the returned buffer.
+        => new (First, token: -1, offset: _consumerCursor, length);
 
-    public ArcBufferSlice ConsumeSlice(int length)
+    /// <summary>
+    /// Consumes a slice of the provided length.
+    /// </summary>
+    /// <param name="length">The length to consume.</param>
+    /// <returns>A buffer representing the consumed data.</returns>
+    public ArcBuffer ConsumeSlice(int length)
     {
         // Create a new slice and pin it.
-        var result = new ArcBufferSlice(First, _consumerCursor, length);
+        var result = new ArcBuffer(First, token: First.Version, offset: _consumerCursor, length);
         result.Pin();
 
         AdvanceConsumerCursor(length);
@@ -277,7 +293,7 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
 
     private ArcPage Grow(int sizeHint)
     {
-        var newBuffer = SequenceSegmentPool.Shared.Rent(sizeHint);
+        var newBuffer = ArcBufferPagePool.Shared.Rent(sizeHint);
         newBuffer.Pin(newBuffer.Version);
         Current.SetNext(newBuffer);
         Current = newBuffer;
@@ -285,20 +301,21 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
     }
 
     /// <summary>
-    /// Represents a slice of a <see cref="ArcBuffer"/>.
+    /// Represents a slice of a <see cref="ArcBufferWriter"/>.
     /// </summary>
     /// <remarks>
-    /// Initializes a new instance of the <see cref="ArcBufferSlice"/> type.
+    /// Initializes a new instance of the <see cref="ArcBuffer"/> type.
     /// </remarks>
     /// <param name="first">The first page in the sequence.</param>
+    /// <param name="token">The token of the first page in the sequence.</param>
     /// <param name="offset">The offset into the buffer at which this slice begins.</param>
     /// <param name="length">The length of this slice.</param>
-    public readonly struct ArcBufferSlice(ArcPage first, int offset, int length)
+    public readonly struct ArcBuffer(ArcPage first, int token, int offset, int length)
     {
         /// <summary>
         /// Gets the token of the first page pointed to by this slice.
         /// </summary>
-        private readonly int _firstPageToken = first.Version;
+        private readonly int _firstPageToken = token;
 
         /// <summary>
         /// Gets the first page.
@@ -336,7 +353,7 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
         }
 
         /// <summary>Copies the contents of this writer to a pooled buffer.</summary>
-        public readonly void CopyTo(ref ArcBuffer output)
+        public readonly void CopyTo(ref ArcBufferWriter output)
         {
             foreach (var span in this)
             {
@@ -433,15 +450,15 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
         public readonly ArraySegmentEnumerator ArraySegments => new(this);
 
         /// <summary>
-        /// Enumerates over pages in a <see cref="ArcBufferSlice"/>.
+        /// Enumerates over pages in a <see cref="ArcBuffer"/>.
         /// </summary>
         /// <remarks>
         /// Initializes a new instance of the <see cref="PageEnumerator"/> type.
         /// </remarks>
         /// <param name="slice">The slice to enumerate.</param>
-        public struct PageEnumerator(ArcBufferSlice slice)
+        public struct PageEnumerator(ArcBuffer slice)
         {
-            private readonly ArcBufferSlice _slice = slice;
+            private readonly ArcBuffer _slice = slice;
             private int _position;
             private ArcPage? _segment = slice.First;
 
@@ -491,15 +508,15 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
         }
 
         /// <summary>
-        /// Enumerates over spans of bytes in a <see cref="ArcBufferSlice"/>.
+        /// Enumerates over spans of bytes in a <see cref="ArcBuffer"/>.
         /// </summary>
         /// <remarks>
         /// Initializes a new instance of the <see cref="SpanEnumerator"/> type.
         /// </remarks>
         /// <param name="slice">The slice to enumerate.</param>
-        public ref struct SpanEnumerator(ArcBufferSlice slice)
+        public ref struct SpanEnumerator(ArcBuffer slice)
         {
-            private readonly ArcBufferSlice _slice = slice;
+            private readonly ArcBuffer _slice = slice;
             private int _position;
             private ArcPage? _segment = slice.First;
 
@@ -551,15 +568,15 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
 
 
         /// <summary>
-        /// Enumerates over sequences of bytes in a <see cref="ArcBufferSlice"/>.
+        /// Enumerates over sequences of bytes in a <see cref="ArcBuffer"/>.
         /// </summary>
         /// <remarks>
         /// Initializes a new instance of the <see cref="MemoryEnumerator"/> type.
         /// </remarks>
         /// <param name="slice">The slice to enumerate.</param>
-        public struct MemoryEnumerator(ArcBufferSlice slice)
+        public struct MemoryEnumerator(ArcBuffer slice)
         {
-            private readonly ArcBufferSlice _slice = slice;
+            private readonly ArcBuffer _slice = slice;
             private int _position;
             private ArcPage? _segment = slice.First;
 
@@ -610,15 +627,15 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
         }
 
         /// <summary>
-        /// Enumerates over array segments in a <see cref="ArcBufferSlice"/>.
+        /// Enumerates over array segments in a <see cref="ArcBuffer"/>.
         /// </summary>
         /// <remarks>
         /// Initializes a new instance of the <see cref="ArraySegmentEnumerator"/> type.
         /// </remarks>
         /// <param name="slice">The slice to enumerate.</param>
-        public struct ArraySegmentEnumerator(ArcBufferSlice slice)
+        public struct ArraySegmentEnumerator(ArcBuffer slice)
         {
-            private readonly ArcBufferSlice _slice = slice;
+            private readonly ArcBuffer _slice = slice;
             private int _position;
             private ArcPage? _segment = slice.First;
 
@@ -669,14 +686,14 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
         }
     }
 
-    private sealed class SequenceSegmentPool
+    private sealed class ArcBufferPagePool
     {
-        public static SequenceSegmentPool Shared { get; } = new();
+        public static ArcBufferPagePool Shared { get; } = new();
         public const int MinimumBlockSize = 4 * 1024;
         private readonly ConcurrentQueue<ArcPage> _blocks = new();
         private readonly ConcurrentQueue<ArcPage> _largeBlocks = new();
 
-        private SequenceSegmentPool() { }
+        private ArcBufferPagePool() { }
 
         public ArcPage Rent(int size = -1)
         {
@@ -711,6 +728,9 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
         }
     }
 
+    /// <summary>
+    /// A page of data.
+    /// </summary>
     public sealed class ArcPage
     {
         // The current version of the page. Each time the page is return to the pool, the version is incremented.
@@ -733,7 +753,7 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
 
         public void ResizeLargeSegment(int length)
         {
-            Debug.Assert(length > SequenceSegmentPool.MinimumBlockSize);
+            Debug.Assert(length > ArcBufferPagePool.MinimumBlockSize);
             InitializeArray(length);
         }
 
@@ -743,13 +763,13 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void InitializeArray(int length)
         {
-            if (length <= SequenceSegmentPool.MinimumBlockSize)
+            if (length <= ArcBufferPagePool.MinimumBlockSize)
             {
                 Debug.Assert(Array is null);
 #if NET6_0_OR_GREATER
-                var array = GC.AllocateUninitializedArray<byte>(SequenceSegmentPool.MinimumBlockSize, pinned: true);
+                var array = GC.AllocateUninitializedArray<byte>(ArcBufferPagePool.MinimumBlockSize, pinned: true);
 #else
-                var array = new byte[SequenceSegmentPool.MinimumBlockSize];
+                var array = new byte[ArcBufferPagePool.MinimumBlockSize];
 #endif
                 Array = array;
             }
@@ -817,7 +837,7 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
         /// <summary>
         /// Gets a value indicating whether this page is equal to the minimum page size.
         /// </summary>
-        public bool IsMinimumSize => Array.Length == SequenceSegmentPool.MinimumBlockSize;
+        public bool IsMinimumSize => Array.Length == ArcBufferPagePool.MinimumBlockSize;
 
         /// <summary>
         /// Gets the number of bytes in the page which are available for writing.
@@ -884,14 +904,18 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
         /// Sets the next page in the sequence.
         /// </summary>
         /// <param name="next">The next page in the sequence.</param>
-        public void SetNext(ArcPage next) => Next = next;
+        public void SetNext(ArcPage next)
+        {
+            Debug.Assert(Next is null);
+            Next = next;
+        }
 
         private void Return()
         {
             Length = 0;
             Next = default;
             Interlocked.Increment(ref _version);
-            SequenceSegmentPool.Shared.Return(this);
+            ArcBufferPagePool.Shared.Return(this);
         }
 
         /// <summary>
