@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Buffers;
 using System.Collections.Concurrent;
@@ -22,134 +23,62 @@ namespace Orleans.Serialization.Buffers;
 [Immutable]
 public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
 {
-    internal SequenceSegment First;
-    internal SequenceSegment Last;
-    internal SequenceSegment WriteHead;
-    internal int TotalLength;
-    internal int CurrentPosition;
+    // The first page. This is the page which consumers will consume from.
+    // This may be equal to the current page, or it may be a previous page.
+    internal ArcPage First;
+
+    // The current page. This is the page which will be written to when the next write occurs.
+    internal ArcPage Current;
+
+    // The offset into the first page which has been consumed already. When this reaches the end of the page, the page can be unpinned.
+    private int _consumerCursor;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ArcBuffer"/> struct.
     /// </summary>
     public ArcBuffer()
     {
-        First = Last = null;
-        WriteHead = null;
-        TotalLength = 0;
-        CurrentPosition = 0;
-    }
-
-    /// <summary>Gets the total length which has been written.</summary>
-    public readonly int Length => TotalLength + CurrentPosition;
-
-    /// <summary>
-    /// Returns the data which has been written as an array.
-    /// </summary>
-    /// <returns>The data which has been written.</returns>
-    public readonly byte[] ToArray()
-    {
-        var result = new byte[Length];
-        var resultSpan = result.AsSpan();
-        var current = First;
-        while (current != null)
-        {
-            var span = current.CommittedMemory.Span;
-            span.CopyTo(resultSpan);
-            resultSpan = resultSpan[span.Length..];
-            current = current.Next as SequenceSegment;
-        }
-
-        if (WriteHead is not null && CurrentPosition > 0)
-        {
-            WriteHead.Array.AsSpan(0, CurrentPosition).CopyTo(resultSpan);
-        }
-
-        return result;
+        First = Current = SequenceSegmentPool.Shared.Rent();
     }
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Advance(int bytes)
-    {
-        if (WriteHead is null || CurrentPosition > WriteHead.Array.Length)
-        {
-            ThrowInvalidOperation();
-        }
-
-        CurrentPosition += bytes;
-
-        [DoesNotReturn]
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        static void ThrowInvalidOperation() => throw new InvalidOperationException("Attempted to advance past the end of a buffer.");
-    }
+    public readonly void Advance(int bytes) => Current.Advance(bytes);
 
     /// <summary>
     /// Resets this instance, returning all memory.
     /// </summary>
     public void Reset()
     {
-        var current = First;
-        while (current != null)
-        {
-            var previous = current;
-            current = previous.Next as SequenceSegment;
-            previous.Return();
-            Debug.Assert(current == null || current != WriteHead);
-        }
-
-        WriteHead?.Return();
-
-        First = Last = WriteHead = null;
-        CurrentPosition = TotalLength = 0;
+        UnpinAll();
+        First = Current = SequenceSegmentPool.Shared.Rent();
     }
 
     /// <inheritdoc/>
-    public void Dispose() => Reset();
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Memory<byte> GetExactMemory(int length)
-    {
-        if (WriteHead is null || length >= WriteHead.Array.Length - CurrentPosition)
-        {
-            return GetExactMemorySlow(length);
-        }
-
-        return WriteHead.AsMemory(CurrentPosition, length);
-    }
+    public readonly void Dispose() => UnpinAll();
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Memory<byte> GetMemory(int sizeHint = 0)
     {
-        if (WriteHead is null || sizeHint >= WriteHead.Array.Length - CurrentPosition)
+        if (sizeHint >= Current.WritableCapacity)
         {
             return GetMemorySlow(sizeHint);
         }
 
-        return WriteHead.AsMemory(CurrentPosition);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Memory<byte> GetLimitedMemory(int length)
-    {
-        if (WriteHead is null || WriteHead.Array.Length == CurrentPosition)
-        {
-            return GetMemorySlow(0);
-        }
-
-        return WriteHead.AsLimitedMemory(CurrentPosition, length);
+        return Current.WritableMemory;
     }
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Span<byte> GetSpan(int sizeHint = 0)
     {
-        if (WriteHead is null || sizeHint >= WriteHead.Array.Length - CurrentPosition)
+        if (sizeHint >= Current.WritableCapacity)
         {
             return GetSpanSlow(sizeHint);
         }
 
-        return WriteHead.Array.AsSpan(CurrentPosition);
+        return Current.WritableSpan;
     }
 
     /// <summary>Copies the contents of this writer to a span.</summary>
@@ -158,17 +87,11 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
         var current = First;
         while (output.Length > 0 && current != null)
         {
-            var segment = current.CommittedMemory.Span;
+            var segment = current.ReadableMemory.Span;
             var slice = segment[..Math.Min(segment.Length, output.Length)];
             slice.CopyTo(output);
             output = output[slice.Length..];
-            current = current.Next as SequenceSegment;
-        }
-
-        if (output.Length > 0 && CurrentPosition > 0 && WriteHead is not null)
-        {
-            var span = WriteHead.Array.AsSpan(0, Math.Min(output.Length, CurrentPosition));
-            span.CopyTo(output);
+            current = current.Next;
         }
     }
 
@@ -178,14 +101,9 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
         var current = First;
         while (current != null)
         {
-            var span = current.CommittedMemory.Span;
+            var span = current.ReadableMemory.Span;
             writer.Write(span);
-            current = current.Next as SequenceSegment;
-        }
-
-        if (CurrentPosition > 0 && WriteHead is not null)
-        {
-            writer.Write(WriteHead.Array.AsSpan(0, CurrentPosition));
+            current = current.Next;
         }
     }
 
@@ -195,21 +113,16 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
         var current = First;
         while (current != null)
         {
-            var span = current.CommittedMemory.Span;
+            var span = current.ReadableMemory.Span;
             writer.Write(span);
-            current = current.Next as SequenceSegment;
-        }
-
-        if (CurrentPosition > 0 && WriteHead is not null)
-        {
-            Write(ref writer, WriteHead.Array.AsSpan(0, CurrentPosition));
+            current = current.Next;
         }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void Write<TBufferWriter>(ref TBufferWriter writer, ReadOnlySpan<byte> value) where TBufferWriter : IBufferWriter<byte>
     {
-        Span<byte> destination = writer.GetSpan();
+        var destination = writer.GetSpan();
 
         // Fast path, try copying to the available memory directly
         if (value.Length <= destination.Length)
@@ -225,10 +138,10 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
 
     private static void WriteMultiSegment<TBufferWriter>(ref TBufferWriter writer, in ReadOnlySpan<byte> source, Span<byte> destination) where TBufferWriter : IBufferWriter<byte>
     {
-        ReadOnlySpan<byte> input = source;
+        var input = source;
         while (true)
         {
-            int writeSize = Math.Min(destination.Length, input.Length);
+            var writeSize = Math.Min(destination.Length, input.Length);
             input[..writeSize].CopyTo(destination);
             writer.Advance(writeSize);
             input = input[writeSize..];
@@ -247,69 +160,6 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
             return;
         }
     }
-
-    /// <summary>
-    /// Returns a sequence of array segments representing the committed data.
-    /// </summary>
-    public readonly BufferSlice.ArraySegmentEnumerator ArraySegments => new(Slice());
-
-    /// <summary>
-    /// Returns a new <see cref="ReadOnlySequence{T}"/> which must not be accessed after disposing this instance.
-    /// </summary>
-    public ReadOnlySequence<byte> AsReadOnlySequence()
-    {
-        if (Length == 0)
-        {
-            return ReadOnlySequence<byte>.Empty;
-        }
-
-        Commit();
-        if (First == Last)
-        {
-            return new ReadOnlySequence<byte>(First!.CommittedMemory);
-        }
-
-        return new ReadOnlySequence<byte>(First!, 0, Last!, Last!.CommittedMemory.Length);
-    }
-
-    /// <summary>
-    /// Returns a <see cref="BufferSlice"/> covering this entire buffer.
-    /// </summary>
-    /// <remarks>
-    /// The lifetime of the returned <see cref="BufferSlice"/> must be shorter than the lifetime of this instance.
-    /// </remarks>
-    /// <returns>A <see cref="BufferSlice"/> covering this entire buffer.</returns>
-    public readonly BufferSlice Slice() => new(this, 0, Length);
-
-    /// <summary>
-    /// Returns a slice of this buffer, beginning at the specified offset.
-    /// </summary>
-    /// <remarks>
-    /// The lifetime of the returned <see cref="BufferSlice"/> must be shorter than the lifetime of this instance.
-    /// </remarks>
-    /// <returns>A slice representing a subset of this instance, beginning at the specified offset.</returns>
-    public readonly BufferSlice Slice(int offset) => new(this, offset, Length - offset);
-
-    /// <summary>
-    /// Returns a slice of this buffer, beginning at the specified offset and having the specified length.
-    /// </summary>
-    /// <remarks>
-    /// The lifetime of the returned <see cref="BufferSlice"/> must be shorter than the lifetime of this instance.
-    /// </remarks>
-    /// <returns>A slice representing a subset of this instance, beginning at the specified offset.</returns>
-    public readonly BufferSlice Slice(int offset, int length) => new(this, offset, length);
-
-    /// <summary>
-    /// Returns an enumerator which can be used to enumerate the data referenced by this instance.
-    /// </summary>
-    /// <returns>An enumerator for the data contained in this instance.</returns>
-    public readonly BufferSlice.SpanEnumerator GetEnumerator() => new(Slice());
-
-    /// <summary>
-    /// Returns an enumerator which can be used to enumerate the data referenced by this instance.
-    /// </summary>
-    /// <returns>An enumerator for the data contained in this instance.</returns>
-    public readonly BufferSlice.MemoryEnumerator MemorySegments => new(Slice());
 
     /// <summary>
     /// Writes the provided sequence to this buffer.
@@ -365,6 +215,57 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
         }
     }
 
+    private readonly void UnpinAll()
+    {
+        var current = First;
+        while (current != null)
+        {
+            var previous = current;
+            current = previous.Next;
+            previous.Unpin(previous.Version);
+        }
+    }
+
+    /// <summary>
+    /// Returns an unpinned slice and does not advance the consumer cursor.
+    /// </summary>
+    /// <param name="length">The length to consume.</param>
+    /// <returns>A slice of unconsumed data.</returns>
+    public readonly ArcBufferSlice PeekSlice(int length) => new ArcBufferSlice(First, _consumerCursor, length);
+
+    public ArcBufferSlice ConsumeSlice(int length)
+    {
+        // Create a new slice and pin it.
+        var result = new ArcBufferSlice(First, _consumerCursor, length);
+        result.Pin();
+
+        AdvanceConsumerCursor(length);
+
+        // Return the slice.
+        return result;
+    }
+
+    private void AdvanceConsumerCursor(int length)
+    {
+        _consumerCursor += length;
+
+        // If this call would consume the entire first page and the page is not the last page, unpin it.
+        while (_consumerCursor > First.Length && Current != First)
+        {
+            // Advance the consumed length;
+            _consumerCursor -= First.Length;
+
+            // Unpin the page
+            First.Unpin(First.Version);
+
+            // Move to the next page
+            Debug.Assert(First.Next is not null);
+            First = First.Next!;
+        }
+
+        Debug.Assert(_consumerCursor < First.Length);
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private Span<byte> GetSpanSlow(int sizeHint) => Grow(sizeHint).Array;
 
@@ -374,87 +275,50 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
     [MethodImpl(MethodImplOptions.NoInlining)]
     private Memory<byte> GetExactMemorySlow(int length) => Grow(length).AsMemory(0, length);
 
-    private SequenceSegment Grow(int sizeHint)
+    private ArcPage Grow(int sizeHint)
     {
-        Commit();
         var newBuffer = SequenceSegmentPool.Shared.Rent(sizeHint);
-        Last.SetNext(newBuffer);
-        Last = newBuffer;
-        return WriteHead = newBuffer;
-    }
-
-    private void Commit()
-    {
-        if (CurrentPosition == 0 || WriteHead is null)
-        {
-            return;
-        }
-
-        WriteHead.Commit(TotalLength, CurrentPosition);
-        TotalLength += CurrentPosition;
-        if (First is null)
-        {
-            First = WriteHead;
-        }
-        else
-        {
-            Debug.Assert(Last is not null);
-            Last.SetNext(WriteHead);
-        }
-
-        Last = WriteHead;
-        WriteHead = null;
-        CurrentPosition = 0;
+        newBuffer.Pin(newBuffer.Version);
+        Current.SetNext(newBuffer);
+        Current = newBuffer;
+        return newBuffer;
     }
 
     /// <summary>
     /// Represents a slice of a <see cref="ArcBuffer"/>.
     /// </summary>
-    public readonly struct BufferSlice
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="ArcBufferSlice"/> type.
+    /// </remarks>
+    /// <param name="first">The first page in the sequence.</param>
+    /// <param name="offset">The offset into the buffer at which this slice begins.</param>
+    /// <param name="length">The length of this slice.</param>
+    public readonly struct ArcBufferSlice(ArcPage first, int offset, int length)
     {
-#pragma warning disable IDE1006 // Naming Styles
-        internal readonly ArcBuffer _buffer;
-        internal readonly int _offset;
-        internal readonly int _length;
-#pragma warning restore IDE1006 // Naming Styles
+        /// <summary>
+        /// Gets the token of the first page pointed to by this slice.
+        /// </summary>
+        private readonly int _firstPageToken = first.Version;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="BufferSlice"/> type.
+        /// Gets the first page.
         /// </summary>
-        /// <param name="buffer">The buffer.</param>
-        /// <param name="offset">The offset into the buffer at which this slice begins.</param>
-        /// <param name="length">The length of this slice.</param>
-        public BufferSlice(in ArcBuffer buffer, int offset, int length)
-        {
-            _buffer = buffer;
-            _offset = offset;
-            _length = length;
-        }
+        public readonly ArcPage First = first;
 
         /// <summary>
-        /// Gets the offset into the underlying buffer at which this slice begins.
+        /// Gets the first span.
         /// </summary>
-        public readonly int Offset => _offset;
+        public readonly ReadOnlySpan<byte> FirstSpan => First.ReadableSpan;
 
         /// <summary>
-        /// Gets the length of this slice.
+        /// Gets the offset into the first page at which this slice begins.
         /// </summary>
-        public readonly int Length => _length;
+        public readonly int Offset = offset;
 
         /// <summary>
-        /// Forms a slice out of this instance, beginning at the specified offset into this slice.
+        /// Gets the length of this sequence.
         /// </summary>
-        /// <param name="offset">The offset into this slice where the newly formed slice will begin.</param>
-        /// <returns>A slice instance.</returns>
-        public readonly BufferSlice Slice(int offset) => new(in _buffer, _offset + offset, _length - offset);
-
-        /// <summary>
-        /// Forms a slice out of this instance, beginning at the specified offset into this slice and having the specified length.
-        /// </summary>
-        /// <param name="offset">The offset into this slice where the newly formed slice will begin.</param>
-        /// <param name="length">The length of the new slice.</param>
-        /// <returns>A slice instance.</returns>
-        public readonly BufferSlice Slice(int offset, int length) => new(in _buffer, _offset + offset, length);
+        public readonly int Length = length;
 
         /// <summary>Copies the contents of this writer to a span.</summary>
         public readonly int CopyTo(Span<byte> output)
@@ -495,53 +359,106 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
         /// <returns>The data which has been written.</returns>
         public readonly byte[] ToArray()
         {
-            var result = new byte[_length];
+            var result = new byte[Length];
             CopyTo(result);
             return result;
         }
 
         /// <summary>
-        /// Returns an enumerator which can be used to enumerate the data referenced by this instance.
+        /// Pins this slice, preventing the referenced pages from being returned to the pool.
+        /// </summary>
+        public void Pin()
+        {
+            var pageEnumerator = Pages.GetEnumerator();
+            if (pageEnumerator.MoveNext())
+            {
+                var page = pageEnumerator.Current!;
+                page.Pin(_firstPageToken);
+            }
+
+            while (pageEnumerator.MoveNext())
+            {
+                var page = pageEnumerator.Current!;
+                page.Pin(page.Version);
+            }
+        }
+
+        /// <summary>
+        /// Unpins this slice, allowing the referenced pages to be returned to the pool.
+        /// </summary>
+        public void Unpin()
+        {
+            var pageEnumerator = Pages.GetEnumerator();
+            if (pageEnumerator.MoveNext())
+            {
+                var page = pageEnumerator.Current!;
+                page.Unpin(_firstPageToken);
+            }
+
+            while (pageEnumerator.MoveNext())
+            {
+                var page = pageEnumerator.Current!;
+                page.Unpin(page.Version);
+            }
+        }
+
+        /// <summary>
+        /// Returns an enumerator which can be used to enumerate the span segments referenced by this instance.
         /// </summary>
         /// <returns>An enumerator for the data contained in this instance.</returns>
         public readonly SpanEnumerator GetEnumerator() => new(this);
 
         /// <summary>
-        /// Returns an enumerator which can be used to enumerate the data referenced by this instance.
+        /// Returns an enumerator which can be used to enumerate the pages referenced by this instance.
+        /// </summary>
+        /// <returns>An enumerator for the data contained in this instance.</returns>
+        public readonly PageEnumerator Pages => new(this);
+
+        /// <summary>
+        /// Returns an enumerator which can be used to enumerate the span segments referenced by this instance.
+        /// </summary>
+        /// <returns>An enumerator for the data contained in this instance.</returns>
+        public readonly SpanEnumerator SpanSegments => new(this);
+
+        /// <summary>
+        /// Returns an enumerator which can be used to enumerate the memory segments referenced by this instance.
         /// </summary>
         /// <returns>An enumerator for the data contained in this instance.</returns>
         public readonly MemoryEnumerator MemorySegments => new(this);
 
         /// <summary>
-        /// Enumerates over spans of bytes in a <see cref="BufferSlice"/>.
+        /// Returns an enumerator which can be used to enumerate the array segments referenced by this instance.
         /// </summary>
-        public ref struct SpanEnumerator
+        /// <returns>An enumerator for the data contained in this instance.</returns>
+        public readonly ArraySegmentEnumerator ArraySegments => new(this);
+
+        /// <summary>
+        /// Enumerates over pages in a <see cref="ArcBufferSlice"/>.
+        /// </summary>
+        /// <remarks>
+        /// Initializes a new instance of the <see cref="PageEnumerator"/> type.
+        /// </remarks>
+        /// <param name="slice">The slice to enumerate.</param>
+        public struct PageEnumerator(ArcBufferSlice slice)
         {
-            private static readonly SequenceSegment InitialSegmentSentinel = new();
-            private static readonly SequenceSegment FinalSegmentSentinel = new();
-            private readonly BufferSlice _slice;
+            private readonly ArcBufferSlice _slice = slice;
             private int _position;
-            private SequenceSegment _segment;
+            private ArcPage? _segment = slice.First;
+
+            internal readonly ArcPage First => _slice.First;
+            internal readonly int Offset => _slice.Offset;
+            internal readonly int Length => _slice.Length;
 
             /// <summary>
-            /// Initializes a new instance of the <see cref="SpanEnumerator"/> type.
+            /// Gets this instance as an enumerator.
             /// </summary>
-            /// <param name="slice">The slice to enumerate.</param>
-            public SpanEnumerator(BufferSlice slice)
-            {
-                _slice = slice;
-                _segment = InitialSegmentSentinel;
-                Current = Span<byte>.Empty;
-            }
-
-            internal readonly ArcBuffer Buffer => _slice._buffer;
-            internal readonly int Offset => _slice._offset;
-            internal readonly int Length => _slice._length;
+            /// <returns>This instance.</returns>
+            public readonly PageEnumerator GetEnumerator() => this;
 
             /// <summary>
             /// Gets the element in the collection at the current position of the enumerator.
             /// </summary>
-            public ReadOnlySpan<byte> Current { get; private set; }
+            public ArcPage? Current { get; private set; }
 
             /// <summary>
             /// Advances the enumerator to the next element of the collection.
@@ -549,213 +466,176 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
             /// <returns><see langword="true"/> if the enumerator was successfully advanced to the next element; <see langword="false"/> if the enumerator has passed the end of the collection.</returns>
             public bool MoveNext()
             {
-                if (ReferenceEquals(_segment, InitialSegmentSentinel))
+                if (_segment == First)
                 {
-                    _segment = _slice._buffer.First;
-                }
-
-                var endPosition = Offset + Length;
-                while (_segment != null && _segment != FinalSegmentSentinel)
-                {
-                    var segment = _segment.CommittedMemory.Span;
-
-                    // Find the starting segment and the offset to copy from.
-                    int segmentOffset;
-                    if (_position < Offset)
-                    {
-                        if (_position + segment.Length <= Offset)
-                        {
-                            // Start is in a subsequent segment
-                            _position += segment.Length;
-                            _segment = _segment.Next as SequenceSegment;
-                            continue;
-                        }
-                        else
-                        {
-                            // Start is in this segment
-                            segmentOffset = Offset;
-                        }
-                    }
-                    else
-                    {
-                        segmentOffset = 0;
-                    }
-
-                    var segmentLength = Math.Min(segment.Length - segmentOffset, endPosition - (_position + segmentOffset));
-                    if (segmentLength == 0)
-                    {
-                        Current = Span<byte>.Empty;
-                        _segment = FinalSegmentSentinel;
-                        return false;
-                    }
-
-                    Current = segment.Slice(segmentOffset, segmentLength);
-                    _position += segmentOffset + segmentLength;
-                    _segment = _segment.Next as SequenceSegment;
+                    var length = Math.Min(Length, _segment.Length - Offset);
+                    _position += length;
+                    Current = _segment;
+                    _segment = _segment.Next;
                     return true;
                 }
 
-                // Account for the uncommitted data at the end of the buffer.
-                // The write head is only linked to the previous buffers when Commit() is called and it is set to null afterwards,
-                // meaning that if the write head is not null, the other buffers are not linked to it and it therefore has not been enumerated.
-                if (_segment != FinalSegmentSentinel && Buffer.CurrentPosition > 0 && Buffer.WriteHead is { } head && _position < endPosition)
+                if (_segment is not null && _position != Length)
                 {
-                    var finalOffset = Math.Max(Offset - _position, 0);
-                    var finalLength = Math.Min(Buffer.CurrentPosition, endPosition - (_position + finalOffset));
-                    if (finalLength == 0)
-                    {
-                        Current = Span<byte>.Empty;
-                        _segment = FinalSegmentSentinel;
-                        return false;
-                    }
-
-                    Current = head.Array.AsSpan(finalOffset, finalLength);
-                    _position += finalOffset + finalLength;
-                    Debug.Assert(_position == endPosition);
-                    _segment = FinalSegmentSentinel;
+                    var length = Math.Min(Length - _position, _segment.Length);
+                    _position += length;
+                    Current = _segment;
+                    _segment = _segment.Next;
                     return true;
                 }
 
+                Current = default; 
+                Debug.Assert(_position == Length);
                 return false;
             }
         }
 
         /// <summary>
-        /// Enumerates over spans of bytes in a <see cref="BufferSlice"/>.
+        /// Enumerates over spans of bytes in a <see cref="ArcBufferSlice"/>.
+        /// </summary>
+        /// <remarks>
+        /// Initializes a new instance of the <see cref="SpanEnumerator"/> type.
+        /// </remarks>
+        /// <param name="slice">The slice to enumerate.</param>
+        public ref struct SpanEnumerator(ArcBufferSlice slice)
+        {
+            private readonly ArcBufferSlice _slice = slice;
+            private int _position;
+            private ArcPage? _segment = slice.First;
+
+            internal readonly ArcPage First => _slice.First;
+            internal readonly int Offset => _slice.Offset;
+            internal readonly int Length => _slice.Length;
+
+            /// <summary>
+            /// Gets this instance as an enumerator.
+            /// </summary>
+            /// <returns>This instance.</returns>
+            public readonly SpanEnumerator GetEnumerator() => this;
+
+            /// <summary>
+            /// Gets the element in the collection at the current position of the enumerator.
+            /// </summary>
+            public ReadOnlySpan<byte> Current { get; private set; } = [];
+
+            /// <summary>
+            /// Advances the enumerator to the next element of the collection.
+            /// </summary>
+            /// <returns><see langword="true"/> if the enumerator was successfully advanced to the next element; <see langword="false"/> if the enumerator has passed the end of the collection.</returns>
+            public bool MoveNext()
+            {
+                if (_segment == First)
+                {
+                    var offset = Offset;
+                    var length = Math.Min(Length, _segment.Length - offset);
+                    _position += length;
+                    Current = _segment.ReadableMemory.Span[offset..length];
+                    _segment = _segment.Next;
+                    return true;
+                }
+
+                if (_segment is not null && _position != Length)
+                {
+                    var length = Math.Min(Length - _position, _segment.Length);
+                    _position += length;
+                    Current = _segment.ReadableMemory.Span[..length];
+                    _segment = _segment.Next;
+                    return true;
+                }
+
+                Current = [];
+                Debug.Assert(_position == Length);
+                return false;
+            }
+        }
+
+
+        /// <summary>
+        /// Enumerates over sequences of bytes in a <see cref="ArcBufferSlice"/>.
         /// </summary>
         /// <remarks>
         /// Initializes a new instance of the <see cref="MemoryEnumerator"/> type.
         /// </remarks>
         /// <param name="slice">The slice to enumerate.</param>
-        public struct MemoryEnumerator(BufferSlice slice)
+        public struct MemoryEnumerator(ArcBufferSlice slice)
         {
-            private static readonly SequenceSegment InitialSegmentSentinel = new();
-            private static readonly SequenceSegment FinalSegmentSentinel = new();
-            private readonly BufferSlice _slice = slice;
+            private readonly ArcBufferSlice _slice = slice;
             private int _position;
-            private SequenceSegment _segment = InitialSegmentSentinel;
+            private ArcPage? _segment = slice.First;
 
-            internal readonly ArcBuffer Buffer => _slice._buffer;
-            internal readonly int Offset => _slice._offset;
-            internal readonly int Length => _slice._length;
-
-            /// <summary>
-            /// Gets the element in the collection at the current position of the enumerator.
-            /// </summary>
-            public ReadOnlyMemory<byte> Current { get; private set; } = ReadOnlyMemory<byte>.Empty;
+            internal readonly ArcPage First => _slice.First;
+            internal readonly int Offset => _slice.Offset;
+            internal readonly int Length => _slice.Length;
 
             /// <summary>
-            /// Gets the enumerator.
+            /// Gets this instance as an enumerator.
             /// </summary>
             /// <returns>This instance.</returns>
             public readonly MemoryEnumerator GetEnumerator() => this;
 
             /// <summary>
+            /// Gets the element in the collection at the current position of the enumerator.
+            /// </summary>
+            public ReadOnlyMemory<byte> Current { get; private set; }
+
+            /// <summary>
             /// Advances the enumerator to the next element of the collection.
             /// </summary>
             /// <returns><see langword="true"/> if the enumerator was successfully advanced to the next element; <see langword="false"/> if the enumerator has passed the end of the collection.</returns>
             public bool MoveNext()
             {
-                if (ReferenceEquals(_segment, InitialSegmentSentinel))
+                if (_segment == First)
                 {
-                    _segment = Buffer.First;
-                }
-
-                var endPosition = Offset + Length;
-                while (_segment != null && _segment != FinalSegmentSentinel)
-                {
-                    var segment = _segment.CommittedMemory;
-
-                    // Find the starting segment and the offset to copy from.
-                    int segmentOffset;
-                    if (_position < Offset)
-                    {
-                        if (_position + segment.Length <= Offset)
-                        {
-                            // Start is in a subsequent segment
-                            _position += segment.Length;
-                            _segment = _segment.Next as SequenceSegment;
-                            continue;
-                        }
-                        else
-                        {
-                            // Start is in this segment
-                            segmentOffset = Offset;
-                        }
-                    }
-                    else
-                    {
-                        segmentOffset = 0;
-                    }
-
-                    var segmentLength = Math.Min(segment.Length - segmentOffset, endPosition - (_position + segmentOffset));
-                    if (segmentLength == 0)
-                    {
-                        Current = ReadOnlyMemory<byte>.Empty;
-                        _segment = FinalSegmentSentinel;
-                        return false;
-                    }
-
-                    Current = segment.Slice(segmentOffset, segmentLength);
-                    _position += segmentOffset + segmentLength;
-                    _segment = _segment.Next as SequenceSegment;
+                    var offset = Offset;
+                    var length = Math.Min(Length, _segment.Length - offset);
+                    _position += length;
+                    Current = _segment.ReadableMemory[offset..length];
+                    _segment = _segment.Next;
                     return true;
                 }
 
-                // Account for the uncommitted data at the end of the buffer.
-                // The write head is only linked to the previous buffers when Commit() is called and it is set to null afterwards,
-                // meaning that if the write head is not null, the other buffers are not linked to it and it therefore has not been enumerated.
-                if (_segment != FinalSegmentSentinel && Buffer.CurrentPosition > 0 && Buffer.WriteHead is { } head && _position < endPosition)
+                if (_segment is not null && _position != Length)
                 {
-                    var finalOffset = Math.Max(Offset - _position, 0);
-                    var finalLength = Math.Min(Buffer.CurrentPosition, endPosition - (_position + finalOffset));
-                    if (finalLength == 0)
-                    {
-                        Current = ReadOnlyMemory<byte>.Empty;
-                        _segment = FinalSegmentSentinel;
-                        return false;
-                    }
-
-                    Current = head.Array.AsMemory(finalOffset, finalLength);
-                    _position += finalOffset + finalLength;
-                    Debug.Assert(_position == endPosition);
-                    _segment = FinalSegmentSentinel;
+                    var length = Math.Min(Length - _position, _segment.Length);
+                    _position += length;
+                    Current = _segment.ReadableMemory[..length];
+                    _segment = _segment.Next;
                     return true;
                 }
 
+                Current = default; 
+                Debug.Assert(_position == Length);
                 return false;
             }
         }
 
         /// <summary>
-        /// Enumerates over spans of bytes in a <see cref="BufferSlice"/>.
+        /// Enumerates over array segments in a <see cref="ArcBufferSlice"/>.
         /// </summary>
         /// <remarks>
         /// Initializes a new instance of the <see cref="ArraySegmentEnumerator"/> type.
         /// </remarks>
         /// <param name="slice">The slice to enumerate.</param>
-        public struct ArraySegmentEnumerator(BufferSlice slice)
+        public struct ArraySegmentEnumerator(ArcBufferSlice slice)
         {
-            private static readonly SequenceSegment InitialSegmentSentinel = new();
-            private static readonly SequenceSegment FinalSegmentSentinel = new();
-            private readonly BufferSlice _slice = slice;
+            private readonly ArcBufferSlice _slice = slice;
             private int _position;
-            private SequenceSegment _segment = InitialSegmentSentinel;
+            private ArcPage? _segment = slice.First;
 
-            internal readonly ArcBuffer Buffer => _slice._buffer;
-            internal readonly int Offset => _slice._offset;
-            internal readonly int Length => _slice._length;
+            internal readonly ArcPage First => _slice.First;
+            internal readonly int Offset => _slice.Offset;
+            internal readonly int Length => _slice.Length;
+
+            /// <summary>
+            /// Gets this instance as an enumerator.
+            /// </summary>
+            /// <returns>This instance.</returns>
+            public readonly ArraySegmentEnumerator GetEnumerator() => this;
 
             /// <summary>
             /// Gets the element in the collection at the current position of the enumerator.
             /// </summary>
-            public ArraySegment<byte> Current { get; private set; } = ArraySegment<byte>.Empty;
-
-            /// <summary>
-            /// Returns an enumerator which can be used to enumerate the data referenced by this instance.
-            /// </summary>
-            /// <returns>An enumerator for the data contained in this instance.</returns>
-            public readonly ArraySegmentEnumerator GetEnumerator() => this;
+            public ArraySegment<byte> Current { get; private set; }
 
             /// <summary>
             /// Advances the enumerator to the next element of the collection.
@@ -763,73 +643,27 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
             /// <returns><see langword="true"/> if the enumerator was successfully advanced to the next element; <see langword="false"/> if the enumerator has passed the end of the collection.</returns>
             public bool MoveNext()
             {
-                if (ReferenceEquals(_segment, InitialSegmentSentinel))
+                if (_segment == First)
                 {
-                    _segment = Buffer.First;
-                }
-
-                var endPosition = Offset + Length;
-                while (_segment != null && _segment != FinalSegmentSentinel)
-                {
-                    var segment = _segment.CommittedArraySegment;
-
-                    // Find the starting segment and the offset to copy from.
-                    int segmentOffset;
-                    if (_position < Offset)
-                    {
-                        if (_position + segment.Count <= Offset)
-                        {
-                            // Start is in a subsequent segment
-                            _position += segment.Count;
-                            _segment = _segment.Next as SequenceSegment;
-                            continue;
-                        }
-                        else
-                        {
-                            // Start is in this segment
-                            segmentOffset = Offset;
-                        }
-                    }
-                    else
-                    {
-                        segmentOffset = 0;
-                    }
-
-                    var segmentLength = Math.Min(segment.Count - segmentOffset, endPosition - (_position + segmentOffset));
-                    if (segmentLength == 0)
-                    {
-                        Current = ArraySegment<byte>.Empty;
-                        _segment = FinalSegmentSentinel;
-                        return false;
-                    }
-
-                    Current = segment.Slice(segmentOffset, segmentLength);
-                    _position += segmentOffset + segmentLength;
-                    _segment = _segment.Next as SequenceSegment;
+                    var offset = Offset;
+                    var length = Math.Min(Length, _segment.Length - offset);
+                    _position += length;
+                    Current = _segment.ReadableArraySegment[offset..length];
+                    _segment = _segment.Next;
                     return true;
                 }
 
-                // Account for the uncommitted data at the end of the buffer.
-                // The write head is only linked to the previous buffers when Commit() is called and it is set to null afterwards,
-                // meaning that if the write head is not null, the other buffers are not linked to it and it therefore has not been enumerated.
-                if (_segment != FinalSegmentSentinel && Buffer.CurrentPosition > 0 && Buffer.WriteHead is { } head && _position < endPosition)
+                if (_segment is not null && _position != Length)
                 {
-                    var finalOffset = Math.Max(Offset - _position, 0);
-                    var finalLength = Math.Min(Buffer.CurrentPosition, endPosition - (_position + finalOffset));
-                    if (finalLength == 0)
-                    {
-                        Current = ArraySegment<byte>.Empty;
-                        _segment = FinalSegmentSentinel;
-                        return false;
-                    }
-
-                    Current = new (head.Array, finalOffset, finalLength);
-                    _position += finalOffset + finalLength;
-                    Debug.Assert(_position == endPosition);
-                    _segment = FinalSegmentSentinel;
+                    var length = Math.Min(Length - _position, _segment.Length);
+                    _position += length;
+                    Current = _segment.ReadableArraySegment[..length];
+                    _segment = _segment.Next;
                     return true;
                 }
 
+                Current = default; 
+                Debug.Assert(_position == Length);
                 return false;
             }
         }
@@ -839,19 +673,19 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
     {
         public static SequenceSegmentPool Shared { get; } = new();
         public const int MinimumBlockSize = 4 * 1024;
-        private readonly ConcurrentQueue<SequenceSegment> _blocks = new();
-        private readonly ConcurrentQueue<SequenceSegment> _largeBlocks = new();
+        private readonly ConcurrentQueue<ArcPage> _blocks = new();
+        private readonly ConcurrentQueue<ArcPage> _largeBlocks = new();
 
         private SequenceSegmentPool() { }
 
-        public SequenceSegment Rent(int size = -1)
+        public ArcPage Rent(int size = -1)
         {
-            SequenceSegment block;
+            ArcPage? block;
             if (size <= MinimumBlockSize)
             {
                 if (!_blocks.TryDequeue(out block))
                 {
-                    block = new SequenceSegment(size);
+                    block = new ArcPage(size);
                 }
             }
             else if (_largeBlocks.TryDequeue(out block))
@@ -860,10 +694,10 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
                 return block;
             }
 
-            return block ?? new SequenceSegment(size);
+            return block ?? new ArcPage(size);
         }
 
-        internal void Return(SequenceSegment block)
+        internal void Return(ArcPage block)
         {
             Debug.Assert(block.IsValid);
             if (block.IsMinimumSize)
@@ -877,14 +711,22 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
         }
     }
 
-    internal sealed class SequenceSegment : ReadOnlySequenceSegment<byte>
+    public sealed class ArcPage
     {
-        internal SequenceSegment()
+        // The current version of the page. Each time the page is return to the pool, the version is incremented.
+        // This helps to ensure that the page is not consumed after it has been returned to the pool.
+        // This is a guard against certain programming bugs.
+        private int _version;
+
+        // The current reference count. This is used to ensure that a page is not returned to the pool while it is still in use.
+        private int _refCount;
+
+        internal ArcPage()
         {
             Array = [];
         }
 
-        internal SequenceSegment(int length)
+        internal ArcPage(int length)
         {
             InitializeArray(length);
         }
@@ -932,14 +774,71 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
             }
         }
 
+        /// <summary>
+        /// Gets the array underpinning the page.
+        /// </summary>
         public byte[] Array { get; private set; }
 
-        public ReadOnlyMemory<byte> CommittedMemory => Memory;
-        public ArraySegment<byte> CommittedArraySegment => new(Array, 0, Memory.Length);
+        /// <summary>
+        /// Gets the number of bytes which have been written to the page.
+        /// </summary>
+        public int Length { get; private set; }
 
+        /// <summary>
+        /// A <see cref="ReadOnlySpan{T}"/> containing the readable bytes from this page.
+        /// </summary>
+        public ReadOnlySpan<byte> ReadableSpan => Array.AsSpan(0, Length);
+
+        /// <summary>
+        /// A <see cref="ReadOnlyMemory{T}"/> containing the readable bytes from this page.
+        /// </summary>
+        public ReadOnlyMemory<byte> ReadableMemory => AsMemory(0, Length);
+
+        /// <summary>
+        /// An <see cref="ArraySegment{T}"/> containing the readable bytes from this page.
+        /// </summary>
+        public ArraySegment<byte> ReadableArraySegment => new(Array, 0, Length);
+
+        /// <summary>
+        /// Gets the next node.
+        /// </summary>
+        public ArcPage? Next { get; protected set; }
+
+        /// <summary>
+        /// Gets the current page version.
+        /// </summary>
+        public int Version => _version;
+
+        /// <summary>
+        /// Gets a value indicating whether this page is valid.
+        /// </summary>
         public bool IsValid => Array is { Length: > 0 };
+
+        /// <summary>
+        /// Gets a value indicating whether this page is equal to the minimum page size.
+        /// </summary>
         public bool IsMinimumSize => Array.Length == SequenceSegmentPool.MinimumBlockSize;
 
+        /// <summary>
+        /// Gets the number of bytes in the page which are available for writing.
+        /// </summary>
+        public int WritableCapacity => Array.Length - Length;
+
+        /// <summary>
+        /// Gets the writable memory in the page.
+        /// </summary>
+        public Memory<byte> WritableMemory => AsMemory(Length);
+
+        /// <summary>
+        /// Gets a span representing the writable memory in the page.
+        /// </summary>
+        public Span<byte> WritableSpan => AsSpan(Length);
+
+        /// <summary>
+        /// Gets memory starting from the provided offset.
+        /// </summary>
+        /// <param name="offset">The offset into the array to return memory from.</param>
+        /// <returns>Memory which can be written to.</returns>
         public Memory<byte> AsMemory(int offset)
         {
 #if NET6_0_OR_GREATER
@@ -950,6 +849,23 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
 #endif
 
             return Array.AsMemory(offset);
+        }
+
+        /// <summary>
+        /// Gets a span pointing to the underlying array, starting from the provided offset.
+        /// </summary>
+        /// <param name="offset">The offset.</param>
+        /// <returns>A span pointing to the underlying array.</returns>
+        public Span<byte> AsSpan(int offset) => Array.AsSpan(offset);
+
+        /// <summary>
+        /// Increases the number of bytes written to the page by the provided amount.
+        /// </summary>
+        /// <param name="bytes">The number of bytes to increase the length of this page by.</param>
+        public void Advance(int bytes)
+        {
+            Length += bytes;
+            Debug.Assert(Length <= Array.Length);
         }
 
         public Memory<byte> AsMemory(int offset, int length)
@@ -964,47 +880,34 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
             return Array.AsMemory(offset, length);
         }
 
-        public Memory<byte> AsLimitedMemory(int offset, int limit)
+        /// <summary>
+        /// Sets the next page in the sequence.
+        /// </summary>
+        /// <param name="next">The next page in the sequence.</param>
+        public void SetNext(ArcPage next) => Next = next;
+
+        private void Return()
         {
-            var length = Math.Min(Array.Length - offset, limit);
-#if NET6_0_OR_GREATER
-            if (IsMinimumSize)
-            {
-                return MemoryMarshal.CreateFromPinnedArray(Array, offset, length);
-            }
-#endif
-
-            return Array.AsMemory(offset, length);
-        }
-
-        public void Commit(long runningIndex, int length)
-        {
-            RunningIndex = runningIndex;
-            Memory = AsMemory(0, length);
-        }
-
-        public void SetNext(SequenceSegment next) => Next = next;
-
-        public void Return()
-        {
-            RunningIndex = default;
+            Length = 0;
             Next = default;
-            Memory = default;
             Interlocked.Increment(ref _version);
-
             SequenceSegmentPool.Shared.Return(this);
         }
 
-        private int _version;
-        public int Version => _version;
-        private int _refCount;
-
+        /// <summary>
+        /// Pins this page to prevent it from being returned to the page pool.
+        /// </summary>
+        /// <param name="token">The token, which must match the page's <see cref="Version"/> for this operation to be allowed.</param>
         public void Pin(int token)
         {
             ThrowIfTokenIsInvalid(token);
             Interlocked.Increment(ref _refCount);
         }
 
+        /// <summary>
+        /// Unpins this page, allowing it to be returned to the page pool.
+        /// </summary>
+        /// <param name="token">The token, which must match the page's <see cref="Version"/> for this operation to be allowed.</param>
         public void Unpin(int token)
         {
             ThrowIfTokenIsInvalid(token);
@@ -1014,6 +917,10 @@ public partial struct ArcBuffer : IBufferWriter<byte>, IDisposable
             }
         }
 
+        /// <summary>
+        /// Throws if the provided <paramref name="token"/> does not match the page's <see cref="Version"/>.
+        /// </summary>
+        /// <param name="token">The token, which must match the page's <see cref="Version"/>.</param>
         public void ThrowIfTokenIsInvalid(int token)
         {
             if (token != _version)
