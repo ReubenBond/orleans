@@ -1,7 +1,6 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using Orleans.Serialization.Buffers;
 using Xunit;
@@ -23,7 +22,13 @@ namespace Orleans.Serialization.UnitTests
             using var bufferWriter = new ArcBufferWriter();
             var randomData = new byte[PageSize * 3];
             Random.NextBytes(randomData);
-            bufferWriter.Write(randomData);
+            int[] writeSizes = [1, 52, 125, 4096];
+            var i = 0;
+            while (bufferWriter.UnconsumedLength < randomData.Length)
+            {
+                var writeSize = Math.Min(randomData.Length - bufferWriter.UnconsumedLength, writeSizes[i++ % writeSizes.Length]);
+                bufferWriter.Write(randomData);
+            }
 
             {
                 using var wholeBuffer = bufferWriter.PeekSlice(randomData.Length);

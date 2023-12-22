@@ -240,13 +240,15 @@ public sealed class SocketMessageTransport : MessageTransportBase
         Exception? error = null;
         ReadRequest? request = null;
         using ArcBufferWriter bufferWriter = new();
+        var scratchBuffer = new byte[4096];
 
         // Note that socket APIs can generally only accept a maximum number of buffers.
         // For example on Linux, the maximum is defined via IOV_MAX in <limits.h> and is typically 16.
         // See https://www.man7.org/linux/man-pages/man0/limits.h.0p.html
         // Here, we choose 8 as the maximum number of buffers which CoreCLR will stackalloc on *nix,
         // see: https://github.com/dotnet/runtime/blob/0cf461b302f58c7add3f6dc405873fb2212b513f/src/libraries/System.Net.Sockets/src/System/Net/Sockets/SocketPal.Unix.cs#L24
-        List<ArraySegment<byte>> networkBuffers = new(capacity: 1);
+        //List<ArraySegment<byte>> networkBuffers = new(capacity: 1);
+        //networkBuffers.Add(new ArraySegment<byte>(scratchBuffer, 0, scratchBuffer.Length));
         try
         {
             // Loop until termination.
@@ -258,9 +260,10 @@ public sealed class SocketMessageTransport : MessageTransportBase
                     // Process the request to completion.
                     while (true)
                     {
-                        bufferWriter.ReplenishBuffers(networkBuffers);
-                        Debug.Assert(networkBuffers.Count == networkBuffers.Capacity);
-                        await _socketReceiver.ReceiveAsync(_socket, networkBuffers).ConfigureAwait(false);
+                        //bufferWriter.ReplenishBuffers(networkBuffers);
+                        //Debug.Assert(networkBuffers.Count == networkBuffers.Capacity);
+                        //await _socketReceiver.ReceiveAsync(_socket, networkBuffers).ConfigureAwait(false);
+                        await _socketReceiver.ReceiveAsync(_socket, scratchBuffer).ConfigureAwait(false);
 
                         if (_socketReceiver.HasError)
                         {
@@ -270,8 +273,9 @@ public sealed class SocketMessageTransport : MessageTransportBase
                         }
 
                         var transferred = _socketReceiver.BytesTransferred;
-                        MaintainBufferList(networkBuffers, transferred);
-                        bufferWriter.AdvanceWriter(transferred);
+                        bufferWriter.Write(scratchBuffer.AsSpan()[..transferred]);
+                        //MaintainBufferList(networkBuffers, transferred);
+                        //bufferWriter.AdvanceWriter(transferred);
                         if (request.OnRead(new ArcBufferReader(bufferWriter)))
                         {
                             // This request is complete, move on to the next one.
@@ -351,6 +355,7 @@ exit:
             }
         }
 
+        /*
         static void MaintainBufferList(List<ArraySegment<byte>> buffers, int readSize)
         {
             while (readSize > 0)
@@ -372,6 +377,7 @@ exit:
                 }
             }
         }
+        */
     }
 
     private bool HandleReadError(ref Exception? error)
