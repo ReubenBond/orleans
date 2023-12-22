@@ -257,7 +257,7 @@ namespace Orleans.TestingHost
                 var fileName = TestingUtils.CreateTraceFileName(name, configuration[nameof(TestClusterOptions.ClusterId)]);
                 services.AddLogging(loggingBuilder =>
                 {
-                    loggingBuilder.SetMinimumLevel(LogLevel.Trace);
+                    //loggingBuilder.SetMinimumLevel(LogLevel.Trace);
                     loggingBuilder.AddFile(fileName);
                 });
             }

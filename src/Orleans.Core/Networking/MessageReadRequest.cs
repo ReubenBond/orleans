@@ -34,6 +34,8 @@ namespace Orleans.Runtime.Messaging
 
         public void Reset()
         {
+            return;
+            /*
             Debug.Assert(!_isScheduled);
             Shared.MessagingTrace.LogTrace("[MessageReadRequest] resetting {count} byte message", PayloadLength);
             fragmentation = 0;
@@ -46,6 +48,7 @@ namespace Orleans.Runtime.Messaging
             _headers = default;
             _body = default;
             Shared.Return(this);
+            */
         }
 
         public override void OnError(Exception error)
@@ -92,17 +95,17 @@ namespace Orleans.Runtime.Messaging
             
             Shared.MessagingTrace.LogTrace("[MessageReadRequest] enqueuing read for {count} bytes", PayloadLength);
             _connection.EnqueueRead();
-            _isScheduled = true;
+            //_isScheduled = true;
             ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: false);
             return true;
         }
 
-        private bool _isScheduled;
+        //private bool _isScheduled;
         private int fragmentation;
 
         void IThreadPoolWorkItem.Execute()
         {
-                _isScheduled = false;
+            //_isScheduled = false;
             Message message = null;
             var connection = _connection;
             var payloadLength = PayloadLength;
