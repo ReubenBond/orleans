@@ -28,7 +28,7 @@ public sealed class SocketMessageTransport : MessageTransportBase
     private readonly SocketReceiver _socketReceiver = new();
     private readonly Socket _socket;
     private readonly Queue<ReadRequest> _readRequests = new();
-    private readonly SingleWaiterAutoResetEvent _readSignal = new() { RunContinuationsAsynchronously = true };
+    private readonly SingleWaiterAutoResetEvent _readSignal = new() { RunContinuationsAsynchronously = false };
     private readonly SingleWaiterAutoResetEvent _writeSignal = new() { RunContinuationsAsynchronously = true };
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _connectionClosingCts = new();
