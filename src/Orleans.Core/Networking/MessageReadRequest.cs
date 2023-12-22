@@ -34,6 +34,8 @@ namespace Orleans.Runtime.Messaging
 
         public void Reset()
         {
+            Debug.Assert(!_isScheduled);
+            Shared.MessagingTrace.LogTrace("[MessageReadRequest] resetting {count} byte message", PayloadLength);
             fragmentation = 0;
             Debug.Assert(_connection is not null);
             _headerLength = default;
@@ -85,22 +87,31 @@ namespace Orleans.Runtime.Messaging
 
             _headers = bufferReader.ConsumeSlice(_headerLength);
             _body = bufferReader.ConsumeSlice(_bodyLength);
+            Debug.Assert(_headers.Length == _headerLength);
+            Debug.Assert(_body.Length == _bodyLength);
             
+            Shared.MessagingTrace.LogTrace("[MessageReadRequest] enqueuing read for {count} bytes", PayloadLength);
             _connection.EnqueueRead();
+            _isScheduled = true;
             ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: false);
             return true;
         }
 
+        private bool _isScheduled;
         private int fragmentation;
 
         void IThreadPoolWorkItem.Execute()
         {
+                _isScheduled = false;
             Message message = null;
+            var connection = _connection;
+            var payloadLength = PayloadLength;
             var shouldReset = true;
             var messageSerializer = Shared.GetMessageSerializer();
             try
             {
                 messageSerializer.ReadHeaders(_headers, _headerLength, _bodyLength, out message);
+                Shared.MessagingTrace.LogTrace("[MessageReadRequest] read headers read for {count} byte message: {message}", payloadLength, message);
 
                 if (fragmentation > 0)
                 {
@@ -113,19 +124,22 @@ namespace Orleans.Runtime.Messaging
                 {
                     // This instance is owned by the message now, so it will not be reset immediately.
                     message.SetMessageReadRequest(this);
+                    Shared.MessagingTrace.LogTrace("[MessageReadRequest] attached this as body for {count} byte message: {message}", payloadLength, message);
                     shouldReset = false;
                 }
                 else
                 {
                     // Otherwise, return this instance to the pool on exiting this method.
+                    Shared.MessagingTrace.LogTrace("[MessageReadRequest] no body for {count} byte message: {message}", payloadLength, message);
                 }
 
-                _connection.OnReceivedMessage(message);
+                connection.OnReceivedMessage(message);
             }
             catch (Exception exception)
             {
                 if (!HandleReceiveMessageFailure(message, exception))
                 {
+                    Shared.MessagingTrace.LogTrace("[MessageReadRequest] failure for {count} byte message: {message}", payloadLength, message);
                     throw;
                 }
             }
@@ -147,7 +161,7 @@ namespace Orleans.Runtime.Messaging
                     Shared.MessagingTrace.LogWarning(
                         exception,
                         "Exception reading message from connection {Connection}",
-                        _connection);
+                        connection);
 
                     // Returning false here informs the caller that the exception should not be caught.
                     return false;
@@ -157,7 +171,7 @@ namespace Orleans.Runtime.Messaging
                     exception,
                     "Exception reading message {Message} from connection {Connection}",
                     message,
-                    _connection);
+                    connection);
 
                 // The message body was not successfully decoded, but the headers were.
                 MessagingInstruments.OnRejectedMessage(message);
@@ -172,7 +186,7 @@ namespace Orleans.Runtime.Messaging
                         response.BodyObject = Response.FromException(exception);
 
                         // Send the error response and continue processing the next message.
-                        _connection.Send(response);
+                        connection.Send(response);
                     }
                     else if (message.Direction == Message.Directions.Response)
                     {

@@ -52,7 +52,7 @@ namespace Orleans.Runtime.Messaging
             {
                 // Build message
                 message = new();
-                var headersReader = Reader.Create(buffer, _deserializationSession);
+                var headersReader = Reader.Create(buffer.AsReadOnlySequence(), _deserializationSession);
                 DeserializeHeaders(ref headersReader, message);
             }
             finally
@@ -65,7 +65,7 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                var reader = Reader.Create(readRequest.Body, _deserializationSession);
+                var reader = Reader.Create(readRequest.Body.AsReadOnlySequence(), _deserializationSession);
                 var field = reader.ReadFieldHeader();
 
                 if (message.Result == ResponseTypes.Success)
