@@ -34,11 +34,6 @@ namespace Orleans.Runtime.Messaging
 
         public void Reset()
         {
-            return;
-            /*
-            Debug.Assert(!_isScheduled);
-            Shared.MessagingTrace.LogTrace("[MessageReadRequest] resetting {count} byte message", PayloadLength);
-            fragmentation = 0;
             Debug.Assert(_connection is not null);
             _headerLength = default;
             _bodyLength = default;
@@ -48,7 +43,6 @@ namespace Orleans.Runtime.Messaging
             _headers = default;
             _body = default;
             Shared.Return(this);
-            */
         }
 
         public override void OnError(Exception error)
@@ -69,7 +63,6 @@ namespace Orleans.Runtime.Messaging
 
             if (bufferReader.Length < Message.LENGTH_HEADER_SIZE)
             {
-                ++fragmentation;
                 return false;
             }
 
@@ -84,7 +77,6 @@ namespace Orleans.Runtime.Messaging
 
             if (bufferReader.Length < PayloadLength)
             {
-                ++fragmentation;
                 return false;
             }
 
@@ -93,19 +85,14 @@ namespace Orleans.Runtime.Messaging
             Debug.Assert(_headers.Length == _headerLength);
             Debug.Assert(_body.Length == _bodyLength);
             
-            Shared.MessagingTrace.LogTrace("[MessageReadRequest] enqueuing read for {count} bytes", PayloadLength);
             _connection.EnqueueRead();
             //_isScheduled = true;
             ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: false);
             return true;
         }
 
-        //private bool _isScheduled;
-        private int fragmentation;
-
         void IThreadPoolWorkItem.Execute()
         {
-            //_isScheduled = false;
             Message message = null;
             var connection = _connection;
             var payloadLength = PayloadLength;
@@ -114,12 +101,6 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 messageSerializer.ReadHeaders(_headers, _headerLength, _bodyLength, out message);
-                Shared.MessagingTrace.LogTrace("[MessageReadRequest] read headers read for {count} byte message: {message}", payloadLength, message);
-
-                if (fragmentation > 0)
-                {
-                    fragmentation = 0;
-                }
 
                 // Body deserialization is more likely to fail than header deserialization.
                 // Separating the two allows for these kinds of errors to be propagated back to the caller.
@@ -127,13 +108,11 @@ namespace Orleans.Runtime.Messaging
                 {
                     // This instance is owned by the message now, so it will not be reset immediately.
                     message.SetMessageReadRequest(this);
-                    Shared.MessagingTrace.LogTrace("[MessageReadRequest] attached this as body for {count} byte message: {message}", payloadLength, message);
                     shouldReset = false;
                 }
                 else
                 {
                     // Otherwise, return this instance to the pool on exiting this method.
-                    Shared.MessagingTrace.LogTrace("[MessageReadRequest] no body for {count} byte message: {message}", payloadLength, message);
                 }
 
                 connection.OnReceivedMessage(message);
@@ -142,7 +121,6 @@ namespace Orleans.Runtime.Messaging
             {
                 if (!HandleReceiveMessageFailure(message, exception))
                 {
-                    Shared.MessagingTrace.LogTrace("[MessageReadRequest] failure for {count} byte message: {message}", payloadLength, message);
                     throw;
                 }
             }

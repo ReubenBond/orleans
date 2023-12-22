@@ -16,7 +16,6 @@ namespace Orleans.Runtime.Messaging
 
         public void Initialize(Message message)
         {
-            _shared.MessagingTrace.LogTrace("[MessageWriteRequest] initializing for {message}", message);
             Message = message;
             SerializeAndFrameMessage();
         }
@@ -45,7 +44,6 @@ namespace Orleans.Runtime.Messaging
 
         public override void SetResult()
         {
-            _shared.MessagingTrace.LogTrace("[MessageWriteRequest] completed for {message}", Message);
             Reset();
         }
 
@@ -58,7 +56,6 @@ namespace Orleans.Runtime.Messaging
 
         public void Reset()
         {
-            _shared.MessagingTrace.LogTrace("[MessageWriteRequest] resetting for {message}", Message);
             Message = null;
             _buffer.Reset();
             //_completion.Reset();
