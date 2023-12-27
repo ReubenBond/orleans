@@ -66,20 +66,20 @@ namespace Orleans.Runtime.Messaging
         private sealed class PreambleWriteRequest : WriteRequest, IDisposable
         {
             private readonly TaskCompletionSource _completion = new();
-            private PooledBuffer _buffer;
+            private readonly ArcBufferWriter _buffer;
 
-            private PreambleWriteRequest(PooledBuffer buffer)
+            private PreambleWriteRequest(ArcBufferWriter buffer)
             {
-                IsSingleBuffer = false;
                 _buffer = buffer;
+                Buffers = new (_buffer);
             }
 
             public static PreambleWriteRequest Create(ConnectionPreamble preamble, Serializer<ConnectionPreamble> preambleSerializer, SerializerSessionPool serializerSessionPool)
             {
                 // Reserve space for framing
-                var buffer = new PooledBuffer();
+                var buffer = new ArcBufferWriter();
                 var framingBytes = buffer.GetSpan(sizeof(int));
-                buffer.Advance(sizeof(int));
+                buffer.AdvanceWriter(sizeof(int));
 
                 // Serialize the preamble.
                 using var session = serializerSessionPool.GetSession();
@@ -95,18 +95,13 @@ namespace Orleans.Runtime.Messaging
                     throw new InvalidOperationException($"Created preamble of length {length}, which is greater than maximum allowed size of {MaxPreambleLength}.");
                 }
 
-                return new(writer.Output);
+                return new(buffer);
             }
-
-            public void SetPreamble(in PooledBuffer buffer) => _buffer = buffer;
-
-            public override ReadOnlyMemory<byte> Buffer => throw new NotImplementedException();
-            public override ref PooledBuffer Buffers => ref _buffer;
 
             public override void SetResult() => _completion.SetResult();
             public override void SetException(Exception error) => _completion.SetException(error);
 
-            public void Dispose() => _buffer.Reset();
+            public void Dispose() => _buffer.Dispose();
 
             public Task Completion => _completion.Task;
         }

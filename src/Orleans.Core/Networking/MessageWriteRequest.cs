@@ -3,35 +3,33 @@ using Orleans.Serialization.Buffers;
 using System.Buffers.Binary;
 using Orleans.Connections.Transport;
 using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class MessageWriteRequest(MessageHandlerShared shared) : WriteRequest//, IValueTaskSource
+    internal sealed class MessageWriteRequest : WriteRequest
     {
-        private readonly MessageHandlerShared _shared = shared;
-        private PooledBuffer _buffer = new();
-
-        public Message Message { get; private set; }
-
-        public void Initialize(Message message)
+        private readonly MessageHandlerShared _shared;
+        private readonly ArcBufferWriter _buffer = new();
+        public MessageWriteRequest(MessageHandlerShared shared)
         {
-            Message = message;
-            SerializeAndFrameMessage();
+            _shared = shared;
+            Buffers = new(_buffer);
         }
 
-        public override ReadOnlyMemory<byte> Buffer => throw new InvalidOperationException();
+        public List<Message> Messages { get; } = new();
 
-        public override ref PooledBuffer Buffers => ref _buffer;
-
-        private void SerializeAndFrameMessage()
+        public void AddMessage(Message message)
         {
+            Messages.Add(message);
+
             // Reserve space for framing
             var framingBytes = _buffer.GetSpan(Message.LENGTH_HEADER_SIZE);
-            _buffer.Advance(Message.LENGTH_HEADER_SIZE);
+            _buffer.AdvanceWriter(Message.LENGTH_HEADER_SIZE);
 
             // Serialize the message in full
             var messageSerializer = _shared.GetMessageSerializer();
-            var (headerLength, bodyLength) = messageSerializer.Write(ref _buffer, Message);
+            var (headerLength, bodyLength) = messageSerializer.Write(_buffer, message);
             _shared.Return(messageSerializer);
 
             // Write the framing
@@ -46,13 +44,14 @@ namespace Orleans.Runtime.Messaging
 
         public override void SetException(Exception error)
         {
-            _shared.MessagingTrace.LogError(error, "Error sending message {Message}", Message);
+            // TODO: Reject the messages
+            _shared.MessagingTrace.LogError(error, "Error sending messages {Messages}", Messages);
             Reset();
         }
 
         public void Reset()
         {
-            Message = null;
+            Messages.Clear();
             _buffer.Reset();
             _shared.Return(this);
         }

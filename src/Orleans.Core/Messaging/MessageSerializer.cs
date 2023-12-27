@@ -95,7 +95,7 @@ namespace Orleans.Runtime.Messaging
             return rawCodec;
         }
 
-        public (int HeaderLength, int BodyLength) Write(ref PooledBuffer buffer, Message message)
+        public (int HeaderLength, int BodyLength) Write(ArcBufferWriter buffer, Message message)
         {
             var headers = message.Headers;
             IFieldCodec? bodyCodec = null;
@@ -124,7 +124,6 @@ namespace Orleans.Runtime.Messaging
                 var writer = Writer.Create(buffer, _serializationSession);
                 SerializeHeaders(ref writer, message, headers);
                 writer.Commit();
-                buffer = writer.Output;
                 var headerLength = writer.Position;
                 _serializationSession.Reset();
 
@@ -132,21 +131,18 @@ namespace Orleans.Runtime.Messaging
                 if (readRequest is not null)
                 {
                     bodyLength = readRequest.BodyLength;
-                    var preLength = buffer.Length;
-                    readRequest.Body.CopyTo(ref buffer);
-                    var postLength = buffer.Length;
+                    readRequest.Body.CopyTo(buffer);
                     message._bodyObject = null;
                     readRequest.Reset();
                 }
                 else if (bodyCodec is not null)
                 {
                     Debug.Assert(bodyObject is not null);
-                    writer = Writer.Create(writer.Output, _serializationSession);
+                    writer = Writer.Create(buffer, _serializationSession);
                     if (rawCodec != null) rawCodec.WriteRaw(ref writer, bodyObject);
                     else bodyCodec.WriteField(ref writer, 0, null, bodyObject);
                     writer.Commit();
                     bodyLength = writer.Position;
-                    buffer = writer.Output;
                 }
 
                 // Before completing, check lengths

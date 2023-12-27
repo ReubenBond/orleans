@@ -88,7 +88,7 @@ public class MessageTransportStream(MessageTransport transport, MemoryPool<byte>
     public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
     {
         _writeRequest.Reset();
-        _writeRequest.SetBuffer(buffer);
+        _writeRequest.Write(buffer);
         if (!_transport.WriteAsync(_writeRequest))
         {
             return ValueTask.FromException(new ObjectDisposedException("Network transport is unable to satisfy the request"));
@@ -114,15 +114,13 @@ public class MessageTransportStream(MessageTransport transport, MemoryPool<byte>
             RunContinuationsAsynchronously = true
         };
 
-        private ReadOnlyMemory<byte> _buffer;
+        private readonly ArcBufferWriter _bufferWriter = new();
         public StreamWriteRequest()
         {
-            IsSingleBuffer = true;
+            Buffers = new(_bufferWriter);
         }
 
-        public override ref PooledBuffer Buffers => throw new InvalidOperationException();
-        public void SetBuffer(ReadOnlyMemory<byte> buffer) => _buffer = buffer;
-        public override ReadOnlyMemory<byte> Buffer => _buffer;
+        public void Write(ReadOnlyMemory<byte> buffer) => _bufferWriter.Write(buffer.Span);
         public ValueTask OnCompleteAsync() => new(this, _signal.Version);
         public override void SetResult() => _signal.SetResult(true);
         public override void SetException(Exception error) => _signal.SetException(error);
