@@ -14,14 +14,15 @@ namespace Orleans.Runtime.Messaging
         internal readonly MessageHandlerShared Shared = shared;
 
         private Connection _connection;
-        private int _headerLength;
-        private int _bodyLength;
-        private ArcBuffer _headers;
+        internal int _headerLength;
+        internal int _bodyLength;
+        internal ArcBuffer _headers;
         private ArcBuffer _body;
 
         public int FramedLength => Message.LENGTH_HEADER_SIZE + PayloadLength;
         public int PayloadLength => _headerLength + _bodyLength;
 
+        internal Message.PackedHeaders _originalHeaders;
         public ref ArcBuffer Headers => ref _headers;
         public ref ArcBuffer Body => ref _body;
         public int BodyLength => _bodyLength;
@@ -95,12 +96,11 @@ namespace Orleans.Runtime.Messaging
         {
             Message message = null;
             var connection = _connection;
-            var payloadLength = PayloadLength;
             var shouldReset = true;
             var messageSerializer = Shared.GetMessageSerializer();
             try
             {
-                messageSerializer.ReadHeaders(_headers, _headerLength, _bodyLength, out message);
+                messageSerializer.ReadHeaders(this, out message);
 
                 // Body deserialization is more likely to fail than header deserialization.
                 // Separating the two allows for these kinds of errors to be propagated back to the caller.

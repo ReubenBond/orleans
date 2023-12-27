@@ -199,36 +199,6 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
         return bytesCopied;
     }
 
-    /// <summary>Copies the contents of this writer to another writer.</summary>
-    /// <remarks>This method does not advance the read cursor.</remarks>
-    public void Peek<TBufferWriter>(ref Writer<TBufferWriter> writer) where TBufferWriter : IBufferWriter<byte>
-    {
-        var current = _readPage;
-        var offset = _readIndex;
-        while (current != null)
-        {
-            var segment = current.AsSpan(offset, current.Length - offset);
-            writer.Write(segment);
-            current = current.Next;
-            offset = 0;
-        }
-    }
-
-    /// <summary>Copies the contents of this writer to another writer.</summary>
-    /// <remarks>This method does not advance the read cursor.</remarks>
-    public void Peek<TBufferWriter>(ref TBufferWriter writer) where TBufferWriter : IBufferWriter<byte>
-    {
-        var current = _readPage;
-        var offset = _readIndex;
-        while (current != null)
-        {
-            var segment = current.AsSpan(offset, current.Length - offset);
-            writer.Write(segment);
-            current = current.Next;
-            offset = 0;
-        }
-    }
-
     /// <summary>
     /// Writes the provided sequence to this buffer.
     /// </summary>
@@ -835,14 +805,59 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
     }
 
     /// <summary>Copies the contents of this writer to a buffer writer.</summary>
-    public readonly void CopyTo<TBufferWriter>(ref TBufferWriter output) where TBufferWriter : struct, IBufferWriter<byte>
+    public readonly void CopyTo<TBufferWriter>(ref TBufferWriter output) where TBufferWriter : IBufferWriter<byte>
     {
         CheckValidity();
         foreach (var span in this)
         {
-            output.Write(span);
+            Write(ref output, span);
         }
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Write<TBufferWriter>(ref TBufferWriter writer, ReadOnlySpan<byte> value) where TBufferWriter : IBufferWriter<byte>
+    {
+        var destination = writer.GetSpan();
+
+        // Fast path, try copying to the available memory directly
+        if (value.Length <= destination.Length)
+        {
+            value.CopyTo(destination);
+            writer.Advance(value.Length);
+        }
+        else
+        {
+            WriteMultiSegment(ref writer, value, destination);
+        }
+    }
+
+    private static void WriteMultiSegment<TBufferWriter>(ref TBufferWriter writer, in ReadOnlySpan<byte> source, Span<byte> destination) where TBufferWriter : IBufferWriter<byte>
+    {
+        var input = source;
+        while (true)
+        {
+            var writeSize = Math.Min(destination.Length, input.Length);
+            input[..writeSize].CopyTo(destination);
+            writer.Advance(writeSize);
+            input = input[writeSize..];
+            if (input.Length > 0)
+            {
+                destination = writer.GetSpan();
+
+                if (destination.IsEmpty)
+                {
+                    ThrowInsufficientSpaceException();
+                }
+
+                continue;
+            }
+
+            return;
+        }
+    }
+
+    [DoesNotReturn]
+    private static void ThrowInsufficientSpaceException() => throw new InvalidOperationException("Insufficient capacity in provided buffer");
 
     /// <summary>
     /// Returns a new <see cref="ReadOnlySequence{T}"/> which must not be accessed after disposing this instance.

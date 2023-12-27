@@ -43,17 +43,18 @@ namespace Orleans.Runtime.Messaging
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void ReadHeaders(ArcBuffer buffer, int headerLength, int bodyLength, out Message message)
+        public void ReadHeaders(MessageReadRequest readRequest, out Message message)
         {
             // Check lengths
-            ThrowIfLengthsInvalid(headerLength, bodyLength);
+            ThrowIfLengthsInvalid(readRequest._headerLength, readRequest._bodyLength);
 
             try
             {
                 // Build message
                 message = new();
-                var headersReader = Reader.Create(buffer.AsReadOnlySequence(), _deserializationSession);
+                var headersReader = Reader.Create(readRequest._headers, _deserializationSession);
                 DeserializeHeaders(ref headersReader, message);
+                readRequest._originalHeaders = message._headers;
             }
             finally
             {
@@ -65,7 +66,7 @@ namespace Orleans.Runtime.Messaging
         {
             try
             {
-                var reader = Reader.Create(readRequest.Body.AsReadOnlySequence(), _deserializationSession);
+                var reader = Reader.Create(readRequest.Body, _deserializationSession);
                 var field = reader.ReadFieldHeader();
 
                 if (message.Result == ResponseTypes.Success)
@@ -99,8 +100,14 @@ namespace Orleans.Runtime.Messaging
             var headers = message.Headers;
             IFieldCodec? bodyCodec = null;
             ResponseCodec? rawCodec = null;
-            var bodyObject = message.BodyObject;
-            if (bodyObject is not null and not MessageReadRequest)
+            var bodyObject = message._bodyObject;
+            var readRequest = bodyObject as MessageReadRequest;
+            if (readRequest is not null && headers.ResponseType is ResponseTypes.None)
+            {
+                var originalHeaders = readRequest._originalHeaders;
+                headers.ResponseType = originalHeaders.ResponseType;
+            }
+            else if (bodyObject is not null)
             {
                 bodyCodec = _codecProvider.GetCodec(bodyObject.GetType());
                 if (headers.ResponseType is ResponseTypes.None && bodyCodec is ResponseCodec responseCodec)
@@ -121,34 +128,26 @@ namespace Orleans.Runtime.Messaging
                 var headerLength = writer.Position;
                 _serializationSession.Reset();
 
-                int bodyLength = 0;
-                if (bodyCodec is not null)
+                var bodyLength = 0;
+                if (readRequest is not null)
                 {
+                    bodyLength = readRequest.BodyLength;
+                    var preLength = buffer.Length;
+                    readRequest.Body.CopyTo(ref buffer);
+                    var postLength = buffer.Length;
+                    message._bodyObject = null;
+                    readRequest.Reset();
+                }
+                else if (bodyCodec is not null)
+                {
+                    Debug.Assert(bodyObject is not null);
                     writer = Writer.Create(writer.Output, _serializationSession);
-                    if (rawCodec != null) rawCodec.WriteRaw(ref writer, message._bodyObject!);
-                    else bodyCodec.WriteField(ref writer, 0, null, message._bodyObject);
+                    if (rawCodec != null) rawCodec.WriteRaw(ref writer, bodyObject);
+                    else bodyCodec.WriteField(ref writer, 0, null, bodyObject);
                     writer.Commit();
                     bodyLength = writer.Position;
                     buffer = writer.Output;
                 }
-                else if (bodyObject is not null)
-                {
-                    Debug.Fail("body no null");
-                }
-                /*
-                else if (message._bodyObject is MessageReadRequest readRequest)
-                {
-                    bodyLength = readRequest.BodyLength;
-                    if (bodyLength > 0)
-                    {
-                        readRequest.Body.CopyTo(ref buffer);
-                    }
-
-                    message._bodyObject = null;
-                    readRequest.Reset();
-                }
-                */
-
 
                 // Before completing, check lengths
                 ThrowIfLengthsInvalid(headerLength, bodyLength);
