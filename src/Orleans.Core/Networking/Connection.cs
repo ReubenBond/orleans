@@ -42,7 +42,7 @@ namespace Orleans.Runtime.Messaging
             MessageTransport transport,
             ConnectionCommon shared)
         {
-            _sendWorker = new IOQueue[8];
+            _sendWorker = new IOQueue[16];
             for (int i = 0; i < _sendWorker.Length; i++)
             {
                 _sendWorker[i] = new(this);
@@ -185,8 +185,10 @@ namespace Orleans.Runtime.Messaging
 
         public virtual void Send(Message message)
         {
-            _sendWorker[Interlocked.Increment(ref nextWorker) & 0x7].Schedule(message);
+            _sendWorker[Interlocked.Increment(ref nextWorker) & 0xf].Schedule(message);
         }
+        public Task<int> GetShoppingCartAsync() => Task.FromResult(42);
+        public int GetShoppingCart() => 42;
 
         private int nextWorker;
         private IOQueue[] _sendWorker;
