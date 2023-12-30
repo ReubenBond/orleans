@@ -71,11 +71,11 @@ namespace Orleans.Runtime.Messaging
         {
             if (!msg.TargetGrain.IsClient()) return false;
             if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)) return true;
-            if (this.hostedClient is HostedClient client && client.TryDispatchToClient(msg))
+            if (this.hostedClient is HostedClient hostedClient && hostedClient.TryDispatchToClient(msg))
             {
                 if (targetCache is not null)
                 {
-                    targetCache.MessageReceiver = client;
+                    targetCache.MessageReceiver = hostedClient;
                 }
             }
 
@@ -230,19 +230,27 @@ namespace Orleans.Runtime.Messaging
                         var connectionTask = this.connectionManager.GetConnection(targetSilo);
                         if (connectionTask.IsCompletedSuccessfully)
                         {
-                            var sender = connectionTask.Result;
-                            sender.Send(msg);
+                            var connection = connectionTask.Result;
+                            connection.Send(msg);
+                            if (targetCache is not null)
+                            {
+                                targetCache.MessageReceiver = connection;
+                            }
                         }
                         else
                         {
-                            _ = SendAsync(this, connectionTask, msg);
+                            _ = SendAsync(this, connectionTask, msg, targetCache);
 
-                            static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg)
+                            static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg, IMessageTargetCache targetCache)
                             {
                                 try
                                 {
-                                    var sender = await connectionTask;
-                                    sender.Send(msg);
+                                    var connection = await connectionTask;
+                                    connection.Send(msg);
+                                    if (targetCache is not null)
+                                    {
+                                        targetCache.MessageReceiver = connection;
+                                    }
                                 }
                                 catch (Exception exception)
                                 {
@@ -445,7 +453,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 message.TargetSilo = null;
-                _ = AddressAndSendMessage(message);
+                _ = AddressAndSendMessage(message, targetCache: null);
             }
         }
 
@@ -463,17 +471,17 @@ namespace Orleans.Runtime.Messaging
         /// - add ordering info and maintain send order
         ///
         /// </summary>
-        internal Task AddressAndSendMessage(Message message)
+        internal Task AddressAndSendMessage(Message message, IMessageTargetCache targetCache)
         {
             try
             {
                 var messageAddressingTask = placementService.AddressMessage(message);
                 if (messageAddressingTask.Status != TaskStatus.RanToCompletion)
                 {
-                    return SendMessageAsync(messageAddressingTask, message);
+                    return SendMessageAsync(messageAddressingTask, message, targetCache);
                 }
 
-                SendMessage(message, targetCache: null);
+                SendMessage(message, targetCache: targetCache);
             }
             catch (Exception ex)
             {
@@ -482,7 +490,7 @@ namespace Orleans.Runtime.Messaging
 
             return Task.CompletedTask;
 
-            async Task SendMessageAsync(Task addressMessageTask, Message m)
+            async Task SendMessageAsync(Task addressMessageTask, Message message, IMessageTargetCache targetCache)
             {
                 try
                 {
@@ -490,11 +498,11 @@ namespace Orleans.Runtime.Messaging
                 }
                 catch (Exception ex)
                 {
-                    OnAddressingFailure(m, ex);
+                    OnAddressingFailure(message, ex);
                     return;
                 }
 
-                SendMessage(m, targetCache: null);
+                SendMessage(message, targetCache: targetCache);
             }
 
             void OnAddressingFailure(Message m, Exception ex)
