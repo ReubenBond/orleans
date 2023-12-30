@@ -8,7 +8,7 @@ using Orleans.Serialization.Invocation;
 namespace Orleans.Runtime
 {
     [Id(101)]
-    internal sealed class Message : ISpanFormattable
+    internal sealed class Message : ISpanFormattable, IMessageTargetCache
     {
         public const int LENGTH_HEADER_SIZE = 8;
 
@@ -313,6 +313,9 @@ namespace Orleans.Runtime
                 _headers.SetFlag(MessageFlags.HasInterfaceType, !value.IsDefault);
             }
         }
+
+        [field: NonSerialized]
+        public object MessageReceiver { get; set; }
 
         public bool IsExpirableMessage(bool dropExpiredMessages)
         {
