@@ -1,17 +1,11 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Diagnostics.Metrics;
-using System.Net;
-using System.Numerics;
 using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Serialization.Invocation;
-using Orleans.Serialization.Buffers;
 using Orleans.Connections.Transport;
 using Orleans.Connections;
 using Orleans.Runtime.Internal;
@@ -19,7 +13,7 @@ using System.Collections.Concurrent;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal abstract class Connection
+    internal abstract class Connection : IMessageReceiver
     {
         private static readonly Counter<long> OverReadBytes;
         private static readonly Counter<int> NumOverReads;
@@ -377,6 +371,19 @@ namespace Orleans.Runtime.Messaging
 
                 MessagingInstruments.OnDroppedSentMessage(message);
             }
+        }
+
+        // Sends a message
+        void IMessageReceiver.ReceiveMessage(Message message, IMessageTargetCache cache)
+        {
+            if (!IsValid)
+            {
+                cache.MessageReceiver = null;
+                RetryMessage(message);
+                return;
+            }
+
+            Send(message);
         }
     }
 }

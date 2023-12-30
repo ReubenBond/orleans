@@ -640,7 +640,7 @@ namespace Orleans.Runtime
                         }
 
                         var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, diagnostics);
-                        messageCenter.SendMessage(response);
+                        messageCenter.SendMessage(response, targetCache: message);
                     }
                 }
 
@@ -662,7 +662,7 @@ namespace Orleans.Runtime
                         };
 
                         var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, messageDiagnostics);
-                        messageCenter.SendMessage(response);
+                        messageCenter.SendMessage(response, targetCache: message);
                     }
                 }
 
@@ -681,7 +681,7 @@ namespace Orleans.Runtime
                         };
 
                         var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: false, isWaiting: true, messageDiagnostics);
-                        messageCenter.SendMessage(response);
+                        messageCenter.SendMessage(response, targetCache: message);
                     }
 
                     queueLength++;

@@ -166,7 +166,15 @@ namespace Orleans.Runtime
             }
 
             this.messagingTrace.OnSendRequest(message);
-            this.MessageCenter.AddressAndSendMessage(message);
+
+            if (target.MessageReceiver is IMessageReceiver receiver)
+            {
+                receiver.ReceiveMessage(message, target);
+            }
+            else
+            {
+                this.MessageCenter.AddressAndSendMessage(message);
+            }
         }
 
         public void SendResponse(Message request, Response response)
