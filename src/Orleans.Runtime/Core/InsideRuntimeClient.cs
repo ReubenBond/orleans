@@ -120,6 +120,7 @@ namespace Orleans.Runtime
                 message.SendingSilo = MySilo;
 
             IGrainContext sendingActivation = RuntimeContext.Current;
+            message.MessageReceiver = sendingActivation ?? HostedClient;
 
             if (sendingActivation == null)
             {
@@ -173,7 +174,7 @@ namespace Orleans.Runtime
             }
             else
             {
-                this.MessageCenter.AddressAndSendMessage(message);
+                this.MessageCenter.AddressAndSendMessage(message, targetCache: target);
             }
         }
 
@@ -381,7 +382,7 @@ namespace Orleans.Runtime
                 {
                     // gatewayed message - gateway back to sender
                     if (logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)ErrorCode.Dispatcher_NoCallbackForRejectionResp, "No callback for rejection response message: {Message}", message);
-                    this.MessageCenter.AddressAndSendMessage(message);
+                    this.MessageCenter.AddressAndSendMessage(message, targetCache: null);
                     return;
                 }
 

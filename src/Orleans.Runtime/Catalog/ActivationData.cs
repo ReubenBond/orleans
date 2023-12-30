@@ -25,7 +25,7 @@ namespace Orleans.Runtime
     /// MUST lock this object for any concurrent access
     /// Consider: compartmentalize by usage, e.g., using separate interfaces for data for catalog, etc.
     /// </summary>
-    internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, IGrainExtensionBinder, IActivationWorkingSetMember, IGrainTimerRegistry, IGrainManagementExtension, ICallChainReentrantGrainContext, IAsyncDisposable
+    internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, IGrainExtensionBinder, IActivationWorkingSetMember, IGrainTimerRegistry, IGrainManagementExtension, ICallChainReentrantGrainContext, IAsyncDisposable, IMessageReceiver
     {
         private const string GrainAddressMigrationContextKey = "sys.addr";
         private readonly GrainTypeSharedContext _shared;
@@ -1867,6 +1867,16 @@ namespace Orleans.Runtime
             }
 
             return tracker.IsReentrantSectionActive(reentrancyId);
+        }
+
+        public void ReceiveMessage(Message message, IMessageTargetCache cache)
+        {
+            if (!IsValid)
+            {
+                cache.MessageReceiver = null;
+            }
+
+            ReceiveMessage(message);
         }
 
         #endregion
