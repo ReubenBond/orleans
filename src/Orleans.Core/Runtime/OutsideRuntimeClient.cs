@@ -61,10 +61,10 @@ namespace Orleans
             MessagingTrace messagingTrace,
             IServiceProvider serviceProvider)
         {
-            _callbacks = new CallbackManager[16];
+            _callbacks = new CallbackWorker[16];
             for (var i = 0; i < _callbacks.Length; i++)
             {
-                _callbacks[i] = new(loggerFactory.CreateLogger<CallbackManager>());
+                _callbacks[i] = new(loggerFactory.CreateLogger<CallbackWorker>());
             }
             this.ServiceProvider = serviceProvider;
             _localClientDetails = localClientDetails;
@@ -129,7 +129,7 @@ namespace Orleans
             }
         }
 
-        private readonly CallbackManager[] _callbacks;
+        private readonly CallbackWorker[] _callbacks;
 
         public IServiceProvider ServiceProvider { get; private set; }
 
