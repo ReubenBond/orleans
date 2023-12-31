@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -16,7 +15,6 @@ using Orleans.Internal;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
-using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
@@ -379,19 +377,12 @@ namespace Orleans.Runtime
 
         internal List<Message> DequeueAllWaitingRequests()
         {
-            List<Message> result;
             lock (this)
             {
-                result = _waitingRequests.Select(m => m.Message).ToList();
+                var tmp = _waitingRequests.Select(m => m.Item1).ToList();
                 _waitingRequests.Clear();
+                return tmp;
             }
-
-            while (_incomingRequests.TryDequeue(out var req))
-            {
-                result.Add(req.Message);
-            }
-
-            return result;
         }
 
         /// <summary>
@@ -871,11 +862,6 @@ namespace Orleans.Runtime
                     Message message = null;
                     lock (this)
                     {
-                        while (_incomingRequests.TryDequeue(out var incoming))
-                        {
-                            _waitingRequests.Add(incoming);
-                        }
-
                         if (_waitingRequests.Count <= i)
                         {
                             break;
@@ -1300,7 +1286,6 @@ namespace Orleans.Runtime
             }
         }
 
-        private readonly ConcurrentQueue<(Message Message, CoarseStopwatch QueuedTime)> _incomingRequests = new();
         private void ReceiveRequest(Message message)
         {
             var overloadException = CheckOverloaded();
@@ -1311,7 +1296,10 @@ namespace Orleans.Runtime
                 return;
             }
 
-            _incomingRequests.Enqueue((message, CoarseStopwatch.StartNew()));
+            lock (this)
+            {
+                _waitingRequests.Add((message, CoarseStopwatch.StartNew()));
+            }
 
             _workSignal.Signal();
         }
