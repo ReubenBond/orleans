@@ -108,7 +108,7 @@ namespace Benchmarks.Ping
         private async Task Run(int runs, IGrainFactory grainFactory, int blocksPerWorker)
         {
             var loadGenerator = new ConcurrentLoadGenerator<IPingGrain>(
-                maxConcurrency: 250,
+                maxConcurrency: 500,
                 blocksPerWorker: blocksPerWorker,
                 requestsPerBlock: 500,
                 issueRequest: g => g.Run(),

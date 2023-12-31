@@ -22,7 +22,6 @@ namespace Orleans
         private readonly ILogger logger;
         private readonly ClientMessagingOptions clientMessagingOptions;
 
-        private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private InvokableObjectManager localObjects;
         private bool disposing;
         private bool disposed;
@@ -62,16 +61,19 @@ namespace Orleans
             MessagingTrace messagingTrace,
             IServiceProvider serviceProvider)
         {
+            _callbacks = new CallbackManager[16];
+            for (var i = 0; i < _callbacks.Length; i++)
+            {
+                _callbacks[i] = new(loggerFactory.CreateLogger<CallbackManager>());
+            }
             this.ServiceProvider = serviceProvider;
             _localClientDetails = localClientDetails;
             this.loggerFactory = loggerFactory;
             this.messagingTrace = messagingTrace;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
-            callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
 
             this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.Id),
                 this.loggerFactory.CreateLogger<CallbackData>(),
                 this.clientMessagingOptions,
                 this.clientMessagingOptions.ResponseTimeout);
@@ -126,6 +128,8 @@ namespace Orleans
                 throw;
             }
         }
+
+        private readonly CallbackManager[] _callbacks;
 
         public IServiceProvider ServiceProvider { get; private set; }
 
@@ -249,7 +253,7 @@ namespace Orleans
             if (!oneWay)
             {
                 var callbackData = new CallbackData(this.sharedCallbackData, context, message);
-                callbacks.TryAdd(message.Id, callbackData);
+                _callbacks[message.Id.Value & 0xf].RegisterCallback(callbackData);
             }
             else
             {
@@ -266,51 +270,7 @@ namespace Orleans
 
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Received {Message}", response);
 
-            if (response.Result is Message.ResponseTypes.Status)
-            {
-                var status = (StatusResponse)response.BodyObject;
-                callbacks.TryGetValue(response.Id, out var callback);
-                var request = callback?.Message;
-                if (!(request is null))
-                {
-                    callback.OnStatusUpdate(status);
-
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
-                    {
-                        var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        this.logger.LogInformation("Received status update for pending request, Request: {RequestMessage}. Status: {Diagnostics}", request, diagnosticsString);
-                    }
-                }
-                else
-                {
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Information))
-                    {
-                        var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        this.logger.LogInformation("Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}", response, diagnosticsString);
-                    }
-                }
-
-                return;
-            }
-
-            CallbackData callbackData;
-            var found = callbacks.TryRemove(response.Id, out callbackData);
-            if (found)
-            {
-                // We need to import the RequestContext here as well.
-                // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
-                // RequestContextExtensions.Import(response.RequestContextData);
-                callbackData.DoCallback(response);
-            }
-            else
-            {
-                logger.LogWarning((int)ErrorCode.Runtime_Error_100011, "No callback for response message {ResponseMessage}", response);
-            }
-        }
-
-        private void UnregisterCallback(CorrelationId id)
-        {
-            callbacks.TryRemove(id, out _);
+            _callbacks[response.Id.Value & 0xf].ReceiveResponse(response);
         }
 
         public void Reset()
@@ -393,12 +353,9 @@ namespace Orleans
 
         public void BreakOutstandingMessagesToDeadSilo(SiloAddress deadSilo)
         {
-            foreach (var callback in callbacks)
+            foreach (var callbackManager in _callbacks)
             {
-                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
-                {
-                    callback.Value.OnTargetSiloFail();
-                }
+                callbackManager.BreakOutstandingMessagesToDeadSilo(deadSilo);
             }
         }
 
@@ -436,12 +393,9 @@ namespace Orleans
 
         private void OnCallbackExpiryTick(object state)
         {
-            var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
-            foreach (var pair in callbacks)
+            foreach (var callbackManager in _callbacks)
             {
-                var callback = pair.Value;
-                if (callback.IsCompleted) continue;
-                if (callback.IsExpired(currentStopwatchTicks)) callback.OnTimeout();
+                callbackManager.CheckForExpiredCallbacks();
             }
         }
 
