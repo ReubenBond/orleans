@@ -29,7 +29,7 @@ namespace Orleans.Runtime
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
         private readonly List<IDisposable> disposables;
-        private readonly CallbackManager[] _callbacks;
+        private readonly CallbackWorker[] _callbacks;
         private readonly SharedCallbackData sharedCallbackData;
         private readonly SharedCallbackData systemSharedCallbackData;
         private SafeTimer callbackTimer;
@@ -59,10 +59,10 @@ namespace Orleans.Runtime
             GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver,
             DeepCopier deepCopier)
         {
-            _callbacks = new CallbackManager[64];
+            _callbacks = new CallbackWorker[64];
             for (var i = 0; i < _callbacks.Length; i++)
             {
-                _callbacks[i] = new(loggerFactory.CreateLogger<CallbackManager>());
+                _callbacks[i] = new(loggerFactory.CreateLogger<CallbackWorker>());
             }
             this.interfaceToImplementationMapping = new InterfaceToImplementationMappingCache();
             this._deepCopier = deepCopier;

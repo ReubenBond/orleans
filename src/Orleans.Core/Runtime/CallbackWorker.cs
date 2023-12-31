@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime;
 
-internal sealed class CallbackManager(ILogger logger) : IThreadPoolWorkItem
+internal sealed class CallbackWorker(ILogger logger) : IThreadPoolWorkItem
 {
     private readonly ConcurrentQueue<WorkItem> _workItems = new();
     private readonly Dictionary<long, CallbackData> _callbacks = [];
