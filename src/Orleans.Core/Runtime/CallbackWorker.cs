@@ -31,8 +31,6 @@ internal sealed class CallbackWorker(ILogger logger) : IThreadPoolWorkItem
         ExpireCallbacks = 3,
     }
 
-    // IDEA: use a dictionaries of queues for timeouts, keyed on response timeout, rounded to seconds. This allows us to check only the head of each queue, rather than scanning all callbacks.
-
     public void RegisterCallback(CallbackData callback)
     {
         if (TryBecomeWorker())
@@ -50,6 +48,7 @@ internal sealed class CallbackWorker(ILogger logger) : IThreadPoolWorkItem
     {
         if (TryBecomeWorker())
         {
+            // Ensure that the request is processed requests before the response.
             ProcessWorkItems();
             ReceiveResponseInternal(message);
             Execute();
