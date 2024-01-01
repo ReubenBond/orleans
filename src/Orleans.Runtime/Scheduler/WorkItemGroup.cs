@@ -106,8 +106,8 @@ namespace Orleans.Runtime.Scheduler
                 int maxPendingItemsLimit = schedulingOptions.MaxPendingWorkItemsSoftLimit;
                 if (maxPendingItemsLimit > 0 && count > maxPendingItemsLimit)
                 {
-                    var now = ValueStopwatch.GetTimestamp();
-                    if (ValueStopwatch.FromTimestamp(this.lastLongQueueWarningTimestamp, now).Elapsed > TimeSpan.FromSeconds(10))
+                    var now = CoarseStopwatch.GetTimestamp();
+                    if (CoarseStopwatch.FromTimestamp(this.lastLongQueueWarningTimestamp, now).Elapsed > TimeSpan.FromSeconds(10))
                     {
                         log.LogWarning(
                             (int)ErrorCode.SchedulerTooManyPendingItems,
@@ -173,7 +173,7 @@ namespace Orleans.Runtime.Scheduler
 
                 // Process multiple items -- drain the applicationMessageQueue (up to max items) for this physical activation
                 int count = 0;
-                var stopwatch = ValueStopwatch.StartNew();
+                var stopwatch = CoarseStopwatch.StartNew();
                 do
                 {
                     lock (lockable)
