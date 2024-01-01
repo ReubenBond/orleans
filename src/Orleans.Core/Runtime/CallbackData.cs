@@ -12,7 +12,7 @@ namespace Orleans.Runtime
         private readonly IResponseCompletionSource context;
         private int completed;
         private StatusResponse lastKnownStatus;
-        private ValueStopwatch stopwatch;
+        private CoarseStopwatch stopwatch;
 
         public CallbackData(
             SharedCallbackData shared,
@@ -23,7 +23,7 @@ namespace Orleans.Runtime
             this.context = ctx;
             this.Message = msg;
 
-            this.stopwatch = ValueStopwatch.StartNew();
+            this.stopwatch = CoarseStopwatch.StartNew();
         }
 
         public Message Message { get; } // might hold metadata used by response pipeline

@@ -16,7 +16,7 @@ internal static class ApplicationRequestInstruments
     private static readonly ObservableCounter<long> AppRequestsLatencyHistogramSum = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM + "-sum", AppRequestsLatencyHistogramAggregator.CollectSum);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static void OnAppRequestsEnd(ref ValueStopwatch stopwatch)
+    internal static void OnAppRequestsEnd(ref CoarseStopwatch stopwatch)
     {
         if (AppRequestsLatencyHistogramSum.Enabled)
         {
