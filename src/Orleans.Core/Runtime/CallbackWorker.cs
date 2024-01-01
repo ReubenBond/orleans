@@ -154,13 +154,13 @@ internal sealed class CallbackWorker(ILogger logger) : IThreadPoolWorkItem
 
     private void CheckForExpiredCallbacksInternal()
     {
-        var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
+        var currentTimestamp = CoarseStopwatch.GetTimestamp();
         List<long>? removed = null; 
 
         foreach (var (key, callback) in _callbacks)
         {
             if (callback.IsCompleted) continue;
-            if (callback.IsExpired(currentStopwatchTicks))
+            if (callback.IsExpired(currentTimestamp))
             {
                 callback.OnTimeout();
                 removed ??= [];

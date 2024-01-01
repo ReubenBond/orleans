@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Metrics;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime;
 
@@ -14,15 +15,8 @@ internal static class ApplicationRequestInstruments
     private static readonly ObservableCounter<long> AppRequestsLatencyHistogramCount = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM + "-count", AppRequestsLatencyHistogramAggregator.CollectCount);
     private static readonly ObservableCounter<long> AppRequestsLatencyHistogramSum = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM + "-sum", AppRequestsLatencyHistogramAggregator.CollectSum);
 
-    internal static void OnAppRequestsStart(ref ValueStopwatch stopwatch)
-    {
-        if (AppRequestsLatencyHistogramSum.Enabled)
-        {
-            stopwatch = ValueStopwatch.StartNew();
-        }
-    }
-
-    internal static void OnAppRequestsEnd(ref ValueStopwatch stopwatch)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static void OnAppRequestsEnd(CoarseStopwatch stopwatch)
     {
         if (AppRequestsLatencyHistogramSum.Enabled)
         {
