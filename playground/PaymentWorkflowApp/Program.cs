@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans.DurableTasks;
 using Orleans.Serialization;
+using PaymentWorkflowApp;
 
 using var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices(services =>
@@ -49,11 +50,11 @@ var result3 = await job3;
 
 // Some time later, maybe an app crash happens in between.
 var result1 = await job1;
-Console.WriteLine($"Result of {job1.TaskId}: {result1}");
+Console.WriteLine($"Result of {job1.Id}: {result1}");
 
 var result2 = await job2;
-Console.WriteLine($"Result of {job2.TaskId}: {result2}");
-Console.WriteLine($"Result of {job3.TaskId}: {result3}");
+Console.WriteLine($"Result of {job2.Id}: {result2}");
+Console.WriteLine($"Result of {job3.Id}: {result3}");
 
 var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
 

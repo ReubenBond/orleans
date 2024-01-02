@@ -8,44 +8,45 @@ namespace Orleans.DurableTasks;
 /// </summary>
 public abstract class ScheduledTask
 {
-    public abstract TaskId TaskId { get; }
-
-    public ValueTask CancelAsync()
-    {
-        throw new NotImplementedException();
-    }
-
+    public abstract TaskId Id { get; }
     public abstract Task AsTask();
     public ScheduledTaskAwaiter GetAwaiter() => new(this);
     protected internal abstract ValueTask AsUntypedValueTask();
 }
-// TODO: Make abstract and push implementation down into ~"GrainCallDurableTaskScheduledTask" or something
-public class ScheduledTask<TResult> : ScheduledTask
+
+public abstract class ScheduledTask<TResult> : ScheduledTask
+{
+    public override async Task<TResult> AsTask() => await this;
+    public new ScheduledTaskAwaiter<TResult> GetAwaiter() => new(this);
+    internal abstract ValueTask<Response> AsValueTask();
+}
+
+internal sealed class ScheduledDurableTask<TResult> : ScheduledTask<TResult>
 {
     private readonly DurableTaskContext _executionContext;
 
-    internal ScheduledTask(DurableTaskContext executionContext)
+    internal ScheduledDurableTask(DurableTaskContext executionContext)
     {
         _executionContext = executionContext;
     }
 
-    public override TaskId TaskId => _executionContext.TaskId;
+    public override TaskId Id => _executionContext.Id;
     public override async Task<TResult> AsTask() => await this;
     public new ScheduledTaskAwaiter<TResult> GetAwaiter() => new(this);
     protected internal override ValueTask AsUntypedValueTask() => _executionContext.AsUntypedValueTask();
-    internal ValueTask<Response> AsValueTask() => _executionContext.AsValueTask();
+    internal override ValueTask<Response> AsValueTask() => _executionContext.AsValueTask();
 }
 
-internal sealed class UntypedScheduledTask : ScheduledTask
+internal sealed class ScheduledDurableTask : ScheduledTask
 {
     private readonly DurableTaskContext _executionContext;
 
-    internal UntypedScheduledTask(DurableTaskContext executionContext)
+    internal ScheduledDurableTask(DurableTaskContext executionContext)
     {
         _executionContext = executionContext;
     }
 
-    public override TaskId TaskId => _executionContext.TaskId;
+    public override TaskId Id => _executionContext.Id;
     public override Task AsTask() => _executionContext.AsUntypedValueTask().AsTask();
     public new ScheduledTaskAwaiter GetAwaiter() => new(this);
     protected internal override ValueTask AsUntypedValueTask() => _executionContext.AsUntypedValueTask();

@@ -123,7 +123,7 @@ internal class DurableTaskGrainExtension(
             // If the task has completed, set the result now.
             if (state.Result is { } response)
             {
-                executionContext.SetResponse(response);
+                executionContext.SetResult(response);
             }
 
             // Move the task into the list of active tasks.
@@ -182,7 +182,7 @@ internal class DurableTaskGrainExtension(
         await _storage.WriteAsync(CancellationToken.None);
 
         // Propagate the response to the application.
-        executionContext.SetResponse(response);
+        executionContext.SetResult(response);
     }
 
     /// <summary>
@@ -430,7 +430,7 @@ internal class DurableTaskGrainExtension(
             // That is ok: we want to ensure that every client always sees the same result for a task, so it is important to persist the task before notifying the first client.
             _storage.SetResponse(taskId, state, response);
             await _storage.WriteAsync(cancellationToken);
-            executionContext.SetResponse(response);
+            executionContext.SetResult(response);
         }
 
         await NotifyClientsAndCleanupTask(taskId, executionContext, cancellationToken);

@@ -142,7 +142,7 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
         // For the first point (identical implementation and arguments), we could store the task locally and verify it against its already-stored copy.
         // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
         Debug.Assert(Context is not null);
-        Context.TaskId = executionContext.TaskId;
+        Context.TaskId = executionContext.Id;
         Context.Caller = _grainContextAccessor.GrainContext?.GrainReference;
         var remote = Context.Target.Cast<IDurableTaskGrainExtension>();
         return await remote.ScheduleAsync(this);
@@ -294,7 +294,7 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
         // For the first point (identical implementation and arguments), we could store the task locally and verify it against its already-stored copy.
         // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
         Debug.Assert(Context is not null);
-        Context.TaskId = executionContext.TaskId;
+        Context.TaskId = executionContext.Id;
         Context.Caller = _grainContextAccessor.GrainContext?.GrainReference;
         var remote = Context.Target.Cast<IDurableTaskGrainExtension>();
         return await remote.ScheduleAsync(this);

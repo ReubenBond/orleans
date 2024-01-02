@@ -3,22 +3,17 @@ using LiteDB;
 using Orleans.DurableTasks;
 using Orleans.Serialization;
 
-public sealed class LiteDbJobStorage : IJobStorage
+namespace PaymentWorkflowApp;
+
+public sealed class LiteDbJobStorage(Serializer<JobTaskState> serializer, DeepCopier<JobTaskState> copier) : IJobStorage
 {
-    private readonly Serializer<JobTaskState> _serializer;
-    private readonly DeepCopier<JobTaskState> _copier;
+    private readonly Serializer<JobTaskState> _serializer = serializer;
+    private readonly DeepCopier<JobTaskState> _copier = copier;
     private readonly object _lock = new();
 
-    private LiteDatabase _db;
-    private Dictionary<TaskId, JobTaskState> _workingCopy = new();
-    private HashSet<TaskId> _removed = new();
-
-    public LiteDbJobStorage(Serializer<JobTaskState> serializer, DeepCopier<JobTaskState> copier)
-    {
-        _serializer = serializer;
-        _copier = copier;
-        _db = new LiteDatabase(@"jobs.db");
-    }
+    private readonly LiteDatabase _db = new(@"jobs.db");
+    private readonly HashSet<TaskId> _removed = [];
+    private Dictionary<TaskId, JobTaskState> _workingCopy = [];
 
     public IEnumerable<(TaskId Id, JobTaskState State)> Tasks
     {
@@ -71,7 +66,7 @@ public sealed class LiteDbJobStorage : IJobStorage
         {
             var collection = _db.GetCollection<JobEntity>("jobs");
 
-            _workingCopy = new Dictionary<TaskId, JobTaskState>();
+            _workingCopy = [];
             foreach (var entry in collection.FindAll())
             {
                 var taskId = TaskId.Parse(entry.Id!);
