@@ -1,12 +1,11 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Orleans.Concurrency;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Remoting;
 using Orleans.Serialization.Invocation;
+namespace PaymentWorkflowApp;
 
 public class JobDescription
 {
@@ -26,20 +25,14 @@ public class JobDescription
     public override string? ToString() => $"[Id: {JobId}, Status: {Status}, Type: {Type}, Arguments: {string.Join(", ", Arguments ?? Array.Empty<string>())}, CreatedAt: {CreatedAt}, CompletedAt: {CompletedAt}, Result: {Result}, Exception: {Exception?.GetType()}]";
 }
 
-public class JobScheduler
+public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
 {
-    private readonly Dictionary<string, object> _handlers = new();
-    private readonly Dictionary<TaskId, JobDurableTaskExecutionContext> _tasks = new();
-    private readonly Dictionary<TaskId, Task> _runningTasks = new();
-    private readonly IJobStorage _storage;
-    private readonly ILogger<JobScheduler> _logger;
+    private readonly Dictionary<string, object> _handlers = [];
+    private readonly Dictionary<TaskId, JobDurableTaskExecutionContext> _tasks = [];
+    private readonly Dictionary<TaskId, Task> _runningTasks = [];
+    private readonly IJobStorage _storage = storage;
+    private readonly ILogger<JobScheduler> _logger = logger;
     private readonly SemaphoreSlim _asyncLock = new(1);
-
-    public JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
-    {
-        _storage = storage;
-        _logger = logger;
-    }
 
     public async ValueTask StartAsync()
     {
@@ -99,7 +92,7 @@ public class JobScheduler
         // If the task has completed, set the result now.
         if (state.Result is { } response)
         {
-            executionContext.SetResponse(response);
+            DurableTaskRuntimeHelper.SetResult(executionContext, response);
         }
 
         // Move the task into the list of active tasks.
@@ -282,7 +275,7 @@ public class JobScheduler
             state.CompletedAt = DateTime.UtcNow;
             _storage.AddOrUpdateTask(taskId, state);
             await _storage.WriteAsync();
-            executionContext.SetResponse(response);
+            DurableTaskRuntimeHelper.SetResult(executionContext, response);
         }
     }
 
@@ -334,14 +327,14 @@ public class JobScheduler
             if (taskId.Parent() is { } parent && parent != TaskId.None && allTasks.ContainsKey(parent))
             {
                 // There is a local parent task which this task is waiting on, and that is the last thing keeping this task alive.
-                waitingOnParent ??= new();
+                waitingOnParent ??= [];
                 ref var waiters = ref CollectionsMarshal.GetValueRefOrAddDefault(waitingOnParent, parent, out var exists);
-                waiters ??= new();
+                waiters ??= [];
                 waiters.Add(taskId);
                 continue;
             }
 
-            completedTaskIds ??= new();
+            completedTaskIds ??= [];
             completedTaskIds.Add(taskId);
         }
 
@@ -375,18 +368,11 @@ public class JobScheduler
         return completedTaskIds is not null;
     }
 
-    internal class JobTask : DurableTask<string>, ISchedulableTask
+    internal class JobTask(string type, string[]? args, JobScheduler jobScheduler) : DurableTask<string>, ISchedulableTask
     {
-        private readonly JobScheduler _jobScheduler;
-        public string[]? Arguments { get; }
-        public string Type { get; }
-
-        public JobTask(string type, string[]? args, JobScheduler jobScheduler)
-        {
-            Arguments = args;
-            Type = type;
-            _jobScheduler = jobScheduler;
-        }
+        private readonly JobScheduler _jobScheduler = jobScheduler;
+        public string[]? Arguments { get; } = args;
+        public string Type { get; } = type;
 
         public ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, SchedulingOptions? options)
         {
@@ -399,7 +385,7 @@ public class JobScheduler
             Response response;
             if (handler is Func<string[]?, string> funcJob)
             {
-                DurableTaskContext.SetCurrentContext(executionContext);
+                DurableTaskRuntimeHelper.SetCurrentContext(executionContext);
                 response = Response.FromResult(funcJob(Arguments));
 
             }
@@ -419,7 +405,7 @@ public class JobScheduler
     }
 }
 
-public sealed class SingleThreadedJobScheduler : SynchronizationContext, IThreadPoolWorkItem
+public sealed class SingleThreadedJobScheduler(ILogger<JobScheduler> logger) : SynchronizationContext, IThreadPoolWorkItem
 {
     private static int NextSchedulerId = 0;
     private enum RunState
@@ -431,15 +417,9 @@ public sealed class SingleThreadedJobScheduler : SynchronizationContext, IThread
 
     private readonly Queue<(object Callback, object? State)> _workItems = new();
     private readonly object _lock = new();
-    private readonly ILogger<JobScheduler> _logger;
-    private readonly int _id;
+    private readonly ILogger<JobScheduler> _logger = logger;
+    private readonly int _id = Interlocked.Increment(ref NextSchedulerId);
     private RunState _state;
-
-    public SingleThreadedJobScheduler(ILogger<JobScheduler> logger)
-    {
-        _logger = logger;
-        _id = Interlocked.Increment(ref NextSchedulerId);
-    }
 
     public override string ToString() => $"{nameof(SingleThreadedJobScheduler)}-{_id}";
 

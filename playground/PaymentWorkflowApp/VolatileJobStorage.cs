@@ -1,21 +1,16 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using Orleans.DurableTasks;
 using Orleans.Serialization;
+namespace PaymentWorkflowApp;
 
-internal class VolatileJobStorage : IJobStorage
+internal class VolatileJobStorage(DeepCopier<Dictionary<TaskId, JobTaskState>> storageCopier, DeepCopier<JobTaskState> stateCopier) : IJobStorage
 {
-    private Dictionary<TaskId, JobTaskState> _workingCopy = new();
-    private Dictionary<TaskId, JobTaskState> _persistedCopy = new();
-    private readonly DeepCopier<Dictionary<TaskId, JobTaskState>> _storageCopier;
-    private readonly DeepCopier<JobTaskState> _stateCopier;
+    private Dictionary<TaskId, JobTaskState> _workingCopy = [];
+    private Dictionary<TaskId, JobTaskState> _persistedCopy = [];
+    private readonly DeepCopier<Dictionary<TaskId, JobTaskState>> _storageCopier = storageCopier;
+    private readonly DeepCopier<JobTaskState> _stateCopier = stateCopier;
 
     public IEnumerable<(TaskId Id, JobTaskState State)> Tasks => _workingCopy.Select(static pair => (pair.Key, pair.Value));
-
-    public VolatileJobStorage(DeepCopier<Dictionary<TaskId, JobTaskState>> storageCopier, DeepCopier<JobTaskState> stateCopier)
-    {
-        _storageCopier = storageCopier;
-        _stateCopier = stateCopier;
-    }
 
     public void AddOrUpdateTask(TaskId taskId, JobTaskState state) => _workingCopy[taskId] = _stateCopier.Copy(state);
     public bool RemoveTask(TaskId taskId) => _workingCopy.Remove(taskId);

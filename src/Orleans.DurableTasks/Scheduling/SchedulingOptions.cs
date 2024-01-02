@@ -4,7 +4,7 @@ namespace Orleans.DurableTasks;
 public class SchedulingOptions
 {
     [Id(0)]
-    public DateTime? DueTime { get; init; }
+    public DateTimeOffset? DueTime { get; init; }
 
     [Id(1)]
     public string? PolicyId { get; init; }

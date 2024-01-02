@@ -30,7 +30,7 @@ public static class DurableTaskExtensions
         }
 
         var executionContext = await schedulableTask.ScheduleAsync(typedTaskId, options);
-        return new ScheduledTask<TResult>(executionContext);
+        return new ScheduledDurableTask<TResult>(executionContext);
     }
 
     /// <summary>
@@ -57,7 +57,7 @@ public static class DurableTaskExtensions
         }
 
         var executionContext = await schedulableTask.ScheduleAsync(typedTaskId, options);
-        return new UntypedScheduledTask(executionContext);
+        return new ScheduledDurableTask(executionContext);
     }
 
     /// <summary>
@@ -74,9 +74,9 @@ public static class DurableTaskExtensions
         var parentContext = DurableTaskContext.GetCurrentContextOrThrow();
 
         // Create a new, nested task id for the step
-        var taskId = parentContext.TaskId.Child(stepId);
+        var taskId = parentContext.Id.Child(stepId);
 
-        var executionContext = await parentContext.EvaluateStepAsync(taskId, taskDefinition, CancellationToken.None);
+        var executionContext = await parentContext.EvaluateAsync(taskId, taskDefinition, CancellationToken.None);
         return await executionContext.GetResultAsync<TResult>();
     }
 
@@ -91,9 +91,9 @@ public static class DurableTaskExtensions
         // Steps are only applicable nested within other durable tasks, so if we do not have an ambient context
         // then something has gone awry.
         var parentContext = DurableTaskContext.GetCurrentContextOrThrow();
-        var taskId = parentContext.TaskId.Child(stepId);
+        var taskId = parentContext.Id.Child(stepId);
 
-        var executionContext = await parentContext.EvaluateStepAsync(taskId, taskDefinition, CancellationToken.None);
+        var executionContext = await parentContext.EvaluateAsync(taskId, taskDefinition, CancellationToken.None);
         await executionContext.AsUntypedValueTask();
     }
 

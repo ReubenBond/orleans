@@ -17,7 +17,7 @@ public abstract partial class DurableTaskContext : IValueTaskSource<Response>, I
     internal ValueTask<Response> AsValueTask() => new(this, _tcs.Version);
     internal DurableTaskResultAwaitable<TResult> GetResultAsync<TResult>() => new(this);
 
-    public void SetResponse(Response response)
+    internal void SetResult(Response response)
     {
         Debug.Assert(response is not PendingResponse);
         _tcs.SetResult(response);
