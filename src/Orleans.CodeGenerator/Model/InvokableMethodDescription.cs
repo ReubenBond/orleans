@@ -36,9 +36,9 @@ namespace Orleans.CodeGenerator
             InvokableBaseTypes = invokableBaseTypes;
             foreach (var methodAttr in Method.GetAttributes())
             {
-                if (methodAttr.AttributeClass.GetAttributes(CodeGenerator.LibraryTypes.InvokableBaseTypeAttribute, out var attrs))
+                if (methodAttr.AttributeClass.GetAttributes(CodeGenerator.LibraryTypes.InvokableBaseTypeAttribute, out var attributes))
                 {
-                    foreach (var attr in attrs)
+                    foreach (var attr in attributes)
                     {
                         var ctorArgs = attr.ConstructorArguments;
                         var proxyBaseType = (INamedTypeSymbol)ctorArgs[0].Value;
@@ -54,9 +54,9 @@ namespace Orleans.CodeGenerator
                     }
                 }
 
-                if (methodAttr.AttributeClass.GetAttributes(CodeGenerator.LibraryTypes.InvokableCustomInitializerAttribute, out attrs))
+                if (methodAttr.AttributeClass.GetAttributes(CodeGenerator.LibraryTypes.InvokableCustomInitializerAttribute, out attributes))
                 {
-                    foreach (var attr in attrs)
+                    foreach (var attr in attributes)
                     {
                         var methodName = (string)attr.ConstructorArguments[0].Value;
 
@@ -93,6 +93,26 @@ namespace Orleans.CodeGenerator
                 if (SymbolEqualityComparer.Default.Equals(methodAttr.AttributeClass, CodeGenerator.LibraryTypes.ResponseTimeoutAttribute))
                 {
                     ResponseTimeoutTicks = TimeSpan.Parse((string)methodAttr.ConstructorArguments[0].Value).Ticks;
+                }
+            }
+
+            // Support custom return types on grain interfaces.
+            // This may be the wrong place to do this: it may be more efficient to centralize it so that it's computed once per type.
+            if (Method.ReturnType.GetAttributes(CodeGenerator.LibraryTypes.InvokableBaseTypeAttribute, out var returnTypeAttributes))
+            {
+                foreach (var attr in returnTypeAttributes)
+                {
+                    var ctorArgs = attr.ConstructorArguments;
+                    var proxyBaseType = (INamedTypeSymbol)ctorArgs[0].Value;
+                    var returnType = (INamedTypeSymbol)ctorArgs[1].Value;
+                    var invokableBaseType = (INamedTypeSymbol)ctorArgs[2].Value;
+                    if (!SymbolEqualityComparer.Default.Equals(ProxyBase.ProxyBaseType, proxyBaseType))
+                    {
+                        // This attribute does not apply to this particular invoker, since it is for a different proxy base type.
+                        continue;
+                    }
+
+                    invokableBaseTypes[returnType] = invokableBaseType;
                 }
             }
 

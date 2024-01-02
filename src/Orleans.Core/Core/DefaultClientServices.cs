@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using Orleans.Configuration;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,6 +26,7 @@ using Orleans.Hosting;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Orleans.Placement.Repartitioning;
+using Orleans.DurableTasks;
 
 namespace Orleans
 {
@@ -161,6 +162,9 @@ namespace Orleans
             services.AddSingleton<IGrainInterfacePropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, TypeNameGrainPropertiesProvider>();
             services.AddSingleton<IGrainPropertiesProvider, ImplementedInterfaceProvider>();
+
+            // DurableTasks
+            services.TryAddSingleton<DurableTaskRequestShared>();
 
             services.AddSingleton<IGrainCallCancellationManager, ExternalClientGrainCallCancellationManager>();
 

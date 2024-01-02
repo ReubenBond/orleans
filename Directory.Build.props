@@ -18,7 +18,7 @@
     <PrivateRepositoryUrl>$(RepositoryUrl)</PrivateRepositoryUrl>
     <RepositoryUrl>$(RepositoryUrl)</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <LangVersion>12</LangVersion>
+    <LangVersion>latest</LangVersion>
     <Features>strict</Features>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -51,11 +51,11 @@
   <!-- Versioning properties -->
   <PropertyGroup>
     <AssemblyVersion>9.0.0.0</AssemblyVersion>
-    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">9.1.0</VersionPrefix>
+    <VersionPrefix Condition=" '$(VersionPrefix)'=='' ">9.2.0</VersionPrefix>
   </PropertyGroup>
 
   <!-- For Debug builds generated a date/time dependent version suffix -->
-  <PropertyGroup Condition=" '$(Configuration)'=='Debug' ">
+  <PropertyGroup>
     <VersionSuffix Condition=" '$(VersionSuffix)'=='' ">dev</VersionSuffix>
     <VersionSuffix Condition=" '$(VersionDateSuffix)'!='' ">$(VersionSuffix)-$(VersionDateSuffix)</VersionSuffix>
   </PropertyGroup>

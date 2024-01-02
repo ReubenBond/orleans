@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
@@ -44,18 +44,16 @@ namespace Orleans.Serialization.Invocation
         /// </summary>
         public static Response Completed => CompletedResponse.Instance;
 
-        /// <inheritdoc />
         public abstract object? Result { get; set; }
+
+        public abstract bool IsFinal { get; }
 
         public virtual Type? GetSimpleResultType() => null;
 
-        /// <inheritdoc />
         public abstract Exception? Exception { get; set; }
 
-        /// <inheritdoc />
         public abstract T GetResult<T>();
 
-        /// <inheritdoc />
         public abstract void Dispose();
 
         /// <inheritdoc />
@@ -78,6 +76,9 @@ namespace Orleans.Serialization.Invocation
 
         /// <inheritdoc/>
         public override Exception? Exception { get => null; set => throw new InvalidOperationException($"Type {nameof(CompletedResponse)} is read-only"); }
+
+        /// <inheritdoc/>
+        public override bool IsFinal => true;
 
         /// <inheritdoc/>
         public override T GetResult<T>() => default!;
@@ -122,6 +123,9 @@ namespace Orleans.Serialization.Invocation
         public override Exception? Exception { get; set; }
 
         /// <inheritdoc/>
+        public override bool IsFinal => true;
+
+        /// <inheritdoc/>
         public override T GetResult<T>()
         {
             ExceptionDispatchInfo.Capture(Exception!).Throw();
@@ -158,6 +162,9 @@ namespace Orleans.Serialization.Invocation
             get => _result;
             set => _result = (TResult?)value;
         }
+
+        /// <inheritdoc/>
+        public override bool IsFinal => true;
 
         public override Type GetSimpleResultType() => typeof(TResult);
 
