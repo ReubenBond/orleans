@@ -302,7 +302,7 @@ namespace Orleans.Serialization.Codecs
         {
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(PooledBuffer), WireType.LengthPrefixed);
             writer.WriteVarUInt32((uint)value.Length);
-            foreach (var segment in value)
+            foreach (var segment in value.GetEnumerator())
             {
                 writer.Write(segment);
             }
