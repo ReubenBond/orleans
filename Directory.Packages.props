@@ -57,6 +57,10 @@
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="9.0.0" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="9.0.0" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="9.0.0" />
+    <PackageVersion Include="Aspire.Hosting.Azure" Version="9.0.0" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="9.0.0" />
+    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="9.0.0" />
+    <PackageVersion Include="Aspire.Azure.Data.Tables" Version="9.0.0" />
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="9.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="9.0.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="9.0.0" />
@@ -96,8 +100,8 @@
     <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" />
     <PackageVersion Include="FSharp.Core" Version="9.0.100" />
     <PackageVersion Include="Azure.Identity" Version="1.13.1" />
-    <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.5.0" />
-    <PackageVersion Include="NSubstitute" Version="4.4.0" />
+    <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.7.0" />
+    <PackageVersion Include="NSubstitute" Version="5.1.0" />
     <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.15" />
     <PackageVersion Include="CsCheck" Version="2.14.1" />
     <PackageVersion Include="System.Data.SqlClient" Version="4.8.6" />
@@ -115,6 +119,7 @@
     <PackageVersion Include="Grpc.Tools" Version="2.67.0" />
     <PackageVersion Include="Testcontainers" Version="3.8.0" />
     <PackageVersion Include="GitHubActionsTestLogger" Version="2.4.1" />
+    <PackageVersion Include="LiteDB" Version="5.0.20" />
     <!-- Tooling related packages -->
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="8.0.0" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />

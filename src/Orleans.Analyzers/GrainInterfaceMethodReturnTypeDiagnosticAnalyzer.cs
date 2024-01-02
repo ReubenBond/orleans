@@ -18,11 +18,13 @@ namespace Orleans.Analyzers
             (new [] { "System", "Threading", "Tasks" }, "ValueTask"),
             (new [] { "System", "Threading", "Tasks" }, "ValueTask`1"),
             (new [] { "System", "Collections", "Generic" }, "IAsyncEnumerable`1"),
+            (new [] { "Orleans", "DurableTasks" }, "DurableTask"),
+            (new [] { "Orleans", "DurableTasks" }, "DurableTask`1"),
             (new [] { "System" }, "Void")
         };
         public const string DiagnosticId = "ORLEANS0009";
         public const string Title = "Grain interfaces methods must return a compatible type";
-        public const string MessageFormat = $"Grain interfaces methods must return a compatible type, such as Task, Task<T>, ValueTask, ValueTask<T>, or void";
+        public const string MessageFormat = $"Grain interfaces methods must return a compatible type, such as Task, Task<T>, ValueTask, ValueTask<T>, DurableTask, DurableTask<T>, or void";
         public const string Category = "Usage";
 
         private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
