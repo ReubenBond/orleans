@@ -179,6 +179,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		Directory.Build.props = Directory.Build.props
 		Directory.Build.targets = Directory.Build.targets
 		Directory.Packages.props = Directory.Packages.props
+		global.json = global.json
+		NuGet.Config = NuGet.Config
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DistributedTests", "DistributedTests", "{FFEC9FEE-FEDF-4510-B7D2-0B0B3374ED2F}"
@@ -192,6 +194,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DistributedTests.Server", "test\DistributedTests\DistributedTests.Server\DistributedTests.Server.csproj", "{E8335DC9-9A7F-45C1-AFA3-0AA93ABD4FA5}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.SystemTextJson", "src\Orleans.Serialization.SystemTextJson\Orleans.Serialization.SystemTextJson.csproj", "{5CFBC7AC-C9AE-4C6C-943C-4A157396E427}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.DurableTasks", "src\Orleans.DurableTasks\Orleans.DurableTasks.csproj", "{FD582453-4F44-4E91-8F77-6816B51B2982}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.BroadcastChannel", "src\Orleans.BroadcastChannel\Orleans.BroadcastChannel.csproj", "{497D472A-0BA8-4306-A110-C4D871FD5918}"
 EndProject
@@ -218,6 +222,16 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tester.Redis", "test\Extensions\Tester.Redis\Tester.Redis.csproj", "{F13247A0-70C9-4200-9CB1-2002CB8105E0}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.Protobuf", "src\Serializers\Orleans.Serialization.Protobuf\Orleans.Serialization.Protobuf.csproj", "{A073C0EE-8732-42F9-A22E-D47034E25076}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.DurableTasks.Tests", "test\Orleans.DurableTasks.Tests\Orleans.DurableTasks.Tests.csproj", "{CE97AF79-7107-4639-A491-9B2D3BEBBF0F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PaymentWorkflowApp", "playground\PaymentWorkflowApp\PaymentWorkflowApp.csproj", "{4C945351-ECE4-4F1E-B1F1-68B36B72C800}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Journaling", "src\Orleans.Journaling\Orleans.Journaling.csproj", "{0E8FE8C9-C8ED-492E-B778-279121693571}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Journaling.Tests", "test\Orleans.Journaling.Tests\Orleans.Journaling.Tests.csproj", "{9D722F27-6AE8-451C-8CBF-21F87AF87B54}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.DurableTask.Playground", "test\Orleans.DurableTask.Playground\Orleans.DurableTask.Playground.csproj", "{3F220F64-F86A-40AA-803B-79939ACA544A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -533,6 +547,10 @@ Global
 		{5CFBC7AC-C9AE-4C6C-943C-4A157396E427}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5CFBC7AC-C9AE-4C6C-943C-4A157396E427}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5CFBC7AC-C9AE-4C6C-943C-4A157396E427}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FD582453-4F44-4E91-8F77-6816B51B2982}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FD582453-4F44-4E91-8F77-6816B51B2982}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FD582453-4F44-4E91-8F77-6816B51B2982}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FD582453-4F44-4E91-8F77-6816B51B2982}.Release|Any CPU.Build.0 = Release|Any CPU
 		{497D472A-0BA8-4306-A110-C4D871FD5918}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{497D472A-0BA8-4306-A110-C4D871FD5918}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{497D472A-0BA8-4306-A110-C4D871FD5918}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -581,6 +599,26 @@ Global
 		{A073C0EE-8732-42F9-A22E-D47034E25076}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A073C0EE-8732-42F9-A22E-D47034E25076}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A073C0EE-8732-42F9-A22E-D47034E25076}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CE97AF79-7107-4639-A491-9B2D3BEBBF0F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE97AF79-7107-4639-A491-9B2D3BEBBF0F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE97AF79-7107-4639-A491-9B2D3BEBBF0F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE97AF79-7107-4639-A491-9B2D3BEBBF0F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4C945351-ECE4-4F1E-B1F1-68B36B72C800}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4C945351-ECE4-4F1E-B1F1-68B36B72C800}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4C945351-ECE4-4F1E-B1F1-68B36B72C800}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4C945351-ECE4-4F1E-B1F1-68B36B72C800}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0E8FE8C9-C8ED-492E-B778-279121693571}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0E8FE8C9-C8ED-492E-B778-279121693571}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0E8FE8C9-C8ED-492E-B778-279121693571}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0E8FE8C9-C8ED-492E-B778-279121693571}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9D722F27-6AE8-451C-8CBF-21F87AF87B54}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9D722F27-6AE8-451C-8CBF-21F87AF87B54}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9D722F27-6AE8-451C-8CBF-21F87AF87B54}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9D722F27-6AE8-451C-8CBF-21F87AF87B54}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F220F64-F86A-40AA-803B-79939ACA544A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F220F64-F86A-40AA-803B-79939ACA544A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F220F64-F86A-40AA-803B-79939ACA544A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F220F64-F86A-40AA-803B-79939ACA544A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -675,6 +713,7 @@ Global
 		{25D20278-8901-47CC-AD1D-F3C4BEB845BF} = {FFEC9FEE-FEDF-4510-B7D2-0B0B3374ED2F}
 		{E8335DC9-9A7F-45C1-AFA3-0AA93ABD4FA5} = {FFEC9FEE-FEDF-4510-B7D2-0B0B3374ED2F}
 		{5CFBC7AC-C9AE-4C6C-943C-4A157396E427} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
+		{FD582453-4F44-4E91-8F77-6816B51B2982} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
 		{497D472A-0BA8-4306-A110-C4D871FD5918} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
 		{F24358D6-7DAB-4DEB-A05E-0C4359C5F7CF} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
 		{A734945A-36DC-485E-B84D-3C2D395BC7BE} = {FE2E08C6-9C3B-4AEE-AE07-CCA387580D7A}
@@ -688,6 +727,11 @@ Global
 		{8FC6457C-6273-4338-AD2A-ECAA8FE2C5D7} = {082D25DB-70CA-48F4-93E0-EC3455F494B8}
 		{F13247A0-70C9-4200-9CB1-2002CB8105E0} = {082D25DB-70CA-48F4-93E0-EC3455F494B8}
 		{A073C0EE-8732-42F9-A22E-D47034E25076} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
+		{CE97AF79-7107-4639-A491-9B2D3BEBBF0F} = {A6573187-FD0D-4DF7-91D1-03E07E470C0A}
+		{4C945351-ECE4-4F1E-B1F1-68B36B72C800} = {A6573187-FD0D-4DF7-91D1-03E07E470C0A}
+		{0E8FE8C9-C8ED-492E-B778-279121693571} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
+		{9D722F27-6AE8-451C-8CBF-21F87AF87B54} = {A6573187-FD0D-4DF7-91D1-03E07E470C0A}
+		{3F220F64-F86A-40AA-803B-79939ACA544A} = {A6573187-FD0D-4DF7-91D1-03E07E470C0A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}

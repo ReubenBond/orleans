@@ -1,0 +1,45 @@
+﻿using System.Diagnostics.CodeAnalysis;
+using Orleans.DurableTasks;
+using Orleans.Serialization;
+
+internal class VolatileJobStorage : IJobStorage
+{
+    private Dictionary<TaskId, JobTaskState> _workingCopy = new();
+    private Dictionary<TaskId, JobTaskState> _persistedCopy = new();
+    private readonly DeepCopier<Dictionary<TaskId, JobTaskState>> _storageCopier;
+    private readonly DeepCopier<JobTaskState> _stateCopier;
+
+    public IEnumerable<(TaskId Id, JobTaskState State)> Tasks => _workingCopy.Select(static pair => (pair.Key, pair.Value));
+
+    public VolatileJobStorage(DeepCopier<Dictionary<TaskId, JobTaskState>> storageCopier, DeepCopier<JobTaskState> stateCopier)
+    {
+        _storageCopier = storageCopier;
+        _stateCopier = stateCopier;
+    }
+
+    public void AddOrUpdateTask(TaskId taskId, JobTaskState state) => _workingCopy[taskId] = _stateCopier.Copy(state);
+    public bool RemoveTask(TaskId taskId) => _workingCopy.Remove(taskId);
+    public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out JobTaskState? state)
+    {
+        if (_workingCopy.TryGetValue(taskId, out var internalState))
+        {
+            state = _stateCopier.Copy(internalState);
+            return true;
+        }
+
+        state = null;
+        return false;
+    }
+
+    public ValueTask ReadAsync()
+    {
+        _workingCopy = _storageCopier.Copy(_persistedCopy);
+        return default;
+    }
+
+    public ValueTask WriteAsync()
+    {
+        _persistedCopy = _storageCopier.Copy(_workingCopy);
+        return default;
+    }
+}
