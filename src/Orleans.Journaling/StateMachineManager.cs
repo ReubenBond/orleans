@@ -51,6 +51,9 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
 
         lock (_lock)
         {
+            // TODO: if there is already a placeholder state machine with the specified name, replace it and initialize the new state machine with its state.
+            //       If the existing state machine is not a placeholder (IDurableNothing), throw an exception.
+
             _stateMachines.Add(name, stateMachine);
             _workQueue.Enqueue(new WorkItem(WorkItemType.RegisterStateMachine, completion: null)
             {
@@ -309,8 +312,10 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
         }
     }
 
-    public async ValueTask WriteStateAsync(CancellationToken cancellationToken)
+    public ValueTask WriteStateAsync(CancellationToken cancellationToken)
     {
+        // TODO: deduplicate writes - if there is already a non-started write, don't enqueue another one.
+
         cancellationToken.ThrowIfCancellationRequested();
 
         Task? pendingWrite;
@@ -341,9 +346,14 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
             _workSignal.Signal();
         }
 
-        if (pendingWrite is { } task)
+        Debug.Assert(pendingWrite is not null);
+        if (cancellationToken.CanBeCanceled)
         {
-            await task.WaitAsync(cancellationToken);
+            return new ValueTask(pendingWrite.WaitAsync(cancellationToken));
+        }
+        else
+        {
+            return new ValueTask(pendingWrite);
         }
     }
 

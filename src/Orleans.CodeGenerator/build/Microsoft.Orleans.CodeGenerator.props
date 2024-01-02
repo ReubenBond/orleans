@@ -1,16 +1,16 @@
 <Project>
 
-  <ItemGroup>
-    <CompilerVisibleProperty Include="Orleans_DesignTimeBuild" />
-    <CompilerVisibleProperty Include="Orleans_AttachDebugger" />
-    <CompilerVisibleProperty Include="Orleans_GenerateFieldIds" />
-    <CompilerVisibleProperty Include="Orleans_ImmutableAttributes" />
-    <CompilerVisibleProperty Include="Orleans_IdAttributes" />
-    <CompilerVisibleProperty Include="Orleans_AliasAttributes" />
-    <CompilerVisibleProperty Include="Orleans_GenerateSerializerAttributes" />
-    <CompilerVisibleProperty Include="Orleans_ConstructorAttributes" />
-    <CompilerVisibleProperty Include="OrleansGenerateCompatibilityInvokers" />
-  </ItemGroup>
+<ItemGroup>
+  <CompilerVisibleProperty Include="Orleans_DesignTimeBuild" />
+  <CompilerVisibleProperty Include="Orleans_AttachDebugger" />
+  <CompilerVisibleProperty Include="Orleans_GenerateFieldIds" />
+  <CompilerVisibleProperty Include="Orleans_ImmutableAttributes" />
+  <CompilerVisibleProperty Include="Orleans_IdAttributes" />
+  <CompilerVisibleProperty Include="Orleans_AliasAttributes" />
+  <CompilerVisibleProperty Include="Orleans_GenerateSerializerAttributes" />
+  <CompilerVisibleProperty Include="Orleans_ConstructorAttributes" />
+  <CompilerVisibleProperty Include="OrleansGenerateCompatibilityInvokers" />
+</ItemGroup>
 
   <PropertyGroup>
     <Orleans_DesignTimeBuild>$(DesignTimeBuild)</Orleans_DesignTimeBuild>

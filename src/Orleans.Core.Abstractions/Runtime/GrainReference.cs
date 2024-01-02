@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.Serialization.Cloning;
@@ -11,6 +11,7 @@ using System.Text;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Threading;
+using Orleans.DurableTasks;
 
 namespace Orleans.Runtime
 {
@@ -251,6 +252,8 @@ namespace Orleans.Runtime
     [DefaultInvokableBaseType(typeof(Task), typeof(TaskRequest))]
     [DefaultInvokableBaseType(typeof(void), typeof(VoidRequest))]
     [DefaultInvokableBaseType(typeof(IAsyncEnumerable<>), typeof(AsyncEnumerableRequest<>))]
+    [DefaultInvokableBaseType(typeof(System.Distributed.DurableTasks.DurableTask), typeof(DurableTaskRequest))]
+    [DefaultInvokableBaseType(typeof(System.Distributed.DurableTasks.DurableTask<>), typeof(DurableTaskRequest<>))]
     public class GrainReference : IAddressable, IEquatable<GrainReference>, ISpanFormattable
     {
         /// <summary>
@@ -393,12 +396,12 @@ namespace Orleans.Runtime
         public virtual string InterfaceName => InterfaceType.ToString();
 
         /// <inheritdoc/>
-        public sealed override string ToString() => $"GrainReference:{GrainId}:{InterfaceType}";
+        public sealed override string ToString() => $"{GrainId} ({InterfaceType})";
 
         string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString();
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
-            => destination.TryWrite($"GrainReference:{GrainId}:{InterfaceType}", out charsWritten);
+            => destination.TryWrite($"{GrainId} ({InterfaceType})", out charsWritten);
 
         protected TInvokable GetInvokable<TInvokable>() => ActivatorUtilities.GetServiceOrCreateInstance<TInvokable>(Shared.ServiceProvider);
 
@@ -455,16 +458,20 @@ namespace Orleans.Runtime
         /// Returns a string representation of the request.
         /// </summary>
         /// <returns>A string representation of the request.</returns>
-        public static string ToString(IRequest request)
+        public static string ToString(IRequest request) => ToString(request, includeTarget: false);
+
+        /// <summary>
+        /// Returns a string representation of the request.
+        /// </summary>
+        /// <returns>A string representation of the request.</returns>
+        public static string ToString(IRequest request, bool includeTarget)
         {
             var result = new StringBuilder();
             result.Append(request.GetInterfaceName());
-            if (request.GetTarget() is { } target)
+            if (includeTarget && request.GetTarget() is { } target)
             {
-                result.Append("[(");
-                result.Append(request.GetInterfaceName());
-                result.Append(')');
-                result.Append(target.ToString());
+                result.Append('[');
+                result.Append(target.GetType().Name);
                 result.Append(']');
             }
 
@@ -510,7 +517,7 @@ namespace Orleans.Runtime
         public static string ToMethodCallString(IRequest request)
         {
             var result = new StringBuilder();
-            result.Append(request.GetInterfaceName());
+            result.Append(request.GetInterfaceType()?.Name ?? request.GetInterfaceName());
             result.Append('.');
             result.Append(request.GetMethodName());
             result.Append('(');

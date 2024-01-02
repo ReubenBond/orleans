@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration;
@@ -44,6 +44,7 @@ using Orleans.Serialization.Internal;
 using Orleans.Core;
 using Orleans.Placement.Repartitioning;
 using Orleans.Runtime.Placement.Filtering;
+using Orleans.DurableTasks;
 
 namespace Orleans.Hosting
 {
@@ -426,6 +427,9 @@ namespace Orleans.Hosting
             services.AddSingleton<GrainCallCancellationManager>();
             services.AddFromExisting<IGrainCallCancellationManager, GrainCallCancellationManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainCallCancellationManager>();
+
+            // DurableTasks
+            services.TryAddSingleton<DurableTaskRequestShared>();
 
             ApplyConfiguration(builder);
         }

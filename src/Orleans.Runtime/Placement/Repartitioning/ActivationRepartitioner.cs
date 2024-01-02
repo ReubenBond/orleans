@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,6 +17,7 @@ using System.Runtime.InteropServices;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Orleans.Placement.Repartitioning;
+using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.Placement.Repartitioning;
 
