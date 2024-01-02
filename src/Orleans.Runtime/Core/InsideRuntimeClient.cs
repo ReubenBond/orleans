@@ -269,7 +269,7 @@ namespace Orleans.Runtime
                                 else
                                 {
                                     response = await invokable.Invoke();
-                                    response = this.responseCopier.Copy(response);
+                                    response = response.Copy();
                                 }
                                 break;
                             }
