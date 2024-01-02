@@ -44,15 +44,25 @@ namespace Orleans.Serialization.Invocation
         /// </summary>
         public static Response Completed => CompletedResponse.Instance;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Returns the result, which may be <see langword="null"/>.
+        /// </summary>
+        /// <returns>The result.</returns>
         public abstract object? Result { get; set; }
 
         public virtual Type? GetSimpleResultType() => null;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Returns the exception, which may be <see langword="null"/>.
+        /// </summary>
+        /// <returns>The exception.</returns>
         public abstract Exception? Exception { get; set; }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Returns the result value, or throws if the result is an exception.
+        /// </summary>
+        /// <typeparam name="T">The result value type.</typeparam>
+        /// <returns>The result value.</returns>
         public abstract T GetResult<T>();
 
         /// <inheritdoc />
@@ -60,6 +70,8 @@ namespace Orleans.Serialization.Invocation
 
         /// <inheritdoc />
         public override string ToString() => Exception is { } ex ? ex.ToString() : Result?.ToString() ?? "[null]";
+
+        public abstract Response Copy();
     }
 
     /// <summary>
@@ -87,6 +99,9 @@ namespace Orleans.Serialization.Invocation
 
         /// <inheritdoc/>
         public override string ToString() => "[Completed]";
+
+        /// <inheritdoc/>
+        public override Response Copy() => this;
     }
 
     /// <summary>
@@ -133,6 +148,8 @@ namespace Orleans.Serialization.Invocation
 
         /// <inheritdoc/>
         public override string ToString() => Exception?.ToString() ?? "[null]";
+
+        public override Response Copy() => this;
     }
 
     /// <summary>
@@ -144,6 +161,9 @@ namespace Orleans.Serialization.Invocation
     {
         [Id(0)]
         private TResult? _result;
+
+        [NonSerialized]
+        private readonly DeepCopier<Response<TResult>>? _responseCopier;
 
         public TResult? TypedResult { get => _result; set => _result = value; }
 
@@ -176,6 +196,8 @@ namespace Orleans.Serialization.Invocation
         }
 
         public override string ToString() => _result?.ToString() ?? "[null]";
+
+        public override Response Copy() => _responseCopier?.Copy(this) ?? this;
     }
 
     /// <summary>

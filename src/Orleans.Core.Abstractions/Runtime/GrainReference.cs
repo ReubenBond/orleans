@@ -646,7 +646,7 @@ namespace Orleans.Runtime
                 var resultTask = InvokeInner();
                 if (resultTask.IsCompleted)
                 {
-                    return new ValueTask<Response>(Response.FromResult(resultTask.Result));
+                    return new ValueTask<Response>(Response.FromResult(CopyResult(resultTask.Result)));
                 }
 
                 return CompleteInvokeAsync(resultTask);
@@ -675,6 +675,13 @@ namespace Orleans.Runtime
         /// </summary>
         /// <returns>The invocation result.</returns>
         protected abstract ValueTask<TResult> InvokeInner();
+
+        /// <summary>
+        /// Copies the result value, if necessary.
+        /// </summary>
+        /// <param name="result">The original result value.</param>
+        /// <returns>The copied result value.</returns>
+        protected virtual TResult CopyResult(TResult result) => result;
     }
 
     /// <summary>
