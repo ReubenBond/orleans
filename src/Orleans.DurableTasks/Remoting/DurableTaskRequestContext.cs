@@ -3,6 +3,7 @@ using Orleans.Runtime;
 namespace Orleans.DurableTasks.Remoting;
 
 [GenerateSerializer]
+[Alias("DurableTaskRequestContext")]
 public class DurableTaskRequestContext
 {
     [Id(0)]

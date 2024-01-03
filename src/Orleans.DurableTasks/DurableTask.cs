@@ -5,14 +5,10 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;
 
-public interface IPollableTask
-{
-    ValueTask<Response> PollAsync();
-}
-
 [InvokableBaseType(typeof(GrainReference), typeof(DurableTask), typeof(DurableTaskRequest))]
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
 [GenerateSerializer, SerializerTransparent]
+[Alias("DurableTask")]
 public abstract partial class DurableTask
 {
     public static DurableTask<T> FromResult<T>(T value) => new CompletedDurableTask<T>(value);
@@ -22,12 +18,18 @@ public abstract partial class DurableTask
     public static DurableTask Run(Func<ValueTask> func) => new AsyncDelegateDurableTask(func);
     public static DurableTask<T> Run<T>(Func<ValueTask<T>> func) => new AsyncDelegateDurableTask<T>(func);
 
-    protected internal abstract ValueTask<Response> InvokeAsync(DurableTaskContext executionContext);
+    /// <summary>
+    /// Invokes the task with the provided context.
+    /// </summary>
+    /// <param name="context">The task context.</param>
+    /// <returns></returns>
+    protected internal abstract ValueTask<Response> InvokeAsync(DurableTaskContext context);
 }
 
 [InvokableBaseType(typeof(GrainReference), typeof(DurableTask<>), typeof(DurableTaskRequest<>))]
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder<>))]
 [GenerateSerializer, SerializerTransparent]
+[Alias("DurableTask`1")]
 public abstract class DurableTask<TResult> : DurableTask
 {
 }
@@ -43,7 +45,7 @@ internal sealed class CompletedDurableTask<TResult>(TResult value) : DurableTask
 {
     public TResult Result { get; } = value;
 
-    protected internal override ValueTask<Response> InvokeAsync(DurableTaskContext executionContext) => new(Response.Completed);
+    protected internal override ValueTask<Response> InvokeAsync(DurableTaskContext context) => new(Response.Completed);
 }
 
 /// <summary>
@@ -53,11 +55,11 @@ internal sealed class AsyncDelegateDurableTask<TResult>(Func<ValueTask<TResult>>
 {
     private readonly Func<ValueTask<TResult>> _func = func;
 
-    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext executionContext)
+    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext context)
     {
         try
         {
-            DurableTaskContext.SetCurrentContext(executionContext);
+            DurableTaskContext.SetCurrentContext(context);
             return Response.FromResult(await _func());
         }
         catch (Exception exception)
@@ -74,11 +76,11 @@ internal sealed class AsyncDelegateDurableTask(Func<ValueTask> func) : DurableTa
 {
     private readonly Func<ValueTask> _func = func;
 
-    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext executionContext)
+    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext context)
     {
         try
         {
-            DurableTaskContext.SetCurrentContext(executionContext);
+            DurableTaskContext.SetCurrentContext(context);
             await _func();
             return Response.Completed;
         }
@@ -96,11 +98,11 @@ internal sealed class DelegateDurableTask<TResult>(Func<TResult> func) : Durable
 {
     private readonly Func<TResult> _func = func;
 
-    protected internal override ValueTask<Response> InvokeAsync(DurableTaskContext executionContext)
+    protected internal override ValueTask<Response> InvokeAsync(DurableTaskContext context)
     {
         try
         {
-            DurableTaskContext.SetCurrentContext(executionContext);
+            DurableTaskContext.SetCurrentContext(context);
             return new(Response.FromResult(_func()));
         }
         catch (Exception exception)
@@ -117,11 +119,11 @@ internal sealed class DelegateDurableTask(Action func) : DurableTask
 {
     private readonly Action _func = func;
 
-    protected internal override ValueTask<Response> InvokeAsync(DurableTaskContext executionContext)
+    protected internal override ValueTask<Response> InvokeAsync(DurableTaskContext context)
     {
         try
         {
-            DurableTaskContext.SetCurrentContext(executionContext);
+            DurableTaskContext.SetCurrentContext(context);
             _func();
             return new(Response.Completed);
         }

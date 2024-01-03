@@ -31,8 +31,9 @@ public interface IDurableTaskRequest : IRequest
     public string ToMethodCallString() => ToMethodCallString(this);
 }
 
-[GenerateSerializer] // Do not make this serializer transparent. We want the option to include information here in future and this is not nearly as perf-critical as regular method calls.
+[GenerateSerializer]
 [ReturnValueProxy(initializerMethodName: nameof(InitializeRequest))]
+[Alias("DurableTaskRequest")]
 public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISchedulableTask, IPollableTask
 {
     // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
@@ -190,6 +191,7 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
 /// </summary>
 [GenerateSerializer]
 [ReturnValueProxy(initializerMethodName: nameof(InitializeRequest))]
+[Alias("DurableTaskRequest`1")]
 public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurableTaskRequest, ISchedulableTask, IPollableTask
 {
     // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
@@ -326,7 +328,9 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
 /// Represents a pending result for a <see cref="DurableTask"/> or <see cref="DurableTask{TResult}"/> method.
 /// </summary>
 [GenerateSerializer, Immutable, UseActivator, SuppressReferenceTracking]
+[Alias("PendingResponse")]
 public sealed class PendingResponse : Response
+
 {
     /// <summary>
     /// Gets the singleton instance of this class.
@@ -363,6 +367,7 @@ internal sealed class PendingResponseActivator : IActivator<PendingResponse>
 /// Represents a pending result for a <see cref="DurableTask"/> or <see cref="DurableTask{TResult}"/> method.
 /// </summary>
 [GenerateSerializer, Immutable, UseActivator, SuppressReferenceTracking]
+[Alias("SubscribedResponse")]
 public sealed class SubscribedResponse : Response
 {
     /// <summary>
@@ -397,9 +402,10 @@ internal sealed class SubscribedResponseActivator : IActivator<SubscribedRespons
 }
 
 /// <summary>
-/// Represents an unkown task result for a <see cref="DurableTask"/> or <see cref="DurableTask{TResult}"/> method.
+/// Represents an unknown task result for a <see cref="DurableTask"/> or <see cref="DurableTask{TResult}"/> method.
 /// </summary>
 [GenerateSerializer, Immutable, UseActivator, SuppressReferenceTracking]
+[Alias("UnknownTaskResponse")]
 public sealed class UnknownTaskResponse : Response
 {
     /// <summary>
