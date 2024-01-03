@@ -9,7 +9,7 @@ public abstract partial class DurableTask
         var until = await DurableTask.Run(() => DateTimeOffset.UtcNow.Add(duration)).AsStep("until");
 
         var delay = until.Subtract(DateTimeOffset.UtcNow);
-        var cancellationToken = CancellationToken.None;
+        var cancellationToken = DurableTaskContext.GetCurrentContextOrThrow().CancellationToken;
         var maxDelay = TimeSpan.FromMilliseconds(int.MaxValue);
         while (delay > maxDelay)
         {
@@ -17,7 +17,7 @@ public abstract partial class DurableTask
             var task2 = await Task.WhenAny(Task.Delay(maxDelay, cancellationToken)).ConfigureAwait(false);
             if (task2.IsCanceled)
             {
-                await Task.Yield();
+                await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
                 return false;
             }
         }
@@ -29,7 +29,7 @@ public abstract partial class DurableTask
     public static async DurableTask<bool> DelayUntil(DateTimeOffset dateTime)
     {
         var delay = dateTime.Subtract(DateTimeOffset.UtcNow);
-        var cancellationToken = CancellationToken.None;
+        var cancellationToken = DurableTaskContext.GetCurrentContextOrThrow().CancellationToken;
         var maxDelay = TimeSpan.FromMilliseconds(int.MaxValue);
         while (delay > maxDelay)
         {
@@ -37,7 +37,7 @@ public abstract partial class DurableTask
             var task2 = await Task.WhenAny(Task.Delay(maxDelay, cancellationToken)).ConfigureAwait(false);
             if (task2.IsCanceled)
             {
-                await Task.Yield();
+                await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
                 return false;
             }
         }

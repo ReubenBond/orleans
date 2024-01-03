@@ -46,6 +46,7 @@ public interface IDurableTaskState
 }
 
 [GenerateSerializer, SuppressReferenceTracking]
+[Alias("DurableTaskState")]
 public class DurableTaskState : IDurableTaskState
 {
     /// <summary>

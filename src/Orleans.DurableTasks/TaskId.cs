@@ -2,7 +2,8 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.DurableTasks;
 
-[GenerateSerializer]
+[GenerateSerializer, Immutable]
+[Alias("TaskId")]
 public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<TaskId>, ISpanParsable<TaskId>
 {
     public static readonly TaskId None = default;

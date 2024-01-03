@@ -13,9 +13,9 @@ namespace Orleans.DurableTasks.Tests
         [Fact]
         public void RepresentationIsInconsequential()
         {
-            var aParent = new HierarchicalKey("foo/bar");
+            var aParent = HierarchicalKey.Create("foo/bar");
             var a = aParent.CreateChildKey("baz");
-            var b = new HierarchicalKey("foo/bar/baz");
+            var b = HierarchicalKey.Create("foo/bar/baz");
             Assert.Equal(a, b);
             Assert.Equal(b.ToString(), b.ToString());
             Assert.Equal(a.GetHashCode(), b.GetHashCode());
@@ -43,9 +43,9 @@ namespace Orleans.DurableTasks.Tests
         [Fact]
         public void SegmentsCanBeEscaped()
         {
-            var aParent = new HierarchicalKey("foo/bar\\/");
+            var aParent = HierarchicalKey.Create("foo/bar\\/");
             var a = aParent.CreateChildKey("baz");
-            var b = new HierarchicalKey("foo/bar\\//baz");
+            var b = HierarchicalKey.Create("foo/bar\\//baz");
             Assert.Equal(a, b);
             Assert.Equal(b.ToString(), b.ToString());
             Assert.Equal(a.GetHashCode(), b.GetHashCode());
@@ -73,58 +73,58 @@ namespace Orleans.DurableTasks.Tests
         [Fact]
         public void OnlyValidValuesAreAllowed()
         {
-            Assert.Throws<ArgumentNullException>(() => new HierarchicalKey(null));
-            Assert.Throws<ArgumentException>(() => new HierarchicalKey(""));
-            Assert.Throws<ArgumentException>(() => new HierarchicalKey("/"));
-            Assert.Throws<ArgumentException>(() => new HierarchicalKey("//"));
-            Assert.Throws<ArgumentException>(() => new HierarchicalKey("a//"));
-            Assert.Throws<ArgumentException>(() => new HierarchicalKey("//a"));
-            Assert.Throws<ArgumentException>(() => new HierarchicalKey("\\//"));
-            Assert.Throws<ArgumentException>(() => new HierarchicalKey("a/b//c/d"));
-            Assert.Throws<ArgumentException>(() => new HierarchicalKey("aaa/bbb//ccc/ddd"));
-            Assert.Throws<ArgumentException>(() => new HierarchicalKey("a/b/c/d//"));
-            Assert.Throws<ArgumentException>(() => new HierarchicalKey("//a/b/c/d//"));
-            _ = new HierarchicalKey("\\/\\/");
-            _ = new HierarchicalKey("aaa/bbb/ccc/ddd");
-            _ = new HierarchicalKey("a/b/c/d");
-            _ = new HierarchicalKey("\\/\\/a/b/c/d\\/\\/");
+            Assert.Throws<ArgumentNullException>(() => HierarchicalKey.Create(null));
+            Assert.Throws<ArgumentException>(() => HierarchicalKey.Create(""));
+            Assert.Throws<ArgumentException>(() => HierarchicalKey.Create("/"));
+            Assert.Throws<ArgumentException>(() => HierarchicalKey.Create("//"));
+            Assert.Throws<ArgumentException>(() => HierarchicalKey.Create("a//"));
+            Assert.Throws<ArgumentException>(() => HierarchicalKey.Create("//a"));
+            Assert.Throws<ArgumentException>(() => HierarchicalKey.Create("\\//"));
+            Assert.Throws<ArgumentException>(() => HierarchicalKey.Create("a/b//c/d"));
+            Assert.Throws<ArgumentException>(() => HierarchicalKey.Create("aaa/bbb//ccc/ddd"));
+            Assert.Throws<ArgumentException>(() => HierarchicalKey.Create("a/b/c/d//"));
+            Assert.Throws<ArgumentException>(() => HierarchicalKey.Create("//a/b/c/d//"));
+            _ = HierarchicalKey.Create("\\/\\/");
+            _ = HierarchicalKey.Create("aaa/bbb/ccc/ddd");
+            _ = HierarchicalKey.Create("a/b/c/d");
+            _ = HierarchicalKey.Create("\\/\\/a/b/c/d\\/\\/");
         }
 
         [Fact]
         public void GetParentTest()
         {
-            var aKey = new HierarchicalKey("aaa");
+            var aKey = HierarchicalKey.Create("aaa");
 
-            Assert.True(aKey.IsParentOf(new HierarchicalKey(aKey, "bbb")));
-            Assert.True(aKey.IsPrefixOf(new HierarchicalKey("aaa/bbb/ccc")));
-            Assert.True(aKey.IsParentOf(new HierarchicalKey("aaa/bbb")));
-            Assert.False(aKey.IsParentOf(new HierarchicalKey("aaa/bbb/ccc")));
-            Assert.False(aKey.IsPrefixOf(new HierarchicalKey("bbb/ccc")));
-            Assert.False(new HierarchicalKey("a").IsPrefixOf(new HierarchicalKey("aa")));
+            Assert.True(aKey.IsParentOf(HierarchicalKey.Create(aKey, "bbb")));
+            Assert.True(aKey.IsPrefixOf(HierarchicalKey.Create("aaa/bbb/ccc")));
+            Assert.True(aKey.IsParentOf(HierarchicalKey.Create("aaa/bbb")));
+            Assert.False(aKey.IsParentOf(HierarchicalKey.Create("aaa/bbb/ccc")));
+            Assert.False(aKey.IsPrefixOf(HierarchicalKey.Create("bbb/ccc")));
+            Assert.False(HierarchicalKey.Create("a").IsPrefixOf(HierarchicalKey.Create("aa")));
 
             Assert.True(aKey.IsPrefixOf(aKey));
             Assert.False(aKey.IsParentOf(aKey));
-            Assert.False(aKey.IsParentOf(new HierarchicalKey("aaa")));
-            Assert.False(aKey.IsParentOf(new HierarchicalKey("bbb")));
+            Assert.False(aKey.IsParentOf(HierarchicalKey.Create("aaa")));
+            Assert.False(aKey.IsParentOf(HierarchicalKey.Create("bbb")));
 
             Assert.Null(aKey.GetParent());
-            Assert.Same(aKey, new HierarchicalKey(aKey, "bbb").GetParent());
-            Assert.True(new HierarchicalKey("aaa/bbb").IsChildOf(aKey));
-            Assert.False(new HierarchicalKey("aaa/bbb/ccc").IsChildOf(aKey));
-            Assert.Equal(new HierarchicalKey(aKey, "bbb"), new HierarchicalKey("aaa/bbb/ccc").GetParent());
-            Assert.True(new HierarchicalKey("aaa/bbb").IsParentOf(new HierarchicalKey("aaa/bbb/ccc")));
-            Assert.Equal(new HierarchicalKey("aaa/bbb"), new HierarchicalKey("aaa/bbb/ccc").GetParent());
+            Assert.Same(aKey, HierarchicalKey.Create(aKey, "bbb").GetParent());
+            Assert.True(HierarchicalKey.Create("aaa/bbb").IsChildOf(aKey));
+            Assert.False(HierarchicalKey.Create("aaa/bbb/ccc").IsChildOf(aKey));
+            Assert.Equal(HierarchicalKey.Create(aKey, "bbb"), HierarchicalKey.Create("aaa/bbb/ccc").GetParent());
+            Assert.True(HierarchicalKey.Create("aaa/bbb").IsParentOf(HierarchicalKey.Create("aaa/bbb/ccc")));
+            Assert.Equal(HierarchicalKey.Create("aaa/bbb"), HierarchicalKey.Create("aaa/bbb/ccc").GetParent());
 
-            Assert.Null(new HierarchicalKey("\\/\\/").GetParent());
-            Assert.Null(new HierarchicalKey("\\/").GetParent());
-            Assert.Equal(new HierarchicalKey("\\/\\/"), new HierarchicalKey("\\/\\//aaa").GetParent());
-            Assert.Equal(new HierarchicalKey("\\/"), new HierarchicalKey("\\//\\/").GetParent());
+            Assert.Null(HierarchicalKey.Create("\\/\\/").GetParent());
+            Assert.Null(HierarchicalKey.Create("\\/").GetParent());
+            Assert.Equal(HierarchicalKey.Create("\\/\\/"), HierarchicalKey.Create("\\/\\//aaa").GetParent());
+            Assert.Equal(HierarchicalKey.Create("\\/"), HierarchicalKey.Create("\\//\\/").GetParent());
         }
 
         [Fact]
         public void CreateEscapedChildKeyTest()
         {
-            var aParent = new HierarchicalKey("foo/bar\\/");
+            var aParent = HierarchicalKey.Create("foo/bar\\/");
             var a = aParent.CreateEscapedChildKey("baz/boz");
             var b = aParent.CreateEscapedChildKey("baz\\/boz");
             Assert.Equal(a, b);

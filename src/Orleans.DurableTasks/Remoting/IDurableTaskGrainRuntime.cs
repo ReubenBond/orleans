@@ -16,33 +16,43 @@ using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.DurableTasks.Remoting;
 
+[Alias("IDurableTaskClient")]
 public interface IDurableTaskClient : IGrainExtension
 {
     // Called when a remotely scheduled request completes
     [AlwaysInterleave]
+    [Alias("OnResponse")]
     ValueTask OnResponse(TaskId taskId, Response response);
 }
 
+[Alias("IDurableTaskServer")]
 public interface IDurableTaskServer : IGrainExtension
 {
     // Called by DurableTaskRequest.Invoke to ensure that a task is scheduled
+    [Alias("ScheduleAsync")]
     ValueTask<Response> ScheduleAsync(IDurableTaskRequest request);
 
     // API used by ScheduledTask/<T> to check for a result for a task.
     // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
+    [Alias("SubscribeOrPollAsync")]
     ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskClient? client);
 }
 
+[Alias("IDurableTaskGrainExtension")]
 public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServer, IDurableTaskClient
 {
     // TODO: implement. This will require making a serializable implementation of ScheduledTask<T>
     //ValueTask<(bool Exists, ScheduledTask<T> Task)> TryGetScheduledTaskAsync<T>(TaskId taskId);
     //ValueTask<(bool Exists, ScheduledTask Task)> TryGetScheduledTaskAsync(TaskId taskId);
+    [Alias("GetTasksAsync")]
     IAsyncEnumerable<(TaskId TaskId, DurableTaskDiagnosticState State)> GetTasksAsync();
+
+    [Alias("GetRunningTasksAsync")]
     IAsyncEnumerable<TaskId> GetRunningTasksAsync();
 }
 
 [GenerateSerializer]
+[Alias("DurableTaskDiagnosticState")]
 public struct DurableTaskDiagnosticState
 {
     [Id(0)]
@@ -69,7 +79,7 @@ public interface IDurableTaskGrainRuntime
     ValueTask<DurableTaskContext> EvaluateAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
 }
 
-internal class DurableTaskGrainExtensionShared(
+internal sealed class DurableTaskGrainExtensionShared(
     IGrainContextAccessor grainContextAccessor,
     TimeProvider timeProvider,
     PlacementStrategyResolver placementStrategyResolver,
@@ -82,7 +92,7 @@ internal class DurableTaskGrainExtensionShared(
     public CleanupPolicy DefaultCleanupPolicy { get; } = new CleanupPolicy { CleanupAge = TimeSpan.FromDays(1) };
 }
 
-internal class DurableTaskGrainExtension(
+internal sealed class DurableTaskGrainExtension(
     IDurableTaskGrainStorage storage,
     DurableTaskGrainExtensionShared shared) : IDurableTaskGrainRuntime, IDurableTaskGrainExtension
 {
@@ -488,7 +498,7 @@ internal class DurableTaskGrainExtension(
                 _shared.Logger.LogWarning(exception, "{Id} exception while notifying clients of completion for durable task {TaskId}", GrainId, taskId);
             }
 
-            // TODO: Make this configurable and probably use exponential backoff, potentially with some coordination with other tasks.
+            // TODO: Make this configurable and probably use exponential back-off, potentially with some coordination with other tasks.
             await Task.Delay(TimeSpan.FromSeconds(10));
         }
     }
@@ -721,6 +731,7 @@ public interface IDurableTaskClientConverter
 /// Represents the address of a <see cref="IDurableTaskClient"/>.
 /// </summary>
 [Serializable, GenerateSerializer, Immutable]
+[Alias("DurableTaskClientAddress")]
 public readonly struct DurableTaskClientAddress : IEquatable<DurableTaskClientAddress>, IComparable<DurableTaskClientAddress>, ISpanFormattable, IParsable<DurableTaskClientAddress>
 {
     [Id(0)]

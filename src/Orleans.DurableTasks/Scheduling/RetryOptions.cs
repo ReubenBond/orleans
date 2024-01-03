@@ -2,7 +2,7 @@ namespace Orleans.DurableTasks;
 
 public class RetryOptions
 {
-    public double BackoffCoefficient { get; init; } = 2;
+    public double BackOffCoefficient { get; init; } = 2;
     public TimeSpan FirstRetryInterval { get; init; } = TimeSpan.FromSeconds(1);
     public TimeSpan MaximumRetryInterval { get; init; } = TimeSpan.FromMinutes(5);
     public int MaximumAttemptCount { get; init; }

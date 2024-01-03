@@ -1,6 +1,7 @@
 namespace Orleans.DurableTasks;
 
 [GenerateSerializer]
+[Alias("SchedulingOptions")]
 public class SchedulingOptions
 {
     [Id(0)]

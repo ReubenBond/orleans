@@ -5,7 +5,8 @@ using System.Runtime.InteropServices;
 
 namespace Orleans.DurableTasks;
 
-[GenerateSerializer]
+[GenerateSerializer, Immutable]
+[Alias("HierarchicalKey")]
 internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalKey>, IParsable<HierarchicalKey>, ISpanParsable<HierarchicalKey>
 {
     public const char EscapeCharacter = '\\';
@@ -15,17 +16,20 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
     [Id(0)]
     private readonly HierarchicalKey? _parent;
 
-    // TODO: Operations on this (eg, GetParent()) might be cheaper if it were a ReadOnlyMemory<char>
     [Id(1)]
-    private readonly string _value;
+    private readonly ReadOnlyMemory<char> _value;
 
-    // Private constructor used to skip re-validation in parsing cases.
-    private HierarchicalKey(string value, bool ignored)
+    private HierarchicalKey(ReadOnlyMemory<char> value)
     { 
         _value = value;
     }
 
-    public HierarchicalKey(string value)
+    private HierarchicalKey(HierarchicalKey? parent, ReadOnlyMemory<char> value) : this(value)
+    {
+        _parent = parent;
+    }
+
+    public static HierarchicalKey Create(string value)
     {
         ArgumentException.ThrowIfNullOrEmpty(value);
         if (!IsSegmentationValid(value))
@@ -33,28 +37,25 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
             throw new ArgumentException("Value must not contain empty segments", nameof(value));
         }
 
-        _value = value;
+        return new(value.AsMemory());
     }
 
-    public HierarchicalKey(HierarchicalKey? parent, string value) : this(value)
-    {
-        _parent = parent;
-    }
+    public static HierarchicalKey Create(HierarchicalKey? parent, string value) => new(parent, value.AsMemory());
 
     public HierarchicalKey? GetParent() => WithoutLastSegment(_value) switch
     {
-        { Length: > 0 } value => new(_parent, new string(value)),
+        { Length: > 0 } value => new(_parent, value),
         _ => _parent,
     };
 
-    public static HierarchicalKey Parse(string s, IFormatProvider? provider) => new (s);
+    public static HierarchicalKey Parse(string s, IFormatProvider? provider) => Create(s);
 
     public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, [MaybeNullWhen(false)] out HierarchicalKey result)
     {
         if (s is { Length: > 0 } && IsSegmentationValid(s))
         {
             // Avoid re-validating the key.
-            result = new HierarchicalKey(s, false);
+            result = new HierarchicalKey(s.AsMemory());
             return true;
         }
 
@@ -77,7 +78,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         if (s is { Length: > 0 } && IsSegmentationValid(s))
         {
             // Avoid re-validating the key.
-            result = new HierarchicalKey(new string(s), false);
+            result = new HierarchicalKey(new string(s).AsMemory());
             return true;
         }
 
@@ -85,15 +86,15 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         return false;
     }
 
-    public static HierarchicalKey CreateEscaped(HierarchicalKey? parent, string value)
+    public static HierarchicalKey CreateEscaped(HierarchicalKey? parent, ReadOnlyMemory<char> value)
     {
-        var unescapedChars = UnescapedCharCount(value);
+        var unescapedChars = UnescapedCharCount(value.Span);
         if (unescapedChars == 0)
         {
             return new HierarchicalKey(parent, value);
         }
 
-        return new HierarchicalKey(parent, Escape(value, unescapedChars));
+        return new HierarchicalKey(parent, Escape(value.Span, unescapedChars).AsMemory());
     }
 
     private static string Escape(ReadOnlySpan<char> value, int unescapedChars)
@@ -143,14 +144,15 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         return result;
     }
 
-    private static ReadOnlySpan<char> WithoutLastSegment(ReadOnlySpan<char> value)
+    private static ReadOnlyMemory<char> WithoutLastSegment(ReadOnlyMemory<char> value)
     {
         // Find the last segment in the value string by searching for the last unescaped segment separator
         var isEscaped = false;
         var lastSegmentStart = 0;
-        for (var i = 0; i < value.Length; i++)
+        var valueSpan = value.Span;
+        for (var i = 0; i < valueSpan.Length; i++)
         {
-            var c = value[i];
+            var c = valueSpan[i];
             if (c == SegmentSeparator)
             {
                 if (!isEscaped)
@@ -167,7 +169,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
             }
         }
 
-        return lastSegmentStart == 0 ? [] : value[..(lastSegmentStart - 1)];
+        return lastSegmentStart == 0 ? ReadOnlyMemory<char>.Empty : value[..(lastSegmentStart - 1)];
     }
 
     private static ReadOnlySpan<char> GetLastSegment(ReadOnlySpan<char> value)
@@ -331,23 +333,23 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
     /// Creates a new key, escaping any unescaped segment separators in <paramref name="value"/>, and returns it.
     /// </summary>
     /// <param name="value">The value.</param>
-    public static HierarchicalKey CreateEscaped(string value) => CreateEscaped(null, value);
+    public static HierarchicalKey CreateEscaped(string value) => CreateEscaped(null, value.AsMemory());
 
     /// <summary>
     /// Creates a key which is a child of this key, escaping any unescaped segment separators in <paramref name="value"/>, and returns it.
     /// </summary>
     /// <param name="value">The value for the child segments.</param>
-    public HierarchicalKey CreateEscapedChildKey(string value) => CreateEscaped(this, value);
+    public HierarchicalKey CreateEscapedChildKey(string value) => CreateEscaped(this, value.AsMemory());
 
     /// <summary>
     /// Creates a key which is a child of this key and returns it.
     /// </summary>
     /// <param name="value">The value for the child segments.</param>
     /// <returns></returns>
-    public HierarchicalKey CreateChildKey(string value) => new(this, value);
+    public HierarchicalKey CreateChildKey(string value) => new(this, value.AsMemory());
 
     /// <inheritdoc/>
-    public override string ToString() => _parent is null ? _value : $"{this}";
+    public override string ToString() => $"{this}";
 
     /// <summary>
     /// Gets the number of characters which comprise the key.
@@ -432,7 +434,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
             charsWritten = 0;
         }
 
-        if (_value.AsSpan().TryCopyTo(destination))
+        if (_value.Span.TryCopyTo(destination))
         {
             charsWritten += _value.Length;
             return true;
@@ -511,7 +513,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
             return true;
         }
 
-        private ReadOnlySpan<char> GetNextSegment()
+        private readonly ReadOnlySpan<char> GetNextSegment()
         {
             var buffer = _buffer;
             var isEscaped = false;
@@ -577,7 +579,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
                 current = current!._parent;
             }
 
-            return current!._value;
+            return current!._value.Span;
         }
 
         public bool MoveNext()
