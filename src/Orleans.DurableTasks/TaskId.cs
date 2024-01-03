@@ -47,7 +47,7 @@ public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<
     {
         if (HierarchicalKey.TryParse(s, provider, out var key))
         {
-            result = new TaskId(key);
+            result = new(key);
             return true;
         }
 

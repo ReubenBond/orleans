@@ -89,7 +89,7 @@ internal sealed class DurableTaskGrainExtensionShared(
     public TimeProvider TimeProvider { get; } = timeProvider;
     public ILogger<DurableTaskGrainExtension> Logger { get; } = logger;
     public PlacementStrategyResolver PlacementStrategyResolver { get; } = placementStrategyResolver;
-    public CleanupPolicy DefaultCleanupPolicy { get; } = new CleanupPolicy { CleanupAge = TimeSpan.FromDays(1) };
+    public CleanupPolicy DefaultCleanupPolicy { get; } = new() { CleanupAge = TimeSpan.FromDays(1) };
 }
 
 internal sealed class DurableTaskGrainExtension(
@@ -109,7 +109,7 @@ internal sealed class DurableTaskGrainExtension(
     /// <param name="taskId">The task id.</param>
     /// <param name="state">The task state.</param>
     /// <returns>The new execution context.</returns>
-    private GrainDurableTaskExecutionContext CreateExecutionContext(TaskId taskId, IDurableTaskState state) => _pendingTasks[taskId] = new GrainDurableTaskExecutionContext(taskId, this, state);
+    private GrainDurableTaskExecutionContext CreateExecutionContext(TaskId taskId, IDurableTaskState state) => _pendingTasks[taskId] = new(taskId, this, state);
 
     /// <summary>
     /// Gets the execution context corresponding to the provided task, if it exists, and returns it.
@@ -128,7 +128,7 @@ internal sealed class DurableTaskGrainExtension(
         if (_storage.TryGetTask(taskId, out var state))
         {
             // Rehydrate the execution context from its persisted state.
-            executionContext = new GrainDurableTaskExecutionContext(taskId, this, state);
+            executionContext = new(taskId, this, state);
 
             // If the task has completed, set the result now.
             if (state.Result is { } response)
@@ -751,7 +751,7 @@ public readonly struct DurableTaskClientAddress : IEquatable<DurableTaskClientAd
     /// <param name="value">
     /// The raw id value.
     /// </param>
-    public DurableTaskClientAddress(byte[] value) => _value = new IdSpan(value);
+    public DurableTaskClientAddress(byte[] value) => _value = new(value);
 
     /// <summary>
     /// Gets the underlying value.
@@ -932,7 +932,7 @@ public sealed class DurableTaskClientAddressCodec : IFieldCodec<DurableTaskClien
 
         var hashCode = reader.ReadInt32();
         var payloadArray = reader.ReadBytes(length);
-        return new DurableTaskClientAddress(IdSpan.UnsafeCreate(payloadArray, hashCode));
+        return new(IdSpan.UnsafeCreate(payloadArray, hashCode));
     }
 
     /// <inheritdoc />
@@ -948,6 +948,6 @@ public sealed class DurableTaskClientAddressCodec : IFieldCodec<DurableTaskClien
 
         var hashCode = reader.ReadInt32();
         var payloadArray = reader.ReadBytes(length - sizeof(int));
-        return new DurableTaskClientAddress(IdSpan.UnsafeCreate(payloadArray, hashCode));
+        return new(IdSpan.UnsafeCreate(payloadArray, hashCode));
     }
 }

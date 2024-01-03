@@ -53,14 +53,12 @@ internal sealed class CompletedDurableTask<TResult>(TResult value) : DurableTask
 /// </summary>
 internal sealed class AsyncDelegateDurableTask<TResult>(Func<ValueTask<TResult>> func) : DurableTask<TResult>
 {
-    private readonly Func<ValueTask<TResult>> _func = func;
-
     protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext context)
     {
         try
         {
             DurableTaskContext.SetCurrentContext(context);
-            return Response.FromResult(await _func());
+            return Response.FromResult(await func());
         }
         catch (Exception exception)
         {
@@ -74,14 +72,12 @@ internal sealed class AsyncDelegateDurableTask<TResult>(Func<ValueTask<TResult>>
 /// </summary>
 internal sealed class AsyncDelegateDurableTask(Func<ValueTask> func) : DurableTask
 {
-    private readonly Func<ValueTask> _func = func;
-
     protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext context)
     {
         try
         {
             DurableTaskContext.SetCurrentContext(context);
-            await _func();
+            await func();
             return Response.Completed;
         }
         catch (Exception exception)
@@ -96,14 +92,12 @@ internal sealed class AsyncDelegateDurableTask(Func<ValueTask> func) : DurableTa
 /// </summary>
 internal sealed class DelegateDurableTask<TResult>(Func<TResult> func) : DurableTask<TResult>
 {
-    private readonly Func<TResult> _func = func;
-
     protected internal override ValueTask<Response> InvokeAsync(DurableTaskContext context)
     {
         try
         {
             DurableTaskContext.SetCurrentContext(context);
-            return new(Response.FromResult(_func()));
+            return new(Response.FromResult(func()));
         }
         catch (Exception exception)
         {
@@ -117,14 +111,12 @@ internal sealed class DelegateDurableTask<TResult>(Func<TResult> func) : Durable
 /// </summary>
 internal sealed class DelegateDurableTask(Action func) : DurableTask
 {
-    private readonly Action _func = func;
-
     protected internal override ValueTask<Response> InvokeAsync(DurableTaskContext context)
     {
         try
         {
             DurableTaskContext.SetCurrentContext(context);
-            _func();
+            func();
             return new(Response.Completed);
         }
         catch (Exception exception)
