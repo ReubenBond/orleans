@@ -55,7 +55,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         if (s is { Length: > 0 } && IsSegmentationValid(s))
         {
             // Avoid re-validating the key.
-            result = new HierarchicalKey(s.AsMemory());
+            result = new(s.AsMemory());
             return true;
         }
 
@@ -78,7 +78,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         if (s is { Length: > 0 } && IsSegmentationValid(s))
         {
             // Avoid re-validating the key.
-            result = new HierarchicalKey(new string(s).AsMemory());
+            result = new(new string(s).AsMemory());
             return true;
         }
 
@@ -91,10 +91,10 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         var unescapedChars = UnescapedCharCount(value.Span);
         if (unescapedChars == 0)
         {
-            return new HierarchicalKey(parent, value);
+            return new(parent, value);
         }
 
-        return new HierarchicalKey(parent, Escape(value.Span, unescapedChars).AsMemory());
+        return new(parent, Escape(value.Span, unescapedChars).AsMemory());
     }
 
     private static string Escape(ReadOnlySpan<char> value, int unescapedChars)
@@ -120,7 +120,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
             resultArray[i + insertions] = c;
         }
 
-        return new string(resultArray.AsSpan(0, value.Length + unescapedChars));
+        return new(resultArray.AsSpan(0, value.Length + unescapedChars));
     }
 
     private static int UnescapedCharCount(ReadOnlySpan<char> value)
@@ -391,10 +391,10 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         // hash code as an instance with the value "foo/bar/baz".
         var length = Length;
         var array = length <= 256 ? null : ArrayPool<char>.Shared.Rent(length);
-        Span<char> buffer = array ?? stackalloc char[256];
+        var buffer = array ?? stackalloc char[256];
 
         // Write the value into the buffer.
-        var didFormat = TryFormat(buffer, out var len, ReadOnlySpan<char>.Empty, null);
+        var didFormat = TryFormat(buffer, out var len, [], null);
         buffer = buffer[..len];
         Debug.Assert(didFormat);
 
@@ -476,7 +476,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
 
     public ref struct SegmentEnumerator(HierarchicalKey id)
     {
-        private StructureEnumerator _enumerator = new StructureEnumerator(id);
+        private StructureEnumerator _enumerator = new(id);
         private ReadOnlySpan<char> _buffer = ReadOnlySpan<char>.Empty;
 
         public ReadOnlySpan<char> Current { get; private set; }
@@ -548,7 +548,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         {
             -2 => throw new InvalidOperationException($"{nameof(MoveNext)} must be called before accessing {nameof(Current)}"),
             -1 => throw new InvalidOperationException("No remaining elements"),
-            int depth => GetElement(_current, depth),
+            var depth => GetElement(_current, depth),
         };
 
         private static int GetElementCount(HierarchicalKey? current)

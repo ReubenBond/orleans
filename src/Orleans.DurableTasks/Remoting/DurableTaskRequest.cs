@@ -112,7 +112,7 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
     public DurableTask InitializeRequest(GrainReference targetGrainReference)
     {
         // Capture the request context.
-        Context = new DurableTaskRequestContext
+        Context = new()
         {
             // TaskId will be filled in later, before submission, via an extension method at the call site.
             Target = targetGrainReference,
@@ -264,7 +264,7 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
     public DurableTask<TResult> InitializeRequest(GrainReference targetGrainReference)
     {
         // Capture the request context.
-        Context = new DurableTaskRequestContext
+        Context = new()
         {
             // TaskId will be filled in later, before submission, via an extension method at the call site.
             Target = targetGrainReference,
@@ -335,7 +335,7 @@ public sealed class PendingResponse : Response
     /// <summary>
     /// Gets the singleton instance of this class.
     /// </summary>
-    public static PendingResponse Instance { get; } = new PendingResponse();
+    public static PendingResponse Instance { get; } = new();
 
     /// <inheritdoc/>
     public override object? Result { get => null; set => throw new InvalidOperationException($"Type {nameof(PendingResponse)} is read-only"); } 
@@ -373,7 +373,7 @@ public sealed class SubscribedResponse : Response
     /// <summary>
     /// Gets the singleton instance of this class.
     /// </summary>
-    public static SubscribedResponse Instance { get; } = new SubscribedResponse();
+    public static SubscribedResponse Instance { get; } = new();
 
     /// <inheritdoc/>
     public override object? Result { get => null; set => throw new InvalidOperationException($"Type {nameof(SubscribedResponse)} is read-only"); } 
@@ -411,7 +411,7 @@ public sealed class UnknownTaskResponse : Response
     /// <summary>
     /// Gets the singleton instance of this class.
     /// </summary>
-    public static UnknownTaskResponse Instance { get; } = new UnknownTaskResponse();
+    public static UnknownTaskResponse Instance { get; } = new();
 
     /// <inheritdoc/>
     public override object? Result
