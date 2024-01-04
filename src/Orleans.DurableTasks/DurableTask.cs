@@ -1,4 +1,3 @@
-using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 using Orleans.DurableTasks.Remoting;
 using Orleans.Runtime;
