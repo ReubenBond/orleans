@@ -41,6 +41,7 @@ public class Program
         DurableTask<bool> Transfer(IAccountGrain source, IAccountGrain destination, long amount);
     }
 
+    [Alias("IAccountGrain")]
     public interface IAccountGrain : IGrainWithStringKey
     {
         DurableTask<bool> Withdraw(long amount);
@@ -48,6 +49,8 @@ public class Program
         ValueTask<long> GetBalance();
     }
 
+    [GrainType("bank")]
+    [Alias("BankGrain")]
     public class BankGrain : DurableGrain, IBankGrain
     {
         public async DurableTask<bool> Transfer(
@@ -63,6 +66,8 @@ public class Program
         }
     }
 
+    [GrainType("account")]
+    [Alias("AccountGrain")]
     public class AccountGrain : DurableGrain, IAccountGrain
     {
         private readonly DurableValue<long> _balance;
@@ -88,7 +93,7 @@ public class Program
         public ValueTask<long> GetBalance() => new(_balance.Value);
     }
 
-    [Alias("Program.IClientGrain")]
+    [Alias("IClientGrain")]
     public interface IClientGrain : IGrainWithStringKey
     {
         [Alias("Run")]
@@ -97,6 +102,8 @@ public class Program
         DurableTask RunWorkflow();
     }
 
+    [GrainType("client")]
+    [Alias("ClientGrain")]
     public class ClientGrain : DurableGrain, IClientGrain
     {
         public async Task Run()
@@ -307,24 +314,6 @@ public class Program
         await Task.Yield();
     }
 #endif
-}
-
-[Alias("ITransferGrain")]
-public interface ITransferGrain : IGrain
-{
-    [Alias("Transfer")]
-    DurableTask<bool> Transfer(IAccountGrain source, IAccountGrain destination, int amount);
-}
-
-[Alias("IAccountGrain")]
-public interface IAccountGrain : IGrain
-{
-    [Alias("Credit")]
-    DurableTask Credit(int amount);
-
-    // Deducting funds might fail and return false if the account would be overdrawn
-    [Alias("TryDebit")]
-    DurableTask<bool> TryDebit(int amount);
 }
 
 [Alias("ICopyProcessorGrain")]
