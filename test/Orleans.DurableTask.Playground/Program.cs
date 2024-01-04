@@ -57,9 +57,9 @@ public class Program
             IAccountGrain destination,
             long amount)
         {
-            var success = await source.Withdraw(amount).AsStep("withdraw");
+            var success = await source.Withdraw(amount);
             if (!success) return false;
-            await destination.Deposit(amount).AsStep("deposit");
+            await destination.Deposit(amount);
             return success;
         }
     }
@@ -103,16 +103,12 @@ public class Program
             var customer = GrainFactory.GetGrain<IAccountGrain>("customer");
             var business = GrainFactory.GetGrain<IAccountGrain>("business");
 
-            // await await?! awaiting ScheduleAsync yields a ScheduledTask<T> and ensures
-            // that the task has been scheduled durably.
-            // Awaiting the ScheduledTask<T> yields the result of the task.
-            await await customer.Deposit(120_000_000_000).ScheduleAsync("receive-inheritance");
+            await customer.Deposit(120_000_000_000).WithId("receive-inheritance2");
 
-            var scheduledTask = await bankGrain
+            var success = await bankGrain
                 .Transfer(customer, business, 20)
-                .ScheduleAsync("transfer123");
+                .WithId("transfer1234");
 
-            var success = await scheduledTask;
             Console.WriteLine(success ? "Success!" : "Fail :(");
             Console.WriteLine("Customer balance: " + await customer.GetBalance());
             Console.WriteLine("Business balance: " + await business.GetBalance());

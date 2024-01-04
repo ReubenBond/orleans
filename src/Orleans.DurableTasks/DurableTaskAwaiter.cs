@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;
 
@@ -7,15 +8,14 @@ namespace Orleans.DurableTasks;
 /// </summary>
 public readonly struct DurableTaskAwaiter : INotifyCompletion, ICriticalNotifyCompletion
 {
-    private readonly ValueTaskAwaiter _awaiter;
+    private readonly ValueTaskAwaiter<Response> _awaiter;
 
-    internal DurableTaskAwaiter(DurableTask durableTask)
+    internal DurableTaskAwaiter(ValueTask<Response> invokedTask)
     {
-        throw new NotImplementedException();
-        //_awaiter = new ValueTask(durableTask.InvokeAsync(null!).AsTask()).GetAwaiter();
+        _awaiter = invokedTask.GetAwaiter();
     }
 
-    public void GetResult() => _awaiter.GetResult();
+    public void GetResult() => _awaiter.GetResult().ThrowIfExceptionResponse();
     public bool IsCompleted => _awaiter.IsCompleted;
     public void OnCompleted(Action continuation) => _awaiter.OnCompleted(continuation);
     public void UnsafeOnCompleted(Action continuation) => _awaiter.UnsafeOnCompleted(continuation);
@@ -26,15 +26,14 @@ public readonly struct DurableTaskAwaiter : INotifyCompletion, ICriticalNotifyCo
 /// </summary>
 public readonly struct DurableTaskAwaiter<TResult> : INotifyCompletion, ICriticalNotifyCompletion
 {
-    private readonly ValueTaskAwaiter<TResult> _awaiter;
+    private readonly ValueTaskAwaiter<Response> _awaiter;
 
-    internal DurableTaskAwaiter(DurableTask<TResult> durableTask)
+    internal DurableTaskAwaiter(ValueTask<Response> invokedTask)
     {
-        throw new NotImplementedException();
-        //_awaiter = durableTask.InvokeAsync(null!).GetAwaiter();
+        _awaiter = invokedTask.GetAwaiter();
     }
 
-    public TResult GetResult() => _awaiter.GetResult();
+    public TResult GetResult() => _awaiter.GetResult().GetResult<TResult>();
     public bool IsCompleted => _awaiter.IsCompleted;
     public void OnCompleted(Action continuation) => _awaiter.OnCompleted(continuation);
     public void UnsafeOnCompleted(Action continuation) => _awaiter.UnsafeOnCompleted(continuation);

@@ -21,6 +21,8 @@ public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<
         _key = key;
     }
 
+    public bool IsDefault => Equals(None);
+
     public static explicit operator string(TaskId taskId) => taskId.ToString();
     public static explicit operator TaskId(string taskId) => new(taskId);
 

@@ -1,3 +1,5 @@
+using Orleans.Serialization.Invocation;
+
 namespace Orleans.DurableTasks;
 
 public abstract partial class DurableTaskContext(TaskId id)
@@ -18,4 +20,6 @@ public abstract partial class DurableTaskContext(TaskId id)
     internal CancellationTokenSource CancellationTokenSource { get; } = new();
     public CancellationToken CancellationToken => CancellationTokenSource.Token;
     protected internal abstract ValueTask<DurableTaskContext> EvaluateAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
+    protected internal abstract ValueTask<Response> InvokeAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
+    protected internal abstract TaskId CreateChildTaskId();
 }
