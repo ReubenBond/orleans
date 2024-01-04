@@ -9,13 +9,11 @@ using Orleans.Journaling;
 using Azure.Storage.Blobs;
 using Azure.Core.Pipeline;
 using Azure.Core;
-using static Orleans.Journaling.LogExtentBuilder;
-using System.Diagnostics.Tracing;
 using System.Diagnostics;
-using System.Text;
+using Newtonsoft.Json;
+using Orleans.Runtime;
 
 namespace Orleans.DurableTasks.Playground;
-#pragma warning disable ORLEANS0009 // Grain interfaces methods must return a compatible type
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
 
 public static class DurableTaskHostingExtensions
@@ -59,6 +57,7 @@ public class Program
         {
             var success = await source.Withdraw(amount);
             if (!success) return false;
+
             await destination.Deposit(amount);
             return success;
         }
@@ -89,9 +88,12 @@ public class Program
         public ValueTask<long> GetBalance() => new(_balance.Value);
     }
 
+    [Alias("Program.IClientGrain")]
     public interface IClientGrain : IGrainWithStringKey
     {
+        [Alias("Run")]
         Task Run();
+        [Alias("RunWorkflow")]
         DurableTask RunWorkflow();
     }
 
@@ -99,21 +101,28 @@ public class Program
     {
         public async Task Run()
         {
-            var bankGrain = GrainFactory.GetGrain<IBankGrain>("bank");
+            var bank = GrainFactory.GetGrain<IBankGrain>("bank");
             var customer = GrainFactory.GetGrain<IAccountGrain>("customer");
             var business = GrainFactory.GetGrain<IAccountGrain>("business");
 
-            await customer.Deposit(120_000_000_000).WithId("receive-inheritance2");
+            await customer.Deposit(120_000_000_000);
 
-            var success = await bankGrain
+            var scheduled = await customer.Deposit(120_000_000_000).ScheduleAsync();
+            var id = scheduled.Id;
+            Console.WriteLine(id);
+            await scheduled;
+
+            var scheduledTransfer = await bank
                 .Transfer(customer, business, 20)
-                .WithId("transfer1234");
+                .WithId("transfer1234")
+                .ScheduleAsync();
 
+            var success = await scheduledTransfer;
             Console.WriteLine(success ? "Success!" : "Fail :(");
             Console.WriteLine("Customer balance: " + await customer.GetBalance());
             Console.WriteLine("Business balance: " + await business.GetBalance());
 
-            var scheduledTask2 = await bankGrain
+            var scheduledTask2 = await bank
                 .Transfer(customer, business, 20)
                 .ScheduleAsync("transfer456");
 
@@ -121,6 +130,17 @@ public class Program
             Console.WriteLine(success2 ? "Success!" : "Fail :(");
             Console.WriteLine("Customer balance: " + await customer.GetBalance());
             Console.WriteLine("Business balance: " + await business.GetBalance());
+
+            IGrain[] grains = [bank, customer, business];
+            foreach (var grain in grains)
+            {
+                Console.WriteLine($"Tasks for grain {grain}:");
+                await foreach (var task in grain.Cast<IDurableTaskGrainExtension>().GetTasksAsync())
+                {
+                    Console.WriteLine($" * {task.TaskId}: {JsonConvert.SerializeObject(task.State, Formatting.Indented)}");
+                }
+            }
+
         }
 
         public async DurableTask RunWorkflow()
@@ -289,21 +309,28 @@ public class Program
 #endif
 }
 
+[Alias("ITransferGrain")]
 public interface ITransferGrain : IGrain
 {
+    [Alias("Transfer")]
     DurableTask<bool> Transfer(IAccountGrain source, IAccountGrain destination, int amount);
 }
 
+[Alias("IAccountGrain")]
 public interface IAccountGrain : IGrain
 {
+    [Alias("Credit")]
     DurableTask Credit(int amount);
 
     // Deducting funds might fail and return false if the account would be overdrawn
+    [Alias("TryDebit")]
     DurableTask<bool> TryDebit(int amount);
 }
 
+[Alias("ICopyProcessorGrain")]
 internal interface ICopyProcessorGrain : IGrain
 {
+    [Alias("Copy")]
     DurableTask Copy(string source, string destination, string startRowId, string endRowId);
 }
 
@@ -549,12 +576,15 @@ public class SubscriptionProcessor : DurableTaskOrchestrator
 #endif
 
 // Example: eShop order process
+[Alias("IBuyerAccount")]
 public interface IBuyerAccount : IGrain { }
 
 [GenerateSerializer]
+[Alias("Invoice")]
 public record class Invoice();
 
 [GenerateSerializer]
+[Alias("PaymentResult")]
 public record class PaymentResult()
 {
     public bool IsSuccess { get; internal set; }
@@ -567,9 +597,11 @@ public interface IPaymentService
 }
 
 [GenerateSerializer]
+[Alias("StockCheckResult")]
 public record class StockCheckResult(bool HasStock);
 
 [GenerateSerializer]
+[Alias("CreateShipmentResult")]
 public record class CreateShipmentResult(bool IsSuccess);
 
 public interface ICatalogService
@@ -582,9 +614,13 @@ public interface ILogisticsService
     DurableTask WaitForDelivery(CreateShipmentResult shipmentDetails);
 }
 [GenerateSerializer]
+[Alias("Order")]
 public record class Order();
+
+[Alias("IOrderProcessor")]
 public interface IOrderProcessor : IGrain
 {
+    [Alias("ProcessOrderAsync")]
     DurableTask ProcessOrderAsync(IBuyerAccount buyer, Order order);
 }
 
@@ -604,6 +640,7 @@ public enum OrderStatus
 }
 
 [GenerateSerializer]
+[Alias("OrderState")]
 public class OrderState
 {
     [Id(0)]
@@ -775,10 +812,14 @@ public static class TransactionalStateExtensions
 */
 
 
+[Alias("IMyGrainWithDurableTasks")]
 public interface IMyGrainWithDurableTasks : IGrain
 {
+    [Alias("MyDurableTaskMethod")]
     DurableTask MyDurableTaskMethod(int a, string b);
+    [Alias("MyDurableTaskMethod2")]
     DurableTask<string> MyDurableTaskMethod2(int a, string b);
+    [Alias("MyDurableTaskMethod3")]
     DurableTask<T> MyDurableTaskMethod3<T>(T a);
 }
 
@@ -804,8 +845,6 @@ internal partial class LoggingPolicy(ILoggerFactory loggerFactory) : HttpPipelin
 
     private async ValueTask ProcessAsync(HttpMessage message, ReadOnlyMemory<HttpPipelinePolicy> pipeline, bool async)
     {
-        Request request = message.Request;
-
         LogRequest(message);
 
         var before = Stopwatch.GetTimestamp();
