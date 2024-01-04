@@ -21,4 +21,6 @@ public static class DurableTaskRuntimeHelper
 
     public static void SetCurrentContext(DurableTaskContext? context) => DurableTaskContext.SetCurrentContext(context);
     public static void SetCurrentContext(DurableTaskContext? context, out DurableTaskContext? previous) => DurableTaskContext.SetCurrentContext(context, out previous);
+
+    public static ValueTask<Response> AsValueTask(DurableTaskContext context) => context.AsValueTask();
 }

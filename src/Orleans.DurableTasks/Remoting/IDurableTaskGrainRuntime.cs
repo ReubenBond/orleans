@@ -77,6 +77,9 @@ public struct DurableTaskDiagnosticState
 public interface IDurableTaskGrainRuntime
 {
     ValueTask<DurableTaskContext> EvaluateAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
+
+    // Evaluate and return result.
+    ValueTask<Response> InvokeAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
 }
 
 internal sealed class DurableTaskGrainExtensionShared(
@@ -96,7 +99,7 @@ internal sealed class DurableTaskGrainExtension(
     IDurableTaskGrainStorage storage,
     DurableTaskGrainExtensionShared shared) : IDurableTaskGrainRuntime, IDurableTaskGrainExtension
 {
-    private readonly Dictionary<TaskId, GrainDurableTaskExecutionContext> _pendingTasks = [];
+    private readonly Dictionary<TaskId, GrainDurableTaskContext> _pendingTasks = [];
     private readonly Dictionary<TaskId, Task> _runningTasks = [];
     private readonly DurableTaskGrainExtensionShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
@@ -109,7 +112,7 @@ internal sealed class DurableTaskGrainExtension(
     /// <param name="taskId">The task id.</param>
     /// <param name="state">The task state.</param>
     /// <returns>The new execution context.</returns>
-    private GrainDurableTaskExecutionContext CreateExecutionContext(TaskId taskId, IDurableTaskState state) => _pendingTasks[taskId] = new(taskId, this, state);
+    private GrainDurableTaskContext CreateExecutionContext(TaskId taskId, IDurableTaskState state) => _pendingTasks[taskId] = new(taskId, this, state);
 
     /// <summary>
     /// Gets the execution context corresponding to the provided task, if it exists, and returns it.
@@ -117,7 +120,7 @@ internal sealed class DurableTaskGrainExtension(
     /// <param name="taskId">The task to get an execution context from.</param>
     /// <param name="executionContext">The execution context.</param>
     /// <returns><see langword="true"/> if the execution context was found, <see langword="false"/> otherwise.</returns>
-    private bool TryGetExecutionContext(TaskId taskId, [NotNullWhen(true)] out GrainDurableTaskExecutionContext? executionContext)
+    private bool TryGetExecutionContext(TaskId taskId, [NotNullWhen(true)] out GrainDurableTaskContext? executionContext)
     {
         // Is an active method already waiting for this?
         if (_pendingTasks.TryGetValue(taskId, out executionContext))
@@ -271,7 +274,7 @@ internal sealed class DurableTaskGrainExtension(
         };
     }
 
-    private async ValueTask SubscribeClientAsync(TaskId taskId, GrainDurableTaskExecutionContext executionContext, IDurableTaskClient? client)
+    private async ValueTask SubscribeClientAsync(TaskId taskId, GrainDurableTaskContext executionContext, IDurableTaskClient? client)
     {
         if (client is not null)
         {
@@ -298,6 +301,11 @@ internal sealed class DurableTaskGrainExtension(
         }
     }
 
+    public async ValueTask<Response> InvokeAsync(TaskId taskId, DurableTask durableTask, CancellationToken cancellationToken)
+    {
+        var ctx = await EvaluateAsync(taskId, durableTask, cancellationToken);
+        return await ctx.AsValueTask();
+    }
     public async ValueTask<DurableTaskContext> EvaluateAsync(TaskId taskId, DurableTask durableTask, CancellationToken cancellationToken)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
@@ -333,6 +341,7 @@ internal sealed class DurableTaskGrainExtension(
                         var pollable = durableTask as IPollableTask;
                         while (true)
                         {
+                            // TODO: make this configurable, possibly centralize polling, add a way to break out.
                             await Task.Delay(1_000);
                             try
                             {
@@ -385,7 +394,7 @@ internal sealed class DurableTaskGrainExtension(
         return executionContext;
     }
 
-    private async Task<GrainDurableTaskExecutionContext> CreateExecutionContextAsync(TaskId taskId, CancellationToken cancellationToken)
+    private async Task<GrainDurableTaskContext> CreateExecutionContextAsync(TaskId taskId, CancellationToken cancellationToken)
     {
         var newTaskState = _storage.GetOrCreateTask(taskId, null);
         await _storage.WriteAsync(cancellationToken);
@@ -393,12 +402,12 @@ internal sealed class DurableTaskGrainExtension(
         return CreateExecutionContext(taskId, newTaskState);
     }
 
-    private void InvokeRequestMethod(TaskId taskId, IDurableTaskRequest request, GrainDurableTaskExecutionContext context)
+    private void InvokeRequestMethod(TaskId taskId, IDurableTaskRequest request, GrainDurableTaskContext context)
     {
         _runningTasks.Add(taskId, InvokeRequestMethodCore(taskId, request, context));
     }
 
-    private async Task InvokeRequestMethodCore(TaskId taskId, IDurableTaskRequest request, GrainDurableTaskExecutionContext context)
+    private async Task InvokeRequestMethodCore(TaskId taskId, IDurableTaskRequest request, GrainDurableTaskContext context)
     {
         await Task.Yield();
 
@@ -418,7 +427,7 @@ internal sealed class DurableTaskGrainExtension(
     private async Task CompleteRequestWithResponse(
         TaskId taskId,
         Response response,
-       GrainDurableTaskExecutionContext executionContext,
+       GrainDurableTaskContext executionContext,
        CancellationToken cancellationToken)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
@@ -452,7 +461,7 @@ internal sealed class DurableTaskGrainExtension(
     /// <param name="taskId">The task which has completed.</param>
     /// <param name="executionContext">The task execution context, containing the result.</param>
     /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-    private async Task NotifyClientsAndCleanupTask(TaskId taskId, GrainDurableTaskExecutionContext executionContext, CancellationToken cancellationToken)
+    private async Task NotifyClientsAndCleanupTask(TaskId taskId, GrainDurableTaskContext executionContext, CancellationToken cancellationToken)
     {
         Debug.Assert(executionContext.State.Result is not null);
         while (true)

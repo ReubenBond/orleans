@@ -199,6 +199,11 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         }
     }
 
+    public async ValueTask<Response> InvokeAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+    {
+        var ctx = await EvaluateStepAsync(taskId, taskDefinition, cancellationToken);
+        return await DurableTaskRuntimeHelper.AsValueTask(ctx);
+    }
     public async ValueTask<DurableTaskContext> EvaluateStepAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
     {
         try
