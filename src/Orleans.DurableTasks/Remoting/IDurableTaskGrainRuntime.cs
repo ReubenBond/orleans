@@ -72,6 +72,8 @@ public struct DurableTaskDiagnosticState
 
     [Id(5)]
     public List<string>? Waiters { get; set; }
+
+    public override readonly string? ToString() => $"[{Status}, Created: {CreatedAt}, Completed: {CompletedAt}, Request: {Request}, Response: {Response}, Waiters: {string.Join(", ", Waiters ?? [])}]";
 }
 
 public interface IDurableTaskGrainRuntime
@@ -665,16 +667,31 @@ internal sealed class DurableTaskGrainExtension(
     public async IAsyncEnumerable<(TaskId TaskId, DurableTaskDiagnosticState State)> GetTasksAsync()
     {
         await Task.CompletedTask;
+        /*
         foreach (var task in _pendingTasks.ToList())
         {
             var taskId = task.Key;
             var taskState = task.Value.State;
-            var state = new DurableTaskDiagnosticState
+            var state = GetDiagnosticState(taskState);
+            yield return (taskId, state);
+        }
+        */
+
+        foreach (var (taskId, taskState) in _storage.Tasks)
+        {
+            var state = GetDiagnosticState(taskState);
+
+            yield return (taskId, state);
+        }
+
+        static DurableTaskDiagnosticState GetDiagnosticState(IDurableTaskState taskState)
+        {
+            return new DurableTaskDiagnosticState
             {
                 CompletedAt = taskState.CompletedAt,
                 CreatedAt = taskState.CreatedAt,
                 Response = taskState.Result?.ToString(),
-                Request =  taskState.Request?.ToString(),
+                Request = taskState.Request?.ToString(),
                 Status = taskState.Result switch
                 {
                     { } response when response.Exception is null => "Completed",
@@ -683,8 +700,6 @@ internal sealed class DurableTaskGrainExtension(
                 },
                 Waiters = taskState.Observers?.Select(static client => client.ToString()!).ToList() ?? [],
             };
-
-            yield return (taskId, state);
         }
     }
 

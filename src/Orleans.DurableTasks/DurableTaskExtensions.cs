@@ -1,9 +1,52 @@
-using Orleans.DurableTasks.Remoting;
+using System.Diagnostics.Contracts;
 
 namespace Orleans.DurableTasks;
 
 public static class DurableTaskExtensions
 {
+
+    public static DurableTaskAwaiter GetAwaiter(this DurableTask task) => new ConfiguredDurableTask(task).GetAwaiter();
+
+    /// <summary>
+    /// Sets the identifier for this task.
+    /// If the caller is executing in the context of a <see cref="DurableTask"/>, this identifier is relative to the parent task.
+    /// If the caller is not executing in the context of a <see cref="DurableTask"/>, this identifier is absolute.
+    /// </summary>
+    /// <param name="id">The identifier.</param>
+    /// <returns>This instance.</returns>
+    [Pure]
+    public static ConfiguredDurableTask WithId(this DurableTask task, string id)
+    {
+        var result = new ConfiguredDurableTask(task);
+        result.WithId(id);
+        return result;
+    }
+
+    public static DurableTaskAwaiter<TResult> GetAwaiter<TResult>(this DurableTask<TResult> task) => new ConfiguredDurableTask<TResult>(task).GetAwaiter();
+
+    /// <summary>
+    /// Sets the identifier for this task.
+    /// If the caller is executing in the context of a <see cref="DurableTask"/>, this identifier is relative to the parent task.
+    /// If the caller is not executing in the context of a <see cref="DurableTask"/>, this identifier is absolute.
+    /// </summary>
+    /// <param name="id">The identifier.</param>
+    /// <returns>This instance.</returns>
+    [Pure]
+    public static ConfiguredDurableTask<TResult> WithId<TResult>(this DurableTask<TResult> task, string id)
+    {
+        var result = new ConfiguredDurableTask<TResult>(task);
+        result.WithId(id);
+        return result;
+    }
+
+    /// <summary>
+    /// Schedules the provided <see cref="DurableTask{TResult}"/> as a workflow using the provided identifier.
+    /// </summary>
+    /// <typeparam name="TResult">The task result type.</typeparam>
+    /// <param name="task">The task.</param>
+    /// <returns>A handle for the scheduled task.</returns>
+    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task) => ScheduleAsync(task, taskId: null, options: null);
+
     /// <summary>
     /// Schedules the provided <see cref="DurableTask{TResult}"/> as a workflow using the provided identifier.
     /// </summary>
@@ -21,17 +64,28 @@ public static class DurableTaskExtensions
     /// <param name="taskId">The task identifier.</param>
     /// <param name="options">The task scheduling options.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static async ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> taskDefinition, string taskId, SchedulingOptions? options)
+    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> taskDefinition, string? taskId, SchedulingOptions? options = null)
     {
-        var typedTaskId = TaskId.Create(taskId);
-        if (taskDefinition is not ISchedulableTask schedulableTask)
+        var configuredTask = new ConfiguredDurableTask<TResult>(taskDefinition);
+        if (taskId is not null)
         {
-            throw GetNonSchedulableTaskException();
+            configuredTask = configuredTask.WithId(taskId);
         }
 
-        var executionContext = await schedulableTask.ScheduleAsync(typedTaskId, options);
-        return new ScheduledDurableTask<TResult>(executionContext);
+        if (options is not null)
+        {
+            configuredTask = configuredTask.WithSchedulingOptions(options);
+        }
+
+        return configuredTask.ScheduleAsync();
     }
+
+    /// <summary>
+    /// Schedules the provided <see cref="DurableTask"/> as a workflow using the provided identifier.
+    /// </summary>
+    /// <param name="taskDefinition">The task.</param>
+    /// <returns>A handle for the scheduled task.</returns>
+    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition) => ScheduleAsync(taskDefinition, taskId: null, options: null);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask"/> as a workflow using the provided identifier.
@@ -48,16 +102,20 @@ public static class DurableTaskExtensions
     /// <param name="taskId">The task identifier.</param>
     /// <param name="options">The task scheduling options.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static async ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition, string taskId, SchedulingOptions? options)
+    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition, string? taskId, SchedulingOptions? options)
     {
-        var typedTaskId = TaskId.Create(taskId);
-        if (taskDefinition is not ISchedulableTask schedulableTask)
+        var configuredTask = new ConfiguredDurableTask(taskDefinition);
+        if (taskId is not null)
         {
-            throw GetNonSchedulableTaskException();
+            configuredTask = configuredTask.WithId(taskId);
         }
 
-        var executionContext = await schedulableTask.ScheduleAsync(typedTaskId, options);
-        return new ScheduledDurableTask(executionContext);
+        if (options is not null)
+        {
+            configuredTask = configuredTask.WithSchedulingOptions(options);
+        }
+
+        return configuredTask.ScheduleAsync();
     }
 
     /// <summary>
@@ -96,6 +154,4 @@ public static class DurableTaskExtensions
         var executionContext = await parentContext.EvaluateAsync(taskId, taskDefinition, CancellationToken.None);
         await executionContext.AsUntypedValueTask();
     }
-
-    private static InvalidOperationException GetNonSchedulableTaskException() => new ("The provided task does not support scheduling. This may be because it is a local method or another non-serializable task type.");
 }

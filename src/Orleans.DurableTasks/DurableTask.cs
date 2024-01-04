@@ -25,23 +25,6 @@ public abstract partial class DurableTask
     /// <param name="context">The task context.</param>
     /// <returns>The response.</returns>
     protected internal abstract ValueTask<Response> InvokeAsync(DurableTaskContext context);
-
-    public new DurableTaskAwaiter GetAwaiter() => new ConfiguredDurableTask(this).GetAwaiter();
-
-    /// <summary>
-    /// Sets the identifier for this task.
-    /// If the caller is executing in the context of a <see cref="DurableTask"/>, this identifier is relative to the parent task.
-    /// If the caller is not executing in the context of a <see cref="DurableTask"/>, this identifier is absolute.
-    /// </summary>
-    /// <param name="id">The identifier.</param>
-    /// <returns>This instance.</returns>
-    [Pure]
-    public ConfiguredDurableTask WithId(string id)
-    {
-        var result = new ConfiguredDurableTask(this);
-        result.WithId(id);
-        return result;
-    }
 }
 
 [InvokableBaseType(typeof(GrainReference), typeof(DurableTask<>), typeof(DurableTaskRequest<>))]
@@ -50,22 +33,6 @@ public abstract partial class DurableTask
 [Alias("DurableTask`1")]
 public abstract class DurableTask<TResult> : DurableTask
 {
-    public new DurableTaskAwaiter<TResult> GetAwaiter() => new ConfiguredDurableTask<TResult>(this).GetAwaiter();
-
-    /// <summary>
-    /// Sets the identifier for this task.
-    /// If the caller is executing in the context of a <see cref="DurableTask"/>, this identifier is relative to the parent task.
-    /// If the caller is not executing in the context of a <see cref="DurableTask"/>, this identifier is absolute.
-    /// </summary>
-    /// <param name="id">The identifier.</param>
-    /// <returns>This instance.</returns>
-    [Pure]
-    public new ConfiguredDurableTask<TResult> WithId(string id)
-    {
-        var result = new ConfiguredDurableTask<TResult>(this);
-        result.WithId(id);
-        return result;
-    }
 }
 
 internal struct ConfiguredDurableTaskCore<TDurableTask>(TDurableTask task) where TDurableTask : DurableTask
@@ -155,6 +122,19 @@ public struct ConfiguredDurableTask(DurableTask task)
         SchedulingOptions = options;
         return this;
     }
+
+    public async readonly ValueTask<ScheduledTask> ScheduleAsync()
+    {
+        if (Task is not ISchedulableTask schedulableTask)
+        {
+            throw GetNonSchedulableTaskException();
+        }
+
+        var executionContext = await schedulableTask.ScheduleAsync(Id, SchedulingOptions);
+        return new ScheduledDurableTask(executionContext);
+    }
+
+    internal static InvalidOperationException GetNonSchedulableTaskException() => new ("The provided task does not support scheduling. This may be because it is a local method or another non-serializable task type.");
 }
 
 public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
@@ -174,6 +154,17 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
     {
         SchedulingOptions = options;
         return this;
+    }
+
+    public async readonly ValueTask<ScheduledTask<TResult>> ScheduleAsync()
+    {
+        if (Task is not ISchedulableTask schedulableTask)
+        {
+            throw ConfiguredDurableTask.GetNonSchedulableTaskException();
+        }
+
+        var executionContext = await schedulableTask.ScheduleAsync(Id, SchedulingOptions);
+        return new ScheduledDurableTask<TResult>(executionContext);
     }
 
     public DurableTaskAwaiter<TResult> GetAwaiter() => new (_core.InvokeAsync());
