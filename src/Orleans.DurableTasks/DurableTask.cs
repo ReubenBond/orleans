@@ -17,6 +17,8 @@ public abstract partial class DurableTask
     public static DurableTask<T> Run<T>(Func<T> func) => new DelegateDurableTask<T>(func);
     public static DurableTask Run(Func<ValueTask> func) => new AsyncDelegateDurableTask(func);
     public static DurableTask<T> Run<T>(Func<ValueTask<T>> func) => new AsyncDelegateDurableTask<T>(func);
+    public static DurableTask Run(Func<Task> func) => new AsyncTaskDelegateDurableTask(func);
+    public static DurableTask<T> Run<T>(Func<Task<T>> func) => new AsyncTaskDelegateDurableTask<T>(func);
 
     /// <summary>
     /// Invokes the task with the provided context.
@@ -169,23 +171,21 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
     public DurableTaskAwaiter<TResult> GetAwaiter() => new (_core.InvokeAsync());
 }
 
-internal interface ICompletedDurableTask
-{
-}
-
 /// <summary>
 /// Represents a completed <see cref="DurableTask{TResult}"/> instance.
 /// </summary>
-internal sealed class CompletedDurableTask<TResult>(TResult value) : DurableTask<TResult>, ICompletedDurableTask
+internal sealed class CompletedDurableTask<TResult>(TResult value) : DurableTask<TResult>
 {
+    /// <inheritdoc/>
     protected internal override ValueTask<Response> InvokeAsync(DurableTaskContext context) => new(Response.FromResult(value));
 }
 
 /// <summary>
 /// Represents a <see cref="DurableTask{TResult}"/> instance which invokes a delegate.
 /// </summary>
-internal sealed class AsyncDelegateDurableTask<TResult>(Func<ValueTask<TResult>> func) : DurableTask<TResult>
+internal sealed class AsyncTaskDelegateDurableTask<TResult>(Func<Task<TResult>> func) : DurableTask<TResult>
 {
+    /// <inheritdoc/>
     protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext context)
     {
         try
@@ -201,10 +201,52 @@ internal sealed class AsyncDelegateDurableTask<TResult>(Func<ValueTask<TResult>>
 }
 
 /// <summary>
+/// Represents a <see cref="DurableTask"/> instance which invokes a delegate.
+/// </summary>
+internal sealed class AsyncTaskDelegateDurableTask(Func<Task> func) : DurableTask
+{
+    /// <inheritdoc/>
+    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext context)
+    {
+        try
+        {
+            DurableTaskContext.SetCurrentContext(context);
+            await func();
+            return Response.Completed;
+        }
+        catch (Exception exception)
+        {
+            return Response.FromException(exception);
+        }
+    }
+}
+
+/// <summary>
 /// Represents a <see cref="DurableTask{TResult}"/> instance which invokes a delegate.
+/// </summary>
+internal sealed class AsyncDelegateDurableTask<TResult>(Func<ValueTask<TResult>> func) : DurableTask<TResult>
+{
+    /// <inheritdoc/>
+    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext context)
+    {
+        try
+        {
+            DurableTaskContext.SetCurrentContext(context);
+            return Response.FromResult(await func());
+        }
+        catch (Exception exception)
+        {
+            return Response.FromException(exception);
+        }
+    }
+}
+
+/// <summary>
+/// Represents a <see cref="DurableTask"/> instance which invokes a delegate.
 /// </summary>
 internal sealed class AsyncDelegateDurableTask(Func<ValueTask> func) : DurableTask
 {
+    /// <inheritdoc/>
     protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext context)
     {
         try
@@ -225,6 +267,7 @@ internal sealed class AsyncDelegateDurableTask(Func<ValueTask> func) : DurableTa
 /// </summary>
 internal sealed class DelegateDurableTask<TResult>(Func<TResult> func) : DurableTask<TResult>
 {
+    /// <inheritdoc/>
     protected internal override ValueTask<Response> InvokeAsync(DurableTaskContext context)
     {
         try
@@ -240,10 +283,11 @@ internal sealed class DelegateDurableTask<TResult>(Func<TResult> func) : Durable
 }
 
 /// <summary>
-/// Represents a <see cref="DurableTask{TResult}"/> instance which invokes a delegate.
+/// Represents a <see cref="DurableTask"/> instance which invokes a delegate.
 /// </summary>
 internal sealed class DelegateDurableTask(Action func) : DurableTask
 {
+    /// <inheritdoc/>
     protected internal override ValueTask<Response> InvokeAsync(DurableTaskContext context)
     {
         try

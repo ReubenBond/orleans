@@ -2,13 +2,27 @@ using System.Diagnostics.Contracts;
 
 namespace Orleans.DurableTasks;
 
+/// <summary>
+/// Extension methods for working with <see cref="DurableTask"/> and <see cref="DurableTask{TResult}"/> instances.
+/// </summary>
 public static class DurableTaskExtensions
 {
-
+    /// <summary>
+    /// Gets an awaiter for the durable task. This schedules the task and awaits completion.
+    /// </summary>
+    /// <param name="task">The task.</param>
+    /// <returns>An awaiter for the task.</returns>
     public static DurableTaskAwaiter GetAwaiter(this DurableTask task) => new ConfiguredDurableTask(task).GetAwaiter();
 
     /// <summary>
-    /// Sets the identifier for this task.
+    /// Gets an awaiter for the durable task. This schedules the task and awaits completion.
+    /// </summary>
+    /// <param name="task">The task.</param>
+    /// <returns>An awaiter for the task.</returns>
+    public static DurableTaskAwaiter<TResult> GetAwaiter<TResult>(this DurableTask<TResult> task) => new ConfiguredDurableTask<TResult>(task).GetAwaiter();
+
+    /// <summary>
+    /// Returns a configured task with an identifier set.
     /// If the caller is executing in the context of a <see cref="DurableTask"/>, this identifier is relative to the parent task.
     /// If the caller is not executing in the context of a <see cref="DurableTask"/>, this identifier is absolute.
     /// </summary>
@@ -22,10 +36,8 @@ public static class DurableTaskExtensions
         return result;
     }
 
-    public static DurableTaskAwaiter<TResult> GetAwaiter<TResult>(this DurableTask<TResult> task) => new ConfiguredDurableTask<TResult>(task).GetAwaiter();
-
     /// <summary>
-    /// Sets the identifier for this task.
+    /// Returns a configured task with an identifier set.
     /// If the caller is executing in the context of a <see cref="DurableTask"/>, this identifier is relative to the parent task.
     /// If the caller is not executing in the context of a <see cref="DurableTask"/>, this identifier is absolute.
     /// </summary>
@@ -116,42 +128,5 @@ public static class DurableTaskExtensions
         }
 
         return configuredTask.ScheduleAsync();
-    }
-
-    /// <summary>
-    /// Schedules the provided <see cref="DurableTask{TResult}" /> as a named step within the current workflow.
-    /// </summary>
-    /// <typeparam name="TResult">The task result type.</typeparam>
-    /// <param name="taskDefinition">The task.</param>
-    /// <param name="stepId">The step identifier, which must be unique within the current context.</param>
-    /// <returns>The result of invoking the task.</returns>
-    public static async ValueTask<TResult> AsStep<TResult>(this DurableTask<TResult> taskDefinition, string stepId)
-    {
-        // Steps are only applicable nested within other durable tasks, so if we do not have an ambient context
-        // then something has gone awry.
-        var parentContext = DurableTaskContext.GetCurrentContextOrThrow();
-
-        // Create a new, nested task id for the step
-        var taskId = parentContext.Id.Child(stepId);
-
-        var executionContext = await parentContext.EvaluateAsync(taskId, taskDefinition, CancellationToken.None);
-        return await executionContext.GetResultAsync<TResult>();
-    }
-
-    /// <summary>
-    /// Schedules the provided <see cref="DurableTask" /> as a named step within the current workflow.
-    /// </summary>
-    /// <param name="taskDefinition">The task.</param>
-    /// <param name="stepId">The step identifier, which must be unique within the current context.</param>
-    /// <returns>A <see cref="ValueTask"/> representing the work performed.</returns>
-    public static async ValueTask AsStep(this DurableTask taskDefinition, string stepId)
-    {
-        // Steps are only applicable nested within other durable tasks, so if we do not have an ambient context
-        // then something has gone awry.
-        var parentContext = DurableTaskContext.GetCurrentContextOrThrow();
-        var taskId = parentContext.Id.Child(stepId);
-
-        var executionContext = await parentContext.EvaluateAsync(taskId, taskDefinition, CancellationToken.None);
-        await executionContext.AsUntypedValueTask();
     }
 }

@@ -157,11 +157,11 @@ public class Program
             var customer = client.GetGrain<IAccountGrain>("customer");
             var business = client.GetGrain<IAccountGrain>("business");
 
-            var randomId = await DurableTask.Run(() => Guid.NewGuid()).AsStep("generate-random-id");
+            var randomId = await DurableTask.Run(() => Guid.NewGuid()).WithId("generate-random-id");
             Console.WriteLine(randomId);
 
             // If the task is interrupted (eg, power outage) and is retried, it will only sleep for the remaining time.
-            var slept = await DurableTask.Delay(TimeSpan.FromSeconds(1)).AsStep("wait-for-confirmation");
+            var slept = await DurableTask.Delay(TimeSpan.FromSeconds(1)).WithId("wait-for-confirmation");
             Console.WriteLine("slept? " + slept);
 
             var scheduledTask = await bankGrain
@@ -647,7 +647,7 @@ public class OrderProcessorGrain(
 
     public async DurableTask ProcessOrderAsync(IBuyerAccount buyer, Order order)
     {
-        var confirmed = await DurableTask.Delay(TimeSpan.FromMinutes(1)).AsStep("wait-for-confirmation");
+        var confirmed = await DurableTask.Delay(TimeSpan.FromMinutes(1)).WithId("wait-for-confirmation");
         if (!confirmed)
         {
             // The order was canceled using task management APIs within the grace period.
@@ -655,7 +655,7 @@ public class OrderProcessorGrain(
             return;
         }
 
-        var stockLevelResult = await _catalogService.CheckOrderStock(order).AsStep("check-stock");
+        var stockLevelResult = await _catalogService.CheckOrderStock(order).WithId("check-stock");
         if (stockLevelResult.Any(item => !item.HasStock))
         {
             // There is insufficient stock. No charge has been made yet, but we would likely need to notify the user before terminating.
@@ -663,10 +663,10 @@ public class OrderProcessorGrain(
             return;
         }
 
-        var invoice = await _paymentService.CreateInvoice(buyer, order).AsStep("create-invoice");
+        var invoice = await _paymentService.CreateInvoice(buyer, order).WithId("create-invoice");
 
         // This might take a very long time (hours, days, indefinite)
-        var paymentResult = await _paymentService.WaitForPayment(invoice).AsStep("process-payment");
+        var paymentResult = await _paymentService.WaitForPayment(invoice).WithId("process-payment");
         if (!paymentResult.IsSuccess)
         {
             State.Status = OrderStatus.PaymentFailed;
@@ -674,14 +674,14 @@ public class OrderProcessorGrain(
         }
 
         State.Status = OrderStatus.Paid;
-        var shipmentDetails = await _logisticsService.CreateShipment(order).AsStep("create-shipment");
+        var shipmentDetails = await _logisticsService.CreateShipment(order).WithId("create-shipment");
         if (!shipmentDetails.IsSuccess)
         {
             State.Status = OrderStatus.ShipmentFailed;
             return;
         }
 
-        await _logisticsService.WaitForDelivery(shipmentDetails).AsStep("wait-for-delivery");
+        await _logisticsService.WaitForDelivery(shipmentDetails).WithId("wait-for-delivery");
         State.Status = OrderStatus.Delivered;
 
         // Done...
