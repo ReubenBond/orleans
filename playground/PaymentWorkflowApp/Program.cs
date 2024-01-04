@@ -30,7 +30,7 @@ jobScheduler.AddHandler("SayHello", async args =>
     string result;
     if (args is { Length: > 1 })
     {
-        result = await jobScheduler.GetOrCreateJob("stringJoin", args).AsStep("join");
+        result = await jobScheduler.GetOrCreateJob("stringJoin", args).WithId("join");
     }
     else
     {
