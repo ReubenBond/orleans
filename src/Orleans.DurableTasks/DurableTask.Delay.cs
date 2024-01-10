@@ -22,6 +22,13 @@ public abstract partial class DurableTask
             }
         }
 
+        var task3 = await Task.WhenAny(Task.Delay(delay, cancellationToken)).ConfigureAwait(false);
+        if (task3.IsCanceled)
+        {
+            await Task.Yield();
+            return false;
+        }
+
         return true;
     }
 
@@ -40,6 +47,13 @@ public abstract partial class DurableTask
                 await Task.Yield();
                 return false;
             }
+        }
+
+        var task3 = await Task.WhenAny(Task.Delay(delay, cancellationToken)).ConfigureAwait(false);
+        if (task3.IsCanceled)
+        {
+            await Task.Yield();
+            return false;
         }
 
         return true;

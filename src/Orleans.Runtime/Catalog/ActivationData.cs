@@ -379,25 +379,26 @@ namespace Orleans.Runtime
 
         public void DelayDeactivation(TimeSpan timespan)
         {
-            if (timespan <= TimeSpan.Zero)
+            if (timespan <= TimeSpan.Zero && timespan != Timeout.InfiniteTimeSpan)
             {
                 // reset any current keepAliveUntil
-                ResetKeepAliveRequest();
-            }
-            else if (timespan == TimeSpan.MaxValue)
-            {
-                // otherwise creates negative time.
-                KeepAliveUntil = DateTime.MaxValue;
+                KeepAliveUntil = DateTime.MinValue;
             }
             else
             {
-                KeepAliveUntil = DateTime.UtcNow + timespan;
-            }
-        }
+                unchecked
+                {
+                    var now = DateTime.UtcNow.Ticks;
+                    var max = DateTime.MaxValue.Ticks;
+                    var keepAliveTicks = now + timespan.Ticks;
+                    if (keepAliveTicks < now || keepAliveTicks > max)
+                    {
+                        keepAliveTicks = max;
+                    }
 
-        public void ResetKeepAliveRequest()
-        {
-            KeepAliveUntil = DateTime.MinValue;
+                    KeepAliveUntil = new DateTime(keepAliveTicks, DateTimeKind.Utc);
+                }
+            }
         }
 
         private void ScheduleOperation(object operation)

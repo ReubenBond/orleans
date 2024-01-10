@@ -175,7 +175,7 @@ public class Program
             })
             .ConfigureLogging(logging =>
             {
-                logging.SetMinimumLevel(LogLevel.Warning);
+                logging.SetMinimumLevel(LogLevel.Critical);
                 //logging.AddFilter((category, level) => category is not null && category.StartsWith("Orleans.DurableTasks"));
             })
             .UseConsoleLifetime();

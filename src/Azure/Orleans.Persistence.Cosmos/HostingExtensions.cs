@@ -36,7 +36,7 @@ public static class HostingExtensions
         string name,
         Action<CosmosGrainStorageOptions> configureOptions) where TPartitionKeyProvider : class, IPartitionKeyProvider
     {
-        builder.Services.TryAddNamedSingleton<IPartitionKeyProvider, TPartitionKeyProvider>(name);
+        builder.Services.TryAddKeyedSingleton<IPartitionKeyProvider, TPartitionKeyProvider>(name);
         builder.Services.AddCosmosGrainStorage(name, configureOptions);
         return builder;
     }
