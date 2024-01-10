@@ -21,5 +21,5 @@ public abstract partial class DurableTaskContext(TaskId id)
     public CancellationToken CancellationToken => CancellationTokenSource.Token;
     protected internal abstract ValueTask<DurableTaskContext> EvaluateAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
     protected internal abstract ValueTask<Response> InvokeAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
-    protected internal abstract TaskId CreateChildTaskId();
+    protected internal abstract TaskId CreateChildTaskId(string? name);
 }
