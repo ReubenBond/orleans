@@ -36,16 +36,23 @@ public static class DurableTaskHostingExtensions
 
 public class Program
 {
+    [Alias("Program.IBankGrain")]
     public interface IBankGrain : IGrainWithStringKey
     {
+        [Alias("Transfer")]
         DurableTask<bool> Transfer(IAccountGrain source, IAccountGrain destination, long amount);
     }
 
     [Alias("IAccountGrain")]
     public interface IAccountGrain : IGrainWithStringKey
     {
+        [Alias("Withdraw")]
         DurableTask<bool> Withdraw(long amount);
+
+        [Alias("Deposit")]
         DurableTask Deposit(long amount);
+        
+        [Alias("GetBalance")]
         ValueTask<long> GetBalance();
     }
 
@@ -58,10 +65,10 @@ public class Program
             IAccountGrain destination,
             long amount)
         {
-            var success = await source.Withdraw(amount);
+            var success = await source.Withdraw(amount).WithId("withdraw");
             if (!success) return false;
 
-            await destination.Deposit(amount);
+            await destination.Deposit(amount).WithId("deposit");
             return success;
         }
     }

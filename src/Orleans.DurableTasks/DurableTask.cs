@@ -50,7 +50,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask>(TDurableTask task) where
             if (Id.IsDefault)
             {
                 // Allocate a child identifier for the task.
-                Id = parentContext.CreateChildTaskId();
+                Id = parentContext.CreateChildTaskId(null);
             }
 
             // Evaluates the task: if it is a local method, it will be executed immediately.
@@ -81,9 +81,9 @@ internal struct ConfiguredDurableTaskCore<TDurableTask>(TDurableTask task) where
         return await context.AsValueTask();
     }
 
-    internal void SetTaskIdCore(string id)
+    internal void SetTaskIdCore(string name)
     {
-        ArgumentNullException.ThrowIfNullOrWhiteSpace(id);
+        ArgumentNullException.ThrowIfNullOrWhiteSpace(name);
         if (!Id.IsDefault)
         {
             throw new InvalidOperationException("Id already specified");
@@ -91,11 +91,12 @@ internal struct ConfiguredDurableTaskCore<TDurableTask>(TDurableTask task) where
 
         if (ParentContext is { } parentContext)
         {
-            Id = parentContext.Id.Child(id);
+            // Create an identifier relative to the parent context's identifier.
+            Id = parentContext.CreateChildTaskId(name);
         }
         else
         {
-            Id = TaskId.Create(id);
+            Id = TaskId.Create(name);
         }
     }
 

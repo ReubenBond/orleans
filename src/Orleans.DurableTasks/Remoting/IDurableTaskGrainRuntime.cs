@@ -82,6 +82,9 @@ public interface IDurableTaskGrainRuntime
 
     // Evaluate and return result.
     ValueTask<Response> InvokeAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
+
+    bool GetResponseOrCreateInternalTask(TaskId taskId, [NotNullWhen(true)] out Response? response);
+    void SetInternalTaskResponse(TaskId taskId, Response response);
 }
 
 internal sealed class DurableTaskGrainExtensionShared(
@@ -175,6 +178,63 @@ internal sealed class DurableTaskGrainExtension(
     }
 
     /// <summary>
+    /// Gets a task-internal response if it is available.
+    /// </summary>
+    /// <param name="taskId">The task id.</param>
+    /// <param name="response">The response.</param>
+    /// <returns>A value indicating whether the response exists.</returns>
+    /// <remarks>
+    /// An internal task is a task which executes as part of another task and whose result it not externally visible.
+    /// </remarks>
+    public bool GetResponseOrCreateInternalTask(TaskId taskId, [NotNullWhen(true)] out Response? response)
+    {
+        if (TryGetExecutionContext(taskId, out var context))
+        {
+            // The task exists, but it may not have a result.
+            if (context.State.Result is { } completedResponse)
+            {
+                response = completedResponse;
+                return true;
+            }
+        }
+        else
+        {
+            // Create a new task.
+            var newTaskState = _storage.GetOrCreateTask(taskId, null);
+            context = CreateExecutionContext(taskId, newTaskState);
+            _pendingTasks.Add(taskId, context);
+        }
+
+        response = default;
+        return false;
+    }
+
+    /// <summary>
+    /// Sets a task-internal response.
+    /// </summary>
+    /// <param name="taskId">The task id.</param>
+    /// <param name="response">The response.</param>
+    /// <exception cref="InvalidOperationException">The response has already been set.</exception>
+    /// <remarks>
+    /// An internal task is a task which executes as part of another task and whose result it not externally visible.
+    /// </remarks>
+    public void SetInternalTaskResponse(TaskId taskId, Response response)
+    {
+        if (!TryGetExecutionContext(taskId, out var context))
+        {
+            throw new InvalidOperationException($"Cannot set response for unknown task {taskId}");
+        }
+
+        if (context.State.Result is not null)
+        {
+            throw new InvalidOperationException($"Cannot set response for completed task {taskId}");
+        }
+
+        _storage.SetResponse(taskId, context.State, response);
+        context.SetResult(response);
+    }
+
+    /// <summary>
     /// Called upon completion of a task. The receiver must persist consume the response as the caller may clear task state after this method returns.
     /// </summary>
     /// <param name="taskId">The task id.</param>
@@ -182,7 +242,7 @@ internal sealed class DurableTaskGrainExtension(
     /// <returns>A <see cref="ValueTask"/> representing the work performed.</returns>
     async ValueTask IDurableTaskClient.OnResponse(TaskId taskId, Response response)
     {
-        if (!TryGetExecutionContext(taskId, out var executionContext))
+        if (!TryGetExecutionContext(taskId, out var context))
         {
             // No such task. This may be because this client has already received a response for this task and removed its entry for it.
             // TODO: Perhaps this should log at a lower level since it is likely not the symptom of a bug or exceptional condition.
@@ -193,11 +253,11 @@ internal sealed class DurableTaskGrainExtension(
         // Persist the response before responding to the caller.
         // TODO: If this write (or just about any state write) fails, then we need to undo the update to the task state.
         // The most straightforward way to do that might be to take a copy before mutating it.
-        _storage.SetResponse(taskId, executionContext.State, response);
+        _storage.SetResponse(taskId, context.State, response);
         await _storage.WriteAsync(CancellationToken.None);
 
         // Propagate the response to the application.
-        executionContext.SetResult(response);
+        context.SetResult(response);
     }
 
     /// <summary>
@@ -241,7 +301,7 @@ internal sealed class DurableTaskGrainExtension(
             if (client is not null)
             {
                 // The client will receive a callback with the response, rather than receiving an immediate response.
-                await SubscribeClientAsync(taskId, executionContext, client);
+                await SubscribeClientAsync(taskId, executionContext, client, CancellationToken.None);
             }
             else if (responseTask.IsCompleted)
             {
@@ -276,7 +336,7 @@ internal sealed class DurableTaskGrainExtension(
         };
     }
 
-    private async ValueTask SubscribeClientAsync(TaskId taskId, GrainDurableTaskContext executionContext, IDurableTaskClient? client)
+    private async ValueTask SubscribeClientAsync(TaskId taskId, GrainDurableTaskContext executionContext, IDurableTaskClient? client, CancellationToken cancellationToken)
     {
         if (client is not null)
         {
@@ -297,7 +357,7 @@ internal sealed class DurableTaskGrainExtension(
                 {
                     // Add the client to the persisted task state.
                     _storage.AddObserver(taskId, state, client);
-                    await _storage.WriteAsync(CancellationToken.None);
+                    await _storage.WriteAsync(cancellationToken);
                 }
             }
         }
@@ -308,6 +368,7 @@ internal sealed class DurableTaskGrainExtension(
         var ctx = await EvaluateAsync(taskId, durableTask, cancellationToken);
         return await ctx.AsValueTask();
     }
+
     public async ValueTask<DurableTaskContext> EvaluateAsync(TaskId taskId, DurableTask durableTask, CancellationToken cancellationToken)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
@@ -494,6 +555,8 @@ internal sealed class DurableTaskGrainExtension(
                 _storage.ClearObservers(taskId, state);
 
                 PruneCompletedTasks();
+
+                // NOTE: this write is not required for correctness, so it could be removed & performed lazily.
                 await _storage.WriteAsync(cancellationToken);
 
                 if (_shared.Logger.IsEnabled(LogLevel.Trace))
@@ -574,6 +637,7 @@ internal sealed class DurableTaskGrainExtension(
                         }
 
                         _storage.RemoveTask(childTaskId);
+                        _pendingTasks.Remove(childTaskId);
                     }
                 }
 
@@ -582,14 +646,16 @@ internal sealed class DurableTaskGrainExtension(
                 {
                     _shared.Logger.LogTrace("{Id} pruning completed task {TaskId}", GrainId, taskId);
                 }
+
                 _storage.RemoveTask(taskId);
+                _pendingTasks.Remove(taskId);
             }
         }
 
         return completedTaskIds is not null;
     }
 
-    private bool AreRequestsEquivalent(IDurableTaskRequest left, IDurableTaskRequest right)
+    private static bool AreRequestsEquivalent(IDurableTaskRequest left, IDurableTaskRequest right)
     {
         if (!string.Equals(left.GetInterfaceName(), right.GetInterfaceName(), StringComparison.Ordinal))
         {
@@ -648,7 +714,7 @@ internal sealed class DurableTaskGrainExtension(
             return new(PendingResponse.Instance);
         }
 
-        var subscribeTask = SubscribeClientAsync(taskId, executionContext, client);
+        var subscribeTask = SubscribeClientAsync(taskId, executionContext, client, CancellationToken.None);
         if (!subscribeTask.IsCompleted)
         {
             // Subscribe the client and return
@@ -667,15 +733,6 @@ internal sealed class DurableTaskGrainExtension(
     public async IAsyncEnumerable<(TaskId TaskId, DurableTaskDiagnosticState State)> GetTasksAsync()
     {
         await Task.CompletedTask;
-        /*
-        foreach (var task in _pendingTasks.ToList())
-        {
-            var taskId = task.Key;
-            var taskState = task.Value.State;
-            var state = GetDiagnosticState(taskState);
-            yield return (taskId, state);
-        }
-        */
 
         foreach (var (taskId, taskState) in _storage.Tasks)
         {
