@@ -65,16 +65,15 @@ public class Program
             IAccountGrain destination,
             long amount)
         {
-            var success = await source.Withdraw(amount).WithId("withdraw");
+            var success = await source.Withdraw(amount);
             if (!success) return false;
 
-            await destination.Deposit(amount).WithId("deposit");
+            await destination.Deposit(amount);
             return success;
         }
     }
 
     [GrainType("account")]
-    [Alias("AccountGrain")]
     public class AccountGrain : DurableGrain, IAccountGrain
     {
         private readonly DurableValue<long> _balance;
@@ -119,16 +118,11 @@ public class Program
             var customer = GrainFactory.GetGrain<IAccountGrain>("customer");
             var business = GrainFactory.GetGrain<IAccountGrain>("business");
 
-            await customer.Deposit(120_000_000_000);
-
-            var scheduled = await customer.Deposit(120_000_000_000).ScheduleAsync();
-            var id = scheduled.Id;
-            Console.WriteLine(id);
-            await scheduled;
+            await customer.Deposit(120_000_000_000).WithId("transfer-1");
 
             var scheduledTransfer = await bank
                 .Transfer(customer, business, 20)
-                .WithId("transfer1234")
+                .WithId("transfer-2")
                 .ScheduleAsync();
 
             var success = await scheduledTransfer;
@@ -138,7 +132,7 @@ public class Program
 
             var scheduledTask2 = await bank
                 .Transfer(customer, business, 20)
-                .ScheduleAsync("transfer456");
+                .ScheduleAsync("transfer-3");
 
             var success2 = await scheduledTask2;
             Console.WriteLine(success2 ? "Success!" : "Fail :(");
