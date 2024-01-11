@@ -3,19 +3,32 @@ using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
-public class DurableList<T>(IFieldCodec<T> codec, SerializerSessionPool serializerSessionPool) : IList<T>, IDurableStateMachine
+public interface IDurableList<T> : IList<T>
 {
-    private readonly SerializerSessionPool _serializerSessionPool = serializerSessionPool;
-    private readonly IFieldCodec<T> _codec = codec;
+}
+
+internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
+{
+    private readonly SerializerSessionPool _serializerSessionPool;
+    private readonly IFieldCodec<T> _codec;
     private const byte VersionByte = 0;
     private readonly List<T> _items = [];
     private IStateMachineLogWriter? _storage;
+
+    public DurableList([ServiceKey] string key, IStateMachineManager manager, IFieldCodec<T> codec, SerializerSessionPool serializerSessionPool)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(key);
+        _codec = codec;
+        _serializerSessionPool = serializerSessionPool;
+        manager.RegisterStateMachine(key, this);
+    }
 
     public T this[int index]
     {

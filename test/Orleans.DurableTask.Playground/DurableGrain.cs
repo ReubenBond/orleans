@@ -18,12 +18,6 @@ public abstract class DurableGrain : Grain, IGrainBase
     }
     
     protected IStateMachineManager StateMachineManager { get; }
-    protected DurableDictionary<K, V> GetOrCreateDictionary<K, V>(string name) where K : notnull => GetOrCreateStateMachine<DurableDictionary<K, V>>(name);
-    protected DurableList<T> GetOrCreateList<T>(string name) => GetOrCreateStateMachine<DurableList<T>>(name);
-    protected DurableSet<T> GetOrCreateSet<T>(string name) => GetOrCreateStateMachine<DurableSet<T>>(name);
-    protected DurableQueue<T> GetOrCreateQueue<T>(string name) => GetOrCreateStateMachine<DurableQueue<T>>(name);
-    protected DurableValue<T> GetOrCreateValue<T>(string name) => GetOrCreateStateMachine<DurableValue<T>>(name);
-    protected DurableTaskCompletionSource<T> GetOrCreateTaskCompletionSource<T>(string name) => GetOrCreateStateMachine<DurableTaskCompletionSource<T>>(name);
 
     protected TStateMachine GetOrCreateStateMachine<TStateMachine>(string name) where TStateMachine : class, IDurableStateMachine
         => GetOrCreateStateMachine(name, static sp => sp.GetRequiredService<TStateMachine>(), ServiceProvider);
@@ -52,16 +46,11 @@ public interface IShoppingCartGrain
     ValueTask<(bool Success, long Version)> Clear(long version);
 }
 
-public class ShoppingCartGrain : DurableGrain, IShoppingCartGrain
+public class ShoppingCartGrain(
+    [FromKeyedServices("shopping-cart")] IDurableDictionary<string, int> cart,
+    [FromKeyedServices("version")] IDurableValue<long> version) : DurableGrain, IShoppingCartGrain
 {
-    private readonly DurableDictionary<string, int> _cart;
-    private readonly DurableValue<long> _version;
-
-    public ShoppingCartGrain()
-    {
-        _cart = GetOrCreateDictionary<string, int>("shopping-cart");
-        _version = GetOrCreateValue<long>("version");
-    }
+    private readonly IDurableValue<long> _version = version;
 
     public async ValueTask<(bool Success, long Version)> UpdateItem(string itemId, int quantity, long version)
     {
@@ -73,11 +62,11 @@ public class ShoppingCartGrain : DurableGrain, IShoppingCartGrain
 
         if (quantity == 0)
         {
-            _cart.Remove(itemId);
+            cart.Remove(itemId);
         }
         else
         {
-            _cart[itemId] = quantity;
+            cart[itemId] = quantity;
         }
 
         _version.Value++;
@@ -85,7 +74,7 @@ public class ShoppingCartGrain : DurableGrain, IShoppingCartGrain
         return (true, _version.Value);
     }
 
-    public ValueTask<(Dictionary<string, int> Contents, long Version)> GetCart() => new((_cart.ToDictionary(), _version.Value));
+    public ValueTask<(Dictionary<string, int> Contents, long Version)> GetCart() => new((cart.ToDictionary(), _version.Value));
     public ValueTask<long> GetVersion() => new(_version.Value);
 
     public async ValueTask<(bool Success, long Version)> Clear(long version)
@@ -96,7 +85,7 @@ public class ShoppingCartGrain : DurableGrain, IShoppingCartGrain
             return (false, _version.Value);
         }
 
-        _cart.Clear();
+        cart.Clear();
         _version.Value++;
         await WriteStateAsync();
         return (true, _version.Value);
@@ -120,19 +109,15 @@ public interface IDictionaryGrain<K, V> : IGrainWithStringKey where K : notnull
     IAsyncEnumerable<(K Key, V Value, long Version)> GetValuesAsync();
 }
 
-public class DictionaryGrain<K, V> : DurableGrain, IDictionaryGrain<K, V> where K : notnull
+public class DictionaryGrain<K, V>(
+    [FromKeyedServices("values")] IDurableDictionary<K, V> dictionary,
+    [FromKeyedServices("version")] IDurableValue<long> version) : DurableGrain, IDictionaryGrain<K, V> where K : notnull
 {
-    private readonly DurableDictionary<K, V> _dictionary;
-    private readonly DurableValue<long> _version;
-    public DictionaryGrain()
-    {
-        _dictionary = GetOrCreateDictionary<K, V>("shopping-cart");
-        _version = GetOrCreateValue<long>("version");
-    }
+    private readonly IDurableValue<long> _version = version;
 
     public ValueTask<(bool Success, V? Value, long Version)> TryGetValueAsync(K key)
     {
-        var success = _dictionary.TryGetValue(key, out var value);
+        var success = dictionary.TryGetValue(key, out var value);
         return new((success, value, _version.Value));
     }
 
@@ -144,7 +129,7 @@ public class DictionaryGrain<K, V> : DurableGrain, IDictionaryGrain<K, V> where 
             return (false, _version.Value);
         }
 
-        if (_dictionary.TryAdd(key, value))
+        if (dictionary.TryAdd(key, value))
         {
             _version.Value++;
             await WriteStateAsync();
@@ -162,7 +147,7 @@ public class DictionaryGrain<K, V> : DurableGrain, IDictionaryGrain<K, V> where 
             return (false, _version.Value);
         }
 
-        if (_dictionary.Remove(key))
+        if (dictionary.Remove(key))
         {
             _version.Value++;
             await WriteStateAsync();
@@ -180,7 +165,7 @@ public class DictionaryGrain<K, V> : DurableGrain, IDictionaryGrain<K, V> where 
             return (false, _version.Value);
         }
 
-        _dictionary.Clear();
+        dictionary.Clear();
         _version.Value++;
         await WriteStateAsync();
         return (true, _version.Value);
@@ -189,7 +174,7 @@ public class DictionaryGrain<K, V> : DurableGrain, IDictionaryGrain<K, V> where 
     public async IAsyncEnumerable<(K Key, V Value, long Version)> GetValuesAsync()
     {
         await Task.CompletedTask; // Make C# happy.
-        foreach (var kvp in _dictionary)
+        foreach (var kvp in dictionary)
         {
             yield return (kvp.Key, kvp.Value, _version.Value);
         }
@@ -203,7 +188,7 @@ public class DictionaryGrain<K, V> : DurableGrain, IDictionaryGrain<K, V> where 
             return (false, _version.Value);
         }
 
-        _dictionary[key] = value;
+        dictionary[key] = value;
         _version.Value++;
         await WriteStateAsync();
         return (true, _version.Value);

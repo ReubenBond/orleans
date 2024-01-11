@@ -3,19 +3,40 @@ using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
-public class DurableQueue<T>(IFieldCodec<T> codec, SerializerSessionPool serializerSessionPool) : IReadOnlyCollection<T>, IDurableStateMachine
+public interface IDurableQueue<T> : IEnumerable<T>, IReadOnlyCollection<T>
 {
-    private readonly SerializerSessionPool _serializerSessionPool = serializerSessionPool;
-    private readonly IFieldCodec<T> _codec = codec;
+    void Clear();
+    bool Contains(T item);
+    void CopyTo(T[] array, int arrayIndex);
+    T Dequeue();
+    void Enqueue(T item);
+    T Peek();
+    bool TryDequeue([MaybeNullWhen(false)] out T item);
+    bool TryPeek([MaybeNullWhen(false)] out T item);
+}
+
+internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
+{
+    private readonly SerializerSessionPool _serializerSessionPool;
+    private readonly IFieldCodec<T> _codec;
     private const byte VersionByte = 0;
     private readonly Queue<T> _items = new();
     private IStateMachineLogWriter? _storage;
+
+    public DurableQueue([ServiceKey] string key, IStateMachineManager manager, IFieldCodec<T> codec, SerializerSessionPool serializerSessionPool)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(key);
+        _codec = codec;
+        _serializerSessionPool = serializerSessionPool;
+        manager.RegisterStateMachine(key, this);
+    }
 
     public int Count => _items.Count;
 

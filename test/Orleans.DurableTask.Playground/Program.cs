@@ -75,29 +75,22 @@ public class Program
 
     [GrainType("account")]
     [Alias("AccountGrain")]
-    public class AccountGrain : DurableGrain, IAccountGrain
+    public class AccountGrain([FromKeyedServices("balance")] IDurableValue<long> balance) : DurableGrain, IAccountGrain
     {
-        private readonly DurableValue<long> _balance;
-
-        public AccountGrain()
-        {
-            _balance = GetOrCreateValue<long>("balance");
-        }
-
-        public async DurableTask Deposit(long amount) => _balance.Value += amount;
+        public async DurableTask Deposit(long amount) => balance.Value += amount;
 
         public async DurableTask<bool> Withdraw(long amount)
         {
-            if (_balance.Value >= amount)
+            if (balance.Value >= amount)
             {
-                _balance.Value -= amount;
+                balance.Value -= amount;
                 return true;
             }
 
             return false;
         }
 
-        public ValueTask<long> GetBalance() => new(_balance.Value);
+        public ValueTask<long> GetBalance() => new(balance.Value);
     }
 
     [Alias("IClientGrain")]
@@ -115,6 +108,10 @@ public class Program
     {
         public async Task Run()
         {
+            var dictionary = GrainFactory.GetGrain<IDictionaryGrain<string, int>>("my-dict");
+            var (added, version) = await dictionary.TryAddAsync("bananas", 12, 0);
+            Console.WriteLine($"{added}, {version}");
+
             var bank = GrainFactory.GetGrain<IBankGrain>("bank");
             var customer = GrainFactory.GetGrain<IAccountGrain>("customer");
             var business = GrainFactory.GetGrain<IAccountGrain>("business");
@@ -164,7 +161,7 @@ public class Program
             var customer = client.GetGrain<IAccountGrain>("customer");
             var business = client.GetGrain<IAccountGrain>("business");
 
-            var randomId = await DurableTask.Run(() => Guid.NewGuid()).WithId("generate-random-id");
+            var randomId = await DurableTask.Run(ct => Guid.NewGuid()).WithId("generate-random-id");
             Console.WriteLine(randomId);
 
             // If the task is interrupted (eg, power outage) and is retried, it will only sleep for the remaining time.

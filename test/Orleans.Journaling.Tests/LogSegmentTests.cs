@@ -71,8 +71,7 @@ public class LogSegmentTests
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
         //var storage = new InMemoryStateMachineStorage();
         var manager = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), sessionPool);
-        var list = new DurableList<string>(codecProvider.GetCodec<string>(), sessionPool);
-        manager.RegisterStateMachine("fooey", list);
+        var list = new DurableList<string>("fooey", manager, codecProvider.GetCodec<string>(), sessionPool);
         await manager.InitializeAsync(CancellationToken.None);
 
         // NOTE TO SELF: when we register the state machine, we need a signal which indicates when the state machine is ready to be used.
@@ -92,8 +91,7 @@ public class LogSegmentTests
         // TODO: throw in state machine MANAGER if trying to append log entries before recovery has completed
 
         var newManager = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), sessionPool);
-        var newList = new DurableList<string>(codecProvider.GetCodec<string>(), sessionPool);
-        newManager.RegisterStateMachine("fooey", newList);
+        var newList = new DurableList<string>("fooey", newManager, codecProvider.GetCodec<string>(), sessionPool);
         await newManager.InitializeAsync(CancellationToken.None);
 
         var originalList = list.ToList();
@@ -115,8 +113,7 @@ public class LogSegmentTests
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
         //var storage = new InMemoryStateMachineStorage();
         var manager = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), sessionPool);
-        var list = new DurableList<string>(codecProvider.GetCodec<string>(), sessionPool);
-        manager.RegisterStateMachine("fooey", list);
+        var list = new DurableList<string>("fooey", manager, codecProvider.GetCodec<string>(), sessionPool);
         await manager.InitializeAsync(CancellationToken.None);
 
         // NOTE TO SELF: when we register the state machine, we need a signal which indicates when the state machine is ready to be used.
@@ -140,8 +137,7 @@ public class LogSegmentTests
         // TODO: throw in state machine MANAGER if trying to append log entries before recovery has completed
 
         var newManager = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), sessionPool);
-        var newList = new DurableList<string>(codecProvider.GetCodec<string>(), sessionPool);
-        newManager.RegisterStateMachine("fooey", newList);
+        var newList = new DurableList<string>("fooey", newManager, codecProvider.GetCodec<string>(), sessionPool);
         await newManager.InitializeAsync(CancellationToken.None);
 
         var originalList = list.ToList();

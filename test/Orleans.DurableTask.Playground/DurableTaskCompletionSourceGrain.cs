@@ -1,19 +1,13 @@
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
 namespace Orleans.DurableTasks.Playground;
 
-public class DurableTaskCompletionSourceGrain<T> : DurableGrain, IDurableTaskCompletionSourceGrain<T>
+public class DurableTaskCompletionSourceGrain<T>([FromKeyedServices("state")] IDurableTaskCompletionSource<T> state) : DurableGrain, IDurableTaskCompletionSourceGrain<T>
 {
-    private readonly DurableTaskCompletionSource<T> _state;
-
-    public DurableTaskCompletionSourceGrain()
-    {
-        _state = GetOrCreateTaskCompletionSource<T>("state");
-    }
-
     public async ValueTask<bool> TrySetResult(T value)
     {
-        if (_state.TrySetResult(value))
+        if (state.TrySetResult(value))
         {
             await WriteStateAsync();
             return true;
@@ -24,7 +18,7 @@ public class DurableTaskCompletionSourceGrain<T> : DurableGrain, IDurableTaskCom
 
     public async ValueTask<bool> TrySetException(Exception exception)
     {
-        if (_state.TrySetException(exception))
+        if (state.TrySetException(exception))
         {
             await WriteStateAsync();
             return true;
@@ -35,7 +29,7 @@ public class DurableTaskCompletionSourceGrain<T> : DurableGrain, IDurableTaskCom
 
     public async ValueTask<bool> TrySetCanceled()
     {
-        if (_state.TrySetCanceled())
+        if (state.TrySetCanceled())
         {
             await WriteStateAsync();
             return true;
@@ -47,12 +41,12 @@ public class DurableTaskCompletionSourceGrain<T> : DurableGrain, IDurableTaskCom
     public async DurableTask<DurableTaskCompletionSourceState<T>> GetCompletionState()
     {
         // Wait for the result to complete, without throwing.
-        var nonGenericTask = (Task)_state.Task;
+        var nonGenericTask = (Task)state.Task;
         await nonGenericTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
 
-        return _state.State;
+        return state.State;
     }
 
-    public async DurableTask<T> GetResult() => await _state.Task;
-    public ValueTask<DurableTaskCompletionSourceState<T>> GetState() => new(_state.State);
+    public async DurableTask<T> GetResult() => await state.Task;
+    public ValueTask<DurableTaskCompletionSourceState<T>> GetState() => new(state.State);
 }

@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
@@ -9,24 +10,48 @@ using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
-public class DurableTaskCompletionSource<T>(
-    IFieldCodec<T> codec,
-    DeepCopier<T> copier,
-    IFieldCodec<Exception> exceptionCodec,
-    DeepCopier<Exception> exceptionCopier,
-    SerializerSessionPool serializerSessionPool) : IDurableStateMachine
+public interface IDurableTaskCompletionSource<T>
+{
+    Task<T> Task { get; }
+    DurableTaskCompletionSourceState<T> State { get; }
+
+    bool TrySetCanceled();
+    bool TrySetException(Exception exception);
+    bool TrySetResult(T value);
+}
+
+internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IDurableStateMachine
 {
     private const byte SupportedVersion = 0;
-    private readonly SerializerSessionPool _serializerSessionPool = serializerSessionPool;
-    private readonly IFieldCodec<T> _codec = codec;
-    private readonly IFieldCodec<Exception> _exceptionCodec = exceptionCodec;
-    private readonly DeepCopier<T> _copier = copier;
-    private readonly DeepCopier<Exception> _exceptionCopier = exceptionCopier;
+    private readonly SerializerSessionPool _serializerSessionPool;
+    private readonly IFieldCodec<T> _codec;
+    private readonly IFieldCodec<Exception> _exceptionCodec;
+    private readonly DeepCopier<T> _copier;
+    private readonly DeepCopier<Exception> _exceptionCopier;
+
     private TaskCompletionSource<T> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private IStateMachineLogWriter? _storage;
     private DurableTaskCompletionSourceStatus _status;
     private T? _value;
     private Exception? _exception;
+
+    public DurableTaskCompletionSource(
+        [ServiceKey] string key,
+        IStateMachineManager manager,
+        IFieldCodec<T> codec,
+        DeepCopier<T> copier,
+        IFieldCodec<Exception> exceptionCodec,
+        DeepCopier<Exception> exceptionCopier,
+        SerializerSessionPool serializerSessionPool)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(key);
+        _codec = codec;
+        _copier = copier;
+        _exceptionCodec = exceptionCodec;
+        _exceptionCopier = exceptionCopier;
+        _serializerSessionPool = serializerSessionPool;
+        manager.RegisterStateMachine(key, this);
+    }
 
     public bool TrySetResult(T value)
     {
@@ -48,7 +73,7 @@ public class DurableTaskCompletionSource<T>(
         }
 
         _status = DurableTaskCompletionSourceStatus.Faulted;
-        _exception= _exceptionCopier.Copy(exception);
+        _exception = _exceptionCopier.Copy(exception);
         return true;
     }
 
@@ -121,12 +146,12 @@ public class DurableTaskCompletionSource<T>(
         {
             case DurableTaskCompletionSourceStatus.Completed:
                 _value = ReadValue(ref reader);
-                break;  
+                break;
             case DurableTaskCompletionSourceStatus.Faulted:
                 _exception = ReadException(ref reader);
                 break;
             default:
-                break;  
+                break;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -10,11 +10,11 @@ public static class HostingExtensions
     {
         builder.Services.TryAddScoped<IStateMachineStorage>(sp => sp.GetRequiredService<IStateMachineStorageProvider>().Create(sp.GetRequiredService<IGrainContext>()));
         builder.Services.TryAddScoped<IStateMachineManager, StateMachineManager>();
-        builder.Services.TryAddTransient(typeof(DurableDictionary<,>));
-        builder.Services.TryAddTransient(typeof(DurableList<>));
-        builder.Services.TryAddTransient(typeof(DurableSet<>));
-        builder.Services.TryAddTransient(typeof(DurableQueue<>));
-        builder.Services.TryAddTransient(typeof(DurableValue<>));
+        builder.Services.TryAddKeyedScoped(typeof(IDurableDictionary<,>), KeyedService.AnyKey, typeof(DurableDictionary<,>));
+        builder.Services.TryAddKeyedScoped(typeof(IDurableList<>), KeyedService.AnyKey, typeof(DurableList<>));
+        builder.Services.TryAddKeyedScoped(typeof(IDurableQueue<>), KeyedService.AnyKey, typeof(DurableQueue<>));
+        builder.Services.TryAddKeyedScoped(typeof(IDurableSet<>), KeyedService.AnyKey, typeof(DurableSet<>));
+        builder.Services.TryAddKeyedScoped(typeof(IDurableValue<>), KeyedService.AnyKey, typeof(DurableValue<>));
         return builder;
     }
 }

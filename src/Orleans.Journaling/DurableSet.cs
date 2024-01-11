@@ -1,21 +1,34 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
-public class DurableSet<T>(IFieldCodec<T> codec, SerializerSessionPool serializerSessionPool) : ISet<T>, IReadOnlyCollection<T>, IDurableStateMachine
+public interface IDurableSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<T>
 {
-    private readonly SerializerSessionPool _serializerSessionPool = serializerSessionPool;
-    private readonly IFieldCodec<T> _codec = codec;
+}
+
+internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine
+{
+    private readonly SerializerSessionPool _serializerSessionPool;
+    private readonly IFieldCodec<T> _codec;
     private const byte VersionByte = 0;
     private readonly HashSet<T> _items = [];
     private IStateMachineLogWriter? _storage;
+
+    public DurableSet([ServiceKey] string key, IStateMachineManager manager, IFieldCodec<T> codec, SerializerSessionPool serializerSessionPool)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(key);
+        _codec = codec;
+        _serializerSessionPool = serializerSessionPool;
+        manager.RegisterStateMachine(key, this);
+    }
 
     public int Count => _items.Count;
     public bool IsReadOnly => false;

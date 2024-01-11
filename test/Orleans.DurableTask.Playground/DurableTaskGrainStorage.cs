@@ -163,7 +163,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
         var version = reader.ReadByte();
         if (version != VersionByte)
         {
-            throw new NotSupportedException($"This instance of {nameof(DurableDictionary<TaskId, DurableTaskState>)} supports version {(uint)VersionByte} and not version {(uint)version}.");
+            throw new NotSupportedException($"This instance of {nameof(DurableTaskGrainStorage)} supports version {(uint)VersionByte} and not version {(uint)version}.");
         }
 
         var commandType = (CommandType)reader.ReadVarUInt32();

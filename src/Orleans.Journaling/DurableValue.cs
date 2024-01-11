@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
@@ -9,15 +10,29 @@ using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
-public class DurableValue<T>(IFieldCodec<T> codec, DeepCopier<T> copier, SerializerSessionPool serializerSessionPool) : IDurableStateMachine
+public interface IDurableValue<T>
+{
+    T? Value { get; set; }
+}
+
+internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine
 {
     private const byte VersionByte = 0;
-    private readonly SerializerSessionPool _serializerSessionPool = serializerSessionPool;
-    private readonly IFieldCodec<T> _codec = codec;
-    private readonly DeepCopier<T> _copier = copier;
+    private readonly SerializerSessionPool _serializerSessionPool;
+    private readonly IFieldCodec<T> _codec;
+    private readonly DeepCopier<T> _copier;
     private IStateMachineLogWriter? _storage;
     private T? _value;
     private bool _isDirty;
+
+    public DurableValue([ServiceKey] string key, IStateMachineManager manager, IFieldCodec<T> codec, DeepCopier<T> copier, SerializerSessionPool serializerSessionPool)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(key);
+        _codec = codec;
+        _copier = copier;
+        _serializerSessionPool = serializerSessionPool;
+        manager.RegisterStateMachine(key, this);
+    }
 
     public T? Value
     {
@@ -31,7 +46,7 @@ public class DurableValue<T>(IFieldCodec<T> codec, DeepCopier<T> copier, Seriali
 
     public Action? OnPersisted { get; set; }
 
-    protected virtual void OnValuePersisted() => OnPersisted?.Invoke();
+    private void OnValuePersisted() => OnPersisted?.Invoke();
 
     public void OnModified() => _isDirty = true;
 
@@ -83,10 +98,9 @@ public class DurableValue<T>(IFieldCodec<T> codec, DeepCopier<T> copier, Seriali
         }
     }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter)
-    {
-        WriteState(snapshotWriter);
-    }
+    void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter) => WriteState(snapshotWriter);
+
+    public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
 
     private void WriteState(StateMachineStorageWriter writer)
     {
@@ -108,16 +122,6 @@ public class DurableValue<T>(IFieldCodec<T> codec, DeepCopier<T> copier, Seriali
     {
         Debug.Assert(_storage is not null);
         return _storage;
-    }
-
-    public IDurableStateMachine DeepCopy()
-    {
-        var result = new DurableValue<T>(_codec, _copier, _serializerSessionPool)
-        {
-            _value = _copier.Copy(_value!),
-            _isDirty = _isDirty
-        };
-        return result;
     }
 
     private enum CommandType

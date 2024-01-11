@@ -3,20 +3,38 @@ using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
-public class DurableDictionary<K, V>(IFieldCodec<K> keyCodec, IFieldCodec<V> valueCodec, SerializerSessionPool serializerSessionPool) : IDictionary<K, V>, IDurableStateMachine where K : notnull
+public interface IDurableDictionary<K, V> : IDictionary<K, V> where K : notnull
 {
-    private readonly SerializerSessionPool _serializerSessionPool = serializerSessionPool;
-    private readonly IFieldCodec<K> _keyCodec = keyCodec;
-    private readonly IFieldCodec<V> _valueCodec = valueCodec;
+}
+
+internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableStateMachine where K : notnull
+{
+    private readonly SerializerSessionPool _serializerSessionPool;
+    private readonly IFieldCodec<K> _keyCodec;
+    private readonly IFieldCodec<V> _valueCodec;
     private const byte VersionByte = 0;
     private readonly Dictionary<K, V> _items = [];
     private IStateMachineLogWriter? _storage;
+
+    protected DurableDictionary(IFieldCodec<K> keyCodec, IFieldCodec<V> valueCodec, SerializerSessionPool serializerSessionPool)
+    {
+        _keyCodec = keyCodec;
+        _valueCodec = valueCodec;
+        _serializerSessionPool = serializerSessionPool;
+    }
+
+    public DurableDictionary([ServiceKey] string key, IStateMachineManager manager, IFieldCodec<K> keyCodec, IFieldCodec<V> valueCodec, SerializerSessionPool serializerSessionPool) : this(keyCodec, valueCodec, serializerSessionPool)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(key);
+        manager.RegisterStateMachine(key, this);
+    }
 
     public V this[K key]
     {

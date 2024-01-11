@@ -41,9 +41,6 @@ public interface IDurableTaskServer : IGrainExtension
 [Alias("IDurableTaskGrainExtension")]
 public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServer, IDurableTaskClient
 {
-    // TODO: implement. This will require making a serializable implementation of ScheduledTask<T>
-    //ValueTask<(bool Exists, ScheduledTask<T> Task)> TryGetScheduledTaskAsync<T>(TaskId taskId);
-    //ValueTask<(bool Exists, ScheduledTask Task)> TryGetScheduledTaskAsync(TaskId taskId);
     [Alias("GetTasksAsync")]
     IAsyncEnumerable<(TaskId TaskId, DurableTaskDiagnosticState State)> GetTasksAsync();
 
