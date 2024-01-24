@@ -16,4 +16,6 @@ namespace Orleans.Runtime;
 public sealed class ResourceOptimizedPlacement : PlacementStrategy
 {
     internal static readonly ResourceOptimizedPlacement Singleton = new();
+
+    public override bool IsGrain => true;
 }

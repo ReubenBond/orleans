@@ -36,28 +36,20 @@ public static class DurableTaskHostingExtensions
 
 public class Program
 {
-    [Alias("Program.IBankGrain")]
     public interface IBankGrain : IGrainWithStringKey
     {
-        [Alias("Transfer")]
         DurableTask<bool> Transfer(IAccountGrain source, IAccountGrain destination, long amount);
     }
 
-    [Alias("IAccountGrain")]
     public interface IAccountGrain : IGrainWithStringKey
     {
-        [Alias("Withdraw")]
         DurableTask<bool> Withdraw(long amount);
 
-        [Alias("Deposit")]
         DurableTask Deposit(long amount);
         
-        [Alias("GetBalance")]
         ValueTask<long> GetBalance();
     }
 
-    [GrainType("bank")]
-    [Alias("BankGrain")]
     public class BankGrain : DurableGrain, IBankGrain
     {
         public async DurableTask<bool> Transfer(
@@ -73,7 +65,6 @@ public class Program
         }
     }
 
-    [GrainType("account")]
     public class AccountGrain : DurableGrain, IAccountGrain
     {
         private readonly DurableValue<long> _balance;
@@ -99,17 +90,12 @@ public class Program
         public ValueTask<long> GetBalance() => new(_balance.Value);
     }
 
-    [Alias("IClientGrain")]
     public interface IClientGrain : IGrainWithStringKey
     {
-        [Alias("Run")]
         Task Run();
-        [Alias("RunWorkflow")]
         DurableTask RunWorkflow();
     }
 
-    [GrainType("client")]
-    [Alias("ClientGrain")]
     public class ClientGrain : DurableGrain, IClientGrain
     {
         public async Task Run()
@@ -148,7 +134,6 @@ public class Program
                     Console.WriteLine($" * {task.TaskId}: {JsonConvert.SerializeObject(task.State, Formatting.Indented)}");
                 }
             }
-
         }
 
         public async DurableTask RunWorkflow()
