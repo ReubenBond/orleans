@@ -15,14 +15,14 @@ namespace Orleans.Runtime.Scheduler
 
         private static void RunWorkItemTask(IWorkItem todo)
         {
+            RuntimeContext.SetExecutionContext(todo.GrainContext, out var originalContext);
             try
             {
-                RuntimeContext.SetExecutionContext(todo.GrainContext);
                 todo.Execute();
             }
             finally
             {
-                RuntimeContext.ResetExecutionContext();
+                RuntimeContext.ResetExecutionContext(originalContext);
             }
         }
     }

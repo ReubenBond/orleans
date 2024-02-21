@@ -41,9 +41,9 @@ namespace Orleans.Runtime.Scheduler
 
         public override void Execute()
         {
+            RuntimeContext.SetExecutionContext(this.activation, out var originalContext);
             try
             {
-                RuntimeContext.SetExecutionContext(this.activation);
                 var grain = activation.GrainInstance;
                 var runtimeClient = this.dispatcher.RuntimeClient;
                 Task task = runtimeClient.Invoke(grain, this.activation, this.message);
@@ -66,7 +66,7 @@ namespace Orleans.Runtime.Scheduler
             }
             finally
             {
-                RuntimeContext.ResetExecutionContext();
+                RuntimeContext.ResetExecutionContext(originalContext);
             }
         }
 

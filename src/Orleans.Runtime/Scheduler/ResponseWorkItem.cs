@@ -24,14 +24,14 @@ namespace Orleans.Runtime.Scheduler
 
         public override void Execute()
         {
+            RuntimeContext.SetExecutionContext(this.target, out var originalContext);
             try
             {
-                RuntimeContext.SetExecutionContext(this.target);
                 target.HandleResponse(response);
             }
             finally
             {
-                RuntimeContext.ResetExecutionContext();
+                RuntimeContext.ResetExecutionContext(originalContext);
             }
         }
 

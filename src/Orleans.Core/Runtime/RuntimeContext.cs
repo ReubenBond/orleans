@@ -15,16 +15,17 @@ namespace Orleans.Runtime
         internal static IGrainContext CurrentGrainContext { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => context?.GrainContext; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void SetExecutionContext(IGrainContext shedContext)
+        internal static void SetExecutionContext(IGrainContext newContext, out IGrainContext originalContext)
         {
             context ??= new RuntimeContext();
-            context.GrainContext = shedContext;
+            originalContext = context.GrainContext;
+            context.GrainContext = newContext;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void ResetExecutionContext()
+        internal static void ResetExecutionContext(IGrainContext originalContext)
         {
-            context.GrainContext = null;
+            context.GrainContext = originalContext;
         }
 
         public override string ToString() => $"RuntimeContext: GrainContext={GrainContext?.ToString() ?? "null"}";
