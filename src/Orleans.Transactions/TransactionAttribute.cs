@@ -309,7 +309,6 @@ namespace Orleans
         }
 
         public override T GetResult<T>() => _response.GetResult<T>();
-        public override Response Copy() => this;
     }
 
     [SerializerTransparent]
