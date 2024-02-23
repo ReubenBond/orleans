@@ -1,8 +1,10 @@
 using BenchmarkGrainInterfaces.Ping;
+using Orleans.Placement;
 using Orleans.Runtime;
 
 namespace BenchmarkGrains.Ping
 {
+    [PreferLocalPlacement]
     public class PingGrain : IGrainBase, IPingGrain
     {
         private IPingGrain _self;
