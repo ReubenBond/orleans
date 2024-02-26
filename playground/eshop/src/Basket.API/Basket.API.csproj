@@ -3,6 +3,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <UserSecretsId>2964ec8e-0d48-4541-b305-94cab537f867</UserSecretsId>
     <PublishAot Condition="'$(EnableAotPublishing)' == 'true'">true</PublishAot>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.StackExchange.Redis" />
@@ -14,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\..\src\Orleans.Sdk\Orleans.Sdk.csproj" />
     <ProjectReference Include="..\eShop.ServiceDefaults\eShop.ServiceDefaults.csproj" />
     <ProjectReference Include="..\EventBusRabbitMQ\EventBusRabbitMQ.csproj" />
   </ItemGroup>

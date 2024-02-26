@@ -22,8 +22,4 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
   </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\ClientApp\ClientApp.csproj" />
-  </ItemGroup>
 </Project>

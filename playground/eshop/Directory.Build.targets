@@ -1,5 +1,11 @@
 <Project>
 
+  <PropertyGroup>
+    <_ParentDirectoryBuildTargetsPath Condition="'$(_DirectoryBuildTargetsFile)' != ''">$([System.IO.Path]::Combine('..', '..', '$(_DirectoryBuildTargetsFile)'))</_ParentDirectoryBuildTargetsPath>
+  </PropertyGroup>
+
+  <Import Project="$(_ParentDirectoryBuildTargetsPath)" Condition="Exists('$(_ParentDirectoryBuildTargetsPath)')"/>
+
   <PropertyGroup Condition="'$(PublishAot)' == 'true'">
     <!-- EventSource is disabled by default for non-ASP.NET AOT'd apps, re-enable it -->
     <EventSourceSupport>true</EventSourceSupport>
