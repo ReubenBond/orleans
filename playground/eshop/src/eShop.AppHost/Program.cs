@@ -20,6 +20,11 @@ var webhooksDb = postgres.AddDatabase("webhooksdb");
 
 var openAi = builder.AddAzureOpenAI("openai");
 
+var orleans = builder.AddOrleans("orleans")
+    .WithClustering(redis)
+    .WithGrainStorage(redis)
+    .WithReminders(redis);
+
 // Services
 var identityApi = builder.AddProject<Projects.Identity_API>("identity-api")
     .WithReference(identityDb)
@@ -30,11 +35,13 @@ var idpHttps = identityApi.GetEndpoint("https");
 var basketApi = builder.AddProject<Projects.Basket_API>("basket-api")
     .WithReference(redis)
     .WithReference(rabbitMq)
+    .WithReference(orleans)
     .WithEnvironment("Identity__Url", idpHttps);
 
 var catalogApi = builder.AddProject<Projects.Catalog_API>("catalog-api")
     .WithReference(rabbitMq)
     .WithReference(catalogDb)
+    .WithReference(orleans)
     .WithReference(openAi, optional: true);
 
 var orderingApi = builder.AddProject<Projects.Ordering_API>("ordering-api")
