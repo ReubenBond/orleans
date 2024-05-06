@@ -731,23 +731,31 @@ namespace Orleans.Runtime
             try
             {
                 var activator = GetComponent<IGrainActivator>();
-                if (activator != null)
+                if (activator != null && GrainInstance is { } grainInstance)
                 {
-                    await activator.DisposeInstance(this, GrainInstance);
+                    await activator.DisposeInstance(this, grainInstance);
                 }
             }
-            catch (ObjectDisposedException)
+            catch (Exception exception)
             {
+                _shared.Logger.LogError(exception, "Error disposing grain activation.");
             }
 
-            switch (_serviceScope)
+            try
             {
-                case IAsyncDisposable asyncDisposable:
-                    await asyncDisposable.DisposeAsync();
-                    break;
-                case IDisposable disposable:
-                    disposable.Dispose();
-                    break;
+                switch (_serviceScope)
+                {
+                    case IAsyncDisposable asyncDisposable:
+                        await asyncDisposable.DisposeAsync();
+                        break;
+                    case IDisposable disposable:
+                        disposable.Dispose();
+                        break;
+                }
+            }
+            catch (Exception exception)
+            {
+                _shared.Logger.LogError(exception, "Error disposing grain activation service provider scope.");
             }
         }
 
@@ -1450,8 +1458,6 @@ namespace Orleans.Runtime
                         DeactivationReason = new(DeactivationReasonCode.ActivationFailed, sourceException, "Failed to activate grain.");
                     }
 
-                    GetDeactivationCompletionSource().TrySetResult(true);
-
                     if (IsUsingGrainDirectory && ForwardingAddress is null)
                     {
                         try
@@ -1478,12 +1484,17 @@ namespace Orleans.Runtime
                         ScheduleOperation(new Command.Delay(TimeSpan.FromSeconds(5)));
                     }
 
-                    ScheduleOperation(new Command.UnregisterFromCatalog());
-
                     lock (this)
                     {
                         SetState(ActivationState.Invalid);
                     }
+
+                    // In case timers were started during activation, stop them now.
+                    StopAllTimers();
+
+                    // Schedule deactivation to execute after the delay completes.
+                    var deactivationCancellationToken = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout).Token;
+                    ScheduleOperation(new Command.Deactivate(deactivationCancellationToken));
 
                     return false;
                 }
@@ -1747,54 +1758,48 @@ namespace Orleans.Runtime
 
             async Task CallGrainDeactivate(CancellationToken ct)
             {
+                // Note: This call is being made from within Scheduler.Queue wrapper, so we are already executing on worker thread
+                if (_shared.Logger.IsEnabled(LogLevel.Debug))
+                {
+                    _shared.Logger.LogDebug(
+                        (int)ErrorCode.Catalog_BeforeCallingDeactivate,
+                        "About to call {Activation} grain's OnDeactivateAsync(...) method {GrainInstanceType}",
+                        this,
+                        GrainInstance?.GetType().FullName);
+                }
+
+                // Call OnDeactivateAsync inline, but within try-catch wrapper to safely capture any exceptions thrown from called function
                 try
                 {
-                    // Note: This call is being made from within Scheduler.Queue wrapper, so we are already executing on worker thread
-                    if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                        _shared.Logger.LogDebug(
-                            (int)ErrorCode.Catalog_BeforeCallingDeactivate,
-                            "About to call {Activation} grain's OnDeactivateAsync(...) method {GrainInstanceType}",
-                            this,
-                            GrainInstance?.GetType().FullName);
-
-                    // Call OnDeactivateAsync inline, but within try-catch wrapper to safely capture any exceptions thrown from called function
-                    try
+                    // just check in case this activation data is already Invalid or not here at all.
+                    if (State == ActivationState.Deactivating)
                     {
-                        // just check in case this activation data is already Invalid or not here at all.
-                        if (State == ActivationState.Deactivating)
+                        // Clear any previous RC, so it does not leak into this call by mistake.
+                        RequestContext.Clear();
+                        if (GrainInstance is IGrainBase grainBase && DeactivationReason.ReasonCode != DeactivationReasonCode.ActivationFailed)
                         {
-                            RequestContext.Clear(); // Clear any previous RC, so it does not leak into this call by mistake.
-                            if (GrainInstance is IGrainBase grainBase)
-                            {
-                                await grainBase.OnDeactivateAsync(DeactivationReason, ct).WithCancellation($"Timed out waiting for {nameof(IGrainBase.OnDeactivateAsync)} to complete", ct);
-                            }
-
-                            await Lifecycle.OnStop(ct).WithCancellation("Timed out waiting for grain lifecycle to complete deactivation", ct);
+                            await grainBase.OnDeactivateAsync(DeactivationReason, ct).WithCancellation($"Timed out waiting for {nameof(IGrainBase.OnDeactivateAsync)} to complete", ct);
                         }
 
-                        if (_shared.Logger.IsEnabled(LogLevel.Debug))
-                            _shared.Logger.LogDebug(
-                                (int)ErrorCode.Catalog_AfterCallingDeactivate,
-                                "Returned from calling {Activation} grain's OnDeactivateAsync(...) method {GrainInstanceType}",
-                                this,
-                                GrainInstance?.GetType().FullName);
+                        await Lifecycle.OnStop(ct).WithCancellation("Timed out waiting for grain lifecycle to complete deactivation", ct);
                     }
-                    catch (Exception exc)
+
+                    if (_shared.Logger.IsEnabled(LogLevel.Debug))
                     {
-                        _shared.Logger.LogError(
-                            (int)ErrorCode.Catalog_ErrorCallingDeactivate,
-                            exc,
-                            "Error calling grain's OnDeactivateAsync(...) method - Grain type = {GrainType} Activation = {Activation}",
-                            GrainInstance?.GetType().FullName,
-                            this);
+                        _shared.Logger.LogDebug(
+                            (int)ErrorCode.Catalog_AfterCallingDeactivate,
+                            "Returned from calling {Activation} grain's OnDeactivateAsync(...) method {GrainInstanceType}",
+                            this,
+                            GrainInstance?.GetType().FullName);
                     }
                 }
                 catch (Exception exc)
                 {
                     _shared.Logger.LogError(
-                        (int)ErrorCode.Catalog_FinishGrainDeactivateAndCleanupStreams_Exception,
+                        (int)ErrorCode.Catalog_ErrorCallingDeactivate,
                         exc,
-                        "CallGrainDeactivateAndCleanupStreams Activation = {Activation} failed.",
+                        "Error calling grain's OnDeactivateAsync(...) method - Grain type = {GrainType} Activation = {Activation}",
+                        GrainInstance?.GetType().FullName,
                         this);
                 }
             }
