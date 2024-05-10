@@ -1,6 +1,3 @@
-﻿using System;
-using System.Net.Http;
-
 namespace GoogleUtils.Tests
 {
     public static class GoogleTestUtils

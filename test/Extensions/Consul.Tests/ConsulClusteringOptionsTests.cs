@@ -1,3 +1,4 @@
+using Consul.Interfaces;
 using Orleans.Configuration;
 using Xunit;
 
@@ -111,6 +112,8 @@ namespace Consul.Tests
             public ICoordinateEndpoint Coordinate => throw new NotImplementedException();
 
             public ISnapshotEndpoint Snapshot => throw new NotImplementedException();
+
+            public IConfigurationEndpoint Configuration { get; }
 
             public Task<IDistributedLock> AcquireLock(LockOptions opts, CancellationToken ct = default) => throw new NotImplementedException();
             public Task<IDistributedLock> AcquireLock(string key, CancellationToken ct = default) => throw new NotImplementedException();

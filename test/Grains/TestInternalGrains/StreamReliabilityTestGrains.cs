@@ -337,7 +337,7 @@ namespace UnitTests.Grains
 
     //    public Task OnCompletedAsync()
     //    {
-    //        logger.Info("Receive OnCompletedAsync - Total Items={0} Errors={1}", NumItems, NumErrors);
+    //        logger.LogInformation("Receive OnCompletedAsync - Total Items={0} Errors={1}", NumItems, NumErrors);
     //        return Task.CompletedTask;
     //    }
 

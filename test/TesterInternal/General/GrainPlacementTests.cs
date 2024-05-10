@@ -40,7 +40,7 @@ namespace UnitTests.General
         //public void PreferLocalPlacedGrainShouldPlaceActivationsLocally_OneHop()
         //{
         //    HostedCluster.WaitForLivenessToStabilize();
-        //    logger.Info("********************** Starting the test PreferLocalPlacedGrainShouldPlaceActivationsLocally ******************************");
+        //    logger.LogInformation("********************** Starting the test PreferLocalPlacedGrainShouldPlaceActivationsLocally ******************************");
         //    TestSilosStarted(2);
 
         //    int numGrains = 20;
@@ -55,7 +55,7 @@ namespace UnitTests.General
         //    foreach (int key in Enumerable.Range(0, numGrains))
         //    {
         //        string preferLocal = preferLocalGrainPlaces.ElementAt(key);
-        //        logger.Info(preferLocal);
+        //        logger.LogInformation(preferLocal);
         //    }
         //}
 

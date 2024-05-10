@@ -149,7 +149,7 @@ namespace UnitTests.Grains
                 logger.LogInformation("About to throw 3 from Task {TaskId}", Task.CurrentId);
                 throw new ArgumentException("ErrorGrain left ContinueWith Unobserved Error 3.");
             });
-            //logger.Info("cont.number=" + cont.task.number + " cont.m_Task.number=" + cont.task.m_Task.Id);
+            //logger.LogInformation("cont.number=" + cont.task.number + " cont.m_Task.number=" + cont.task.m_Task.Id);
             promise = null;
             cont = null;
             GC.Collect();

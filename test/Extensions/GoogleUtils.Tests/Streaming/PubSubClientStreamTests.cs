@@ -1,16 +1,12 @@
-using System;
-using System.Threading.Tasks;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Providers.GCP.Streams.PubSub;
-using Orleans.Hosting;
 using Microsoft.Extensions.Configuration;
-using Orleans;
 using Orleans.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace GoogleUtils.Tests.Streaming
 {
@@ -78,14 +74,14 @@ namespace GoogleUtils.Tests.Streaming
         [SkippableFact]
         public async Task GPS_StreamProducerOnDroppedClientTest()
         {
-            logger.Info("************************ AQStreamProducerOnDroppedClientTest *********************************");
+            logger.LogInformation("************************ AQStreamProducerOnDroppedClientTest *********************************");
             await runner.StreamProducerOnDroppedClientTest(PROVIDER_NAME, STREAM_NAMESPACE);
         }
 
         [SkippableFact(Skip = "PubSub has unpredictable event delivery counts - re-enable when we figure out how to handle this.")]
         public async Task GPS_StreamConsumerOnDroppedClientTest()
         {
-            logger.Info("************************ AQStreamConsumerOnDroppedClientTest *********************************");
+            logger.LogInformation("************************ AQStreamConsumerOnDroppedClientTest *********************************");
             await runner.StreamConsumerOnDroppedClientTest(PROVIDER_NAME, STREAM_NAMESPACE, output);
         }
     }
