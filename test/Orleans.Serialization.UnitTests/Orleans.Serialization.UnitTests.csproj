@@ -18,7 +18,10 @@
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="FSharp.Core" />
     <PackageReference Include="Google.Protobuf" />
-    <PackageReference Include="Grpc.Tools" />
+    <PackageReference Include="Grpc.Tools">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>

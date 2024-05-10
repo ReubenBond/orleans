@@ -39,7 +39,7 @@ namespace UnitTests.Grains
         {
             this.label = label;
 
-            //logger.Info("SetLabel {0} received", label);
+            //logger.LogInformation("SetLabel {0} received", label);
             return Task.CompletedTask;
         }
 

@@ -1,8 +1,4 @@
-using System;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Providers.GCP.Streams.PubSub;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -35,8 +31,7 @@ namespace GoogleUtils.Tests.Streaming
             {
                 hostBuilder
                     .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1)
-                    .AddMemoryGrainStorage("PubSubStorage")
-                    .AddSimpleMessageStreamProvider("SMSProvider")
+                    .AddMemoryGrainStorage("PubSubStore")
                     .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME, b=>
                         b.ConfigurePubSub(ob=>ob.Configure(options =>
                         {
@@ -52,7 +47,6 @@ namespace GoogleUtils.Tests.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddSimpleMessageStreamProvider("SMSProvider")
                     .AddPubSubStreams<PubSubDataAdapter>(PUBSUB_STREAM_PROVIDER_NAME, b=>
                         b.ConfigurePubSub(ob=>ob.Configure(options =>
                         {

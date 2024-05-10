@@ -117,7 +117,7 @@ namespace NonSilo.Tests.Membership
         public async Task SiloHealthMonitor_SuccessfulProbe()
         {
             _prober.Probe(default, default).ReturnsForAnyArgs(Task.CompletedTask);
-            _prober.ProbeIndirectly(default, default, default, default).ThrowsForAnyArgs(new InvalidOperationException("No"));
+            _prober.ProbeIndirectly(default, default, default, default).ThrowsAsyncForAnyArgs(new InvalidOperationException("No"));
 
             _monitor.Start();
 
@@ -141,7 +141,7 @@ namespace NonSilo.Tests.Membership
             _clusterMembershipOptions.ProbeTimeout = TimeSpan.FromSeconds(2);
 
             _prober.Probe(default, default).ReturnsForAnyArgs(info => Task.Delay(TimeSpan.FromSeconds(3)));
-            _prober.ProbeIndirectly(default, default, default, default).ThrowsForAnyArgs(new InvalidOperationException("No"));
+            _prober.ProbeIndirectly(default, default, default, default).ThrowsAsyncForAnyArgs(new InvalidOperationException("No"));
             _monitor.Start();
 
             // Let a timer complete
@@ -155,7 +155,7 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(0, probeResult.IntermediaryHealthDegradationScore);
 
             // Throw directly, instead of timing out the probe
-            _prober.Probe(default, default).ThrowsForAnyArgs(new Exception("nope"));
+            _prober.Probe(default, default).ThrowsAsyncForAnyArgs(new Exception("nope"));
             timerCall = await _timerCalls.Reader.ReadAsync();
             timerCall.Completion.TrySetResult(true);
 
@@ -174,7 +174,7 @@ namespace NonSilo.Tests.Membership
             _clusterMembershipOptions.ProbeTimeout = TimeSpan.FromSeconds(2);
             _clusterMembershipOptions.EnableIndirectProbes = true;
 
-            _prober.Probe(default, default).ThrowsForAnyArgs(info => new Exception("nonono!"));
+            _prober.Probe(default, default).ThrowsAsyncForAnyArgs(info => new Exception("nonono!"));
             _prober.ProbeIndirectly(default, default, default, default).ReturnsForAnyArgs(new IndirectProbeResponse
             {
                 FailureMessage = "fail",
