@@ -83,7 +83,7 @@
         }));
 
         const newGrainNodes = jsonData.grainIds.map((d, i) => ({
-          id: "grain-" + i,
+          id: "grain-" + d.name,
           host: d.host,
           name: d.name,
           key: d.key,
@@ -93,20 +93,24 @@
         const newNodes = newHostNodes.concat(newGrainNodes);
 
         const newGrainLinks = jsonData.edges
-          .map((d) => ({
-            id: "edge-" + d.source + "-" + d.target,
-            source: "grain-" + d.source,
-            target: "grain-" + d.target,
-            sourceHost: jsonData.grainIds[d.source].host,
-            targetHost: jsonData.grainIds[d.target].host,
-            weight: d.weight,
-            isHostLink: false,
-          }))
+          .map((d) => {
+            var source = jsonData.grainIds[d.source];
+            var target = jsonData.grainIds[d.target];
+            return {
+              id: "edge(" + source.name + "," + target.name + ")",
+              source: "grain-" + source.name,
+              target: "grain-" + target.name,
+              sourceHost: source.host,
+              targetHost: target.host,
+              weight: d.weight,
+              isHostLink: false,
+            };
+          })
           .filter((d) => d.source !== null && d.target !== null);
 
         const newHostLinks = jsonData.grainIds.map((d, i) => ({
-          id: "host-edge-" + i + "-" + d.host,
-          source: "grain-" + i,
+          id: "host-edge(" + d.name + "," + d.host + ")",
+          source: "grain-" + d.name,
           target: "host-" + d.host,
           distance: 100,
           isHostLink: true,
@@ -137,12 +141,9 @@
       }
 
       function initializeGraph() {
-        console.log("state", state);
-
-        const links = state.links;
-        const nodes = state.nodes;
-
         const svg = d3.select("svg");
+        let width = svg.node().clientWidth;
+        let height = svg.node().clientHeight;
         const graphContainer = svg.select(".graph-container");
 
         const color = d3.scaleOrdinal(d3.schemeCategory10);
@@ -153,8 +154,8 @@
         const nodeData = graphContainer
           .select(".nodes")
           .selectAll("g")
-          .data(nodes, (d) => d.id);
-        const newNodes = nodeData.join("g");
+          .data(state.nodes, (d) => d.id);
+        const newNodes = nodeData.enter().append("g");
         newNodes.append("circle");
         newNodes.append("text").attr("class", "label");
         newNodes
@@ -167,6 +168,7 @@
           .filter((d) => !d.isHost)
           .text((d) => (d.key.includes("hosted-") ? "client" : d.key))
           .attr("dy", -10);
+        nodeData.exit().remove();
 
         const nodeGroup = newNodes.merge(nodeData);
 
@@ -199,51 +201,36 @@
           .attr("fill", (d) => (d.isHost ? color(d.index) : color(d.host)));
 
         // Links
-        const link = graphContainer
+        const linkData = graphContainer
           .select(".links")
           .selectAll("line")
-          .data(links, (d) => d.id);
+          .data(state.links, (d) => d.id);
 
-        const linkLine = link.join(
-          (enter) =>
-            enter
-              .append("line")
-              .attr("stroke-width", (d) =>
-                d.isHostLink ? 0.25 : (0.8 * d.weight) / state.maxEdgeValue
-              )
-              .attr("stroke", (d) =>
-                d.isHostLink
-                  ? color(d.host)
-                  : d.sourceHost == d.targetHost
-                  ? color(d.sourceHost)
-                  : "red"
-              ),
-          (update) =>
-            update
-              .attr("stroke-width", (d) =>
-                d.isHostLink ? 0.25 : (0.8 * d.weight) / state.maxEdgeValue
-              )
-              .attr("stroke", (d) =>
-                d.isHostLink
-                  ? color(d.host)
-                  : d.sourceHost == d.targetHost
-                  ? color(d.sourceHost)
-                  : "red"
-              ),
-          (exit) => exit.remove()
-        );
-
-        let width = svg.node().clientWidth;
-        let height = svg.node().clientHeight;
+        const linkLine = linkData
+          .join("line")
+          .attr("stroke-width", (d) =>
+            d.isHostLink ? 0.25 : 1 + d.weight / state.maxEdgeValue
+          )
+          .attr("stroke", (d) =>
+            d.isHostLink
+              ? color(d.host)
+              : d.sourceHost == d.targetHost
+              ? color(d.sourceHost)
+              : "red"
+          );
+        linkData.exit().remove();
 
         if (!state.isUpdate) {
           state.simulation = d3
-            .forceSimulation(nodes)
-            .force("center", d3.forceCenter(width / 2, height / 2))
+            .forceSimulation(state.nodes)
+            .force(
+              "center",
+              d3.forceCenter(width / 2, height / 2).strength(0.5)
+            )
             .force(
               "link",
               d3
-                .forceLink(links)
+                .forceLink(state.links)
                 .id((d) => d.id)
                 .strength((d) => (d.isHostLink ? 0.6 : 0.3))
                 .distance((d) => (d.isHostLink ? 100 : 30))
@@ -253,6 +240,7 @@
               d3.forceManyBody().strength((d) => (d.isHost ? -50 : -100))
             )
             .alphaDecay(0.01) // Reduce alpha decay rate for gradual settling
+            .velocityDecay(0.5) // Reduce velocity decay rate for gradual settling
             .on("tick", ticked);
 
           svg.call(
@@ -264,8 +252,8 @@
               })
           );
         } else {
-          state.simulation.nodes(nodes);
-          state.simulation.force("link").links(links);
+          state.simulation.nodes(state.nodes);
+          state.simulation.force("link").links(state.links);
           state.simulation.alphaTarget(0.3).restart();
         }
 

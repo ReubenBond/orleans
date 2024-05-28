@@ -12,14 +12,23 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
     private readonly IManagementGrain _managementGrain = grainFactory.GetGrain<IManagementGrain>(0);
     private readonly record struct GrainDetails(int GrainKey, int HostKey);
     private readonly record struct HostDetails(int HostKey, int ActivationCount);
+    private int _version;
 
     public async ValueTask<CallGraph> GetGrainCallFrequencies()
     {
+        var resetCount = await grainFactory.GetGrain<ILoaderGrain>("root").GetResetCount();
+        if (resetCount > _version)
+        {
+            _version = resetCount;
+            await ResetAsync();
+        }
+
         _edges.Clear();
         var maxEdgeValue = 0;
         var maxActivationCount = 0;
 
-        foreach (var (silo, _) in await _managementGrain.GetHosts(onlyActive: true))
+        var silos = (await _managementGrain.GetHosts(onlyActive: true)).Keys.Order();
+        foreach (var silo in silos)
         {
             var hostKey = GetHostVertex(silo);
             var activationCount = 0;
@@ -73,7 +82,7 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
 
     internal async ValueTask ResetAsync()
     {
-        var fanoutType = grainFactory.GetGrain<IFanOutGrain>(0).GetGrainId().Type;
+        var fanoutType = grainFactory.GetGrain<IFanOutGrain>(0, "0").GetGrainId().Type;
         foreach (var activation in await _managementGrain.GetDetailedGrainStatistics())
         {
             if (!activation.GrainId.Type.Equals(fanoutType)) continue;

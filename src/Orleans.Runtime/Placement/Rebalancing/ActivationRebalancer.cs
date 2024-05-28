@@ -353,7 +353,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
                     return false;
                 }
 
-                if (chosenVertex.AccumulatedTransferScore <= 0)
+                if (chosenVertex.AccumulatedTransferScore < 0)
                 {
                     // If it got affected by a previous run, and the score is zero or negative, simply pop and ignore it.
                     return false;

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using BenchmarkGrainInterfaces.Ping;
 using DashboardToy.Frontend.Data;
 using Microsoft.AspNetCore.Mvc;
@@ -26,10 +27,13 @@ var app = builder.Build();
 
 var clusterDiagnosticsService = app.Services.GetRequiredService<ClusterDiagnosticsService>();
 app.MapGet("/data.json", ([FromServices] ClusterDiagnosticsService clusterDiagnosticsService) => clusterDiagnosticsService.GetGrainCallFrequencies());
-app.MapGet("/reset", async ([FromServices] IGrainFactory grainFactory, [FromServices] ClusterDiagnosticsService clusterDiagnosticsService) =>
+app.MapGet("/reset", async ([FromServices] IGrainFactory grainFactory) =>
 {
-    await clusterDiagnosticsService.ResetAsync();
-    await grainFactory.GetGrain<IManagementGrain>(0).ResetGrainCallFrequencies();
+    await grainFactory.GetGrain<ILoaderGrain>("root").Reset();
+});
+app.MapGet("/add", async ([FromServices] IGrainFactory grainFactory) =>
+{
+    await grainFactory.GetGrain<ILoaderGrain>("root").AddForest();
 });
 
 // Configure the HTTP request pipeline.
@@ -52,13 +56,68 @@ var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
 while (!lifetime.ApplicationStopping.IsCancellationRequested)
 {
     await Task.Delay(5_000);
-    var loadGrain = app.Services.GetRequiredService<IGrainFactory>().GetGrain<IFanOutGrain>(0);
+    var loadGrain = app.Services.GetRequiredService<IGrainFactory>().GetGrain<ILoaderGrain>("root");
     await loadGrain.Ping();
 }
 
 await app.WaitForShutdownAsync();
 
-public interface IFanOutGrain : IGrainWithIntegerKey
+public interface ILoaderGrain : IGrainWithStringKey
+{
+    ValueTask AddForest();
+    ValueTask RemoveForest();
+    ValueTask Reset();
+    ValueTask Ping();
+    ValueTask<int> GetResetCount();
+}
+
+public class LoaderGrain : Grain, ILoaderGrain
+{
+    private readonly IGrainTimer _timer;
+    private int _numForests = 3;
+    private int _resetCount;
+
+    public LoaderGrain()
+    {
+        _timer = RegisterGrainTimer(() => PingForests().AsTask(), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+    }
+
+    public ValueTask Ping() => default;
+
+    private async ValueTask PingForests()
+    {
+        for (var i = 0; i < _numForests; i++)
+        {
+            var loadGrain = GrainFactory.GetGrain<IFanOutGrain>(0, i.ToString());
+            await loadGrain.Ping().AsTask();
+            await Task.Delay(250);
+        }
+    }
+
+    public ValueTask AddForest()
+    {
+        ++_numForests;
+        return default;
+    }
+
+    public ValueTask RemoveForest()
+    {
+        --_numForests;
+        return default;
+    }
+
+    public async ValueTask Reset()
+    {
+        ++_resetCount;
+        _numForests = 0;
+        await ServiceProvider.GetRequiredService<ClusterDiagnosticsService>().ResetAsync();
+        await GrainFactory.GetGrain<IManagementGrain>(0).ResetGrainCallFrequencies();
+    }
+
+    public ValueTask<int> GetResetCount() => new(_resetCount);
+}
+
+public interface IFanOutGrain : IGrainWithIntegerCompoundKey
 {
     public ValueTask Ping();
 }
@@ -66,12 +125,12 @@ public interface IFanOutGrain : IGrainWithIntegerKey
 public class FanOutGrain : Grain, IFanOutGrain
 {
     public const int FanOutFactor = 4;
-    public const int MaxLevel = 3;
+    public const int MaxLevel = 2;
     private readonly List<IFanOutGrain> _children;
 
     public FanOutGrain()
     {
-        var id = this.GetPrimaryKeyLong();
+        var id = this.GetPrimaryKeyLong(out var forest);
 
         var level = id == 0 ? 0 : (int)Math.Log(id, FanOutFactor);
         var numChildren = level < MaxLevel ? FanOutFactor : 0;
@@ -79,7 +138,7 @@ public class FanOutGrain : Grain, IFanOutGrain
         var childBase = (id + 1) * FanOutFactor;
         for (var i = 1; i <= numChildren; i++)
         {
-            var child = GrainFactory.GetGrain<IFanOutGrain>(childBase + i);
+            var child = GrainFactory.GetGrain<IFanOutGrain>(childBase + i, forest);
             _children.Add(child);
         }
     }
@@ -102,5 +161,5 @@ public class FanOutGrain : Grain, IFanOutGrain
 
 internal sealed class HardLimitRule : IImbalanceToleranceRule
 {
-    public bool IsSatisfiedBy(uint imbalance) => imbalance <= 10;
+    public bool IsSatisfiedBy(uint imbalance) => imbalance <= 3;
 }
