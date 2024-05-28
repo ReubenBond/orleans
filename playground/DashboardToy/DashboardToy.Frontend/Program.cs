@@ -23,9 +23,16 @@ builder.UseOrleans(orleans =>
 builder.Services.AddSingleton<ClusterDiagnosticsService>();
 
 var app = builder.Build();
+var forest = 0;
 
 var clusterDiagnosticsService = app.Services.GetRequiredService<ClusterDiagnosticsService>();
 app.MapGet("/data.json", ([FromServices] ClusterDiagnosticsService clusterDiagnosticsService) => clusterDiagnosticsService.GetGrainCallFrequencies());
+app.MapGet("/reset", async ([FromServices] IGrainFactory grainFactory, [FromServices] ClusterDiagnosticsService clusterDiagnosticsService) =>
+{
+    await clusterDiagnosticsService.ResetAsync();
+    await grainFactory.GetGrain<IManagementGrain>(0).ResetGrainCallFrequencies();
+    ++forest;
+});
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -43,18 +50,17 @@ app.UseStaticFiles();
 app.UseRouting();
 
 await app.StartAsync();
-var loadGrain = app.Services.GetRequiredService<IGrainFactory>().GetGrain<IFanOutGrain>(0);
 var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
 while (!lifetime.ApplicationStopping.IsCancellationRequested)
 {
     await Task.Delay(5_000);
+    var loadGrain = app.Services.GetRequiredService<IGrainFactory>().GetGrain<IFanOutGrain>(0, forest.ToString());
     await loadGrain.Ping();
-    await Task.Delay(20_000);
 }
 
 await app.WaitForShutdownAsync();
 
-public interface IFanOutGrain : IGrainWithIntegerKey
+public interface IFanOutGrain : IGrainWithIntegerCompoundKey
 {
     public ValueTask Ping();
 }
@@ -67,7 +73,7 @@ public class FanOutGrain : Grain, IFanOutGrain
 
     public FanOutGrain()
     {
-        var id = this.GetPrimaryKeyLong();
+        var id = this.GetPrimaryKeyLong(out var forest);
 
         var level = id == 0 ? 0 : (int)Math.Log(id, FanOutFactor);
         var numChildren = level < MaxLevel ? FanOutFactor : 0;
@@ -75,7 +81,7 @@ public class FanOutGrain : Grain, IFanOutGrain
         var childBase = (id + 1) * FanOutFactor;
         for (var i = 1; i <= numChildren; i++)
         {
-            var child = GrainFactory.GetGrain<IFanOutGrain>(childBase + i);
+            var child = GrainFactory.GetGrain<IFanOutGrain>(childBase + i, forest);
             _children.Add(child);
         }
     }

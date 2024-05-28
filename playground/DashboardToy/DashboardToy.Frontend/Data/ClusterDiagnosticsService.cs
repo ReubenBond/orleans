@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Orleans.Core.Internal;
 
 namespace DashboardToy.Frontend.Data;
 
@@ -69,6 +70,26 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
         }
 
         return new(grainIds, hostIds, edges, maxEdgeValue, maxActivationCount);
+    }
+
+    internal async ValueTask ResetAsync()
+    {
+        var fanoutType = grainFactory.GetGrain<IFanOutGrain>(0, "0").GetGrainId().Type;
+        foreach (var activation in await _managementGrain.GetDetailedGrainStatistics())
+        {
+            if (!activation.GrainId.Type.Equals(fanoutType)) continue;
+            await grainFactory.GetGrain<IGrainManagementExtension>(activation.GrainId).DeactivateOnIdle();
+        }
+
+        Reset();
+    }
+
+    internal void Reset()
+    {
+        _hostKeys.Clear();
+        _hostDetails.Clear();
+        _grainDetails.Clear();
+        _edges.Clear();
     }
 
     private GrainDetails GetGrainVertex(GrainId grainId, int hostKey)

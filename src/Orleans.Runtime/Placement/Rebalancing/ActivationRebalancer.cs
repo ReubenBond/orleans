@@ -87,6 +87,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
     {
         _pendingMessages.Clear();
         _edgeWeights.Clear();
+        _anchoredGrainIds.Reset();
         return ValueTask.CompletedTask;
     }
 

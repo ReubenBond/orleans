@@ -44,23 +44,28 @@
       </svg>
     </div>
     <script type="text/javascript">
+      const state = { nodes: [], links: [], isUpdate: false };
       let loadData = async function () {
         try {
           const data = await fetch("/data.json");
           const jsonData = await data.json();
-          initializeGraph(jsonData);
+          processData(jsonData);
+          initializeGraph();
         } catch (error) {
           console.error("Error fetching or parsing data:", error);
         }
       };
 
-      window.onload = loadData;
-      //setInterval(loadData, 5000);
+      window.onload = async function () {
+        await loadData();
+      };
+      setInterval(async function () {
+        state.isUpdate = true;
+        //await loadData();
+      }, 5000);
 
-      function initializeGraph(graphData) {
-        console.log("Received JSON:", graphData);
-
-        const hostNodes = graphData.hostIds.map((d, i) => ({
+      function processData(jsonData) {
+        const hostNodes = jsonData.hostIds.map((d, i) => ({
           id: "host-" + i,
           name: d.name,
           isHost: true,
@@ -68,7 +73,7 @@
           activationCount: d.activationCount,
         }));
 
-        const grainNodes = graphData.grainIds.map((d, i) => ({
+        const grainNodes = jsonData.grainIds.map((d, i) => ({
           id: "grain-" + i,
           host: d.host,
           name: d.name,
@@ -78,19 +83,21 @@
 
         const nodes = hostNodes.concat(grainNodes);
 
-        const grainLinks = graphData.edges
+        // combine the updated nodes with the data already in 'state'
+
+        const grainLinks = jsonData.edges
           .map((d) => ({
             id: "edge-" + d.source + "-" + d.target,
             source: "grain-" + d.source,
             target: "grain-" + d.target,
-            sourceHost: graphData.grainIds[d.source].host,
-            targetHost: graphData.grainIds[d.target].host,
+            sourceHost: jsonData.grainIds[d.source].host,
+            targetHost: jsonData.grainIds[d.target].host,
             weight: d.weight,
             isHostLink: false,
           }))
           .filter((d) => d.source !== null && d.target !== null);
 
-        const hostLinks = graphData.grainIds.map((d, i) => ({
+        const hostLinks = jsonData.grainIds.map((d, i) => ({
           id: "host-edge-" + i + "-" + d.host,
           source: "grain-" + i,
           target: "host-" + d.host,
@@ -104,25 +111,68 @@
         console.log("Nodes:", nodes);
         console.log("Links:", links);
 
+        state.nodes = nodes;
+        state.links = links;
+        state.maxEdgeValue = jsonData.maxEdgeValue;
+        state.maxActivationCount = jsonData.maxActivationCount;
+      }
+
+      function initializeGraph() {
+        console.log("state", state);
+
+        const links = state.links;
+        const nodes = state.nodes;
+
         const svg = d3.select("svg");
         const graphContainer = svg.select(".graph-container");
 
         const color = d3.scaleOrdinal(d3.schemeCategory10);
         const linkColor = d3
           .scaleSequential(d3.interpolateOrRd)
-          .domain([0, graphData.maxEdgeValue]);
+          .domain([0, state.maxEdgeValue]);
 
-        const node = graphContainer
+        const nodeData = graphContainer
           .select(".nodes")
           .selectAll("g")
           .data(nodes, (d) => d.id);
-        const nodeG = node.enter().append("g");
+        const newNodes = nodeData.enter().append("g");
+        newNodes.append("circle");
+        newNodes.append("text").attr("class", "label");
+        newNodes
+          .filter((d) => d.isHost)
+          .append("text")
+          .attr("class", "info");
 
-        nodeG
-          .append("circle")
+        newNodes
+          .select("text.label")
+          .filter((d) => !d.isHost)
+          .text((d) => (d.key.includes("hosted-") ? "client" : d.key))
+          .attr("dy", -10);
+
+        const nodeGroup = newNodes.merge(nodeData);
+        const hostNode = nodeGroup.filter((d) => d.isHost);
+
+        // Label
+        const nodeLabels = nodeGroup
+          .select("text.label")
+          .filter((d) => d.isHost)
+          .text((d) => "[" + d.index + "]")
+          .attr("font-weight", "bold")
+          .attr("dy", -5);
+
+        // Info
+        const nodeInfoLabels = nodeGroup
+          .select("text.info")
+          .filter((d) => d.isHost)
+          .attr("dy", 15)
+          .text((d) => d.activationCount);
+
+        // Circle
+        nodeGroup
+          .select("circle")
           .attr("r", (d) =>
             d.isHost
-              ? 10 + (15 * d.activationCount) / graphData.maxActivationCount
+              ? 10 + (15 * d.activationCount) / state.maxActivationCount
               : 8
           )
           .attr("stroke", "#222")
@@ -130,6 +180,7 @@
           .attr("class", (d) => (d.isHost ? "host-circle" : ""))
           .attr("fill", (d) => (d.isHost ? color(d.index) : color(d.host)));
 
+        // Links
         const link = graphContainer
           .select(".links")
           .selectAll("line")
@@ -138,7 +189,7 @@
         const linkLine = link
           .join("line")
           .attr("stroke-width", (d) =>
-            d.isHostLink ? 0.25 : (0.8 * d.weight) / graphData.maxEdgeValue
+            d.isHostLink ? 0.25 : (0.8 * d.weight) / state.maxEdgeValue
           )
           .attr("stroke", (d) =>
             d.isHostLink
@@ -148,54 +199,39 @@
               : "red"
           );
 
-        nodeG
-          .filter((d) => !d.isHost)
-          .append("text")
-
-          .text((d) => (d.key.includes("hosted-") ? "client" : d.key))
-          .attr("dy", -10);
-
-        const hostNode = nodeG.filter((d) => d.isHost);
-
-        hostNode
-          .append("text")
-          .text((d) => "[" + d.index + "]")
-          .attr("font-weight", "bold")
-          .attr("dy", -5);
-
-        hostNode
-          .append("text")
-          .attr("dy", 15)
-          .text((d) => d.activationCount);
-
         let width = svg.node().clientWidth;
         let height = svg.node().clientHeight;
 
-        const simulation = d3
-          .forceSimulation(nodes)
-          .force("center", d3.forceCenter(width / 2, height / 2))
-          .force(
-            "link",
-            d3
-              .forceLink(links)
-              .id((d) => d.id)
-              .strength((d) => (d.isHostLink ? 0.6 : 0.3))
-              .distance((d) => (d.isHostLink ? 50 : 10))
-          )
-          .force(
-            "hostGravity",
-            d3.forceManyBody().strength((d) => (d.isHost ? 0 : -100))
-          )
-          .on("tick", ticked);
+        if (!state.isUpdate) {
+          state.simulation = d3
+            .forceSimulation(nodes)
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force(
+              "link",
+              d3
+                .forceLink(links)
+                .id((d) => d.id)
+                .strength((d) => (d.isHostLink ? 0.6 : 0.3))
+                .distance((d) => (d.isHostLink ? 50 : 10))
+            )
+            .force(
+              "hostGravity",
+              d3.forceManyBody().strength((d) => (d.isHost ? 0 : -100))
+            )
+            .on("tick", ticked);
 
-        svg.call(
-          d3
-            .zoom()
-            .scaleExtent([0.1, 10])
-            .on("zoom", (event) => {
-              graphContainer.attr("transform", event.transform);
-            })
-        );
+          svg.call(
+            d3
+              .zoom()
+              .scaleExtent([0.1, 10])
+              .on("zoom", (event) => {
+                graphContainer.attr("transform", event.transform);
+              })
+          );
+        } else {
+          //state.simulation.on('tick', ticked);
+          //state.simulation.alpha(1).restart();
+        }
 
         function ticked() {
           linkLine
@@ -204,14 +240,14 @@
             .attr("x2", (d) => d.target.x)
             .attr("y2", (d) => d.target.y);
 
-          nodeG.attr("transform", (d) => `translate(${d.x},${d.y})`);
+          nodeGroup.attr("transform", (d) => `translate(${d.x},${d.y})`);
         }
 
         window.addEventListener("resize", () => {
           width = svg.node().clientWidth;
           height = svg.node().clientHeight;
-          simulation.force("center", d3.forceCenter(width / 2, height / 2));
-          simulation.alpha(1).restart();
+          state.simulation.force("center", d3.forceCenter(width / 2, height / 2));
+          state.simulation.alpha(1).restart();
         });
       }
     </script>

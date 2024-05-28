@@ -401,5 +401,20 @@ namespace Orleans.Runtime.Management
 
             return results;
         }
+
+        public async ValueTask ResetGrainCallFrequencies(SiloAddress[] hostsIds = null)
+        {
+            if (hostsIds == null)
+            {
+                var hosts = await GetHosts(true);
+                hostsIds = [.. hosts.Keys];
+            }
+
+            foreach (var host in hostsIds)
+            {
+                var siloBalancer = IActivationRebalancerSystemTarget.GetReference(internalGrainFactory, host);
+                await siloBalancer.ResetCounters();
+            }
+        }
     }
 }

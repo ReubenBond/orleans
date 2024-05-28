@@ -126,6 +126,7 @@ namespace Orleans.Runtime
         ValueTask<List<GrainId>> GetActiveGrains(GrainType type);
 
         Task<List<GrainCallFrequency>> GetGrainCallFrequencies(SiloAddress[] hostsIds = null);
+        ValueTask ResetGrainCallFrequencies(SiloAddress[] hostsIds = null);
     }
 
     [GenerateSerializer]
