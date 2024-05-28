@@ -73,10 +73,9 @@
             }));
 
             const nodes = hostNodes.concat(grainNodes);
-            const nodeMap = {};
-            nodes.forEach(node => { nodeMap[node.name] = node; });
 
             const grainLinks = graphData.edges.map(d => ({
+                id: 'edge-' + d.source + '-' + d.target,
                 source: 'grain-' + d.source,
                 target: 'grain-' + d.target,
                 sourceHost: graphData.grainIds[d.source].host,
@@ -86,6 +85,7 @@
             })).filter(d => d.source !== null && d.target !== null);
 
             const hostLinks = graphData.grainIds.map((d, i) => ({
+                id: 'host-edge-' + i + '-' + d.host,
                 source: 'grain-' + i,
                 target: 'host-' + d.host,
                 distance: 100,
@@ -98,10 +98,6 @@
             console.log("Nodes:", nodes);
             console.log("Links:", links);
 
-            renderGraph(nodes, links, graphData);
-        }
-
-        function renderGraph(nodes, links, graphData) {
             const svg = d3.select("svg");
             const graphContainer = svg.select(".graph-container");
 
@@ -111,8 +107,9 @@
 
             const node = graphContainer.select(".nodes")
                 .selectAll("g")
-                .data(nodes)
+                .data(nodes, d => d.id)
                 .enter().append("g");
+            node.merge(node);
 
             node.append("circle")
                 .attr("r", d => d.isHost ? 10 + (15 * d.activationCount / graphData.maxActivationCount) : 8)
@@ -123,8 +120,10 @@
 
             const link = graphContainer.select(".links")
                 .selectAll("line")
-                .data(links)
-                .enter().append("line")
+                .data(links, d => d.id)
+                .enter().append("line");
+
+              link.merge(link)
                 .attr("stroke-width", d => d.isHostLink ? 0.25 : 0.8 * d.weight / graphData.maxEdgeValue)
                 .attr("stroke", d => d.isHostLink ? color(d.host) : d.sourceHost == d.targetHost ? color(d.sourceHost) : "red");
 
