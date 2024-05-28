@@ -43,7 +43,7 @@
         </svg>
     </div>
     <script type="text/javascript">
-        window.onload = async function () {
+        let loadData = async function () {
             try {
                 const data = await fetch('/data.json');
                 const jsonData = await data.json();
@@ -52,6 +52,9 @@
                 console.error("Error fetching or parsing data:", error);
             }
         };
+
+          window.onload = loadData;
+          setInterval(loadData, 5000);
 
         function initializeGraph(graphData) {
             console.log("Received JSON:", graphData);
@@ -109,7 +112,6 @@
                 .selectAll("g")
                 .data(nodes, d => d.id)
                 .enter().append("g");
-            node.merge(node);
 
             node.append("circle")
                 .attr("r", d => d.isHost ? 10 + (15 * d.activationCount / graphData.maxActivationCount) : 8)
@@ -123,7 +125,7 @@
                 .data(links, d => d.id)
                 .enter().append("line");
 
-              link.merge(link)
+              link
                 .attr("stroke-width", d => d.isHostLink ? 0.25 : 0.8 * d.weight / graphData.maxEdgeValue)
                 .attr("stroke", d => d.isHostLink ? color(d.host) : d.sourceHost == d.targetHost ? color(d.sourceHost) : "red");
 
