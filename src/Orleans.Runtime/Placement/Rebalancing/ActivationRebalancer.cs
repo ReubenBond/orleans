@@ -740,6 +740,17 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         _enableMessageSampling = _siloStatusOracle.GetActiveSilos().Length > 1;
     }
 
+    public ValueTask<ImmutableArray<(Edge, ulong)>> GetGrainCallFrequencies()
+    {
+        var result = ImmutableArray.CreateBuilder<(Edge, ulong)>(_edgeWeights.Count);
+        foreach (var (edge, count, _) in _edgeWeights.Elements)
+        {
+            result.Add((edge, count));
+        }
+
+        return new(result.ToImmutable());
+    }
+
     private enum Direction : byte
     {
         Unspecified,
