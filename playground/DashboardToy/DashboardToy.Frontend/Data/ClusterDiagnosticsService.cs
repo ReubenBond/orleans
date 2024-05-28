@@ -3,16 +3,15 @@ using Orleans.Core.Internal;
 
 namespace DashboardToy.Frontend.Data;
 
-public readonly record struct GrainDetails(int GrainKey, int HostKey);
-public readonly record struct HostDetails(int HostKey, int ActivationCount);
 public class ClusterDiagnosticsService(IGrainFactory grainFactory)
 {
-    //private readonly Dictionary<GrainId, int> _grainKeys = [];
     private readonly Dictionary<SiloAddress, int> _hostKeys = [];
     private readonly Dictionary<SiloAddress, HostDetails> _hostDetails = [];
     private readonly Dictionary<GrainId, GrainDetails> _grainDetails = []; // Grain to host id
     private readonly Dictionary<Key, ulong> _edges = [];
     private readonly IManagementGrain _managementGrain = grainFactory.GetGrain<IManagementGrain>(0);
+    private readonly record struct GrainDetails(int GrainKey, int HostKey);
+    private readonly record struct HostDetails(int HostKey, int ActivationCount);
 
     public async ValueTask<CallGraph> GetGrainCallFrequencies()
     {
