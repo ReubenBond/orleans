@@ -49,7 +49,7 @@
         try {
           const data = await fetch("/data.json");
           const jsonData = await data.json();
-          processData(jsonData);
+          mergeData(jsonData);
           initializeGraph();
         } catch (error) {
           console.error("Error fetching or parsing data:", error);
@@ -59,13 +59,14 @@
       window.onload = async function () {
         await loadData();
       };
+
       setInterval(async function () {
         state.isUpdate = true;
-        //await loadData();
+        await loadData();
       }, 5000);
 
-      function processData(jsonData) {
-        const hostNodes = jsonData.hostIds.map((d, i) => ({
+      function mergeData(jsonData) {
+        const newHostNodes = jsonData.hostIds.map((d, i) => ({
           id: "host-" + i,
           name: d.name,
           isHost: true,
@@ -73,7 +74,7 @@
           activationCount: d.activationCount,
         }));
 
-        const grainNodes = jsonData.grainIds.map((d, i) => ({
+        const newGrainNodes = jsonData.grainIds.map((d, i) => ({
           id: "grain-" + i,
           host: d.host,
           name: d.name,
@@ -81,11 +82,9 @@
           isHost: false,
         }));
 
-        const nodes = hostNodes.concat(grainNodes);
+        const newNodes = newHostNodes.concat(newGrainNodes);
 
-        // combine the updated nodes with the data already in 'state'
-
-        const grainLinks = jsonData.edges
+        const newGrainLinks = jsonData.edges
           .map((d) => ({
             id: "edge-" + d.source + "-" + d.target,
             source: "grain-" + d.source,
@@ -97,7 +96,7 @@
           }))
           .filter((d) => d.source !== null && d.target !== null);
 
-        const hostLinks = jsonData.grainIds.map((d, i) => ({
+        const newHostLinks = jsonData.grainIds.map((d, i) => ({
           id: "host-edge-" + i + "-" + d.host,
           source: "grain-" + i,
           target: "host-" + d.host,
@@ -106,13 +105,21 @@
           host: d.host,
         }));
 
-        const links = grainLinks.concat(hostLinks);
+        const newLinks = newGrainLinks.concat(newHostLinks);
 
-        console.log("Nodes:", nodes);
-        console.log("Links:", links);
+        // Merge new nodes and links into the existing state
+        const nodeMap = new Map(state.nodes.map((d) => [d.id, d]));
+        newNodes.forEach((node) => {
+          nodeMap.set(node.id, node);
+        });
+        state.nodes = Array.from(nodeMap.values());
 
-        state.nodes = nodes;
-        state.links = links;
+        const linkMap = new Map(state.links.map((d) => [d.id, d]));
+        newLinks.forEach((link) => {
+          linkMap.set(link.id, link);
+        });
+        state.links = Array.from(linkMap.values());
+
         state.maxEdgeValue = jsonData.maxEdgeValue;
         state.maxActivationCount = jsonData.maxActivationCount;
       }
@@ -229,8 +236,9 @@
               })
           );
         } else {
-          //state.simulation.on('tick', ticked);
-          //state.simulation.alpha(1).restart();
+          state.simulation.nodes(nodes);
+          state.simulation.force("link").links(links);
+          state.simulation.alpha(1).restart();
         }
 
         function ticked() {
