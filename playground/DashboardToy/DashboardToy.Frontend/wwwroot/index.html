@@ -45,6 +45,14 @@
     </div>
     <script type="text/javascript">
       const state = { nodes: [], links: [], isUpdate: false };
+      function mergeObjects(updated, existing) {
+        for (let key in existing) {
+          if (existing.hasOwnProperty(key) && !updated.hasOwnProperty(key)) {
+            updated[key] = existing[key];
+          }
+        }
+      }
+
       let loadData = async function () {
         try {
           const data = await fetch("/data.json");
@@ -110,12 +118,18 @@
         // Merge new nodes and links into the existing state
         const nodeMap = new Map(state.nodes.map((d) => [d.id, d]));
         newNodes.forEach((node) => {
+          if (nodeMap.has(node.id)) {
+            mergeObjects(node, nodeMap.get(node.id));
+          }
           nodeMap.set(node.id, node);
         });
         state.nodes = Array.from(nodeMap.values());
 
         const linkMap = new Map(state.links.map((d) => [d.id, d]));
         newLinks.forEach((link) => {
+          if (linkMap.has(link.id)) {
+            mergeObjects(link, linkMap.get(link.id));
+          }
           linkMap.set(link.id, link);
         });
         state.links = Array.from(linkMap.values());
