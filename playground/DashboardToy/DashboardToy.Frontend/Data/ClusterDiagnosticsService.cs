@@ -73,7 +73,7 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
 
     internal async ValueTask ResetAsync()
     {
-        var fanoutType = grainFactory.GetGrain<IFanOutGrain>(0, "0").GetGrainId().Type;
+        var fanoutType = grainFactory.GetGrain<IFanOutGrain>(0).GetGrainId().Type;
         foreach (var activation in await _managementGrain.GetDetailedGrainStatistics())
         {
             if (!activation.GrainId.Type.Equals(fanoutType)) continue;

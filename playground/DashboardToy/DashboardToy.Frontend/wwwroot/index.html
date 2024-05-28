@@ -154,7 +154,7 @@
           .select(".nodes")
           .selectAll("g")
           .data(nodes, (d) => d.id);
-        const newNodes = nodeData.enter().append("g");
+        const newNodes = nodeData.join("g");
         newNodes.append("circle");
         newNodes.append("text").attr("class", "label");
         newNodes
@@ -169,7 +169,6 @@
           .attr("dy", -10);
 
         const nodeGroup = newNodes.merge(nodeData);
-        const hostNode = nodeGroup.filter((d) => d.isHost);
 
         // Label
         const nodeLabels = nodeGroup
