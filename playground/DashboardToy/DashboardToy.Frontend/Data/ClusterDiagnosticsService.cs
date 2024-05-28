@@ -2,32 +2,45 @@ using System.Runtime.InteropServices;
 
 namespace DashboardToy.Frontend.Data;
 
+public readonly record struct GrainDetails(int GrainKey, int HostKey);
 public class ClusterDiagnosticsService(IGrainFactory grainFactory)
 {
-    private readonly Dictionary<GrainId, int> _grainKeys = [];
+    //private readonly Dictionary<GrainId, int> _grainKeys = [];
     private readonly Dictionary<SiloAddress, int> _hostKeys = [];
+    private readonly Dictionary<GrainId, GrainDetails> _grainDetails = []; // Grain to host id
     private readonly Dictionary<Key, ulong> _edges = [];
     private readonly IManagementGrain _managementGrain = grainFactory.GetGrain<IManagementGrain>(0);
 
     public async ValueTask<CallGraph> GetGrainCallFrequencies()
     {
         _edges.Clear();
-        var maxCount = 0UL;
-        foreach (var edge in await _managementGrain.GetGrainCallFrequencies())
+        var maxEdgeValue = 0UL;
+
+        foreach (var (silo, _) in await _managementGrain.GetHosts(onlyActive: true))
         {
-            var sourceId = GetGrainKey(edge.SourceGrain);
-            var targetId = GetGrainKey(edge.TargetGrain);
-            var sourceHostId = GetHostKey(edge.SourceHost);
-            var targetHostId = GetHostKey(edge.TargetHost);
-            maxCount = Math.Max(maxCount, edge.CallCount);
-            UpdateEdge(new(sourceId, targetId, sourceHostId, targetHostId), edge.CallCount);
+            var hostKey = GetHostVertex(silo);
+            foreach (var activation in await _managementGrain.GetDetailedGrainStatistics(hostsIds: [silo]))
+            {
+                var details = GetGrainVertex(activation.GrainId, hostKey);
+                _grainDetails[activation.GrainId] = new(details.GrainKey, hostKey);
+            }
         }
 
-        var grainIds = new List<GraphNode>(_grainKeys.Count);
-        CollectionsMarshal.SetCount(grainIds, _grainKeys.Count);
-        foreach ((var grainId, var key) in _grainKeys)
+        foreach (var edge in await _managementGrain.GetGrainCallFrequencies())
         {
-            grainIds[key] = new(grainId.ToString(), 1.0);
+            var sourceHostId = GetHostVertex(edge.SourceHost);
+            var targetHostId = GetHostVertex(edge.TargetHost);
+            var sourceVertex = GetGrainVertex(edge.SourceGrain, sourceHostId);
+            var targetVertex = GetGrainVertex(edge.TargetGrain, targetHostId);
+            maxEdgeValue = Math.Max(maxEdgeValue, edge.CallCount);
+            UpdateEdge(new(sourceVertex.GrainKey, targetVertex.GrainKey), edge.CallCount);
+        }
+
+        var grainIds = new List<GraphNode>(_grainDetails.Count);
+        CollectionsMarshal.SetCount(grainIds, _grainDetails.Count);
+        foreach ((var grainId, var (grainKey, hostKey)) in _grainDetails)
+        {
+            grainIds[grainKey] = new(grainId.ToString(), hostKey, 1.0);
         }
 
         var hostIds = new List<string>(_hostKeys.Count);
@@ -39,27 +52,26 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
 
         var edges = new List<GraphEdge>();
 
-        var distanceFactor = maxCount / 1000.0;
         foreach (var edge in _edges)
         {
-            edges.Add(new(edge.Key.Source, edge.Key.Target, edge.Key.SourceHost, edge.Key.TargetHost, edge.Value / distanceFactor));
+            edges.Add(new(edge.Key.Source, edge.Key.Target, edge.Value));
         }
 
-        return new(grainIds, hostIds, edges);
+        return new(grainIds, hostIds, edges, maxEdgeValue);
     }
 
-    private int GetGrainKey(GrainId grainId)
+    private GrainDetails GetGrainVertex(GrainId grainId, int hostKey)
     {
-        ref var key = ref CollectionsMarshal.GetValueRefOrAddDefault(_grainKeys, grainId, out var exists);
+        ref var key = ref CollectionsMarshal.GetValueRefOrAddDefault(_grainDetails, grainId, out var exists);
         if (!exists)
         {
-            key = _grainKeys.Count - 1;
+            key = new (_grainDetails.Count - 1, hostKey);
         }
 
         return key;
     }
 
-    private int GetHostKey(SiloAddress silo)
+    private int GetHostVertex(SiloAddress silo)
     {
         ref var key = ref CollectionsMarshal.GetValueRefOrAddDefault(_hostKeys, silo, out var exists);
         if (!exists)
@@ -77,8 +89,8 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
     }
 }
 
-public record class CallGraph(List<GraphNode> GrainIds, List<string> HostIds, List<GraphEdge> Edges);
+public record class CallGraph(List<GraphNode> GrainIds, List<string> HostIds, List<GraphEdge> Edges, ulong MaxEdgeValue);
 
-public record struct GraphNode(string Name, double R);
-public record struct Key(int Source, int Target, int SourceHost, int TargetHost);
-public record struct GraphEdge(int Source, int Target, int SourceHost, int TargetHost, double Distance);
+public record struct GraphNode(string Name, int Host, double Weight);
+public record struct Key(int Source, int Target);
+public record struct GraphEdge(int Source, int Target, double Weight);
