@@ -24,10 +24,6 @@
             height: 100%;
         }
         circle {
-            fill: cadetblue;
-        }
-        .host-circle {
-            fill: red;
         }
         .host-link{
             stroke: red;
@@ -51,7 +47,6 @@
             <g class="graph-container">
                 <g class="links"></g>
                 <g class="nodes"></g>
-                <g class="hosts"></g>
             </g>
         </svg>
     </div>
@@ -70,8 +65,8 @@
         function onData(graphData) {
             console.log("Received JSON:", graphData);
 
-            var hostNodes = graphData.hostIds.map((d, i) => ({ id: 'host-' + i, name: d.name, isHost: true }));
-            var grainNodes = graphData.grainIds.map((d, i) => ({ id: 'grain-' + i, name: d.name, host: d.host, isHost: false }));
+            var hostNodes = graphData.hostIds.map((d, i) => ({ id: 'host-' + i, name: d, isHost: true, index: i }));
+            var grainNodes = graphData.grainIds.map((d, i) => ({ id: 'grain-' + i, host: d.host, name: d.name, isHost: false }));
             var nodes = hostNodes.concat(grainNodes);
 
             // Create a map to find nodes by their names
@@ -83,7 +78,7 @@
                 target: 'grain-' + d.target,
                 weight: 100 * (d.weight / graphData.maxEdgeValue),
             })).filter(d => d.source !== null && d.target !== null);
-            hostLinks = graphData.grainIds.map((d, i) => ({
+            var hostLinks = graphData.grainIds.map((d, i) => ({
                 source: 'grain-' + i,
                 target: 'host-' + d.host,
                 weight: 1
@@ -97,6 +92,8 @@
             var svg = d3.select("svg");
             var graphContainer = svg.select(".graph-container");
 
+            var color = d3.scaleOrdinal(d3.schemeCategory10);
+
             var link = graphContainer.select(".links")
                 .selectAll("line")
                 .data(links)
@@ -108,8 +105,16 @@
                 .enter().append("g");
 
             node.append("circle")
-                .attr("r", d => d.isHost ? 10 : 5)
-                .attr("class", d => d.isHost ? "host-circle" : "");
+                .filter(d => d.isHost)
+                .attr("r", d => 10)
+                .attr("class", d => "host-circle")
+                .attr("fill", d => color(d.index));
+
+            node.append("circle")
+                .filter(d => !d.isHost)
+                .attr("r", d => 5)
+                .attr("class", d => "")
+                .attr("fill", d => color(d.host));
 
             node.append("text")
                 .text(d => d.name)
