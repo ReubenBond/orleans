@@ -43,7 +43,7 @@ app.UseStaticFiles();
 app.UseRouting();
 
 await app.StartAsync();
-var loadGrain = app.Services.GetRequiredService<IGrainFactory>().GetGrain<ITreeGrain>(0, "0");
+var loadGrain = app.Services.GetRequiredService<IGrainFactory>().GetGrain<IFanOutGrain>(0);
 var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
 while (!lifetime.ApplicationStopping.IsCancellationRequested)
 {
@@ -53,7 +53,50 @@ while (!lifetime.ApplicationStopping.IsCancellationRequested)
 }
 
 await app.WaitForShutdownAsync();
-        internal sealed class HardLimitRule : IImbalanceToleranceRule
+
+public interface IFanOutGrain : IGrainWithIntegerKey
+{
+    public ValueTask Ping();
+}
+
+public class FanOutGrain : Grain, IFanOutGrain
+{
+    public const int FanOutFactor = 4;
+    public const int MaxLevel = 3;
+    private readonly List<IFanOutGrain> _children;
+
+    public FanOutGrain()
+    {
+        var id = this.GetPrimaryKeyLong();
+
+        var level = id == 0 ? 0 : (int)Math.Log(id, FanOutFactor);
+        var numChildren = level < MaxLevel ? FanOutFactor : 0;
+        _children = new List<IFanOutGrain>(numChildren);
+        var childBase = (id + 1) * FanOutFactor;
+        for (var i = 1; i <= numChildren; i++)
         {
-            public bool IsSatisfiedBy(uint imbalance) => imbalance <= 5;
+            var child = GrainFactory.GetGrain<IFanOutGrain>(childBase + i);
+            _children.Add(child);
         }
+    }
+
+    public async ValueTask Ping()
+    {
+        var tasks = new List<ValueTask>(_children.Count);
+        foreach (var child in _children)
+        {
+            tasks.Add(child.Ping());
+        }
+
+        // Wait for the tasks to complete.
+        foreach (var task in tasks)
+        {
+            await task;
+        }
+    }
+}
+
+internal sealed class HardLimitRule : IImbalanceToleranceRule
+{
+    public bool IsSatisfiedBy(uint imbalance) => imbalance <= 10;
+}

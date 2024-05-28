@@ -50,7 +50,7 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
         CollectionsMarshal.SetCount(grainIds, _grainDetails.Count);
         foreach ((var grainId, var (grainKey, hostKey)) in _grainDetails)
         {
-            grainIds[grainKey] = new(grainId.ToString(), hostKey, 1.0);
+            grainIds[grainKey] = new(grainId.ToString(), grainId.Key.ToString()!, hostKey, 1.0);
         }
 
         var hostIds = new List<HostNode>(_hostKeys.Count);
@@ -103,6 +103,6 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
 public record class CallGraph(List<GraphNode> GrainIds, List<HostNode> HostIds, List<GraphEdge> Edges, int MaxEdgeValue, int MaxActivationCount);
 
 public record struct HostNode(string Name, int ActivationCount);
-public record struct GraphNode(string Name, int Host, double Weight);
+public record struct GraphNode(string Name, string Key, int Host, double Weight);
 public record struct Key(int Source, int Target);
 public record struct GraphEdge(int Source, int Target, double Weight);

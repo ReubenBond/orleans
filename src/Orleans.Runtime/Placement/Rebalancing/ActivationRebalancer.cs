@@ -339,7 +339,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
             bool TryMigrateCore(MaxHeap<CandidateVertexHeapElement> sourceHeap, int localDelta, int remoteDelta, [NotNullWhen(true)] out CandidateVertexHeapElement? chosenVertex)
             {
                 var anticipatedImbalance = CalculateImbalance(localActivations + localDelta, remoteActivations + remoteDelta);
-                if (anticipatedImbalance >= initialImbalance && !_toleranceRule.IsSatisfiedBy((uint)anticipatedImbalance))
+                if (anticipatedImbalance >= imbalance && !_toleranceRule.IsSatisfiedBy((uint)anticipatedImbalance))
                 {
                     // Taking from this heap would not improve imbalance.
                     chosenVertex = null;
@@ -376,7 +376,7 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         }
     }
 
-    private static int CalculateImbalance(int left, int right) => (int)Math.Abs(Math.Abs((long)left) - Math.Abs((long)right));
+    private static int CalculateImbalance(int left, int right) => Math.Abs(Math.Abs(left) - Math.Abs(right));
     private static (MaxHeap<CandidateVertexHeapElement> Local, MaxHeap<CandidateVertexHeapElement> Remote) CreateCandidateHeaps(List<CandidateVertex> local, ImmutableArray<CandidateVertex> remote)
     {
         Dictionary<GrainId, CandidateVertex> sourceIndex = new(local.Count + remote.Length);

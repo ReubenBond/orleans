@@ -1,11 +1,12 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <meta charset="utf-8" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Orleans Active Rebalancing</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
-    <link href="css/site.css" rel="stylesheet" />
-    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css">
+    <link href="css/site.css" rel="stylesheet">
+    <link rel="icon" type="image/png" href="favicon.png">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/6.2.0/d3.min.js"></script>
     <style>
         body, html {
@@ -27,42 +28,55 @@
             font-family: "Helvetica Neue", Helvetica, sans-serif;
             font-size: 16px;
         }
+        .host-label-bg {
+        }
     </style>
 </head>
 <body>
-
     <div id="callGraphContainer">
         <svg>
+            <rect width="100%" height="100%" fill="white"></rect>
             <g class="graph-container">
                 <g class="links"></g>
                 <g class="nodes"></g>
             </g>
         </svg>
     </div>
-
     <script type="text/javascript">
         window.onload = async function () {
             try {
-                var data = await fetch('/data.json');
-                var jsonData = await data.json();
-                onData(jsonData);
+                const data = await fetch('/data.json');
+                const jsonData = await data.json();
+                initializeGraph(jsonData);
             } catch (error) {
                 console.error("Error fetching or parsing data:", error);
             }
-        }
+        };
 
-        function onData(graphData) {
+        function initializeGraph(graphData) {
             console.log("Received JSON:", graphData);
 
-            var hostNodes = graphData.hostIds.map((d, i) => ({ id: 'host-' + i, name: d.name, isHost: true, index: i, activationCount: d.activationCount}));
-            var grainNodes = graphData.grainIds.map((d, i) => ({ id: 'grain-' + i, host: d.host, name: d.name, isHost: false }));
-            var nodes = hostNodes.concat(grainNodes);
+            const hostNodes = graphData.hostIds.map((d, i) => ({
+                id: 'host-' + i,
+                name: d.name,
+                isHost: true,
+                index: i,
+                activationCount: d.activationCount
+            }));
 
-            // Create a map to find nodes by their names
-            var nodeMap = {};
+            const grainNodes = graphData.grainIds.map((d, i) => ({
+                id: 'grain-' + i,
+                host: d.host,
+                name: d.name,
+                key: d.key,
+                isHost: false
+            }));
+
+            const nodes = hostNodes.concat(grainNodes);
+            const nodeMap = {};
             nodes.forEach(node => { nodeMap[node.name] = node; });
 
-            var grainLinks = graphData.edges.map(d => ({
+            const grainLinks = graphData.edges.map(d => ({
                 source: 'grain-' + d.source,
                 target: 'grain-' + d.target,
                 sourceHost: graphData.grainIds[d.source].host,
@@ -70,78 +84,78 @@
                 weight: d.weight,
                 isHostLink: false
             })).filter(d => d.source !== null && d.target !== null);
-            var hostLinks = graphData.grainIds.map((d, i) => ({
+
+            const hostLinks = graphData.grainIds.map((d, i) => ({
                 source: 'grain-' + i,
                 target: 'host-' + d.host,
-                weight: 1,
+                distance: 100,
                 isHostLink: true,
                 host: d.host
             }));
 
-            var links = grainLinks.concat(hostLinks);
+            const links = grainLinks.concat(hostLinks);
 
             console.log("Nodes:", nodes);
             console.log("Links:", links);
 
-            var svg = d3.select("svg");
-            var graphContainer = svg.select(".graph-container");
+            renderGraph(nodes, links, graphData);
+        }
 
-            var color = d3.scaleOrdinal(d3.schemeTableau10);
-            var linkColor = d3.scaleSequential(d3.interpolateOrRd)
+        function renderGraph(nodes, links, graphData) {
+            const svg = d3.select("svg");
+            const graphContainer = svg.select(".graph-container");
+
+            const color = d3.scaleOrdinal(d3.schemeCategory10);
+            const linkColor = d3.scaleSequential(d3.interpolateOrRd)
                 .domain([0, graphData.maxEdgeValue]);
 
-
-            var node = graphContainer.select(".nodes")
+            const node = graphContainer.select(".nodes")
                 .selectAll("g")
                 .data(nodes)
                 .enter().append("g");
 
             node.append("circle")
                 .attr("r", d => d.isHost ? 10 + (15 * d.activationCount / graphData.maxActivationCount) : 8)
-                .attr("stroke", d => d.isHost ? "#222": "#222")
-                .attr("stroke-width", d => d.isHost ? 2 : 1 )
+                .attr("stroke", "#222")
+                .attr("stroke-width", d => d.isHost ? 2 : 1)
                 .attr("class", d => d.isHost ? "host-circle" : "")
                 .attr("fill", d => d.isHost ? color(d.index) : color(d.host));
 
-            var link = graphContainer.select(".links")
+            const link = graphContainer.select(".links")
                 .selectAll("line")
                 .data(links)
                 .enter().append("line")
                 .attr("stroke-width", d => d.isHostLink ? 0.25 : 0.8 * d.weight / graphData.maxEdgeValue)
-                // If the link is between two hosts, color it red. Otherwise, color it based on the host.
                 .attr("stroke", d => d.isHostLink ? color(d.host) : d.sourceHost == d.targetHost ? color(d.sourceHost) : "red");
 
             node.append("text")
                 .filter(d => !d.isHost)
-                .text(d => d.name)
-                .attr("color", "#fff")
-                .attr("dy", -10)
+                .text(d => d.key.includes('hosted-') ? 'client' : d.key)
+                .attr("dy", -10);
 
-            node.append("text")
-                .filter(d => d.isHost)
-                .text(d => d.name)
-                .attr("color", "#fff")
-                .attr("dy", -15)
+            const hostNode = node.filter(d => d.isHost);
 
-            node.filter(d => d.isHost)
-              .append("text")
-                .attr("color", "black")
-                .attr("dy", 5)
+            hostNode.append("text")
+                .text(d => '[' + d.index + ']')
+                .attr("font-weight", "bold")
+                .attr("dy", -5);
+
+            hostNode.append("text")
+                .attr("dy", 15)
                 .text(d => d.activationCount);
 
-            var width = svg.node().clientWidth;
-            var height = svg.node().clientHeight;
+            let width = svg.node().clientWidth;
+            let height = svg.node().clientHeight;
 
-            var simulation = d3.forceSimulation(nodes)
-                //.force('charge', d3.forceManyBody().strength(d => -500))
+            const simulation = d3.forceSimulation(nodes)
                 .force('center', d3.forceCenter(width / 2, height / 2))
-                .force('link', d3.forceLink(links).id(d => d.id))
-                .force('hostGravity', grainGravitationForce(nodes, hostNodes))
+                .force('link', d3.forceLink(links).id(d => d.id).strength(d => d.isHostLink ? 0.6 : 0.3).distance(d => d.isHostLink ? 50 : 10))
+                .force('hostGravity', d3.forceManyBody().strength(d => d.isHost ? 0 : -100))
                 .on('tick', ticked);
 
             svg.call(d3.zoom()
                 .scaleExtent([0.1, 10])
-                .on('zoom', function(event) {
+                .on('zoom', event => {
                     graphContainer.attr('transform', event.transform);
                 }));
 
@@ -156,24 +170,12 @@
                     .attr("transform", d => `translate(${d.x},${d.y})`);
             }
 
-            // Update the simulation on window resize
             window.addEventListener('resize', () => {
                 width = svg.node().clientWidth;
                 height = svg.node().clientHeight;
                 simulation.force('center', d3.forceCenter(width / 2, height / 2));
                 simulation.alpha(1).restart();
             });
-        }
-
-        function grainGravitationForce(nodes, hostNodes) {
-            return d3.forceManyBody()
-                .strength(d => {
-                    if (d.isHost) return 0;
-                    var hostNode = hostNodes.find(host => host.name === d.host);
-                    return hostNode ? -1000 : -500;
-                })
-                .distanceMin(10)
-                .distanceMax(200);
         }
     </script>
 </body>
