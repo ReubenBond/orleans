@@ -54,7 +54,7 @@
         };
 
           window.onload = loadData;
-          setInterval(loadData, 5000);
+          //setInterval(loadData, 5000);
 
         function initializeGraph(graphData) {
             console.log("Received JSON:", graphData);
@@ -110,10 +110,10 @@
 
             const node = graphContainer.select(".nodes")
                 .selectAll("g")
-                .data(nodes, d => d.id)
-                .enter().append("g");
+                .data(nodes, d => d.id);
+            const nodeG = node.join("g");
 
-            node.append("circle")
+            nodeG.append("circle")
                 .attr("r", d => d.isHost ? 10 + (15 * d.activationCount / graphData.maxActivationCount) : 8)
                 .attr("stroke", "#222")
                 .attr("stroke-width", d => d.isHost ? 2 : 1)
@@ -122,19 +122,18 @@
 
             const link = graphContainer.select(".links")
                 .selectAll("line")
-                .data(links, d => d.id)
-                .enter().append("line");
+                .data(links, d => d.id);
 
-              link
+            const linkLine = link.join("line")
                 .attr("stroke-width", d => d.isHostLink ? 0.25 : 0.8 * d.weight / graphData.maxEdgeValue)
                 .attr("stroke", d => d.isHostLink ? color(d.host) : d.sourceHost == d.targetHost ? color(d.sourceHost) : "red");
 
-            node.append("text")
+            nodeG.append("text")
                 .filter(d => !d.isHost)
                 .text(d => d.key.includes('hosted-') ? 'client' : d.key)
                 .attr("dy", -10);
 
-            const hostNode = node.filter(d => d.isHost);
+            const hostNode = nodeG.filter(d => d.isHost);
 
             hostNode.append("text")
                 .text(d => '[' + d.index + ']')
@@ -161,13 +160,13 @@
                 }));
 
             function ticked() {
-                link
+                linkLine
                     .attr("x1", d => d.source.x)
                     .attr("y1", d => d.source.y)
                     .attr("x2", d => d.target.x)
                     .attr("y2", d => d.target.y);
 
-                node
+                nodeG
                     .attr("transform", d => `translate(${d.x},${d.y})`);
             }
 
