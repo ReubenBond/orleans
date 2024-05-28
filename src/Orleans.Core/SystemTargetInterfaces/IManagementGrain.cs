@@ -125,7 +125,7 @@ namespace Orleans.Runtime
         /// <returns>A list of all active grains of the specified type.</returns>
         ValueTask<List<GrainId>> GetActiveGrains(GrainType type);
 
-        IAsyncEnumerable<GrainCallFrequency> GetGrainCallFrequencies(SiloAddress[] hostsIds = null);
+        Task<List<GrainCallFrequency>> GetGrainCallFrequencies(SiloAddress[] hostsIds = null);
     }
 
     [GenerateSerializer]

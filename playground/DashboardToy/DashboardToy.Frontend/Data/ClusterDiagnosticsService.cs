@@ -1,20 +1,19 @@
 using System.Runtime.InteropServices;
-using Orleans.Runtime;
 
 namespace DashboardToy.Frontend.Data;
 
 public class ClusterDiagnosticsService(IGrainFactory grainFactory)
 {
-    private readonly Dictionary<GrainId, int> _grainKeys= new();
-    private readonly Dictionary<SiloAddress, int> _hostKeys= new();
-    private readonly Dictionary<Key, ulong> _edges = new();
-    public readonly IManagementGrain _managementGrain = grainFactory.GetGrain<IManagementGrain>(0);
+    private readonly Dictionary<GrainId, int> _grainKeys = [];
+    private readonly Dictionary<SiloAddress, int> _hostKeys = [];
+    private readonly Dictionary<Key, ulong> _edges = [];
+    private readonly IManagementGrain _managementGrain = grainFactory.GetGrain<IManagementGrain>(0);
 
     public async ValueTask<CallGraph> GetGrainCallFrequencies()
     {
         _edges.Clear();
         var maxCount = 0UL;
-        await foreach (var edge in _managementGrain.GetGrainCallFrequencies())
+        foreach (var edge in await _managementGrain.GetGrainCallFrequencies())
         {
             var sourceId = GetGrainKey(edge.SourceGrain);
             var targetId = GetGrainKey(edge.TargetGrain);
@@ -28,7 +27,7 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
         CollectionsMarshal.SetCount(grainIds, _grainKeys.Count);
         foreach ((var grainId, var key) in _grainKeys)
         {
-            grainIds[key] = new(grainId.ToString());
+            grainIds[key] = new(grainId.ToString(), 1.0);
         }
 
         var hostIds = new List<string>(_hostKeys.Count);
@@ -43,7 +42,7 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
         var distanceFactor = maxCount / 1000.0;
         foreach (var edge in _edges)
         {
-            edges.Add(new (edge.Key.Source, edge.Key.Target, edge.Key.SourceHost, edge.Key.TargetHost, edge.Value/distanceFactor));
+            edges.Add(new(edge.Key.Source, edge.Key.Target, edge.Key.SourceHost, edge.Key.TargetHost, edge.Value / distanceFactor));
         }
 
         return new(grainIds, hostIds, edges);
@@ -58,7 +57,7 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
         }
 
         return key;
-    }   
+    }
 
     private int GetHostKey(SiloAddress silo)
     {
@@ -69,13 +68,13 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
         }
 
         return key;
-    } 
+    }
 
     private void UpdateEdge(Key key, ulong increment)
     {
         ref var count = ref CollectionsMarshal.GetValueRefOrAddDefault(_edges, key, out var exists);
         count += increment;
-    } 
+    }
 }
 
 public record class CallGraph(List<GraphNode> GrainIds, List<string> HostIds, List<GraphEdge> Edges);

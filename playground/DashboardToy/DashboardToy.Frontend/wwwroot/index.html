@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Orleans Active Rebalancing</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="~/" />
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
+    <link href="css/site.css" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sigma.js/2.4.0/sigma.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/graphology/0.25.4/graphology.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/6.2.0/d3.min.js"></script>
+</head>
+<body>
+
+    <h1>Active Rebalanding demo</h1>
+    <div id="callGraphContainer">
+        <svg width="1200" height="900">
+            <g class="links"></g>
+            <g class="nodes"></g>
+        </svg>
+    </div>
+    <style>
+        circle {
+            fill: cadetblue;
+        }
+
+        line {
+            stroke: #ccc;
+        }
+
+        text {
+            text-anchor: middle;
+            font-family: "Helvetica Neue", Helvetica, sans-serif;
+            fill: #666;
+            font-size: 16px;
+        }
+    </style>
+    <script type="text/javascript">
+        var width = 1200, height = 800;
+        window.onload = async function () {
+            var data = await fetch('/data.json');
+            onData(await data.json());
+        }
+
+        function onData(graphData) {
+            console.log("Received JSON:", graphData);
+            var nodes = graphData.grainIds;
+            var links = graphData.edges;
+
+            var simulation = d3.forceSimulation(nodes)
+                .force('charge', d3.forceManyBody().strength(-100))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('link', d3.forceLink().links(links))
+                .on('tick', ticked);
+
+            function updateLinks() {
+                var u = d3.select('.links')
+                    .selectAll('line')
+                    .data(links)
+                    .join('line')
+                    .attr('x1', function (d) {
+                        return d.source.x
+                    })
+                    .attr('y1', function (d) {
+                        return d.source.y
+                    })
+                    .attr('x2', function (d) {
+                        return d.target.x
+                    })
+                    .attr('y2', function (d) {
+                        return d.target.y
+                    });
+            }
+
+            function updateNodes() {
+                u = d3.select('.nodes')
+                    .selectAll('text')
+                    .data(nodes)
+                    .join('text')
+                    .text(function (d) {
+                        return d.name
+                    })
+                    .attr('x', function (d) {
+                        return d.x
+                    })
+                    .attr('y', function (d) {
+                        return d.y
+                    })
+                    .attr('dy', function (d) {
+                        return 5
+                    });
+            }
+
+            function ticked() {
+                updateLinks()
+                updateNodes()
+            }
+
+            /*
+            const graph = new graphology.Graph();
+            for (var i in graphData.grainIds) {
+                var grainId = graphData.grainIds[i];
+                graph.addNode(i, { label: grainId, x: Math.random(), y: Math.random(), size: 10, forceLabel: true });
+            }
+            for (var i in graphData.edges) {
+                var edge = graphData.edges[i];
+                graph.addEdge(edge.sourceId, edge.targetId, { forceLabel: true, label: edge.callCount, size: 3, type: 'curved' });
+            }
+        const sigmaInstance = new Sigma(graph, document.getElementById("callGraphContainer"));
+        */
+        }
+    </script>
+</body>
+</html>

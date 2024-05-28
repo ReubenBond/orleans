@@ -373,7 +373,7 @@ namespace Orleans.Runtime.Management
             return results;
         }
 
-        public async IAsyncEnumerable<GrainCallFrequency> GetGrainCallFrequencies(SiloAddress[] hostsIds = null)
+        public async Task<List<GrainCallFrequency>> GetGrainCallFrequencies(SiloAddress[] hostsIds = null)
         {
             if (hostsIds == null)
             {
@@ -381,22 +381,25 @@ namespace Orleans.Runtime.Management
                 hostsIds = [.. hosts.Keys];
             }
 
+            var results = new List<GrainCallFrequency>();
             foreach (var host in hostsIds)
             {
                 var siloBalancer = IActivationRebalancerSystemTarget.GetReference(internalGrainFactory, host);
                 var frequencies = await siloBalancer.GetGrainCallFrequencies();
                 foreach (var frequency in frequencies)
                 {
-                    yield return new GrainCallFrequency
+                    results.Add(new GrainCallFrequency
                     {
                         SourceGrain = frequency.Item1.Source.Id,
                         TargetGrain = frequency.Item1.Target.Id,
                         SourceHost = frequency.Item1.Source.Silo,
                         TargetHost = frequency.Item1.Target.Silo,
                         CallCount = frequency.Item2
-                    };
+                    });
                 }
             }
+
+            return results;
         }
     }
 }
