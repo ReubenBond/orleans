@@ -1,13 +1,22 @@
 using BenchmarkGrainInterfaces.Ping;
 using DashboardToy.Frontend.Data;
-using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Mvc;
+using Orleans.Configuration;
+using Orleans.Placement.Rebalancing;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddKeyedRedisClient("orleans-redis");
 #pragma warning disable ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-builder.UseOrleans(orleans => orleans.AddActiveRebalancing());
+builder.UseOrleans(orleans =>
+{
+    orleans.AddActiveRebalancing<HardLimitRule>();
+    orleans.Configure<ActiveRebalancingOptions>(o =>
+    {
+        o.MinRebalancingPeriod = TimeSpan.FromSeconds(5);
+        o.MaxRebalancingPeriod = TimeSpan.FromSeconds(15);
+        o.RecoveryPeriod = TimeSpan.FromSeconds(2);
+    });
+});
 #pragma warning restore ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 
 // Add services to the container.
@@ -44,3 +53,7 @@ while (!lifetime.ApplicationStopping.IsCancellationRequested)
 }
 
 await app.WaitForShutdownAsync();
+        internal sealed class HardLimitRule : IImbalanceToleranceRule
+        {
+            public bool IsSatisfiedBy(uint imbalance) => imbalance <= 5;
+        }

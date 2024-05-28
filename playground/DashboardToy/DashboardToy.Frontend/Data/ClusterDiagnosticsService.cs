@@ -3,10 +3,12 @@ using System.Runtime.InteropServices;
 namespace DashboardToy.Frontend.Data;
 
 public readonly record struct GrainDetails(int GrainKey, int HostKey);
+public readonly record struct HostDetails(int HostKey, int ActivationCount);
 public class ClusterDiagnosticsService(IGrainFactory grainFactory)
 {
     //private readonly Dictionary<GrainId, int> _grainKeys = [];
     private readonly Dictionary<SiloAddress, int> _hostKeys = [];
+    private readonly Dictionary<SiloAddress, HostDetails> _hostDetails = [];
     private readonly Dictionary<GrainId, GrainDetails> _grainDetails = []; // Grain to host id
     private readonly Dictionary<Key, ulong> _edges = [];
     private readonly IManagementGrain _managementGrain = grainFactory.GetGrain<IManagementGrain>(0);
@@ -14,27 +16,33 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
     public async ValueTask<CallGraph> GetGrainCallFrequencies()
     {
         _edges.Clear();
-        var maxEdgeValue = 0UL;
+        var maxEdgeValue = 0;
+        var maxActivationCount = 0;
 
         foreach (var (silo, _) in await _managementGrain.GetHosts(onlyActive: true))
         {
             var hostKey = GetHostVertex(silo);
+            var activationCount = 0;
             foreach (var activation in await _managementGrain.GetDetailedGrainStatistics(hostsIds: [silo]))
             {
                 if (activation.GrainId.IsSystemTarget()) continue;
                 var details = GetGrainVertex(activation.GrainId, hostKey);
                 _grainDetails[activation.GrainId] = new(details.GrainKey, hostKey);
+                ++activationCount;
             }
+
+            maxActivationCount = Math.Max(maxActivationCount, activationCount);
+            _hostDetails[silo] = new(hostKey, activationCount);
         }
 
         foreach (var edge in await _managementGrain.GetGrainCallFrequencies())
         {
-            if (edge.TargetGrain.IsSystemTarget() || edge.TargetGrain.IsSystemTarget()) continue;
+            if (edge.TargetGrain.IsSystemTarget() || edge.SourceGrain.IsSystemTarget()) continue;
             var sourceHostId = GetHostVertex(edge.SourceHost);
             var targetHostId = GetHostVertex(edge.TargetHost);
             var sourceVertex = GetGrainVertex(edge.SourceGrain, sourceHostId);
             var targetVertex = GetGrainVertex(edge.TargetGrain, targetHostId);
-            maxEdgeValue = Math.Max(maxEdgeValue, edge.CallCount);
+            maxEdgeValue = Math.Max(maxEdgeValue, (int)edge.CallCount);
             UpdateEdge(new(sourceVertex.GrainKey, targetVertex.GrainKey), edge.CallCount);
         }
 
@@ -45,11 +53,12 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
             grainIds[grainKey] = new(grainId.ToString(), hostKey, 1.0);
         }
 
-        var hostIds = new List<string>(_hostKeys.Count);
+        var hostIds = new List<HostNode>(_hostKeys.Count);
         CollectionsMarshal.SetCount(hostIds, _hostKeys.Count);
         foreach ((var hostId, var key) in _hostKeys)
         {
-            hostIds[key] = hostId.ToString();
+            var details = _hostDetails[hostId];
+            hostIds[key] = new(hostId.ToString(), details.ActivationCount);
         }
 
         var edges = new List<GraphEdge>();
@@ -59,7 +68,7 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
             edges.Add(new(edge.Key.Source, edge.Key.Target, edge.Value));
         }
 
-        return new(grainIds, hostIds, edges, maxEdgeValue);
+        return new(grainIds, hostIds, edges, maxEdgeValue, maxActivationCount);
     }
 
     private GrainDetails GetGrainVertex(GrainId grainId, int hostKey)
@@ -91,8 +100,9 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
     }
 }
 
-public record class CallGraph(List<GraphNode> GrainIds, List<string> HostIds, List<GraphEdge> Edges, ulong MaxEdgeValue);
+public record class CallGraph(List<GraphNode> GrainIds, List<HostNode> HostIds, List<GraphEdge> Edges, int MaxEdgeValue, int MaxActivationCount);
 
+public record struct HostNode(string Name, int ActivationCount);
 public record struct GraphNode(string Name, int Host, double Weight);
 public record struct Key(int Source, int Target);
 public record struct GraphEdge(int Source, int Target, double Weight);

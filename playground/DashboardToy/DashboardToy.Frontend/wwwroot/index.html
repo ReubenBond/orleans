@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8" />
@@ -23,25 +22,15 @@
             width: 100%;
             height: 100%;
         }
-        circle {
-        }
-        .host-link{
-            stroke: red;
-        }
-        line {
-            stroke: #ccc;
-        }
         text {
             text-anchor: middle;
             font-family: "Helvetica Neue", Helvetica, sans-serif;
-            fill: #666;
             font-size: 16px;
         }
     </style>
 </head>
 <body>
 
-    <h1>Active Rebalancing Demo</h1>
     <div id="callGraphContainer">
         <svg>
             <g class="graph-container">
@@ -50,7 +39,7 @@
             </g>
         </svg>
     </div>
-    
+
     <script type="text/javascript">
         window.onload = async function () {
             try {
@@ -65,7 +54,7 @@
         function onData(graphData) {
             console.log("Received JSON:", graphData);
 
-            var hostNodes = graphData.hostIds.map((d, i) => ({ id: 'host-' + i, name: d, isHost: true, index: i }));
+            var hostNodes = graphData.hostIds.map((d, i) => ({ id: 'host-' + i, name: d.name, isHost: true, index: i, activationCount: d.activationCount}));
             var grainNodes = graphData.grainIds.map((d, i) => ({ id: 'grain-' + i, host: d.host, name: d.name, isHost: false }));
             var nodes = hostNodes.concat(grainNodes);
 
@@ -76,12 +65,17 @@
             var grainLinks = graphData.edges.map(d => ({
                 source: 'grain-' + d.source,
                 target: 'grain-' + d.target,
-                weight: 100 * (d.weight / graphData.maxEdgeValue),
+                sourceHost: graphData.grainIds[d.source].host,
+                targetHost: graphData.grainIds[d.target].host,
+                weight: d.weight,
+                isHostLink: false
             })).filter(d => d.source !== null && d.target !== null);
             var hostLinks = graphData.grainIds.map((d, i) => ({
                 source: 'grain-' + i,
                 target: 'host-' + d.host,
-                weight: 1
+                weight: 1,
+                isHostLink: true,
+                host: d.host
             }));
 
             var links = grainLinks.concat(hostLinks);
@@ -92,12 +86,10 @@
             var svg = d3.select("svg");
             var graphContainer = svg.select(".graph-container");
 
-            var color = d3.scaleOrdinal(d3.schemeCategory10);
+            var color = d3.scaleOrdinal(d3.schemeTableau10);
+            var linkColor = d3.scaleSequential(d3.interpolateOrRd)
+                .domain([0, graphData.maxEdgeValue]);
 
-            var link = graphContainer.select(".links")
-                .selectAll("line")
-                .data(links)
-                .enter().append("line");
 
             var node = graphContainer.select(".nodes")
                 .selectAll("g")
@@ -105,20 +97,37 @@
                 .enter().append("g");
 
             node.append("circle")
-                .filter(d => d.isHost)
-                .attr("r", d => 10)
-                .attr("class", d => "host-circle")
-                .attr("fill", d => color(d.index));
+                .attr("r", d => d.isHost ? 10 + (15 * d.activationCount / graphData.maxActivationCount) : 8)
+                .attr("stroke", d => d.isHost ? "#222": "#222")
+                .attr("stroke-width", d => d.isHost ? 2 : 1 )
+                .attr("class", d => d.isHost ? "host-circle" : "")
+                .attr("fill", d => d.isHost ? color(d.index) : color(d.host));
 
-            node.append("circle")
-                .filter(d => !d.isHost)
-                .attr("r", d => 5)
-                .attr("class", d => "")
-                .attr("fill", d => color(d.host));
+            var link = graphContainer.select(".links")
+                .selectAll("line")
+                .data(links)
+                .enter().append("line")
+                .attr("stroke-width", d => d.isHostLink ? 0.25 : 0.8 * d.weight / graphData.maxEdgeValue)
+                // If the link is between two hosts, color it red. Otherwise, color it based on the host.
+                .attr("stroke", d => d.isHostLink ? color(d.host) : d.sourceHost == d.targetHost ? color(d.sourceHost) : "red");
 
             node.append("text")
+                .filter(d => !d.isHost)
                 .text(d => d.name)
-                .attr("dy", -10);
+                .attr("color", "#fff")
+                .attr("dy", -10)
+
+            node.append("text")
+                .filter(d => d.isHost)
+                .text(d => d.name)
+                .attr("color", "#fff")
+                .attr("dy", -15)
+
+            node.filter(d => d.isHost)
+              .append("text")
+                .attr("color", "black")
+                .attr("dy", 5)
+                .text(d => d.activationCount);
 
             var width = svg.node().clientWidth;
             var height = svg.node().clientHeight;
