@@ -1,182 +1,219 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Orleans Active Rebalancing</title>
-    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css">
-    <link href="css/site.css" rel="stylesheet">
-    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
+    <link href="css/site.css" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="favicon.png" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/6.2.0/d3.min.js"></script>
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-        }
-        #callGraphContainer {
-            width: 100%;
-            height: 100%;
-        }
-        svg {
-            width: 100%;
-            height: 100%;
-        }
-        text {
-            text-anchor: middle;
-            font-family: "Helvetica Neue", Helvetica, sans-serif;
-            font-size: 16px;
-        }
-        .host-label-bg {
-        }
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+      }
+      #callGraphContainer {
+        width: 100%;
+        height: 100%;
+      }
+      svg {
+        width: 100%;
+        height: 100%;
+      }
+      text {
+        text-anchor: middle;
+        font-family: "Helvetica Neue", Helvetica, sans-serif;
+        font-size: 16px;
+      }
+      .host-label-bg {
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div id="callGraphContainer">
-        <svg>
-            <rect width="100%" height="100%" fill="white"></rect>
-            <g class="graph-container">
-                <g class="links"></g>
-                <g class="nodes"></g>
-            </g>
-        </svg>
+      <svg>
+        <rect width="100%" height="100%" fill="white"></rect>
+        <g class="graph-container">
+          <g class="links"></g>
+          <g class="nodes"></g>
+        </g>
+      </svg>
     </div>
     <script type="text/javascript">
-        let loadData = async function () {
-            try {
-                const data = await fetch('/data.json');
-                const jsonData = await data.json();
-                initializeGraph(jsonData);
-            } catch (error) {
-                console.error("Error fetching or parsing data:", error);
-            }
-        };
-
-          window.onload = loadData;
-          //setInterval(loadData, 5000);
-
-        function initializeGraph(graphData) {
-            console.log("Received JSON:", graphData);
-
-            const hostNodes = graphData.hostIds.map((d, i) => ({
-                id: 'host-' + i,
-                name: d.name,
-                isHost: true,
-                index: i,
-                activationCount: d.activationCount
-            }));
-
-            const grainNodes = graphData.grainIds.map((d, i) => ({
-                id: 'grain-' + i,
-                host: d.host,
-                name: d.name,
-                key: d.key,
-                isHost: false
-            }));
-
-            const nodes = hostNodes.concat(grainNodes);
-
-            const grainLinks = graphData.edges.map(d => ({
-                id: 'edge-' + d.source + '-' + d.target,
-                source: 'grain-' + d.source,
-                target: 'grain-' + d.target,
-                sourceHost: graphData.grainIds[d.source].host,
-                targetHost: graphData.grainIds[d.target].host,
-                weight: d.weight,
-                isHostLink: false
-            })).filter(d => d.source !== null && d.target !== null);
-
-            const hostLinks = graphData.grainIds.map((d, i) => ({
-                id: 'host-edge-' + i + '-' + d.host,
-                source: 'grain-' + i,
-                target: 'host-' + d.host,
-                distance: 100,
-                isHostLink: true,
-                host: d.host
-            }));
-
-            const links = grainLinks.concat(hostLinks);
-
-            console.log("Nodes:", nodes);
-            console.log("Links:", links);
-
-            const svg = d3.select("svg");
-            const graphContainer = svg.select(".graph-container");
-
-            const color = d3.scaleOrdinal(d3.schemeCategory10);
-            const linkColor = d3.scaleSequential(d3.interpolateOrRd)
-                .domain([0, graphData.maxEdgeValue]);
-
-            const node = graphContainer.select(".nodes")
-                .selectAll("g")
-                .data(nodes, d => d.id);
-            const nodeG = node.join("g");
-
-            nodeG.append("circle")
-                .attr("r", d => d.isHost ? 10 + (15 * d.activationCount / graphData.maxActivationCount) : 8)
-                .attr("stroke", "#222")
-                .attr("stroke-width", d => d.isHost ? 2 : 1)
-                .attr("class", d => d.isHost ? "host-circle" : "")
-                .attr("fill", d => d.isHost ? color(d.index) : color(d.host));
-
-            const link = graphContainer.select(".links")
-                .selectAll("line")
-                .data(links, d => d.id);
-
-            const linkLine = link.join("line")
-                .attr("stroke-width", d => d.isHostLink ? 0.25 : 0.8 * d.weight / graphData.maxEdgeValue)
-                .attr("stroke", d => d.isHostLink ? color(d.host) : d.sourceHost == d.targetHost ? color(d.sourceHost) : "red");
-
-            nodeG.append("text")
-                .filter(d => !d.isHost)
-                .text(d => d.key.includes('hosted-') ? 'client' : d.key)
-                .attr("dy", -10);
-
-            const hostNode = nodeG.filter(d => d.isHost);
-
-            hostNode.append("text")
-                .text(d => '[' + d.index + ']')
-                .attr("font-weight", "bold")
-                .attr("dy", -5);
-
-            hostNode.append("text")
-                .attr("dy", 15)
-                .text(d => d.activationCount);
-
-            let width = svg.node().clientWidth;
-            let height = svg.node().clientHeight;
-
-            const simulation = d3.forceSimulation(nodes)
-                .force('center', d3.forceCenter(width / 2, height / 2))
-                .force('link', d3.forceLink(links).id(d => d.id).strength(d => d.isHostLink ? 0.6 : 0.3).distance(d => d.isHostLink ? 50 : 10))
-                .force('hostGravity', d3.forceManyBody().strength(d => d.isHost ? 0 : -100))
-                .on('tick', ticked);
-
-            svg.call(d3.zoom()
-                .scaleExtent([0.1, 10])
-                .on('zoom', event => {
-                    graphContainer.attr('transform', event.transform);
-                }));
-
-            function ticked() {
-                linkLine
-                    .attr("x1", d => d.source.x)
-                    .attr("y1", d => d.source.y)
-                    .attr("x2", d => d.target.x)
-                    .attr("y2", d => d.target.y);
-
-                nodeG
-                    .attr("transform", d => `translate(${d.x},${d.y})`);
-            }
-
-            window.addEventListener('resize', () => {
-                width = svg.node().clientWidth;
-                height = svg.node().clientHeight;
-                simulation.force('center', d3.forceCenter(width / 2, height / 2));
-                simulation.alpha(1).restart();
-            });
+      let loadData = async function () {
+        try {
+          const data = await fetch("/data.json");
+          const jsonData = await data.json();
+          initializeGraph(jsonData);
+        } catch (error) {
+          console.error("Error fetching or parsing data:", error);
         }
+      };
+
+      window.onload = loadData;
+      //setInterval(loadData, 5000);
+
+      function initializeGraph(graphData) {
+        console.log("Received JSON:", graphData);
+
+        const hostNodes = graphData.hostIds.map((d, i) => ({
+          id: "host-" + i,
+          name: d.name,
+          isHost: true,
+          index: i,
+          activationCount: d.activationCount,
+        }));
+
+        const grainNodes = graphData.grainIds.map((d, i) => ({
+          id: "grain-" + i,
+          host: d.host,
+          name: d.name,
+          key: d.key,
+          isHost: false,
+        }));
+
+        const nodes = hostNodes.concat(grainNodes);
+
+        const grainLinks = graphData.edges
+          .map((d) => ({
+            id: "edge-" + d.source + "-" + d.target,
+            source: "grain-" + d.source,
+            target: "grain-" + d.target,
+            sourceHost: graphData.grainIds[d.source].host,
+            targetHost: graphData.grainIds[d.target].host,
+            weight: d.weight,
+            isHostLink: false,
+          }))
+          .filter((d) => d.source !== null && d.target !== null);
+
+        const hostLinks = graphData.grainIds.map((d, i) => ({
+          id: "host-edge-" + i + "-" + d.host,
+          source: "grain-" + i,
+          target: "host-" + d.host,
+          distance: 100,
+          isHostLink: true,
+          host: d.host,
+        }));
+
+        const links = grainLinks.concat(hostLinks);
+
+        console.log("Nodes:", nodes);
+        console.log("Links:", links);
+
+        const svg = d3.select("svg");
+        const graphContainer = svg.select(".graph-container");
+
+        const color = d3.scaleOrdinal(d3.schemeCategory10);
+        const linkColor = d3
+          .scaleSequential(d3.interpolateOrRd)
+          .domain([0, graphData.maxEdgeValue]);
+
+        const node = graphContainer
+          .select(".nodes")
+          .selectAll("g")
+          .data(nodes, (d) => d.id);
+        const nodeG = node.enter().append("g");
+
+        nodeG
+          .append("circle")
+          .attr("r", (d) =>
+            d.isHost
+              ? 10 + (15 * d.activationCount) / graphData.maxActivationCount
+              : 8
+          )
+          .attr("stroke", "#222")
+          .attr("stroke-width", (d) => (d.isHost ? 2 : 1))
+          .attr("class", (d) => (d.isHost ? "host-circle" : ""))
+          .attr("fill", (d) => (d.isHost ? color(d.index) : color(d.host)));
+
+        const link = graphContainer
+          .select(".links")
+          .selectAll("line")
+          .data(links, (d) => d.id);
+
+        const linkLine = link
+          .join("line")
+          .attr("stroke-width", (d) =>
+            d.isHostLink ? 0.25 : (0.8 * d.weight) / graphData.maxEdgeValue
+          )
+          .attr("stroke", (d) =>
+            d.isHostLink
+              ? color(d.host)
+              : d.sourceHost == d.targetHost
+              ? color(d.sourceHost)
+              : "red"
+          );
+
+        nodeG
+          .filter((d) => !d.isHost)
+          .append("text")
+
+          .text((d) => (d.key.includes("hosted-") ? "client" : d.key))
+          .attr("dy", -10);
+
+        const hostNode = nodeG.filter((d) => d.isHost);
+
+        hostNode
+          .append("text")
+          .text((d) => "[" + d.index + "]")
+          .attr("font-weight", "bold")
+          .attr("dy", -5);
+
+        hostNode
+          .append("text")
+          .attr("dy", 15)
+          .text((d) => d.activationCount);
+
+        let width = svg.node().clientWidth;
+        let height = svg.node().clientHeight;
+
+        const simulation = d3
+          .forceSimulation(nodes)
+          .force("center", d3.forceCenter(width / 2, height / 2))
+          .force(
+            "link",
+            d3
+              .forceLink(links)
+              .id((d) => d.id)
+              .strength((d) => (d.isHostLink ? 0.6 : 0.3))
+              .distance((d) => (d.isHostLink ? 50 : 10))
+          )
+          .force(
+            "hostGravity",
+            d3.forceManyBody().strength((d) => (d.isHost ? 0 : -100))
+          )
+          .on("tick", ticked);
+
+        svg.call(
+          d3
+            .zoom()
+            .scaleExtent([0.1, 10])
+            .on("zoom", (event) => {
+              graphContainer.attr("transform", event.transform);
+            })
+        );
+
+        function ticked() {
+          linkLine
+            .attr("x1", (d) => d.source.x)
+            .attr("y1", (d) => d.source.y)
+            .attr("x2", (d) => d.target.x)
+            .attr("y2", (d) => d.target.y);
+
+          nodeG.attr("transform", (d) => `translate(${d.x},${d.y})`);
+        }
+
+        window.addEventListener("resize", () => {
+          width = svg.node().clientWidth;
+          height = svg.node().clientHeight;
+          simulation.force("center", d3.forceCenter(width / 2, height / 2));
+          simulation.alpha(1).restart();
+        });
+      }
     </script>
-</body>
+  </body>
 </html>
