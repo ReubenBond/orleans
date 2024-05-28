@@ -26,6 +26,12 @@
         circle {
             fill: cadetblue;
         }
+        .host-circle {
+            fill: red;
+        }
+        .host-link{
+            stroke: red;
+        }
         line {
             stroke: #ccc;
         }
@@ -45,6 +51,7 @@
             <g class="graph-container">
                 <g class="links"></g>
                 <g class="nodes"></g>
+                <g class="hosts"></g>
             </g>
         </svg>
     </div>
@@ -62,12 +69,27 @@
 
         function onData(graphData) {
             console.log("Received JSON:", graphData);
-            var nodes = graphData.grainIds.map((d, i) => ({ id: i, name: d.name, silo: d.hostKey }));
-            var links = graphData.edges.map(d => ({
-                source: d.source,
-                target: d.target,
-                weight: d.weight
+
+            var hostNodes = graphData.hostIds.map((d, i) => ({ id: 'host-' + i, name: d.name, isHost: true }));
+            var grainNodes = graphData.grainIds.map((d, i) => ({ id: 'grain-' + i, name: d.name, host: d.host, isHost: false }));
+            var nodes = hostNodes.concat(grainNodes);
+
+            // Create a map to find nodes by their names
+            var nodeMap = {};
+            nodes.forEach(node => { nodeMap[node.name] = node; });
+
+            var grainLinks = graphData.edges.map(d => ({
+                source: 'grain-' + d.source,
+                target: 'grain-' + d.target,
+                weight: 100 * (d.weight / graphData.maxEdgeValue),
+            })).filter(d => d.source !== null && d.target !== null);
+            hostLinks = graphData.grainIds.map((d, i) => ({
+                source: 'grain-' + i,
+                target: 'host-' + d.host,
+                weight: 1
             }));
+
+            var links = grainLinks.concat(hostLinks);
 
             console.log("Nodes:", nodes);
             console.log("Links:", links);
@@ -86,7 +108,8 @@
                 .enter().append("g");
 
             node.append("circle")
-                .attr("r", 5);
+                .attr("r", d => d.isHost ? 10 : 5)
+                .attr("class", d => d.isHost ? "host-circle" : "");
 
             node.append("text")
                 .text(d => d.name)
@@ -96,9 +119,10 @@
             var height = svg.node().clientHeight;
 
             var simulation = d3.forceSimulation(nodes)
-                .force('charge', d3.forceManyBody().strength(-100))
+                //.force('charge', d3.forceManyBody().strength(d => -500))
                 .force('center', d3.forceCenter(width / 2, height / 2))
                 .force('link', d3.forceLink(links).id(d => d.id))
+                .force('hostGravity', grainGravitationForce(nodes, hostNodes))
                 .on('tick', ticked);
 
             svg.call(d3.zoom()
@@ -126,7 +150,17 @@
                 simulation.alpha(1).restart();
             });
         }
+
+        function grainGravitationForce(nodes, hostNodes) {
+            return d3.forceManyBody()
+                .strength(d => {
+                    if (d.isHost) return 0;
+                    var hostNode = hostNodes.find(host => host.name === d.host);
+                    return hostNode ? -1000 : -500;
+                })
+                .distanceMin(10)
+                .distanceMax(200);
+        }
     </script>
 </body>
 </html>
-/html>

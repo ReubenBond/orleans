@@ -21,6 +21,7 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
             var hostKey = GetHostVertex(silo);
             foreach (var activation in await _managementGrain.GetDetailedGrainStatistics(hostsIds: [silo]))
             {
+                if (activation.GrainId.IsSystemTarget()) continue;
                 var details = GetGrainVertex(activation.GrainId, hostKey);
                 _grainDetails[activation.GrainId] = new(details.GrainKey, hostKey);
             }
@@ -28,6 +29,7 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
 
         foreach (var edge in await _managementGrain.GetGrainCallFrequencies())
         {
+            if (edge.TargetGrain.IsSystemTarget() || edge.TargetGrain.IsSystemTarget()) continue;
             var sourceHostId = GetHostVertex(edge.SourceHost);
             var targetHostId = GetHostVertex(edge.TargetHost);
             var sourceVertex = GetGrainVertex(edge.SourceGrain, sourceHostId);

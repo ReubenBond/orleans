@@ -482,7 +482,22 @@ internal sealed partial class ActivationRebalancer : SystemTarget, IActivationRe
         _logger.LogInformation("Adding {NewlyAnchoredGrains} newly anchored grains to set on host {Silo}. EdgeWeights contains {EdgeWeightCount} elements.", newlyAnchoredGrains.Count, Silo, _edgeWeights.Count);
         foreach (var id in newlyAnchoredGrains)
         {
-            _anchoredGrainIds.Add(id);
+// WARNING
+// WARNING
+// WARNING
+// WARNING
+// WARNING
+// WARNING
+// WARNING
+// WARNING
+// WARNING
+            //_anchoredGrainIds.Add(id);
+// WARNING
+// WARNING
+// WARNING
+// WARNING
+// WARNING
+// WARNING
         }
 
         foreach (var id in accepting)
