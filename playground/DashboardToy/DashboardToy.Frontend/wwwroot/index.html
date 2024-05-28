@@ -116,7 +116,20 @@
         host: d.host,
       }));
 
-      const newLinks = newGrainLinks.concat(newHostLinks);
+    const hostToHostLinks = [];
+    for (let i = 0; i < newHostNodes.length; i++) {
+      for (let j = i + 1; j < newHostNodes.length; j++) {
+        if (i == j) continue;
+        hostToHostLinks.push({
+          id: "host-link(" + newHostNodes[i].id + "," + newHostNodes[j].id + ")",
+          source: newHostNodes[i].id,
+          target: newHostNodes[j].id,
+          isHostToHostLink: true,
+        });
+      }
+    }
+
+      const newLinks = newGrainLinks.concat(newHostLinks).concat(hostToHostLinks);
 
       // Merge new nodes and links into the existing state
       const nodeMap = new Map(state.nodes.map((d) => [d.id, d]));
@@ -205,6 +218,8 @@
         .selectAll("line")
         .data(state.links, (d) => d.id);
 
+      linkData.exit().remove();
+
       const linkLine = linkData
         .enter()
         .append("line")
@@ -220,8 +235,6 @@
             : "red"
         );
 
-      linkData.exit().remove();
-
       if (!state.isUpdate) {
         state.simulation = d3
           .forceSimulation(state.nodes)
@@ -234,17 +247,12 @@
             d3
               .forceLink(state.links)
               .id((d) => d.id)
-              .strength((d) => (d.isHostLink ? 0.6 : 0.3))
-              .distance((d) => (d.isHostLink ? 100 : 30))
+              .strength((d) => d.isHostToHostLink ? 0.8 : d.isHostLink ? 0.2 : 0.05)
+              .distance((d) => d.isHostToHostLink ? 400 : d.isHostLink ? 150 : 30)
           )
-          .force("x", d3.forceX().strength(0.01))
-          .force("y", d3.forceY().strength(0.01))
-          .force(
-            "hostGravity",
-            d3.forceManyBody().strength((d) => (d.isHost ? -100 : -100))
-          )
+          .force("charge", d3.forceManyBody().strength((d) => (d.isHost ? -150 : -50)))
           .alphaDecay(0.01) // Reduce alpha decay rate for gradual settling
-          .velocityDecay(0.5) // Reduce velocity decay rate for gradual settling
+          .velocityDecay(0.3) // Reduce velocity decay rate for gradual settling
           .on("tick", ticked);
 
         svg.call(
