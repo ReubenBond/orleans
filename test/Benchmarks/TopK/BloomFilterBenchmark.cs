@@ -53,10 +53,12 @@ public class BloomFilterBenchmark
             _population[i] = GrainId.Create($"grain_{i}", i.ToString());
         }
 
-        _bloomFilter = new(Cap, 0.01);
-        _bloomFilterWithSamples = new(Cap, 0.01);
+        _bloomFilter = new(Cap, FP);
+        _bloomFilterWithSamples = new(Cap, FP);
         _originalBloomFilter = new();
         _originalBloomFilterWithSamples = new();
+        _blockedBloomFilter = new(Cap, FP);
+        _blockedBloomFilterWithSamples = new(Cap, FP);
 
         _samples = new GrainId[Samples];
         _set = new(Samples);
@@ -176,7 +178,6 @@ public class BloomFilterBenchmark
         }
     }
 
-    /*
     // This is expected to yield a slighly higher FP rate, due to tuning
     [Benchmark]
     [BenchmarkCategory("FP rate")]
@@ -198,7 +199,6 @@ public class BloomFilterBenchmark
 
         return incorrect;
     }
-    */
 }
 
 [AttributeUsage(AttributeTargets.Class)]
