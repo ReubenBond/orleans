@@ -516,27 +516,27 @@ namespace Orleans.Runtime
             bool gracefully = !ct.IsCancellationRequested;
             try
             {
+                try
+                {
+                    await catalog.DeactivateAllActivations().WaitAsync(ct);
+                }
+                catch (Exception exception)
+                {
+                    if (!ct.IsCancellationRequested)
+                    {
+                        logger.LogError(exception, "Error deactivating activations.");
+                    }
+                    else
+                    {
+                        logger.LogWarning("Some grains failed to deactivate promptly.");
+                    }
+                }
+
+                // Stop LocalGrainDirectory
+                await localGrainDirectory.CacheValidator.RunOrQueueTask(localGrainDirectory.StopAsync);
+
                 if (gracefully)
                 {
-                    // Stop LocalGrainDirectory
-                    await localGrainDirectory.CacheValidator.RunOrQueueTask(localGrainDirectory.StopAsync);
-
-                    try
-                    {
-                        await catalog.DeactivateAllActivations().WaitAsync(ct);
-                    }
-                    catch (Exception exception)
-                    {
-                        if (!ct.IsCancellationRequested)
-                        {
-                            logger.LogError(exception, "Error deactivating activations.");
-                        }
-                        else
-                        {
-                            logger.LogWarning("Some grains failed to deactivate promptly.");
-                        }
-                    }
-
                     // Wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop.
                     await Task.WhenAny(Task.Delay(waitForMessageToBeQueuedForOutbound), ct.WhenCancelled());
                 }

@@ -471,7 +471,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
         IMembershipTable membershipTable = services.GetRequiredService<CassandraClusteringTable>();
         await membershipTable.InitializeMembershipTable(true);
 
-        IGatewayListProvider gatewayProvider = services.GetRequiredService < CassandraGatewayListProvider>();
+        IGatewayListProvider gatewayProvider = services.GetRequiredService<CassandraGatewayListProvider>();
         await gatewayProvider.InitializeGatewayListProvider();
 
         return (membershipTable, gatewayProvider);
