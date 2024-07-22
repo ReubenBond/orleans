@@ -10,8 +10,8 @@ namespace Orleans.Runtime
     /// </summary>
     internal abstract class ActivityPropagationGrainCallFilter
     {
-        protected const string TraceParentHeaderName = "traceparent";
-        protected const string TraceStateHeaderName = "tracestate";
+        protected const string traceparentheadername = "traceparent";
+        protected const string tracestateheadername = "tracestate";
 
         internal const string RpcSystem = "orleans";
         internal const string OrleansNamespacePrefix = "Orleans";

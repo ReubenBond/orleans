@@ -77,6 +77,26 @@ namespace Orleans.Runtime.MembershipService
             siloTable[entry.SiloAddress] = new Tuple<MembershipEntry, string>(data.Item1, NewETag());
         }
 
+        public void CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+        {
+            List<SiloAddress> entriesToRemove = [];
+            foreach (var (siloAddress, (entry, _)) in siloTable)
+            {
+                if (entry.Status != SiloStatus.Active
+                    && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
+                {
+                    continue;
+                }
+
+                entriesToRemove.Add(siloAddress);
+            }
+
+            foreach (var siloAddress in entriesToRemove)
+            {
+                siloTable.Remove(siloAddress);
+            }
+        }
+
         public override string ToString() => $"Table = {ReadAll()}, ETagCounter={lastETagCounter}";
 
         private string NewETag()
