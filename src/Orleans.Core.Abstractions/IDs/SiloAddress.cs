@@ -1,6 +1,8 @@
 using System;
 using System.Buffers.Binary;
 using System.Buffers.Text;
+using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -425,6 +427,12 @@ namespace Orleans.Runtime
             Debug.Assert(len == 16);
 
             return b1.SequenceCompareTo(b2);
+        }
+
+        internal sealed class ConsistentHashCodeComparer : IComparer<SiloAddress>
+        {
+            public static readonly ConsistentHashCodeComparer Instance = new();
+            public int Compare(SiloAddress? x, SiloAddress? y) => x?.GetConsistentHashCode() ?? 0 - y?.GetConsistentHashCode() ?? 0;
         }
     }
 

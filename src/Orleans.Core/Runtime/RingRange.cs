@@ -220,6 +220,16 @@ namespace Orleans.Runtime
             => EquallyDividedMultiRange.GetEquallyDividedSubRange(range, numSubRanges, mySubRangeIndex);
 
         /// <summary>
+        /// Creates equally divided sub-ranges from the provided range and returns one sub-range from that range.
+        /// </summary>
+        /// <param name="range">The range.</param>
+        /// <param name="numSubRanges">The number of sub-ranges.</param>
+        /// <param name="mySubRangeIndex">The index of the sub-range to return.</param>
+        /// <returns>The identified sub-range.</returns>
+        internal static SingleRange GetEquallyDividedSubRange(SingleRange range, int numSubRanges, int mySubRangeIndex)
+            => EquallyDividedMultiRange.GetEquallyDividedSubRange(range, numSubRanges, mySubRangeIndex);
+
+        /// <summary>
         /// Gets the contiguous sub-ranges represented by the provided range.
         /// </summary>
         /// <param name="range">The range.</param>
@@ -308,7 +318,7 @@ namespace Orleans.Runtime
 
     internal static class EquallyDividedMultiRange
     {
-        private static SingleRange GetEquallyDividedSubRange(SingleRange singleRange, int numSubRanges, int mySubRangeIndex)
+        public static SingleRange GetEquallyDividedSubRange(SingleRange singleRange, int numSubRanges, int mySubRangeIndex)
         {
             var rangeSize = singleRange.RangeSize();
             uint portion = (uint)(rangeSize / numSubRanges);
@@ -325,7 +335,10 @@ namespace Orleans.Runtime
                     remainder--;
                 }
                 if (i == mySubRangeIndex)
+                {
                     return new SingleRange(start, end);
+                }
+
                 start = end; // nextStart
             }
             throw new ArgumentException(nameof(mySubRangeIndex));
