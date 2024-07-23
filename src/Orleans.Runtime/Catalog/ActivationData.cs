@@ -1676,9 +1676,9 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
         finally
         {
-            if (cancellationToken.IsCancellationRequested && stopwatch.Elapsed.TotalMilliseconds > 50)
+            if (cancellationToken.IsCancellationRequested && stopwatch.Elapsed.TotalMilliseconds > 500)
             {
-                _shared.Logger.LogInformation("Cancellation requested for activation {Activation} took {ElapsedMilliseconds:0.0}ms.", this, stopwatch.Elapsed.TotalMilliseconds);
+                _shared.Logger.LogDebug("Cancellation requested for activation {Activation} took {ElapsedMilliseconds:0.0}ms.", this, stopwatch.Elapsed.TotalMilliseconds);
             }
 
             _workSignal.Signal();
@@ -1846,9 +1846,9 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         // Signal deactivation
         GetDeactivationCompletionSource().TrySetResult(true);
         _workSignal.Signal();
-        if (cancellationToken.IsCancellationRequested && stopwatch.Elapsed.TotalMilliseconds > 50)
+        if (cancellationToken.IsCancellationRequested && stopwatch.Elapsed.TotalMilliseconds > 500)
         {
-            _shared.Logger.LogInformation("Cancellation requested for deactivation {Activation} took {ElapsedMilliseconds:0.0}ms.", this, stopwatch.Elapsed.TotalMilliseconds);
+            _shared.Logger.LogDebug("Cancellation requested for deactivation {Activation} took {ElapsedMilliseconds:0.0}ms.", this, stopwatch.Elapsed.TotalMilliseconds);
         }
     }
 
