@@ -43,6 +43,8 @@ using Microsoft.Extensions.Configuration;
 using Orleans.Serialization.Internal;
 using Orleans.Core;
 using Orleans.Placement.Repartitioning;
+using Orleans.GrainDirectory;
+using Orleans.Runtime.Hosting;
 
 namespace Orleans.Hosting
 {
@@ -125,6 +127,12 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationWorkingSet>();
 
             // Directory
+            services.TryAddScoped<ReplicatedGrainDirectory>();
+            services.TryAddScoped<GrainDirectoryReplica>();    
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainDirectoryReplica>();
+            services.AddFromExisting<IGrainDirectory, ReplicatedGrainDirectory>();
+            services.AddGrainDirectory<ReplicatedGrainDirectory>(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (sp, name) => sp.GetRequiredService<ReplicatedGrainDirectory>());
+
             services.TryAddSingleton<LocalGrainDirectory>();
             services.TryAddFromExisting<ILocalGrainDirectory, LocalGrainDirectory>();
             services.AddSingleton<GrainLocator>();
