@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,6 +13,262 @@ using Orleans.Runtime.Scheduler;
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory
 {
+    internal interface IMemberId : IComparable<IMemberId>, IEquatable<IMemberId>
+    {
+        uint GetUniformHashCode();
+    }
+
+    internal interface IMemberEntry
+    {
+        IMemberId Id { get; }
+
+        static IEqualityComparer<IMemberEntry> IdEqualityComparer { get; } = new MemberEntryIdComparer();
+
+        private class MemberEntryIdComparer : IEqualityComparer<IMemberEntry>
+        {
+            public bool Equals(IMemberEntry? x, IMemberEntry? y) => x is null && y is null || x is not null && y is not null && x.Id.Equals(y.Id);
+
+            public int GetHashCode([DisallowNull] IMemberEntry obj) => unchecked((int)obj.Id.GetUniformHashCode());
+        }
+    }
+
+    public readonly struct VersionVector(ImmutableArray<long> versionVector) : IComparable<VersionVector>, IEquatable<VersionVector>
+    {
+        public ImmutableArray<long> Vector { get; } = versionVector;
+
+        public int CompareTo(VersionVector other)
+        {
+            if (other.Vector.Length != Vector.Length)
+            {
+                throw new ArgumentException("Only vectors of the same length can be compared.");
+            }
+
+            for (var i = 0; i < Vector.Length; i++)
+            {
+                var comparison = Vector[i].CompareTo(other.Vector[i]);
+                if (comparison != 0)
+                {
+                    return comparison;
+                }
+            }
+
+            return 0;
+        }
+
+        public bool Equals(VersionVector other)
+        {
+            if (other.Vector.Length != Vector.Length) return false;
+            for (var i = 0; i < Vector.Length; i++)
+            {
+                if (Vector[i] != other.Vector[i]) return false;
+            }
+
+            return true;
+        }
+
+        public override bool Equals(object? obj) => obj is VersionVector other && Equals(other);
+
+        public override int GetHashCode()
+        {
+            var hash = new HashCode();
+            hash.Add(Vector.Length);
+            foreach (var version in Vector)
+            {
+                hash.Add(version);
+            }
+
+            return hash.ToHashCode();
+        }
+
+        public static bool operator ==(VersionVector left, VersionVector right) => left.Equals(right);
+
+        public static bool operator !=(VersionVector left, VersionVector right) => !(left == right);
+
+        public static bool operator <(VersionVector left, VersionVector right) => left.CompareTo(right) < 0;
+
+        public static bool operator <=(VersionVector left, VersionVector right) => left.CompareTo(right) <= 0;
+
+        public static bool operator >(VersionVector left, VersionVector right) => left.CompareTo(right) > 0;
+
+        public static bool operator >=(VersionVector left, VersionVector right) => left.CompareTo(right) >= 0;
+
+        public override string ToString() => string.Join('.', Vector);
+    }
+
+    // Represents consistent, monotonically-versioned view of group membership.
+
+    internal class MembershipSnapshot(
+        string groupName,
+        VersionVector version,
+        ImmutableArray<IMemberEntry> members) : IComparable<MembershipSnapshot>, IEquatable<MembershipSnapshot>
+    {
+        public string GroupName { get; init; } = groupName;
+
+        public VersionVector Version { get; init; } = version;
+
+        public ImmutableArray<IMemberEntry> Members { get; init; } = members;
+
+        public int CompareTo(MembershipSnapshot? other)
+        {
+            if (other is null)
+            {
+                return 1;
+            }
+
+            if (!string.Equals(GroupName, other.GroupName, StringComparison.Ordinal))
+            {
+                throw new ArgumentException($"Cannot compare membership snapshots from different groups: '{GroupName}' and '{other.GroupName}'.");
+            }
+
+            return Version.CompareTo(other.Version);
+        }
+
+        public bool Equals([NotNullWhen(true)] MembershipSnapshot? other) =>
+            other is not null
+                && Version == other.Version
+                && string.Equals(GroupName, other.GroupName, StringComparison.Ordinal);
+
+        public bool StructuralEquals(MembershipSnapshot? other) => Equals(other) && Members.SequenceEqual(other.Members, IMemberEntry.IdEqualityComparer);
+
+        public override bool Equals(object? obj) => Equals(obj as MembershipSnapshot);
+
+        public override int GetHashCode() => HashCode.Combine(GroupName, Version);
+    }
+
+    internal interface IMembershipSnapshotProvider
+    {
+        /// <summary>
+        /// Gets the empty snapshot.
+        /// </summary>
+        MembershipSnapshot Empty { get; }
+
+        /// <summary>
+        /// Gets the current snapshot.
+        /// </summary>
+        MembershipSnapshot Current { get; }
+
+        /// <summary>
+        /// Gets an enumerable collection of updates.
+        /// </summary>
+        /// <value>The updates.</value>
+        IAsyncEnumerable<MembershipSnapshot> Updates { get; }
+
+        /// <summary>
+        /// Refreshes membership if it is not at or above the specified snapshot's version.
+        /// </summary>
+        /// <param name="snapshot">The current snapshot.</param>
+        /// <returns>A <see cref="ValueTask"/> representing the work performed.</returns>
+        ValueTask Refresh(MembershipSnapshot? snapshot = default);
+    }
+
+    internal class DirectoryDummy(IMembershipSnapshotProvider membershipProvider)
+    {
+        private readonly List<(SingleRange Range, TaskCompletionSource Lock)> _rangeLocks = [];
+        private readonly List<SingleRange> _activeRanges = [];
+
+        private async Task RunAsync()
+        {
+            var previousSnapshot = membershipProvider.Empty;
+            await foreach (var snapshot in membershipProvider.Updates)
+            {
+                // Detect if there has been a view change:
+                // Find added ranges
+                // If the previous owner is in the 'ShuttingDown' state (not 'Dead' yet), keep requests from its range enqueued.
+                // If the previous owner is in the 'Dead' state, handle queued requests and unblock requests.
+                // For each added range -> do nothing. The previous owner will contact us to hand off the data, removing the range when they do.
+                // Find removed ranges -> find the new owner and read the data from there, halting it in the process.
+
+                previousSnapshot = snapshot;
+            }
+        }
+
+        public async Task<GrainAddress> AddOrUpdate(GrainAddress address, GrainAddress? existing)
+        {
+            ArgumentNullException.ThrowIfNull(address);
+            var hashCode = address.GrainId.GetUniformHashCode();
+            while (TryGetRangeLock(hashCode, out var rangeLock))
+            {
+                await rangeLock;
+            }
+
+            // Forward if necessary
+            if (!IsInActiveRange(hashCode))
+            {
+                // Forward to the current owner.
+                var currentMembers = membershipProvider.Current.Members;
+                var owner = currentMembers[^1];
+                foreach (var member in currentMembers)
+                {
+                    var memberHashCode = member.Id.GetUniformHashCode();
+                    if (memberHashCode <= hashCode)
+                    {
+                        owner = member;
+                        break;
+                    }
+                }
+
+                // Forward to the owner.
+                return await owner.Id
+            }
+
+            // Handle
+
+        }
+
+        private bool IsInActiveRange(uint hashCode)
+        {
+            foreach (var range in _activeRanges)
+            {
+                if (range.InRange(hashCode))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool TryGetRangeLock(uint hashCode, [NotNullWhen(true)] out Task? lockTask)
+        {
+            foreach (var rangeLock in _rangeLocks)
+            {
+                if (rangeLock.Range.InRange(hashCode))
+                {
+                    lockTask = rangeLock.Lock.Task;
+                    return true;
+                }
+            }
+
+            lockTask = null;
+            return false;
+        }
+    }
+
+    // Provides ability to dynamically join/leave a group.
+    internal interface IMembershipManager
+    {
+        string GroupName { get; }
+        Task JoinGroupAsync(IMemberEntry entry);
+        Task UpdateMembershipAsync(IMemberEntry entry);
+        Task LeaveGroupAsync(IMemberId id);
+    }
+
+    // Interface implemented by services, used for up-calls from the process group manager.
+    internal interface IRangePartitionedService
+    {
+        // Stop serving requests for the specified range, writing data for that range to the specified context.
+        ValueTask RemoveRangeAsync(IRingRange ringRange, MembershipSnapshot membershipSnapshot);
+
+        // Start serving requests for the specified range, reading data for that range from the specified context.
+        ValueTask AddRangeAsync(IRingRange ringRange, MembershipSnapshot membershipSnapshot);
+    }
+
+    // Manages a group of processes in a range-partitioned service
+    internal sealed class RangePartitionedProcessGroupManager(string groupName)
+    {
+        public string GroupName { get; } = groupName;
+    }
+
     internal sealed class LocalGrainDirectory : ILocalGrainDirectory, ISiloStatusListener
     {
         private readonly AdaptiveDirectoryCacheMaintainer maintainer;
@@ -23,7 +280,7 @@ namespace Orleans.Runtime.GrainDirectory
         private Action<SiloAddress, SiloStatus>? catalogOnSiloRemoved;
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
 
-        // Consider: move these constants into an apropriate place
+        // Consider: move these constants into an appropriate place
         internal const int HOP_LIMIT = 6; // forward a remote request no more than 5 times
         public static readonly TimeSpan RETRY_DELAY = TimeSpan.FromMilliseconds(200); // Pause 200ms between forwards to let the membership directory settle down
 
@@ -71,7 +328,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             DirectoryPartition = grainDirectoryPartitionFactory();
-            HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, grainDirectoryPartitionFactory, loggerFactory);
+            HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, loggerFactory);
 
             RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceType, loggerFactory);
             CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorType, loggerFactory);
@@ -265,22 +522,6 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        internal SiloAddress? FindPredecessor(SiloAddress silo)
-        {
-            var existing = directoryMembership.MembershipRingList;
-            int index = existing.IndexOf(silo);
-            if (index == -1)
-            {
-                log.LogWarning(
-                    (int)ErrorCode.Runtime_Error_100201,
-                    "Got request to find predecessors of silo {SiloAddress}, which is not in the list of members",
-                    silo);
-                return null;
-            }
-
-            return existing.Count > 1 ? existing[(index == 0 ? existing.Count : index) - 1] : null;
-        }
-
         internal SiloAddress? FindSuccessor(SiloAddress silo)
         {
             var existing = directoryMembership.MembershipRingList;
@@ -294,7 +535,7 @@ namespace Orleans.Runtime.GrainDirectory
                 return null;
             }
 
-            return existing.Count > 1 ? existing[(index + 1) % existing.Count] : null;
+            return existing.Length > 1 ? existing[(index + 1) % existing.Length] : null;
         }
 
         public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
@@ -315,7 +556,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private bool IsValidSilo(SiloAddress? silo) => siloStatusOracle.IsFunctionalDirectory(silo);
+        private bool IsValidSilo(SiloAddress? silo) => silo is not null && directoryMembership.Contains(silo);
 
         /// <summary>
         /// Finds the silo that owns the directory information for the given grain ID.
@@ -356,14 +597,14 @@ namespace Orleans.Runtime.GrainDirectory
             bool excludeMySelf = !Running;
 
             var existing = this.directoryMembership;
-            if (existing.MembershipRingList.Count == 0)
+            if (existing.MembershipRingList.Length == 0)
             {
                 // If the membership ring is empty, then we're the owner by default unless we're stopping.
                 return !Running ? null : MyAddress;
             }
 
             // need to implement a binary search, but for now simply traverse the list of silos sorted by their hashes
-            for (var index = existing.MembershipRingList.Count - 1; index >= 0; --index)
+            for (var index = existing.MembershipRingList.Length - 1; index >= 0; --index)
             {
                 var item = existing.MembershipRingList[index];
                 if (IsSiloNextInTheRing(item, hash, excludeMySelf))
@@ -377,11 +618,11 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 // If not found in the traversal, last silo will do (we are on a ring).
                 // We checked above to make sure that the list isn't empty, so this should always be safe.
-                siloAddress = existing.MembershipRingList[existing.MembershipRingList.Count - 1];
+                siloAddress = existing.MembershipRingList[existing.MembershipRingList.Length - 1];
                 // Make sure it's not us...
                 if (siloAddress.Equals(MyAddress) && excludeMySelf)
                 {
-                    siloAddress = existing.MembershipRingList.Count > 1 ? existing.MembershipRingList[existing.MembershipRingList.Count - 2] : null;
+                    siloAddress = existing.MembershipRingList.Length > 1 ? existing.MembershipRingList[existing.MembershipRingList.Length - 2] : null;
                 }
             }
 
@@ -825,25 +1066,37 @@ namespace Orleans.Runtime.GrainDirectory
 
         public bool IsSiloInCluster(SiloAddress silo)
         {
-            return this.directoryMembership.MembershipCache.Contains(silo);
+            return this.directoryMembership.Contains(silo);
         }
 
         public void AddOrUpdateCacheEntry(GrainId grainId, SiloAddress siloAddress) => this.DirectoryCache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
         public bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address) => (address = GetLocalCacheData(grainId)) is not null;
 
-        private class DirectoryMembership
+        private sealed class DirectoryMembership
         {
-            public DirectoryMembership(ImmutableList<SiloAddress> membershipRingList, ImmutableHashSet<SiloAddress> membershipCache)
+            private readonly ClusterMembershipSnapshot _snapshot;
+            public DirectoryMembership(ClusterMembershipSnapshot snapshot)
             {
-                this.MembershipRingList = membershipRingList;
-                this.MembershipCache = membershipCache;
+                var memberRingList = ImmutableArray.CreateBuilder<SiloAddress>();
+                foreach (var member in snapshot.Members)
+                {
+                    // Only active members are part of directory membership.
+                    if (member.Value.Status == SiloStatus.Active)
+                    {
+                        memberRingList.Add(member.Key);
+                    }
+                }
+
+                memberRingList.Sort(static (left, right) => left.GetConsistentHashCode().CompareTo(right.GetConsistentHashCode()));
+                MembershipRingList = memberRingList.ToImmutable();
+                _snapshot = snapshot;
             }
 
-            public static DirectoryMembership Default { get; } = new DirectoryMembership(ImmutableList<SiloAddress>.Empty, ImmutableHashSet<SiloAddress>.Empty);
+            public static DirectoryMembership Default { get; } = new DirectoryMembership(new ClusterMembershipSnapshot(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, MembershipVersion.MinValue));
 
-
-            public ImmutableList<SiloAddress> MembershipRingList { get; }
-            public ImmutableHashSet<SiloAddress> MembershipCache { get; }
+            public MembershipVersion Version => _snapshot.Version;
+            public ImmutableArray<SiloAddress> MembershipRingList { get; }
+            public bool Contains(SiloAddress address) => _snapshot.Members.ContainsKey(address);
         }
     }
 }

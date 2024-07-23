@@ -36,7 +36,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Represents a single, contiguous range round a virtual ring where points along the ring are identified using <see cref="uint"/> values.
     /// </summary>
-    /// <seealso cref="Orleans.Runtime.IRingRange" />
+    /// <seealso cref="IRingRange" />
     public interface ISingleRange : IRingRange
     {
         /// <summary>
@@ -51,29 +51,23 @@ namespace Orleans.Runtime
     }
 
     [Serializable, GenerateSerializer, Immutable]
-    internal sealed class SingleRange : IRingRangeInternal, IEquatable<SingleRange>, ISingleRange, ISpanFormattable
+    internal sealed class SingleRange(uint begin, uint end) : IRingRangeInternal, IEquatable<SingleRange>, ISingleRange, ISpanFormattable
     {
         [Id(0)]
-        private readonly uint begin;
+        private readonly uint _begin = begin;
 
         [Id(1)]
-        private readonly uint end;
+        private readonly uint _end = end;
 
         /// <summary>
         /// Exclusive
         /// </summary>
-        public uint Begin { get { return begin; } }
+        public uint Begin => _begin;
 
         /// <summary>
         /// Inclusive
         /// </summary>
-        public uint End { get { return end; } }
-
-        public SingleRange(uint begin, uint end)
-        {
-            this.begin = begin;
-            this.end = end;
-        }
+        public uint End => _end;
 
         /// <summary>
         /// checks if n is element of (Begin, End], while remembering that the ranges are on a ring
@@ -83,47 +77,49 @@ namespace Orleans.Runtime
         public bool InRange(uint n)
         {
             uint num = n;
-            if (begin < end)
+            if (_begin < _end)
             {
-                return num > begin && num <= end;
+                return num > _begin && num <= _end;
             }
+
             // Begin > End
-            return num > begin || num <= end;
+            return num > _begin || num <= _end;
         }
 
         public long RangeSize()
         {
-            if (begin < end)
+            if (_begin < _end)
             {
-                return end - begin;
+                return _end - _begin;
             }
-            return RangeFactory.RING_SIZE - (begin - end);
+
+            return RangeFactory.RING_SIZE - (_begin - _end);
         }
 
         public double RangePercentage() => RangeSize() * (100.0 / RangeFactory.RING_SIZE);
 
-        public bool Equals(SingleRange? other) => other != null && begin == other.begin && end == other.end;
+        public bool Equals(SingleRange? other) => other != null && _begin == other._begin && _end == other._end;
 
         public override bool Equals(object? obj) => Equals(obj as SingleRange);
 
-        public override int GetHashCode() => HashCode.Combine(GetType(), begin, end);
+        public override int GetHashCode() => HashCode.Combine(GetType(), _begin, _end);
 
-        public override string ToString() => begin == 0 && end == 0 ? "<(0 0], Size=x100000000, %Ring=100%>" : $"{this}";
+        public override string ToString() => _begin == 0 && _end == 0 ? "<(0 0], Size=x100000000, %Ring=100%>" : $"{this}";
 
         string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
         bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
         {
-            return begin == 0 && end == 0
+            return _begin == 0 && _end == 0
                 ? destination.TryWrite($"<(0 0], Size=x100000000, %Ring=100%>", out charsWritten)
-                : destination.TryWrite($"<(x{begin:X8} x{end:X8}], Size=x{RangeSize():X8}, %Ring={RangePercentage():0.000}%>", out charsWritten);
+                : destination.TryWrite($"<(x{_begin:X8} x{_end:X8}], Size=x{RangeSize():X8}, %Ring={RangePercentage():0.000}%>", out charsWritten);
         }
 
-        internal bool Overlaps(SingleRange other) => Equals(other) || InRange(other.begin) || other.InRange(begin);
+        internal bool Overlaps(SingleRange other) => Equals(other) || InRange(other._begin) || other.InRange(_begin);
 
         internal SingleRange Merge(SingleRange other)
         {
-            if ((begin | end) == 0 || (other.begin | other.end) == 0)
+            if ((_begin | _end) == 0 || (other._begin | other._end) == 0)
             {
                 return RangeFactory.FullRange;
             }
@@ -133,12 +129,12 @@ namespace Orleans.Runtime
                 return this;
             }
 
-            if (InRange(other.begin))
+            if (InRange(other._begin))
             {
                 return MergeEnds(other);
             }
 
-            if (other.InRange(begin))
+            if (other.InRange(_begin))
             {
                 return other.MergeEnds(this);
             }
@@ -149,17 +145,17 @@ namespace Orleans.Runtime
         // other range begins inside this range, merge it based on where it ends
         private SingleRange MergeEnds(SingleRange other)
         {
-            if (begin == other.end)
+            if (_begin == other._end)
             {
                 return RangeFactory.FullRange;
             }
 
-            if (!InRange(other.end))
+            if (!InRange(other._end))
             {
-                return new SingleRange(begin, other.end);
+                return new SingleRange(_begin, other._end);
             }
 
-            if (other.InRange(begin))
+            if (other.InRange(_begin))
             {
                 return RangeFactory.FullRange;
             }

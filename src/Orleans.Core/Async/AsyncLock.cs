@@ -80,7 +80,7 @@ namespace Orleans
             }
         }
 
-        private class LockReleaser : IDisposable
+        private sealed class LockReleaser : IDisposable
         {
             private AsyncLock target;
 
