@@ -46,7 +46,7 @@ namespace Orleans.Streams
             var ls = new List<QueueId>();
             foreach (QueueId queueId in hashRing.GetAllRingMembers())
             {
-                if (range.InRange(queueId.GetUniformHashCode()))
+                if (range.Contains(queueId.GetUniformHashCode()))
                 {
                     ls.Add(queueId);
                 }

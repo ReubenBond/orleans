@@ -293,7 +293,7 @@ namespace UnitTests.General
                         break;
                     }
 
-                    if (m.InRange(s.Begin + 1) && m.InRange(s.End)) // s cant overlap two singleranges
+                    if (m.Contains(s.Begin + 1) && m.Contains(s.End)) // s cant overlap two singleranges
                     {
                         found = true;
                         ranges.Remove(m);

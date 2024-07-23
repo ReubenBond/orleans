@@ -17,14 +17,14 @@ namespace Orleans.Runtime
         /// The value to check.
         /// </param>
         /// <returns><see langword="true"/> if the reminder is in our responsibility range, <see langword="false"/> otherwise.</returns>
-        bool InRange(uint value);
+        bool Contains(uint value);
 
         /// <summary>
         /// Returns a value indicating whether <paramref name="grainId"/> is within this ring range.
         /// </summary>
         /// <param name="grainId">The value to check.</param>
         /// <returns><see langword="true"/> if the reminder is in our responsibility range, <see langword="false"/> otherwise.</returns>
-        public sealed bool InRange(GrainId grainId) => InRange(grainId.GetUniformHashCode());
+        public sealed bool InRange(GrainId grainId) => Contains(grainId.GetUniformHashCode());
     }
 
     // This is the internal interface to be used only by the different range implementations.
@@ -50,14 +50,29 @@ namespace Orleans.Runtime
         uint End { get; }
     }
 
+    internal sealed class EmptyRange : IRingRangeInternal
+    {
+        public static readonly EmptyRange Instance = new();
+        public bool Contains(uint value) => false;
+        public double RangePercentage() => 0.0;
+    }
+
     [Serializable, GenerateSerializer, Immutable]
+    [Alias("Orleans.Runtime.SingleRange")]
     internal sealed class SingleRange(uint begin, uint end) : IRingRangeInternal, IEquatable<SingleRange>, ISingleRange, ISpanFormattable
     {
         [Id(0)]
-        private readonly uint _begin = begin;
+        private readonly uint _begin = begin == end && begin > 1 ? 1 : begin;
 
         [Id(1)]
-        private readonly uint _end = end;
+        private readonly uint _end = begin == end && begin > 1 ? 1 : end;
+
+        public bool IsEmpty => _begin == _end && _begin == 0;
+        public bool IsFull => _begin == _end && _begin != 0;
+        private bool IsWrapped => _begin >= _end;
+
+        public static SingleRange Full { get; } = new SingleRange(1, 1);
+        public static SingleRange Empty { get; } = new SingleRange(0, 0);
 
         /// <summary>
         /// Exclusive
@@ -70,13 +85,74 @@ namespace Orleans.Runtime
         public uint End => _end;
 
         /// <summary>
+        /// Gets the length of the range.
+        /// </summary>
+        public uint Length
+        {
+            get
+            {
+                if (_begin == _end)
+                {
+                    // Empty
+                    if (_begin == 0) return 0;
+
+                    // Full
+                    return uint.MaxValue;
+                }
+
+                // Normal
+                if (_end > _begin) return _end - _begin;
+
+                // Wrapped
+                return uint.MaxValue - _begin + _end;
+            }
+        }
+
+        public int Compare(uint n)
+        {
+            if (Contains(n))
+            {
+                return 0;
+            }
+
+            if (_begin >= _end)
+            {
+                // Begin > End (wrap-around case)
+                if (n <= _begin)
+                {
+                    // Range starts after N (range > N)
+                    return -1;
+                }
+
+                // n > _end
+                // Range starts & ends before N (range < N)
+                return 1;
+            }
+
+            if (n <= _begin)
+            {
+                // Range starts after N (range > N)
+                return 1;
+            }
+
+            // n > _end
+            // Range starts & ends before N (range < N)
+            return -1;
+        }
+
+        /// <summary>
         /// checks if n is element of (Begin, End], while remembering that the ranges are on a ring
         /// </summary>
-        /// <param name="n"></param>
+        /// <param name="point"></param>
         /// <returns>true if n is in (Begin, End], false otherwise</returns>
-        public bool InRange(uint n)
+        public bool Contains(uint point)
         {
-            uint num = n;
+            if (IsEmpty)
+            {
+                return false;
+            }
+
+            uint num = point;
             if (_begin < _end)
             {
                 return num > _begin && num <= _end;
@@ -86,17 +162,7 @@ namespace Orleans.Runtime
             return num > _begin || num <= _end;
         }
 
-        public long RangeSize()
-        {
-            if (_begin < _end)
-            {
-                return _end - _begin;
-            }
-
-            return RangeFactory.RING_SIZE - (_begin - _end);
-        }
-
-        public double RangePercentage() => RangeSize() * (100.0 / RangeFactory.RING_SIZE);
+        public double RangePercentage() => Length * (100.0 / uint.MaxValue);
 
         public bool Equals(SingleRange? other) => other != null && _begin == other._begin && _end == other._end;
 
@@ -112,34 +178,178 @@ namespace Orleans.Runtime
         {
             return _begin == 0 && _end == 0
                 ? destination.TryWrite($"<(0 0], Size=x100000000, %Ring=100%>", out charsWritten)
-                : destination.TryWrite($"<(x{_begin:X8} x{_end:X8}], Size=x{RangeSize():X8}, %Ring={RangePercentage():0.000}%>", out charsWritten);
+                : destination.TryWrite($"<(x{_begin:X8} x{_end:X8}], Size=x{Length:X8}, %Ring={RangePercentage():0.000}%>", out charsWritten);
         }
 
-        internal bool Overlaps(SingleRange other) => Equals(other) || InRange(other._begin) || other.InRange(_begin);
+        internal bool Overlaps(SingleRange other) => !IsEmpty && !other.IsEmpty && (Equals(other) || Contains(other._begin) || other.Contains(_begin));
 
         internal SingleRange Merge(SingleRange other)
         {
-            if ((_begin | _end) == 0 || (other._begin | other._end) == 0)
-            {
-                return RangeFactory.FullRange;
-            }
-
             if (Equals(other))
             {
                 return this;
             }
 
-            if (InRange(other._begin))
+            if (IsEmpty || other.IsFull)
+            {
+                return other;
+            }
+
+            if (IsFull || other.IsEmpty)
+            {
+                return this;
+            }
+
+            if (Contains(other._begin))
             {
                 return MergeEnds(other);
             }
 
-            if (other.InRange(_begin))
+            if (other.Contains(_begin))
             {
                 return other.MergeEnds(this);
             }
 
             throw new InvalidOperationException("Ranges don't overlap");
+        }
+
+        public SingleRange Inverse()
+        {
+            if (IsEmpty)
+            {
+                return Full;
+            }
+
+            if (IsFull)
+            {
+                return Empty;
+            }
+
+            return new SingleRange(_end, _begin);
+        }
+
+        public IEnumerable<SingleRange> Intersections(SingleRange other)
+        {
+            if (!Overlaps(other))
+            {
+                // No intersections.
+                yield break;
+            }
+
+            if (IsFull)
+            {
+                // One intersection, the other range.
+                yield return other;
+            }
+            else if (IsWrapped ^ other.IsWrapped)
+            {
+                var wrapped = IsWrapped ? this : other;
+                var normal = IsWrapped ? other : this;
+
+                // There are possibly two intersections, between the normal and wrapped range.
+                // ...---NB====WE----WB====NE----...
+
+                // Intersection at the low side.
+                if (wrapped._end > normal._begin)
+                {
+                    // ---NB====WE---
+                    yield return new SingleRange(normal._begin, wrapped._end);
+                }
+
+                // Intersection at the high side.
+                if (wrapped._begin < normal._end)
+                {
+                    // ---WB====NE---
+                    yield return new SingleRange(wrapped._begin, normal._end);
+                }
+            }
+            else
+            {
+                yield return new SingleRange(Math.Max(_begin, other._begin), Math.Min(_end, other._end));
+            }
+        }
+
+        // Gets the sub-ranges which are in this range but are not in the 'previous' range.
+        public IEnumerable<SingleRange> GetAdditions(SingleRange previous)
+        {
+            if (!Overlaps(previous))
+            {
+                // This entire sub-range is new.
+                yield return this;
+                yield break;
+            }
+
+            if (Equals(previous))
+            {
+                // Nothing was added.
+                yield break;
+            }
+
+            // Extensions to the beginning
+            // Extensions to the end
+
+            if (IsWrapped)
+            {
+                if (previous.IsWrapped)
+                {
+                    // Both wrapped.
+
+
+                    yield break;
+                }
+
+                // This is wrapped.
+                yield break;
+            }
+
+            if (previous.IsWrapped)
+            {
+                // Previous is wrapped.
+                if (_begin < previous._begin && _end > previous._end)
+                {
+                    // Some prefix or suffix was added.
+                    var newBegin = Math.Max(_begin, previous.End);
+                    var newEnd = Math.Min(_end, previous.Begin);
+                    yield return new SingleRange(newBegin, newEnd);
+                }
+
+                yield break;
+            }
+
+
+            // None wrapped
+            if (_begin < previous._begin)
+            {
+                // A prefix was added.
+                yield return new SingleRange(_begin, previous._begin);
+            }
+
+            if (_end > previous._end)
+            {
+                // A suffix was added.
+                yield return new SingleRange(previous._end, _end);
+            }
+        }
+
+        // Gets the sub-ranges which are not in this range but are in the 'previous' range.
+        public IEnumerable<SingleRange> GetRemovals(SingleRange previous)
+        {
+            if (!Overlaps(previous))
+            {
+                // The entire previous sub-range was removed.
+                yield return previous;
+                yield break;
+            }
+
+            if (Equals(previous))
+            {
+                // Nothing was removed.
+                yield break;
+            }
+
+            // Removals from the beginning
+
+            // Removals from the end
         }
 
         // other range begins inside this range, merge it based on where it ends
@@ -150,12 +360,12 @@ namespace Orleans.Runtime
                 return RangeFactory.FullRange;
             }
 
-            if (!InRange(other._end))
+            if (!Contains(other._end))
             {
                 return new SingleRange(_begin, other._end);
             }
 
-            if (other.InRange(_begin))
+            if (other.Contains(_begin))
             {
                 return RangeFactory.FullRange;
             }
@@ -178,6 +388,7 @@ namespace Orleans.Runtime
         /// Represents an empty range.
         /// </summary>
         private static readonly GeneralMultiRange EmptyRange = new(new());
+
         /// <summary>
         /// Represents a full range.
         /// </summary>
@@ -258,7 +469,7 @@ namespace Orleans.Runtime
             Debug.Assert(ranges.Count != 1);
             this.ranges = ranges;
             foreach (var r in ranges)
-                rangeSize += r.RangeSize();
+                rangeSize += r.Length;
         }
 
         internal static IRingRange Create(List<IRingRange> inRanges)
@@ -293,11 +504,11 @@ namespace Orleans.Runtime
             }
         }
 
-        public bool InRange(uint n)
+        public bool Contains(uint n)
         {
             foreach (var s in ranges)
             {
-                if (s.InRange(n)) return true;
+                if (s.Contains(n)) return true;
             }
             return false;
         }
@@ -320,7 +531,7 @@ namespace Orleans.Runtime
     {
         public static SingleRange GetEquallyDividedSubRange(SingleRange singleRange, int numSubRanges, int mySubRangeIndex)
         {
-            var rangeSize = singleRange.RangeSize();
+            var rangeSize = singleRange.Length;
             uint portion = (uint)(rangeSize / numSubRanges);
             uint remainder = (uint)(rangeSize - portion * numSubRanges);
             uint start = singleRange.Begin;

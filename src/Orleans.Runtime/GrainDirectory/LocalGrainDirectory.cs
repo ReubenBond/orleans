@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -82,10 +83,10 @@ namespace Orleans.Runtime.GrainDirectory
             DirectoryInstruments.RegisterMyPortionRingPercentageObserve(() => RingDistanceToSuccessor() / (float)(int.MaxValue * 2L) * 100);
             DirectoryInstruments.RegisterMyPortionAverageRingPercentageObserve(() =>
             {
-                var ring = _directoryMembership.MembershipRingList;
+                var ring = _directoryMembership.Members;
                 return ring.Length == 0 ? 0 : (100 / (float)ring.Length);
             });
-            DirectoryInstruments.RegisterRingSizeObserve(() => _directoryMembership.MembershipRingList.Length);
+            DirectoryInstruments.RegisterRingSizeObserve(() => _directoryMembership.Members.Length);
         }
 
         public void Start()
@@ -143,18 +144,33 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 await foreach (var snapshot in _clusterMembershipService.MembershipUpdates)
                 {
-                    var previousDirectoryMembership = _directoryMembership;
-                    var newDirectoryMembership = new DirectoryMembership(snapshot);
-                    var newContainsLocalSilo = newDirectoryMembership.Contains(MyAddress);
-                    var oldContainsLocalSilo = previousDirectoryMembership.Contains(MyAddress);
-                    if (newContainsLocalSilo && !oldContainsLocalSilo)
+                    var previous = _directoryMembership;
+                    var current = new DirectoryMembership(snapshot);
+                    _directoryMembership = current;
+
+                    var currentContainsSelf = current.Contains(MyAddress);
+                    var previousContainsSelf = previous.Contains(MyAddress);
+
+                    if (currentContainsSelf && !previousContainsSelf)
                     {
                         // We just became active
                     }
-                    else if (!newContainsLocalSilo && !oldContainsLocalSilo)
+                    else if (!currentContainsSelf && previousContainsSelf)
                     {
-                        // We just became active
+                        // We just became inactive
                     }
+                    else if (!currentContainsSelf && !previousContainsSelf)
+                    {
+                        // We are not active, and we were not active
+                    }
+                    else
+                    {
+                    }
+
+                    var previousRange = previous.GetRingRange(MyAddress);
+                    var currentRange = current.GetRingRange(MyAddress);
+                    var removedRange = previousRange.Remove(currentRange);
+                    var addedRange = currentRange.Remove(previousRange);
                 }
             }
         }
@@ -176,10 +192,10 @@ namespace Orleans.Runtime.GrainDirectory
                 // Find the last silo with hash smaller than the new silo, and insert the latter after (this is why we have +1 here) the former.
                 // Notice that FindLastIndex might return -1 if this should be the first silo in the list, but then
                 // 'index' will get 0, as needed.
-                int index = existing.MembershipRingList.FindLastIndex(siloAddr => siloAddr.GetConsistentHashCode() < hash) + 1;
+                int index = existing.Members.FindLastIndex(siloAddr => siloAddr.GetConsistentHashCode() < hash) + 1;
 
                 _directoryMembership = new DirectoryMembership(
-                    existing.MembershipRingList.Insert(index, silo),
+                    existing.Members.Insert(index, silo),
                     existing.MembershipCache.Add(silo));
 
                 HandoffManager.ProcessSiloAddEvent(silo);
@@ -217,7 +233,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
 
                 _directoryMembership = new DirectoryMembership(
-                    existing.MembershipRingList.Remove(silo),
+                    existing.Members.Remove(silo),
                     existing.MembershipCache.Remove(silo));
 
                 AdjustLocalDirectory(silo, dead: true);
@@ -287,7 +303,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         internal SiloAddress? FindSuccessor(SiloAddress silo)
         {
-            var existing = _directoryMembership.MembershipRingList;
+            var existing = _directoryMembership.Members;
             int index = existing.IndexOf(silo);
             if (index == -1)
             {
@@ -351,45 +367,15 @@ namespace Orleans.Runtime.GrainDirectory
                 return MyAddress;
             }
 
-            SiloAddress? siloAddress = null;
-            int hash = unchecked((int)grainId.GetUniformHashCode());
-
-            // excludeMySelf from being a TargetSilo if we're not running and the excludeThisSIloIfStopping flag is true. see the comment in the Stop method.
-            // excludeThisSIloIfStopping flag was removed because we believe that flag complicates things unnecessarily. We can add it back if it turns out that flag
-            // is doing something valuable.
-            bool excludeMySelf = !Running;
-
-            var existing = _directoryMembership;
-            if (existing.MembershipRingList.Length == 0)
+            var hash = grainId.GetUniformHashCode();
+            if (!_directoryMembership.TryGetOwner(hash, out var siloAddress))
             {
-                // If the membership ring is empty, then we're the owner by default unless we're stopping.
-                return !Running ? null : MyAddress;
-            }
-
-            // need to implement a binary search, but for now simply traverse the list of silos sorted by their hashes
-            for (var index = existing.MembershipRingList.Length - 1; index >= 0; --index)
-            {
-                var item = existing.MembershipRingList[index];
-                if (IsSiloNextInTheRing(item, hash, excludeMySelf))
-                {
-                    siloAddress = item;
-                    break;
-                }
-            }
-
-            if (siloAddress == null)
-            {
-                // If not found in the traversal, last silo will do (we are on a ring).
-                // We checked above to make sure that the list isn't empty, so this should always be safe.
-                siloAddress = existing.MembershipRingList[existing.MembershipRingList.Length - 1];
-                // Make sure it's not us...
-                if (siloAddress.Equals(MyAddress) && excludeMySelf)
-                {
-                    siloAddress = existing.MembershipRingList.Length > 1 ? existing.MembershipRingList[existing.MembershipRingList.Length - 2] : null;
-                }
+                // No owner is available.
+                return null;
             }
 
             if (log.IsEnabled(LogLevel.Trace))
+            {
                 log.LogTrace(
                     "Silo {SiloAddress} calculated directory partition owner silo {OwnerAddress} for grain {GrainId}: {GrainIdHash} --> {OwnerAddressHash}",
                     MyAddress,
@@ -397,6 +383,8 @@ namespace Orleans.Runtime.GrainDirectory
                     grainId,
                     hash,
                     siloAddress?.GetConsistentHashCode());
+            }
+
             return siloAddress;
         }
 
@@ -817,27 +805,15 @@ namespace Orleans.Runtime.GrainDirectory
             return 0;
         }
 
-        internal IRemoteGrainDirectory GetDirectoryReference(SiloAddress silo)
-        {
-            return grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceType, silo);
-        }
-
-        private bool IsSiloNextInTheRing(SiloAddress siloAddr, int hash, bool excludeMySelf)
-        {
-            return siloAddr.GetConsistentHashCode() <= hash && (!excludeMySelf || !siloAddr.Equals(MyAddress));
-        }
-
-        public bool IsSiloInCluster(SiloAddress silo)
-        {
-            return _directoryMembership.Contains(silo);
-        }
+        internal IRemoteGrainDirectory GetDirectoryReference(SiloAddress silo) => grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceType, silo);
 
         public void AddOrUpdateCacheEntry(GrainId grainId, SiloAddress siloAddress) => DirectoryCache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
         public bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address) => (address = GetLocalCacheData(grainId)) is not null;
 
-        private sealed class DirectoryMembership
+        internal sealed class DirectoryMembership
         {
             private readonly ClusterMembershipSnapshot _snapshot;
+
             public DirectoryMembership(ClusterMembershipSnapshot snapshot)
             {
                 var sortedActiveMembers = ImmutableArray.CreateBuilder<SiloAddress>(snapshot.Members.Count(static m => m.Value.Status == SiloStatus.Active));
@@ -860,7 +836,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
 
                 Members = sortedActiveMembers.ToImmutable();
-                MemberRanges = memberRanges.ToImmutable();
+                Ranges = memberRanges.ToImmutable();
                 _snapshot = snapshot;
             }
 
@@ -868,15 +844,90 @@ namespace Orleans.Runtime.GrainDirectory
                 new ClusterMembershipSnapshot(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, MembershipVersion.MinValue));
 
             public MembershipVersion Version => _snapshot.Version;
-            public ImmutableArray<SiloAddress> Members { get; }
-            public ImmutableArray<SingleRange> MemberRanges { get; }
-            public bool Contains(SiloAddress address) => Members.BinarySearch(address, SiloAddress.ConsistentHashCodeComparer.Instance) >= 0;
 
-            public SingleRange GetRingRange(SiloAddress address)
+            public ImmutableArray<SiloAddress> Members { get; }
+
+            public ImmutableArray<SingleRange> Ranges { get; }
+
+            public bool Contains(SiloAddress address) => TryGetMemberIndex(address) >= 0;
+
+            public RingRange GetRingRange(SiloAddress address)
             {
-                var index = Members.BinarySearch(address, SiloAddress.ConsistentHashCodeComparer.Instance);
-                if (index < 0) throw new KeyNotFoundException($"Member '{address}' not found in the membership ring.");
-                return MemberRanges[index];
+                var index = TryGetMemberIndex(address);
+
+                if (index < 0)
+                {
+                    return RingRange.Empty;
+                }
+
+                return Ranges[index];
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private int TryGetMemberIndex(SiloAddress address)
+            {
+                return BinarySearch(
+                    Members,
+                    address,
+                    static (candidate, address) =>
+                    {
+                        var comparison = candidate.GetConsistentHashCode().CompareTo(address.GetConsistentHashCode());
+                        if (comparison != 0)
+                        {
+                            return comparison;
+                        }
+
+                        if (candidate.Equals(address))
+                        {
+                            return 0;
+                        }
+
+                        return candidate.CompareTo(address);
+                    });
+            }
+
+            public bool TryGetOwner(GrainId grainId, out SiloAddress? owner) => TryGetOwner(grainId.GetUniformHashCode(), out owner);
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool TryGetOwner(uint hashCode, out SiloAddress? owner)
+            {
+                var index = BinarySearch(Ranges, hashCode, static (range, hashCode) => range.Compare(hashCode));
+                if (index >= 0)
+                {
+                    owner = Members[index];
+                    return true;
+                }
+
+                owner = null;
+                return false;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private static int BinarySearch<T, U>(ImmutableArray<T> haystack, U needle, Func<T, U, int> comparer)
+            {
+                var left = 0;
+                var right = haystack.Length - 1;
+
+                while (left <= right)
+                {
+                    var mid = left + (right - left) / 2;
+                    var comparison = comparer(haystack[mid], needle);
+
+                    if (comparison == 0)
+                    {
+                        return mid;
+                    }
+                    else if (comparison < 0)
+                    {
+                        left = mid + 1;
+                    }
+                    else
+                    {
+                        right = mid - 1;
+                    }
+                }
+
+                return -1;
             }
         }
     }

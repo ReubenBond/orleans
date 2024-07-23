@@ -428,12 +428,6 @@ namespace Orleans.Runtime
 
             return b1.SequenceCompareTo(b2);
         }
-
-        internal sealed class ConsistentHashCodeComparer : IComparer<SiloAddress>
-        {
-            public static readonly ConsistentHashCodeComparer Instance = new();
-            public int Compare(SiloAddress? x, SiloAddress? y) => x?.GetConsistentHashCode() ?? 0 - y?.GetConsistentHashCode() ?? 0;
-        }
     }
 
     /// <summary>

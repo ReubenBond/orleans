@@ -22,21 +22,6 @@ namespace Orleans.Runtime.GrainDirectory
         RemoteGrainDirectory CacheValidator { get; }
 
         /// <summary>
-        /// Removes the record for an non-existing activation from the directory service.
-        /// This is used when a request is received for an activation that cannot be found, 
-        /// to lazily clean up the remote directory.
-        /// The timestamp is used to prevent removing a valid entry in a possible (but unlikely)
-        /// race where a request is received for a new activation before the request that causes the
-        /// new activation to be created.
-        /// Note that this method is a no-op if the global configuration parameter DirectoryLazyDeregistrationDelay
-        /// is a zero or negative TimeSpan.
-        /// <para>This method must be called from a scheduler thread.</para>
-        /// </summary>
-        /// <param name="address">The address of the activation to remove.</param>
-        /// <param name="origin"> the silo from which the message to the non-existing activation was sent</param>
-        Task UnregisterAfterNonexistingActivation(GrainAddress address, SiloAddress origin);
-
-        /// <summary>
         /// Fetches locally known directory information for a grain.
         /// If there is no local information, either in the cache or in this node's directory partition,
         /// then this method will return false and leave the list empty.
@@ -96,13 +81,6 @@ namespace Orleans.Runtime.GrainDirectory
         /// Attempts to find the specified grain in the directory cache.
         /// </summary>
         bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address);
-
-        /// <summary>
-        /// For determining message forwarding logic, we sometimes check if a silo is part of this cluster or not
-        /// </summary>
-        /// <param name="silo">the address of the silo</param>
-        /// <returns>true if the silo is known to be part of this cluster</returns>
-        bool IsSiloInCluster(SiloAddress silo);
 
         /// <summary>
         /// Sets the callback to <see cref="Catalog"/> which is called when a silo is removed from membership.
