@@ -210,7 +210,7 @@ namespace UnitTests.General
             for (int i = 0; i < iteration; i++)
             {
                 double next = Random.Shared.NextDouble();
-                uint randomKey = (uint)((double)RangeFactory.RING_SIZE * next);
+                uint randomKey = (uint)(RangeFactory.RING_SIZE * next);
                 SiloAddress s = testHooks.GetConsistentRingPrimaryTargetSilo(randomKey).Result;
                 if (responsibleSilo.Equals(s))
                     return randomKey;

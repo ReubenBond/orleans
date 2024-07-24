@@ -37,7 +37,7 @@ namespace Orleans.Runtime.ConsistentRing
 
             myAddress = siloAddress;
             running = true;
-            myRange = RangeFactory.CreateFullRange();
+            myRange = RangeFactory.FullRange;
             lastNotification = (myRange, myRange, true);
 
             if (logger.IsEnabled(LogLevel.Debug))

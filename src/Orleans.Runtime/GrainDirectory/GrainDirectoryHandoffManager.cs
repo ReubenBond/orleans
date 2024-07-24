@@ -57,7 +57,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var splitPartListSingle = localDirectory.DirectoryPartition.Split(
                     grain =>
                     {
-                        var s = localDirectory.CalculateGrainDirectoryPartition(grain);
+                        var s = localDirectory.GetPartitionOwner(grain);
                         return s != null && !localDirectory.MyAddress.Equals(s);
                     });
 

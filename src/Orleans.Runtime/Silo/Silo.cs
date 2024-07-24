@@ -217,7 +217,6 @@ namespace Orleans.Runtime
 
         private void InjectDependencies()
         {
-            catalog.SiloStatusOracle = this.siloStatusOracle;
             this.siloStatusOracle.SubscribeToSiloStatusEvents(localGrainDirectory);
 
             this.siloStatusOracle.SubscribeToSiloStatusEvents(Services.GetRequiredService<DeploymentLoadPublisher>());

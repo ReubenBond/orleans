@@ -36,7 +36,7 @@ namespace Orleans.Runtime.ConsistentRing
             _siloStatusOracle = siloStatusOracle;
             myKey = MyAddress.GetConsistentHashCode();
 
-            myRange = RangeFactory.CreateFullRange(); // i am responsible for the whole range
+            myRange = RangeFactory.FullRange; // i am responsible for the whole range
             lastNotification = (myRange, myRange, true);
 
             // add myself to the list of members
@@ -112,7 +112,7 @@ namespace Orleans.Runtime.ConsistentRing
             lock (membershipRingList)
             {
                 if (membershipRingList.Count == 1)
-                    return $"[{membershipRingList[0]:H} -> {RangeFactory.CreateFullRange()}]";
+                    return $"[{membershipRingList[0]:H} -> {RangeFactory.FullRange}]";
 
                 var sb = new StringBuilder().Append('[');
                 for (int i = 0; i < membershipRingList.Count; i++)
@@ -150,7 +150,7 @@ namespace Orleans.Runtime.ConsistentRing
                     IRingRange oldRange = myRange;
                     if (membershipRingList.Count == 1) // i'm the only one left
                     {
-                        myRange = RangeFactory.CreateFullRange();
+                        myRange = RangeFactory.FullRange;
                         NotifyLocalRangeSubscribers(oldRange, myRange, true);
                     }
                     else

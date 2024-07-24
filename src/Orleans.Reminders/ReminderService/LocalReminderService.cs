@@ -238,7 +238,7 @@ namespace Orleans.Runtime.ReminderService
 
             foreach (var r in localReminders)
             {
-                if (RingRange.InRange(r.Key.GrainId)) continue;
+                if (RingRange.Contains(r.Key.GrainId)) continue;
                 remindersOutOfRange++;
 
                 if (logger.IsEnabled(LogLevel.Trace))
@@ -333,7 +333,7 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        private async Task ReadTableAndStartTimers(ISingleRange range, int rangeSerialNumberCopy)
+        private async Task ReadTableAndStartTimers(SingleRange range, int rangeSerialNumberCopy)
         {
             if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Reading rows from {Range}", range.ToString());
             localTableSequence++;
@@ -363,7 +363,7 @@ namespace Orleans.Runtime.ReminderService
 
                 var remindersNotInTable = new Dictionary<ReminderIdentity, LocalReminderData>(); // shallow copy
                 foreach (var r in localReminders)
-                    if (range.InRange(r.Key.GrainId))
+                    if (range.Contains(r.Key.GrainId))
                         remindersNotInTable.Add(r.Key, r.Value);
 
                 if (logger.IsEnabled(LogLevel.Debug))
@@ -539,7 +539,7 @@ namespace Orleans.Runtime.ReminderService
 
             void CheckRange()
             {
-                if (!RingRange.InRange(grainId))
+                if (!RingRange.Contains(grainId))
                 {
                     logger.LogWarning((int)ErrorCode.RS_NotResponsible, "I shouldn't have received request '{Request}' for {GrainId}. It is not in my responsibility range: {Range}",
                         debugInfo, grainId.ToString(), RingRange);

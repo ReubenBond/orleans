@@ -65,7 +65,7 @@ namespace Orleans.Runtime.ReminderService
 
             var list = new List<ReminderEntry>();
             foreach (var e in _reminderTable)
-                if (range.InRange(e.Key))
+                if (range.Contains(e.Key))
                     list.AddRange(e.Value.Values);
 
             if (_logger.IsEnabled(LogLevel.Trace))

@@ -97,7 +97,7 @@ namespace Orleans.Runtime.GrainDirectory
                         GrainId grain = pair.Key;
                         var entry = pair.Value;
 
-                        var owner = router.CalculateGrainDirectoryPartition(grain);
+                        var owner = router.GetPartitionOwner(grain);
                         if (owner == null) // Null means there's no other silo and we're shutting down, so skip this entry
                         {
                             continue;
