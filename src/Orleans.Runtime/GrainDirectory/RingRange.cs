@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 #nullable enable
@@ -6,7 +6,7 @@ namespace Orleans.Runtime.GrainDirectory;
 
 [GenerateSerializer, Immutable]
 [Alias(nameof(RingRange))]
-public readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>, IRingRange, ISpanFormattable
+public readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>, ISpanFormattable
 {
     [Id(0)]
     private readonly uint _start = start == end && start > 1 ? 1 : start;
