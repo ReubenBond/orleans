@@ -59,7 +59,7 @@ internal sealed class ReplicatedGrainDirectory(GrainDirectoryReplica localReplic
                     return default!;
                 }
 
-                view = await localReplica.RefreshView(new(view.Version.Value + 1));
+                view = await localReplica.RefreshViewAsync(new(view.Version.Value + 1));
                 continue;
             }
 
@@ -75,7 +75,7 @@ internal sealed class ReplicatedGrainDirectory(GrainDirectoryReplica localReplic
             else
             {
                 // Sync with the remote replica.
-                view = await localReplica.RefreshView(invokeResult.Version);
+                view = await localReplica.RefreshViewAsync(invokeResult.Version);
             }
         }
     }
@@ -118,7 +118,7 @@ internal sealed class GrainDirectoryReplica(
     public DirectoryMembershipSnapshot CurrentView => _view;
     public IAsyncEnumerable<DirectoryMembershipSnapshot> ViewUpdates => _viewUpdates;
 
-    public async ValueTask<DirectoryMembershipSnapshot> RefreshView(MembershipVersion version = default)
+    public async ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version = default)
     {
         _ = _clusterMembershipService.Refresh(version);
         await foreach (var view in _viewUpdates)
@@ -155,7 +155,7 @@ internal sealed class GrainDirectoryReplica(
         // Ensure that the current membership version is new enough.
         if (version != _view.Version)
         {
-            await RefreshMembershipAsync(version);
+            await RefreshViewAsync(version);
         }
 
         var results = new List<GrainAddress>(addresses.Count);
@@ -196,7 +196,7 @@ internal sealed class GrainDirectoryReplica(
         // Ensure that the current membership version is new enough.
         if (version != _view.Version)
         {
-            await RefreshMembershipAsync(version);
+            await RefreshViewAsync(version);
         }
 
         var results = new List<GrainAddress?>(grainIds.Count);
@@ -235,7 +235,7 @@ internal sealed class GrainDirectoryReplica(
         // Ensure that the current membership version is new enough.
         if (version != _view.Version)
         {
-            await RefreshMembershipAsync(version);
+            await RefreshViewAsync(version);
         }
 
         var result = true;
@@ -259,14 +259,9 @@ internal sealed class GrainDirectoryReplica(
         _logger.LogInformation("GetPartitionSnapshotAsync('{Version}', '{Range}')", version, range);
 
         // Ensure that the current membership version is new enough.
-        if (version != _view.Version)
+        if (version > _view.Version)
         {
-            await RefreshMembershipAsync(version);
-
-            if (version != _view.Version)
-            {
-                return new DirectoryResult<GrainDirectoryPartitionSnapshot>(null!, _view.Version);
-            }
+            await RefreshViewAsync(version);
         }
 
         List<GrainAddress> addresses = [];
@@ -298,22 +293,6 @@ internal sealed class GrainDirectoryReplica(
         // Note: A time-based deletion or version-based deletion is likely superior (eg, keep snapshot for 2 versions, or 5 mins)
 
         return new DirectoryResult<GrainDirectoryPartitionSnapshot>(snapshot!, _view.Version);
-    }
-
-    private async Task RefreshMembershipAsync(MembershipVersion version)
-    {
-        var first = true;
-        while (version > _view.Version)
-        {
-            await _clusterMembershipService.Refresh(version);
-
-            if (first)
-            {
-                // TODO: use a signal mechanism instead
-                await Task.Delay(TimeSpan.FromMilliseconds(10));
-                first = false;
-            }
-        }
     }
 
     [Conditional("DEBUG")]
@@ -363,7 +342,7 @@ internal sealed class GrainDirectoryReplica(
         Task? completion;
         if (_view.Version < version)
         {
-            completion = RefreshMembershipAsync(version);
+            completion = _clusterMembershipService.Refresh(version).AsTask();
         }
         else
         {
@@ -526,8 +505,9 @@ internal sealed class GrainDirectoryReplica(
 
                 var owner = membershipSnapshot.Members[i];
 
-                _logger.LogInformation("Requesting entries for range '{Range}' from '{PreviousOwner}'.", range, owner);
-                var snapshotResult = await GetReplica(owner).GetPartitionSnapshotAsync(version, range).AsTask().WaitAsync(cancellationToken);
+                var fromVersion = membershipSnapshot.Version;
+                _logger.LogInformation("Requesting entries for range '{Range}' from '{PreviousOwner}' at version '{Version}'.", range, owner, fromVersion);
+                var snapshotResult = await GetReplica(owner).GetPartitionSnapshotAsync(fromVersion, range).AsTask().WaitAsync(cancellationToken);
 
                 // Check that the version has not changed since the call was issued, and that the remote replica validated the version.
                 if (_view.Version != version || !snapshotResult.TryGetResult(version, out var snapshot))
@@ -575,14 +555,14 @@ internal sealed class GrainDirectoryReplica(
         }
     }
 
-    private List<GrainAddress> RemoveRange(RingRange removedRange)
+    private List<GrainAddress> RemoveRange(RingRange range)
     {
         List<GrainAddress> addresses = [];
 
         // Collect all addresses that are not in the owned range.
         foreach (var entry in _directory)
         {
-            if (!removedRange.Contains(entry.Key))
+            if (range.Contains(entry.Key))
             {
                 addresses.Add(entry.Value);
             }
