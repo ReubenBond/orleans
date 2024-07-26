@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
+using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 
 #nullable enable
@@ -22,13 +23,12 @@ internal sealed class LocalGrainDirectory : ILocalGrainDirectory
     private readonly IInternalGrainFactory grainFactory;
     private readonly object writeLock = new object();
     private Action<SiloAddress, SiloStatus>? catalogOnSiloRemoved;
-    private DirectoryMembership _directoryMembership = DirectoryMembership.Default;
+    private DirectoryMembershipSnapshot _directoryMembership = DirectoryMembershipSnapshot.Default;
+    private Task? _processUpdatesTask;
 
     // Consider: move these constants into an appropriate place
     internal const int HOP_LIMIT = 6; // forward a remote request no more than 5 times
     public static readonly TimeSpan RETRY_DELAY = TimeSpan.FromMilliseconds(200); // Pause 200ms between forwards to let the membership directory settle down
-
-    internal bool Running;
 
     internal SiloAddress MyAddress { get; }
 
@@ -74,12 +74,9 @@ internal sealed class LocalGrainDirectory : ILocalGrainDirectory
         RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceType, loggerFactory);
         CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorType, loggerFactory);
 
-        // add myself to the list of members
-        AddServer(MyAddress);
-
         DirectoryInstruments.RegisterDirectoryPartitionSizeObserve(() => DirectoryPartition.Count);
         DirectoryInstruments.RegisterMyPortionRingDistanceObserve(() => _directoryMembership.GetRingRange(MyAddress).Length);
-        DirectoryInstruments.RegisterMyPortionRingPercentageObserve(() => (float)_directoryMembership.GetRingRange(MyAddress).RangePercentage());
+        DirectoryInstruments.RegisterMyPortionRingPercentageObserve(() => (float)_directoryMembership.GetRingRange(MyAddress).SizePercent);
         DirectoryInstruments.RegisterMyPortionAverageRingPercentageObserve(() =>
         {
             var ring = _directoryMembership.Members;
@@ -95,7 +92,11 @@ internal sealed class LocalGrainDirectory : ILocalGrainDirectory
             log.LogDebug("Start");
         }
 
-        Running = true;
+        using (new ExecutionContextSuppressor())
+        {
+            _processUpdatesTask = Task.Run(ProcessMembershipUpdates);
+        }
+
         if (maintainer != null)
         {
             CacheValidator.WorkItemGroup.QueueAction(maintainer.Start);
@@ -114,9 +115,6 @@ internal sealed class LocalGrainDirectory : ILocalGrainDirectory
         // Requests might bounce back and forth for a while as membership stabilizes, but they will either be served by the
         // new owner of the grain, or will wind up failing. In either case, we avoid requests succeeding at this silo after we've
         // begun stopping, which could cause them to not get handed off to the new owner.
-
-        //mark Running as false will exclude myself from CalculateGrainDirectoryPartition(grainId)
-        Running = false;
 
         if (maintainer is { } directoryCacheMaintainer)
         {
@@ -143,30 +141,11 @@ internal sealed class LocalGrainDirectory : ILocalGrainDirectory
         {
             await foreach (var snapshot in _clusterMembershipService.MembershipUpdates)
             {
-                var previous = _directoryMembership;
-                var current = new DirectoryMembership(snapshot);
-                _directoryMembership = current;
-
-                // The view change is contiguous if the new version is exactly one greater than the previous version.
-                // If not, we have missed some updates, so we must declare a potential data loss event.
-                var isContiguous = current.Version.Value == previous.Version.Value + 1;
-
-                var previousRange = previous.GetRingRange(MyAddress);
-                var currentRange = current.GetRingRange(MyAddress);
-                foreach (var removedRange in currentRange.GetRemovals(previousRange))
-                {
-                    // Wedge this range and transfer state to a successor.
-                }
-
-                foreach (var addedRange in currentRange.GetAdditions(previousRange))
-                {
-                    // Wedge this range and wait for state to be transferred from a predecessor.
-                    // If the predecessor becomes unavailable, we will declare data loss and un-wedge the range.
-                }
             }
         }
     }
 
+    /*
     private void AddServer(SiloAddress silo)
     {
         lock (writeLock)
@@ -235,6 +214,25 @@ internal sealed class LocalGrainDirectory : ILocalGrainDirectory
         }
     }
 
+    public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
+    {
+        // This silo's status has changed
+        if (!Equals(updatedSilo, MyAddress)) // Status change for some other silo
+        {
+            if (status.IsTerminating())
+            {
+                // QueueAction up the "Remove" to run on a system turn
+                CacheValidator.WorkItemGroup.QueueAction(() => RemoveServer(updatedSilo, status));
+            }
+            else if (status == SiloStatus.Active)      // do not do anything with SiloStatus.Starting -- wait until it actually becomes active
+            {
+                // QueueAction up the "Remove" to run on a system turn
+                CacheValidator.WorkItemGroup.QueueAction(() => AddServer(updatedSilo));
+            }
+        }
+    }
+    */
+
     /// <summary>
     /// Adjust local directory following the addition/removal of a silo
     /// </summary>
@@ -289,24 +287,6 @@ internal sealed class LocalGrainDirectory : ILocalGrainDirectory
             if (activationAddress.SiloAddress!.IsPredecessorOf(silo) || dead && activationAddress.SiloAddress.Equals(silo))
             {
                 DirectoryCache.Remove(activationAddress.GrainId);
-            }
-        }
-    }
-
-    public void SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
-    {
-        // This silo's status has changed
-        if (!Equals(updatedSilo, MyAddress)) // Status change for some other silo
-        {
-            if (status.IsTerminating())
-            {
-                // QueueAction up the "Remove" to run on a system turn
-                CacheValidator.WorkItemGroup.QueueAction(() => RemoveServer(updatedSilo, status));
-            }
-            else if (status == SiloStatus.Active)      // do not do anything with SiloStatus.Starting -- wait until it actually becomes active
-            {
-                // QueueAction up the "Remove" to run on a system turn
-                CacheValidator.WorkItemGroup.QueueAction(() => AddServer(updatedSilo));
             }
         }
     }
@@ -459,7 +439,9 @@ internal sealed class LocalGrainDirectory : ILocalGrainDirectory
         }
 
         if (hopCount == 0)
+        {
             InvalidateCacheEntry(address);
+        }
 
         // see if the owner is somewhere else (returns null if we are owner)
         var forwardAddress = CheckIfShouldForward(address.GrainId, hopCount, "UnregisterAsync");
@@ -534,31 +516,31 @@ internal sealed class LocalGrainDirectory : ILocalGrainDirectory
             DirectoryInstruments.UnregistrationsManyIssued.Add(1);
         }
 
-        Dictionary<SiloAddress, List<GrainAddress>>? forwardlist = null;
+        Dictionary<SiloAddress, List<GrainAddress>>? forwardList = null;
 
-        UnregisterOrPutInForwardList(addresses, cause, hopCount, ref forwardlist, "UnregisterManyAsync");
+        UnregisterOrPutInForwardList(addresses, cause, hopCount, ref forwardList, "UnregisterManyAsync");
 
         // before forwarding to other silos, we insert a retry delay and re-check destination
-        if (hopCount > 0 && forwardlist != null)
+        if (hopCount > 0 && forwardList != null)
         {
             await Task.Delay(RETRY_DELAY);
-            Dictionary<SiloAddress, List<GrainAddress>>? forwardlist2 = null;
-            UnregisterOrPutInForwardList(addresses, cause, hopCount, ref forwardlist2, "UnregisterManyAsync");
-            forwardlist = forwardlist2;
-            if (forwardlist != null)
+            Dictionary<SiloAddress, List<GrainAddress>>? forwardList2 = null;
+            UnregisterOrPutInForwardList(addresses, cause, hopCount, ref forwardList2, "UnregisterManyAsync");
+            forwardList = forwardList2;
+            if (forwardList != null)
             {
                 log.LogWarning(
                     "RegisterAsync - It seems we are not the owner of some activations, trying to forward it to {Count} silos (hopCount={HopCount})",
-                    forwardlist.Count,
+                    forwardList.Count,
                     hopCount);
             }
         }
 
         // forward the requests
-        if (forwardlist != null)
+        if (forwardList != null)
         {
             var tasks = new List<Task>();
-            foreach (var kvp in forwardlist)
+            foreach (var kvp in forwardList)
             {
                 DirectoryInstruments.UnregistrationsManyRemoteSent.Add(1);
                 tasks.Add(GetDirectoryReference(kvp.Key).UnregisterManyAsync(kvp.Value, cause, hopCount + 1));
@@ -568,7 +550,6 @@ internal sealed class LocalGrainDirectory : ILocalGrainDirectory
             await Task.WhenAll(tasks);
         }
     }
-
 
     public bool LocalLookup(GrainId grain, out AddressAndTag result)
     {
@@ -701,36 +682,6 @@ internal sealed class LocalGrainDirectory : ILocalGrainDirectory
             if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("FullLookup remote {GrainId}={Address}", grainId, result.Address);
 
             return result;
-        }
-    }
-
-    public async Task DeleteGrainAsync(GrainId grainId, int hopCount)
-    {
-        // see if the owner is somewhere else (returns null if we are owner)
-        var forwardAddress = CheckIfShouldForward(grainId, hopCount, "DeleteGrainAsync");
-
-        // on all silos other than first, we insert a retry delay and recheck owner before forwarding
-        if (hopCount > 0 && forwardAddress != null)
-        {
-            await Task.Delay(RETRY_DELAY);
-            forwardAddress = CheckIfShouldForward(grainId, hopCount, "DeleteGrainAsync");
-            log.LogWarning(
-                "DeleteGrainAsync - It seems we are not the owner of grain {GrainId}, trying to forward it to {ForwardAddress} (hopCount={HopCount})",
-                grainId,
-                forwardAddress,
-                hopCount);
-        }
-
-        if (forwardAddress == null)
-        {
-            // we are the owner
-            DirectoryPartition.RemoveGrain(grainId);
-        }
-        else
-        {
-            // otherwise, notify the owner
-            DirectoryCache.Remove(grainId);
-            await GetDirectoryReference(forwardAddress).DeleteGrainAsync(grainId, hopCount + 1);
         }
     }
 

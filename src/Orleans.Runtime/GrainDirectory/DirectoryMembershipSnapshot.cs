@@ -1,16 +1,18 @@
 using System;
 using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory;
 
-internal sealed class DirectoryMembership
+internal sealed class DirectoryMembershipSnapshot
 {
     private readonly ClusterMembershipSnapshot _snapshot;
 
-    public DirectoryMembership(ClusterMembershipSnapshot snapshot)
+    public DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot)
     {
         var sortedActiveMembers = ImmutableArray.CreateBuilder<SiloAddress>(snapshot.Members.Count(static m => m.Value.Status == SiloStatus.Active));
         foreach (var member in snapshot.Members)
@@ -24,36 +26,38 @@ internal sealed class DirectoryMembership
 
         sortedActiveMembers.Sort(static (left, right) => left.GetConsistentHashCode().CompareTo(right.GetConsistentHashCode()));
 
-        var memberRanges = ImmutableArray.CreateBuilder<SingleRange>(sortedActiveMembers.Count);
+        var memberRanges = ImmutableArray.CreateBuilder<RingRange>(sortedActiveMembers.Count);
         for (var i = 0; i < sortedActiveMembers.Count; i++)
         {
-            var memberRange = RangeFactory.GetEquallyDividedSubRange(RangeFactory.FullRange, sortedActiveMembers.Count, i);
+            var memberRange = RingRange.GetEquallyDividedSubRange(sortedActiveMembers.Count, i);
             memberRanges.Add(memberRange);
         }
 
         Members = sortedActiveMembers.ToImmutable();
         Ranges = memberRanges.ToImmutable();
+        Debug.Assert(Members.Length == Ranges.Length);
+
         _snapshot = snapshot;
     }
 
-    public static DirectoryMembership Default { get; } = new DirectoryMembership(
+    public static DirectoryMembershipSnapshot Default { get; } = new DirectoryMembershipSnapshot(
         new ClusterMembershipSnapshot(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, MembershipVersion.MinValue));
 
     public MembershipVersion Version => _snapshot.Version;
 
     public ImmutableArray<SiloAddress> Members { get; }
 
-    public ImmutableArray<SingleRange> Ranges { get; }
+    public ImmutableArray<RingRange> Ranges { get; }
 
     public bool Contains(SiloAddress? address) => TryGetMemberIndex(address) >= 0;
 
-    public SingleRange GetRingRange(SiloAddress? address)
+    public RingRange GetRingRange(SiloAddress? address)
     {
         var index = TryGetMemberIndex(address);
 
         if (index < 0)
         {
-            return SingleRange.Empty;
+            return RingRange.Empty;
         }
 
         return Ranges[index];
@@ -87,10 +91,10 @@ internal sealed class DirectoryMembership
                 });
     }
 
-    public bool TryGetOwner(GrainId grainId, out SiloAddress? owner) => TryGetOwner(grainId.GetUniformHashCode(), out owner);
+    public bool TryGetOwner(GrainId grainId, [NotNullWhen(true)] out SiloAddress? owner) => TryGetOwner(grainId.GetUniformHashCode(), out owner);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryGetOwner(uint hashCode, out SiloAddress? owner)
+    public bool TryGetOwner(uint hashCode, [NotNullWhen(true)] out SiloAddress? owner)
     {
         var index = BinarySearch(Ranges, hashCode, static (range, hashCode) => range.Compare(hashCode));
         if (index >= 0)

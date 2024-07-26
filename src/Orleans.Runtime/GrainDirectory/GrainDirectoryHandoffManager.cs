@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Scheduler;
 
 #nullable enable
+#if false
 namespace Orleans.Runtime.GrainDirectory
 {
     /// <summary>
@@ -243,3 +244,4 @@ namespace Orleans.Runtime.GrainDirectory
         }
     }
 }
+#endif

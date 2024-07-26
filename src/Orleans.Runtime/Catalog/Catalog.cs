@@ -18,7 +18,7 @@ namespace Orleans.Runtime
 {
     internal class Catalog : SystemTarget, ICatalog
     {
-        private readonly ClusterMembershipService _siloStatusOracle;
+        private readonly ISiloStatusOracle _siloStatusOracle;
         private readonly ActivationCollector activationCollector;
         private readonly GrainLocator grainLocator;
         private readonly GrainDirectoryResolver grainDirectoryResolver;
@@ -30,7 +30,6 @@ namespace Orleans.Runtime
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
         private readonly GrainContextActivator grainActivator;
         private readonly GrainPropertiesResolver grainPropertiesResolver;
-        private SiloStatus _siloStatus;
 
         public Catalog(
             InsideRuntimeClient runtimeClient,
@@ -45,7 +44,7 @@ namespace Orleans.Runtime
             IOptions<GrainCollectionOptions> collectionOptions,
             GrainContextActivator grainActivator,
             GrainPropertiesResolver grainPropertiesResolver,
-            ClusterMembershipService siloStatusOracle)
+            ISiloStatusOracle siloStatusOracle)
             : base(Constants.CatalogType, localSiloDetails.SiloAddress, loggerFactory)
         {
             _siloStatusOracle = siloStatusOracle;
