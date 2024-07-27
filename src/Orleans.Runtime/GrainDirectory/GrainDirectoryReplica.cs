@@ -39,7 +39,7 @@ internal sealed class GrainDirectoryReplica(
         _ => { });
 
     // Ranges which cannot be served yet, eg because the replica is currently transferring them from a previous owner.
-    private readonly List<(RingRange Range, MembershipVersion Version, Task Completion)> _wedgedRanges = [];
+    private readonly List<(RingRange Range, MembershipVersion Version, Task Completion)> _pendingRanges = [];
 
     // Ranges which were previously at least partially owned by this replica, but which are pending transfer to a new replica.  
     private readonly List<PartitionSnapshotState> _partitionSnapshots = [];
@@ -66,16 +66,20 @@ internal sealed class GrainDirectoryReplica(
             }
         }
 
-        throw new UnreachableException();
+        return _view;
     }
 
     async ValueTask<DirectoryResult<GrainAddress>> IGrainDirectoryReplica.RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration) 
     {
         ArgumentNullException.ThrowIfNull(address);
-        _logger.LogInformation("RegisterAsync('{Version}', '{Address}', '{ExistingAddress}')", version, address, currentRegistration);
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace("RegisterAsync('{Version}', '{Address}', '{ExistingAddress}')", version, address, currentRegistration);
+        }
 
         // Ensure that the current membership version is new enough.
-        if (!await EnsureValidViewAsync(address.GrainId, version))
+        await WaitForRange(address.GrainId, version);
+        if (!IsExpectedView(version))
         {
             return new DirectoryResult<GrainAddress>(null!, _view.Version);
         }
@@ -87,19 +91,17 @@ internal sealed class GrainDirectoryReplica(
     async ValueTask<DirectoryResult<List<GrainAddress>>> IGrainDirectoryReplica.RegisterAsync(MembershipVersion version, List<GrainAddress> addresses) 
     {
         ArgumentNullException.ThrowIfNull(addresses);
-        _logger.LogInformation("RegisterAsync('{Version}', '{AddressCount}')", version, addresses.Count);
-
-        // Ensure that the current membership version is new enough.
-        if (version != _view.Version)
+        if (_logger.IsEnabled(LogLevel.Trace))
         {
-            await RefreshViewAsync(version);
+            _logger.LogTrace("RegisterAsync('{Version}', '{AddressCount}')", version, addresses.Count);
         }
 
         var results = new List<GrainAddress>(addresses.Count);
         foreach (var address in addresses)
         {
             // Ensure we can serve the request.
-            if (!await EnsureValidViewAsync(address.GrainId, version))
+            await WaitForRange(address.GrainId, version);
+            if (!IsExpectedView(version))
             {
                 return new DirectoryResult<List<GrainAddress>>(null!, _view.Version);
             }
@@ -113,10 +115,14 @@ internal sealed class GrainDirectoryReplica(
 
     async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryReplica.LookupAsync(MembershipVersion version, GrainId grainId)
     {
-        _logger.LogInformation("LookupAsync('{Version}', '{GrainId}')", version, grainId);
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace("LookupAsync('{Version}', '{GrainId}')", version, grainId);
+        }
 
         // Ensure we can serve the request.
-        if (!await EnsureValidViewAsync(grainId, version))
+        await WaitForRange(grainId, version);
+        if (!IsExpectedView(version))
         {
             return new DirectoryResult<GrainAddress?>(null, _view.Version);
         }
@@ -128,18 +134,16 @@ internal sealed class GrainDirectoryReplica(
     async ValueTask<DirectoryResult<List<GrainAddress?>>> IGrainDirectoryReplica.LookupAsync(MembershipVersion version, List<GrainId> grainIds)
     {
         ArgumentNullException.ThrowIfNull(grainIds);
-        _logger.LogInformation("LookupAsync('{Version}', '{GrainIdCount}')", version, grainIds.Count);
-
-        // Ensure that the current membership version is new enough.
-        if (version != _view.Version)
+        if (_logger.IsEnabled(LogLevel.Trace))
         {
-            await RefreshViewAsync(version);
+            _logger.LogTrace("LookupAsync('{Version}', '{GrainIdCount}')", version, grainIds.Count);
         }
 
         var results = new List<GrainAddress?>(grainIds.Count);
         foreach (var grainId in grainIds)
         {
-            if (!await EnsureValidViewAsync(grainId, version))
+            await WaitForRange(grainId, version);
+            if (!IsExpectedView(version))
             {
                 return new DirectoryResult<List<GrainAddress?>>(null!, _view.Version);
             }
@@ -154,8 +158,13 @@ internal sealed class GrainDirectoryReplica(
     async ValueTask<DirectoryResult<bool>> IGrainDirectoryReplica.UnregisterAsync(MembershipVersion version, GrainAddress address)
     {
         ArgumentNullException.ThrowIfNull(address);
-        _logger.LogInformation("UnregisterAsync('{Version}', '{Address}')", version, address);
-        if (!await EnsureValidViewAsync(address.GrainId, version))
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace("UnregisterAsync('{Version}', '{Address}')", version, address);
+        }
+
+        await WaitForRange(address.GrainId, version);
+        if (!IsExpectedView(version))
         {
             return new DirectoryResult<bool>(false, _view.Version);
         }
@@ -167,19 +176,17 @@ internal sealed class GrainDirectoryReplica(
     async ValueTask<DirectoryResult<bool>> IGrainDirectoryReplica.UnregisterAsync(MembershipVersion version, List<GrainAddress> addresses)
     {
         ArgumentNullException.ThrowIfNull(addresses);
-        _logger.LogInformation("UnregisterAsync('{Version}', '{AddressCount}')", version, addresses.Count);
-
-        // Ensure that the current membership version is new enough.
-        if (version != _view.Version)
+        if (_logger.IsEnabled(LogLevel.Trace))
         {
-            await RefreshViewAsync(version);
+            _logger.LogTrace("UnregisterAsync('{Version}', '{AddressCount}')", version, addresses.Count);
         }
 
         var result = true;
         foreach (var address in addresses)
         {
             // Ensure we can serve the request.
-            if (!await EnsureValidViewAsync(address.GrainId, version))
+            await WaitForRange(address.GrainId, version);
+            if (!IsExpectedView(version))
             {
                 return new DirectoryResult<bool>(false, _view.Version);
             }
@@ -193,13 +200,14 @@ internal sealed class GrainDirectoryReplica(
 
     async ValueTask<DirectoryResult<GrainDirectoryPartitionSnapshot>> IGrainDirectoryReplica.GetPartitionSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range)
     {
-        _logger.LogInformation("GetPartitionSnapshotAsync('{Version}', '{RangeVersion}', '{Range}')", version, rangeVersion, range);
-
-        // Ensure that the current membership version is new enough.
-        if (version > _view.Version)
+        if (_logger.IsEnabled(LogLevel.Trace))
         {
-            await RefreshViewAsync(version);
+            _logger.LogTrace("GetPartitionSnapshotAsync('{Version}', '{RangeVersion}', '{Range}')", version, rangeVersion, range);
         }
+
+        // Wait for the range to be un-wedged.
+        await RefreshViewAsync(version);
+        await WaitForRange(range, rangeVersion);
 
         foreach (var partitionSnapshot in _partitionSnapshots)
         {
@@ -219,9 +227,15 @@ internal sealed class GrainDirectoryReplica(
             }
 
             var rangeSnapshot = new GrainDirectoryPartitionSnapshot(partitionSnapshot.DirectoryMembershipVersion, partitionAddresses, partitionSnapshot.DataLossVersion);
-            return new DirectoryResult<GrainDirectoryPartitionSnapshot>(rangeSnapshot, _view.Version);
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation("Transferring '{Count}' entries in range '{Range}' from version '{Version}' snapshot.", partitionAddresses.Count, range, rangeVersion);
+            }
+
+            return new DirectoryResult<GrainDirectoryPartitionSnapshot>(rangeSnapshot, rangeVersion);
         }
 
+        _logger.LogWarning("Received a request for a snapshot which this replica does not have, version '{Version}', range version '{RangeVersion}', range '{Range}'.", version, rangeVersion, range);
         return new DirectoryResult<GrainDirectoryPartitionSnapshot>(null!, _view.Version);
     }
 
@@ -244,6 +258,11 @@ internal sealed class GrainDirectoryReplica(
             partitionSnapshot.TransferPartners.Remove(owner);
             if (partitionSnapshot.TransferPartners.Count == 0)
             {
+                if (_logger.IsEnabled(LogLevel.Information))
+                {
+                    _logger.LogInformation("Removing version '{Version}' snapshot. Current snapshots: '{CurrentSnapshots}'.", partitionSnapshot.DirectoryMembershipVersion, string.Join(", ", _partitionSnapshots.Select(s => s.DirectoryMembershipVersion)));
+                }
+
                 _partitionSnapshots.RemoveAt(i);
 
                 // Trigger shutdown completion if the final snapshot has been transferred.
@@ -295,58 +314,41 @@ internal sealed class GrainDirectoryReplica(
         }
 
         return existing;
+
+        bool IsSiloDead(GrainAddress existing) => _clusterMembershipService.CurrentSnapshot.GetSiloStatus(existing.SiloAddress) == SiloStatus.Dead;
     }
 
-    private bool IsSiloDead(GrainAddress existing) => _clusterMembershipService.CurrentSnapshot.GetSiloStatus(existing.SiloAddress) == SiloStatus.Dead;
+    private ValueTask WaitForRange(GrainId grainId, MembershipVersion version) => WaitForRange(RingRange.FromPoint(grainId.GetUniformHashCode()), version);
 
-    private ValueTask<bool> EnsureValidViewAsync(GrainId grainId, MembershipVersion version)
+    private async ValueTask WaitForRange(RingRange range, MembershipVersion version)
     {
-        Task? completion;
         if (_view.Version < version)
         {
-            completion = _clusterMembershipService.Refresh(version).AsTask();
-        }
-        else
-        {
-            TryGetWedge(grainId, version, out completion);
+            await RefreshViewAsync(version);
         }
 
-        if (completion is not null)
+        while (TryGetOverlappingWedge(range, version, out var completion))
         {
-            return WaitForActivationCore(grainId, version, completion);
+            await completion;
         }
 
-        return new(IsValid(grainId, version));
-
-        async ValueTask<bool> WaitForActivationCore(GrainId grainId, MembershipVersion version, Task initialCompletion)
+        bool TryGetOverlappingWedge(RingRange range, MembershipVersion version, [NotNullWhen(true)] out Task? completion)
         {
-            var completion = initialCompletion;
-
-            do
+            foreach (var wedge in _pendingRanges)
             {
-                await completion;
-            } while (TryGetWedge(grainId, version, out completion));
-
-            return IsValid(grainId, version);
-        }
-
-        bool IsValid(GrainId grainId, MembershipVersion version) => version == _view.Version;// && _view.TryGetOwner(grainId, out var owner) && _id.Equals(owner);
-    }
-
-    private bool TryGetWedge(GrainId grainId, MembershipVersion version, [NotNullWhen(true)] out Task? completion)
-    {
-        foreach (var wedge in _wedgedRanges)
-        {
-            if (wedge.Version == version && wedge.Range.Contains(grainId))
-            {
-                completion = wedge.Completion;
-                return true;
+                if (wedge.Version <= version && wedge.Range.Overlaps(range))
+                {
+                    completion = wedge.Completion;
+                    return true;
+                }
             }
-        }
 
-        completion = null;
-        return false;
+            completion = null;
+            return false;
+        }
     }
+
+    private bool IsExpectedView(MembershipVersion version) => version == _view.Version;
 
     public IGrainDirectoryReplica GetReplica(SiloAddress address) => _grainFactory.GetSystemTarget<IGrainDirectoryReplica>(Constants.DirectoryReplicaType, address);
 
@@ -389,7 +391,7 @@ internal sealed class GrainDirectoryReplica(
 
     private async Task ProcessMembershipUpdates()
     {
-        // For debugging purposes, we track background tasks started by this process.
+        // Ensure all child tasks are completed before exiting, tracking them here.
         List<Task> tasks = [];
 
         try
@@ -402,7 +404,6 @@ internal sealed class GrainDirectoryReplica(
                     await foreach (var update in _clusterMembershipService.MembershipUpdates.WithCancellation(_shutdownCts.Token))
                     {
                         var changes = update.CreateUpdate(previousUpdate);
-                        previousUpdate = update;
                         
                         foreach (var change in changes.Changes)
                         {
@@ -421,10 +422,13 @@ internal sealed class GrainDirectoryReplica(
                         }
 
                         // It is important that this method is synchronous, to ensure that updates are atomic.
+                        _logger.LogInformation("Updating view from '{PreviousVersion}' to '{Version}'.", previousUpdate.Version, update.Version);
                         ProcessMembershipUpdate(tasks, current);
+                        tasks.RemoveAll(task => task.IsCompleted);
 
-                        tasks.RemoveAll(t => t.IsCompleted);
+                        _logger.LogInformation("Updated view from '{PreviousVersion}' to '{Version}'.", previousUpdate.Version, update.Version);
                         _viewUpdates.Publish(current);
+                        previousUpdate = update;
                     }
                 }
                 catch (Exception exception)
@@ -455,9 +459,17 @@ internal sealed class GrainDirectoryReplica(
             }
         }
 
-        foreach (var grainAddress in toRemove)
+        if (toRemove.Count > 0)
         {
-            UnregisterCore(grainAddress);
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation("Deleting '{Count}' entries located on now-defunct silo '{SiloAddress}'.", toRemove.Count, change.SiloAddress);
+            }
+
+            foreach (var grainAddress in toRemove)
+            {
+                UnregisterCore(grainAddress);
+            }
         }
 
         RemoveSnapshotTransferPartner(change.SiloAddress, rangeVersion: null);
@@ -465,7 +477,11 @@ internal sealed class GrainDirectoryReplica(
 
     private void ProcessMembershipUpdate(List<Task> tasks, DirectoryMembershipSnapshot current)
     {
-        _logger.LogInformation("Observed membership version '{Version}'.", current.Version);
+        if (_logger.IsEnabled(LogLevel.Trace))
+        {
+            _logger.LogTrace("Observed membership version '{Version}'.", current.Version);
+        }
+
         var previous = _view;
         _view = current;
 
@@ -502,11 +518,9 @@ internal sealed class GrainDirectoryReplica(
 
         foreach (var addedRange in currentRange.GetAdditions(previousRange))
         {
-            _logger.LogInformation("Accepting ownership of range '{Range}' (current: '{Current}', previous: '{Previous}').", addedRange, currentRange, previousRange);
-
-            if (addedRange.SizePercent > 101f / _view.Ranges.Length)
+            if (_logger.IsEnabled(LogLevel.Trace))
             {
-                Console.WriteLine("1) what");
+                _logger.LogTrace("Accepting ownership of range '{Range}' (current: '{Current}', previous: '{Previous}').", addedRange, currentRange, previousRange);
             }
 
             // Wedge this range and transfer state from the previous owner.
@@ -522,18 +536,22 @@ internal sealed class GrainDirectoryReplica(
         var isContiguous = currentVersion.Value == previous.Version.Value + 1;
         if (!isContiguous)
         {
-            _logger.LogInformation(
-                "Non-contiguous view change detected: '{PreviousVersion}' to '{CurrentVersion}'. Bumping data loss version for range '{Range}'.",
-                previous.Version,
-                currentVersion,
-                addedRange);
-            BumpDataLossVersion(currentVersion);
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation(
+                    "Non-contiguous view change detected: '{PreviousVersion}' to '{CurrentVersion}'. Bumping data loss version for range '{Range}'.",
+                    previous.Version,
+                    currentVersion,
+                    addedRange);
+            }
+
+            BumpDataLossVersion(currentVersion, "non-contiguous view numbers");
             return;
         }
 
         // Yield back to the caller immediately after wedging the range.
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        _wedgedRanges.Add((addedRange, currentVersion, tcs.Task));
+        _pendingRanges.Add((addedRange, currentVersion, tcs.Task));
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
         try
@@ -546,34 +564,40 @@ internal sealed class GrainDirectoryReplica(
                     continue;
                 }
 
-                // If the view changes while this is running, abandon the transfer, declaring data loss.
-                if (_view.Version != currentVersion)
-                {
-                    BumpDataLossVersion(currentVersion);
-                    return;
-                }
-
                 var previousOwner = previous.Members[i];
                 var previousVersion = previous.Version;
-                _logger.LogInformation("Requesting entries for range '{Range}' from '{PreviousOwner}' at version '{PreviousVersion}'.", addedRange, previousOwner, previousVersion);
+                if (_logger.IsEnabled(LogLevel.Trace))
+                {
+                    _logger.LogTrace("Requesting entries for range '{Range}' from '{PreviousOwner}' at version '{PreviousVersion}'.", addedRange, previousOwner, previousVersion);
+                }
+
                 var replica = GetReplica(previousOwner);
+
+                // Alternatively, the previous owner could push the snapshot. The pull-based approach is used here because it is simpler.
                 var snapshotResult = await replica.GetPartitionSnapshotAsync(currentVersion, previousVersion, addedRange).AsTask().WaitAsync(cancellationToken);
+
+                // The acknowledgement step lets the previous owner know that the snapshot has been received so that it can proceed.
                 await replica.AcknowledgeSnapshotTransferAsync(_id, previousVersion).SuppressThrowing();
 
+                // Wait for previous versions to be un-wedged before proceeding.
+                await WaitForRange(addedRange, previousVersion);
+
                 // Check that the version has not changed since the call was issued, and that the remote replica validated the version.
-                if (_view.Version != currentVersion || !snapshotResult.TryGetResult(currentVersion, out var snapshot))
+                if (!snapshotResult.TryGetResult(previousVersion, out var snapshot))
                 {
-                    BumpDataLossVersion(currentVersion);
+                    _logger.LogWarning("Expected a valid snapshot from previous owner '{PreviousOwner}' for part of range '{Range}', but found none.", previousOwner, addedRange);
+                    BumpDataLossVersion(currentVersion, "result version mismatch");
                     return;
                 }
 
                 if (snapshot is null)
                 {
-                    BumpDataLossVersion(currentVersion);
+                    _logger.LogWarning("Expected a valid snapshot from previous owner '{PreviousOwner}' for part of range '{Range}', but found none.", previousOwner, addedRange);
+                    BumpDataLossVersion(currentVersion, "snapshot null");
                     return;
                 }
 
-                BumpDataLossVersion(snapshot.DataLossVersion);
+                BumpDataLossVersion(snapshot.DataLossVersion, "inherited");
 
                 // Incorporate the values into the grain directory.
                 foreach (var entry in snapshot.GrainAddresses)
@@ -582,14 +606,20 @@ internal sealed class GrainDirectoryReplica(
                     _directory[entry.GrainId] = entry;
                 }
 
-                _logger.LogInformation("Transferred {Count} entries for range '{Range}' from '{PreviousOwner}'.", snapshot.GrainAddresses.Count, addedRange, previousOwner);
+                if (_logger.IsEnabled(LogLevel.Information))
+                {
+                    _logger.LogInformation("Transferred '{Count}' entries for range '{Range}' from '{PreviousOwner}'.", snapshot.GrainAddresses.Count, addedRange, previousOwner);
+                }
             }
 
-            _logger.LogInformation("Completed transferring entries for range '{Range}'.", addedRange);
+            if (_logger.IsEnabled(LogLevel.Trace))
+            {
+                _logger.LogTrace("Completed transferring entries for range '{Range}'.", addedRange);
+            }
         }
         catch (Exception exception)
         {
-            BumpDataLossVersion(currentVersion);
+            BumpDataLossVersion(currentVersion, "exception");
             _logger.LogError(exception, "Error transferring ownership of range {Range}.", addedRange);
         }
         finally
@@ -598,15 +628,19 @@ internal sealed class GrainDirectoryReplica(
 
             // Un-wedge the range whether it was successfully transferred or not.
             // If it was not successfully transferred, data loss will have been declared.
-            _wedgedRanges.Remove((addedRange, currentVersion, tcs.Task));
+            _pendingRanges.Remove((addedRange, currentVersion, tcs.Task));
         }
 
-        void BumpDataLossVersion(MembershipVersion version)
+        void BumpDataLossVersion(MembershipVersion version, string reason)
         {
             // TODO: Consider finer-grain tracking of data loss version.
             if (_dataLossVersion < version)
             {
-                _logger.LogInformation("Bumping data loss version to '{Version}'.", version);
+                if (_logger.IsEnabled(LogLevel.Information))
+                {
+                    _logger.LogInformation("Bumping data loss version to '{Version}' due to '{Reason}'.", version, reason);
+                }
+
                 _dataLossVersion = version;
             }
         }

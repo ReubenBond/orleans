@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -53,13 +53,21 @@ internal sealed class ReplicatedGrainDirectory(GrainDirectoryReplica localReplic
                 continue;
             }
 
-            logger.LogInformation("Invoking '{Operation}' on '{Owner}' for grain '{GrainId}'.", operation, owner, grainId);
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                logger.LogTrace("Invoking '{Operation}' on '{Owner}' for grain '{GrainId}'.", operation, owner, grainId);
+            }
+
             var replica = localReplica.GetReplica(owner);
             invokeResult = await func(replica, view.Version, state);
 
             if (invokeResult.TryGetResult(view.Version, out var result))
             {
-                logger.LogInformation("Invoked '{Operation}' on '{Owner}' for grain '{GrainId}' and received result '{Result}'.", operation, owner, grainId, result);
+                if (logger.IsEnabled(LogLevel.Trace))
+                {
+                    logger.LogInformation("Invoked '{Operation}' on '{Owner}' for grain '{GrainId}' and received result '{Result}'.", operation, owner, grainId, result);
+                }
+
                 return result;
             }
             else

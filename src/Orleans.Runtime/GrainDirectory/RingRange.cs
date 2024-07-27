@@ -71,6 +71,13 @@ internal readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>
     }
 
     /// <summary>
+    /// Creates a range representing a single point.
+    /// </summary>
+    /// <param name="point">The point which the range will include.</param>
+    /// <returns>A range including only <paramref name="point"/>.</returns>
+    public static RingRange FromPoint(uint point) => new (unchecked(point - 1), point);
+
+    /// <summary>
     /// Gets the length of the range.
     /// </summary>
     public uint Length

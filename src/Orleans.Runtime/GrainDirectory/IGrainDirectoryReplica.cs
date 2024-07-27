@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.Concurrency;
 using Orleans.Runtime.GrainDirectory;
 
 #nullable enable
@@ -17,5 +18,6 @@ internal interface IGrainDirectoryReplica : ISystemTarget
     ValueTask<DirectoryResult<bool>> UnregisterAsync(MembershipVersion version, List<GrainAddress> addresses);
 
     ValueTask<DirectoryResult<GrainDirectoryPartitionSnapshot>> GetPartitionSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range);
+
     ValueTask AcknowledgeSnapshotTransferAsync(SiloAddress owner, MembershipVersion version);
 }

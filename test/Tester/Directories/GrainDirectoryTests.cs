@@ -39,10 +39,13 @@ public sealed class ReplicatedGrainDirectoryTests
         {
             while (!cts.IsCancellationRequested)
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(50));
+                await Task.Delay(TimeSpan.FromMilliseconds(5));
                 try
                 {
-                    await testCluster.GrainFactory.GetGrain<IMyDirectoryTestGrain>(Guid.NewGuid()).Echo("hello");
+                    for (var i = 0; i < 100; i++)
+                    {
+                        await testCluster.GrainFactory.GetGrain<IMyDirectoryTestGrain>(Guid.NewGuid()).Echo("hello");
+                    }
 
                     if (reconfigurationTimer.Elapsed > TimeSpan.FromSeconds(5))
                     {
