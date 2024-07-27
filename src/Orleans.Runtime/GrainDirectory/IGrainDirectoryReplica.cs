@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime.GrainDirectory;
 
@@ -16,6 +16,6 @@ internal interface IGrainDirectoryReplica : ISystemTarget
     ValueTask<DirectoryResult<bool>> UnregisterAsync(MembershipVersion version, GrainAddress address);
     ValueTask<DirectoryResult<bool>> UnregisterAsync(MembershipVersion version, List<GrainAddress> addresses);
 
-    //ValueTask<DirectoryResult<bool>> AcceptPartition(MembershipVersion version, GrainDirectoryPartition addresses);
-    ValueTask<DirectoryResult<GrainDirectoryPartitionSnapshot>> GetPartitionSnapshotAsync(MembershipVersion version, RingRange range);
+    ValueTask<DirectoryResult<GrainDirectoryPartitionSnapshot>> GetPartitionSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range);
+    ValueTask AcknowledgeSnapshotTransferAsync(MembershipVersion version, RingRange range);
 }

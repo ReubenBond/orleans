@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory;
 
 [GenerateSerializer, Immutable]
 [Alias(nameof(RingRange))]
-public readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>, ISpanFormattable
+internal readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>, ISpanFormattable
 {
     [Id(0)]
     private readonly uint _start = start == end && start > 1 ? 1 : start;
@@ -26,36 +27,47 @@ public readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>, 
 
     public uint Start => IsFull ? 0 : _start;
 
-    public static RingRange GetEquallyDividedSubRange(int count, int index)
+    public uint End => IsFull ? 0 : _end;
+
+    public static RingRange CreateEquallyDividedRange(int count, int index)
     {
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, count, nameof(index));
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, count, nameof(index));
-
-        var rangeSize = uint.MaxValue;
-        var portion = (uint)(rangeSize / count);
-        var remainder = (uint)(rangeSize - portion * count);
-        var start = 0u;
-        for (var i = 0; i < count; i++)
+        ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
+        return Core((uint)count, (uint)index);
+        static RingRange Core(uint count, uint index)
         {
-            // (Start, End]
-            var end = unchecked(start + portion);
+            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, count, nameof(index));
 
-            // Overflow on purpose. It will do the right thing.
-            if (remainder > 0)
+            if (count == 1 && index == 0)
             {
-                end++;
-                remainder--;
+                return Full;
             }
 
-            if (i == index)
+            var rangeSize = (ulong)uint.MaxValue + 1;
+            var portion = rangeSize / count;
+            var remainder = rangeSize - portion * count;
+            var start = 0u;
+            for (var i = 0; i < count; i++)
             {
-                return new RingRange(start, end);
+                // (Start, End]
+                var end = unchecked((uint)(start + portion));
+
+                if (remainder > 0)
+                {
+                    end++;
+                    remainder--;
+                }
+
+                if (i == index)
+                {
+                    return new RingRange(start, end);
+                }
+
+                start = end;
             }
 
-            start = end;
+            throw new ArgumentException(null, nameof(index));
         }
-
-        throw new ArgumentException(null, nameof(index));
     }
 
     /// <summary>
@@ -89,10 +101,11 @@ public readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>, 
             return 0;
         }
 
-        if (_start >= _end)
+        var start = Start;
+        if (start >= End)
         {
             // Start > End (wrap-around case)
-            if (n <= _start)
+            if (n <= start)
             {
                 // Range starts after N (range > N)
                 return -1;
@@ -103,7 +116,7 @@ public readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>, 
             return 1;
         }
 
-        if (n <= _start)
+        if (n <= start)
         {
             // Range starts after N (range > N)
             return 1;
@@ -133,13 +146,13 @@ public readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>, 
         }
 
         var num = point;
-        if (_start < _end)
+        if (Start < End)
         {
-            return num > _start && num <= _end;
+            return num > Start && num <= End;
         }
 
         // Start > End
-        return num > _start || num <= _end;
+        return num > Start || num <= End;
     }
 
     public float SizePercent => Length * (100.0f / uint.MaxValue);
@@ -152,7 +165,7 @@ public readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>, 
 
     public override string ToString() => IsFull
         ? $"(0, 0], Size=0x{Length:X8} (100.0%)"
-        : $"(x{_start:X8}, x{_end:X8}], Size=0x{Length:X8} ({SizePercent:0.0}%)";
+        : $"(0x{Start:X8}, 0x{End:X8}], Size=0x{Length:X8} ({SizePercent:0.0}%)";
 
     string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
@@ -162,10 +175,10 @@ public readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>, 
             ? destination.TryWrite($"(0 0), Size=0x0 (0%)", out charsWritten)
             : IsFull
                 ? destination.TryWrite($"(0, 0], Size=0x{uint.MaxValue:X8} (100%)", out charsWritten)
-                : destination.TryWrite($"(x{_start:X8}, x{_end:X8}], Size=0x{Length:X8} ({SizePercent:0.0}%)", out charsWritten);
+                : destination.TryWrite($"(0x{Start:X8}, 0x{End:X8}], Size=0x{Length:X8} ({SizePercent:0.0}%)", out charsWritten);
     }
 
-    internal bool Overlaps(RingRange other) => !IsEmpty && !other.IsEmpty && (Equals(other) || Contains(other._start) || other.Contains(_start));
+    internal bool Overlaps(RingRange other) => !IsEmpty && !other.IsEmpty && (Equals(other) || Contains(other.End) || other.Contains(End));
 
     internal RingRange Merge(RingRange other)
     {
@@ -184,12 +197,12 @@ public readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>, 
             return this;
         }
 
-        if (Contains(other._start))
+        if (Contains(other.Start))
         {
             return MergeEnds(other);
         }
 
-        if (other.Contains(_start))
+        if (other.Contains(Start))
         {
             return other.MergeEnds(this);
         }
@@ -209,7 +222,7 @@ public readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>, 
             return Empty;
         }
 
-        return new RingRange(_end, _start);
+        return new RingRange(End, Start);
     }
 
     internal IEnumerable<RingRange> Intersections(RingRange other)
@@ -225,32 +238,38 @@ public readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>, 
             // One intersection, the other range.
             yield return other;
         }
+        else if (other.IsFull)
+        {
+            yield return this;
+        }
         else if (IsWrapped ^ other.IsWrapped)
         {
             var wrapped = IsWrapped ? this : other;
             var normal = IsWrapped ? other : this;
+            var (normalStart, normalEnd) = (normal.Start, normal.End);
+            var (wrappedStart, wrappedEnd) = (wrapped.Start, wrapped.End);
 
             // There are possibly two intersections, between the normal and wrapped range.
             //         low         high
             // ...---NB====WE----WB====NE----...
 
             // Intersection at the low side.
-            if (wrapped._end > normal._start)
+            if (wrappedEnd > normalStart)
             {
                 // ---NB====WE---
-                yield return new RingRange(normal._start, wrapped._end);
+                yield return new RingRange(normalStart, wrappedEnd);
             }
 
             // Intersection at the high side.
-            if (wrapped._start < normal._end)
+            if (wrappedStart < normalEnd)
             {
                 // ---WB====NE---
-                yield return new RingRange(wrapped._start, normal._end);
+                yield return new RingRange(wrappedStart, normalEnd);
             }
         }
         else
         {
-            yield return new RingRange(Math.Max(_start, other._start), Math.Min(_end, other._end));
+            yield return new RingRange(Math.Max(Start, other.Start), Math.Min(End, other.End));
         }
     }
 
@@ -258,9 +277,11 @@ public readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>, 
     internal IEnumerable<RingRange> GetAdditions(RingRange previous)
     {
         // Additions are the intersections between this range and the inverse of the previous range.
-        foreach (var intersection in Intersections(previous.Inverse()))
+        foreach (var addition in Intersections(previous.Inverse()))
         {
-            yield return intersection;
+            Debug.Assert(!addition.Overlaps(previous));
+            Debug.Assert(addition.Overlaps(this));
+            yield return addition;
         }
     }
 
@@ -268,26 +289,30 @@ public readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>, 
     internal IEnumerable<RingRange> GetRemovals(RingRange previous)
     {
         // Removals are the intersections between the inverse of this range and the previous range.
-        foreach (var intersection in Inverse().Intersections(previous))
+        foreach (var removal in Inverse().Intersections(previous))
         {
-            yield return intersection;
+            Debug.Assert(removal.Overlaps(previous));
+            Debug.Assert(!removal.Overlaps(this));
+            yield return removal;
         }
     }
 
     // other range starts inside this range, merge it based on where it ends
     private RingRange MergeEnds(RingRange other)
     {
-        if (_start == other._end)
+        var (start, end) = (Start, End);
+        var (otherStart, otherEnd) = (other.Start, other.End);
+        if (start == otherEnd)
         {
             return Full;
         }
 
-        if (!Contains(other._end))
+        if (!Contains(otherEnd))
         {
-            return new RingRange(_start, other._end);
+            return new RingRange(start, otherEnd);
         }
 
-        if (other.Contains(_start))
+        if (other.Contains(Start))
         {
             return Full;
         }

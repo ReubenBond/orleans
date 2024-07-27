@@ -29,7 +29,7 @@ internal sealed class DirectoryMembershipSnapshot
         var memberRanges = ImmutableArray.CreateBuilder<RingRange>(sortedActiveMembers.Count);
         for (var i = 0; i < sortedActiveMembers.Count; i++)
         {
-            var memberRange = RingRange.GetEquallyDividedSubRange(sortedActiveMembers.Count, i);
+            var memberRange = RingRange.CreateEquallyDividedRange(sortedActiveMembers.Count, i);
             memberRanges.Add(memberRange);
         }
 

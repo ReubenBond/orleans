@@ -7,8 +7,7 @@ namespace Orleans.Runtime.GrainDirectory;
 internal sealed class GrainDirectoryPartitionSnapshot(
     MembershipVersion directoryMembershipVersion,
     List<GrainAddress> grainAddresses,
-    MembershipVersion dataLossVersion,
-    RingRange range)
+    MembershipVersion dataLossVersion)
 {
     [Id(0)]
     public MembershipVersion DirectoryMembershipVersion { get; } = directoryMembershipVersion;
@@ -18,7 +17,4 @@ internal sealed class GrainDirectoryPartitionSnapshot(
 
     [Id(2)]
     public MembershipVersion DataLossVersion { get; } = dataLossVersion;
-
-    [Id(3)]
-    public RingRange Range { get; } = range;
 }

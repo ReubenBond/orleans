@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
