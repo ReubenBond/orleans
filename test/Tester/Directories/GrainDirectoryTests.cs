@@ -26,7 +26,7 @@ public sealed class ReplicatedGrainDirectoryTests
     [Fact]
     public async Task DynamicClusterTest()
     {
-        var testClusterBuilder = new TestClusterBuilder(2);
+        var testClusterBuilder = new TestClusterBuilder(1);
         var testCluster = testClusterBuilder.Build();
         await testCluster.DeployAsync();
 

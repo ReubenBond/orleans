@@ -4,82 +4,18 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.GrainDirectory;
+using Orleans.Internal;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Utilities;
 
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory;
-
-internal sealed class ReplicatedGrainDirectory(GrainDirectoryReplica localReplica, ILogger<ReplicatedGrainDirectory> logger) : IGrainDirectory
-{
-    public async Task<GrainAddress?> Lookup(GrainId grainId) => await InvokeAsync(
-        grainId,
-        static (replica, version, grainId) => replica.LookupAsync(version, grainId),
-        grainId);
-
-    public async Task<GrainAddress?> Register(GrainAddress address) => await InvokeAsync(
-        address.GrainId,
-        static (replica, version, address) => replica.RegisterAsync(version, address, null),
-        address);
-
-    public async Task Unregister(GrainAddress address) => await InvokeAsync(
-        address.GrainId,
-        static (replica, version, address) => replica.UnregisterAsync(version, address),
-        address);
-
-    public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) => await InvokeAsync(
-        address.GrainId,
-        static (replica, version, state) => replica.RegisterAsync(version, state.Address, state.PreviousAddress),
-        (Address: address, PreviousAddress: previousAddress));
-
-    public Task UnregisterSilos(List<SiloAddress> siloAddresses) => Task.CompletedTask;
-
-    private async Task<TResult> InvokeAsync<TState, TResult>(
-        GrainId grainId,
-        Func<IGrainDirectoryReplica, MembershipVersion, TState, ValueTask<DirectoryResult<TResult>>> func,
-        TState state,
-        [CallerArgumentExpression(nameof(func))] string operation = "")
-    {
-        DirectoryResult<TResult> invokeResult;
-        var view = localReplica.CurrentView;
-        while (true)
-        {
-            if (!view.TryGetOwner(grainId, out var owner))
-            {
-                if (view.Members.Length == 0 && view.Version.Value > 0)
-                {
-                    return default!;
-                }
-
-                view = await localReplica.RefreshViewAsync(new(view.Version.Value + 1));
-                continue;
-            }
-
-            logger.LogInformation("Invoking '{Operation}' on '{Owner}' for grain '{GrainId}'.", operation, owner, grainId);
-            var replica = localReplica.GetReplica(owner);
-            invokeResult = await func(replica, view.Version, state);
-
-            if (invokeResult.TryGetResult(view.Version, out var result))
-            {
-                logger.LogInformation("Invoked '{Operation}' on '{Owner}' for grain '{GrainId}' and received result '{Result}'.", operation, owner, grainId, result);
-                return result;
-            }
-            else
-            {
-                // Sync with the remote replica.
-                view = await localReplica.RefreshViewAsync(invokeResult.Version);
-            }
-        }
-    }
-}
 
 internal sealed class GrainDirectoryReplica(
     ILocalSiloDetails localSiloDetails,
@@ -106,7 +42,7 @@ internal sealed class GrainDirectoryReplica(
     private readonly List<(RingRange Range, MembershipVersion Version, Task Completion)> _wedgedRanges = [];
 
     // Ranges which were previously at least partially owned by this replica, but which are pending transfer to a new replica.  
-    private readonly List<RangeSnapshotState> _partitionSnapshots = [];
+    private readonly List<PartitionSnapshotState> _partitionSnapshots = [];
 
     // The current directory membership snapshot.
     private DirectoryMembershipSnapshot _view = DirectoryMembershipSnapshot.Default;
@@ -118,7 +54,6 @@ internal sealed class GrainDirectoryReplica(
     private DirectoryMembershipSnapshot? _finalView;
 
     public DirectoryMembershipSnapshot CurrentView => _view;
-    public IAsyncEnumerable<DirectoryMembershipSnapshot> ViewUpdates => _viewUpdates;
 
     public async ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version = default)
     {
@@ -226,7 +161,7 @@ internal sealed class GrainDirectoryReplica(
         }
 
         AssertOwnership(address.GrainId);
-        return new DirectoryResult<bool>(UnregisterAsyncCore(address), _view.Version);
+        return new DirectoryResult<bool>(UnregisterCore(address), _view.Version);
     }
 
     async ValueTask<DirectoryResult<bool>> IGrainDirectoryReplica.UnregisterAsync(MembershipVersion version, List<GrainAddress> addresses)
@@ -250,7 +185,7 @@ internal sealed class GrainDirectoryReplica(
             }
 
             AssertOwnership(address.GrainId);
-            result &= UnregisterAsyncCore(address);
+            result &= UnregisterCore(address);
         }
 
         return new DirectoryResult<bool>(result, _view.Version);
@@ -290,22 +225,29 @@ internal sealed class GrainDirectoryReplica(
         return new DirectoryResult<GrainDirectoryPartitionSnapshot>(null!, _view.Version);
     }
 
-    ValueTask IGrainDirectoryReplica.AcknowledgeSnapshotTransferAsync(MembershipVersion rangeVersion, RingRange range)
+    ValueTask IGrainDirectoryReplica.AcknowledgeSnapshotTransferAsync(SiloAddress owner, MembershipVersion rangeVersion)
+    {
+        RemoveSnapshotTransferPartner(owner, rangeVersion);
+        return ValueTask.CompletedTask;
+    }
+
+    private void RemoveSnapshotTransferPartner(SiloAddress owner, MembershipVersion? rangeVersion)
     {
         for (var i = 0; i < _partitionSnapshots.Count; ++i)
         {
             var partitionSnapshot = _partitionSnapshots[i];
-            if (partitionSnapshot.DirectoryMembershipVersion != rangeVersion)
+            if (rangeVersion.HasValue && partitionSnapshot.DirectoryMembershipVersion != rangeVersion.Value)
             {
                 continue;
             }
 
-            if (--partitionSnapshot.ExpectedAcknowledgements <= 0)
+            partitionSnapshot.TransferPartners.Remove(owner);
+            if (partitionSnapshot.TransferPartners.Count == 0)
             {
                 _partitionSnapshots.RemoveAt(i);
 
                 // Trigger shutdown completion if the final snapshot has been transferred.
-                if (_finalView is { } finalView && finalView.Version == rangeVersion)
+                if (_finalView is { } finalView && finalView.Version == partitionSnapshot.DirectoryMembershipVersion)
                 {
                     _shutdownTcs.TrySetResult();
                 }
@@ -313,8 +255,6 @@ internal sealed class GrainDirectoryReplica(
                 break;
             }
         }
-
-        return ValueTask.CompletedTask;
     }
 
     [Conditional("DEBUG")]
@@ -324,7 +264,7 @@ internal sealed class GrainDirectoryReplica(
         Debug.Assert(_id.Equals(owner));
     }
 
-    private bool UnregisterAsyncCore(GrainAddress address)
+    private bool UnregisterCore(GrainAddress address)
     {
         if (_directory.TryGetValue(address.GrainId, out var existing) && existing.Equals(address))
         {
@@ -422,7 +362,7 @@ internal sealed class GrainDirectoryReplica(
     {
         while (!token.IsCancellationRequested && _partitionSnapshots.Count > 0)
         {
-            await _shutdownTcs.Task.WaitAsync(token).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            await _shutdownTcs.Task.WaitAsync(token).SuppressThrowing();
         }
     }
 
@@ -443,7 +383,7 @@ internal sealed class GrainDirectoryReplica(
         if (_runTask is { } task)
         {
             // Try to wait for hand-off to complete.
-            await this.RunOrQueueTask(async () => await task.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing));
+            await this.RunOrQueueTask(async () => await task.WaitAsync(cancellationToken).SuppressThrowing());
         }
     }
 
@@ -454,12 +394,24 @@ internal sealed class GrainDirectoryReplica(
 
         try
         {
+            var previousUpdate = ClusterMembershipSnapshot.Default;
             while (!_shutdownCts.IsCancellationRequested)
             {
                 try
                 {
                     await foreach (var update in _clusterMembershipService.MembershipUpdates.WithCancellation(_shutdownCts.Token))
                     {
+                        var changes = update.CreateUpdate(previousUpdate);
+                        previousUpdate = update;
+                        
+                        foreach (var change in changes.Changes)
+                        {
+                            if (change.Status == SiloStatus.Dead)
+                            {
+                                OnSiloRemovedFromCluster(change);
+                            }
+                        }
+
                         var current = new DirectoryMembershipSnapshot(update);
                         if (!current.Contains(_id) && _view.Contains(_id))
                         {
@@ -484,12 +436,31 @@ internal sealed class GrainDirectoryReplica(
                 }
             }
 
-            await Task.WhenAll(tasks).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+            await Task.WhenAll(tasks).SuppressThrowing();
         }
         finally
         {
             _viewUpdates.Dispose();
         }
+    }
+
+    private void OnSiloRemovedFromCluster(ClusterMember change)
+    {
+        var toRemove = new List<GrainAddress>();
+        foreach (var entry in _directory)
+        {
+            if (change.SiloAddress.Equals(entry.Value.SiloAddress))
+            {
+                toRemove.Add(entry.Value);
+            }
+        }
+
+        foreach (var grainAddress in toRemove)
+        {
+            UnregisterCore(grainAddress);
+        }
+
+        RemoveSnapshotTransferPartner(change.SiloAddress, rangeVersion: null);
     }
 
     private void ProcessMembershipUpdate(List<Task> tasks, DirectoryMembershipSnapshot current)
@@ -506,16 +477,26 @@ internal sealed class GrainDirectoryReplica(
             // Snapshot & remove everything not in the current range.
             // The new owner will have the opportunity to retrieve the snapshot as they take ownership.
             List<GrainAddress>? removedAddresses = [];
-            var expectedAcks = 0;
+            HashSet<SiloAddress> transferPartners = [];
             foreach (var removedRange in currentRange.GetRemovals(previousRange))
             {
-                expectedAcks += current.Ranges.Count(r => r.Overlaps(removedRange));
+                for (var i = 0; i < current.Ranges.Length; ++i)
+                {
+                    if (current.Ranges[i].Overlaps(removedRange))
+                    {
+                        var owner = current.Members[i];
+                        Debug.Assert(!_id.Equals(owner));
+                        transferPartners.Add(owner);
+                        continue;
+                    }
+                }
+
                 RemoveRange(removedRange, removedAddresses);
             }
 
-            if (expectedAcks > 0)
+            if (transferPartners.Count > 0)
             {
-                _partitionSnapshots.Add(new RangeSnapshotState(previous.Version, removedAddresses, _dataLossVersion) { ExpectedAcknowledgements = expectedAcks });
+                _partitionSnapshots.Add(new PartitionSnapshotState(previous.Version, removedAddresses, _dataLossVersion, transferPartners));
             }
         }
 
@@ -577,7 +558,7 @@ internal sealed class GrainDirectoryReplica(
                 _logger.LogInformation("Requesting entries for range '{Range}' from '{PreviousOwner}' at version '{PreviousVersion}'.", addedRange, previousOwner, previousVersion);
                 var replica = GetReplica(previousOwner);
                 var snapshotResult = await replica.GetPartitionSnapshotAsync(currentVersion, previousVersion, addedRange).AsTask().WaitAsync(cancellationToken);
-                await replica.AcknowledgeSnapshotTransferAsync(previousVersion, addedRange).AsTask().ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                await replica.AcknowledgeSnapshotTransferAsync(_id, previousVersion).SuppressThrowing();
 
                 // Check that the version has not changed since the call was issued, and that the remote replica validated the version.
                 if (_view.Version != currentVersion || !snapshotResult.TryGetResult(currentVersion, out var snapshot))
@@ -652,17 +633,9 @@ internal sealed class GrainDirectoryReplica(
         }
     }
 
-    private sealed class RangeSnapshotState(
-        MembershipVersion directoryMembershipVersion,
-        List<GrainAddress> grainAddresses,
-        MembershipVersion dataLossVersion)
-    {
-        public MembershipVersion DirectoryMembershipVersion { get; } = directoryMembershipVersion;
-
-        public List<GrainAddress> GrainAddresses { get; } = grainAddresses;
-
-        public MembershipVersion DataLossVersion { get; } = dataLossVersion;
-
-        public int ExpectedAcknowledgements { get; set; }
-    }
+    private sealed record class PartitionSnapshotState(
+        MembershipVersion DirectoryMembershipVersion,
+        List<GrainAddress> GrainAddresses,
+        MembershipVersion DataLossVersion,
+        HashSet<SiloAddress> TransferPartners);
 }
