@@ -258,12 +258,12 @@ internal sealed class GrainDirectoryReplica(
             partitionSnapshot.TransferPartners.Remove(owner);
             if (partitionSnapshot.TransferPartners.Count == 0)
             {
+                _partitionSnapshots.RemoveAt(i);
+
                 if (_logger.IsEnabled(LogLevel.Information))
                 {
-                    _logger.LogInformation("Removing version '{Version}' snapshot. Current snapshots: '{CurrentSnapshots}'.", partitionSnapshot.DirectoryMembershipVersion, string.Join(", ", _partitionSnapshots.Select(s => s.DirectoryMembershipVersion)));
+                    _logger.LogInformation("Removing version '{Version}' snapshot. Current snapshots: [{CurrentSnapshots}].", partitionSnapshot.DirectoryMembershipVersion, string.Join(", ", _partitionSnapshots.Select(s => s.DirectoryMembershipVersion)));
                 }
-
-                _partitionSnapshots.RemoveAt(i);
 
                 // Trigger shutdown completion if the final snapshot has been transferred.
                 if (_finalView is { } finalView && finalView.Version == partitionSnapshot.DirectoryMembershipVersion)

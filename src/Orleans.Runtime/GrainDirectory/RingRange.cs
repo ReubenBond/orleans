@@ -5,29 +5,46 @@ using System.Diagnostics;
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory;
 
+/// <summary>
+/// Represents a contiguous range of zero or more values on a ring.
+/// </summary>
 [GenerateSerializer, Immutable]
 [Alias(nameof(RingRange))]
-internal readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>, ISpanFormattable
+internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
 {
+    // The exclusive starting point for the range.
+    //  Note that _start == _end == 1 is used as a special value to represent a full range.
     [Id(0)]
-    private readonly uint _start = start == end && start > 1 ? 1 : start;
+    private readonly uint _start;
 
+    // The inclusive ending point for the range.
+    //  Note that _start == _end == 1 is used as a special value to represent a full range.
     [Id(1)]
-    private readonly uint _end = start == end && start > 1 ? 1 : end;
+    private readonly uint _end;
 
     public bool IsEmpty => _start == _end && _start == 0;
 
     public bool IsFull => _start == _end && _start != 0;
 
+    // Whether the range includes uint.MaxValue.
     private bool IsWrapped => _start >= _end;
 
-    public static RingRange Full { get; } = new RingRange(1, 1);
+    public static RingRange Full { get; } = new (1, 1);
 
-    public static RingRange Empty { get; } = new RingRange(0, 0);
+    public static RingRange Empty { get; } = new (0, 0);
 
     public uint Start => IsFull ? 0 : _start;
 
     public uint End => IsFull ? 0 : _end;
+
+    private RingRange(uint start, uint end)
+    {
+        _start = start == end && start > 1 ? 1 : start;
+        _end = start == end && start > 1 ? 1 : end;
+    }
+
+    // For testing only.
+    internal static RingRange Create(uint start, uint end) => new (start, end);
 
     public static RingRange CreateEquallyDividedRange(int count, int index)
     {
@@ -187,36 +204,6 @@ internal readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>
 
     internal bool Overlaps(RingRange other) => !IsEmpty && !other.IsEmpty && (Equals(other) || Contains(other.End) || other.Contains(End));
 
-    internal RingRange Merge(RingRange other)
-    {
-        if (Equals(other))
-        {
-            return this;
-        }
-
-        if (IsEmpty || other.IsFull)
-        {
-            return other;
-        }
-
-        if (IsFull || other.IsEmpty)
-        {
-            return this;
-        }
-
-        if (Contains(other.Start))
-        {
-            return MergeEnds(other);
-        }
-
-        if (other.Contains(Start))
-        {
-            return other.MergeEnds(this);
-        }
-
-        throw new InvalidOperationException("Ranges don't overlap");
-    }
-
     internal RingRange Inverse()
     {
         if (IsEmpty)
@@ -302,29 +289,6 @@ internal readonly struct RingRange(uint start, uint end) : IEquatable<RingRange>
             Debug.Assert(!removal.Overlaps(this));
             yield return removal;
         }
-    }
-
-    // other range starts inside this range, merge it based on where it ends
-    private RingRange MergeEnds(RingRange other)
-    {
-        var (start, end) = (Start, End);
-        var (otherStart, otherEnd) = (other.Start, other.End);
-        if (start == otherEnd)
-        {
-            return Full;
-        }
-
-        if (!Contains(otherEnd))
-        {
-            return new RingRange(start, otherEnd);
-        }
-
-        if (other.Contains(Start))
-        {
-            return Full;
-        }
-
-        return this;
     }
 
     public static bool operator ==(RingRange left, RingRange right) => left.Equals(right);

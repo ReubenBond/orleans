@@ -1,5 +1,3 @@
-using Microsoft.Extensions.DependencyModel;
-using Newtonsoft.Json;
 using Orleans.Runtime.GrainDirectory;
 using Xunit;
 
@@ -10,7 +8,7 @@ public sealed class RingRangeTests
     public void RingRangeAdditionsTest()
     {
         var previous = RingRange.Empty;
-        var current = new RingRange(0, 0x80000000);
+        var current = RingRange.CreateEquallyDividedRange(2, 0);
         Assert.Empty(current.GetAdditions(current));
         Assert.Empty(current.GetRemovals(current));
 
@@ -30,7 +28,7 @@ public sealed class RingRangeTests
         var first = RingRange.CreateEquallyDividedRange(8, 0);
         var second = RingRange.CreateEquallyDividedRange(8, 1);
         var third = RingRange.CreateEquallyDividedRange(8, 2);
-        var fullRange = new RingRange(first.Start, third.End);
+        var fullRange = RingRange.Create(first.Start, third.End);
 
         var midPunch = fullRange.GetAdditions(second);
         Assert.Equal(2, midPunch.Count());
@@ -41,7 +39,7 @@ public sealed class RingRangeTests
     [Fact]
     public void RingRangeAdditionsTest_End()
     {
-        var current = new RingRange(0x33333334, 0x66666667);
+        var current = RingRange.Create(0x33333334, 0x66666667);
         var result = current.GetAdditions(RingRange.Empty);
         Assert.Equal(current, Assert.Single(result));
     }
@@ -49,8 +47,8 @@ public sealed class RingRangeTests
     [Fact]
     public void RingRangeAdditionsTest_End_Two()
     {
-        var current = new RingRange(0x33333334, 0x66666667);
-        var result = current.GetAdditions(new RingRange(uint.MaxValue - 1, 1));
+        var current = RingRange.Create(0x33333334, 0x66666667);
+        var result = current.GetAdditions(RingRange.Create(uint.MaxValue - 1, 1));
         Assert.Equal(current, Assert.Single(result));
     }
 
