@@ -1,10 +1,8 @@
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,7 +15,7 @@ using Orleans.Runtime.Utilities;
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory;
 
-internal sealed class GrainDirectoryReplica(
+internal sealed partial class GrainDirectoryReplica(
     ILocalSiloDetails localSiloDetails,
     ClusterMembershipService clusterMembershipService,
     ILoggerFactory loggerFactory,
@@ -55,6 +53,8 @@ internal sealed class GrainDirectoryReplica(
 
     public DirectoryMembershipSnapshot CurrentView => _view;
 
+    public IAsyncEnumerable<DirectoryMembershipSnapshot> ViewUpdates => _viewUpdates;
+
     public async ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version = default)
     {
         _ = _clusterMembershipService.Refresh(version);
@@ -69,136 +69,36 @@ internal sealed class GrainDirectoryReplica(
         return _view;
     }
 
-    async ValueTask<DirectoryResult<GrainAddress>> IGrainDirectoryReplica.RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration) 
-    {
-        ArgumentNullException.ThrowIfNull(address);
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace("RegisterAsync('{Version}', '{Address}', '{ExistingAddress}')", version, address, currentRegistration);
-        }
-
-        // Ensure that the current membership version is new enough.
-        await WaitForRange(address.GrainId, version);
-        if (!IsExpectedView(version))
-        {
-            return new DirectoryResult<GrainAddress>(null!, _view.Version);
-        }
-
-        AssertOwnership(address.GrainId);
-        return new DirectoryResult<GrainAddress>(RegisterCore(address, currentRegistration), _view.Version);
-    }
-
-    async ValueTask<DirectoryResult<List<GrainAddress>>> IGrainDirectoryReplica.RegisterAsync(MembershipVersion version, List<GrainAddress> addresses) 
-    {
-        ArgumentNullException.ThrowIfNull(addresses);
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace("RegisterAsync('{Version}', '{AddressCount}')", version, addresses.Count);
-        }
-
-        var results = new List<GrainAddress>(addresses.Count);
-        foreach (var address in addresses)
-        {
-            // Ensure we can serve the request.
-            await WaitForRange(address.GrainId, version);
-            if (!IsExpectedView(version))
-            {
-                return new DirectoryResult<List<GrainAddress>>(null!, _view.Version);
-            }
-
-            AssertOwnership(address.GrainId);
-            results.Add(RegisterCore(address, null));
-        }
-
-        return new DirectoryResult<List<GrainAddress>>(results, _view.Version);
-    }
-
-    async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryReplica.LookupAsync(MembershipVersion version, GrainId grainId)
+    async ValueTask<DirectoryResult<MembershipVersion>> IGrainDirectoryReplica.GetDataLossVersion(MembershipVersion version)
     {
         if (_logger.IsEnabled(LogLevel.Trace))
         {
-            _logger.LogTrace("LookupAsync('{Version}', '{GrainId}')", version, grainId);
+            _logger.LogTrace("GetDataLossVersion('{Version}')", version);
         }
 
-        // Ensure we can serve the request.
-        await WaitForRange(grainId, version);
-        if (!IsExpectedView(version))
+        // Ensure we are at least at the specified view number.
+        await RefreshViewAsync(version);
+
+        // If we have moved past it, it's too late to provide the data loss version.
+        if (_view.Version != version)
         {
-            return new DirectoryResult<GrainAddress?>(null, _view.Version);
+            return new(default, _view.Version);
         }
 
-        AssertOwnership(grainId);
-        return new DirectoryResult<GrainAddress?>(LookupCore(grainId), _view.Version);
+        // Ensure that we have un-wedged our owned range.
+        var range = _view.GetRingRange(_id);
+        await WaitForRange(range, version);
+
+        // If we have moved past the requested view, it's too late to provide the data loss version.
+        if (_view.Version != version)
+        {
+            return new(default, _view.Version);
+        }
+
+        return new(_dataLossVersion, _view.Version);
     }
 
-    async ValueTask<DirectoryResult<List<GrainAddress?>>> IGrainDirectoryReplica.LookupAsync(MembershipVersion version, List<GrainId> grainIds)
-    {
-        ArgumentNullException.ThrowIfNull(grainIds);
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace("LookupAsync('{Version}', '{GrainIdCount}')", version, grainIds.Count);
-        }
-
-        var results = new List<GrainAddress?>(grainIds.Count);
-        foreach (var grainId in grainIds)
-        {
-            await WaitForRange(grainId, version);
-            if (!IsExpectedView(version))
-            {
-                return new DirectoryResult<List<GrainAddress?>>(null!, _view.Version);
-            }
-
-            AssertOwnership(grainId);
-            results.Add(LookupCore(grainId));
-        }
-
-        return new DirectoryResult<List<GrainAddress?>>(results, _view.Version);
-    }
-
-    async ValueTask<DirectoryResult<bool>> IGrainDirectoryReplica.UnregisterAsync(MembershipVersion version, GrainAddress address)
-    {
-        ArgumentNullException.ThrowIfNull(address);
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace("UnregisterAsync('{Version}', '{Address}')", version, address);
-        }
-
-        await WaitForRange(address.GrainId, version);
-        if (!IsExpectedView(version))
-        {
-            return new DirectoryResult<bool>(false, _view.Version);
-        }
-
-        AssertOwnership(address.GrainId);
-        return new DirectoryResult<bool>(UnregisterCore(address), _view.Version);
-    }
-
-    async ValueTask<DirectoryResult<bool>> IGrainDirectoryReplica.UnregisterAsync(MembershipVersion version, List<GrainAddress> addresses)
-    {
-        ArgumentNullException.ThrowIfNull(addresses);
-        if (_logger.IsEnabled(LogLevel.Trace))
-        {
-            _logger.LogTrace("UnregisterAsync('{Version}', '{AddressCount}')", version, addresses.Count);
-        }
-
-        var result = true;
-        foreach (var address in addresses)
-        {
-            // Ensure we can serve the request.
-            await WaitForRange(address.GrainId, version);
-            if (!IsExpectedView(version))
-            {
-                return new DirectoryResult<bool>(false, _view.Version);
-            }
-
-            AssertOwnership(address.GrainId);
-            result &= UnregisterCore(address);
-        }
-
-        return new DirectoryResult<bool>(result, _view.Version);
-    }
-
-    async ValueTask<DirectoryResult<GrainDirectoryPartitionSnapshot>> IGrainDirectoryReplica.GetPartitionSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range)
+    async ValueTask<GrainDirectoryPartitionSnapshot?> IGrainDirectoryReplica.GetPartitionSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range)
     {
         if (_logger.IsEnabled(LogLevel.Trace))
         {
@@ -232,11 +132,11 @@ internal sealed class GrainDirectoryReplica(
                 _logger.LogInformation("Transferring '{Count}' entries in range '{Range}' from version '{Version}' snapshot.", partitionAddresses.Count, range, rangeVersion);
             }
 
-            return new DirectoryResult<GrainDirectoryPartitionSnapshot>(rangeSnapshot, rangeVersion);
+            return rangeSnapshot;
         }
 
         _logger.LogWarning("Received a request for a snapshot which this replica does not have, version '{Version}', range version '{RangeVersion}', range '{Range}'.", version, rangeVersion, range);
-        return new DirectoryResult<GrainDirectoryPartitionSnapshot>(null!, _view.Version);
+        return null;
     }
 
     ValueTask IGrainDirectoryReplica.AcknowledgeSnapshotTransferAsync(SiloAddress owner, MembershipVersion rangeVersion)
@@ -279,43 +179,9 @@ internal sealed class GrainDirectoryReplica(
     [Conditional("DEBUG")]
     private void AssertOwnership(GrainId grainId)
     {
-        Debug.Assert(_view.TryGetOwner(grainId, out var owner));
-        Debug.Assert(_id.Equals(owner));
-    }
-
-    private bool UnregisterCore(GrainAddress address)
-    {
-        if (_directory.TryGetValue(address.GrainId, out var existing) && existing.Equals(address))
-        {
-            return _directory.Remove(address.GrainId);
-        }
-
-        return false;
-    }
-
-    private GrainAddress? LookupCore(GrainId grainId)
-    {
-        if (_directory.TryGetValue(grainId, out var existing))
-        {
-            return existing;
-        }
-
-        return null;
-    }
-
-    private GrainAddress RegisterCore(GrainAddress newAddress, GrainAddress? existingAddress)
-    {
-        ref var existing = ref CollectionsMarshal.GetValueRefOrAddDefault(_directory, newAddress.GrainId, out _);
-
-        // Optimization: if silo is dead, allow the entry to be overwritten.
-        if (existing is null || existing.Equals(existingAddress) || IsSiloDead(existing))
-        {
-            existing = newAddress;
-        }
-
-        return existing;
-
-        bool IsSiloDead(GrainAddress existing) => _clusterMembershipService.CurrentSnapshot.GetSiloStatus(existing.SiloAddress) == SiloStatus.Dead;
+        var view = _view;
+        Debug.Assert(view.TryGetOwnerIndex(grainId, out var index));
+        Debug.Assert(_id.Equals(view.Members[index]));
     }
 
     private ValueTask WaitForRange(GrainId grainId, MembershipVersion version) => WaitForRange(RingRange.FromPoint(grainId.GetUniformHashCode()), version);
@@ -347,8 +213,6 @@ internal sealed class GrainDirectoryReplica(
             return false;
         }
     }
-
-    private bool IsExpectedView(MembershipVersion version) => version == _view.Version;
 
     public IGrainDirectoryReplica GetReplica(SiloAddress address) => _grainFactory.GetSystemTarget<IGrainDirectoryReplica>(Constants.DirectoryReplicaType, address);
 
@@ -574,28 +438,22 @@ internal sealed class GrainDirectoryReplica(
                 var replica = GetReplica(previousOwner);
 
                 // Alternatively, the previous owner could push the snapshot. The pull-based approach is used here because it is simpler.
-                var snapshotResult = await replica.GetPartitionSnapshotAsync(currentVersion, previousVersion, addedRange).AsTask().WaitAsync(cancellationToken);
+                var snapshot = await replica.GetPartitionSnapshotAsync(currentVersion, previousVersion, addedRange).AsTask().WaitAsync(cancellationToken);
 
-                // The acknowledgement step lets the previous owner know that the snapshot has been received so that it can proceed.
-                await replica.AcknowledgeSnapshotTransferAsync(_id, previousVersion).SuppressThrowing();
-
-                // Wait for previous versions to be un-wedged before proceeding.
-                await WaitForRange(addedRange, previousVersion);
-
-                // Check that the version has not changed since the call was issued, and that the remote replica validated the version.
-                if (!snapshotResult.TryGetResult(previousVersion, out var snapshot))
-                {
-                    _logger.LogWarning("Expected a valid snapshot from previous owner '{PreviousOwner}' for part of range '{Range}', but found none.", previousOwner, addedRange);
-                    BumpDataLossVersion(currentVersion, "result version mismatch");
-                    return;
-                }
-
+                // If the snapshot is missing, we must declare a data loss event.
                 if (snapshot is null)
                 {
                     _logger.LogWarning("Expected a valid snapshot from previous owner '{PreviousOwner}' for part of range '{Range}', but found none.", previousOwner, addedRange);
-                    BumpDataLossVersion(currentVersion, "snapshot null");
+                    BumpDataLossVersion(currentVersion, "partition snapshot not found");
                     return;
                 }
+
+                // The acknowledgement step lets the previous owner know that the snapshot has been received so that it can proceed.
+                // This does not need to be awaited, since it is only a notification, but we should 
+                replica.AcknowledgeSnapshotTransferAsync(_id, previousVersion).AsTask().Ignore();
+
+                // Wait for previous versions to be un-wedged before proceeding.
+                await WaitForRange(addedRange, previousVersion);
 
                 BumpDataLossVersion(snapshot.DataLossVersion, "inherited");
 

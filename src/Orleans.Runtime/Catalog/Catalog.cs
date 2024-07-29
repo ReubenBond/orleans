@@ -31,6 +31,8 @@ namespace Orleans.Runtime
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
         private readonly GrainContextActivator grainActivator;
         private readonly GrainPropertiesResolver grainPropertiesResolver;
+        private readonly ClusterMembershipService _clusterMembershipService;
+
         public Catalog(
             ILocalSiloDetails localSiloDetails,
             GrainLocator grainLocator,
@@ -42,7 +44,8 @@ namespace Orleans.Runtime
             ILoggerFactory loggerFactory,
             IOptions<GrainCollectionOptions> collectionOptions,
             GrainContextActivator grainActivator,
-            GrainPropertiesResolver grainPropertiesResolver)
+            GrainPropertiesResolver grainPropertiesResolver,
+            ClusterMembershipService clusterMembershipService)
             : base(Constants.CatalogType, localSiloDetails.SiloAddress, loggerFactory)
         {
             this.LocalSilo = localSiloDetails.SiloAddress;
@@ -55,6 +58,7 @@ namespace Orleans.Runtime
             this.collectionOptions = collectionOptions;
             this.grainActivator = grainActivator;
             this.grainPropertiesResolver = grainPropertiesResolver;
+            _clusterMembershipService = clusterMembershipService;
             this.logger = loggerFactory.CreateLogger<Catalog>();
             this.activationCollector = activationCollector;
             this.RuntimeClient = serviceProvider.GetRequiredService<InsideRuntimeClient>();
@@ -262,7 +266,13 @@ namespace Orleans.Runtime
 
                 if (!SiloStatusOracle.CurrentStatus.IsTerminating())
                 {
-                    var address = GrainAddress.GetAddress(Silo, grainId, ActivationId.NewId());
+                    var address = new GrainAddress
+                    {
+                        SiloAddress = Silo,
+                        GrainId = grainId,
+                        ActivationId = ActivationId.NewId(),
+                        MembershipVersion = _clusterMembershipService.CurrentSnapshot.Version,
+                    };
                     result = this.grainActivator.CreateInstance(address);
                     activations.RecordNewTarget(result);
                 }
@@ -430,7 +440,7 @@ namespace Orleans.Runtime
             if (!status.IsTerminating()) return;
             if (status == SiloStatus.Dead)
             {
-                this.RuntimeClient.BreakOutstandingMessagesToDeadSilo(updatedSilo);
+                this.RuntimeClient.BreakOutstandingMessagesToSilo(updatedSilo);
             }
 
             var activationsToShutdown = new List<IGrainContext>();

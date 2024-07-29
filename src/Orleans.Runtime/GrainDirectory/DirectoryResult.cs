@@ -1,10 +1,9 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 
 #nullable enable
 namespace Orleans.Runtime;
 
-[GenerateSerializer]
-[Alias("DirectoryResult`1")]
+[GenerateSerializer, Alias("DirectoryResult`1"), Immutable]
 public readonly struct DirectoryResult<T>(T result, MembershipVersion version)
 {
     [Id(0)]

@@ -91,20 +91,13 @@ internal sealed class DirectoryMembershipSnapshot
                 });
     }
 
-    public bool TryGetOwner(GrainId grainId, [NotNullWhen(true)] out SiloAddress? owner) => TryGetOwner(grainId.GetUniformHashCode(), out owner);
+    public bool TryGetOwnerIndex(GrainId grainId, out int owner) => TryGetOwnerIndex(grainId.GetUniformHashCode(), out owner);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryGetOwner(uint hashCode, [NotNullWhen(true)] out SiloAddress? owner)
+    public bool TryGetOwnerIndex(uint hashCode, out int index)
     {
-        var index = BinarySearch(Ranges, hashCode, static (range, hashCode) => range.Compare(hashCode));
-        if (index >= 0)
-        {
-            owner = Members[index];
-            return true;
-        }
-
-        owner = null;
-        return false;
+        index = BinarySearch(Ranges, hashCode, static (range, hashCode) => range.Compare(hashCode));
+        return index >= 0;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
