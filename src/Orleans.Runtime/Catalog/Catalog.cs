@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
@@ -112,7 +113,7 @@ namespace Orleans.Runtime
                 .ToList();
         }
 
-        public List<DetailedGrainStatistic> GetDetailedGrainStatistics(string[] types=null)
+        public List<DetailedGrainStatistic> GetDetailedGrainStatistics(string[] types = null)
         {
             var stats = new List<DetailedGrainStatistic>();
             lock (activations)
@@ -123,7 +124,7 @@ namespace Orleans.Runtime
                     if (data == null || data.GrainInstance == null) continue;
 
                     var grainType = RuntimeTypeNameFormatter.Format(data.GrainInstance.GetType());
-                    if (types==null || types.Contains(grainType))
+                    if (types == null || types.Contains(grainType))
                     {
                         stats.Add(new DetailedGrainStatistic()
                         {
@@ -489,6 +490,42 @@ namespace Orleans.Runtime
                     var reason = new DeactivationReason(DeactivationReasonCode.InternalFailure, reasonText);
                     StartDeactivatingActivations(reason, activationsToShutdown);
                 }
+            }
+        }
+
+        Task<Immutable<List<GrainAddress>>> ICatalog.GetRegisteredActivations(RingRange range)
+        {
+            var result = new List<GrainAddress>();
+            foreach (var (grainId, activation) in activations)
+            {
+                var directory = GetGrainDirectory(activation, grainDirectoryResolver);
+                if (directory is not null && directory.GetType() == typeof(ReplicatedGrainDirectory))
+                {
+                    if (range.Contains(activation.GrainId.GetUniformHashCode()))
+                    {
+                        result.Add(activation.Address);
+                    }
+                }
+            }
+
+            return Task.FromResult(result.AsImmutable());
+
+            static IGrainDirectory GetGrainDirectory(IGrainContext grainContext, GrainDirectoryResolver grainDirectoryResolver)
+            {
+                if (grainContext is ActivationData activationData)
+                {
+                    return activationData.Shared.GrainDirectory;
+                }
+                else if (grainContext is SystemTarget systemTarget)
+                {
+                    return null;
+                }
+                else if (grainContext.GetComponent<PlacementStrategy>() is { IsUsingGrainDirectory: true })
+                {
+                    return grainDirectoryResolver.Resolve(grainContext.GrainId.Type);
+                }
+
+                return null;
             }
         }
     }

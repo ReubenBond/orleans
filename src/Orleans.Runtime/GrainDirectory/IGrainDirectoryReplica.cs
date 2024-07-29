@@ -18,6 +18,4 @@ internal interface IGrainDirectoryReplica : ISystemTarget
 
     ValueTask<GrainDirectoryPartitionSnapshot?> GetPartitionSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range);
     ValueTask AcknowledgeSnapshotTransferAsync(SiloAddress owner, MembershipVersion version);
-
-    ValueTask<DirectoryResult<MembershipVersion>> GetDataLossVersion(MembershipVersion version);
 }

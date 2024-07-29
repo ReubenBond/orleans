@@ -13,6 +13,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Runtime.GrainDirectory;
 
+/*
 internal sealed partial class ReplicatedGrainDirectory : ILifecycleParticipant<ISiloLifecycle>
 {
     private readonly CancellationTokenSource _shutdownCts = new();
@@ -78,7 +79,12 @@ internal sealed partial class ReplicatedGrainDirectory : ILifecycleParticipant<I
             dataLossVersionTasks.Add(GetDataLossVersion(view.Version, member, cancellationToken));
         }
 
-        await Task.WhenAll(dataLossVersionTasks).WaitAsync(cancellationToken);
+        await Task.WhenAll(dataLossVersionTasks).WaitAsync(cancellationToken).SuppressThrowing();
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
 
         var isLatestView = true;
         var dataLossVersions = new MembershipVersion[dataLossVersionTasks.Count];
@@ -140,23 +146,6 @@ internal sealed partial class ReplicatedGrainDirectory : ILifecycleParticipant<I
 
         await Task.WhenAll(tasks);
 
-        static IGrainDirectory? GetGrainDirectory(IGrainContext grainContext, GrainDirectoryResolver grainDirectoryResolver)
-        {
-            if (grainContext is ActivationData activationData)
-            {
-                return activationData.Shared.GrainDirectory;
-            }
-            else if (grainContext is SystemTarget systemTarget)
-            {
-                return null;
-            }
-            else if (grainContext.GetComponent<PlacementStrategy>() is { IsUsingGrainDirectory: true })
-            {
-                return grainDirectoryResolver.Resolve(grainContext.GrainId.Type);
-            }
-
-            return null;
-        }
 
         async Task DeactivateActivations(DeactivationReason reason, List<IGrainContext> list, CancellationToken token)
         {
@@ -205,3 +194,4 @@ internal sealed partial class ReplicatedGrainDirectory : ILifecycleParticipant<I
         return (false, default);
     }
 }
+*/

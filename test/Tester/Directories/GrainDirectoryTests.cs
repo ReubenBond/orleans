@@ -21,7 +21,7 @@ internal class MyDirectoryTestGrain : Grain, IMyDirectoryTestGrain
     public ValueTask<string> Echo(string data) => new(data);
 }
 
-public sealed class ReplicatedGrainDirectoryTests
+public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
 {
     [Fact]
     public async Task DynamicClusterTest()
@@ -54,7 +54,15 @@ public sealed class ReplicatedGrainDirectoryTests
 
                         if (currentCount > target)
                         {
-                            await testCluster.StopSiloAsync(testCluster.Silos.Last());
+                            var victim = testCluster.Silos.Last();
+                            if (currentCount % 2 == 0)
+                            {
+                                await testCluster.StopSiloAsync(victim);
+                            }
+                            else
+                            {
+                                await testCluster.KillSiloAsync(victim);
+                            }
                         }
                         else if (currentCount < target)
                         {
@@ -73,7 +81,7 @@ public sealed class ReplicatedGrainDirectoryTests
                 }
                 catch (Exception exception)
                 {
-                    Debug.WriteLine(exception);
+                    output.WriteLine($"Exception: {exception}");
                 }
             }
         }
@@ -82,7 +90,6 @@ public sealed class ReplicatedGrainDirectoryTests
             await testCluster.StopAllSilosAsync();
             await testCluster.DisposeAsync();
         }
-
     }
 }
 

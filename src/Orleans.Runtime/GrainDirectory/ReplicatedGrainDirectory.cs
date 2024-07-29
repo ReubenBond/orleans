@@ -10,8 +10,9 @@ namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed partial class ReplicatedGrainDirectory(
     GrainDirectoryReplica localReplica,
-    ILogger<ReplicatedGrainDirectory> logger,
-    IServiceProvider serviceProvider) : IGrainDirectory
+    ILogger<ReplicatedGrainDirectory> logger
+    /*,
+    IServiceProvider serviceProvider*/) : IGrainDirectory
 {
     public async Task<GrainAddress?> Lookup(GrainId grainId) => await InvokeAsync(
         grainId,
