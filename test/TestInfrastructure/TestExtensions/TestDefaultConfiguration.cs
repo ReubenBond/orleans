@@ -67,6 +67,7 @@ namespace TestExtensions
                 if (!string.IsNullOrEmpty(clientId))
                 {
                     options.ManagedIdentityClientId = clientId;
+                    options.CredentialProcessTimeout = TimeSpan.FromSeconds(90);
                 }
                 return new DefaultAzureCredential(options);
             }
