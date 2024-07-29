@@ -17,5 +17,5 @@ internal interface IGrainDirectoryReplica : ISystemTarget
     ValueTask<DirectoryResult<bool>> UnregisterAsync(MembershipVersion version, List<GrainAddress> addresses);
 
     ValueTask<GrainDirectoryPartitionSnapshot?> GetPartitionSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range);
-    ValueTask AcknowledgeSnapshotTransferAsync(SiloAddress owner, MembershipVersion version);
+    ValueTask<bool> AcknowledgeSnapshotTransferAsync(SiloAddress owner, MembershipVersion version);
 }
