@@ -388,21 +388,12 @@ internal sealed partial class GrainDirectoryReplica(
         {
             // Transfer subranges from previous owners.
             var tasks = new List<Task<bool>>();
-            foreach (var member in previous.Members)
+            foreach (var previousOwner in previous.Members)
             {
-                var previousRanges = previous.GetRanges(member);
-                var intersections = ImmutableArray.CreateBuilder<RingRange>();
-                foreach (var range in addedRanges)
+                var previousOwnerRanges = previous.GetRanges(previousOwner);
+                if (addedRanges.Overlaps(previousOwnerRanges))
                 {
-                    foreach (var previousRange in previousRanges.Ranges)
-                    {
-                        intersections.AddRange(range.Intersections(previousRange));
-                    }
-                }
-
-                if (intersections.Count > 0)
-                {
-                    tasks.Add(TransferRangeAsync(currentVersion, new(intersections.ToImmutable()), member, previous.Version));
+                    tasks.Add(TransferRangeAsync(currentVersion, addedRanges, previousOwner, previous.Version));
                 }
             }
 

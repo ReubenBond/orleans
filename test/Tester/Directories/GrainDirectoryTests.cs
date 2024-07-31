@@ -41,10 +41,7 @@ public sealed class ReplicatedGrainDirectoryTests
             while (!cts.IsCancellationRequested)
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(5));
-                for (var i = 0; i < CallsPerIteration; i++)
-                {
-                    await testCluster.GrainFactory.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping();
-                }
+                await Parallel.ForAsync(0, CallsPerIteration, (i, ct) => testCluster.GrainFactory.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping());
 
                 idBase += CallsPerIteration;
                 if (idBase > IterationsPerCycle * CallsPerIteration)

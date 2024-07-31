@@ -70,6 +70,21 @@ internal sealed partial class ReplicatedGrainDirectory(
         var view = localReplica.CurrentView;
         while (true)
         {
+
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+                await Task.Delay(100);
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+            
             var initialVersion = _recoveryMembershipVersionValue;
             if (view.Version.Value < _recoveryMembershipVersionValue || !view.TryGetOwnerIndex(grainId, out var owner))
             {
@@ -96,21 +111,40 @@ internal sealed partial class ReplicatedGrainDirectory(
 // TESTING TESTING TESTING
 // TESTING TESTING TESTING
 // TESTING TESTING TESTING
-            if (strict && TESTLATCH.LATCH && Random.Shared.Next(10) == 4)
+                await Task.Delay(100);
+            if (TESTLATCH.LATCH && Random.Shared.Next(10) == 4)
             {
                 await Task.Delay(5000);
             }
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
 
-            if (strict && initialVersion != _recoveryMembershipVersionValue)
+            if (initialVersion != _recoveryMembershipVersionValue)
             {
                 // If the recovery version changed, perform a view refresh and re-issue the operation.
                 // See the comment on the declaration of '_recoveryMembershipVersionValue' for more details.
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
                 logger.LogError("WOWOWOW - Retry '{Operation}' on '{Owner}' for grain '{GrainId}' due to recovery version change from '{InitialVersion}' to '{CurrentVersion}'", operation, owner, grainId, initialVersion, _recoveryMembershipVersionValue);  
                 logger.LogError("WOWOWOW - Retry '{Operation}' on '{Owner}' for grain '{GrainId}' due to recovery version change from '{InitialVersion}' to '{CurrentVersion}'", operation, owner, grainId, initialVersion, _recoveryMembershipVersionValue);  
                 logger.LogError("WOWOWOW - Retry '{Operation}' on '{Owner}' for grain '{GrainId}' due to recovery version change from '{InitialVersion}' to '{CurrentVersion}'", operation, owner, grainId, initialVersion, _recoveryMembershipVersionValue);  
                 logger.LogError("WOWOWOW - Retry '{Operation}' on '{Owner}' for grain '{GrainId}' due to recovery version change from '{InitialVersion}' to '{CurrentVersion}'", operation, owner, grainId, initialVersion, _recoveryMembershipVersionValue);  
                 logger.LogError("WOWOWOW - Retry '{Operation}' on '{Owner}' for grain '{GrainId}' due to recovery version change from '{InitialVersion}' to '{CurrentVersion}'", operation, owner, grainId, initialVersion, _recoveryMembershipVersionValue);  
                 logger.LogError("WOWOWOW - Retry '{Operation}' on '{Owner}' for grain '{GrainId}' due to recovery version change from '{InitialVersion}' to '{CurrentVersion}'", operation, owner, grainId, initialVersion, _recoveryMembershipVersionValue);  
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
+// TESTING TESTING TESTING
                 continue;
             }
 
