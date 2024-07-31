@@ -1,27 +1,24 @@
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
-using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.TestingHost;
 using TestExtensions;
-using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Tester.Directories;
 
-internal interface IMyDirectoryTestGrain : IGrainWithGuidKey
+internal interface IMyDirectoryTestGrain : IGrainWithIntegerKey
 {
-    ValueTask<string> Echo(string data);
+    ValueTask Ping();
 }
 
 internal class MyDirectoryTestGrain : Grain, IMyDirectoryTestGrain
 {
-    public ValueTask<string> Echo(string data) => new(data);
+    public ValueTask Ping() => default;
 }
 
-public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
+public sealed class ReplicatedGrainDirectoryTests
 {
     [Fact]
     public async Task DynamicClusterTest()
@@ -32,24 +29,35 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
 
         var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
         var reconfigurationTimer = CoarseStopwatch.StartNew();
-        var target = 10;
-        var upperLimit = 10;
+        var upperLimit = 5;
         var lowerLimit = 1;
+        var target = upperLimit;
+        Task clusterOperation = Task.CompletedTask;
+        var idBase = 0L;
+        const int CallsPerIteration = 100;
+        const int IterationsPerCycle = 1000;
         try
         {
             while (!cts.IsCancellationRequested)
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(5));
-                try
+                for (var i = 0; i < CallsPerIteration; i++)
                 {
-                    for (var i = 0; i < 100; i++)
-                    {
-                        await testCluster.GrainFactory.GetGrain<IMyDirectoryTestGrain>(Guid.NewGuid()).Echo("hello");
-                    }
+                    await testCluster.GrainFactory.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping();
+                }
 
-                    if (reconfigurationTimer.Elapsed > TimeSpan.FromSeconds(5))
+                idBase += CallsPerIteration;
+                if (idBase > IterationsPerCycle * CallsPerIteration)
+                {
+                    idBase = 0;
+                }
+
+                if (reconfigurationTimer.Elapsed > TimeSpan.FromSeconds(5))
+                {
+                    reconfigurationTimer.Restart();
+                    await clusterOperation;
+                    clusterOperation = Task.Run(async () =>
                     {
-                        reconfigurationTimer.Restart();
                         var currentCount = testCluster.Silos.Count;
 
                         if (currentCount > target)
@@ -61,7 +69,9 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
                             }
                             else
                             {
+                                TESTLATCH.LATCH = true;
                                 await testCluster.KillSiloAsync(victim);
+                                TESTLATCH.LATCH = false;
                             }
                         }
                         else if (currentCount < target)
@@ -77,11 +87,7 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
                         {
                             target = lowerLimit;
                         }
-                    }
-                }
-                catch (Exception exception)
-                {
-                    output.WriteLine($"Exception: {exception}");
+                    });
                 }
             }
         }
