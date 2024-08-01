@@ -51,6 +51,8 @@ internal sealed partial class GrainDirectoryReplica(
 
     private Task? _runTask;
 
+    private bool _disposed;
+
     public DirectoryMembershipSnapshot CurrentView => _view;
 
     public IAsyncEnumerable<DirectoryMembershipSnapshot> ViewUpdates => _viewUpdates;
@@ -197,9 +199,25 @@ internal sealed partial class GrainDirectoryReplica(
         observer.Subscribe(nameof(GrainDirectoryReplica), ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
 
         // Transition into 'ShuttingDown'/'Stopping' stage, removing ourselves from directory membership, but allow some time for hand-off before transitioning to 'Dead'.
-        observer.Subscribe(nameof(GrainDirectoryReplica), ServiceLifecycleStage.BecomeActive - 1, _ => Task.CompletedTask, OnShuttingDown);
-    }
-
+        //observer.Subscribe(nameof(GrainDirectoryReplica), ServiceLifecycleStage.BecomeActive - 1, _ => Task.CompletedTask, OnShuttingDown);
+        // TESTING TESTING TESTING RESTORE THE ABOVE
+        // TESTING TESTING TESTING RESTORE THE ABOVE
+        // TESTING TESTING TESTING RESTORE THE ABOVE
+        // TESTING TESTING TESTING RESTORE THE ABOVE
+        // TESTING TESTING TESTING RESTORE THE ABOVE
+        // TESTING TESTING TESTING RESTORE THE ABOVE
+        // TESTING TESTING TESTING RESTORE THE ABOVE
+        // TESTING TESTING TESTING RESTORE THE ABOVE
+        // TESTING TESTING TESTING RESTORE THE ABOVE
+        // TESTING TESTING TESTING RESTORE THE ABOVE
+        // TESTING TESTING TESTING RESTORE THE ABOVE, DELETE BELOW
+        observer.Subscribe(nameof(GrainDirectoryReplica), ServiceLifecycleStage.Active, _ => Task.CompletedTask, async ct =>
+        {
+            _disposed = true;
+            _shutdownCts.Cancel();
+            await _serviceProvider.GetRequiredService<ClusterMembershipService>().TryKill(_id);
+        });
+    } 
     private async Task OnShuttingDown(CancellationToken token)
     {
         while (!token.IsCancellationRequested && _partitionSnapshots.Count > 0)

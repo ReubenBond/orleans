@@ -318,6 +318,20 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         GrainInstance = grainInstance;
     }
 
+    public bool SetState(ActivationState currentState, ActivationState state)
+    {
+        lock (this)
+        {
+            if (State != currentState)
+            {
+                return false;
+            }
+
+            State = state;
+            return true;
+        }
+    }
+
     public void SetState(ActivationState state)
     {
         State = state;
@@ -1410,9 +1424,10 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 return;
             }
 
-            lock (this)
+            if (!SetState(ActivationState.Create, ActivationState.Activating))
             {
-                SetState(ActivationState.Activating);
+                // The activation has been told to deactivate.
+                return;
             }
 
             success = await CallActivateAsync(requestContextData, cancellationToken);
@@ -1449,17 +1464,21 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             {
                 RequestContextExtensions.Import(requestContextData);
                 await Lifecycle.OnStart(cancellationToken).WithCancellation("Timed out waiting for grain lifecycle to complete activation", cancellationToken);
+
+                if (State is not ActivationState.Activating)
+                {
+                    return false;
+                }
+
                 if (GrainInstance is IGrainBase grainBase)
                 {
                     await grainBase.OnActivateAsync(cancellationToken).WithCancellation($"Timed out waiting for {nameof(IGrainBase.OnActivateAsync)} to complete", cancellationToken);
                 }
 
-                lock (this)
+                // Activate calls on this activation are finished
+                if (!SetState(ActivationState.Activating, ActivationState.Valid))
                 {
-                    if (State == ActivationState.Activating)
-                    {
-                        SetState(ActivationState.Valid); // Activate calls on this activation are finished
-                    }
+                    return false;
                 }
 
                 if (_shared.Logger.IsEnabled(LogLevel.Debug))
@@ -1480,8 +1499,10 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 // Unregister the activation from the directory so other silo don't keep sending message to it
                 lock (this)
                 {
-                    SetState(ActivationState.FailedToActivate);
-                    DeactivationReason = new(DeactivationReasonCode.ActivationFailed, sourceException, "Failed to activate grain.");
+                    if (SetState(ActivationState.Activating, ActivationState.FailedToActivate))
+                    {
+                        DeactivationReason = new(DeactivationReasonCode.ActivationFailed, sourceException, "Failed to activate grain.");
+                    }
                 }
 
                 GetDeactivationCompletionSource().TrySetResult(true);
@@ -1513,11 +1534,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 }
 
                 ScheduleOperation(Command.UnregisterFromCatalog.Instance);
-
-                lock (this)
-                {
-                    SetState(ActivationState.Invalid);
-                }
+                SetState(ActivationState.FailedToActivate, ActivationState.Invalid);
 
                 return false;
             }
@@ -1617,11 +1634,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                     DeactivationReason = new(DeactivationReasonCode.InternalFailure, registrationException, "Failed to register activation in grain directory.");
                 }
 
-                lock (this)
-                {
-                    SetState(ActivationState.Invalid);
-                }
-
+                SetState(ActivationState.Create, ActivationState.Invalid);
                 UnregisterMessageTarget();
             }
         }
@@ -1644,6 +1657,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 return false;
             }
 
+            // 🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱🧱
             if (State is ActivationState.Activating or ActivationState.Create)
             {
                 throw new InvalidOperationException("Calling DeactivateOnIdle from within OnActivateAsync is not supported");

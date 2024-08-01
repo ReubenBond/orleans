@@ -12,6 +12,11 @@ internal sealed partial class GrainDirectoryReplica
 {
     async ValueTask<DirectoryResult<GrainAddress>> IGrainDirectoryReplica.RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration) 
     {
+        if (_disposed)
+        {
+            await Task.Delay(10_000);
+        }
+
         ArgumentNullException.ThrowIfNull(address);
         if (_logger.IsEnabled(LogLevel.Trace))
         {
@@ -31,6 +36,11 @@ internal sealed partial class GrainDirectoryReplica
 
     async ValueTask<DirectoryResult<List<GrainAddress>>> IGrainDirectoryReplica.RegisterAsync(MembershipVersion version, List<GrainAddress> addresses) 
     {
+        if (_disposed)
+        {
+            await Task.Delay(10_000);
+        }
+
         ArgumentNullException.ThrowIfNull(addresses);
         if (_logger.IsEnabled(LogLevel.Trace))
         {
