@@ -109,10 +109,19 @@ namespace Orleans
             return observable.Subscribe(observer.GetType().FullName, stage, observer);
         }
 
-        private class Observer(Func<CancellationToken, Task> onStart, Func<CancellationToken, Task> onStop) : ILifecycleObserver
+        private class Observer : ILifecycleObserver
         {
-            public Task OnStart(CancellationToken ct) => onStart(ct);
-            public Task OnStop(CancellationToken ct) => onStop(ct);
+            private readonly Func<CancellationToken, Task> onStart;
+            private readonly Func<CancellationToken, Task> onStop;
+
+            public Observer(Func<CancellationToken, Task> onStart, Func<CancellationToken, Task> onStop)
+            {
+                this.onStart = onStart;
+                this.onStop = onStop;
+            }
+
+            public Task OnStart(CancellationToken ct) => this.onStart(ct);
+            public Task OnStop(CancellationToken ct) => this.onStop(ct);
         }
 
         private sealed class StartupObserver : ILifecycleObserver
