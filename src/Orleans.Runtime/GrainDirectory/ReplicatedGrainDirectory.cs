@@ -11,50 +11,8 @@ using Orleans.GrainDirectory;
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory;
 
-public static class TESTLATCH
-{
-    private static volatile int _latch;
-    public static bool LATCH
-    {
-        get => _latch == 1;
-        set => Interlocked.Exchange(ref _latch, value ? 1 : 0);
-    }
-}
-
-/*
-
-TODO:
-* Automatically batch registrations & unregistrations
-* Fix potential lost registration issue either by deactivating activations or by one of the below options.
-
-*/
-
-internal sealed class ReplicatedGrainDirectoryClient : IGrainDirectory 
-{
-    /*
-    If a grain successfully registers itself in the directory
-    then the directory crashes
-    before the grain updates its .Address property
-    and recovery occurs before the grain updates its .Address
-    recovery will observe that .Address.MembershipVersion == MembershipVersion.MinValue
-    and it will skip sending the registration to the new owner.
-
-    Setting 'recovery version' prevents any concurrent registration from being lost within the directory client code, but it does not guarantee that changes are visible on the grain instance
-    when recovery visits that grain instance.
-
-    Therefore, we need some stronger mechanism. Ideas:
-    * Set the activation's .Address from within the directory before validating registration result against 'recovery version'. This requires access to the grain context (we only have the GrainAddress today).
-        * Can use ActivationDirectory to get the grain instance and mutate its .Address property if it's an `ActivationData`. This breaks encapsulation and separation of concerns.
-    * Make GrainAddress mutable and update it atomically before returning to the grain. This may be dangerous.
-    * Instead of consulting ActivationDirectory, keep a dictionary of registered activations locally.
-        * Downsides include increased memory usage and potential for inconsistencies between the directory and the activation directory.
-    * Create a background worker which temporarily holds successful registrations and polls grains until they have updated their .Address property.
-    * Do the reverse: during recovery, keep a list of grains which have 'default' versions and 
-    * Add a validation step, called from grain code after registration completes and before activation continues. This is ugly.
-    * Deactivate any grain with a default MembershipVersion. 
-      * This results in a very small number of grains being deactivated, but potentially deactivates grains which are registered.
-    */
-}
+// TODO: Automatically batch registrations & unregistrations
+// TODO: Fix potential lost registration issue either by deactivating activations or by one of the below options.
 
 internal sealed partial class ReplicatedGrainDirectory(
     GrainDirectoryReplica localReplica,
@@ -113,7 +71,7 @@ internal sealed partial class ReplicatedGrainDirectory(
         var delay = TimeSpan.FromMilliseconds(10);
         while (true)
         {
-            
+
             var initialVersion = _recoveryMembershipVersionValue;
             if (view.Version.Value < _recoveryMembershipVersionValue || !view.TryGetOwnerIndex(grainId, out var owner))
             {
@@ -133,23 +91,6 @@ internal sealed partial class ReplicatedGrainDirectory(
 
             var replica = localReplica.GetReplica(owner);
 
-            // TESTING TESTING TESTING
-            // TESTING TESTING TESTING
-            // TESTING TESTING TESTING
-            // TESTING TESTING TESTING
-            // TESTING TESTING TESTING
-            // TESTING TESTING TESTING
-            if (TESTLATCH.LATCH)
-            {
-                await Task.Delay(5000);
-            }
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-
             try
             {
                 invokeResult = await func(replica, view.Version, state);
@@ -163,40 +104,10 @@ internal sealed partial class ReplicatedGrainDirectory(
                 continue;
             }
 
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-            if (TESTLATCH.LATCH)
-            {
-                await Task.Delay(5000);
-            }
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-
             if (initialVersion != _recoveryMembershipVersionValue)
             {
                 // If the recovery version changed, perform a view refresh and re-issue the operation.
                 // See the comment on the declaration of '_recoveryMembershipVersionValue' for more details.
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-                logger.LogError("WOWOWOW - Retry '{Operation}' on '{Owner}' for grain '{GrainId}' due to recovery version change from '{InitialVersion}' to '{CurrentVersion}'", operation, owner, grainId, initialVersion, _recoveryMembershipVersionValue);  
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
-// TESTING TESTING TESTING
                 continue;
             }
 
@@ -234,24 +145,20 @@ internal sealed partial class ReplicatedGrainDirectory(
             if (directory is not null && directory == this)
             {
                 var address = activation.Address;
-                if (address.MembershipVersion == MembershipVersion.MinValue)
+                if (address.MembershipVersion == MembershipVersion.MinValue
+                    || activation is ActivationData activationData && !activationData.IsValid)
                 {
+                    try
+                    {
+                        // This activation has not completed registration or is not currently active.
+                        // TODO: Expand validity check to non-ActivationData activations.
+                        activation.Deactivate(new DeactivationReason(DeactivationReasonCode.InternalFailure, "Cluster membership changed during directory registration."));
+                    }
+                    catch(Exception exception)
+                    {
+                        logger.LogWarning(exception, "Failed to deactivate activation {Activation}", activation);
+                    }
 
-                    /*
-
-                    If the grain is *active*, then we know it has a valid registration.
-                    If not, its registration status is in-doubt:
-                        * If it is not yet active, perhaps it has completed registration, perhaps not.
-                        * If it has started deactivating, it may have unregistered itself already and a new activation may have registered itself in its place.
-                     */
-
-
-
-                    
-                    // This activation has not completed registration.
-                    // The recovery version above will force the activation to complete registration on the new owner,
-                    // nullifying delayed messages from a previous owner.
-                    activation.Deactivate(new DeactivationReason(DeactivationReasonCode.InternalFailure, "Cluster membership changed during directory registration."));
                     continue;
                 }
 
