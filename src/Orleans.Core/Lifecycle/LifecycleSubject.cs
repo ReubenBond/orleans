@@ -23,15 +23,14 @@ namespace Orleans
     /// </remarks>
     public abstract class LifecycleSubject : ILifecycleSubject
     {
-        private readonly List<OrderedObserver> subscribers;
+        private readonly List<OrderedObserver> subscribers = [];
         protected readonly ILogger logger;
         private int? highStage = null;
 
         protected LifecycleSubject(ILogger logger)
         {
-            if (logger == null) throw new ArgumentNullException(nameof(logger));
+            ArgumentNullException.ThrowIfNull(logger);
             this.logger = logger;
-            this.subscribers = new List<OrderedObserver>();
         }
 
         /// <summary>
