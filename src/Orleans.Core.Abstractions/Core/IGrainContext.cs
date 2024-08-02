@@ -20,7 +20,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the grain identity.
         /// </summary>
-        GrainId GrainId => Address.GrainId;
+        GrainId GrainId { get; }
 
         /// <summary>
         /// Gets the grain instance, or <see langword="null"/> if the grain instance has not been set yet.
