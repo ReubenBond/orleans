@@ -96,9 +96,6 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     public DateTime KeepAliveUntil { get; set; } = DateTime.MinValue;
     public bool IsValid => State is ActivationState.Valid;
 
-    // Currently, the only supported multi-activation grain is one using the StatelessWorkerPlacement strategy.
-    internal bool IsStatelessWorker => PlacementStrategy is StatelessWorkerPlacement;
-
     /// <summary>
     /// Returns a value indicating whether or not this placement strategy requires activations to be registered in
     /// the grain directory.
@@ -347,7 +344,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         string limitName = nameof(SiloMessagingOptions.MaxEnqueuedRequestsHardLimit);
         int maxRequestsHardLimit = _shared.MessagingOptions.MaxEnqueuedRequestsHardLimit;
         int maxRequestsSoftLimit = _shared.MessagingOptions.MaxEnqueuedRequestsSoftLimit;
-        if (IsStatelessWorker)
+        if (PlacementStrategy is StatelessWorkerPlacement)
         {
             limitName = nameof(SiloMessagingOptions.MaxEnqueuedRequestsHardLimit_StatelessWorker);
             maxRequestsHardLimit = _shared.MessagingOptions.MaxEnqueuedRequestsHardLimit_StatelessWorker;

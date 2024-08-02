@@ -153,7 +153,7 @@ namespace Orleans.Runtime.Providers
             where TExtension : class, TExtensionInterface
             where TExtensionInterface : class, IGrainExtension
         {
-            if (this.grainContextAccessor.GrainContext is ActivationData activationData && activationData.IsStatelessWorker)
+            if (this.grainContextAccessor.GrainContext is ActivationData activationData && activationData.PlacementStrategy is StatelessWorkerPlacement)
             {
                 throw new InvalidOperationException($"The extension { typeof(TExtension) } cannot be bound to a Stateless Worker.");
             }
