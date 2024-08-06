@@ -1681,7 +1681,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 {
                     try
                     {
-                        await grainBase.OnDeactivateAsync(DeactivationReason, cancellationToken);
+                        await grainBase.OnDeactivateAsync(DeactivationReason, cancellationToken).WaitAsync(cancellationToken);
 
                         if (_shared.Logger.IsEnabled(LogLevel.Debug))
                             _shared.Logger.LogDebug(
@@ -1705,7 +1705,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 {
                     // Stops the lifecycle stages which were previously started.
                     // Stages which were never started are ignored.
-                    await lifecycle.OnStop(cancellationToken);
+                    await lifecycle.OnStop(cancellationToken).WaitAsync(cancellationToken);
                 }
             }
             catch (Exception exception)
@@ -1733,7 +1733,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                     OnDehydrate(context.MigrationContext);
 
                     // Send the dehydration context to the target host.
-                    await migrationManager.MigrateAsync(forwardingAddress, GrainId, context.MigrationContext);
+                    await migrationManager.MigrateAsync(forwardingAddress, GrainId, context.MigrationContext).AsTask().WaitAsync(cancellationToken);
                     _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, forwardingAddress);
                     migrated = true;
                 }
@@ -1756,7 +1756,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 // If the grain was migrated, the new activation will perform a check-and-set on the registration itself.
                 try
                 {
-                    await _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force);
+                    await _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force).WaitAsync(cancellationToken);
                 }
                 catch (Exception exception)
                 {
