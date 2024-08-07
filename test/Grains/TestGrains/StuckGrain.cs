@@ -11,15 +11,15 @@ namespace UnitTests.Grains
         private static readonly Dictionary<Guid, TaskCompletionSource<bool>> tcss = new Dictionary<Guid, TaskCompletionSource<bool>>();
         private static readonly Dictionary<Guid, int> counters = new Dictionary<Guid, int>();
         private static readonly HashSet<Guid> grains = new HashSet<Guid>();
-        private readonly ILogger<StuckGrain> _log;
+        private readonly ILogger _log;
         private bool isDeactivatingBlocking = false;
 
         private static readonly ConcurrentDictionary<GrainId, ManualResetEventSlim> blockingMREMap =
             new ConcurrentDictionary<GrainId, ManualResetEventSlim>();
 
-        public StuckGrain(ILogger<StuckGrain> log)
+        public StuckGrain(ILoggerFactory log)
         {
-            _log = log;
+            _log = log.CreateLogger($"StuckGrain-{this.GrainContext.ActivationId}");
         }
 
         public static bool Release(Guid key)
@@ -84,6 +84,7 @@ namespace UnitTests.Grains
 
         public Task NonBlockingCall()
         {
+            _log.LogInformation("NonBlockingCall");
             counters[this.GetPrimaryKey()] = counters[this.GetPrimaryKey()] + 1;
             return Task.CompletedTask;
         }
@@ -100,6 +101,7 @@ namespace UnitTests.Grains
 
         public Task BlockingDeactivation()
         {
+            _log.LogInformation("BlockingDeactivation");
             isDeactivatingBlocking = true;
             BlockCallingTestUntilDeactivation(this.GetGrainId());
             DeactivateOnIdle();

@@ -24,7 +24,7 @@ internal sealed partial class GrainDirectoryReplica(
     ILoggerFactory loggerFactory,
     IServiceProvider serviceProvider,
     IInternalGrainFactory grainFactory)
-    : SystemTarget(Constants.DirectoryReplicaType, localSiloDetails.SiloAddress, loggerFactory), IGrainDirectoryReplica, ILifecycleParticipant<ISiloLifecycle>
+    : SystemTarget(Constants.DirectoryReplicaType, localSiloDetails.SiloAddress, loggerFactory), IGrainDirectoryReplica, IGrainDirectoryReplicaTestHooks, ILifecycleParticipant<ISiloLifecycle>
 {
     private readonly Dictionary<GrainId, GrainAddress> _directory = [];
     private readonly ClusterMembershipService _clusterMembershipService = clusterMembershipService;
@@ -167,7 +167,7 @@ internal sealed partial class GrainDirectoryReplica(
     }
 
     [Conditional("DEBUG")]
-    private void AssertOwnership(GrainId grainId) => DebugAssertOwnership(_view, grainId);
+    private void DebugAssertOwnership(GrainId grainId) => DebugAssertOwnership(_view, grainId);
 
     [Conditional("DEBUG")]
     private void DebugAssertOwnership(DirectoryMembershipSnapshot view, GrainId grainId)
@@ -187,23 +187,23 @@ internal sealed partial class GrainDirectoryReplica(
 
     private ValueTask WaitForRange(GrainId grainId, MembershipVersion version, CancellationToken cancellationToken) => WaitForRange(RingRange.FromPoint(grainId.GetUniformHashCode()), version, cancellationToken);
 
-    private async ValueTask WaitForRange(RingRange ranges, MembershipVersion version, CancellationToken cancellationToken)
+    private async ValueTask WaitForRange(RingRange range, MembershipVersion version, CancellationToken cancellationToken)
     {
         if (_view.Version < version)
         {
             await RefreshViewAsync(version, cancellationToken);
         }
 
-        while (TryGetOverlappingWedge(ranges, version, out var completion))
+        while (TryGetOverlappingWedge(range, version, out var completion))
         {
             await completion.WaitAsync(cancellationToken);
         }
 
-        bool TryGetOverlappingWedge(RingRange ranges, MembershipVersion version, [NotNullWhen(true)] out Task? completion)
+        bool TryGetOverlappingWedge(RingRange range, MembershipVersion version, [NotNullWhen(true)] out Task? completion)
         {
             foreach (var wedge in _pendingRanges)
             {
-                if (wedge.Version <= version && ranges.Intersects(wedge.Range))
+                if (wedge.Version <= version && range.Intersects(wedge.Range))
                 {
                     completion = wedge.Completion.Task;
                     return true;
@@ -332,6 +332,7 @@ internal sealed partial class GrainDirectoryReplica(
 
             foreach (var grainAddress in toRemove)
             {
+                _logger.LogInformation("Deleting '{GrainAddress}' located on now-defunct silo '{SiloAddress}'.", grainAddress, change.SiloAddress);
                 UnregisterCore(grainAddress);
             }
         }
@@ -356,7 +357,7 @@ internal sealed partial class GrainDirectoryReplica(
         // The new owner will have the opportunity to retrieve the snapshot as they take ownership.
         List<GrainAddress> removedAddresses = [];
         HashSet<SiloAddress> transferPartners = [];
-        foreach (var removedRange in currentRanges.GetRemovals(previousRanges))
+        foreach (var removedRange in previousRanges.Difference(currentRanges))
         {
             if (_logger.IsEnabled(LogLevel.Trace))
             {
@@ -381,20 +382,29 @@ internal sealed partial class GrainDirectoryReplica(
                     removedAddresses.Add(entry.Value);
                 }
             }
+        }
 
-            // Remove these addresses from the partition.
-            foreach (var address in removedAddresses)
+        // Remove these addresses from the partition.
+        foreach (var address in removedAddresses)
+        {
+            if (transferPartners.Count > 0)
             {
-                _directory.Remove(address.GrainId);
+                _logger.LogInformation("Evicting entry '{Address}' to snapshot.", address);
             }
+
+            _directory.Remove(address.GrainId);
         }
 
         if (transferPartners.Count > 0)
         {
             _partitionSnapshots.Add(new PartitionSnapshotState(previous.Version, removedAddresses, transferPartners));
         }
+        else
+        {
+            _logger.LogInformation("Dropping snapshot since there are no transfer partners.");
+        }
 
-        var addedRanges = currentRanges.GetAdditions(previousRanges);
+        var addedRanges = currentRanges.Difference(previousRanges);
         if (!addedRanges.IsEmpty)
         {
             tasks.Add(TransferOwnershipAsync(previous, current, addedRanges));
@@ -416,7 +426,7 @@ internal sealed partial class GrainDirectoryReplica(
             foreach (var previousOwner in previous.Members)
             {
                 var previousOwnerRanges = previous.GetRanges(previousOwner);
-                if (addedRanges.Overlaps(previousOwnerRanges))
+                if (addedRanges.Intersects(previousOwnerRanges))
                 {
                     tasks.Add(TransferRangeAsync(current, addedRanges, previousOwner, previous.Version));
                 }
@@ -472,6 +482,8 @@ internal sealed partial class GrainDirectoryReplica(
 
         void ResumeAllRanges(MembershipVersion currentVersion)
         {
+            _logger.LogTrace("Resuming all ranges for version '{Version}'.", currentVersion);
+
             // Resume any remaining ranges for this version.
             foreach (var pending in _pendingRanges)
             {
@@ -535,6 +547,8 @@ internal sealed partial class GrainDirectoryReplica(
             foreach (var entry in snapshot.GrainAddresses)
             {
                 DebugAssertOwnership(current, entry.GrainId);
+                
+                _logger.LogInformation("Received '{Entry}' via snapshot from '{PreviousOwner}' for version '{Version}'.", entry, previousOwner, previousVersion);
                 _directory[entry.GrainId] = entry;
             }
 
@@ -571,12 +585,27 @@ internal sealed partial class GrainDirectoryReplica(
     private async Task RecoverPartitionRange(DirectoryMembershipSnapshot current, RingRangeCollection addedRanges)
     {
         _logger.LogInformation("Recovering activations from ranges '{Range}' at version '{Version}'.", addedRanges, current.Version);
-        var tasks = new List<Task<List<GrainAddress>>>();
 
-        // Membership is guaranteed to be newer than the current view.
+        await foreach (var activations in GetRegisteredActivations(current, addedRanges))
+        {
+            foreach (var entry in activations)
+            {
+                DebugAssertOwnership(current, entry.GrainId);
+                _logger.LogInformation("Recovered '{Entry}' for version '{Version}'.", entry, current.Version);
+                _directory[entry.GrainId] = entry;
+            }
+        }
+
+        _logger.LogInformation("Completed recovering activations from ranges '{Range}' at version '{Version}'.", addedRanges, current.Version);
+    }
+
+    private async IAsyncEnumerable<List<GrainAddress>> GetRegisteredActivations(DirectoryMembershipSnapshot current, RingRangeCollection ranges)
+    {
+        // Membership is guaranteed to be at least as recent as the current view.
         var clusterMembershipSnapshot = _clusterMembershipService.CurrentSnapshot;
         Debug.Assert(clusterMembershipSnapshot.Version >= current.Version);
-        var members = new List<ClusterMember>();
+
+        var tasks = new List<Task<List<GrainAddress>>>();
         foreach (var member in clusterMembershipSnapshot.Members.Values)
         {
             if (member.Status is not (SiloStatus.Active or SiloStatus.Joining or SiloStatus.ShuttingDown))
@@ -584,27 +613,21 @@ internal sealed partial class GrainDirectoryReplica(
                 continue;
             }
 
-            members.Add(member);
-            tasks.Add(GetRegisteredActivations(current.Version, addedRanges, member.SiloAddress));
+            tasks.Add(GetRegisteredActivationsFromClusterMember(current.Version, ranges, member.SiloAddress));
         }
 
         await Task.WhenAll(tasks).WaitAsync(_shutdownCts.Token).SuppressThrowing();
         if (_shutdownCts.IsCancellationRequested)
         {
-            return;
+            yield break;
         }
 
-        for (var i = 0; i < tasks.Count; ++i)
+        foreach (var task in tasks)
         {
-            var activations = await tasks[i];
-            foreach (var entry in activations)
-            {
-                DebugAssertOwnership(current, entry.GrainId);
-                _directory[entry.GrainId] = entry;
-            }
+            yield return await task;
         }
 
-        async Task<List<GrainAddress>> GetRegisteredActivations(MembershipVersion version, RingRangeCollection ranges, SiloAddress siloAddress)
+        async Task<List<GrainAddress>> GetRegisteredActivationsFromClusterMember(MembershipVersion version, RingRangeCollection ranges, SiloAddress siloAddress)
         {
             var stopwatch = ValueStopwatch.StartNew();
             var client = _grainFactory.GetSystemTarget<IGrainDirectoryReplicaClient>(Constants.DirectoryReplicaClientType, siloAddress);
@@ -614,10 +637,12 @@ internal sealed partial class GrainDirectoryReplica(
                 new Immutable<List<GrainAddress>>([]),
                 nameof(GetRegisteredActivations));
 
-            if (_logger.IsEnabled(LogLevel.Information) && stopwatch.Elapsed.TotalMilliseconds > 50)
+#if false
+            if (_logger.IsEnabled(LogLevel.Information))
             {
                 _logger.LogInformation("Recovered '{Count}' entries from silo '{SiloAddress}' for ranges '{Range}' at version '{Version}' in {ElapsedMilliseconds}ms.", result.Value.Count, siloAddress, ranges, version, stopwatch.Elapsed.TotalMilliseconds);
             }
+#endif
 
             return result.Value;
         }
@@ -651,6 +676,60 @@ internal sealed partial class GrainDirectoryReplica(
         }
 
         return defaultValue;
+    }
+
+    async ValueTask IGrainDirectoryReplicaTestHooks.CheckIntegrityAsync()
+    {
+        var current = _view;
+        await WaitForRange(RingRange.Full, current.Version, CancellationToken.None);
+        _logger.LogInformation("Performing integrity check on directory at version '{Version}'.", current.Version);
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var fullWedge = (RingRange.Full, current.Version, tcs);
+        _pendingRanges.Add(fullWedge);
+        try
+        {
+            foreach (var entry in _directory)
+            {
+                DebugAssertOwnership(entry.Key);
+            }
+
+            int missing = 0;
+            int mismatched = 0;
+            var total = 0;
+            await foreach (var activationList in GetRegisteredActivations(current, current.GetRanges(_id)))
+            {
+                total += activationList.Count;
+                foreach (var entry in activationList)
+                {
+                    DebugAssertOwnership(entry.GrainId);
+                    if (_directory.TryGetValue(entry.GrainId, out var existingEntry))
+                    {
+                        if (!existingEntry.Equals(entry))
+                        {
+                            ++mismatched;
+                            _logger.LogError("Integrity violation: Recovered entry '{RecoveredRecord}' does not match existing entry '{LocalRecord}'.", entry, existingEntry);
+                            Debugger.Launch();
+                            Debug.Fail($"Integrity violation: Recovered entry '{entry}' does not match existing entry '{existingEntry}'.");
+                        }
+                    }
+                    else
+                    {
+                        ++missing;
+                        _logger.LogError("Integrity violation: Recovered entry '{RecoveredRecord}' not found in directory.", entry);
+                        Debugger.Launch();
+                        Debug.Fail($"Integrity violation: Recovered entry '{entry}' not found in directory.");
+                    }
+                }
+            }
+
+            _logger.LogInformation("Directory integrity check analyzed '{TotalRecordCount}' records, '{MissingRecordCount}' were missing, and '{MismatchedRecordCount}' mismatched.", total, missing, mismatched);
+            return;
+        }
+        finally
+        {
+            tcs.SetResult();
+            _pendingRanges.Remove(fullWedge);
+        }
     }
 
     private sealed record class PartitionSnapshotState(

@@ -26,7 +26,7 @@ internal sealed partial class GrainDirectoryReplica
             return new DirectoryResult<GrainAddress>(null!, _view.Version);
         }
 
-        AssertOwnership(address.GrainId);
+        DebugAssertOwnership(address.GrainId);
         return new DirectoryResult<GrainAddress>(RegisterCore(address, currentRegistration), _view.Version);
     }
 
@@ -48,7 +48,7 @@ internal sealed partial class GrainDirectoryReplica
                 return new DirectoryResult<List<GrainAddress>>(null!, _view.Version);
             }
 
-            AssertOwnership(address.GrainId);
+            DebugAssertOwnership(address.GrainId);
             results.Add(RegisterCore(address, null));
         }
 
@@ -69,7 +69,7 @@ internal sealed partial class GrainDirectoryReplica
             return new DirectoryResult<GrainAddress?>(null, _view.Version);
         }
 
-        AssertOwnership(grainId);
+        DebugAssertOwnership(grainId);
         return new DirectoryResult<GrainAddress?>(LookupCore(grainId), _view.Version);
     }
 
@@ -90,7 +90,7 @@ internal sealed partial class GrainDirectoryReplica
                 return new DirectoryResult<List<GrainAddress?>>(null!, _view.Version);
             }
 
-            AssertOwnership(grainId);
+            DebugAssertOwnership(grainId);
             results.Add(LookupCore(grainId));
         }
 
@@ -111,7 +111,7 @@ internal sealed partial class GrainDirectoryReplica
             return new DirectoryResult<bool>(false, _view.Version);
         }
 
-        AssertOwnership(address.GrainId);
+        DebugAssertOwnership(address.GrainId);
         return new DirectoryResult<bool>(UnregisterCore(address), _view.Version);
     }
 
@@ -133,7 +133,7 @@ internal sealed partial class GrainDirectoryReplica
                 return new DirectoryResult<bool>(false, _view.Version);
             }
 
-            AssertOwnership(address.GrainId);
+            DebugAssertOwnership(address.GrainId);
             result &= UnregisterCore(address);
         }
 

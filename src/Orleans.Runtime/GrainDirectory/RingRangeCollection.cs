@@ -69,7 +69,7 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
                 }) >= 0;
     }
 
-    public bool Overlaps(RingRange other)
+    public bool Intersects(RingRange other)
     {
         if (IsEmpty || other.IsEmpty)
         {
@@ -92,7 +92,7 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
         return false;
     }
 
-    public bool Overlaps(RingRangeCollection other)
+    public bool Intersects(RingRangeCollection other)
     {
         if (IsEmpty || other.IsEmpty)
         {
@@ -118,7 +118,7 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
         return false;
     }
 
-    public RingRangeCollection GetAdditions(RingRangeCollection previous)
+    public RingRangeCollection Difference(RingRangeCollection previous)
     {
         // Ranges in left must not overlap with each other.
         // Ranges in right must not overlap with each other.
@@ -156,54 +156,6 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
             {
                 Debug.Assert(previous.Ranges.Length == 0);
                 return this;
-            }
-            else
-            {
-                Debug.Assert(Ranges.Length == 0 ^ previous.Ranges.Length == 0);
-                return Empty;
-            }
-        }
-    }
-
-    internal RingRangeCollection GetRemovals(RingRangeCollection previous)
-    {
-        // Ranges in left must not overlap with each other.
-        // Ranges in right must not overlap with each other.
-        // Corresponding ranges in left and right have the same starting points.
-        // The number of ranges in both 'Ranges' or 'previous.Ranges' is either zero or the configured number of ranges,
-        // i.e., if both collections have more than zero ranges, the both have the same number of ranges.
-        if (Ranges.Length == previous.Ranges.Length)
-        {
-            Debug.Assert(Ranges.Length == previous.Ranges.Length);
-            var result = ImmutableArray.CreateBuilder<RingRange>(Ranges.Length);
-            for (var i = 0; i < Ranges.Length; i++)
-            {
-                var c = Ranges[i];
-                var p = previous.Ranges[i];
-                Debug.Assert(c.Start == p.Start);
-                if (c.Size < p.Size)
-                {
-                    result.Add(RingRange.Create(c.End, p.End));
-                }
-            }
-
-            // If the last range wrapped around but its truncation does not wrap around, move it to the front.
-            // This preserves sort order.
-            if (result.Count > 1 && result[^1].Start < result[^2].Start)
-            {
-                var last = result[^1];
-                result.RemoveAt(result.Count - 1);
-                result.Insert(0, last);
-            }
-
-            return new(result.ToImmutable());
-        }
-        else
-        {
-            if (previous.Ranges.Length > Ranges.Length)
-            {
-                Debug.Assert(Ranges.Length == 0);
-                return previous;
             }
             else
             {

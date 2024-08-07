@@ -25,3 +25,8 @@ internal interface IGrainDirectoryReplicaClient : ISystemTarget
 {
     ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRangeCollection ranges);
 }
+
+internal interface IGrainDirectoryReplicaTestHooks : ISystemTarget
+{
+    ValueTask CheckIntegrityAsync();
+}
