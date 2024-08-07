@@ -113,9 +113,6 @@ namespace UnitTests.StuckGrainTests
                     () => stuckGrain.NonBlockingCall().WaitAsync(TimeSpan.FromMilliseconds(500)));
             }
 
-            // Wait so the first task will reach with DefaultCollectionAge timeout
-            await Task.Delay(TimeSpan.FromSeconds(3));
-
             // No issue on this one
             await stuckGrain.NonBlockingCall();
 
