@@ -564,11 +564,14 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                         try
                         {
                             _shared.Logger.LogInformation("Cancelling activation of {Activation} due to '{Reason}'", this, reason);
-                            activate.Cts.Cancel();
+                            activate.Cancel();
                         }
                         catch (Exception exception)
                         {
-                            _shared.Logger.LogError(exception, "Error cancelling activation.");
+                            if (exception is not ObjectDisposedException)
+                            {
+                                _shared.Logger.LogWarning(exception, "Error while cancelling on-going activation.");
+                            }
                         }
                     }
                 }
@@ -1129,21 +1132,21 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                         case Command.Activate command:
                             try
                             {
-                                await ActivateAsync(command.RequestContext, command.Cts.Token).SuppressThrowing();
+                                await ActivateAsync(command.RequestContext, command.CancellationToken).SuppressThrowing();
                             }
                             finally
                             {
-                                command.Cts.Dispose();
+                                command.Dispose();
                             }
                             break;
                         case Command.Deactivate command:
                             try
                             {
-                                await FinishDeactivating(command.Cts.Token, command.PreviousState).SuppressThrowing();
+                                await FinishDeactivating(command.CancellationToken, command.PreviousState).SuppressThrowing();
                             }
                             finally
                             {
-                                command.Cts.Dispose();
+                                command.Dispose();
                             }
 
                             break;
@@ -1973,14 +1976,36 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
         public sealed class Deactivate(CancellationTokenSource cts, ActivationState previousState) : Command
         {
-            public CancellationTokenSource Cts { get; } = cts;
+            private readonly CancellationTokenSource _cts = cts;
+            public CancellationToken CancellationToken => _cts.Token;
             public ActivationState PreviousState { get; } = previousState;
+            public void Dispose() => _cts.Dispose();
         }
 
-        public sealed class Activate(Dictionary<string, object>? requestContext, CancellationTokenSource cts) : Command
+        public sealed class Activate(Dictionary<string, object>? requestContext, CancellationTokenSource cts) : Command, IDisposable
         {
+            private bool _disposed;
+            private readonly CancellationTokenSource _cts = cts;
             public Dictionary<string, object>? RequestContext { get; } = requestContext;
-            public CancellationTokenSource Cts { get; } = cts;
+            public CancellationToken CancellationToken => _cts.Token;
+
+            public void Cancel()
+            {
+                lock (this)
+                {
+                    if (_disposed) return;
+                    _cts.Cancel();
+                }
+            }
+
+            public void Dispose()
+            {
+                lock (this)
+                {
+                    _disposed = true;
+                    _cts.Dispose();
+                }
+            }
         }
 
         public sealed class Rehydrate(IRehydrationContext context) : Command

@@ -1,7 +1,10 @@
+using System.Collections.Immutable;
 using Orleans.Runtime.GrainDirectory;
 using Xunit;
 
 namespace NonSilo.Tests.Directory;
+
+[TestCategory("BVT")]
 public sealed class RingRangeTests
 {
     [Fact]
@@ -63,7 +66,6 @@ public sealed class RingRangeTests
         Assert.Equal(RingRange.Full, Assert.Single(RingRange.Full.Difference(RingRange.Empty)));
 
         Assert.Empty(RingRange.Empty.Difference(RingRange.Full));
-        Assert.Empty(RingRange.Full.Difference(RingRange.Empty));
     }
 
     [InlineData(1)]
@@ -85,5 +87,69 @@ public sealed class RingRangeTests
         }
 
         Assert.Equal(uint.MaxValue, sum);
+    }
+}
+
+[TestCategory("BVT")]
+public sealed class RingRangeCollectionTests
+{
+    [Fact]
+    public void ContainsTest()
+    {
+        var ranges = new RingRange[]
+        {
+            RingRange.Create(0x10930012, 0x179C5AD4),
+            RingRange.Create(0x287844C7, 0x2B5DCCCB),
+            RingRange.Create(0x32AC80C2, 0x36F72978),
+            RingRange.Create(0x6F5C3AAC, 0x7776E202),
+            RingRange.Create(0x7D2B02F3, 0x7DF52810),
+            RingRange.Create(0xA18205D1, 0xA3A44031),
+            RingRange.Create(0xA847CD39, 0xAD6C28D0),
+            RingRange.Create(0xAF60D42F, 0xB278D2BE),
+            RingRange.Create(0xBB8EA837, 0xC61DA5E1),
+            RingRange.Create(0xF08C2237, 0xF3030A5A)
+        }.ToImmutableArray();
+        var collection = new RingRangeCollection(ranges);
+        uint point = 0x16F4037C;
+        Assert.True(ranges[0].Contains(point));
+        Assert.True(collection.Contains(point));
+
+        // Just outside the last range.
+        point = 0xF3030A5A + 1;
+        Assert.False(ranges[^1].Contains(point));
+        Assert.False(collection.Contains(point));
+
+        // Just inside the last range.
+        point = 0xF3030A5A;
+        Assert.True(ranges[^1].Contains(point));
+        Assert.True(collection.Contains(point));
+
+        // Between ranges.
+        point = 0xF08C2237 - 1;
+        Assert.False(collection.Contains(point));
+
+        // In an interior range.
+        point = 0x7D2B02F3 + 1;
+        Assert.True(collection.Contains(point));
+    }
+}
+
+[TestCategory("BVT")]
+public sealed class DirectoryMembershipSnapshotTests
+{
+    [Fact]
+    public void GetOwnerTest()
+    {
+    }
+
+    [Fact]
+    public void BoundaryTest()
+    {
+    }
+
+    [Fact]
+    public void HashCollisionTest()
+    {
+        // Tests that silos which have hash collisions are correctly handled.
     }
 }

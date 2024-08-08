@@ -18,6 +18,10 @@ internal class MyDirectoryTestGrain : Grain, IMyDirectoryTestGrain
 
 public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
 {
+    /// <summary>
+    /// Cluster chaos test: tests directory functionality & integrity while starting/stopping/killing silos frequently.
+    /// </summary>
+    /// <returns></returns>
     [Fact]
     public async Task DynamicClusterTest()
     {

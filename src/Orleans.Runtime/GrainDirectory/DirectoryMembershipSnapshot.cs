@@ -19,9 +19,13 @@ internal sealed class DirectoryMembershipSnapshot
     private const int HashesPerEntry = ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS;
     private readonly ClusterMembershipSnapshot _snapshot;
     private readonly ImmutableArray<(uint Start, int MemberIndex)> _ringBoundaries;
-    private readonly RingRangeCollection[] _virtualBucketsByMember;
+    private readonly RingRangeCollection[] _rangesByMember;
 
-    public DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot)
+    public DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot) : this(snapshot, static (silo, count) => silo.GetUniformHashCodes(count))
+    {
+    }
+
+    internal DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, Func<SiloAddress, int, uint[]> getRingBoundaries)
     {
         var sortedActiveMembers = ImmutableArray.CreateBuilder<SiloAddress>(snapshot.Members.Count(static m => m.Value.Status == SiloStatus.Active));
         foreach (var member in snapshot.Members)
@@ -33,12 +37,12 @@ internal sealed class DirectoryMembershipSnapshot
             }
         }
 
-        sortedActiveMembers.Sort(static (left, right) => left.GetConsistentHashCode().CompareTo(right.GetConsistentHashCode()));
+        sortedActiveMembers.Sort(static (left, right) => left.CompareTo(right));
         var hashIndexPairs = ImmutableArray.CreateBuilder<(uint Hash, int MemberIndex)>(HashesPerEntry * sortedActiveMembers.Count);
         for(var i = 0; i < sortedActiveMembers.Count; i++)
         {
             var activeMember = sortedActiveMembers[i];
-            var hashCodes = activeMember.GetUniformHashCodes(HashesPerEntry);
+            var hashCodes = getRingBoundaries(activeMember, HashesPerEntry);
             foreach (var hashCode in hashCodes)
             {
                 hashIndexPairs.Add((hashCode, i));
@@ -51,7 +55,7 @@ internal sealed class DirectoryMembershipSnapshot
         Members = sortedActiveMembers.ToImmutable();
         Debug.Assert(Members.Length * HashesPerEntry == _ringBoundaries.Length);
 
-        _virtualBucketsByMember = new RingRangeCollection[Members.Length];
+        _rangesByMember = new RingRangeCollection[Members.Length];
         _snapshot = snapshot;
     }
 
@@ -77,9 +81,9 @@ internal sealed class DirectoryMembershipSnapshot
     private RingRangeCollection GetRanges(int memberIndex)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(memberIndex, 0);
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(memberIndex, _virtualBucketsByMember.Length);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(memberIndex, _rangesByMember.Length);
 
-        var range = _virtualBucketsByMember[memberIndex];
+        var range = _rangesByMember[memberIndex];
         if (range.IsDefault)
         {
             var result = ImmutableArray.CreateBuilder<RingRange>(HashesPerEntry);
@@ -91,7 +95,7 @@ internal sealed class DirectoryMembershipSnapshot
                 }
             }
 
-            range = _virtualBucketsByMember[memberIndex] = new(result.ToImmutable());
+            range = _rangesByMember[memberIndex] = new(result.ToImmutable());
         }
 
         return range;
@@ -113,15 +117,15 @@ internal sealed class DirectoryMembershipSnapshot
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, _ringBoundaries.Length);
         ArgumentOutOfRangeException.ThrowIfLessThan(index, 0);
 
-        var entry = _ringBoundaries[index];
-        var next = _ringBoundaries[(index + 1) % _ringBoundaries.Length];
-        if (entry.Start == next.Start)
+        var (entryStart, _) = _ringBoundaries[index];
+        var (nextStart, _) = _ringBoundaries[(index + 1) % _ringBoundaries.Length];
+        if (entryStart == nextStart)
         {
-            // Handle hash collisions by making adjacent ranges empty.
+            // Handle hash collisions by making subsequent adjacent ranges empty.
             return _ringBoundaries.Length == 1 ? RingRange.Full : RingRange.Empty;
         }
 
-        return RingRange.Create(entry.Start, next.Start);
+        return RingRange.Create(entryStart, nextStart);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -139,17 +143,6 @@ internal sealed class DirectoryMembershipSnapshot
             {
                 var (snapshot, address) = state;
                 var candidate = snapshot.Members[index];
-                var comparison = candidate.GetConsistentHashCode().CompareTo(address.GetConsistentHashCode());
-                if (comparison != 0)
-                {
-                    return comparison;
-                }
-
-                if (candidate.Equals(address))
-                {
-                    return 0;
-                }
-
                 return candidate.CompareTo(address);
             });
     }
@@ -160,33 +153,15 @@ internal sealed class DirectoryMembershipSnapshot
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGetOwner(uint hashCode, [NotNullWhen(true)] out SiloAddress? owner)
     {
-        // Binary search with wrap-around to include the last element to handle the case
-        // where it wraps around the boundary of the ring.
-        if (_ringBoundaries.Length > 0)
+        var index = SearchAlgorithms.RingRangeBinarySearch(
+            _ringBoundaries.Length,
+            this,
+            static (collection, index) => collection.GetRangeCore(index),
+            hashCode);
+        if (index >= 0)
         {
-            var index = SearchAlgorithms.BinarySearch(
-                _ringBoundaries.Length + 1,
-                (this, hashCode),
-                static (index, state) =>
-                {
-                    var (snapshot, hashCode) = state;
-                    if (index == 0)
-                    {
-                        index = snapshot._ringBoundaries.Length;
-                    }
-
-                    return snapshot.GetRangeCore(index - 1).CompareTo(hashCode);
-                });
-            if (index >= 0)
-            {
-                if (index == 0)
-                {
-                    index = _ringBoundaries.Length;
-                }
-
-                owner = Members[_ringBoundaries[index - 1].MemberIndex];
-                return true;
-            }
+            owner = Members[_ringBoundaries[index].MemberIndex];
+            return true;
         }
 
         owner = null;

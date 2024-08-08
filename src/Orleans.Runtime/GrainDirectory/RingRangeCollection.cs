@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
@@ -9,7 +11,7 @@ namespace Orleans.Runtime.GrainDirectory;
 
 // Read-only, sorted collection of non-overlapping ranges.
 [GenerateSerializer, Alias(nameof(RingRangeCollection))]
-internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, ISpanFormattable
+internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, ISpanFormattable, IEnumerable<RingRange>
 {
     public RingRangeCollection(ImmutableArray<RingRange> ranges)
     {
@@ -45,28 +47,19 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
 
     public bool IsFull => !IsEmpty && Ranges.Sum(r => r.Size) == uint.MaxValue;
 
+    public uint Size => (uint)Ranges.Sum(static r => r.Size);
+
     public float SizePercent => Ranges.Sum(static r => r.SizePercent);
 
     public bool Contains(GrainId grainId) => Contains(grainId.GetUniformHashCode());
 
     public bool Contains(uint value)
     {
-        // Binary search with wrap-around to include the last element to handle the case
-        // where it wraps around the boundary of the ring.
-        return Ranges.Length > 0
-            && SearchAlgorithms.BinarySearch(
-                Ranges.Length + 1,
-                (this, value),
-                static (index, state) =>
-                {
-                    var (virtualRange, hashCode) = state;
-                    if (index == 0)
-                    {
-                        index = virtualRange.Ranges.Length;
-                    }
-
-                    return virtualRange.Ranges[index - 1].CompareTo(hashCode);
-                }) >= 0;
+        return SearchAlgorithms.RingRangeBinarySearch(
+            Ranges.Length,
+            Ranges,
+            static (ranges, index) => ranges[index],
+            value) >= 0;
     }
 
     public bool Intersects(RingRange other)
@@ -207,4 +200,6 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
 
     bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
         => destination.TryWrite($"({Ranges.Length} subranges), {SizePercent:0.00}%", out charsWritten);
+    IEnumerator<RingRange> IEnumerable<RingRange>.GetEnumerator() => ((IEnumerable<RingRange>)Ranges).GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable)Ranges).GetEnumerator();
 }

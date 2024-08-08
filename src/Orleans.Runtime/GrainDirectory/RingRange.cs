@@ -10,7 +10,7 @@ namespace Orleans.Runtime.GrainDirectory;
 /// </summary>
 [GenerateSerializer, Immutable]
 [Alias(nameof(RingRange))]
-internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
+internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable, IComparable<uint>
 {
     // The exclusive starting point for the range.
     //  Note that _start == _end == 1 is used as a special value to represent a full range.
@@ -27,7 +27,7 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
     public bool IsFull => _start == _end && _start != 0;
 
     // Whether the range includes uint.MaxValue.
-    private bool IsWrapped => _start >= _end;
+    internal bool IsWrapped => _start >= _end;
 
     public static RingRange Full { get; } = new (1, 1);
 
@@ -118,9 +118,9 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
         }
     }
 
-    internal int CompareTo(uint n)
+    public int CompareTo(uint point)
     {
-        if (Contains(n))
+        if (Contains(point))
         {
             return 0;
         }
@@ -129,7 +129,7 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
         if (IsWrapped)
         {
             // Start > End (wrap-around case)
-            if (n <= start)
+            if (point <= start)
             {
                 // Range starts after N (range > N)
                 return -1;
@@ -140,7 +140,7 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable
             return 1;
         }
 
-        if (n <= start)
+        if (point <= start)
         {
             // Range starts after N (range > N)
             return 1;

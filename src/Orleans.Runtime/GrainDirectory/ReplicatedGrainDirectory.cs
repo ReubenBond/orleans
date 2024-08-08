@@ -134,7 +134,7 @@ internal sealed partial class ReplicatedGrainDirectory(
         }
     }
 
-    public async ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRangeCollection ranges)
+    public async ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRangeCollection ranges, bool isValidation)
     {
         logger.LogInformation("Collecting registered activations for ranges {Ranges} at version {MembershipVersion}.", ranges, membershipVersion);
         if (_recoveryMembershipVersionValue < membershipVersion.Value)
@@ -168,17 +168,26 @@ internal sealed partial class ReplicatedGrainDirectory(
                         activation.Deactivate(new DeactivationReason(DeactivationReasonCode.DirectoryFailure, "This activation's directory partition was salvaged while registration status was in-doubt."), cts.Token);
                         deactivationTasks.Add(activation.Deactivated);
                     }
-                    catch(Exception exception)
+                    catch (Exception exception)
                     {
                         logger.LogWarning(exception, "Failed to deactivate activation {Activation}", activation);
                     }
-
-                    continue;
                 }
-
-                if (ranges.Contains(address.GrainId.GetUniformHashCode()))
+                else if (ranges.Contains(address.GrainId))
                 {
+                    if (!isValidation)
+                    {
+                        logger.LogTrace("Sending activation '{Activation}' for recovery because its in the requested ranges {Ranges} (version {Version}).", activation.GrainId, ranges, membershipVersion);
+                    }
+
                     result.Add(activation.Address);
+                }
+                else
+                {
+                    if (!isValidation)
+                    {
+                        logger.LogTrace("Skipping activation '{Activation}' because {HashCode} is not in the requested ranges {Ranges} (version {Version}).", activation.GrainId, activation.GrainId.GetUniformHashCode().ToString("X"), ranges, membershipVersion);
+                    }
                 }
             }
         }
