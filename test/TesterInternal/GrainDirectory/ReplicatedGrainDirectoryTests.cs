@@ -46,7 +46,6 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
                         await Parallel.ForAsync(0, CallsPerIteration, (i, ct) => testCluster.GrainFactory.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping());
 
                         idBase += CallsPerIteration;
-
                     }
                     catch (Exception ex)
                     {

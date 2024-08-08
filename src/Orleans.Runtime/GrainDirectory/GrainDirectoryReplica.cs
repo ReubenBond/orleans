@@ -355,66 +355,99 @@ internal sealed partial class GrainDirectoryReplica(
         var previousRanges = previous.GetRanges(_id);
         var currentRanges = current.GetRanges(_id);
 
-
-// TODO: Before we can capture a snapshot at a given version, we must make sure we have recovered up to that version!!!
-
-
-
-        // Snapshot & remove everything not in the current range.
-        // The new owner will have the opportunity to retrieve the snapshot as they take ownership.
-        List<GrainAddress> removedAddresses = [];
-        HashSet<SiloAddress> transferPartners = [];
-        foreach (var removedRange in previousRanges.Difference(currentRanges))
-        {
-            if (_logger.IsEnabled(LogLevel.Trace))
-            {
-                _logger.LogTrace("Relinquishing ownership of range '{Range}'.", removedRange);
-            }
-
-            foreach (var (range, ownerIndex) in current.RangeOwners)
-            {
-                if (range.Intersects(removedRange))
-                {
-                    var owner = current.Members[ownerIndex];
-                    Debug.Assert(!_id.Equals(owner));
-                    transferPartners.Add(owner);
-                }
-            }
-
-            // Collect all addresses that are not in the owned range.
-            foreach (var entry in _directory)
-            {
-                if (removedRange.Contains(entry.Key))
-                {
-                    removedAddresses.Add(entry.Value);
-                }
-            }
-        }
-
-        // Remove these addresses from the partition.
-        foreach (var address in removedAddresses)
-        {
-            if (transferPartners.Count > 0)
-            {
-                _logger.LogInformation("Evicting entry '{Address}' to snapshot.", address);
-            }
-
-            _directory.Remove(address.GrainId);
-        }
-
-        if (transferPartners.Count > 0)
-        {
-            _partitionSnapshots.Add(new PartitionSnapshotState(previous.Version, removedAddresses, transferPartners));
-        }
-        else
-        {
-            _logger.LogInformation("Dropping snapshot since there are no transfer partners.");
-        }
-
+        var removedRanges = previousRanges.Difference(currentRanges);
         var addedRanges = currentRanges.Difference(previousRanges);
+
+        if (!removedRanges.IsEmpty)
+        {
+            tasks.Add(RelinquishOwnershipAsync(previous, current, removedRanges));
+        }
+
         if (!addedRanges.IsEmpty)
         {
             tasks.Add(TransferOwnershipAsync(previous, current, addedRanges));
+        }
+    }
+
+    private async Task RelinquishOwnershipAsync(DirectoryMembershipSnapshot previous, DirectoryMembershipSnapshot current, RingRangeCollection removedRanges)
+    {
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        foreach (var range in removedRanges.Ranges)
+        {
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("Relinquishing ownership of range '{Range}'.", range);
+            }
+
+            // Suspend this range and transfer state from the previous owner.
+            // If the predecessor becomes unavailable or membership advances quickly, we will declare data loss and un-wedge the range.
+            _pendingRanges.Add((range, current.Version, tcs));
+        }
+
+        try
+        {
+            // Snapshot & remove everything not in the current range.
+            // The new owner will have the opportunity to retrieve the snapshot as they take ownership.
+            List<GrainAddress> removedAddresses = [];
+            HashSet<SiloAddress> transferPartners = [];
+            foreach (var removedRange in removedRanges)
+            {
+                // Wait for the range being removed to become valid.
+                await WaitForRange(removedRange, previous.Version, CancellationToken.None);
+
+                if (_logger.IsEnabled(LogLevel.Trace))
+                {
+                    _logger.LogTrace("Relinquishing ownership of range '{Range}'.", removedRange);
+                }
+
+                foreach (var (range, ownerIndex) in current.RangeOwners)
+                {
+                    if (range.Intersects(removedRange))
+                    {
+                        var owner = current.Members[ownerIndex];
+                        Debug.Assert(!_id.Equals(owner));
+                        transferPartners.Add(owner);
+                    }
+                }
+
+                // Collect all addresses that are not in the owned range.
+                foreach (var entry in _directory)
+                {
+                    if (removedRange.Contains(entry.Key))
+                    {
+                        removedAddresses.Add(entry.Value);
+                    }
+                }
+            }
+
+            // Remove these addresses from the partition.
+            foreach (var address in removedAddresses)
+            {
+                if (transferPartners.Count > 0)
+                {
+                    _logger.LogTrace("Evicting entry '{Address}' to snapshot.", address);
+                }
+
+                _directory.Remove(address.GrainId);
+            }
+
+            if (transferPartners.Count > 0)
+            {
+                _partitionSnapshots.Add(new PartitionSnapshotState(previous.Version, removedAddresses, transferPartners));
+            }
+            else
+            {
+                _logger.LogDebug("Dropping snapshot since there are no transfer partners.");
+            }
+        }
+        finally
+        {
+            // Resume the suspended ranges.
+            tcs.SetResult();
+            foreach (var range in removedRanges.Ranges)
+            {
+                _pendingRanges.Remove((range, current.Version, tcs));
+            }
         }
     }
 
@@ -563,7 +596,7 @@ internal sealed partial class GrainDirectoryReplica(
             {
                 DebugAssertOwnership(current, entry.GrainId);
                 
-                _logger.LogInformation("Received '{Entry}' via snapshot from '{PreviousOwner}' for version '{Version}'.", entry, previousOwner, previousVersion);
+                _logger.LogTrace("Received '{Entry}' via snapshot from '{PreviousOwner}' for version '{Version}'.", entry, previousOwner, previousVersion);
                 _directory[entry.GrainId] = entry;
             }
 
@@ -606,7 +639,7 @@ internal sealed partial class GrainDirectoryReplica(
             foreach (var entry in activations)
             {
                 DebugAssertOwnership(current, entry.GrainId);
-                _logger.LogInformation("Recovered '{Entry}' for version '{Version}'.", entry, current.Version);
+                _logger.LogTrace("Recovered '{Entry}' for version '{Version}'.", entry, current.Version);
                 _directory[entry.GrainId] = entry;
             }
         }
