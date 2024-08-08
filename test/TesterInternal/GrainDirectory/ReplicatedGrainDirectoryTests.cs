@@ -132,8 +132,8 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
     {
         public void Configure(ISiloBuilder siloBuilder)
         {
-            siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.GrainDirectoryReplica", LogLevel.Trace));
-            siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.ReplicatedGrainDirectory", LogLevel.Trace));
+            //siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.GrainDirectoryReplica", LogLevel.Trace));
+            //siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.ReplicatedGrainDirectory", LogLevel.Trace));
             siloBuilder.Services.AddSingleton<IFatalErrorHandler, FakeFatalErrorHandler>();
         }
     }

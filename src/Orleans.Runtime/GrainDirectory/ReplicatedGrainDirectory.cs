@@ -88,10 +88,12 @@ internal sealed partial class ReplicatedGrainDirectory(
                 continue;
             }
 
+#if false
             if (logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogTrace("Invoking '{Operation}' on '{Owner}' for grain '{GrainId}'.", operation, owner, grainId);
             }
+#endif
 
             var replica = localReplica.GetReplica(owner);
 

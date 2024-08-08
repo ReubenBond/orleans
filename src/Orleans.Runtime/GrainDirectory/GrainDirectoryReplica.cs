@@ -332,7 +332,9 @@ internal sealed partial class GrainDirectoryReplica(
 
             foreach (var grainAddress in toRemove)
             {
+#if false
                 _logger.LogInformation("Deleting '{GrainAddress}' located on now-defunct silo '{SiloAddress}'.", grainAddress, change.SiloAddress);
+#endif
                 UnregisterCore(grainAddress);
             }
         }
@@ -352,6 +354,11 @@ internal sealed partial class GrainDirectoryReplica(
 
         var previousRanges = previous.GetRanges(_id);
         var currentRanges = current.GetRanges(_id);
+
+
+// TODO: Before we can capture a snapshot at a given version, we must make sure we have recovered up to that version!!!
+
+
 
         // Snapshot & remove everything not in the current range.
         // The new owner will have the opportunity to retrieve the snapshot as they take ownership.
@@ -428,7 +435,7 @@ internal sealed partial class GrainDirectoryReplica(
                 var previousOwnerRanges = previous.GetRanges(previousOwner);
                 if (addedRanges.Intersects(previousOwnerRanges))
                 {
-                    tasks.Add(TransferRangeAsync(current, addedRanges, previousOwner, previous.Version));
+                    tasks.Add(TransferSnapshotAsync(current, addedRanges, previousOwner, previous.Version));
                 }
             }
 
@@ -470,7 +477,15 @@ internal sealed partial class GrainDirectoryReplica(
         var recovered = false;
         if (!success)
         {
-            await RecoverPartitionRange(current, addedRanges);
+
+
+            // HACK DELETE
+            var r = current.GetRanges(_id);
+
+
+
+
+            await RecoverPartitionRange(current, r /* addedRanges */);
             ResumeAllRanges(current.Version);
             recovered = true;
         }
@@ -497,7 +512,7 @@ internal sealed partial class GrainDirectoryReplica(
         }
     }
 
-    private async Task<bool> TransferRangeAsync(DirectoryMembershipSnapshot current, RingRangeCollection addedRanges, SiloAddress previousOwner, MembershipVersion previousVersion)
+    private async Task<bool> TransferSnapshotAsync(DirectoryMembershipSnapshot current, RingRangeCollection addedRanges, SiloAddress previousOwner, MembershipVersion previousVersion)
     {
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         foreach (var addedRange in addedRanges.Ranges)
@@ -637,12 +652,10 @@ internal sealed partial class GrainDirectoryReplica(
                 new Immutable<List<GrainAddress>>([]),
                 nameof(GetRegisteredActivations));
 
-#if false
             if (_logger.IsEnabled(LogLevel.Information))
             {
                 _logger.LogInformation("Recovered '{Count}' entries from silo '{SiloAddress}' for ranges '{Range}' at version '{Version}' in {ElapsedMilliseconds}ms.", result.Value.Count, siloAddress, ranges, version, stopwatch.Elapsed.TotalMilliseconds);
             }
-#endif
 
             return result.Value;
         }
