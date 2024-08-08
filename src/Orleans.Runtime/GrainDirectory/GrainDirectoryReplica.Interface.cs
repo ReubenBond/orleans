@@ -97,12 +97,12 @@ internal sealed partial class GrainDirectoryReplica
         return new DirectoryResult<List<GrainAddress?>>(results, _view.Version);
     }
 
-    async ValueTask<DirectoryResult<bool>> IGrainDirectoryReplica.UnregisterAsync(MembershipVersion version, GrainAddress address)
+    async ValueTask<DirectoryResult<bool>> IGrainDirectoryReplica.DeregisterAsync(MembershipVersion version, GrainAddress address)
     {
         ArgumentNullException.ThrowIfNull(address);
         if (_logger.IsEnabled(LogLevel.Trace))
         {
-            _logger.LogTrace("UnregisterAsync('{Version}', '{Address}')", version, address);
+            _logger.LogTrace("DeregisterAsync('{Version}', '{Address}')", version, address);
         }
 
         await WaitForRange(address.GrainId, version, CancellationToken.None);
@@ -112,15 +112,15 @@ internal sealed partial class GrainDirectoryReplica
         }
 
         DebugAssertOwnership(address.GrainId);
-        return new DirectoryResult<bool>(UnregisterCore(address), _view.Version);
+        return new DirectoryResult<bool>(DeregisterCore(address), _view.Version);
     }
 
-    async ValueTask<DirectoryResult<bool>> IGrainDirectoryReplica.UnregisterAsync(MembershipVersion version, List<GrainAddress> addresses)
+    async ValueTask<DirectoryResult<bool>> IGrainDirectoryReplica.DeregisterAsync(MembershipVersion version, List<GrainAddress> addresses)
     {
         ArgumentNullException.ThrowIfNull(addresses);
         if (_logger.IsEnabled(LogLevel.Trace))
         {
-            _logger.LogTrace("UnregisterAsync('{Version}', '{AddressCount}')", version, addresses.Count);
+            _logger.LogTrace("DeregisterAsync('{Version}', '{AddressCount}')", version, addresses.Count);
         }
 
         var result = true;
@@ -134,13 +134,13 @@ internal sealed partial class GrainDirectoryReplica
             }
 
             DebugAssertOwnership(address.GrainId);
-            result &= UnregisterCore(address);
+            result &= DeregisterCore(address);
         }
 
         return new DirectoryResult<bool>(result, _view.Version);
     }
 
-    private bool UnregisterCore(GrainAddress address)
+    private bool DeregisterCore(GrainAddress address)
     {
         if (_directory.TryGetValue(address.GrainId, out var existing) && (existing.Matches(address) || IsSiloDead(existing)))
         {

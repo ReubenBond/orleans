@@ -155,7 +155,7 @@ namespace Orleans.Runtime
             };
             grainLocator.TryLookupInCache(grain, out var cachedAddress);
             var address = await grainLocator.Lookup(grain);
-            var primary = (serviceProvider.GetService<ReplicatedGrainDirectory>() as ReplicatedGrainDirectory.ITestHooks)?.GetPrimaryForGrain(grain);
+            var primary = (serviceProvider.GetService<DistributedGrainDirectory>() as DistributedGrainDirectory.ITestHooks)?.GetPrimaryForGrain(grain);
             return new()
             {
                 Grain = grain,

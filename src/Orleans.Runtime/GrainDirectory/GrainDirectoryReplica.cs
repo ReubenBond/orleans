@@ -333,7 +333,7 @@ internal sealed partial class GrainDirectoryReplica(
 #if false
                 _logger.LogInformation("Deleting '{GrainAddress}' located on now-defunct silo '{SiloAddress}'.", grainAddress, change.SiloAddress);
 #endif
-                UnregisterCore(grainAddress);
+                DeregisterCore(grainAddress);
             }
         }
 
@@ -366,16 +366,16 @@ internal sealed partial class GrainDirectoryReplica(
 
         if (!removedRanges.IsEmpty)
         {
-            tasks.Add(RelinquishOwnershipAsync(previous, current, removedRanges));
+            tasks.Add(ReleaseRangesAsync(previous, current, removedRanges));
         }
 
         if (!addedRanges.IsEmpty)
         {
-            tasks.Add(AcceptOwnershipAsync(previous, current, addedRanges));
+            tasks.Add(AcquireRangesAsync(previous, current, addedRanges));
         }
     }
 
-    private async Task RelinquishOwnershipAsync(DirectoryMembershipSnapshot previous, DirectoryMembershipSnapshot current, RingRangeCollection removedRanges)
+    private async Task ReleaseRangesAsync(DirectoryMembershipSnapshot previous, DirectoryMembershipSnapshot current, RingRangeCollection removedRanges)
     {
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         foreach (var range in removedRanges.Ranges)
@@ -455,7 +455,7 @@ internal sealed partial class GrainDirectoryReplica(
         }
     }
 
-    private async Task AcceptOwnershipAsync(DirectoryMembershipSnapshot previous, DirectoryMembershipSnapshot current, RingRangeCollection addedRanges)
+    private async Task AcquireRangesAsync(DirectoryMembershipSnapshot previous, DirectoryMembershipSnapshot current, RingRangeCollection addedRanges)
     {
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         foreach (var addedRange in addedRanges.Ranges)
@@ -730,7 +730,6 @@ internal sealed partial class GrainDirectoryReplica(
                         {
                             ++mismatched;
                             _logger.LogError("Integrity violation: Recovered entry '{RecoveredRecord}' does not match existing entry '{LocalRecord}'.", entry, existingEntry);
-                            Debugger.Launch();
                             Debug.Fail($"Integrity violation: Recovered entry '{entry}' does not match existing entry '{existingEntry}'.");
                         }
                     }
@@ -738,7 +737,6 @@ internal sealed partial class GrainDirectoryReplica(
                     {
                         ++missing;
                         _logger.LogError("Integrity violation: Recovered entry '{RecoveredRecord}' not found in directory.", entry);
-                        Debugger.Launch();
                         Debug.Fail($"Integrity violation: Recovered entry '{entry}' not found in directory.");
                     }
                 }

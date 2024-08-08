@@ -11,15 +11,15 @@ using Orleans.GrainDirectory;
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory;
 
-// TODO: Automatically batch registrations & unregistrations
+// TODO: Automatically batch registrations & deregistrations
 
-internal sealed partial class ReplicatedGrainDirectory(
+internal sealed partial class DistributedGrainDirectory(
     GrainDirectoryReplica localReplica,
-    ILogger<ReplicatedGrainDirectory> logger,
+    ILogger<DistributedGrainDirectory> logger,
     ILocalSiloDetails localSiloDetails,
     ILoggerFactory loggerFactory,
     IServiceProvider serviceProvider)
-    : SystemTarget(Constants.DirectoryReplicaClientType, localSiloDetails.SiloAddress, loggerFactory), IGrainDirectory, IGrainDirectoryReplicaClient, ILifecycleParticipant<ISiloLifecycle>, ReplicatedGrainDirectory.ITestHooks
+    : SystemTarget(Constants.DirectoryReplicaClientType, localSiloDetails.SiloAddress, loggerFactory), IGrainDirectory, IGrainDirectoryReplicaClient, ILifecycleParticipant<ISiloLifecycle>, DistributedGrainDirectory.ITestHooks
 {
     // The recovery membership value is used to avoid a race between concurrent registration & recovery operations which could lead to lost registrations.
     // This could occur when a new activation is created and begins registering itself with a host which crashes. Concurrently, the new owner initiates
@@ -46,7 +46,7 @@ internal sealed partial class ReplicatedGrainDirectory(
 
     public async Task Unregister(GrainAddress address) => await InvokeAsync(
         address.GrainId,
-        static (replica, version, address, cancellationToken) => replica.UnregisterAsync(version, address),
+        static (replica, version, address, cancellationToken) => replica.DeregisterAsync(version, address),
         address,
         CancellationToken.None,
         strict: false);
@@ -162,7 +162,7 @@ internal sealed partial class ReplicatedGrainDirectory(
                     try
                     {
                         // This activation has not completed registration or is not currently active.
-                        // Abort the activation with a pre-canceled cancellation token so that it skips directory unregistration.
+                        // Abort the activation with a pre-canceled cancellation token so that it skips directory deregistration.
                         // TODO: Expand validity check to non-ActivationData activations.
                         logger.LogWarning("Deactivating activation '{Activation}' due to failure of a directory range owner.", activation);
                         activation.Deactivate(new DeactivationReason(DeactivationReasonCode.DirectoryFailure, "This activation's directory partition was salvaged while registration status was in-doubt."), cts.Token);

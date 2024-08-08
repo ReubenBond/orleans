@@ -34,8 +34,16 @@ internal static class SearchAlgorithms
         return -1;
     }
 
+    // Binary search for collections of ranges along a ring (eg, a consistent hash ring), sorted by the starting point of each range.
+    // This differs from a standard binary search in that the search can wrap around from the start to the last element in the collection.
+    // This is accommodated by checking the last element in the collection before returning a negative result, to handle the case where a
+    // range wraps around from end to start. See RingRange
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int RingRangeBinarySearch<TCollection, TElement, TKey>(int length, TCollection collection, Func<TCollection, int, TElement> getEntry, TKey key) where TElement : IComparable<TKey>
+    public static int RingRangeBinarySearch<TCollection, TElement, TKey>(
+        int length,
+        TCollection collection,
+        Func<TCollection, int, TElement> getEntry,
+        TKey key) where TElement : IComparable<TKey>
     {
         if (length == 0) return -1;
 
