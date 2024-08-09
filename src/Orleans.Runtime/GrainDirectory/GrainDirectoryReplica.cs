@@ -4,8 +4,6 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -43,7 +41,7 @@ internal sealed partial class GrainDirectoryReplica(
 
     // Ranges which cannot be served currently, eg because the replica is currently transferring them from a previous owner.
     // Requests in these ranges must wait for the range to become available.
-    private readonly HashSet<RingRangeLock> _rangeLocks = [];
+    private readonly List<(RingRange Range, MembershipVersion Version, TaskCompletionSource Completion)> _rangeLocks = [];
 
     // Ranges which were previously at least partially owned by this replica, but which are pending transfer to a new replica.  
     private readonly List<PartitionSnapshotState> _partitionSnapshots = [];
@@ -80,61 +78,56 @@ internal sealed partial class GrainDirectoryReplica(
         return _view;
     }
 
-    async ValueTask<GrainDirectoryPartitionSnapshot?> IGrainDirectoryReplica.GetPartitionSnapshotAsync(MembershipVersion version, RingRange range)
+    async ValueTask<GrainDirectoryPartitionSnapshot?> IGrainDirectoryReplica.GetPartitionSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRangeCollection ranges)
     {
         if (_logger.IsEnabled(LogLevel.Trace))
         {
-            _logger.LogTrace("GetPartitionSnapshotAsync('{RangeVersion}', '{Range}')", version, range);
+            _logger.LogTrace("GetPartitionSnapshotAsync('{Version}', '{RangeVersion}', '{Range}')", version, rangeVersion, ranges);
         }
 
         // Wait for the range to be unlocked.
         await RefreshViewAsync(version, CancellationToken.None);
-        var stopwatch = CoarseStopwatch.StartNew();
-        await WaitForRange(range, version, CancellationToken.None);
-
-        if (stopwatch.Elapsed.TotalMilliseconds > 500)
+        foreach (var range in ranges)
         {
-            _logger.LogInformation("Waited for range '{Range}' at version '{Version}' for {Elapsed}ms.", range, version, stopwatch.ElapsedMilliseconds);
+            var stopwatch = CoarseStopwatch.StartNew();
+            await WaitForRange(range, version, CancellationToken.None);
+            if (stopwatch.Elapsed.TotalMilliseconds > 500)
+            {
+                _logger.LogInformation("Waited for range '{Range}' at version '{Version}' for {Elapsed}ms.", range, rangeVersion, stopwatch.ElapsedMilliseconds);
+            }
         }
 
         List<GrainAddress> partitionAddresses = [];
-        var foundPartition = false;
         foreach (var partitionSnapshot in _partitionSnapshots)
         {
-            if (partitionSnapshot.DirectoryMembershipVersion != version)
+            if (partitionSnapshot.DirectoryMembershipVersion != rangeVersion)
             {
                 continue;
             }
-
-            if (!partitionSnapshot.Range.Intersects(range))
-            {
-                continue;
-            }
-
-            foundPartition = true;
 
             // Only include addresses which are in the requested range.
             foreach (var address in partitionSnapshot.GrainAddresses)
             {
-                if (range.Contains(address.GrainId))
+                foreach (var range in ranges)
                 {
-                    partitionAddresses.Add(address);
+                    if (range.Contains(address.GrainId))
+                    {
+                        partitionAddresses.Add(address);
+                        break;
+                    }
                 }
             }
-        }
 
-        if (foundPartition)
-        {
-            var rangeSnapshot = new GrainDirectoryPartitionSnapshot(version, partitionAddresses);
+            var rangeSnapshot = new GrainDirectoryPartitionSnapshot(rangeVersion, partitionAddresses);
             if (_logger.IsEnabled(LogLevel.Information))
             {
-                _logger.LogInformation("Transferring '{Count}' entries in range '{Range}' from version '{Version}' snapshot.", partitionAddresses.Count, range, version);
+                _logger.LogInformation("Transferring '{Count}' entries in range '{Range}' from version '{Version}' snapshot.", partitionAddresses.Count, ranges, rangeVersion);
             }
 
             return rangeSnapshot;
         }
 
-        Debug.Fail($"Received a request for a snapshot which this replica does not have, version '{version}', range '{range}'.");
+        _logger.LogWarning("Received a request for a snapshot which this replica does not have, version '{Version}', range version '{RangeVersion}', range '{Range}'.", version, rangeVersion, ranges);
         return null;
     }
 
@@ -200,18 +193,18 @@ internal sealed partial class GrainDirectoryReplica(
             await RefreshViewAsync(version, cancellationToken);
         }
 
-        while (TryGetOverlappingRangeLock(range, version, out var completion))
+        while (TryGetIntersectingLock(range, version, out var completion))
         {
             await completion.WaitAsync(cancellationToken);
         }
 
-        bool TryGetOverlappingRangeLock(RingRange range, MembershipVersion version, [NotNullWhen(true)] out Task? completion)
+        bool TryGetIntersectingLock(RingRange range, MembershipVersion version, [NotNullWhen(true)] out Task? completion)
         {
             foreach (var rangeLock in _rangeLocks)
             {
                 if (rangeLock.Version <= version && range.Intersects(rangeLock.Range))
                 {
-                    completion = rangeLock.ReleaseTask;
+                    completion = rangeLock.Completion.Task;
                     return true;
                 }
             }
@@ -250,7 +243,7 @@ internal sealed partial class GrainDirectoryReplica(
         return Task.CompletedTask;
     }
 
-    private async Task OnRuntimeInitializeStop(CancellationToken cancellationToken)
+    async Task OnRuntimeInitializeStop(CancellationToken cancellationToken)
     {
         _shutdownCts.Cancel();
         if (_runTask is { } task)
@@ -385,48 +378,50 @@ internal sealed partial class GrainDirectoryReplica(
 
     private async Task ReleaseRangesAsync(DirectoryMembershipSnapshot previous, DirectoryMembershipSnapshot current, RingRangeCollection removedRanges)
     {
-        // Lock all removed ranges at the current version.
-        var tasks = new List<Task>(removedRanges.Ranges.Length);
-        foreach (var range in removedRanges)
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        foreach (var range in removedRanges.Ranges)
         {
-            tasks.Add(SnapshotRange(previous, current, range));
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("Relinquishing ownership of range '{Range}'.", range);
+            }
+
+            _rangeLocks.Add((range, current.Version, tcs));
         }
 
-        await Task.WhenAll(tasks);
-
-        async Task SnapshotRange(DirectoryMembershipSnapshot previous, DirectoryMembershipSnapshot current, RingRange removedRange)
+        try
         {
-            using var rangeLock = RingRangeLock.Create(this, removedRange, current.Version);
-
             // Snapshot & remove everything not in the current range.
             // The new owner will have the opportunity to retrieve the snapshot as they take ownership.
             List<GrainAddress> removedAddresses = [];
             HashSet<SiloAddress> transferPartners = [];
-
-            // Wait for the range being removed to become valid.
-            await WaitForRange(removedRange, previous.Version, CancellationToken.None);
-
-            if (_logger.IsEnabled(LogLevel.Trace))
+            foreach (var removedRange in removedRanges)
             {
-                _logger.LogTrace("Relinquishing ownership of range '{Range}'.", removedRange);
-            }
+                // Wait for the range being removed to become valid.
+                await WaitForRange(removedRange, previous.Version, CancellationToken.None);
 
-            foreach (var (newRange, newOwnerIndex) in current.RangeOwners)
-            {
-                if (newRange.Intersects(removedRange))
+                if (_logger.IsEnabled(LogLevel.Trace))
                 {
-                    var newOwner = current.Members[newOwnerIndex];
-                    Debug.Assert(!_id.Equals(newOwner));
-                    transferPartners.Add(newOwner);
+                    _logger.LogTrace("Relinquishing ownership of range '{Range}'.", removedRange);
                 }
-            }
 
-            // Collect all addresses that are not in the owned range.
-            foreach (var entry in _directory)
-            {
-                if (removedRange.Contains(entry.Key))
+                foreach (var (range, ownerIndex) in current.RangeOwners)
                 {
-                    removedAddresses.Add(entry.Value);
+                    if (range.Intersects(removedRange))
+                    {
+                        var owner = current.Members[ownerIndex];
+                        Debug.Assert(!_id.Equals(owner));
+                        transferPartners.Add(owner);
+                    }
+                }
+
+                // Collect all addresses that are not in the owned range.
+                foreach (var entry in _directory)
+                {
+                    if (removedRange.Contains(entry.Key))
+                    {
+                        removedAddresses.Add(entry.Value);
+                    }
                 }
             }
 
@@ -443,62 +438,67 @@ internal sealed partial class GrainDirectoryReplica(
 
             if (transferPartners.Count > 0)
             {
-                _partitionSnapshots.Add(new PartitionSnapshotState(current.Version, removedAddresses, transferPartners, rangeLock.Range));
+                _partitionSnapshots.Add(new PartitionSnapshotState(previous.Version, removedAddresses, transferPartners));
             }
             else
             {
-                _logger.LogDebug("Dropping snapshot of range '{Range}' at version '{Version}' since there are no transfer partners.", removedRange, rangeLock.Version);
+                _logger.LogDebug("Dropping snapshot since there are no transfer partners.");
+            }
+        }
+        finally
+        {
+            // Resume the suspended ranges.
+            tcs.SetResult();
+            foreach (var range in removedRanges.Ranges)
+            {
+                _rangeLocks.Remove((range, current.Version, tcs));
             }
         }
     }
 
     private async Task AcquireRangesAsync(DirectoryMembershipSnapshot previous, DirectoryMembershipSnapshot current, RingRangeCollection addedRanges)
     {
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        foreach (var addedRange in addedRanges.Ranges)
+        {
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("Accepting ownership of range '{Range}'.", addedRange);
+            }
+
+            // Suspend this range and transfer state from the previous owner.
+            // If the predecessor becomes unavailable or membership advances quickly, we will declare data loss and unlock the range.
+            _rangeLocks.Add((addedRange, current.Version, tcs));
+        }
+
         var stopwatch = CoarseStopwatch.StartNew();
 
         // The view change is contiguous if the new version is exactly one greater than the previous version.
         // If not, we have missed some updates, so we must declare a potential data loss event.
         var isContiguous = current.Version.Value == previous.Version.Value + 1;
-        var rangeLocks = new List<RingRangeLock>();
+        bool success;
         if (isContiguous)
         {
             // Transfer subranges from previous owners.
-            var tasks = new List<Task>();
-
-            // For each range, find the member(s) which previously owned that range and request their snapshots.
-            // Note that it's possible for one added range to overlap with ranges owned by multiple former members,
-            // eg if multiple members begin shutting down simultaneously.
-            foreach (var addedRange in addedRanges.Ranges)
+            var tasks = new List<Task<bool>>();
+            foreach (var previousOwner in previous.Members)
             {
-                if (_logger.IsEnabled(LogLevel.Debug))
+                var previousOwnerRanges = previous.GetRanges(previousOwner);
+                if (addedRanges.Intersects(previousOwnerRanges))
                 {
-                    _logger.LogDebug("Accepting ownership of range '{Range}'.", addedRange);
-                }
-
-                foreach (var (previousRange, previousOwnerIndex) in previous.RangeOwners)
-                {
-                    //foreach (var intersection in previousRange.Intersections(addedRange))
-                    if (previousRange.Intersects(addedRange))
-                    {
-                        var previousOwner = previous.Members[previousOwnerIndex];
-                        Debug.Assert(!_id.Equals(previousOwner));
-                        
-                        // If the transfer is successful, the range lock will be released.
-                        // If not, the recovery process will need to release the lock once it has completed.
-                        var rangeLock = RingRangeLock.Create(this, addedRange, current.Version);
-                        rangeLocks.Add(rangeLock);
-                        tasks.Add(TransferSnapshotAsync(previous, current, rangeLock, previousOwner));
-                    }
+                    tasks.Add(TransferSnapshotAsync(current, addedRanges, previousOwner, previous.Version));
                 }
             }
 
-            // Note: there should be no 'await' points before this point in the method.
+            // Note: there should be no 'await' points before this point.
             // An await before this point would result in ranges not being locked synchronously.
             await Task.WhenAll(tasks).WaitAsync(_shutdownCts.Token).SuppressThrowing();
             if (_shutdownCts.IsCancellationRequested)
             {
                 return;
             }
+
+            success = tasks.All(t => t.Result);
         }
         else
         {
@@ -510,44 +510,27 @@ internal sealed partial class GrainDirectoryReplica(
                     current.Version);
             }
 
-            // Lock all ranges and wait for recovery.
-            foreach (var addedRange in addedRanges.Ranges)
-            {
-                rangeLocks.Add(RingRangeLock.Create(this, addedRange, current.Version));
-            }
+            success = false;
         }
 
         var recovered = false;
-
-        // If any locks are still held, perform recovery.
-        if (rangeLocks.Any(rangeLock => !rangeLock.ReleaseTask.IsCompletedSuccessfully))
+        if (!success)
         {
-            var remainingRanges = new HashSet<RingRange>();
-            foreach (var rangeLock in rangeLocks)
-            {
-                if (rangeLock.ReleaseTask.IsCompletedSuccessfully)
-                {
-                    continue;
-                }
-
-                remainingRanges.Add(rangeLock.Range);
-            }
-
             // Wait for previous versions to be unlocked before proceeding.
-            foreach (var range in remainingRanges)
+            foreach (var range in addedRanges)
             {
                 await WaitForRange(range, previous.Version, CancellationToken.None);
             }
 
-            await RecoverPartitionRange(current, RingRangeCollection.Create(remainingRanges));
-
-            // Release remaining locks.
-            foreach (var rangeLock in rangeLocks)
-            {
-                rangeLock.Release();
-            }
-
+            await RecoverPartitionRange(current, addedRanges);
             recovered = true;
+        }
+
+        // Resume the suspended ranges.
+        tcs.SetResult();
+        foreach (var addedRange in addedRanges.Ranges)
+        {
+            _rangeLocks.Remove((addedRange, current.Version, tcs));
         }
 
         if (_logger.IsEnabled(LogLevel.Information))
@@ -556,64 +539,67 @@ internal sealed partial class GrainDirectoryReplica(
         }
     }
 
-    private async Task TransferSnapshotAsync(DirectoryMembershipSnapshot previous, DirectoryMembershipSnapshot current, RingRangeLock rangeLock, SiloAddress previousOwner)
+    private async Task<bool> TransferSnapshotAsync(DirectoryMembershipSnapshot current, RingRangeCollection addedRanges, SiloAddress previousOwner, MembershipVersion previousVersion)
     {
-        var addedRange = rangeLock.Range;
         try
         {
             if (_logger.IsEnabled(LogLevel.Trace))
             {
-                _logger.LogTrace("Requesting entries for range '{Range}' from '{PreviousOwner}' at version '{Version}'.", addedRange, previousOwner, current.Version);
+                _logger.LogTrace("Requesting entries for ranges '{Range}' from '{PreviousOwner}' at version '{PreviousVersion}'.", addedRanges, previousOwner, previousVersion);
             }
 
             var replica = GetReplica(previousOwner);
 
             // Alternatively, the previous owner could push the snapshot. The pull-based approach is used here because it is simpler.
-            var snapshot = await replica.GetPartitionSnapshotAsync(current.Version, addedRange).AsTask().WaitAsync(_shutdownCts.Token);
+            var snapshot = await replica.GetPartitionSnapshotAsync(current.Version, previousVersion, addedRanges).AsTask().WaitAsync(_shutdownCts.Token);
 
             if (snapshot is null)
             {
-                _logger.LogWarning("Expected a valid snapshot from previous owner '{PreviousOwner}' for part of range '{Range}', but found none.", previousOwner, addedRange);
-                return;
+                _logger.LogWarning("Expected a valid snapshot from previous owner '{PreviousOwner}' for part of ranges '{Range}', but found none.", previousOwner, addedRanges);
+                return false;
             }
 
             // The acknowledgement step lets the previous owner know that the snapshot has been received so that it can proceed.
             InvokeOnClusterMember(
                 previousOwner,
-                async () => await replica.AcknowledgeSnapshotTransferAsync(_id, current.Version),
+                async () => await replica.AcknowledgeSnapshotTransferAsync(_id, previousVersion),
                 false,
                 nameof(IGrainDirectoryReplica.AcknowledgeSnapshotTransferAsync)).Ignore();
 
             // Wait for previous versions to be unlocked before proceeding.
-            await WaitForRange(addedRange, previous.Version, CancellationToken.None);
+            foreach (var range in addedRanges)
+            {
+                await WaitForRange(range, previousVersion, CancellationToken.None);
+            }
 
             // Incorporate the values into the grain directory.
             foreach (var entry in snapshot.GrainAddresses)
             {
                 DebugAssertOwnership(current, entry.GrainId);
                 
-                _logger.LogTrace("Received '{Entry}' via snapshot from '{PreviousOwner}' for version '{Version}'.", entry, previousOwner, current.Version);
+                _logger.LogTrace("Received '{Entry}' via snapshot from '{PreviousOwner}' for version '{Version}'.", entry, previousOwner, previousVersion);
                 _directory[entry.GrainId] = entry;
             }
 
             if (_logger.IsEnabled(LogLevel.Information))
             {
-                _logger.LogInformation("Transferred '{Count}' entries for range '{Range}' from '{PreviousOwner}'.", snapshot.GrainAddresses.Count, addedRange, previousOwner);
+                _logger.LogInformation("Transferred '{Count}' entries for range '{Range}' from '{PreviousOwner}'.", snapshot.GrainAddresses.Count, addedRanges, previousOwner);
             }
 
-            // Release the range lock.
-            rangeLock.Release();
+            return true;
         }
         catch (Exception exception)
         {
             if (exception is SiloUnavailableException)
             {
-                _logger.LogWarning("Remote host became unavailable while transferring ownership of range '{Range}'. Recovery will be performed.", addedRange);
+                _logger.LogWarning("Remote host became unavailable while transferring ownership of range '{Range}'. Recovery will be performed.", addedRanges);
             }
             else
             {
-                _logger.LogWarning(exception, "Error transferring ownership of range '{Range}'. Recovery will be performed.", addedRange);
+                _logger.LogWarning(exception, "Error transferring ownership of range '{Range}'. Recovery will be performed.", addedRanges);
             }
+
+            return false;
         }
     }
 
@@ -716,82 +702,55 @@ internal sealed partial class GrainDirectoryReplica(
         var current = _view;
         await WaitForRange(RingRange.Full, current.Version, CancellationToken.None);
         _logger.LogInformation("Performing integrity check on directory at version '{Version}'.", current.Version);
-        using var fullRangeLock = RingRangeLock.Create(this, RingRange.Full, current.Version);
-        foreach (var entry in _directory)
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var fullRangeLock = (RingRange.Full, current.Version, tcs);
+        _rangeLocks.Add(fullRangeLock);
+        try
         {
-            DebugAssertOwnership(entry.Key);
-        }
-
-        int missing = 0;
-        int mismatched = 0;
-        var total = 0;
-        await foreach (var activationList in GetRegisteredActivations(current, current.GetRanges(_id), isValidation: true))
-        {
-            total += activationList.Count;
-            foreach (var entry in activationList)
+            foreach (var entry in _directory)
             {
-                DebugAssertOwnership(entry.GrainId);
-                if (_directory.TryGetValue(entry.GrainId, out var existingEntry))
+                DebugAssertOwnership(entry.Key);
+            }
+
+            int missing = 0;
+            int mismatched = 0;
+            var total = 0;
+            await foreach (var activationList in GetRegisteredActivations(current, current.GetRanges(_id), isValidation: true))
+            {
+                total += activationList.Count;
+                foreach (var entry in activationList)
                 {
-                    if (!existingEntry.Equals(entry))
+                    DebugAssertOwnership(entry.GrainId);
+                    if (_directory.TryGetValue(entry.GrainId, out var existingEntry))
                     {
-                        ++mismatched;
-                        _logger.LogError("Integrity violation: Recovered entry '{RecoveredRecord}' does not match existing entry '{LocalRecord}'.", entry, existingEntry);
-                        Debug.Fail($"Integrity violation: Recovered entry '{entry}' does not match existing entry '{existingEntry}'.");
+                        if (!existingEntry.Equals(entry))
+                        {
+                            ++mismatched;
+                            _logger.LogError("Integrity violation: Recovered entry '{RecoveredRecord}' does not match existing entry '{LocalRecord}'.", entry, existingEntry);
+                            Debug.Fail($"Integrity violation: Recovered entry '{entry}' does not match existing entry '{existingEntry}'.");
+                        }
+                    }
+                    else
+                    {
+                        ++missing;
+                        _logger.LogError("Integrity violation: Recovered entry '{RecoveredRecord}' not found in directory.", entry);
+                        Debug.Fail($"Integrity violation: Recovered entry '{entry}' not found in directory.");
                     }
                 }
-                else
-                {
-                    ++missing;
-                    _logger.LogError("Integrity violation: Recovered entry '{RecoveredRecord}' not found in directory.", entry);
-                    Debug.Fail($"Integrity violation: Recovered entry '{entry}' not found in directory.");
-                }
             }
-        }
 
-        _logger.LogInformation("Directory integrity check analyzed '{TotalRecordCount}' records, '{MissingRecordCount}' were missing, and '{MismatchedRecordCount}' mismatched.", total, missing, mismatched);
-        return;
+            _logger.LogInformation("Directory integrity check analyzed '{TotalRecordCount}' records, '{MissingRecordCount}' were missing, and '{MismatchedRecordCount}' mismatched.", total, missing, mismatched);
+            return;
+        }
+        finally
+        {
+            tcs.SetResult();
+            _rangeLocks.Remove(fullRangeLock);
+        }
     }
 
     private sealed record class PartitionSnapshotState(
         MembershipVersion DirectoryMembershipVersion,
         List<GrainAddress> GrainAddresses,
-        HashSet<SiloAddress> TransferPartners,
-        RingRange Range);
-
-    private sealed class RingRangeLock : IDisposable
-    {
-        private readonly GrainDirectoryReplica _source;
-        private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        private RingRangeLock(
-            GrainDirectoryReplica source,
-            RingRange range,
-            MembershipVersion version)
-        {
-            Range = range;
-            Version = version;
-            _source = source;
-        }
-
-        public RingRange Range { get; }
-        public MembershipVersion Version { get; }
-        public Task ReleaseTask => _completion.Task;
-
-        public static RingRangeLock Create(GrainDirectoryReplica source,
-            RingRange range,
-            MembershipVersion version)
-        {
-            var result = new RingRangeLock(source, range, version);
-            source._rangeLocks.Add(result);
-            return result;
-        }
-
-        public void Release() => Dispose();
-        public void Dispose()
-        {
-            _completion.TrySetResult();
-            _source._rangeLocks.Remove(this);
-        }
-    }
+        HashSet<SiloAddress> TransferPartners);
 }

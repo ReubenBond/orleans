@@ -164,7 +164,7 @@ internal sealed partial class DistributedGrainDirectory(
                         // This activation has not completed registration or is not currently active.
                         // Abort the activation with a pre-canceled cancellation token so that it skips directory deregistration.
                         // TODO: Expand validity check to non-ActivationData activations.
-                        logger.LogWarning("Deactivating activation '{Activation}' due to failure of a directory range owner.", activation);
+                        //logger.LogWarning("Deactivating activation '{Activation}' due to failure of a directory range owner.", activation);
                         activation.Deactivate(new DeactivationReason(DeactivationReasonCode.DirectoryFailure, "This activation's directory partition was salvaged while registration status was in-doubt."), cts.Token);
                         deactivationTasks.Add(activation.Deactivated);
                     }

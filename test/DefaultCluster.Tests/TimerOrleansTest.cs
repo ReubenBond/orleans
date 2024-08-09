@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using TestExtensions;
-using UnitTestGrains;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;

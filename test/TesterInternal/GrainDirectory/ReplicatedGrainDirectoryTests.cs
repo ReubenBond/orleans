@@ -30,7 +30,7 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
         var testCluster = testClusterBuilder.Build();
         await testCluster.DeployAsync();
 
-        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
         var reconfigurationTimer = CoarseStopwatch.StartNew();
         var upperLimit = 5;
         var lowerLimit = 1;
@@ -89,12 +89,10 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
                                     {
                                         await testCluster.StopSiloAsync(victim);
                                     }
-                                    /*
-                                    else
-                                    {
-                                        await testCluster.KillSiloAsync(victim);
-                                    }
-                                    */
+                                    //else
+                                    //{
+                                    //    await testCluster.KillSiloAsync(victim);
+                                    //}
                                 }
                                 else if (currentCount < target)
                                 {
