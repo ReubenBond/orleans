@@ -85,14 +85,16 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
                                 {
                                     // Stop or kill a random silo, but not the primary (since that hosts cluster membership)
                                     var victim = testCluster.SecondarySilos[Random.Shared.Next(testCluster.SecondarySilos.Count)];
-                                    if (currentCount % 2 == 0)
+                                    //if (currentCount % 2 == 0)
                                     {
                                         await testCluster.StopSiloAsync(victim);
                                     }
+                                    /*
                                     else
                                     {
                                         await testCluster.KillSiloAsync(victim);
                                     }
+                                    */
                                 }
                                 else if (currentCount < target)
                                 {

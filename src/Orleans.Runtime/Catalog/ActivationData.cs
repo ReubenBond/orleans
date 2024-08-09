@@ -563,7 +563,6 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                     {
                         try
                         {
-                            _shared.Logger.LogInformation("Cancelling activation of {Activation} due to '{Reason}'", this, reason);
                             activate.Cancel();
                         }
                         catch (Exception exception)
@@ -1539,7 +1538,11 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 catch (Exception exception)
                 {
                     registrationException = exception;
-                    _shared.Logger.LogWarning((int)ErrorCode.Runtime_Error_100064, registrationException, "Failed to register grain {Grain} in grain directory", ToString());
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        _shared.Logger.LogWarning((int)ErrorCode.Runtime_Error_100064, registrationException, "Failed to register grain {Grain} in grain directory", ToString());
+                    }
+
                     success = false;
                 }
 

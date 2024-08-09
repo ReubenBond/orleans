@@ -36,6 +36,14 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
         Ranges = ranges;
     }
 
+    public static RingRangeCollection Create<TCollection>(TCollection ranges) where TCollection : ICollection<RingRange>
+    {
+        var result = ImmutableArray.CreateBuilder<RingRange>(ranges.Count);
+        result.AddRange(ranges);
+        result.Sort((l, r) => l.Start.CompareTo(r.Start));
+        return new(result.ToImmutable());
+    }
+
     public static RingRangeCollection Empty { get; } = new([]);
 
     [Id(0)]

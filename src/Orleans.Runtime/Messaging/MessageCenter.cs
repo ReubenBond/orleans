@@ -206,8 +206,12 @@ namespace Orleans.Runtime.Messaging
                     else if (this.siloStatusOracle.IsDeadSilo(targetSilo))
                     {
                         // Do not try to establish
-                        this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
-                        this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead");
+                        if (msg.Direction is Message.Directions.Request or Message.Directions.OneWay)
+                        {
+                            this.messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, msg);
+                            this.SendRejection(msg, Message.RejectionTypes.Transient, "Target silo is known to be dead");
+                        }
+
                         return;
                     }
                     else

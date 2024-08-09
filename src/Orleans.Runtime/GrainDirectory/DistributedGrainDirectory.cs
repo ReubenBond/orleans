@@ -69,7 +69,7 @@ internal sealed partial class DistributedGrainDirectory(
         [CallerMemberName] string operation = "")
     {
         DirectoryResult<TResult> invokeResult;
-        var view = localReplica.CurrentView;
+        var view = localReplica.View;
         var attempts = 0;
         const int MaxAttempts = 10;
         var delay = TimeSpan.FromMilliseconds(10);
@@ -236,7 +236,7 @@ internal sealed partial class DistributedGrainDirectory(
 
     SiloAddress? ITestHooks.GetPrimaryForGrain(GrainId grainId)
     {
-        localReplica.CurrentView.TryGetOwner(grainId, out var owner);
+        localReplica.View.TryGetOwner(grainId, out var owner);
         return owner;
     }
 
