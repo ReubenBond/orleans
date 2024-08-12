@@ -50,6 +50,7 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
         var target = upperLimit;
         var clusterOperation = Task.CompletedTask;
         var idBase = 0L;
+        var client = ((InProcessSiloHandle)testCluster.Primary).SiloHost.Services.GetRequiredService<IGrainFactory>();
         const int CallsPerIteration = 100;
         try
         {
@@ -60,7 +61,7 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
                     try
                     {
                         await Task.Delay(TimeSpan.FromMilliseconds(5));
-                        await Parallel.ForAsync(0, CallsPerIteration, (i, ct) => testCluster.GrainFactory.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping());
+                        await Parallel.ForAsync(0, CallsPerIteration, (i, ct) => client.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping());
 
                         idBase += CallsPerIteration;
                     }
@@ -86,7 +87,7 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
                             foreach (var silo in testCluster.Silos)
                             {
                                 var address = silo.SiloAddress;
-                                var replica = ((IInternalGrainFactory)testCluster.GrainFactory).GetSystemTarget<IGrainDirectoryReplicaTestHooks>(Constants.DirectoryReplicaType, address);
+                                var replica = ((IInternalGrainFactory)client).GetSystemTarget<IGrainDirectoryReplicaTestHooks>(Constants.DirectoryReplicaType, address);
                                 await replica.CheckIntegrityAsync();
                             }
 
@@ -98,14 +99,14 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
                                 {
                                     // Stop or kill a random silo, but not the primary (since that hosts cluster membership)
                                     var victim = testCluster.SecondarySilos[Random.Shared.Next(testCluster.SecondarySilos.Count)];
-                                    //if (currentCount % 2 == 0)
+                                    if (currentCount % 2 == 0)
                                     {
                                         await testCluster.StopSiloAsync(victim);
                                     }
-                                    //else
-                                    //{
-                                    //    await testCluster.KillSiloAsync(victim);
-                                    //}
+                                    else
+                                    {
+                                        await testCluster.KillSiloAsync(victim);
+                                    }
                                 }
                                 else if (currentCount < target)
                                 {

@@ -21,13 +21,13 @@ internal sealed partial class GrainDirectoryReplica
 
         // Ensure that the current membership version is new enough.
         await WaitForRange(address.GrainId, version);
-        if (!IsExpectedView(version))
+        if (!IsOwner(_view, address.GrainId))
         {
-            return new DirectoryResult<GrainAddress>(null!, _view.Version);
+            return DirectoryResult.RefreshRequired<GrainAddress>(_view.Version);
         }
 
         DebugAssertOwnership(address.GrainId);
-        return new DirectoryResult<GrainAddress>(RegisterCore(address, currentRegistration), _view.Version);
+        return DirectoryResult.FromResult(RegisterCore(address, currentRegistration), version);
     }
 
     async ValueTask<DirectoryResult<List<GrainAddress>>> IGrainDirectoryReplica.RegisterAsync(MembershipVersion version, List<GrainAddress> addresses) 
@@ -43,16 +43,16 @@ internal sealed partial class GrainDirectoryReplica
         {
             // Ensure we can serve the request.
             await WaitForRange(address.GrainId, version);
-            if (!IsExpectedView(version))
+            if (!IsOwner(_view, address.GrainId))
             {
-                return new DirectoryResult<List<GrainAddress>>(null!, _view.Version);
+                return DirectoryResult.RefreshRequired<List<GrainAddress>>(_view.Version);
             }
 
             DebugAssertOwnership(address.GrainId);
             results.Add(RegisterCore(address, null));
         }
 
-        return new DirectoryResult<List<GrainAddress>>(results, _view.Version);
+        return DirectoryResult.FromResult(results, version);
     }
 
     async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryReplica.LookupAsync(MembershipVersion version, GrainId grainId)
@@ -64,12 +64,12 @@ internal sealed partial class GrainDirectoryReplica
 
         // Ensure we can serve the request.
         await WaitForRange(grainId, version);
-        if (!IsExpectedView(version))
+        if (!IsOwner(_view, grainId))
         {
-            return new DirectoryResult<GrainAddress?>(null, _view.Version);
+            return DirectoryResult.RefreshRequired<GrainAddress?>(_view.Version);
         }
 
-        return new DirectoryResult<GrainAddress?>(LookupCore(grainId), _view.Version);
+        return DirectoryResult.FromResult(LookupCore(grainId), version);
     }
 
     async ValueTask<DirectoryResult<List<GrainAddress?>>> IGrainDirectoryReplica.LookupAsync(MembershipVersion version, List<GrainId> grainIds)
@@ -84,18 +84,16 @@ internal sealed partial class GrainDirectoryReplica
         foreach (var grainId in grainIds)
         {
             await WaitForRange(grainId, version);
-            if (IsOwner(_view, grainId))
+            if (!IsOwner(_view, grainId))
             {
-                DebugAssertOwnership(grainId);
-                results.Add(LookupCore(grainId));
+                return DirectoryResult.RefreshRequired<List<GrainAddress?>>(_view.Version);
             }
-            else if (!IsExpectedView(version))
-            {
-                return new DirectoryResult<List<GrainAddress?>>(null!, _view.Version);
-            }
+
+            DebugAssertOwnership(grainId);
+            results.Add(LookupCore(grainId));
         }
 
-        return new DirectoryResult<List<GrainAddress?>>(results, _view.Version);
+        return DirectoryResult.FromResult(results, version);
     }
 
     async ValueTask<DirectoryResult<bool>> IGrainDirectoryReplica.DeregisterAsync(MembershipVersion version, GrainAddress address)
@@ -107,13 +105,13 @@ internal sealed partial class GrainDirectoryReplica
         }
 
         await WaitForRange(address.GrainId, version);
-        if (!IsExpectedView(version))
+        if (!IsOwner(_view, address.GrainId))
         {
-            return new DirectoryResult<bool>(false, _view.Version);
+            return DirectoryResult.RefreshRequired<bool>(_view.Version);
         }
 
         DebugAssertOwnership(address.GrainId);
-        return new DirectoryResult<bool>(DeregisterCore(address), _view.Version);
+        return DirectoryResult.FromResult(DeregisterCore(address), version);
     }
 
     async ValueTask<DirectoryResult<bool>> IGrainDirectoryReplica.DeregisterAsync(MembershipVersion version, List<GrainAddress> addresses)
@@ -129,16 +127,16 @@ internal sealed partial class GrainDirectoryReplica
         {
             // Ensure we can serve the request.
             await WaitForRange(address.GrainId, version);
-            if (!IsExpectedView(version))
+            if (!IsOwner(_view, address.GrainId))
             {
-                return new DirectoryResult<bool>(false, _view.Version);
+                return DirectoryResult.RefreshRequired<bool>(_view.Version);
             }
 
             DebugAssertOwnership(address.GrainId);
             result &= DeregisterCore(address);
         }
 
-        return new DirectoryResult<bool>(result, _view.Version);
+        return DirectoryResult.FromResult(result, version);
     }
 
     private bool DeregisterCore(GrainAddress address)
@@ -186,5 +184,4 @@ internal sealed partial class GrainDirectoryReplica
     }
 
     private bool IsSiloDead(GrainAddress existing) => _clusterMembershipService.CurrentSnapshot.GetSiloStatus(existing.SiloAddress) == SiloStatus.Dead;
-    private bool IsExpectedView(MembershipVersion version) => version == _view.Version ||  _stoppedCts.IsCancellationRequested;
 }
