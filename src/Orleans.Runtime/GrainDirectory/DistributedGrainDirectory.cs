@@ -28,7 +28,7 @@ internal sealed partial class DistributedGrainDirectory(
     // grain. By ensuring that any registration occurred at a version at least as high as the recovery version, we avoid this issue. This could be made more
     // precise by also tracking the sets of ranges which need to be recovered, but that complicates things somewhat since it would require tracking the ranges
     // for each recovery version.
-    private long _recoveryMembershipVersionValue;
+    private long _recoveryMembershipVersion;
 
     public async Task<GrainAddress?> Lookup(GrainId grainId) => await InvokeAsync(
         grainId,
@@ -76,15 +76,17 @@ internal sealed partial class DistributedGrainDirectory(
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var initialVersion = _recoveryMembershipVersionValue;
-            if (view.Version.Value < _recoveryMembershipVersionValue || !view.TryGetOwner(grainId, out var owner))
+            var initialRecoveryMembershipVersion = _recoveryMembershipVersion;
+            if (view.Version.Value < initialRecoveryMembershipVersion || !view.TryGetOwner(grainId, out var owner))
             {
+                // If there are no members, bail out with the default return value.
                 if (view.Members.Length == 0 && view.Version.Value > 0)
                 {
                     return default!;
                 }
 
-                view = await localReplica.RefreshViewAsync(new(view.Version.Value + 1), cancellationToken);
+                var targetVersion = Math.Max(view.Version.Value + 1, initialRecoveryMembershipVersion);
+                view = await localReplica.RefreshViewAsync(new(targetVersion), cancellationToken);
                 continue;
             }
 
@@ -110,37 +112,37 @@ internal sealed partial class DistributedGrainDirectory(
                 continue;
             }
 
-            if (initialVersion != _recoveryMembershipVersionValue)
+            if (initialRecoveryMembershipVersion != _recoveryMembershipVersion)
             {
                 // If the recovery version changed, perform a view refresh and re-issue the operation.
                 // See the comment on the declaration of '_recoveryMembershipVersionValue' for more details.
                 continue;
             }
 
-            if (invokeResult.TryGetResult(view.Version, out var result))
-            {
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    logger.LogTrace("Invoked '{Operation}' on '{Owner}' for grain '{GrainId}' and received result '{Result}'.", operation, owner, grainId, result);
-                }
-
-                return result;
-            }
-            else
+            if (!invokeResult.TryGetResult(view.Version, out var result))
             {
                 // Sync with the remote replica.
                 view = await localReplica.RefreshViewAsync(invokeResult.Version, cancellationToken);
+                continue;
             }
+
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                logger.LogTrace("Invoked '{Operation}' on '{Owner}' for grain '{GrainId}' and received result '{Result}'.", operation, owner, grainId, result);
+            }
+
+            return result;
         }
     }
 
     public async ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRangeCollection ranges, bool isValidation)
     {
         logger.LogInformation("Collecting registered activations for ranges {Ranges} at version {MembershipVersion}.", ranges, membershipVersion);
-        if (_recoveryMembershipVersionValue < membershipVersion.Value)
+        var recoveryMembershipVersion = _recoveryMembershipVersion;
+        if (recoveryMembershipVersion < membershipVersion.Value)
         {
-            // Interlocked.Exchange is used to ensure that the value is immediately visible to any thread registering an activation.
-            Interlocked.Exchange(ref _recoveryMembershipVersionValue, membershipVersion.Value);
+            // Ensure that the value is immediately visible to any thread registering an activation.
+            Interlocked.CompareExchange(ref _recoveryMembershipVersion, membershipVersion.Value, recoveryMembershipVersion);
         }
 
         var localActivations = serviceProvider.GetRequiredService<ActivationDirectory>();

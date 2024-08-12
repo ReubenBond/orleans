@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -30,10 +32,11 @@ internal sealed partial class GrainDirectoryReplica(
     private readonly ClusterMembershipService _clusterMembershipService = clusterMembershipService;
     private readonly IServiceProvider _serviceProvider = serviceProvider;
     private readonly IInternalGrainFactory _grainFactory = grainFactory;
-    private readonly CancellationTokenSource _shutdownCts = new();
+    private readonly CancellationTokenSource _drainSnapshotsCts = new();
+    private readonly CancellationTokenSource _stoppedCts = new();
     private readonly SiloAddress _id = localSiloDetails.SiloAddress;
     private readonly ILogger<GrainDirectoryReplica> _logger = loggerFactory.CreateLogger<GrainDirectoryReplica>();
-    private readonly TaskCompletionSource _shutdownTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _snapshotsDrainedTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly AsyncEnumerable<DirectoryMembershipSnapshot> _viewUpdates = new(
         DirectoryMembershipSnapshot.Default,
         (previous, proposed) => proposed.Version >= previous.Version,
@@ -68,35 +71,30 @@ internal sealed partial class GrainDirectoryReplica(
                     break;
                 }
             }
-
-            if (_logger.IsEnabled(LogLevel.Information) && stopwatch.Elapsed.TotalMilliseconds > 50)
-            {
-                _logger.LogInformation("Refreshed view to version '{Version}' in {Elapsed}ms.", version, stopwatch.Elapsed.TotalMilliseconds);
-            }
         }
 
         return _view;
     }
 
-    async ValueTask<GrainDirectoryPartitionSnapshot?> IGrainDirectoryReplica.GetPartitionSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRangeCollection ranges)
+    async ValueTask<GrainDirectoryPartitionSnapshot?> IGrainDirectoryReplica.GetSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRangeCollection ranges)
     {
         if (_logger.IsEnabled(LogLevel.Trace))
         {
-            _logger.LogTrace("GetPartitionSnapshotAsync('{Version}', '{RangeVersion}', '{Range}')", version, rangeVersion, ranges);
+            _logger.LogTrace("GetSnapshotAsync('{Version}', '{RangeVersion}', '{Range}')", version, rangeVersion, ranges);
         }
 
         // Wait for the range to be unlocked.
-        await RefreshViewAsync(version, CancellationToken.None);
         foreach (var range in ranges)
         {
             var stopwatch = CoarseStopwatch.StartNew();
-            await WaitForRange(range, version, CancellationToken.None);
+            await WaitForRange(range, version);
             if (stopwatch.Elapsed.TotalMilliseconds > 500)
             {
                 _logger.LogInformation("Waited for range '{Range}' at version '{Version}' for {Elapsed}ms.", range, rangeVersion, stopwatch.ElapsedMilliseconds);
             }
         }
 
+        _stoppedCts.Token.ThrowIfCancellationRequested();
         List<GrainAddress> partitionAddresses = [];
         foreach (var partitionSnapshot in _partitionSnapshots)
         {
@@ -159,9 +157,9 @@ internal sealed partial class GrainDirectoryReplica(
                 }
 
                 // If shutdown has been requested and there are no more pending snapshots, signal completion.
-                if (_shutdownCts.IsCancellationRequested && _partitionSnapshots.Count == 0)
+                if (_drainSnapshotsCts.IsCancellationRequested && _partitionSnapshots.Count == 0)
                 {
-                    _shutdownTcs.TrySetResult();
+                    _snapshotsDrainedTcs.TrySetResult();
                 }
             }
         }
@@ -175,27 +173,31 @@ internal sealed partial class GrainDirectoryReplica(
     {
         if (!view.TryGetOwner(grainId, out var owner))
         {
+            DumpCapture.CreateMiniDump();
+            Debugger.Launch();
             Debug.Fail($"Could not find owner for grain grain '{grainId}' in view '{view}'.");
         }
 
         if (!_id.Equals(owner))
         {
+            DumpCapture.CreateMiniDump();
+            Debugger.Launch();
             Debug.Fail($"'{_id}' expected to be the owner of grain '{grainId}', but the owner is '{owner}'.");
         }
     }
 
-    private ValueTask WaitForRange(GrainId grainId, MembershipVersion version, CancellationToken cancellationToken) => WaitForRange(RingRange.FromPoint(grainId.GetUniformHashCode()), version, cancellationToken);
+    private ValueTask WaitForRange(GrainId grainId, MembershipVersion version) => WaitForRange(RingRange.FromPoint(grainId.GetUniformHashCode()), version);
 
-    private async ValueTask WaitForRange(RingRange range, MembershipVersion version, CancellationToken cancellationToken)
+    private async ValueTask WaitForRange(RingRange range, MembershipVersion version)
     {
         if (_view.Version < version)
         {
-            await RefreshViewAsync(version, cancellationToken);
+            await RefreshViewAsync(version, _stoppedCts.Token);
         }
 
         while (TryGetIntersectingLock(range, version, out var completion))
         {
-            await completion.WaitAsync(cancellationToken);
+            await completion.WaitAsync(_stoppedCts.Token);
         }
 
         bool TryGetIntersectingLock(RingRange range, MembershipVersion version, [NotNullWhen(true)] out Task? completion)
@@ -226,10 +228,14 @@ internal sealed partial class GrainDirectoryReplica(
 
     private async Task OnShuttingDown(CancellationToken token)
     {
-        while (!token.IsCancellationRequested && _partitionSnapshots.Count > 0)
+        await this.RunOrQueueTask(async () =>
         {
-            await _shutdownTcs.Task.WaitAsync(token).SuppressThrowing();
-        }
+            _drainSnapshotsCts.Cancel();
+            if (_partitionSnapshots.Count > 0)
+            {
+                await _snapshotsDrainedTcs.Task.WaitAsync(token).SuppressThrowing();
+            }
+        });
     }
 
     private Task OnRuntimeInitializeStart(CancellationToken cancellationToken)
@@ -245,7 +251,7 @@ internal sealed partial class GrainDirectoryReplica(
 
     async Task OnRuntimeInitializeStop(CancellationToken cancellationToken)
     {
-        _shutdownCts.Cancel();
+        _stoppedCts.Cancel();
         if (_runTask is { } task)
         {
             // Try to wait for hand-off to complete.
@@ -260,12 +266,12 @@ internal sealed partial class GrainDirectoryReplica(
             // Ensure all child tasks are completed before exiting, tracking them here.
             List<Task> tasks = [];
             var previousUpdate = ClusterMembershipSnapshot.Default;
-            while (!_shutdownCts.IsCancellationRequested)
+            while (!_stoppedCts.IsCancellationRequested)
             {
                 try
                 {
                     var previousRanges = _view.GetRanges(_id);
-                    await foreach (var update in _clusterMembershipService.MembershipUpdates.WithCancellation(_shutdownCts.Token))
+                    await foreach (var update in _clusterMembershipService.MembershipUpdates.WithCancellation(_stoppedCts.Token))
                     {
                         var changes = update.CreateUpdate(previousUpdate);
                         
@@ -296,7 +302,7 @@ internal sealed partial class GrainDirectoryReplica(
                 }
                 catch (Exception exception)
                 {
-                    if (!_shutdownCts.IsCancellationRequested)
+                    if (!_stoppedCts.IsCancellationRequested)
                     {
                         _logger.LogError(exception, "Error processing membership updates.");
                     }
@@ -398,7 +404,7 @@ internal sealed partial class GrainDirectoryReplica(
             foreach (var removedRange in removedRanges)
             {
                 // Wait for the range being removed to become valid.
-                await WaitForRange(removedRange, previous.Version, CancellationToken.None);
+                await WaitForRange(removedRange, previous.Version);
 
                 if (_logger.IsEnabled(LogLevel.Trace))
                 {
@@ -492,8 +498,8 @@ internal sealed partial class GrainDirectoryReplica(
 
             // Note: there should be no 'await' points before this point.
             // An await before this point would result in ranges not being locked synchronously.
-            await Task.WhenAll(tasks).WaitAsync(_shutdownCts.Token).SuppressThrowing();
-            if (_shutdownCts.IsCancellationRequested)
+            await Task.WhenAll(tasks).WaitAsync(_stoppedCts.Token).SuppressThrowing();
+            if (_stoppedCts.IsCancellationRequested)
             {
                 return;
             }
@@ -519,7 +525,7 @@ internal sealed partial class GrainDirectoryReplica(
             // Wait for previous versions to be unlocked before proceeding.
             foreach (var range in addedRanges)
             {
-                await WaitForRange(range, previous.Version, CancellationToken.None);
+                await WaitForRange(range, previous.Version);
             }
 
             await RecoverPartitionRange(current, addedRanges);
@@ -551,7 +557,7 @@ internal sealed partial class GrainDirectoryReplica(
             var replica = GetReplica(previousOwner);
 
             // Alternatively, the previous owner could push the snapshot. The pull-based approach is used here because it is simpler.
-            var snapshot = await replica.GetPartitionSnapshotAsync(current.Version, previousVersion, addedRanges).AsTask().WaitAsync(_shutdownCts.Token);
+            var snapshot = await replica.GetSnapshotAsync(current.Version, previousVersion, addedRanges).AsTask().WaitAsync(_stoppedCts.Token);
 
             if (snapshot is null)
             {
@@ -569,7 +575,7 @@ internal sealed partial class GrainDirectoryReplica(
             // Wait for previous versions to be unlocked before proceeding.
             foreach (var range in addedRanges)
             {
-                await WaitForRange(range, previousVersion, CancellationToken.None);
+                await WaitForRange(range, previousVersion);
             }
 
             // Incorporate the values into the grain directory.
@@ -637,8 +643,8 @@ internal sealed partial class GrainDirectoryReplica(
             tasks.Add(GetRegisteredActivationsFromClusterMember(current.Version, ranges, member.SiloAddress, isValidation));
         }
 
-        await Task.WhenAll(tasks).WaitAsync(_shutdownCts.Token).SuppressThrowing();
-        if (_shutdownCts.IsCancellationRequested)
+        await Task.WhenAll(tasks).WaitAsync(_stoppedCts.Token).SuppressThrowing();
+        if (_stoppedCts.IsCancellationRequested)
         {
             yield break;
         }
@@ -670,7 +676,7 @@ internal sealed partial class GrainDirectoryReplica(
     private async Task<T> InvokeOnClusterMember<T>(SiloAddress siloAddress, Func<Task<T>> func, T defaultValue, string operationName)
     {
         var clusterMembershipSnapshot = _clusterMembershipService.CurrentSnapshot;
-        while (!_shutdownCts.IsCancellationRequested)
+        while (!_stoppedCts.IsCancellationRequested)
         {
             if (clusterMembershipSnapshot.GetSiloStatus(siloAddress) is not (SiloStatus.Active or SiloStatus.Joining or SiloStatus.ShuttingDown))
             {
@@ -694,13 +700,14 @@ internal sealed partial class GrainDirectoryReplica(
             }
         }
 
+        _stoppedCts.Token.ThrowIfCancellationRequested();
         return defaultValue;
     }
 
     async ValueTask IGrainDirectoryReplicaTestHooks.CheckIntegrityAsync()
     {
         var current = _view;
-        await WaitForRange(RingRange.Full, current.Version, CancellationToken.None);
+        await WaitForRange(RingRange.Full, current.Version);
         _logger.LogInformation("Performing integrity check on directory at version '{Version}'.", current.Version);
         var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var fullRangeLock = (RingRange.Full, current.Version, tcs);
@@ -727,6 +734,7 @@ internal sealed partial class GrainDirectoryReplica(
                         {
                             ++mismatched;
                             _logger.LogError("Integrity violation: Recovered entry '{RecoveredRecord}' does not match existing entry '{LocalRecord}'.", entry, existingEntry);
+                            DumpCapture.CreateMiniDump();
                             Debug.Fail($"Integrity violation: Recovered entry '{entry}' does not match existing entry '{existingEntry}'.");
                         }
                     }
@@ -734,6 +742,7 @@ internal sealed partial class GrainDirectoryReplica(
                     {
                         ++missing;
                         _logger.LogError("Integrity violation: Recovered entry '{RecoveredRecord}' not found in directory.", entry);
+                        DumpCapture.CreateMiniDump();
                         Debug.Fail($"Integrity violation: Recovered entry '{entry}' not found in directory.");
                     }
                 }
@@ -753,4 +762,57 @@ internal sealed partial class GrainDirectoryReplica(
         MembershipVersion DirectoryMembershipVersion,
         List<GrainAddress> GrainAddresses,
         HashSet<SiloAddress> TransferPartners);
+}
+
+internal static partial class DumpCapture
+{
+    internal static FileInfo CreateMiniDump() => CreateMiniDump(Process.GetCurrentProcess());
+    internal static FileInfo CreateMiniDump(Process process, MiniDumpType dumpType = MiniDumpType.MiniDumpWithFullMemory)
+    {
+        var dumpFileName = $@"{process.ProcessName}-MiniDump-{DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss-fffZ", CultureInfo.InvariantCulture)}.dmp";
+
+        using (var stream = File.Create(dumpFileName))
+        {
+            var result = MiniDumpWriteDump(
+                process.Handle,
+                process.Id,
+                stream.SafeFileHandle.DangerousGetHandle(),
+                dumpType,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                IntPtr.Zero);
+        }
+
+        return new FileInfo(dumpFileName);
+    }
+
+    [DllImport("Dbghelp.dll")]
+    public static extern bool MiniDumpWriteDump(
+        IntPtr hProcess,
+        int processId,
+        IntPtr hFile,
+        MiniDumpType dumpType,
+        IntPtr exceptionParam,
+        IntPtr userStreamParam,
+        IntPtr callbackParam);
+
+    internal enum MiniDumpType
+    {
+        MiniDumpNormal = 0x00000000,
+        MiniDumpWithDataSegs = 0x00000001,
+        MiniDumpWithFullMemory = 0x00000002,
+        MiniDumpWithHandleData = 0x00000004,
+        MiniDumpFilterMemory = 0x00000008,
+        MiniDumpScanMemory = 0x00000010,
+        MiniDumpWithUnloadedModules = 0x00000020,
+        MiniDumpWithIndirectlyReferencedMemory = 0x00000040,
+        MiniDumpFilterModulePaths = 0x00000080,
+        MiniDumpWithProcessThreadData = 0x00000100,
+        MiniDumpWithPrivateReadWriteMemory = 0x00000200,
+        MiniDumpWithoutOptionalData = 0x00000400,
+        MiniDumpWithFullMemoryInfo = 0x00000800,
+        MiniDumpWithThreadInfo = 0x00001000,
+        MiniDumpWithCodeSegs = 0x00002000,
+        MiniDumpWithoutManagedState = 0x00004000,
+    }
 }

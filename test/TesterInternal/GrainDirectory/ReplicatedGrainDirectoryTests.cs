@@ -1,5 +1,9 @@
+using System.Diagnostics;
+using System.Globalization;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.TestingHost;
 using Xunit;
 using Xunit.Abstractions;
@@ -25,12 +29,21 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
     [Fact]
     public async Task DynamicClusterTest()
     {
+        AppDomain.CurrentDomain.FirstChanceException += (sender, args) =>
+        {
+            var ex = args.Exception;
+            if (ex is NullReferenceException or InvalidOperationException or ArgumentException || ex.GetType().Name.Contains("DebugAssertException"))
+            {
+                DumpCapture.CreateMiniDump("FirstChance");
+            }
+        };
+
         var testClusterBuilder = new TestClusterBuilder(1);
         testClusterBuilder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         var testCluster = testClusterBuilder.Build();
         await testCluster.DeployAsync();
 
-        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
         var reconfigurationTimer = CoarseStopwatch.StartNew();
         var upperLimit = 5;
         var lowerLimit = 1;
@@ -114,6 +127,7 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
                     {
                         if (ex.GetType().Name.Contains("DebugAssertException"))
                         {
+                            DumpCapture.CreateMiniDump("DebugAssertion");
                             throw;
                         }
 
