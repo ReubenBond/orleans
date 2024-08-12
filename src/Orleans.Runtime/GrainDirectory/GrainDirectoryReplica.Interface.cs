@@ -84,13 +84,15 @@ internal sealed partial class GrainDirectoryReplica
         foreach (var grainId in grainIds)
         {
             await WaitForRange(grainId, version);
-            if (!IsExpectedView(version))
+            if (IsOwner(_view, grainId))
+            {
+                DebugAssertOwnership(grainId);
+                results.Add(LookupCore(grainId));
+            }
+            else if (!IsExpectedView(version))
             {
                 return new DirectoryResult<List<GrainAddress?>>(null!, _view.Version);
             }
-
-            DebugAssertOwnership(grainId);
-            results.Add(LookupCore(grainId));
         }
 
         return new DirectoryResult<List<GrainAddress?>>(results, _view.Version);

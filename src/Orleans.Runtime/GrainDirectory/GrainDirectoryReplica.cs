@@ -186,19 +186,19 @@ internal sealed partial class GrainDirectoryReplica(
         }
     }
 
+    private bool IsOwner(DirectoryMembershipSnapshot view, GrainId grainId) => view.TryGetOwner(grainId, out var owner) && _id.Equals(owner);
+
     private ValueTask WaitForRange(GrainId grainId, MembershipVersion version) => WaitForRange(RingRange.FromPoint(grainId.GetUniformHashCode()), version);
 
-    private async ValueTask WaitForRange(RingRange range, MembershipVersion version)
+    private ValueTask WaitForRange(RingRange range, MembershipVersion version)
     {
-        if (_view.Version < version)
+        Task? completion = null;
+        if (_view.Version < version || TryGetIntersectingLock(range, version, out completion))
         {
-            await RefreshViewAsync(version, _stoppedCts.Token);
+            return WaitForRangeCore(range, version, completion);
         }
 
-        while (TryGetIntersectingLock(range, version, out var completion))
-        {
-            await completion.WaitAsync(_stoppedCts.Token);
-        }
+        return ValueTask.CompletedTask;
 
         bool TryGetIntersectingLock(RingRange range, MembershipVersion version, [NotNullWhen(true)] out Task? completion)
         {
@@ -213,6 +213,24 @@ internal sealed partial class GrainDirectoryReplica(
 
             completion = null;
             return false;
+        }
+
+        async ValueTask WaitForRangeCore(RingRange range, MembershipVersion version, Task? task)
+        {
+            if (task is not null)
+            {
+                await task;
+            }
+
+            if (_view.Version < version)
+            {
+                await RefreshViewAsync(version, _stoppedCts.Token);
+            }
+
+            while (TryGetIntersectingLock(range, version, out var completion))
+            {
+                await completion.WaitAsync(_stoppedCts.Token);
+            }
         }
     }
 
@@ -716,7 +734,7 @@ internal sealed partial class GrainDirectoryReplica(
         {
             foreach (var entry in _directory)
             {
-                DebugAssertOwnership(entry.Key);
+                DebugAssertOwnership(_view, entry.Key);
             }
 
             int missing = 0;
@@ -727,7 +745,18 @@ internal sealed partial class GrainDirectoryReplica(
                 total += activationList.Count;
                 foreach (var entry in activationList)
                 {
-                    DebugAssertOwnership(entry.GrainId);
+                    if (!IsOwner(_view, entry.GrainId))
+                    {
+                        // The view has been refreshed since the request for registered activations was made.
+                        if (_view.Version <= current.Version)
+                        {
+                            DumpCapture.CreateMiniDump();
+                            Debug.Fail("Invariant violated. This host was sent a registration which it should not have been.");
+                        }
+
+                        continue;
+                    }
+
                     if (_directory.TryGetValue(entry.GrainId, out var existingEntry))
                     {
                         if (!existingEntry.Equals(entry))
