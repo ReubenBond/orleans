@@ -102,10 +102,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task UpdateIAmAlive(MembershipEntry entry) => this.grain.UpdateIAmAlive(entry);
 
-        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
-        {
-            throw new NotImplementedException();
-        }
+        public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => this.grain.CleanupDefunctSiloEntries(beforeDate);
     }
 
     [Reentrant]
@@ -196,6 +193,7 @@ namespace Orleans.Runtime.MembershipService
 
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
+            table.CleanupDefunctSiloEntries(beforeDate);
             return Task.CompletedTask;
         }
 
