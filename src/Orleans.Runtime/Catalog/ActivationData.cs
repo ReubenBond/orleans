@@ -297,26 +297,32 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-    internal void SetGrainInstance(object? grainInstance)
+    internal void SetGrainInstance(object grainInstance)
     {
-        switch (GrainInstance, grainInstance)
-        {
-            case (null, not null):
-                _shared.OnCreateActivation(this);
-                GetComponent<IActivationLifecycleObserver>()?.OnCreateActivation(this);
-                break;
-            case (not null, null):
-                _shared.OnDestroyActivation(this);
-                GetComponent<IActivationLifecycleObserver>()?.OnDestroyActivation(this);
-                break;
-        }
+        ArgumentNullException.ThrowIfNull(grainInstance);
 
-        if (grainInstance is ILifecycleParticipant<IGrainLifecycle> participant)
+        lock (this)
         {
-            participant.Participate(ObservableLifecycle);
-        }
+            if (GrainInstance is not null)
+            {
+                throw new InvalidOperationException("Grain instance is already set.");
+            }
 
-        GrainInstance = grainInstance;
+            if (State is not ActivationState.Creating)
+            {
+                throw new InvalidOperationException("Grain instance can only be set during creation.");
+            }
+
+            GrainInstance = grainInstance;
+
+            _shared.OnCreateActivation(this);
+            GetComponent<IActivationLifecycleObserver>()?.OnCreateActivation(this);
+
+            if (grainInstance is ILifecycleParticipant<IGrainLifecycle> participant)
+            {
+                participant.Participate(ObservableLifecycle);
+            }
+        }
     }
 
     public void SetState(ActivationState state)
@@ -428,10 +434,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-    public void ResetKeepAliveRequest()
-    {
-        KeepAliveUntil = DateTime.MinValue;
-    }
+    public void ResetKeepAliveRequest() => KeepAliveUntil = DateTime.MinValue;
 
     private void ScheduleOperation(object operation)
     {
@@ -442,6 +445,36 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
 
         _workSignal.Signal();
+    }
+
+    private void CancelPendingOperations()
+    {
+        lock (this)
+        {
+            // If the grain is currently activating, cancel that operation.
+            if (_pendingOperations is not { } operations)
+            {
+                return;
+            }
+
+            foreach (var op in operations)
+            {
+                if (op is Command cmd)
+                {
+                    try
+                    {
+                        cmd.Cancel();
+                    }
+                    catch (Exception exception)
+                    {
+                        if (exception is not ObjectDisposedException)
+                        {
+                            _shared.Logger.LogWarning(exception, "Error while cancelling on-going operation '{Operation}'.", cmd);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default)
@@ -526,9 +559,6 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
     public bool DeactivateCore(DeactivationReason reason, CancellationToken cancellationToken)
     {
-        var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
-
         lock (this)
         {
             var state = State;
@@ -548,32 +578,13 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             }
 
             if (state is ActivationState.Creating or ActivationState.Activating or ActivationState.Valid)
-            {   
+            {
+                CancelPendingOperations();
                 SetState(ActivationState.Deactivating);
                 _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
+                var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
                 ScheduleOperation(new Command.Deactivate(cts, state));
-            }
-
-            // If the grain is currently activating, cancel that operation.
-            if (_pendingOperations is { } operations)
-            {
-                foreach (var op in operations)
-                {
-                    if (op is Command.Activate activate)
-                    {
-                        try
-                        {
-                            activate.Cancel();
-                        }
-                        catch (Exception exception)
-                        {
-                            if (exception is not ObjectDisposedException)
-                            {
-                                _shared.Logger.LogWarning(exception, "Error while cancelling on-going activation.");
-                            }
-                        }
-                    }
-                }
             }
         }
 
@@ -766,14 +777,20 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         if (_extras.IsDisposing) return;
         _extras.IsDisposing = true;
 
+        CancelPendingOperations();
+        lock (this)
+        {
+            State = ActivationState.Invalid;
+        }
+
         DisposeTimers();
 
         try
         {
             var activator = _shared.GetComponent<IGrainActivator>();
-            if (activator != null)
+            if (activator != null && GrainInstance is { } instance)
             {
-                await activator.DisposeInstance(this, GrainInstance);
+                await activator.DisposeInstance(this, instance);
             }
         }
         catch (ObjectDisposedException)
@@ -782,7 +799,8 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
         try
         {
-            SetGrainInstance(null);
+            _shared.OnDestroyActivation(this);
+            GetComponent<IActivationLifecycleObserver>()?.OnDestroyActivation(this);
         }
         catch (ObjectDisposedException)
         {
@@ -1129,39 +1147,28 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                             RehydrateInternal(command.Context);
                             break;
                         case Command.Activate command:
-                            try
-                            {
-                                await ActivateAsync(command.RequestContext, command.CancellationToken).SuppressThrowing();
-                            }
-                            finally
-                            {
-                                command.Dispose();
-                            }
+                            await ActivateAsync(command.RequestContext, command.CancellationToken).SuppressThrowing();
                             break;
                         case Command.Deactivate command:
-                            try
-                            {
-                                await FinishDeactivating(command.CancellationToken, command.PreviousState).SuppressThrowing();
-                            }
-                            finally
-                            {
-                                command.Dispose();
-                            }
-
+                            await FinishDeactivating(command.CancellationToken, command.PreviousState).SuppressThrowing();
                             break;
                         case Command.Delay command:
-                            await Task.Delay(command.Duration, GrainRuntime.TimeProvider);
+                            await Task.Delay(command.Duration, GrainRuntime.TimeProvider, command.CancellationToken);
                             break;
                         case Command.UnregisterFromCatalog:
                             UnregisterMessageTarget();
                             break;
                         default:
-                            throw new NotSupportedException($"Encountered unknown operation of type {op?.GetType().ToString() ?? "null"} {op}");
+                            throw new NotSupportedException($"Encountered unknown operation of type {op?.GetType().ToString() ?? "null"} {op}.");
                     }
                 }
                 catch (Exception exception)
                 {
-                    _shared.Logger.LogError(exception, "Error in RunOnInactive for grain activation {Activation}", this);
+                    _shared.Logger.LogError(exception, "Error in ProcessOperationsAsync for grain activation '{Activation}'.", this);
+                }
+                finally
+                {
+                    (op as IDisposable)?.Dispose();
                 }
             }
         }
@@ -1775,11 +1782,6 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             _shared.Logger.LogWarning((int)ErrorCode.Catalog_DeactivateActivation_Exception, ex, "Error deactivating '{Activation}'.", this);
         }
 
-        lock (this)
-        {
-            SetState(ActivationState.Invalid);
-        }
-
         if (IsStuckDeactivating)
         {
             CatalogInstruments.ActivationShutdownViaDeactivateStuckActivation();
@@ -1973,55 +1975,51 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-    private class Command
+    private abstract class Command(CancellationTokenSource cts)
     {
-        protected Command() { }
+        private bool _disposed;
+        private readonly CancellationTokenSource _cts = cts;
+        public CancellationToken CancellationToken => _cts.Token;
 
-        public sealed class Deactivate(CancellationTokenSource cts, ActivationState previousState) : Command
+        public virtual void Cancel()
         {
-            private readonly CancellationTokenSource _cts = cts;
-            public CancellationToken CancellationToken => _cts.Token;
+            lock (this)
+            {
+                if (_disposed) return;
+                _cts.Cancel();
+            }
+        }
+
+        public virtual void Dispose()
+        {
+            lock (this)
+            {
+                _disposed = true;
+                _cts.Dispose();
+            }
+        }
+
+        public sealed class Deactivate(CancellationTokenSource cts, ActivationState previousState) : Command(cts)
+        {
             public ActivationState PreviousState { get; } = previousState;
-            public void Dispose() => _cts.Dispose();
         }
 
-        public sealed class Activate(Dictionary<string, object>? requestContext, CancellationTokenSource cts) : Command, IDisposable
+        public sealed class Activate(Dictionary<string, object>? requestContext, CancellationTokenSource cts) : Command(cts), IDisposable
         {
-            private bool _disposed;
-            private readonly CancellationTokenSource _cts = cts;
             public Dictionary<string, object>? RequestContext { get; } = requestContext;
-            public CancellationToken CancellationToken => _cts.Token;
-
-            public void Cancel()
-            {
-                lock (this)
-                {
-                    if (_disposed) return;
-                    _cts.Cancel();
-                }
-            }
-
-            public void Dispose()
-            {
-                lock (this)
-                {
-                    _disposed = true;
-                    _cts.Dispose();
-                }
-            }
         }
 
-        public sealed class Rehydrate(IRehydrationContext context) : Command
+        public sealed class Rehydrate(IRehydrationContext context) : Command(new())
         {
             public readonly IRehydrationContext Context = context;
         }
 
-        public sealed class Delay(TimeSpan duration) : Command
+        public sealed class Delay(TimeSpan duration) : Command(new())
         {
             public TimeSpan Duration { get; } = duration;
         }
 
-        public sealed class UnregisterFromCatalog : Command
+        public sealed class UnregisterFromCatalog() : Command(new())
         {
             public static readonly UnregisterFromCatalog Instance = new();
         }
