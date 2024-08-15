@@ -10,7 +10,7 @@ using Orleans.Runtime.Utilities;
 namespace Orleans.Runtime.GrainDirectory;
 
 // Read-only, sorted collection of non-overlapping ranges.
-[GenerateSerializer, Alias(nameof(RingRangeCollection))]
+[GenerateSerializer, Immutable, Alias(nameof(RingRangeCollection))]
 internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, ISpanFormattable, IEnumerable<RingRange>
 {
     public RingRangeCollection(ImmutableArray<RingRange> ranges)

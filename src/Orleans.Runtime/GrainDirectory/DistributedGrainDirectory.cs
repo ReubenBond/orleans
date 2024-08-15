@@ -21,6 +21,10 @@ internal sealed partial class DistributedGrainDirectory(
     IServiceProvider serviceProvider)
     : SystemTarget(Constants.DirectoryReplicaClientType, localSiloDetails.SiloAddress, loggerFactory), IGrainDirectory, IGrainDirectoryReplicaClient, ILifecycleParticipant<ISiloLifecycle>, DistributedGrainDirectory.ITestHooks
 {
+    private readonly GrainDirectoryReplica _localReplica = localReplica;
+    private readonly ILogger<DistributedGrainDirectory> _logger = logger;
+    private BatchWorker _worker = null!;
+
     // The recovery membership value is used to avoid a race between concurrent registration & recovery operations which could lead to lost registrations.
     // This could occur when a new activation is created and begins registering itself with a host which crashes. Concurrently, the new owner initiates
     // recovery and asks all silos for their activations. When this silo processes this request, it will have the activation in its internal
@@ -30,6 +34,15 @@ internal sealed partial class DistributedGrainDirectory(
     // for each recovery version.
     private long _recoveryMembershipVersion;
 
+    public Task<GrainAddress?> Lookup(GrainId grainId) => _worker.LookupAsync(grainId);
+
+    public Task<GrainAddress?> Register(GrainAddress address) => _worker.RegisterAsync(address, null);
+
+    public Task Unregister(GrainAddress address) => _worker.DeregisterAsync(address);
+
+    public Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) => _worker.RegisterAsync(address, previousAddress);
+
+    /*
     public async Task<GrainAddress?> Lookup(GrainId grainId) => await InvokeAsync(
         grainId,
         static (replica, version, grainId, cancellationToken) => replica.LookupAsync(version, grainId),
@@ -57,9 +70,11 @@ internal sealed partial class DistributedGrainDirectory(
         (Address: address, PreviousAddress: previousAddress),
         CancellationToken.None,
         strict: true);
+    */
 
     public Task UnregisterSilos(List<SiloAddress> siloAddresses) => Task.CompletedTask;
 
+    /*
     private async Task<TResult> InvokeAsync<TState, TResult>(
         GrainId grainId,
         Func<IGrainDirectoryReplica, MembershipVersion, TState, CancellationToken, ValueTask<DirectoryResult<TResult>>> func,
@@ -69,7 +84,7 @@ internal sealed partial class DistributedGrainDirectory(
         [CallerMemberName] string operation = "")
     {
         DirectoryResult<TResult> invokeResult;
-        var view = localReplica.View;
+        var view = _localReplica.View;
         var attempts = 0;
         const int MaxAttempts = 10;
         var delay = TimeSpan.FromMilliseconds(10);
@@ -86,7 +101,7 @@ internal sealed partial class DistributedGrainDirectory(
                 }
 
                 var targetVersion = Math.Max(view.Version.Value + 1, initialRecoveryMembershipVersion);
-                view = await localReplica.RefreshViewAsync(new(targetVersion), cancellationToken);
+                view = await _localReplica.RefreshViewAsync(new(targetVersion), cancellationToken);
                 continue;
             }
 
@@ -97,7 +112,7 @@ internal sealed partial class DistributedGrainDirectory(
             }
 #endif
 
-            var replica = localReplica.GetReplica(owner);
+            var replica = _localReplica.GetReplica(owner);
 
             try
             {
@@ -121,23 +136,25 @@ internal sealed partial class DistributedGrainDirectory(
 
             if (!invokeResult.TryGetResult(view.Version, out var result))
             {
-                // Sync with the remote replica.
-                view = await localReplica.RefreshViewAsync(invokeResult.Version, cancellationToken);
+                // The remote replica has a newer view of membership and is no longer the owner of the grain specified in the request.
+                // Refresh membership and re-evaluate.
+                view = await _localReplica.RefreshViewAsync(invokeResult.Version, cancellationToken);
                 continue;
             }
 
-            if (logger.IsEnabled(LogLevel.Trace))
+            if (_logger.IsEnabled(LogLevel.Trace))
             {
-                logger.LogTrace("Invoked '{Operation}' on '{Owner}' for grain '{GrainId}' and received result '{Result}'.", operation, owner, grainId, result);
+                _logger.LogTrace("Invoked '{Operation}' on '{Owner}' for grain '{GrainId}' and received result '{Result}'.", operation, owner, grainId, result);
             }
 
             return result;
         }
     }
+    */
 
     public async ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRangeCollection ranges, bool isValidation)
     {
-        logger.LogInformation("Collecting registered activations for ranges {Ranges} at version {MembershipVersion}.", ranges, membershipVersion);
+        _logger.LogInformation("Collecting registered activations for ranges {Ranges} at version {MembershipVersion}.", ranges, membershipVersion);
         var recoveryMembershipVersion = _recoveryMembershipVersion;
         if (recoveryMembershipVersion < membershipVersion.Value)
         {
@@ -172,14 +189,14 @@ internal sealed partial class DistributedGrainDirectory(
                     }
                     catch (Exception exception)
                     {
-                        logger.LogWarning(exception, "Failed to deactivate activation {Activation}", activation);
+                        _logger.LogWarning(exception, "Failed to deactivate activation {Activation}", activation);
                     }
                 }
                 else if (ranges.Contains(address.GrainId))
                 {
                     if (!isValidation)
                     {
-                        logger.LogTrace("Sending activation '{Activation}' for recovery because its in the requested ranges {Ranges} (version {Version}).", activation.GrainId, ranges, membershipVersion);
+                        _logger.LogTrace("Sending activation '{Activation}' for recovery because its in the requested ranges {Ranges} (version {Version}).", activation.GrainId, ranges, membershipVersion);
                     }
 
                     result.Add(activation.Address);
@@ -188,7 +205,7 @@ internal sealed partial class DistributedGrainDirectory(
                 {
                     if (!isValidation)
                     {
-                        logger.LogTrace("Skipping activation '{Activation}' because {HashCode} is not in the requested ranges {Ranges} (version {Version}).", activation.GrainId, activation.GrainId.GetUniformHashCode().ToString("X"), ranges, membershipVersion);
+                        _logger.LogTrace("Skipping activation '{Activation}' because {HashCode} is not in the requested ranges {Ranges} (version {Version}).", activation.GrainId, activation.GrainId.GetUniformHashCode().ToString("X"), ranges, membershipVersion);
                     }
                 }
             }
@@ -196,7 +213,7 @@ internal sealed partial class DistributedGrainDirectory(
 
         await Task.WhenAll(deactivationTasks);
 
-        logger.LogInformation(
+        _logger.LogInformation(
             "Submitting {Count} registered activations for ranges {Ranges} at version {MembershipVersion}. Deactivated {DeactivationCount} in-doubt registrations. Took {ElapsedMilliseconds}ms",
             result.Count,
             ranges,
@@ -226,19 +243,27 @@ internal sealed partial class DistributedGrainDirectory(
 
     void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle observer)
     {
-        observer.Subscribe(nameof(RemoteGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart);
+        observer.Subscribe(nameof(RemoteGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
         Task OnRuntimeInitializeStart(CancellationToken cancellationToken)
         {
             var catalog = serviceProvider.GetRequiredService<Catalog>();
             catalog.RegisterSystemTarget(this);
+            _worker = new(this);
 
             return Task.CompletedTask;
+        }
+        async Task OnRuntimeInitializeStop(CancellationToken cancellationToken)
+        {
+            if (_worker is { } worker)
+            {
+                await worker.StopAsync(cancellationToken);
+            }
         }
     }
 
     SiloAddress? ITestHooks.GetPrimaryForGrain(GrainId grainId)
     {
-        localReplica.View.TryGetOwner(grainId, out var owner);
+        _localReplica.View.TryGetOwner(grainId, out var owner);
         return owner;
     }
 

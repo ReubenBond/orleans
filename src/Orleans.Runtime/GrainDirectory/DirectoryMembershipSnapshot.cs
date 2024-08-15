@@ -164,6 +164,7 @@ internal sealed class DirectoryMembershipSnapshot
             return true;
         }
 
+        Debug.Assert(Members.Length == 0); 
         owner = null;
         return false;
     }

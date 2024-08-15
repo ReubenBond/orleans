@@ -8,8 +8,7 @@ namespace Orleans.Runtime.GrainDirectory;
 /// <summary>
 /// Represents a contiguous range of zero or more values on a ring.
 /// </summary>
-[GenerateSerializer, Immutable]
-[Alias(nameof(RingRange))]
+[GenerateSerializer, Immutable, Alias(nameof(RingRange))]
 internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable, IComparable<uint>
 {
     // The exclusive starting point for the range.

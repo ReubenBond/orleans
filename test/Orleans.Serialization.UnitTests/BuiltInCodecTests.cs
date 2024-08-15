@@ -1045,6 +1045,36 @@ namespace Orleans.Serialization.UnitTests
         protected override bool IsImmutable => true;
     }
 
+    public class BitArrayCodecTests(ITestOutputHelper output) : FieldCodecTester<BitArray, BitArrayCodec>(output)
+    {
+        protected override BitArray CreateValue() => new BitArray(Guid.NewGuid().ToByteArray());
+
+        protected override bool Equals(BitArray left, BitArray right) => ReferenceEquals(left, right) || left.Length == right.Length && Enumerable.Range(0, left.Length).All(i => left[i] == right[i]);
+
+        protected override BitArray[] TestValues =>
+        [
+            null,
+            new BitArray(0, false),
+            new BitArray(Enumerable.Range(0, Random.Next(4097)).Select(b => unchecked((byte)b)).ToArray()),
+            CreateValue(),
+        ];
+    }
+
+    public class BitArrayCopierTests(ITestOutputHelper output) : CopierTester<BitArray, BitArrayCopier>(output)
+    {
+        protected override BitArray CreateValue() => new BitArray(Guid.NewGuid().ToByteArray());
+
+        protected override bool Equals(BitArray left, BitArray right) => ReferenceEquals(left, right) || left.Length == right.Length && Enumerable.Range(0, left.Length).All(i => left[i] == right[i]);
+
+        protected override BitArray[] TestValues =>
+        [
+            null,
+            new BitArray(0, false),
+            new BitArray(Enumerable.Range(0, Random.Next(4097)).Select(b => unchecked((byte)b)).ToArray()),
+            CreateValue(),
+        ];
+    }
+
     public class ByteArrayCodecTests(ITestOutputHelper output) : FieldCodecTester<byte[], ByteArrayCodec>(output)
     {
         protected override byte[] CreateValue() => Guid.NewGuid().ToByteArray();

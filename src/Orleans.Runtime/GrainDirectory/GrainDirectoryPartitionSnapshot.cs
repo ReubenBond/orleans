@@ -3,7 +3,7 @@ using System.Collections.Generic;
 #nullable enable
 namespace Orleans.Runtime.GrainDirectory;
 
-[GenerateSerializer, Alias(nameof(GrainDirectoryPartitionSnapshot))]
+[GenerateSerializer, Alias(nameof(GrainDirectoryPartitionSnapshot)), Immutable]
 internal sealed class GrainDirectoryPartitionSnapshot(
     MembershipVersion directoryMembershipVersion,
     List<GrainAddress> grainAddresses)

@@ -11,6 +11,7 @@ namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed partial class GrainDirectoryReplica
 {
+    private static GrainAddress InvalidGrainId = new();
     async ValueTask<DirectoryResult<GrainAddress>> IGrainDirectoryReplica.RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration) 
     {
         ArgumentNullException.ThrowIfNull(address);
@@ -137,6 +138,84 @@ internal sealed partial class GrainDirectoryReplica
         }
 
         return DirectoryResult.FromResult(result, version);
+    }
+
+    async ValueTask<BulkDirectoryResponse> IGrainDirectoryReplica.ApplyBulk(BulkDirectoryRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var version = request.Version;
+        await RefreshViewAsync(version, CancellationToken.None);
+
+        var response = new BulkDirectoryResponse
+        {
+            Version = _view.Version
+        };
+
+        // Lookups
+        var lookupRequests = request.Lookups;
+        if (lookupRequests is not null)
+        {
+            var results = new List<GrainAddress?>(lookupRequests.Count);
+            foreach (var grainId in lookupRequests)
+            {
+                await WaitForRange(grainId, version);
+                if (!IsOwner(_view, grainId))
+                {
+                    // This replica is unable to serve the request.
+                    results.Add(InvalidGrainId);
+                    continue;
+                }
+
+                DebugAssertOwnership(grainId);
+                results.Add(LookupCore(grainId));
+            }
+
+            response.Lookups = results;
+        }
+
+        var registrationRequests = request.Registrations;
+        if (registrationRequests is not null)
+        {
+            var results = new List<GrainAddress?>(registrationRequests.Count);
+            foreach (var (newAddress, existingAddress) in registrationRequests)
+            {
+                await WaitForRange(newAddress.GrainId, version);
+                if (!IsOwner(_view, newAddress.GrainId))
+                {
+                    // This replica is unable to serve the request.
+                    results.Add(null);
+                    continue;
+                }
+
+                DebugAssertOwnership(newAddress.GrainId);
+                results.Add(RegisterCore(newAddress, existingAddress));
+            }
+
+            response.Registrations = results;
+        }
+
+        var deregistrationRequests = request.Deregistrations;
+        if (deregistrationRequests is not null)
+        {
+            var results = new List<bool?>(deregistrationRequests.Count);
+            foreach (var address in deregistrationRequests)
+            {
+                await WaitForRange(address.GrainId, version);
+                if (!IsOwner(_view, address.GrainId))
+                {
+                    // This replica is unable to serve the request.
+                    results.Add(null);
+                    continue;
+                }
+
+                DebugAssertOwnership(address.GrainId);
+                results.Add(DeregisterCore(address));
+            }
+
+            response.Deregistrations = results;
+        }
+
+        return response;
     }
 
     private bool DeregisterCore(GrainAddress address)
