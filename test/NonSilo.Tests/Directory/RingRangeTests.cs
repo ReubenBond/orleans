@@ -68,6 +68,26 @@ public sealed class RingRangeTests
         Assert.Empty(RingRange.Empty.Difference(RingRange.Full));
     }
 
+    [Fact]
+    public void RingRangeContains()
+    {
+        Assert.False(RingRange.Empty.Contains(0));
+        Assert.False(RingRange.Empty.Contains(1));
+        Assert.False(RingRange.Empty.Contains(uint.MaxValue));
+        Assert.False(RingRange.Empty.Contains(uint.MaxValue / 2));
+
+        Assert.True(RingRange.Full.Contains(0));
+        Assert.True(RingRange.Full.Contains(1));
+        Assert.True(RingRange.Full.Contains(uint.MaxValue));
+        Assert.True(RingRange.Full.Contains(uint.MaxValue / 2));
+
+        var wrapped = RingRange.Create(uint.MaxValue - 10, 10);
+        Assert.True(wrapped.Contains(0));
+        Assert.True(wrapped.Contains(1));
+        Assert.True(wrapped.Contains(uint.MaxValue));
+        Assert.False(wrapped.Contains(uint.MaxValue / 2));
+    }
+
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(3)]
