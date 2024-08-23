@@ -228,7 +228,7 @@ internal sealed partial class GrainDirectoryReplica
         return false;
     }
 
-    private GrainAddress? LookupCore(GrainId grainId)
+    internal GrainAddress? LookupCore(GrainId grainId)
     {
         if (_directory.TryGetValue(grainId, out var existing) && !IsSiloDead(existing))
         {

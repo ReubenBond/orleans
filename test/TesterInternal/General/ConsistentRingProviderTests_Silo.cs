@@ -32,7 +32,8 @@ namespace UnitTests.General
             {
                 hostBuilder.AddMemoryGrainStorage("MemoryStore")
                     .AddMemoryGrainStorageAsDefault()
-                    .UseInMemoryReminderService();
+                    .UseInMemoryReminderService()
+                    .AddDistributedGrainDirectory();
             }
 
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
@@ -282,7 +283,7 @@ namespace UnitTests.General
             await tableGrain.ReadRows(tableGrainId);
 
             SiloAddress reminderTableGrainPrimaryDirectoryAddress = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.Primary)).PrimaryForGrain;
-            // ask a detailed report from the directory partition owner, and get the actionvation addresses
+            // ask a detailed report from the directory partition owner, and get the activation addresses
             var address = (await TestUtils.GetDetailedGrainReport(this.HostedCluster.InternalGrainFactory, tableGrainId, this.HostedCluster.GetSiloForAddress(reminderTableGrainPrimaryDirectoryAddress))).LocalDirectoryActivationAddress;
             GrainAddress reminderGrainActivation = address;
 

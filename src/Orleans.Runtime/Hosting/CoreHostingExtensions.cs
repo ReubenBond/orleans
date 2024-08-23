@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Diagnostics;
 using System.Net;
@@ -6,7 +7,10 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
+using Orleans.GrainDirectory;
 using Orleans.Runtime;
+using Orleans.Runtime.GrainDirectory;
+using Orleans.Runtime.Hosting;
 using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Hosting
@@ -47,7 +51,7 @@ namespace Orleans.Hosting
             this ISiloBuilder builder,
             int siloPort = EndpointOptions.DEFAULT_SILO_PORT,
             int gatewayPort = EndpointOptions.DEFAULT_GATEWAY_PORT,
-            IPEndPoint primarySiloEndpoint = null,
+            IPEndPoint? primarySiloEndpoint = null,
             string serviceId = ClusterOptions.DevelopmentServiceId,
             string clusterId = ClusterOptions.DevelopmentClusterId)
         {
@@ -127,7 +131,7 @@ namespace Orleans.Hosting
                 });
         }
 
-        private static void ConfigurePrimarySiloEndpoint(OptionsBuilder<DevelopmentClusterMembershipOptions> optionsBuilder, IPEndPoint primarySiloEndpoint)
+        private static void ConfigurePrimarySiloEndpoint(OptionsBuilder<DevelopmentClusterMembershipOptions> optionsBuilder, IPEndPoint? primarySiloEndpoint)
         {
             optionsBuilder.Configure((DevelopmentClusterMembershipOptions options, IOptions<EndpointOptions> endpointOptions) =>
             {
@@ -138,6 +142,24 @@ namespace Orleans.Hosting
 
                 options.PrimarySiloEndpoint = primarySiloEndpoint;
             });
+        }
+
+        public static ISiloBuilder AddDistributedGrainDirectory(this ISiloBuilder siloBuilder, string? name = null)
+        {
+            var services = siloBuilder.Services;
+            if (string.IsNullOrEmpty(name))
+            {
+                name = GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY; 
+            }
+
+            // Distributed Grain Directory
+            services.TryAddSingleton<GrainDirectoryReplica>();    
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GrainDirectoryReplica>();
+            services.TryAddSingleton<DistributedGrainDirectory>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DistributedGrainDirectory>();
+            services.AddGrainDirectory<DistributedGrainDirectory>(name, (sp, name) => sp.GetRequiredService<DistributedGrainDirectory>());
+
+            return siloBuilder;
         }
     }
 }

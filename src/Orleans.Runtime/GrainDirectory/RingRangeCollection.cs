@@ -23,6 +23,7 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
         {
             var prev = ranges[i - 1];
             var curr = ranges[i];
+            Debug.Assert(!curr.IsEmpty);
             Debug.Assert(!prev.Intersects(curr));
             Debug.Assert(curr.Start >= prev.Start);
         }
@@ -38,8 +39,18 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
 
     public static RingRangeCollection Create<TCollection>(TCollection ranges) where TCollection : ICollection<RingRange>
     {
+        ArgumentNullException.ThrowIfNull(ranges);
         var result = ImmutableArray.CreateBuilder<RingRange>(ranges.Count);
-        result.AddRange(ranges);
+        foreach (var range in ranges)
+        {
+            if (range.IsEmpty)
+            {
+                continue;
+            }
+
+            result.AddRange(range);
+        }
+
         result.Sort((l, r) => l.Start.CompareTo(r.Start));
         return new(result.ToImmutable());
     }
@@ -57,7 +68,7 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
 
     public uint Size => (uint)Ranges.Sum(static r => r.Size);
 
-    public float SizePercent => Ranges.Sum(static r => r.SizePercent);
+    public float SizePercent => Size * (100.0f / uint.MaxValue);
 
     public bool Contains(GrainId grainId) => Contains(grainId.GetUniformHashCode());
 

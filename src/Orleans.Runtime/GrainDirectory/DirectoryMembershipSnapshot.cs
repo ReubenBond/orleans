@@ -43,17 +43,43 @@ internal sealed class DirectoryMembershipSnapshot
         {
             var activeMember = sortedActiveMembers[i];
             var hashCodes = getRingBoundaries(activeMember, HashesPerEntry);
+            Debug.Assert(hashCodes.Length == HashesPerEntry);
             foreach (var hashCode in hashCodes)
             {
                 hashIndexPairs.Add((hashCode, i));
             }
         }
 
-        hashIndexPairs.Sort(static (left, right) => left.Hash.CompareTo(right.Hash));
+        hashIndexPairs.Sort(static (left, right) =>
+        {
+            var hashCompare = left.Hash.CompareTo(right.Hash);
+            if (hashCompare != 0)
+            {
+                return hashCompare;
+            }
+
+            return left.MemberIndex.CompareTo(right.MemberIndex);
+        });
+
+        // Remove empty ranges.
+        if (hashIndexPairs.Count > 1)
+        {
+            for (var i = 1; i < hashIndexPairs.Count;)
+            {
+                if (hashIndexPairs[i].Hash == hashIndexPairs[i - 1].Hash)
+                {
+                    hashIndexPairs.RemoveAt(i);
+                }
+                else
+                {
+                    i++;
+                }
+            }
+        }
+
         _ringBoundaries = hashIndexPairs.ToImmutable();
 
         Members = sortedActiveMembers.ToImmutable();
-        Debug.Assert(Members.Length * HashesPerEntry == _ringBoundaries.Length);
 
         _rangesByMember = new RingRangeCollection[Members.Length];
         _snapshot = snapshot;

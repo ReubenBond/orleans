@@ -273,8 +273,11 @@ internal sealed partial class DistributedGrainDirectory(
         return owner;
     }
 
+    GrainAddress? ITestHooks.GetLocalRecord(GrainId grainId) => _localReplica.LookupCore(grainId);
+
     internal interface ITestHooks
     {
         SiloAddress? GetPrimaryForGrain(GrainId grainId);
+        GrainAddress? GetLocalRecord(GrainId grainId);
     }
 }

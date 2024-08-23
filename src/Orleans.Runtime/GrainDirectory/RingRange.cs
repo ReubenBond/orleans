@@ -26,7 +26,7 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable, IC
     public bool IsFull => _start == _end && _start != 0;
 
     // Whether the range includes uint.MaxValue.
-    internal bool IsWrapped => _start >= _end;
+    internal bool IsWrapped => _start >= _end && _start != 0;
 
     public static RingRange Full { get; } = new (1, 1);
 
@@ -44,47 +44,6 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable, IC
 
     // For internal use only.
     internal static RingRange Create(uint start, uint end) => new (start, end);
-
-    public static RingRange CreateEquallyDividedRange(int count, int index)
-    {
-        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, count, nameof(index));
-        ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
-        return Core((uint)count, (uint)index);
-        static RingRange Core(uint count, uint index)
-        {
-            ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, count, nameof(index));
-
-            if (count == 1 && index == 0)
-            {
-                return Full;
-            }
-
-            var rangeSize = (ulong)uint.MaxValue + 1;
-            var portion = rangeSize / count;
-            var remainder = rangeSize - portion * count;
-            var start = 0u;
-            for (var i = 0; i < count; i++)
-            {
-                // (Start, End]
-                var end = unchecked((uint)(start + portion));
-
-                if (remainder > 0)
-                {
-                    end++;
-                    remainder--;
-                }
-
-                if (i == index)
-                {
-                    return new RingRange(start, end);
-                }
-
-                start = end;
-            }
-
-            throw new ArgumentException(null, nameof(index));
-        }
-    }
 
     /// <summary>
     /// Creates a range representing a single point.
@@ -264,13 +223,13 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable, IC
         }
     }
 
-    // Gets the set difference: the sub-ranges which are in this range but are not in the 'previous' range.
-    internal IEnumerable<RingRange> Difference(RingRange previous)
+    // Gets the set difference: the sub-ranges which are in this range but are not in the 'other' range.
+    internal IEnumerable<RingRange> Difference(RingRange other)
     {
         // Additions are the intersections between this range and the inverse of the previous range.
-        foreach (var addition in Intersections(previous.Complement()))
+        foreach (var addition in Intersections(other.Complement()))
         {
-            Debug.Assert(!addition.Intersects(previous));
+            Debug.Assert(!addition.Intersects(other));
             Debug.Assert(addition.Intersects(this));
             yield return addition;
         }

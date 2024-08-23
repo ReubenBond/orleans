@@ -50,10 +50,12 @@ internal static class SearchAlgorithms
         var left = 0;
         var right = length - 1;
 
+        TElement entry;
         while (left <= right)
         {
             var mid = left + (right - left) / 2;
-            var comparison = getEntry(collection, mid).CompareTo(key);
+            entry = getEntry(collection, mid);
+            var comparison = entry.CompareTo(key);
 
             if (comparison == 0)
             {
@@ -72,14 +74,16 @@ internal static class SearchAlgorithms
         }
 
         // Try the last element.
-        if (getEntry(collection, length - 1).CompareTo(key) == 0)
+        entry = getEntry(collection, length - 1);
+        if (entry.CompareTo(key) == 0)
         {
             return length - 1;
         }
 
 #if DEBUG
         // Try the first element.
-        if (getEntry(collection, 0).CompareTo(key) == 0)
+        entry = getEntry(collection, 0);
+        if (entry.CompareTo(key) == 0)
         {
             Debug.Fail("Sort order invariant violated.");
         }
