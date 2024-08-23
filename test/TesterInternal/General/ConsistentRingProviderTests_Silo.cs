@@ -30,10 +30,12 @@ namespace UnitTests.General
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
+#pragma warning disable ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
                 hostBuilder.AddMemoryGrainStorage("MemoryStore")
                     .AddMemoryGrainStorageAsDefault()
                     .UseInMemoryReminderService()
                     .AddDistributedGrainDirectory();
+#pragma warning restore ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             }
 
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)

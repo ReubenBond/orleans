@@ -40,6 +40,8 @@ public sealed class RingRangeTests
                 Assert.False(sample.Contains(inverse.End));
                 var difference = Assert.Single(sample.Difference(inverse));
                 Assert.Equal(sample, difference);
+                var inverseDifference = Assert.Single(inverse.Difference(sample));
+                Assert.Equal(inverse, inverseDifference);
             });
     }
 
