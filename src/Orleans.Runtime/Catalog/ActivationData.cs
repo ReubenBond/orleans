@@ -807,7 +807,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         CancelPendingOperations();
         lock (this)
         {
-            State = ActivationState.Invalid;
+            SetState(ActivationState.Invalid);
         }
 
         DisposeTimers();
@@ -1832,6 +1832,8 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
         _shared.InternalRuntime.ActivationWorkingSet.OnDeactivated(this);
 
+        UnregisterMessageTarget();
+
         try
         {
             await DisposeAsync();
@@ -1841,15 +1843,9 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             _shared.Logger.LogWarning(exception, "Exception disposing activation '{Activation}'.", this);
         }
 
-        UnregisterMessageTarget();
-
         // Signal deactivation
         GetDeactivationCompletionSource().TrySetResult(true);
         _workSignal.Signal();
-        if (cancellationToken.IsCancellationRequested && stopwatch.Elapsed.TotalMilliseconds > 500)
-        {
-            _shared.Logger.LogDebug("Cancellation requested for deactivation {Activation} took {ElapsedMilliseconds:0.0}ms.", this, stopwatch.Elapsed.TotalMilliseconds);
-        }
     }
 
     private TaskCompletionSource<bool> GetDeactivationCompletionSource()

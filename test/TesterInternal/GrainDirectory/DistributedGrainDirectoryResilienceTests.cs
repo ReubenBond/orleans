@@ -1,3 +1,5 @@
+#nullable enable
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.TestingHost;
@@ -16,24 +18,16 @@ internal class MyDirectoryTestGrain : Grain, IMyDirectoryTestGrain
     public ValueTask Ping() => default;
 }
 
-public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
+[TestCategory("SlowBVT"), TestCategory("Directory")]
+public sealed class DistributedGrainDirectoryResilienceTests(ITestOutputHelper output)
 {
     /// <summary>
     /// Cluster chaos test: tests directory functionality & integrity while starting/stopping/killing silos frequently.
     /// </summary>
     /// <returns></returns>
     [Fact]
-    public async Task DynamicClusterTest()
+    public async Task ElasticClusterWorkload()
     {
-        AppDomain.CurrentDomain.FirstChanceException += (sender, args) =>
-        {
-            var ex = args.Exception;
-            if (ex is NullReferenceException or InvalidOperationException or ArgumentException || ex.GetType().Name.Contains("DebugAssertException"))
-            {
-                DumpCapture.CreateMiniDump("FirstChance");
-            }
-        };
-
         var testClusterBuilder = new TestClusterBuilder(1);
         testClusterBuilder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         var testCluster = testClusterBuilder.Build();
@@ -54,17 +48,26 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
             {
                 while (!cts.IsCancellationRequested)
                 {
+                    await Task.Delay(TimeSpan.FromMilliseconds(5));
+                    var time = Stopwatch.StartNew();
+                    var workTask = Parallel.ForAsync(0, CallsPerIteration, (i, ct) => client.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping());
+                    using var delayCancellation = new CancellationTokenSource();
+                    var delayTask = Task.Delay(TimeSpan.FromMilliseconds(15_000), delayCancellation.Token);
+                    await Task.WhenAny(workTask, delayTask);
+                    Assert.False(delayTask.IsCompleted);
+
                     try
                     {
-                        await Task.Delay(TimeSpan.FromMilliseconds(5));
-                        await Parallel.ForAsync(0, CallsPerIteration, (i, ct) => client.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping());
-
-                        idBase += CallsPerIteration;
+                        await workTask;
                     }
-                    catch (Exception ex)
+                    catch (SiloUnavailableException sue)
                     {
-                        output.WriteLine($"Ignoring load exception: {ex}");
+                        output.WriteLine($"Caught & swallowed transient exception: {sue}");
                     }
+
+                    output.WriteLine(time.ElapsedMilliseconds);
+
+                    idBase += CallsPerIteration;
                 }
             });
 
@@ -125,15 +128,9 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
                             await Task.Delay(remaining);
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception exception)
                     {
-                        if (ex.GetType().Name.Contains("DebugAssertException"))
-                        {
-                            DumpCapture.CreateMiniDump("DebugAssertion");
-                            throw;
-                        }
-
-                        output.WriteLine($"Ignoring chaos exception: {ex}");
+                        output.WriteLine($"Ignoring chaos exception: {exception}");
                     }
                 }
             });
@@ -151,18 +148,11 @@ public sealed class ReplicatedGrainDirectoryTests(ITestOutputHelper output)
     {
         public void Configure(ISiloBuilder siloBuilder)
         {
+#pragma warning disable ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+            //siloBuilder.AddDistributedGrainDirectory();
+#pragma warning restore ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.GrainDirectoryReplica", LogLevel.Trace));
             siloBuilder.ConfigureLogging(l => l.AddFilter("Orleans.Runtime.GrainDirectory.DistributedGrainDirectory", LogLevel.Information));
-            siloBuilder.Services.AddSingleton<IFatalErrorHandler, FakeFatalErrorHandler>();
-        }
-    }
-
-    private class FakeFatalErrorHandler : IFatalErrorHandler
-    {
-        bool IFatalErrorHandler.IsUnexpected(Exception exception) => false;
-        void IFatalErrorHandler.OnFatalException(object sender, string context, Exception exception)
-        {
-            // no-op
         }
     }
 }

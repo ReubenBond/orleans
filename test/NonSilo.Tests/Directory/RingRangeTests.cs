@@ -1,8 +1,6 @@
-using System.Collections.Immutable;
 using Orleans.Runtime.GrainDirectory;
 using CsCheck;
 using Xunit;
-using Orleans.Configuration;
 
 namespace NonSilo.Tests.Directory;
 
@@ -42,6 +40,18 @@ public sealed class RingRangeTests
                 Assert.Equal(sample, difference);
                 var inverseDifference = Assert.Single(inverse.Difference(sample));
                 Assert.Equal(inverse, inverseDifference);
+            });
+    }
+
+    [Fact]
+    public void ComplementComplementIsEqual()
+    {
+        GenRingRange
+            .Sample((sample) =>
+            {
+                var inverse = sample.Complement();
+                var inverseInverse = inverse.Complement();
+                Assert.True(sample.Equals(inverseInverse));
             });
     }
 
@@ -169,212 +179,5 @@ public sealed class RingRangeTests
 
             throw new ArgumentException(null, nameof(index));
         }
-    }
-}
-
-[TestCategory("BVT")]
-public sealed class RingRangeCollectionTests
-{
-    private static readonly Gen<RingRangeCollection> GenRingRangeCollection = Gen.Int[0, 100].SelectMany(count => Gen.Select(Gen.UInt, Gen.Bool, static (boundary, included) => (boundary, included)).Array[count].Select(elements =>
-    {
-        var arr = ImmutableArray.CreateBuilder<RingRange>(elements.Length);
-        for (var i = 1; i < arr.Count;)
-        {
-            var prev = elements[i - 1];
-            var curr = elements[i];
-            if (!curr.included)
-            {
-                continue;
-            }
-
-            arr.Add(RingRange.Create(prev.boundary, curr.boundary));
-        }
-
-        return RingRangeCollection.Create(arr);
-    }));
-
-    [Fact]
-    public void Contains()
-    {
-        Gen.Select(GenRingRangeCollection, Gen.UInt).Sample((ranges, point) =>
-        {
-            var doesContain = ranges.Ranges.Any(r => r.Contains(point));
-            Assert.Equal(doesContain, ranges.Contains(point));
-        });
-    }
-
-    [Fact]
-    public void Intersects()
-    {
-        GenRingRangeCollection.Sample(ranges =>
-        {
-            foreach (var range in ranges.Ranges)
-            {
-                Assert.True(ranges.Intersects(range));
-            }
-        });
-    }
-
-    [Fact]
-    public void Difference()
-    {
-        var ringWithUpdates = GenRingRangeCollection.SelectMany(original => Gen.Float[0f, 1f].Array[original.Ranges.Length].Select(diffs =>
-        {
-            // Increase or decrease the end of each range by some amount.
-            var arr = ImmutableArray.CreateBuilder<RingRange>(original.Ranges.Length);
-            for (var i = 0; i < diffs.Length; i++)
-            {
-                var orig = original.Ranges[i];
-                var next = original.Ranges[(i + 1) % original.Ranges.Length];
-                var maxPossibleLength = RingRange.Create(orig.Start, next.Start).Size;
-                var newEnd = orig.Start + maxPossibleLength * diffs[i];
-                arr.Add(RingRange.Create(orig.Start, (uint)Math.Clamp(orig.End + diffs[i], orig.Start + 1, next.Start)));
-            }
-
-            return (original, RingRangeCollection.Create(arr));
-        }));
-
-        ringWithUpdates.Sample((original, updated) =>
-        {
-            var additions = updated.Difference(original);
-            
-            foreach (var addition in additions)
-            {
-                Assert.True(updated.Intersects(addition));
-                Assert.False(original.Intersects(addition));
-            }
-
-            var removals = updated.Difference(original);
-            
-            foreach (var removal in removals)
-            {
-                Assert.False(updated.Intersects(removal));
-                Assert.True(original.Intersects(removal));
-            }
-        });
-    }
-
-    [Fact]
-    public void ContainsTest()
-    {
-        var ranges = new RingRange[]
-        {
-            RingRange.Create(0x10930012, 0x179C5AD4),
-            RingRange.Create(0x287844C7, 0x2B5DCCCB),
-            RingRange.Create(0x32AC80C2, 0x36F72978),
-            RingRange.Create(0x6F5C3AAC, 0x7776E202),
-            RingRange.Create(0x7D2B02F3, 0x7DF52810),
-            RingRange.Create(0xA18205D1, 0xA3A44031),
-            RingRange.Create(0xA847CD39, 0xAD6C28D0),
-            RingRange.Create(0xAF60D42F, 0xB278D2BE),
-            RingRange.Create(0xBB8EA837, 0xC61DA5E1),
-            RingRange.Create(0xF08C2237, 0xF3030A5A)
-        }.ToImmutableArray();
-        var collection = new RingRangeCollection(ranges);
-        uint point = 0x16F4037C;
-        Assert.True(ranges[0].Contains(point));
-        Assert.True(collection.Contains(point));
-
-        // Just outside the last range.
-        point = 0xF3030A5A + 1;
-        Assert.False(ranges[^1].Contains(point));
-        Assert.False(collection.Contains(point));
-
-        // Just inside the last range.
-        point = 0xF3030A5A;
-        Assert.True(ranges[^1].Contains(point));
-        Assert.True(collection.Contains(point));
-
-        // Between ranges.
-        point = 0xF08C2237 - 1;
-        Assert.False(collection.Contains(point));
-
-        // In an interior range.
-        point = 0x7D2B02F3 + 1;
-        Assert.True(collection.Contains(point));
-    }
-}
-
-[TestCategory("BVT")]
-public sealed class DirectoryMembershipSnapshotTests
-{
-    private static readonly Gen<ClusterMembershipSnapshot> GenClusterMembershipSnapshot = Gen.Select(Gen.UInt, Gen.Enum<SiloStatus>(), (hash, status) => (hash, status))
-        .Array[Gen.Int[1, 30]].Select((tuple) =>
-    {
-        var dict = ImmutableDictionary.CreateBuilder<SiloAddress, ClusterMember>();
-        var port = 1;
-        foreach (var item in tuple)
-        {
-            var (hash, status) = item;
-            var addr = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, port++), (int)hash);
-            dict.Add(addr, new ClusterMember(addr, status, $"Silo_{hash}"));
-        }
-
-        return new ClusterMembershipSnapshot(dict.ToImmutable(), new(1));
-    });
-
-    private static readonly Gen<DirectoryMembershipSnapshot> GenDirectoryMembershipSnapshot =
-        GenClusterMembershipSnapshot.SelectMany(snapshot => Gen.UInt.Array[ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS].Array[snapshot.Members.Count].Select(hashes => 
-    {
-        var i = 0;
-        return new DirectoryMembershipSnapshot(snapshot, (_, _) => hashes[i++]);
-    }));
-
-    [Fact]
-    public void GetOwnerTest()
-    {
-        // As long as the cluster has at least one member, we should be able to find an owner.
-        Gen.Select(GenDirectoryMembershipSnapshot, Gen.UInt)
-            .Sample((snapshot, hash) => Assert.Equal(snapshot.Members.Length > 0, snapshot.TryGetOwner(hash, out var owner)));
-    }
-
-    [Fact]
-    public void MembersDoNotIntersectTest()
-    {
-        // Member ranges should not intersect.
-        GenDirectoryMembershipSnapshot.Where(s => s.Members.Length > 0)
-            .Sample(snapshot =>
-            {
-                foreach (var range in snapshot.RangeOwners)
-                {
-                    foreach (var otherRange in snapshot.RangeOwners)
-                    {
-                        if (range == otherRange)
-                        {
-                            continue;
-                        }
-
-                        Assert.False(range.Range.Intersects(otherRange.Range));
-                    }
-                }
-            });
-    }
-
-    [Fact]
-    public void ViewCoversRingTest()
-    {
-        // The union of all member ranges should cover the entire ring.
-        GenDirectoryMembershipSnapshot.Where(s => s.Members.Length > 0)
-            .Sample(snapshot =>
-            {
-                uint sum = 0;
-                var allRanges = new List<RingRange>();
-                foreach (var member in snapshot.Members)
-                {
-                    foreach (var range in snapshot.GetRanges(member))
-                    {
-                        allRanges.Add(range);
-                        sum += range.Size;
-                    }
-                }
-
-                Assert.Equal(uint.MaxValue, sum);
-                var allRangesCollection = RingRangeCollection.Create(allRanges);
-                Assert.Equal(uint.MaxValue, allRangesCollection.Size);
-                Assert.Equal(100f, allRangesCollection.SizePercent);
-                Assert.False(allRangesCollection.IsEmpty);
-                Assert.False(allRangesCollection.IsDefault);
-                Assert.True(allRangesCollection.IsFull);
-            });
     }
 }

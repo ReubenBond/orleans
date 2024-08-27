@@ -1,7 +1,6 @@
+#nullable enable
 using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
 using Orleans.GrainDirectory;
-using Orleans.Runtime.GrainDirectory;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -9,19 +8,20 @@ using Xunit.Abstractions;
 namespace Tester.Directories;
 
 // Base tests for custom Grain Directory
-public abstract class GrainDirectoryTests<T> where T : IGrainDirectory
+public abstract class GrainDirectoryTests<TGrainDirectory> where TGrainDirectory : IGrainDirectory
 {
-    protected T grainDirectory;
     protected readonly ILoggerFactory loggerFactory;
+    private TGrainDirectory? _directory;
 
     protected GrainDirectoryTests(ITestOutputHelper testOutput)
     {
         this.loggerFactory = new LoggerFactory();
         this.loggerFactory.AddProvider(new XunitLoggerProvider(testOutput));
-        this.grainDirectory = GetGrainDirectory();
     }
 
-    protected abstract T GetGrainDirectory();
+    protected TGrainDirectory GrainDirectory => _directory ??= CreateGrainDirectory();
+
+    protected abstract TGrainDirectory CreateGrainDirectory();
 
     [SkippableFact]
     public async Task RegisterLookupUnregisterLookup()
@@ -34,13 +34,13 @@ public abstract class GrainDirectoryTests<T> where T : IGrainDirectory
             MembershipVersion = new MembershipVersion(51)
         };
 
-        Assert.Equal(expected, await this.grainDirectory.Register(expected, null));
+        Assert.Equal(expected, await GrainDirectory.Register(expected, null));
 
-        Assert.Equal(expected, await this.grainDirectory.Lookup(expected.GrainId));
+        Assert.Equal(expected, await GrainDirectory.Lookup(expected.GrainId));
 
-        await this.grainDirectory.Unregister(expected);
+        await GrainDirectory.Unregister(expected);
 
-        Assert.Null(await this.grainDirectory.Lookup(expected.GrainId));
+        Assert.Null(await GrainDirectory.Lookup(expected.GrainId));
     }
 
     [SkippableFact]
@@ -70,11 +70,11 @@ public abstract class GrainDirectoryTests<T> where T : IGrainDirectory
             MembershipVersion = new MembershipVersion(51)
         };
 
-        Assert.Equal(expected, await this.grainDirectory.Register(expected, null));
-        Assert.Equal(expected, await this.grainDirectory.Register(differentActivation, null));
-        Assert.Equal(expected, await this.grainDirectory.Register(differentSilo, null));
+        Assert.Equal(expected, await GrainDirectory.Register(expected, null));
+        Assert.Equal(expected, await GrainDirectory.Register(differentActivation, null));
+        Assert.Equal(expected, await GrainDirectory.Register(differentSilo, null));
 
-        Assert.Equal(expected, await this.grainDirectory.Lookup(expected.GrainId));
+        Assert.Equal(expected, await GrainDirectory.Lookup(expected.GrainId));
     }
 
     /// <summary>
@@ -108,15 +108,15 @@ public abstract class GrainDirectoryTests<T> where T : IGrainDirectory
         };
 
         // Success, no registration exists, so the previous address is ignored.
-        Assert.Equal(initial, await this.grainDirectory.Register(initial, differentSilo));
+        Assert.Equal(initial, await GrainDirectory.Register(initial, differentSilo));
 
         // Success, the previous address matches the existing registration.
-        Assert.Equal(differentActivation, await this.grainDirectory.Register(differentActivation, initial));
+        Assert.Equal(differentActivation, await GrainDirectory.Register(differentActivation, initial));
 
         // Failure, the previous address does not match the existing registration.
-        Assert.Equal(differentActivation, await this.grainDirectory.Register(differentSilo, initial));
+        Assert.Equal(differentActivation, await GrainDirectory.Register(differentSilo, initial));
 
-        Assert.Equal(differentActivation, await this.grainDirectory.Lookup(initial.GrainId));
+        Assert.Equal(differentActivation, await GrainDirectory.Lookup(initial.GrainId));
     }
 
     [SkippableFact]
@@ -138,14 +138,14 @@ public abstract class GrainDirectoryTests<T> where T : IGrainDirectory
             MembershipVersion = new MembershipVersion(51)
         };
 
-        Assert.Equal(expected, await this.grainDirectory.Register(expected, null));
-        await this.grainDirectory.Unregister(otherEntry);
-        Assert.Equal(expected, await this.grainDirectory.Lookup(expected.GrainId));
+        Assert.Equal(expected, await GrainDirectory.Register(expected, null));
+        await GrainDirectory.Unregister(otherEntry);
+        Assert.Equal(expected, await GrainDirectory.Lookup(expected.GrainId));
     }
 
     [SkippableFact]
     public async Task LookupNotFound()
     {
-        Assert.Null(await this.grainDirectory.Lookup(GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N"))));
+        Assert.Null(await GrainDirectory.Lookup(GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N"))));
     }
 }

@@ -603,8 +603,6 @@ namespace Orleans.Runtime
             }
             catch (Exception exception)
             {
-                DumpCapture.CreateMiniDump("Invoke");
-                Debugger.Launch();
                 return new ValueTask<Response>(Response.FromException(exception));
             }
         }
@@ -624,12 +622,6 @@ namespace Orleans.Runtime
 
         // Generated
         protected abstract ValueTask InvokeInner();
-
-        public override void Dispose()
-        {
-            DumpCapture.CreateMiniDump("DisposeRequest");
-            Debugger.Launch();
-        }
     }
 
     /// <summary>
@@ -804,60 +796,6 @@ namespace Orleans.Runtime
         /// Invokes the request against the target.
         /// </summary>
         protected abstract void InvokeInner();
-    }
-}
-internal static partial class DumpCapture
-{
-
-
-    internal static FileInfo CreateMiniDump(string infix) => CreateMiniDump(Process.GetCurrentProcess(), infix);
-    internal static FileInfo CreateMiniDump(Process process, string infix, MiniDumpType dumpType = MiniDumpType.MiniDumpWithFullMemory)
-    {
-        var dumpFileName = $@"{process.ProcessName}-{infix}-{DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss-fffZ", CultureInfo.InvariantCulture)}.dmp";
-
-        using (var stream = File.Create(dumpFileName))
-        {
-            var result = MiniDumpWriteDump(
-                process.Handle,
-                process.Id,
-                stream.SafeFileHandle.DangerousGetHandle(),
-                dumpType,
-                IntPtr.Zero,
-                IntPtr.Zero,
-                IntPtr.Zero);
-        }
-
-        return new FileInfo(dumpFileName);
-    }
-
-    [DllImport("Dbghelp.dll")]
-    public static extern bool MiniDumpWriteDump(
-        IntPtr hProcess,
-        int processId,
-        IntPtr hFile,
-        MiniDumpType dumpType,
-        IntPtr exceptionParam,
-        IntPtr userStreamParam,
-        IntPtr callbackParam);
-
-    internal enum MiniDumpType
-    {
-        MiniDumpNormal = 0x00000000,
-        MiniDumpWithDataSegs = 0x00000001,
-        MiniDumpWithFullMemory = 0x00000002,
-        MiniDumpWithHandleData = 0x00000004,
-        MiniDumpFilterMemory = 0x00000008,
-        MiniDumpScanMemory = 0x00000010,
-        MiniDumpWithUnloadedModules = 0x00000020,
-        MiniDumpWithIndirectlyReferencedMemory = 0x00000040,
-        MiniDumpFilterModulePaths = 0x00000080,
-        MiniDumpWithProcessThreadData = 0x00000100,
-        MiniDumpWithPrivateReadWriteMemory = 0x00000200,
-        MiniDumpWithoutOptionalData = 0x00000400,
-        MiniDumpWithFullMemoryInfo = 0x00000800,
-        MiniDumpWithThreadInfo = 0x00001000,
-        MiniDumpWithCodeSegs = 0x00002000,
-        MiniDumpWithoutManagedState = 0x00004000,
     }
 }
 

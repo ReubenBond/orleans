@@ -173,15 +173,11 @@ internal sealed partial class GrainDirectoryReplica(
     {
         if (!view.TryGetOwner(grainId, out var owner))
         {
-            DumpCapture.CreateMiniDump();
-            Debugger.Launch();
             Debug.Fail($"Could not find owner for grain grain '{grainId}' in view '{view}'.");
         }
 
         if (!_id.Equals(owner))
         {
-            DumpCapture.CreateMiniDump();
-            Debugger.Launch();
             Debug.Fail($"'{_id}' expected to be the owner of grain '{grainId}', but the owner is '{owner}'.");
         }
     }
@@ -766,7 +762,6 @@ internal sealed partial class GrainDirectoryReplica(
                         // The view has been refreshed since the request for registered activations was made.
                         if (_view.Version <= current.Version)
                         {
-                            DumpCapture.CreateMiniDump();
                             Debug.Fail("Invariant violated. This host was sent a registration which it should not have been.");
                         }
 
@@ -779,7 +774,6 @@ internal sealed partial class GrainDirectoryReplica(
                         {
                             ++mismatched;
                             _logger.LogError("Integrity violation: Recovered entry '{RecoveredRecord}' does not match existing entry '{LocalRecord}'.", entry, existingEntry);
-                            DumpCapture.CreateMiniDump();
                             Debug.Fail($"Integrity violation: Recovered entry '{entry}' does not match existing entry '{existingEntry}'.");
                         }
                     }
@@ -787,7 +781,6 @@ internal sealed partial class GrainDirectoryReplica(
                     {
                         ++missing;
                         _logger.LogError("Integrity violation: Recovered entry '{RecoveredRecord}' not found in directory.", entry);
-                        DumpCapture.CreateMiniDump();
                         Debug.Fail($"Integrity violation: Recovered entry '{entry}' not found in directory.");
                     }
                 }
@@ -807,57 +800,4 @@ internal sealed partial class GrainDirectoryReplica(
         MembershipVersion DirectoryMembershipVersion,
         List<GrainAddress> GrainAddresses,
         HashSet<SiloAddress> TransferPartners);
-}
-
-internal static partial class DumpCapture
-{
-    internal static FileInfo CreateMiniDump() => CreateMiniDump(Process.GetCurrentProcess());
-    internal static FileInfo CreateMiniDump(Process process, MiniDumpType dumpType = MiniDumpType.MiniDumpWithFullMemory)
-    {
-        var dumpFileName = $@"{process.ProcessName}-MiniDump-{DateTime.UtcNow.ToString("yyyy-MM-dd-HH-mm-ss-fffZ", CultureInfo.InvariantCulture)}.dmp";
-
-        using (var stream = File.Create(dumpFileName))
-        {
-            var result = MiniDumpWriteDump(
-                process.Handle,
-                process.Id,
-                stream.SafeFileHandle.DangerousGetHandle(),
-                dumpType,
-                IntPtr.Zero,
-                IntPtr.Zero,
-                IntPtr.Zero);
-        }
-
-        return new FileInfo(dumpFileName);
-    }
-
-    [DllImport("Dbghelp.dll")]
-    public static extern bool MiniDumpWriteDump(
-        IntPtr hProcess,
-        int processId,
-        IntPtr hFile,
-        MiniDumpType dumpType,
-        IntPtr exceptionParam,
-        IntPtr userStreamParam,
-        IntPtr callbackParam);
-
-    internal enum MiniDumpType
-    {
-        MiniDumpNormal = 0x00000000,
-        MiniDumpWithDataSegs = 0x00000001,
-        MiniDumpWithFullMemory = 0x00000002,
-        MiniDumpWithHandleData = 0x00000004,
-        MiniDumpFilterMemory = 0x00000008,
-        MiniDumpScanMemory = 0x00000010,
-        MiniDumpWithUnloadedModules = 0x00000020,
-        MiniDumpWithIndirectlyReferencedMemory = 0x00000040,
-        MiniDumpFilterModulePaths = 0x00000080,
-        MiniDumpWithProcessThreadData = 0x00000100,
-        MiniDumpWithPrivateReadWriteMemory = 0x00000200,
-        MiniDumpWithoutOptionalData = 0x00000400,
-        MiniDumpWithFullMemoryInfo = 0x00000800,
-        MiniDumpWithThreadInfo = 0x00001000,
-        MiniDumpWithCodeSegs = 0x00002000,
-        MiniDumpWithoutManagedState = 0x00004000,
-    }
 }

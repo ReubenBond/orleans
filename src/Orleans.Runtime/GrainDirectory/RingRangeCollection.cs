@@ -197,6 +197,7 @@ internal readonly struct RingRangeCollection : IEquatable<RingRangeCollection>, 
     public static bool operator !=(RingRangeCollection left, RingRangeCollection right) => !(left == right);
 
     public override bool Equals(object? obj) => obj is RingRangeCollection range && Equals(range);
+
     public override int GetHashCode()
     {
         var result = new HashCode();
