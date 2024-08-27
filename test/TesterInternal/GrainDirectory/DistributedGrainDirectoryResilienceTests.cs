@@ -65,8 +65,6 @@ public sealed class DistributedGrainDirectoryResilienceTests(ITestOutputHelper o
                         output.WriteLine($"Caught & swallowed transient exception: {sue}");
                     }
 
-                    output.WriteLine(time.ElapsedMilliseconds);
-
                     idBase += CallsPerIteration;
                 }
             });
@@ -135,6 +133,8 @@ public sealed class DistributedGrainDirectoryResilienceTests(ITestOutputHelper o
                 }
             });
 
+            await await Task.WhenAny(loadTask, chaosTask);
+            cts.Cancel();
             await Task.WhenAll(loadTask, chaosTask);
         }
         finally
