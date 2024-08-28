@@ -6,6 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="BraggerSpecs" />
+    <PackageReference Include="BraggerSpecs.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="CsCheck" />
     <PackageReference Include="Azure.Identity" />
