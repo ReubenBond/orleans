@@ -218,6 +218,64 @@ public class LookupBehavior : ExecutableBehavior<LookupRequest, GrainAddressEnti
     }
 }
 
+public class StopSiloBehavior : ExecutableBehavior<string, Empty, SystemState>
+{
+    public override ExpectedOutcomes InvokeOperation(string siloAddress, SystemState state)
+    {
+        if (state.Clients.ContainsKey(siloAddress))
+        {
+            var updatedState = (SystemState)state.Clone();
+            updatedState.Clients.Remove(siloAddress);
+
+            return new ExpectedOutcome(
+                Descriptor.FromValue(Empty.Instance),
+                updatedState);
+        }
+
+        return new ExpectedOutcome(
+            Descriptor.FromValue(Empty.Instance),
+            state);
+    }
+
+    public override async Task<Empty> ExecuteAsync(TestingContext context, string siloAddress)
+    {
+        ArgumentNullException.ThrowIfNull(siloAddress);
+        var siloHandle = ((DistributedGrainDirectoryTestingContext)context).TestCluster.Silos.SingleOrDefault(s => s.SiloAddress.ToParsableString().Equals(siloAddress));
+        if (siloHandle is null) return Empty.Instance;
+        await siloHandle.StopSiloAsync(stopGracefully: true);
+        return Empty.Instance;
+    }
+}
+
+public class StartSiloBehavior : ExecutableBehavior<string, Empty, SystemState>
+{
+    public override ExpectedOutcomes InvokeOperation(string siloAddress, SystemState state)
+    {
+        if (state.Clients.ContainsKey(siloAddress))
+        {
+            var updatedState = (SystemState)state.Clone();
+            updatedState.Clients.Remove(siloAddress);
+
+            return new ExpectedOutcome(
+                Descriptor.FromValue(Empty.Instance),
+                updatedState);
+        }
+
+        return new ExpectedOutcome(
+            Descriptor.FromValue(Empty.Instance),
+            state);
+    }
+
+    public override async Task<Empty> ExecuteAsync(TestingContext context, string siloAddress)
+    {
+        ArgumentNullException.ThrowIfNull(siloAddress);
+        var siloHandle = ((DistributedGrainDirectoryTestingContext)context).TestCluster.Silos.SingleOrDefault(s => s.SiloAddress.ToParsableString().Equals(siloAddress));
+        if (siloHandle is null) return Empty.Instance;
+        await siloHandle.StopSiloAsync(stopGracefully: true);
+        return Empty.Instance;
+    }
+}
+
 [TestCategory("SlowBVT"), TestCategory("Directory")]
 public sealed class DistributedGrainDirectorySpecificationTests : TestClusterPerTest
 {
@@ -242,7 +300,7 @@ public sealed class DistributedGrainDirectorySpecificationTests : TestClusterPer
     public async Task OperationalSpecificationTest()
     {
         var siloAddresses = base.HostedCluster.Silos.Select(s => s.SiloAddress.ToParsableString()).ToList();
-        var grainIds = Enumerable.Range(0, 2).Select(i => GrainId.Create("dir-test", $"{i}").ToString()).ToList();
+        var grainIds = Enumerable.Range(0, 1).Select(i => GrainId.Create("dir-test", $"{i}").ToString()).ToList();
 
         var operations = new OperationSet();
         var startingState = new SystemState();
@@ -284,7 +342,7 @@ public sealed class DistributedGrainDirectorySpecificationTests : TestClusterPer
         var outputPath = logPath.CreateSubdirectory(HostedCluster.Options.ClusterId + Guid.NewGuid().ToString("N")[0..5]);
         var testingContext = new DistributedGrainDirectoryTestingContext(HostedCluster, _registry, outputPath.FullName);
 
-        var testCases = TestCaseGenerator.GenerateSequentialTestCases(
+        var testCases = TestCaseGenerator.GenerateConcurrentTestCases(
             testingContext,
             startingState,
             operations);
@@ -295,8 +353,9 @@ public sealed class DistributedGrainDirectorySpecificationTests : TestClusterPer
             testingContext,
             startingState,
             operations);
+        File.WriteAllText(Path.Combine(outputPath.FullName, "graph.viz"), dotFileContents);
 
-        var results = await TestCaseExecutor.ExecuteSequentialTestCases(
+        var results = await TestCaseExecutor.ExecuteConcurrentTestCases(
             testingContext,
             testCases,
             () => ResetState(testingContext));
