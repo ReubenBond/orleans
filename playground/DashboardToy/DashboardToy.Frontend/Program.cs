@@ -4,7 +4,8 @@ using Orleans.Configuration;
 using Orleans.Placement.Repartitioning;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.AddKeyedRedisClient("orleans-redis");
+builder.AddKeyedAzureCosmosClient("cosmos");
+
 #pragma warning disable ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 builder.UseOrleans(orleans =>
 {

@@ -7,12 +7,13 @@
     <Nullable>enable</Nullable>
 
     <!-- Uncomment this once Aspire no longer requires a 'dotnet workload install aspire' to build -->
-    <!--<IsAspireHost>true</IsAspireHost>-->
+    <IsAspireHost>true</IsAspireHost>
     <UserSecretsId>6a521b87-2bf9-4af8-b7c7-4947536e1d50</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" />
+    <PackageReference Include="Aspire.Hosting.Azure.CosmosDB" />
     <PackageReference Include="Aspire.Hosting.Orleans" />
     <PackageReference Include="Aspire.Hosting.Redis" />
   </ItemGroup>

@@ -1,16 +1,15 @@
 using Projects;
 
 var builder = DistributedApplication.CreateBuilder(args);
-var redis = builder.AddRedis("orleans-redis");
+builder.AddAzureProvisioning();
+var cosmos = builder.AddAzureCosmosDB("cosmos");
 
 var orleans = builder.AddOrleans("cluster")
-    .WithClustering(redis);
+    .WithClustering(cosmos);
 
-/*
 // Comment this out once Aspire no longer requires a 'workload' to build.
 builder.AddProject<DashboardToy_Frontend>("frontend")
     .WithReference(orleans)
-    .WithReplicas(5);
-*/
+    .WithReplicas(1);
 
 builder.Build().Run();

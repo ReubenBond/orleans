@@ -1,5 +1,4 @@
 using System;
-using System.Threading.Tasks;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

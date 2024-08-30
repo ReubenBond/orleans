@@ -8,10 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Microsoft.Azure.Cosmos" />
     <PackageReference Include="Aspire.StackExchange.Redis" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Azure\Orleans.Clustering.Cosmos\Orleans.Clustering.Cosmos.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Runtime\Orleans.Runtime.csproj" />
     <ProjectReference Include="..\..\..\src\Redis\Orleans.Clustering.Redis\Orleans.Clustering.Redis.csproj" />
   </ItemGroup>
