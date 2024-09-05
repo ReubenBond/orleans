@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Grpc.Core;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Serialization.CoreRPC
@@ -12,7 +13,7 @@ namespace Orleans.Serialization.CoreRPC
     public interface IRpcService
     {
     }
-    
+
     [DefaultInvokableBaseType(typeof(ValueTask<>), typeof(Request<>))]
     [DefaultInvokableBaseType(typeof(ValueTask), typeof(Request))]
     [DefaultInvokableBaseType(typeof(Task<>), typeof(TaskRequest<>))]
@@ -29,7 +30,13 @@ namespace Orleans.Serialization.CoreRPC
         {
             _serviceProvider = serviceProvider;
             (_requestMarshaller, _responseMarshaller) = GetMarshallers(serviceProvider);
+            CopyContextPool = serviceProvider.GetRequiredService<CopyContextPool>();
         }
+
+        /// <summary>
+        /// Gets the serialization copy context pool.
+        /// </summary>
+        protected CopyContextPool CopyContextPool { get; }
 
         internal static (Marshaller<RequestBase>, Marshaller<Response>) GetMarshallers(IServiceProvider serviceProvider)
         {
@@ -55,6 +62,15 @@ namespace Orleans.Serialization.CoreRPC
 
         protected TInvokable GetInvokable<TInvokable>() => ActivatorUtilities.GetServiceOrCreateInstance<TInvokable>(_serviceProvider);
 
+        protected async ValueTask InvokeAsync(IInvokable body)
+        {
+            var request = (RequestBase)body;
+            var method = GetMethod(request);
+            var call = CallInvoker.AsyncUnaryCall(method, null, new CallOptions(), request);
+            var result = await call.ResponseAsync;
+            result.ThrowIfExceptionResponse();
+        }
+
         protected async ValueTask<T> InvokeAsync<T>(IInvokable body)
         {
             var request = (RequestBase)body;
@@ -74,8 +90,8 @@ namespace Orleans.Serialization.CoreRPC
 
             method = new Method<RequestBase, Response>(
                 MethodType.Unary,
-                request.InterfaceType.Name,
-                request.Method.Name,
+                request.GetInterfaceType().Name,
+                request.GetMethod().Name,
                 _requestMarshaller,
                 _responseMarshaller);
             _requestMethods[requestType] = method;
@@ -87,24 +103,23 @@ namespace Orleans.Serialization.CoreRPC
     [GenerateSerializer]
     public abstract class RequestBase : IInvokable
     {
-        public abstract int ArgumentCount { get; }
-        public abstract ValueTask<Response> Invoke();
-        public abstract TTarget GetTarget<TTarget>();
-        public abstract void SetTarget<TTargetHolder>(TTargetHolder holder) where TTargetHolder : ITargetHolder;
-        public abstract TArgument GetArgument<TArgument>(int index);
-        public abstract void SetArgument<TArgument>(int index, in TArgument value);
         public abstract void Dispose();
-        public abstract string MethodName { get; }
-        public abstract Type[] MethodTypeArguments { get; }
-        public abstract string InterfaceName { get; }
-        public abstract Type InterfaceType { get; }
-        public abstract Type[] InterfaceTypeArguments { get; }
-        public abstract Type[] ParameterTypes { get; }
-        public abstract MethodInfo Method { get; }
+        public abstract string GetActivityName();
+        public abstract object GetArgument(int index);
+        public abstract int GetArgumentCount();
+        public virtual TimeSpan? GetDefaultResponseTimeout() => null;
+        public abstract string GetInterfaceName();
+        public abstract Type GetInterfaceType();
+        public abstract MethodInfo GetMethod();
+        public abstract string GetMethodName();
+        public abstract object GetTarget();
+        public abstract ValueTask<Response> Invoke();
+        public abstract void SetArgument(int index, object value);
+        public abstract void SetTarget(ITargetHolder holder);
     }
 
     [GenerateSerializer]
-    public abstract class Request : RequestBase 
+    public abstract class Request : RequestBase
     {
         public override ValueTask<Response> Invoke()
         {
@@ -220,7 +235,7 @@ namespace Orleans.Serialization.CoreRPC
     }
 
     [GenerateSerializer]
-    public abstract class TaskRequest : RequestBase 
+    public abstract class TaskRequest : RequestBase
     {
         public override ValueTask<Response> Invoke()
         {

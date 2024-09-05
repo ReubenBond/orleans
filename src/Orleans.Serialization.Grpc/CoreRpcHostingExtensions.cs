@@ -62,15 +62,15 @@ namespace Orleans.Serialization.Grpc
     internal class CoreRpcCallInvokerFactory
     {
         private readonly ILoggerFactory _loggerFactory;
+        private readonly IServiceProvider _serviceProvider;
 
-        public CoreRpcCallInvokerFactory(ILoggerFactory loggerFactory)
+        public CoreRpcCallInvokerFactory(ILoggerFactory loggerFactory, IServiceProvider serviceProvider)
         {
-            if (loggerFactory == null)
-            {
-                throw new ArgumentNullException(nameof(loggerFactory));
-            }
+            ArgumentNullException.ThrowIfNull(loggerFactory);
+            ArgumentNullException.ThrowIfNull(serviceProvider);
 
             _loggerFactory = loggerFactory;
+            _serviceProvider = serviceProvider;
         }
 
         public CallInvoker CreateCallInvoker(HttpMessageHandler httpHandler, string name, Type type, GrpcClientFactoryOptions clientFactoryOptions)
@@ -102,11 +102,15 @@ namespace Orleans.Serialization.Grpc
 
             var httpClientCallInvoker = channel.CreateCallInvoker();
 
-            var resolvedCallInvoker = clientFactoryOptions.Interceptors.Count == 0
-                ? httpClientCallInvoker
-                : httpClientCallInvoker.Intercept(clientFactoryOptions.Interceptors.ToArray());
+            if (clientFactoryOptions.InterceptorRegistrations.Count > 0)
+            {
+                foreach (var registration in clientFactoryOptions.InterceptorRegistrations)
+                {
+                    httpClientCallInvoker = httpClientCallInvoker.Intercept(registration.Creator(_serviceProvider));
+                }
+            }
 
-            return resolvedCallInvoker;
+            return httpClientCallInvoker;
         }
     }
 
@@ -297,12 +301,11 @@ namespace Orleans.Serialization.Grpc
         }
     }
 
-    internal readonly struct TargetHolder : ITargetHolder
+    internal readonly struct TargetHolder(object service) : ITargetHolder
     {
-        public readonly object _service;
-        public TargetHolder(object service) => _service = service;
+        public readonly object _service = service;
 
-        public TComponent GetComponent<TComponent>() => (TComponent)_service;
-        public TTarget GetTarget<TTarget>() => (TTarget)_service;
+        public TComponent GetComponent<TComponent>() where TComponent : class => (TComponent)_service;
+        public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)_service;
     }
 }
