@@ -43,7 +43,7 @@
     <PackageVersion Include="Microsoft.Extensions.Options" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="8.0.1" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="7.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
     <PackageVersion Include="Azure.Data.Tables" Version="12.9.0" />
     <PackageVersion Include="Azure.Core" Version="1.41.0" />
@@ -67,7 +67,7 @@
     <PackageVersion Include="AWSSDK.DynamoDBv2" Version="3.7.300.6" />
     <PackageVersion Include="AWSSDK.SQS" Version="3.7.300" />
     <PackageVersion Include="Consul" Version="1.6.10.9" />
-    <PackageVersion Include="Google.Protobuf" Version="3.24.4" />
+    <PackageVersion Include="Google.Protobuf" Version="3.27.3" />
     <PackageVersion Include="protobuf-net" Version="3.2.26" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
@@ -111,6 +111,9 @@
     <PackageVersion Include="Hyperion" Version="0.12.2" />
     <PackageVersion Include="Grpc.Tools" Version="2.66.0" />
     <PackageVersion Include="Grpc.AspNetCore" Version="2.66.0" />
+    <PackageVersion Include="Grpc.Core" Version="2.46.6" />
+    <PackageVersion Include="Grpc.Core.Api" Version="2.65.0" />
+    <PackageVersion Include="Grpc.Net.ClientFactory" Version="2.65.0" />
     <PackageVersion Include="Testcontainers" Version="3.8.0" />
     <!-- Tooling related packages -->
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="8.0.0" />

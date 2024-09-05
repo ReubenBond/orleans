@@ -60,7 +60,7 @@ namespace Orleans.CodeGenerator
 
         public static string GetSimpleClassName(ProxyInterfaceDescription interfaceDescription)
             => $"Proxy_{SyntaxGeneration.Identifier.SanitizeIdentifierName(interfaceDescription.Name)}";
-
+        
         private List<GeneratedFieldDescription> GetFieldDescriptions(
             ProxyInterfaceDescription interfaceDescription)
         {
