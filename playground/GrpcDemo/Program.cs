@@ -1,9 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Serialization.CoreRPC;
 using System.Threading.Tasks;
-using Orleans.Serialization.Grpc;
 using System.Threading;
 using Grpc.Core;
 using System;
@@ -13,16 +11,23 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Orleans.Runtime;
+using Microsoft.AspNetCore.Builder;
+using Grpc.Net.Client;
+using Orleans.Serialization.gRPC.CoreRPC;
 
-await Host.CreateDefaultBuilder(args)
-    .ConfigureServices(services =>
-    {
-        services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Trace));
-        services.AddStandaloneCoreRpc();
-        services.AddHostedService<ServerService>();
+var builder = WebApplication.CreateBuilder(args);
+var services = builder.Services;
+        services.AddCoreRpc();
+        //services.AddStandaloneCoreRpc();
+        //services.AddHostedService<ServerService>();
         services.AddHostedService<ClientService>();
-    })
-    .RunConsoleAsync();
+var app = builder.Build();
+app.MapGrpcService<HelloService>();
+await app.RunAsync();
+
+public sealed class GreeterGrain : Greet.Greeter.GreeterBase, IGrainWithStringKey
+{
+}
 
 [GenerateSerializer]
 public class MyComplexModel
@@ -91,6 +96,7 @@ public class HelloService : IHelloService
     }
 }
 
+/*
 public class ServerService : IHostedService
 {
     private readonly IServiceProvider _serviceProvider;
@@ -122,6 +128,7 @@ public class ServerService : IHostedService
         return Task.CompletedTask;
     }
 }
+*/
 
 public class ClientService : BackgroundService
 {
@@ -136,8 +143,8 @@ public class ClientService : BackgroundService
         _serviceProvider = serviceProvider;
         _logger = logger;
 
-        var channel = new Channel("localhost", 9001, ChannelCredentials.Insecure); ;
-        var callInvoker = new DefaultCallInvoker(channel);
+        var channel = GrpcChannel.ForAddress("http://localhost:9001", new GrpcChannelOptions { Credentials = ChannelCredentials.Insecure, UnsafeUseInsecureChannelCallCredentials = true });
+        var callInvoker = channel.CreateCallInvoker();
         _client = _clientFactory.CreateClient<IHelloService>(callInvoker);
     }
 

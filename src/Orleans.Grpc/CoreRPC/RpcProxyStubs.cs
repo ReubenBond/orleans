@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Invocation;
 
-namespace Orleans.Serialization.CoreRPC
+namespace Orleans.Serialization.gRPC.CoreRPC
 {
     [GenerateMethodSerializers(typeof(RpcProxyBase))]
     public interface IRpcService

@@ -14,12 +14,11 @@ using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Configuration;
-using Orleans.Serialization.CoreRPC;
 using Orleans.Serialization.Invocation;
 
-namespace Orleans.Serialization.Grpc
+namespace Orleans.Serialization.gRPC.CoreRPC
 {
-    public static class CoreRpcHostingExtensions
+    public static class GrpcOrleansHostingExtensions
     {
         public static IServiceCollection AddCoreRpc(this IServiceCollection services)
         {

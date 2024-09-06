@@ -184,7 +184,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DistributedTests", "Distrib
 		test\DistributedTests\README.md = test\DistributedTests\README.md
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Serialization.gRPC", "src\Orleans.Serialization.gRPC\Orleans.Serialization.gRPC.csproj", "{F8C75392-DEFC-4715-8D88-00E833837B51}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Grpc", "src\Orleans.Grpc\Orleans.Grpc.csproj", "{F8C75392-DEFC-4715-8D88-00E833837B51}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GrpcDemo", "playground\GrpcDemo\GrpcDemo.csproj", "{24974384-A273-4609-8371-E93959349D95}"
 EndProject
