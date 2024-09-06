@@ -1,12 +1,11 @@
 {
   "profiles": {
-    "CoreRpcDemo": {
+    "GprcDemo": {
       "commandName": "Project",
-      "launchBrowser": true,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
-      "applicationUrl": "https://localhost:59399;http://localhost:59400"
+      "applicationUrl": "http://localhost:9001"
     }
   }
 }
