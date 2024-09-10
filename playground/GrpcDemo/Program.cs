@@ -14,8 +14,11 @@ using Orleans.Runtime;
 using Microsoft.AspNetCore.Builder;
 using Grpc.Net.Client;
 using Orleans.Serialization.gRPC.CoreRPC;
+using Orleans.Hosting;
+using Greet;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.UseOrleans(o => o.UseLocalhostClustering());
 var services = builder.Services;
         services.AddCoreRpc();
         //services.AddStandaloneCoreRpc();
@@ -25,8 +28,12 @@ var app = builder.Build();
 app.MapGrpcService<HelloService>();
 await app.RunAsync();
 
-public sealed class GreeterGrain : Greet.Greeter.GreeterBase, IGrainWithStringKey
+public sealed class GreeterGrain : Greeter.GreeterBase, IGrainWithStringKey
 {
+    public override Task<HelloReply> SayHello(HelloRequest request, ServerCallContext context)
+    {
+        return Task.FromResult(new HelloReply{ Message = "Hello " + request.Name });
+    }
 }
 
 [GenerateSerializer]

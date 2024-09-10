@@ -154,7 +154,7 @@ namespace Orleans.Serialization.gRPC.CoreRPC
 
                     var matching = proxyType.FindInterfaces(
                             (type, criteria) =>
-                                type.IsGenericType && type.GetGenericTypeDefinition() == (Type)criteria,
+                                type.IsGenericType && type.GetGenericTypeDefinition() == (Type?)criteria,
                             unbound)
                         .FirstOrDefault();
                     if (matching != null)
@@ -267,7 +267,7 @@ namespace Orleans.Serialization.gRPC.CoreRPC
                 throw new InvalidOperationException($"Service of type {typeof(TService)} is not a CoreRPC service");
             }
 
-            var instance = ActivatorUtilities.GetServiceOrCreateInstance<TService>(serviceProvider);
+            var instance = ActivatorUtilities.GetServiceOrCreateInstance<TService>(serviceProvider)!;
             var (requestMarshaller, responseMarshaller) = RpcProxyBase.GetMarshallers(serviceProvider);
             foreach (var iface in typeof(TService).GetInterfaces())
             {
@@ -283,7 +283,7 @@ namespace Orleans.Serialization.gRPC.CoreRPC
                     var methodDescriptor = new Method<RequestBase, Response>(MethodType.Unary, iface.Name, method.Name, requestMarshaller, responseMarshaller);
                     var handler = new UnaryServerMethod<RequestBase, Response>((request, context) =>
                     {
-                        request.SetTarget(new TargetHolder(instance));
+                        request.SetTarget(new TargetHolder(instance!));
 
                         // If there were interceptors/filters/etc, they would go here.
                         // request.SetArgument(i, value);
