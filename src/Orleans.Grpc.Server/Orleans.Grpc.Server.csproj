@@ -20,6 +20,7 @@
     <ProjectReference Include="..\Orleans.Serialization\Orleans.Serialization.csproj" />
     <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
     <ProjectReference Include="$(SourceRoot)src/Orleans.Analyzers/Orleans.Analyzers.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
+    <ProjectReference Include="..\Serializers\Orleans.Serialization.Protobuf\Orleans.Serialization.Protobuf.csproj" />
   </ItemGroup>
 
 </Project>

@@ -184,7 +184,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DistributedTests", "Distrib
 		test\DistributedTests\README.md = test\DistributedTests\README.md
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Grpc", "src\Orleans.Grpc\Orleans.Grpc.csproj", "{F8C75392-DEFC-4715-8D88-00E833837B51}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Grpc.Server", "src\Orleans.Grpc.Server\Orleans.Grpc.Server.csproj", "{F8C75392-DEFC-4715-8D88-00E833837B51}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GrpcDemo", "playground\GrpcDemo\GrpcDemo.csproj", "{24974384-A273-4609-8371-E93959349D95}"
 EndProject
@@ -277,6 +277,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DistributedChaos.Contracts", "playground\DistributedChaos\DistributedChaos.Contracts\DistributedChaos.Contracts.csproj", "{D6A7671F-B790-4496-B51C-69755EA2753C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DistributedChaos.ServiceDefaults", "playground\DistributedChaos\DistributedChaos.ServiceDefaults\DistributedChaos.ServiceDefaults.csproj", "{8EC8E0DA-707A-4452-A42F-9A1967BE541E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Grpc.Client", "src\Orleans.Grpc.Client\Orleans.Grpc.Client.csproj", "{8DC5A7C2-26E5-4CD9-AE6A-33ECACDD1D29}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -720,6 +722,10 @@ Global
 		{8EC8E0DA-707A-4452-A42F-9A1967BE541E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8EC8E0DA-707A-4452-A42F-9A1967BE541E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8EC8E0DA-707A-4452-A42F-9A1967BE541E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8DC5A7C2-26E5-4CD9-AE6A-33ECACDD1D29}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8DC5A7C2-26E5-4CD9-AE6A-33ECACDD1D29}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8DC5A7C2-26E5-4CD9-AE6A-33ECACDD1D29}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8DC5A7C2-26E5-4CD9-AE6A-33ECACDD1D29}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -852,6 +858,7 @@ Global
 		{E18571DE-AA36-42E7-86FB-0827B58F7721} = {3359BA89-1C90-4FDF-AF49-54CFEEE3548E}
 		{D6A7671F-B790-4496-B51C-69755EA2753C} = {3359BA89-1C90-4FDF-AF49-54CFEEE3548E}
 		{8EC8E0DA-707A-4452-A42F-9A1967BE541E} = {3359BA89-1C90-4FDF-AF49-54CFEEE3548E}
+		{8DC5A7C2-26E5-4CD9-AE6A-33ECACDD1D29} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}
