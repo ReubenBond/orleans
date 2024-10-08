@@ -109,7 +109,7 @@ namespace Orleans.CodeGenerator
 
         public static string GetSimpleClassName(string name) => $"Copier_{name}";
 
-        private MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
+        private static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
         {
             return fieldDescriptions.Select(GetFieldDeclaration).ToArray();
 
@@ -341,7 +341,7 @@ skip:;
             }
         }
 
-        private MemberDeclarationSyntax GenerateMemberwiseDeepCopyMethod(
+        private MethodDeclarationSyntax GenerateMemberwiseDeepCopyMethod(
             ISerializableTypeDescription type,
             List<GeneratedFieldDescription> copierFields,
             List<ISerializableMember> members,
@@ -479,7 +479,7 @@ skip:;
                 .AddBodyStatements(body.ToArray());
         }
 
-        private ExpressionSyntax GetCreateValueExpression(ISerializableTypeDescription type, List<GeneratedFieldDescription> copierFields)
+        private static ExpressionSyntax GetCreateValueExpression(ISerializableTypeDescription type, List<GeneratedFieldDescription> copierFields)
         {
             return type.UseActivator switch
             {
@@ -488,7 +488,7 @@ skip:;
             };
         }
 
-        private MemberDeclarationSyntax GenerateBaseCopierDeepCopyMethod(
+        private MethodDeclarationSyntax GenerateBaseCopierDeepCopyMethod(
             ISerializableTypeDescription type,
             List<GeneratedFieldDescription> copierFields,
             List<ISerializableMember> members,
@@ -633,7 +633,7 @@ skip:;
             return getValueExpression;
         }
 
-        private void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax originalInstance, IdentifierNameSyntax resultInstance, string callbackMethodName, List<StatementSyntax> body)
+        private static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax originalInstance, IdentifierNameSyntax resultInstance, string callbackMethodName, List<StatementSyntax> body)
         {
             var serializationHooks = type.SerializationHooks;
             for (var hookIndex = 0; hookIndex < serializationHooks.Count; ++hookIndex)

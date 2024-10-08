@@ -6,7 +6,7 @@ using System.Collections.Generic;
 
 namespace Orleans.CodeGenerator
 {
-    internal class ActivatorGenerator
+    internal sealed class ActivatorGenerator
     {
         private readonly CodeGenerator _codeGenerator;
 
@@ -70,7 +70,7 @@ namespace Orleans.CodeGenerator
 
         public static string GetSimpleClassName(ISerializableTypeDescription serializableType) => $"Activator_{serializableType.Name}";
 
-        private ConstructorDeclarationSyntax GenerateConstructor(
+        private static ConstructorDeclarationSyntax GenerateConstructor(
             string simpleClassName,
             List<ConstructorArgument> orderedFields)
         {
@@ -102,7 +102,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private MemberDeclarationSyntax GenerateCreateMethod(ISerializableTypeDescription type, List<ConstructorArgument> orderedFields)
+        private static MethodDeclarationSyntax GenerateCreateMethod(ISerializableTypeDescription type, List<ConstructorArgument> orderedFields)
         {
             ExpressionSyntax createObject;
             if (type.ActivatorConstructorParameters is { Count: > 0 })

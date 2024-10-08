@@ -13,7 +13,7 @@ namespace Orleans.CodeGenerator
     /// <summary>
     /// Generates RPC stub objects called invokers.
     /// </summary>
-    internal class InvokableGenerator
+    internal sealed class InvokableGenerator
     {
         private readonly CodeGenerator _codeGenerator;
 
@@ -186,7 +186,7 @@ namespace Orleans.CodeGenerator
             return new MemberDeclarationSyntax[] { timespanField, responseTimeoutProperty };
         }
 
-        private ClassDeclarationSyntax AddOptionalMembers(ClassDeclarationSyntax decl, params MemberDeclarationSyntax[] items)
+        private static ClassDeclarationSyntax AddOptionalMembers(ClassDeclarationSyntax decl, params MemberDeclarationSyntax[] items)
             => decl.WithMembers(decl.Members.AddRange(items.Where(i => i != null)));
 
         internal AttributeSyntax GetCompoundTypeAliasAttribute(CompoundTypeAliasComponent[] argValues)
@@ -249,7 +249,7 @@ namespace Orleans.CodeGenerator
             return alias;
         }
 
-        private INamedTypeSymbol GetBaseClassType(InvokableMethodDescription method)
+        private static INamedTypeSymbol GetBaseClassType(InvokableMethodDescription method)
         {
             var methodReturnType = method.Method.ReturnType;
             if (methodReturnType is not INamedTypeSymbol namedMethodReturnType)
@@ -274,7 +274,7 @@ namespace Orleans.CodeGenerator
             throw new OrleansGeneratorDiagnosticAnalysisException(InvalidRpcMethodReturnTypeDiagnostic.CreateDiagnostic(method));
         }
 
-        private MemberDeclarationSyntax GenerateSetTargetMethod(
+        private MethodDeclarationSyntax GenerateSetTargetMethod(
             InvokableMethodDescription methodDescription,
             TargetFieldDescription targetField)
         {
@@ -305,7 +305,7 @@ namespace Orleans.CodeGenerator
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
 
-        private MemberDeclarationSyntax GenerateGetTargetMethod(TargetFieldDescription targetField)
+        private static MethodDeclarationSyntax GenerateGetTargetMethod(TargetFieldDescription targetField)
         {
             return MethodDeclaration(PredefinedType(Token(SyntaxKind.ObjectKeyword)), "GetTarget")
                 .WithParameterList(ParameterList())
@@ -314,7 +314,7 @@ namespace Orleans.CodeGenerator
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
 
-        private MemberDeclarationSyntax GenerateGetArgumentMethod(
+        private static MethodDeclarationSyntax GenerateGetArgumentMethod(
             InvokableMethodDescription methodDescription,
             List<InvokerFieldDescription> fields)
         {
@@ -375,7 +375,7 @@ namespace Orleans.CodeGenerator
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
 
-        private MemberDeclarationSyntax GenerateSetArgumentMethod(
+        private static MethodDeclarationSyntax GenerateSetArgumentMethod(
             InvokableMethodDescription methodDescription,
             List<InvokerFieldDescription> fields)
         {
@@ -453,7 +453,7 @@ namespace Orleans.CodeGenerator
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
 
-        private MemberDeclarationSyntax GenerateInvokeInnerMethod(
+        private static MethodDeclarationSyntax GenerateInvokeInnerMethod(
             InvokableMethodDescription method,
             List<InvokerFieldDescription> fields,
             TargetFieldDescription target)
@@ -489,7 +489,7 @@ namespace Orleans.CodeGenerator
                 .WithModifiers(TokenList(Token(SyntaxKind.ProtectedKeyword), Token(SyntaxKind.OverrideKeyword)));
         }
 
-        private MemberDeclarationSyntax GenerateDisposeMethod(
+        private static MethodDeclarationSyntax GenerateDisposeMethod(
             List<InvokerFieldDescription> fields,
             INamedTypeSymbol baseClassType)
         {
@@ -520,14 +520,14 @@ namespace Orleans.CodeGenerator
                 .WithBody(Block(body));
         }
 
-        private MemberDeclarationSyntax GenerateGetArgumentCount(InvokableMethodDescription methodDescription)
+        private static MethodDeclarationSyntax GenerateGetArgumentCount(InvokableMethodDescription methodDescription)
             => methodDescription.Method.Parameters.Length is var count and not 0 ?
             MethodDeclaration(PredefinedType(Token(SyntaxKind.IntKeyword)), "GetArgumentCount")
                 .WithExpressionBody(ArrowExpressionClause(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(count))))
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)) : null;
 
-        private MemberDeclarationSyntax GenerateGetActivityName(InvokableMethodDescription methodDescription)
+        private static MethodDeclarationSyntax GenerateGetActivityName(InvokableMethodDescription methodDescription)
         {
             // This property is intended to contain a value suitable for use as an OpenTelemetry Span Name for RPC calls.
             // Therefore, the interface name and method name components must not include periods or slashes.
@@ -547,7 +547,7 @@ namespace Orleans.CodeGenerator
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
         }
 
-        private MemberDeclarationSyntax GenerateGetMethodName(
+        private static MethodDeclarationSyntax GenerateGetMethodName(
             InvokableMethodDescription methodDescription) =>
             MethodDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)), "GetMethodName")
                 .WithExpressionBody(
@@ -558,7 +558,7 @@ namespace Orleans.CodeGenerator
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
 
-        private MemberDeclarationSyntax GenerateGetInterfaceName(
+        private static MethodDeclarationSyntax GenerateGetInterfaceName(
             InvokableMethodDescription methodDescription) =>
             MethodDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)), "GetInterfaceName")
                 .WithExpressionBody(
@@ -569,7 +569,7 @@ namespace Orleans.CodeGenerator
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
 
-        private MemberDeclarationSyntax GenerateGetInterfaceType(
+        private MethodDeclarationSyntax GenerateGetInterfaceType(
             InvokableMethodDescription methodDescription) =>
             MethodDeclaration(LibraryTypes.Type.ToTypeSyntax(), "GetInterfaceType")
                 .WithExpressionBody(
@@ -578,7 +578,7 @@ namespace Orleans.CodeGenerator
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
 
-        private MemberDeclarationSyntax GenerateGetMethod()
+        private MethodDeclarationSyntax GenerateGetMethod()
             => MethodDeclaration(LibraryTypes.MethodInfo.ToTypeSyntax(), "GetMethod")
                 .WithExpressionBody(ArrowExpressionClause(IdentifierName("MethodBackingField")))
                 .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
@@ -641,7 +641,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private ExpressionSyntax GetTypesArray(InvokableMethodDescription method, IEnumerable<ITypeSymbol> typeSymbols)
+        private static ExpressionSyntax GetTypesArray(InvokableMethodDescription method, IEnumerable<ITypeSymbol> typeSymbols)
         {
             var types = typeSymbols.ToArray();
             return types.Length == 0 ? LiteralExpression(SyntaxKind.NullLiteralExpression)
@@ -744,7 +744,7 @@ namespace Orleans.CodeGenerator
             public override bool IsInstanceField => true;
         }
 
-        internal class MethodParameterFieldDescription : InvokerFieldDescription, IMemberDescription
+        internal sealed class MethodParameterFieldDescription : InvokerFieldDescription, IMemberDescription
         {
             public MethodParameterFieldDescription(
                 CodeGenerator codeGenerator,

@@ -8,7 +8,10 @@
   <PropertyGroup>
     <WarningLevel>3</WarningLevel>
     <AnalysisLevel>preview</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <Features>strict</Features>
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <PropertyGroup>

@@ -1,6 +1,7 @@
 // ReSharper disable InconsistentNaming
 namespace Orleans.Reminders;
 
+#pragma warning disable CA1707 // Identifiers should not contain underscores
 /// <summary>
 /// The set of error codes used by the Orleans runtime libraries for logging errors. For Reminders.
 /// </summary>
@@ -42,3 +43,4 @@ public enum RSErrorCode
     RS_ServiceInitialLoadFailed = ReminderServiceBase + 38,
     RS_FastReminderInterval = ReminderServiceBase + 39,
 }
+#pragma warning restore CA1707 // Identifiers should not contain underscores

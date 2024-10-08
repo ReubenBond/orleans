@@ -7,7 +7,6 @@ using System.Linq;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using Microsoft.CodeAnalysis.CSharp;
 
 namespace Orleans.CodeGenerator
 {
@@ -15,7 +14,7 @@ namespace Orleans.CodeGenerator
     /// Describes an invokable method on a proxy interface.
     /// </summary>
     [DebuggerDisplay("{Method} (from {ProxyInterface})")]
-    internal class ProxyMethodDescription : IEquatable<ProxyMethodDescription>
+    internal sealed class ProxyMethodDescription : IEquatable<ProxyMethodDescription>
     {
         private readonly GeneratedInvokableDescription _originalInvokable;
         public static ProxyMethodDescription Create(

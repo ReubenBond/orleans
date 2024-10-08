@@ -16,7 +16,7 @@ namespace Orleans.CodeGenerator
     /// <summary>
     /// Generates RPC stub objects called invokers.
     /// </summary>
-    internal class ProxyGenerator
+    internal sealed class ProxyGenerator
     {
         private const string CopyContextPoolMemberName = "CopyContextPool";
         private const string CodecProviderMemberName = "CodecProvider";
@@ -74,7 +74,7 @@ namespace Orleans.CodeGenerator
             return fields;
         }
 
-        private MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
+        private static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
         {
             return fieldDescriptions.Select(GetFieldDeclaration).ToArray();
 
@@ -281,7 +281,7 @@ namespace Orleans.CodeGenerator
             return (isAsync, Block(statements));
         }
 
-        private MemberDeclarationSyntax[] GenerateConstructors(
+        private static MemberDeclarationSyntax[] GenerateConstructors(
             string simpleClassName,
             List<GeneratedFieldDescription> fieldDescriptions,
             INamedTypeSymbol baseType)
@@ -407,7 +407,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private ParameterSyntax GetParameterSyntax(int index, IParameterSymbol parameter, Dictionary<ITypeParameterSymbol, string> typeParameterSubstitutions)
+        private static ParameterSyntax GetParameterSyntax(int index, IParameterSymbol parameter, Dictionary<ITypeParameterSymbol, string> typeParameterSubstitutions)
         {
             var result = Parameter(Identifier($"arg{index}")).WithType(parameter.Type.ToTypeSyntax(typeParameterSubstitutions));
             switch (parameter.RefKind)

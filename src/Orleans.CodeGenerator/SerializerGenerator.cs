@@ -10,7 +10,7 @@ using static Orleans.CodeGenerator.InvokableGenerator;
 
 namespace Orleans.CodeGenerator
 {
-    internal class SerializerGenerator
+    internal sealed class SerializerGenerator
     {
         private const string BaseTypeSerializerFieldName = "_baseTypeSerializer";
         private const string ActivatorFieldName = "_activator";
@@ -115,7 +115,7 @@ namespace Orleans.CodeGenerator
             _ => CodeGenerator.CodeGeneratorName
         };
 
-        private MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
+        private static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
         {
             return fieldDescriptions.Select(GetFieldDeclaration).ToArray();
 
@@ -336,7 +336,7 @@ namespace Orleans.CodeGenerator
             return new(LibraryTypes.BaseCodec_1.ToTypeSyntax(serializableTypeDescription.BaseTypeSyntax));
         }
 
-        private MemberDeclarationSyntax GenerateSerializeMethod(
+        private MethodDeclarationSyntax GenerateSerializeMethod(
             ISerializableTypeDescription type,
             List<GeneratedFieldDescription> serializerFields,
             List<ISerializableMember> members)
@@ -481,7 +481,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private MemberDeclarationSyntax GenerateDeserializeMethod(
+        private MethodDeclarationSyntax GenerateDeserializeMethod(
             ISerializableTypeDescription type,
             List<GeneratedFieldDescription> serializerFields,
             List<ISerializableMember> members)
@@ -674,7 +674,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax instanceParam, string callbackMethodName, List<StatementSyntax> body)
+        private static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax instanceParam, string callbackMethodName, List<StatementSyntax> body)
         {
             for (var hookIndex = 0; hookIndex < type.SerializationHooks.Count; ++hookIndex)
             {
@@ -697,7 +697,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private MemberDeclarationSyntax GenerateCompoundTypeWriteFieldMethod(
+        private MethodDeclarationSyntax GenerateCompoundTypeWriteFieldMethod(
             ISerializableTypeDescription type)
         {
             var returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
@@ -833,7 +833,7 @@ namespace Orleans.CodeGenerator
                 .AddBodyStatements(body.ToArray());
         }
 
-        private MemberDeclarationSyntax GenerateCompoundTypeReadValueMethod(
+        private MethodDeclarationSyntax GenerateCompoundTypeReadValueMethod(
             ISerializableTypeDescription type,
             List<GeneratedFieldDescription> serializerFields)
         {
@@ -948,7 +948,7 @@ namespace Orleans.CodeGenerator
                 .AddBodyStatements(body.ToArray());
         }
 
-        private MemberDeclarationSyntax GenerateEnumWriteMethod(
+        private MethodDeclarationSyntax GenerateEnumWriteMethod(
             ISerializableTypeDescription type)
         {
             var returnType = PredefinedType(Token(SyntaxKind.VoidKeyword));
@@ -997,7 +997,7 @@ namespace Orleans.CodeGenerator
                 .AddBodyStatements(body.ToArray());
         }
 
-        private MemberDeclarationSyntax GenerateEnumReadMethod(
+        private MethodDeclarationSyntax GenerateEnumReadMethod(
             ISerializableTypeDescription type)
         {
             var readerParam = "reader".ToIdentifierName();
@@ -1204,7 +1204,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// Represents a serializable member (field/property) of a type.
         /// </summary>
-        internal class SerializableMember : ISerializableMember
+        internal sealed class SerializableMember : ISerializableMember
         {
             private readonly IMemberDescription _member;
             private readonly CodeGenerator _codeGenerator;

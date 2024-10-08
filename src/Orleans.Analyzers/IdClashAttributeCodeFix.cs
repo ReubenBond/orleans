@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Immutable;
 using System.Composition;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -37,7 +38,7 @@ public class IdClashAttributeCodeFix : CodeFixProvider
                         .DescendantNodes()
                         .OfType<AttributeSyntax>()
                         .Where(a => a.IsAttribute(Constants.IdAttributeName))
-                        .Select(a => int.Parse(a.ArgumentList.Arguments.Single().ToString()))
+                        .Select(a => int.Parse(a.ArgumentList.Arguments.Single().ToString(), CultureInfo.InvariantCulture))
                         .ToList()
                         .Max() + 1;
 

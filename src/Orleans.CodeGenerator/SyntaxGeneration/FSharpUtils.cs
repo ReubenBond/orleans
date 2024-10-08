@@ -132,7 +132,7 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            private class FSharpUnionCasePropertyNameComparer : IComparer<IFieldSymbol>
+            private sealed class FSharpUnionCasePropertyNameComparer : IComparer<IFieldSymbol>
             {
                 public static FSharpUnionCasePropertyNameComparer Default { get; } = new FSharpUnionCasePropertyNameComparer();
 

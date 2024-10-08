@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans
@@ -574,7 +575,7 @@ namespace Orleans
         /// Specifies the response timeout for the interface method which it is specified on.
         /// </summary>
         /// <param name="timeout">The response timeout, using <see cref="TimeSpan.Parse(string)"/> syntax.</param>
-        public ResponseTimeoutAttribute(string timeout) => Timeout = TimeSpan.Parse(timeout);
+        public ResponseTimeoutAttribute(string timeout) => Timeout = TimeSpan.Parse(timeout, CultureInfo.InvariantCulture);
 
         /// <summary>
         /// Gets or sets the response timeout for this method.

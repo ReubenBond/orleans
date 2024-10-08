@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Linq;
 
 namespace Orleans.Analyzers;
@@ -110,7 +111,7 @@ public partial class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
             return (input, 0);
         }
 
-        return (input.Substring(0, input.Length - suffixLength), ulong.Parse(input.Substring(input.Length - suffixLength)));
+        return (input.Substring(0, input.Length - suffixLength), ulong.Parse(input.Substring(input.Length - suffixLength), CultureInfo.InvariantCulture));
     }
 
     private static int GetNumericSuffixLength(string input)

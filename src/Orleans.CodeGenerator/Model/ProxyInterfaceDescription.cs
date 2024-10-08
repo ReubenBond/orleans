@@ -9,7 +9,7 @@ using System.Diagnostics;
 namespace Orleans.CodeGenerator
 {
     [DebuggerDisplay("{InterfaceType} (proxy base {ProxyBaseType})")]
-    internal class ProxyInterfaceDescription : IEquatable<ProxyInterfaceDescription>
+    internal sealed class ProxyInterfaceDescription : IEquatable<ProxyInterfaceDescription>
     {
         private static readonly char[] FilteredNameChars = new char[] { '`', '.' };
         private List<ProxyMethodDescription> _methods;

@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Orleans.CodeGenerator.Diagnostics;
 
-public static class GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembly_Diagnostic
+internal static class GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembly_Diagnostic
 {
     public const string DiagnosticId = "ORLEANS0108";
     public const string Title = "Types passed to GenerateCodeForDeclaringAssemblyAttribute must have a declaring assembly";

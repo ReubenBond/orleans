@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace Orleans.CodeGenerator
 {
-    internal class MetadataModel
+    internal sealed class MetadataModel
     {
         public List<ISerializableTypeDescription> SerializableTypes { get; } = new(1024);
         public Dictionary<INamedTypeSymbol, ProxyInterfaceDescription> InvokableInterfaces { get; } = new(SymbolEqualityComparer.Default);
