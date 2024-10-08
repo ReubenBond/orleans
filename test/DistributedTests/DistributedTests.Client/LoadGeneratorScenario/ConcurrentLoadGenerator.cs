@@ -88,9 +88,6 @@ namespace DistributedTests.Client
 
             // Ignore warmup blocks.
             while (completedBlockReader.TryRead(out _)) ;
-            GC.Collect();
-            GC.Collect();
-            GC.Collect();
         }
 
         private void ResetBetweenRuns()

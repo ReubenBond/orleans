@@ -12,8 +12,8 @@ namespace Orleans.Runtime
         internal static long _headerBytesReceived;
         internal static readonly ObservableCounter<long> HeaderBytesSentCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_SENT_BYTES_HEADER, () => _headerBytesSent, "bytes");
         internal static readonly ObservableCounter<long> HeaderBytesReceivedCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_RECEIVED_BYTES_HEADER, () => _headerBytesReceived, "bytes");
-        internal static readonly CounterAggregator LocalMessagesSentCounterAggregator = new();
-        private static readonly ObservableCounter<long> LocalMessagesSentCounter = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.MESSAGING_SENT_LOCALMESSAGES, LocalMessagesSentCounterAggregator.Collect);
+        //internal static readonly Counter<int> LocalMessagesSentCounterAggregator = n
+        internal static readonly Counter<long> LocalMessagesSentCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.MESSAGING_SENT_LOCALMESSAGES);
 
         internal static readonly Counter<int> FailedSentMessagesCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_SENT_FAILED);
         internal static readonly Counter<int> DroppedSentMessagesCounter = Instruments.Meter.CreateCounter<int>(InstrumentNames.MESSAGING_SENT_DROPPED);

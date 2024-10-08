@@ -3,13 +3,18 @@
     <RootNamespace>Benchmarks</RootNamespace>
     <AssemblyName>Benchmarks</AssemblyName>
     <TargetFramework>net8.0</TargetFramework>
+    <RollForward>LatestMinor</RollForward>
     <OutputType>Exe</OutputType>
     <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <ThreadPoolMaxThreads>2</ThreadPoolMaxThreads>
     <ServerGarbageCollection>true</ServerGarbageCollection>
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <GenerateProgramFile>false</GenerateProgramFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <!-- Do not warn on errors caused by Protocol Buffers codegen, eg: "error CS8981: The type name 'pb' only contains lower-cased ascii characters. Such names may become reserved for the language." -->
     <NoWarn>$(NoWarn);8981</NoWarn>
   </PropertyGroup>

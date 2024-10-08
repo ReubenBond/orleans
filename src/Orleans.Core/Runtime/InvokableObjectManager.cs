@@ -134,17 +134,19 @@ namespace Orleans
                 _manager.rootGrainContext.SetComponent(value);
             }
 
-            public TComponent GetComponent<TComponent>() where TComponent : class
+            public TComponent GetComponent<TComponent>() where TComponent : class => (TComponent)GetComponent(typeof(TComponent));
+            public object GetComponent(Type componentType)
             {
-                if (this.LocalObject.Target is TComponent component)
+                if (componentType.IsAssignableFrom(this.LocalObject.Target?.GetType()))
                 {
-                    return component;
+                    return LocalObject.Target;
                 }
 
-                return _manager.rootGrainContext.GetComponent<TComponent>();
+                return _manager.rootGrainContext.GetComponent(componentType);
             }
 
-            public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)this.LocalObject.Target;
+            public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)GetTarget(typeof(TTarget));
+            public object GetTarget(Type targetType) => this.LocalObject.Target;
 
             bool IEquatable<IGrainContext>.Equals(IGrainContext other) => ReferenceEquals(this, other);
 

@@ -97,16 +97,17 @@ public class GrainTypeSharedContext
     /// Gets a component.
     /// </summary>
     /// <typeparam name="TComponent">The type specified in the corresponding <see cref="SetComponent{TComponent}"/> call.</typeparam>
-    public TComponent? GetComponent<TComponent>()
+    public TComponent? GetComponent<TComponent>() => (TComponent?)GetComponent(typeof(TComponent));  
+    public object? GetComponent(Type componentType)
     {
-        if (typeof(TComponent) == typeof(PlacementStrategy) && PlacementStrategy is TComponent component)
+        if (componentType == typeof(PlacementStrategy) && PlacementStrategy is { }  component)
         {
             return component;
         }
 
         if (_components is null) return default;
-        _components.TryGetValue(typeof(TComponent), out var resultObj);
-        return (TComponent?)resultObj;
+        _components.TryGetValue(componentType, out var resultObj);
+        return resultObj;
     }
 
     /// <summary>

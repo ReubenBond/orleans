@@ -301,6 +301,11 @@ namespace Orleans.Runtime
             }
         }
 
+        internal void SetTimeToLive(Message other)
+        {
+            _timeToExpiry = other._timeToExpiry;
+        }
+
         internal long GetTimeToLiveMilliseconds() => -_timeToExpiry.ElapsedMilliseconds;
 
         internal void SetTimeToLiveMilliseconds(long milliseconds)

@@ -103,20 +103,21 @@ namespace Orleans.Runtime
         /// </summary>
         /// <typeparam name="TComponent">The component type.</typeparam>
         /// <returns>The component with the specified type.</returns>
-        public TComponent GetComponent<TComponent>()
+        public TComponent GetComponent<TComponent>() => (TComponent)GetComponent(typeof(TComponent));
+        public object GetComponent(Type componentType)
         {
-            TComponent result;
-            if (this is TComponent instanceResult)
+            object result;
+            if (componentType.IsAssignableFrom(GetType()))
             {
-                result = instanceResult;
+                result = this;
             }
-            else if (_components.TryGetValue(typeof(TComponent), out var resultObj))
+            else if (_components.TryGetValue(componentType, out var resultObj))
             {
-                result = (TComponent)resultObj;
+                result = resultObj;
             }
-            else if (typeof(TComponent) == typeof(PlacementStrategy))
+            else if (componentType == typeof(PlacementStrategy))
             {
-                result = (TComponent)(object)SystemTargetPlacementStrategy.Instance;
+                result = SystemTargetPlacementStrategy.Instance;
             }
             else
             {
@@ -284,7 +285,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public TTarget GetTarget<TTarget>() where TTarget : class => (TTarget)(object)this;
+        public object GetTarget(Type targetType)=> this;
 
         /// <inheritdoc/>
         public void Activate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) { }

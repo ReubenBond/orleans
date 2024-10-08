@@ -61,7 +61,6 @@ namespace Benchmarks.Ping
 
             // Ignore warmup blocks.
             while (completedBlockReader.TryRead(out _)) ;
-            GC.Collect();
         }
 
         private void ResetBetweenRuns()
@@ -81,9 +80,18 @@ namespace Benchmarks.Ping
             var completedBlockReader = this._completedBlocks.Reader;
 
             // Start the run.
+            var isSuppressed = ExecutionContext.IsFlowSuppressed();
+            if (!isSuppressed)
+            {
+                ExecutionContext.SuppressFlow();
+            }
             for (var i = 0; i < this._numWorkers; i++)
             {
                 this._tasks[i] = this.RunWorker(this._states[i], this._requestsPerBlock, this._blocksPerWorker);
+            }
+            if (isSuppressed)
+            {
+                ExecutionContext.RestoreFlow();
             }
 
             _ = Task.Run(async () => { try { await Task.WhenAll(this._tasks); } catch { } finally { this._completedBlocks.Writer.Complete(); } });

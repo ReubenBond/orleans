@@ -217,7 +217,7 @@ public sealed class SocketMessageTransport : MessageTransportBase
         }
 
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        _connectionClosedCts.Token.Register(OnClosed, completion, useSynchronizationContext: false);
+        using var registration = _connectionClosedCts.Token.Register(OnClosed, completion, useSynchronizationContext: false);
         await completion.Task;
 
         static void OnClosed(object? state)
@@ -472,6 +472,11 @@ DequeueRequest:
                         else if (buffers.Count == 0)
                         {
 RefreshRequestQueue:
+                            if (_connectionClosingCts.IsCancellationRequested)
+                            {
+                                break;
+                            }
+
                             // Check for pending messages before waiting.
                             RefreshRequestQueue(ref requests);
 

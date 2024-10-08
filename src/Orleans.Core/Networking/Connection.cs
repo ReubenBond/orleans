@@ -116,7 +116,7 @@ namespace Orleans.Runtime.Messaging
 
         private void OnTransportConnectionClosed()
         {
-            StartClosing(new ConnectionClosedException("Underlying connection closed"));
+            StartClosing(new ConnectionClosedException("Underlying connection closed."));
             _transportConnectionClosed.SetResult();
         }
 
@@ -128,6 +128,7 @@ namespace Orleans.Runtime.Messaging
                 return;
             }
 
+            using var _ = new ExecutionContextSuppressor();
             var task = new Task<Task>(CloseAsync);
             if (Interlocked.CompareExchange(ref _closeTask, task.Unwrap(), null) is not null)
             {
@@ -136,14 +137,14 @@ namespace Orleans.Runtime.Messaging
 
             if (!_initializationTcs.Task.IsCompleted)
             {
-                _initializationTcs.TrySetException(exception ?? new ConnectionAbortedException("Connection initialization failed"));
+                _initializationTcs.TrySetException(exception ?? new ConnectionAbortedException("Connection initialization failed."));
             }
 
             if (Log.IsEnabled(LogLevel.Information))
             {
                 Log.LogInformation(
                     exception is not ConnectionClosedException ? exception : null,
-                    "Closing connection {Connection}",
+                    "Closing connection {Connection}.",
                     this);
             }
 
@@ -170,7 +171,7 @@ namespace Orleans.Runtime.Messaging
                 catch (Exception processIncomingException)
                 {
                     // Swallow any exceptions here.
-                    Log.LogWarning(processIncomingException, "Exception processing incoming messages on connection {Connection}", this);
+                    Log.LogWarning(processIncomingException, "Exception processing incoming messages on connection {Connection}.", this);
                 }
             }
 
@@ -313,7 +314,7 @@ namespace Orleans.Runtime.Messaging
 
         private async Task ProcessIncoming()
         {
-            await Task.Yield();
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
             EnqueueRead();
             await _startedClosing.Task.ConfigureAwait(false);
         }

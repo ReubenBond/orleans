@@ -202,7 +202,7 @@ namespace Orleans.Runtime.Messaging
                         log.LogTrace("Message has been looped back to this silo: {Message}", msg);
                     }
 
-                    MessagingInstruments.LocalMessagesSentCounterAggregator.Add(1);
+                    MessagingInstruments.LocalMessagesSentCounter.Add(1);
 
                     this.ReceiveMessage(msg, targetCache);
                 }

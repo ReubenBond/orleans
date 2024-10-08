@@ -222,17 +222,17 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
     public TimeSpan CollectionAgeLimit => _shared.CollectionAgeLimit;
 
-    public TTarget? GetTarget<TTarget>() where TTarget : class => (TTarget?)GrainInstance;
+    public object? GetTarget(Type targetType) => GrainInstance;
 
-    TComponent? ITargetHolder.GetComponent<TComponent>() where TComponent : class
+    object? ITargetHolder.GetComponent(Type componentType)
     {
-        var result = GetComponent<TComponent>();
-        if (result is null && typeof(IGrainExtension).IsAssignableFrom(typeof(TComponent)))
+        var result = GetComponent(componentType);
+        if (result is null && typeof(IGrainExtension).IsAssignableFrom(componentType))
         {
-            var implementation = ActivationServices.GetKeyedService<IGrainExtension>(typeof(TComponent));
-            if (implementation is not TComponent typedResult)
+            var implementation = ActivationServices.GetKeyedService<IGrainExtension>(componentType);
+            if (implementation is not { } typedResult)
             {
-                throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TComponent)} is installed on this instance and no implementations are registered for automated install");
+                throw new GrainExtensionNotInstalledException($"No extension of type {componentType} is installed on this instance and no implementations are registered for automated install");
             }
 
             SetComponent(typedResult);
@@ -242,29 +242,30 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         return result;
     }
 
-    public TComponent? GetComponent<TComponent>() where TComponent : class
+    public TComponent? GetComponent<TComponent>() where TComponent : class => (TComponent?)GetComponent(typeof(TComponent));
+    public object? GetComponent(Type componentType)
     {
-        TComponent? result;
-        if (GrainInstance is TComponent grainResult)
+        object? result;
+        if (componentType.IsAssignableFrom(GrainInstance?.GetType()))
         {
-            result = grainResult;
+            result = GrainInstance;
         }
-        else if (this is TComponent contextResult)
+        else if (componentType.IsAssignableFrom(GetType()))
         {
-            result = contextResult;
+            result = this;
         }
-        else if (_extras is { } components && components.TryGetValue(typeof(TComponent), out var resultObj))
+        else if (_extras is { } components && components.TryGetValue(componentType, out var resultObj))
         {
-            result = (TComponent)resultObj;
+            result = resultObj;
         }
-        else if (ActivationServices.GetService<TComponent>() is { } component)
+        else if (ActivationServices.GetService(componentType) is { } component)
         {
             SetComponent(component);
             result = component;
         }
         else
         {
-            result = _shared.GetComponent<TComponent>();
+            result = _shared.GetComponent(componentType);
         }
 
         return result;
@@ -593,10 +594,10 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-        public void AnalyzeWorkload(DateTime now, MessageCenter messageCenter, MessageFactory messageFactory, SiloMessagingOptions options)
-        {
-            var slowRunningRequestDuration = options.RequestProcessingWarningTime;
-            var longQueueTimeDuration = options.RequestQueueDelayWarningTime;
+    public void AnalyzeWorkload(DateTime now, MessageCenter messageCenter, MessageFactory messageFactory, SiloMessagingOptions options)
+    {
+        var slowRunningRequestDuration = options.RequestProcessingWarningTime;
+        var longQueueTimeDuration = options.RequestQueueDelayWarningTime;
 
         List<string>? diagnostics = null;
         lock (this)
@@ -628,10 +629,10 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                         diagnostics.Add($"Message {message} has been executing for {executionTime}.");
                     }
 
-                        var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, diagnostics);
-                        messageCenter.SendMessage(response, targetCache: message);
-                    }
+                    var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, diagnostics);
+                    messageCenter.SendMessage(response, targetCache: message);
                 }
+            }
 
             foreach (var running in _runningRequests)
             {
@@ -650,10 +651,10 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                         $"Interleaving message {message} has been executing for {executionTime}."
                     };
 
-                        var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, messageDiagnostics);
-                        messageCenter.SendMessage(response, targetCache: message);
-                    }
+                    var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, messageDiagnostics);
+                    messageCenter.SendMessage(response, targetCache: message);
                 }
+            }
 
             var queueLength = 1;
             foreach (var pair in _waitingRequests)
@@ -1293,20 +1294,18 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
     private void ReceiveResponse(Message message)
     {
-        lock (this)
+        var state = State;
+        if (state is ActivationState.Invalid or ActivationState.FailedToActivate)
         {
-            if (State == ActivationState.Invalid || State == ActivationState.FailedToActivate)
-            {
-                _shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveInvalidActivation(message, State);
+            _shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveInvalidActivation(message, State);
 
-                // Always process responses
-                _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
-                return;
-            }
-
-            MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
+            // Always process responses
             _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
+            return;
         }
+
+        MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
+        _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
     }
 
     private void ReceiveRequest(Message message)

@@ -106,6 +106,12 @@ namespace Orleans.Runtime
             _ => _shared.GetComponent<TComponent>()
         };
 
+        public object? GetComponent(Type componentType)
+        {
+            if (componentType.IsAssignableFrom(GetType())) return this;
+            return _shared.GetComponent(componentType);
+        }
+
         public void SetComponent<TComponent>(TComponent? instance) where TComponent : class
         {
             if (typeof(TComponent) != typeof(GrainCanInterleave))
@@ -116,6 +122,7 @@ namespace Orleans.Runtime
             _shared.SetComponent(instance);
         }
 
+        public object GetTarget(Type targetType) => throw new NotImplementedException();
         public TTarget GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
 
         private async Task RunMessageLoop()
