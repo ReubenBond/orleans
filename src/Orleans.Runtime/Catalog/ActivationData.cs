@@ -256,17 +256,17 @@ internal sealed partial class ActivationData :
 
     public TimeSpan CollectionAgeLimit => _shared.CollectionAgeLimit;
 
-    public TTarget? GetTarget<TTarget>() where TTarget : class => (TTarget?)GrainInstance;
+    public object? GetTarget() => GrainInstance;
 
-    TComponent? ITargetHolder.GetComponent<TComponent>() where TComponent : class
+    object? ITargetHolder.GetComponent(Type componentType)
     {
-        var result = GetComponent<TComponent>();
-        if (result is null && typeof(IGrainExtension).IsAssignableFrom(typeof(TComponent)))
+        var result = GetComponent(componentType);
+        if (result is null && typeof(IGrainExtension).IsAssignableFrom(componentType))
         {
-            var implementation = ActivationServices.GetKeyedService<IGrainExtension>(typeof(TComponent));
-            if (implementation is not TComponent typedResult)
+            var implementation = ActivationServices.GetKeyedService<IGrainExtension>(componentType);
+            if (implementation is not { } typedResult)
             {
-                throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TComponent)} is installed on this instance and no implementations are registered for automated install");
+                throw new GrainExtensionNotInstalledException($"No extension of type {componentType} is installed on this instance and no implementations are registered for automated install");
             }
 
             SetComponent(typedResult);
@@ -276,29 +276,30 @@ internal sealed partial class ActivationData :
         return result;
     }
 
-    public TComponent? GetComponent<TComponent>() where TComponent : class
+    public TComponent? GetComponent<TComponent>() where TComponent : class => (TComponent?)GetComponent(typeof(TComponent));
+    public object? GetComponent(Type componentType)
     {
-        TComponent? result = default;
-        if (GrainInstance is TComponent grainResult)
+        object? result;
+        if (componentType.IsAssignableFrom(GrainInstance?.GetType()))
         {
-            result = grainResult;
+            result = GrainInstance;
         }
-        else if (this is TComponent contextResult)
+        else if (componentType.IsAssignableFrom(GetType()))
         {
-            result = contextResult;
+            result = this;
         }
-        else if (_extras is { } components && components.TryGetValue(typeof(TComponent), out var resultObj))
+        else if (_extras is { } components && components.TryGetValue(componentType, out var resultObj))
         {
-            result = (TComponent)resultObj;
+            result = resultObj;
         }
-        else if (_shared.GetComponent<TComponent>() is { } sharedComponent)
-        {
-            result = sharedComponent;
-        }
-        else if (ActivationServices.GetService<TComponent>() is { } component)
+        else if (ActivationServices.GetService(componentType) is { } component)
         {
             SetComponent(component);
             result = component;
+        }
+        else
+        {
+            result = null;
         }
 
         return result;
@@ -776,7 +777,7 @@ internal sealed partial class ActivationData :
 
         try
         {
-            var activator = _shared.GetComponent<IGrainActivator>();
+            var activator = _shared.GetComponent(typeof(IGrainActivator)) as IGrainActivator;
             if (activator != null && GrainInstance is { } instance)
             {
                 await activator.DisposeInstance(this, instance);
