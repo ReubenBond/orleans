@@ -764,17 +764,17 @@ namespace Orleans.Serialization.Buffers
         /// Reads an array of bytes from the input.
         /// </summary>
         /// <param name="count">The length of the array to read.</param>
-        /// <returns>The array wihch was read.</returns>
+        /// <returns>The array which was read.</returns>
         public byte[] ReadBytes(uint count)
         {
             if (count == 0)
             {
-                return Array.Empty<byte>();
+                return [];
             }
 
             if (count > 10240 && count > Length)
             {
-                ThrowInvalidSizeException(count);
+                ThrowInvalidSizeException(typeof(byte[]), count);
             }
 
             var bytes = new byte[count];
@@ -1040,7 +1040,7 @@ namespace Orleans.Serialization.Buffers
 
         private static void ThrowNotSupportedInput() => throw new NotSupportedException($"Type {typeof(TInput)} is not supported");
 
-        private static void ThrowInvalidSizeException(uint length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(byte[])}, {length}, is greater than total length of input.");
+        private static void ThrowInvalidSizeException(Type type, uint length) => throw new InvalidOperationException(
+            $"Declared length of {type}, {length}, is greater than total length of input.");
     }
 }

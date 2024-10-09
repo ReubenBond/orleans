@@ -99,10 +99,10 @@ namespace Orleans.Serialization.Cloning
         public bool IsShallowCopyable() => true;
 
         /// <summary>Returns the input value.</summary>
-        public T DeepCopy(T input, CopyContext _) => input;
+        public T DeepCopy(T input, CopyContext context) => input;
 
         /// <summary>Returns the input value.</summary>
-        public object DeepCopy(object input, CopyContext _) => input;
+        public object DeepCopy(object input, CopyContext context) => input;
     }
 
     /// <summary>
@@ -371,7 +371,7 @@ namespace Orleans.Serialization.Cloning
     /// <summary>
     /// Object pool for <see cref="CopyContext"/> instances.
     /// </summary>
-    public sealed class CopyContextPool
+    public sealed class CopyContextPool : IDisposable
     {
         private readonly ConcurrentObjectPool<CopyContext, PoolPolicy> _pool;
 
@@ -415,6 +415,11 @@ namespace Orleans.Serialization.Cloning
                 obj.Reset();
                 return true;
             }
+        }
+
+        public void Dispose()
+        {
+            _pool.Dispose();
         }
     }
 }

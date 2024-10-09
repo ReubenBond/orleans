@@ -322,20 +322,20 @@ namespace Orleans.Serialization.Serializers
         }
 
         /// <inheritdoc/>
-        public IDeepCopier GetDeepCopier(Type fieldType)
+        public IDeepCopier GetDeepCopier(Type type)
         {
-            var res = TryGetDeepCopier(fieldType);
-            if (res is null) ThrowCopierNotFound(fieldType);
+            var res = TryGetDeepCopier(type);
+            if (res is null) ThrowCopierNotFound(type);
             return res;
         }
 
         /// <inheritdoc/>
-        public IDeepCopier TryGetDeepCopier(Type fieldType)
+        public IDeepCopier TryGetDeepCopier(Type type)
         {
             // If the field type is unavailable, return the void copier which can at least handle references.
-            return fieldType is null ? _voidCopier
-                : _untypedCopiers.TryGetValue(fieldType, out var existing) ? existing
-                : TryCreateCopier(fieldType) is { } res ? _untypedCopiers.GetOrAdd(fieldType, res)
+            return type is null ? _voidCopier
+                : _untypedCopiers.TryGetValue(type, out var existing) ? existing
+                : TryCreateCopier(type) is { } res ? _untypedCopiers.GetOrAdd(type, res)
                 : null;
         }
 
@@ -488,7 +488,7 @@ namespace Orleans.Serialization.Serializers
                 return result;
             }
 
-            result = ActivatorUtilities.CreateInstance(_serviceProvider, type, constructorArguments ?? Array.Empty<object>());
+            result = ActivatorUtilities.CreateInstance(_serviceProvider, type, constructorArguments ?? []);
             return result;
         }
 

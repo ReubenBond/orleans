@@ -102,7 +102,7 @@ public sealed class SurrogateCodec<TField, TSurrogate, TConverter>
             return;
         }
 
-        if (value.GetType() as object == _fieldType as object)
+        if (value.GetType() == _fieldType)
         {
             writer.WriteStartObject(fieldIdDelta, expectedType, _fieldType);
             var surrogate = _converter.ConvertToSurrogate(in value);
@@ -115,7 +115,7 @@ public sealed class SurrogateCodec<TField, TSurrogate, TConverter>
         }
     }
 
-    private bool IsReferenceTrackingSupported => typeof(TField) != typeof(Exception) && !typeof(TField).IsSubclassOf(typeof(Exception));
+    private static bool IsReferenceTrackingSupported => typeof(TField) != typeof(Exception) && !typeof(TField).IsSubclassOf(typeof(Exception));
 
     /// <inheritdoc/>
     public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, TField value) where TBufferWriter : IBufferWriter<byte>

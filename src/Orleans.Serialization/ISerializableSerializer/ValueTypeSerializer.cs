@@ -17,7 +17,7 @@ namespace Orleans.Serialization
     /// Serializer for ISerializable value types.
     /// </summary>
     /// <typeparam name="T">The type which this serializer can serialize.</typeparam>
-    internal class ValueTypeSerializer<T> : ValueTypeSerializer where T : struct
+    internal sealed class ValueTypeSerializer<T> : ValueTypeSerializer where T : struct
     {
         public delegate void ValueConstructor(ref T value, SerializationInfo info, StreamingContext context);
 

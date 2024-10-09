@@ -12,17 +12,17 @@ namespace Orleans.Serialization.WireProtocol
         /// <summary>
         /// The tag byte.
         /// </summary>
-        public Tag Tag;
+        internal Tag Tag;
 
         /// <summary>
         /// The raw field identifier delta.
         /// </summary>
-        public uint FieldIdDeltaRaw;
+        internal uint FieldIdDeltaRaw;
 
         /// <summary>
         /// The raw field type.
         /// </summary>
-        public Type FieldTypeRaw;
+        internal Type FieldTypeRaw;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Field"/> struct.

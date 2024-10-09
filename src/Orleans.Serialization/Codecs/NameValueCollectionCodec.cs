@@ -55,7 +55,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(0)]
-        public Dictionary<string, string> Values;
+        internal Dictionary<string, string> Values;
     }
 
     /// <summary>

@@ -85,7 +85,7 @@ namespace Orleans.Serialization.Codecs
                         var length = (int)UInt32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
-                            ThrowInvalidSizeException(length);
+                            ThrowInvalidSizeException(typeof(HashSet<T>), length);
                         }
 
                         result = CreateInstance(length, comparer, reader.Session, placeholderReferenceId);
@@ -106,15 +106,15 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        private HashSet<T> CreateInstance(int length, IEqualityComparer<T> comparer, SerializerSession session, uint placeholderReferenceId)
+        private static HashSet<T> CreateInstance(int length, IEqualityComparer<T> comparer, SerializerSession session, uint placeholderReferenceId)
         {
             var result = new HashSet<T>(length, comparer);
             ReferenceCodec.RecordObject(session, result, placeholderReferenceId);
             return result;
         }
 
-        private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(HashSet<T>)}, {length}, is greater than total length of input.");
+        private static void ThrowInvalidSizeException(Type type, int length) => throw new InvalidOperationException(
+            $"Declared length of {type}, {length}, is greater than total length of input.");
 
         private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized set is missing its length field.");
 
@@ -163,7 +163,7 @@ namespace Orleans.Serialization.Codecs
                         var length = (int)UInt32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
-                            ThrowInvalidSizeException(length);
+                            ThrowInvalidSizeException(typeof(HashSet<T>), length);
                         }
 
                         // Re-initialize the class by calling the constructor.
@@ -212,7 +212,7 @@ namespace Orleans.Serialization.Codecs
                 return result;
             }
 
-            if (input.GetType() as object != _fieldType as object)
+            if (input.GetType() != _fieldType)
             {
                 return context.DeepCopy(input);
             }

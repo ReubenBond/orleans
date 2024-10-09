@@ -14,10 +14,11 @@ namespace Orleans.Serialization.Configuration
         /// <param name="providerType">The metadata provider type.</param>
         public TypeManifestProviderAttribute(Type providerType)
         {
-            if (providerType is null)
-            {
-                throw new ArgumentNullException(nameof(providerType));
-            }
+#if NET8_0_OR_GREATER
+            ArgumentNullException.ThrowIfNull(providerType);
+#else
+            if (providerType is null) throw new ArgumentNullException(nameof(providerType));
+#endif
 
             if (!typeof(ITypeManifestProvider).IsAssignableFrom(providerType))
             {

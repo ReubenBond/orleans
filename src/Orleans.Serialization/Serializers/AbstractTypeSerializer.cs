@@ -19,9 +19,9 @@ namespace Orleans.Serialization.Serializers
 
         public new TField ReadValue<TInput>(ref Reader<TInput> reader, Field field) => (TField)base.ReadValue(ref reader, field);
 
-        public virtual void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, TField instance) where TBufferWriter : IBufferWriter<byte> { }
+        public virtual void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, TField value) where TBufferWriter : IBufferWriter<byte> { }
 
-        public virtual void Deserialize<TReaderInput>(ref Reader<TReaderInput> reader, TField instance) => reader.ConsumeEndBaseOrEndObject();
+        public virtual void Deserialize<TReaderInput>(ref Reader<TReaderInput> reader, TField value) => reader.ConsumeEndBaseOrEndObject();
     }
 
     // without the class type constraint

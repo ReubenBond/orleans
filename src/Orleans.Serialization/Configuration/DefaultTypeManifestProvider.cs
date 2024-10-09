@@ -5,7 +5,7 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Serialization.Configuration
 {
-    internal class DefaultTypeManifestProvider : TypeManifestProviderBase, IPostConfigureOptions<TypeManifestOptions>
+    internal sealed class DefaultTypeManifestProvider : TypeManifestProviderBase, IPostConfigureOptions<TypeManifestOptions>
     {
         public void PostConfigure(string name, TypeManifestOptions options)
         {

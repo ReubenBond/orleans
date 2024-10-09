@@ -105,7 +105,7 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy(input, out Tuple<T> existing))
                 return existing;
 
-            if (input.GetType() as object != _fieldType as object)
+            if (input.GetType() != _fieldType)
                 return context.DeepCopy(input);
 
             if (IsShallowCopyable())
@@ -235,7 +235,7 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy(input, out Tuple<T1, T2> existing))
                 return existing;
 
-            if (input.GetType() as object != _fieldType as object)
+            if (input.GetType() != _fieldType)
                 return context.DeepCopy(input);
 
             if (IsShallowCopyable())
@@ -388,7 +388,7 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3> existing))
                 return existing;
 
-            if (input.GetType() as object != _fieldType as object)
+            if (input.GetType() != _fieldType)
                 return context.DeepCopy(input);
 
             if (IsShallowCopyable())
@@ -558,7 +558,7 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4> existing))
                 return existing;
 
-            if (input.GetType() as object != _fieldType as object)
+            if (input.GetType() != _fieldType)
                 return context.DeepCopy(input);
 
             if (IsShallowCopyable())
@@ -748,7 +748,7 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5> existing))
                 return existing;
 
-            if (input.GetType() as object != _fieldType as object)
+            if (input.GetType() != _fieldType)
                 return context.DeepCopy(input);
 
             if (IsShallowCopyable())
@@ -955,7 +955,7 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6> existing))
                 return existing;
 
-            if (input.GetType() as object != _fieldType as object)
+            if (input.GetType() != _fieldType)
                 return context.DeepCopy(input);
 
             if (IsShallowCopyable())
@@ -1180,7 +1180,7 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6, T7> existing))
                 return existing;
 
-            if (input.GetType() as object != _fieldType as object)
+            if (input.GetType() != _fieldType)
                 return context.DeepCopy(input);
 
             if (IsShallowCopyable())
@@ -1421,7 +1421,7 @@ namespace Orleans.Serialization.Codecs
             if (context.TryGetCopy(input, out Tuple<T1, T2, T3, T4, T5, T6, T7, T8> existing))
                 return existing;
 
-            if (input.GetType() as object != _fieldType as object)
+            if (input.GetType() != _fieldType)
                 return context.DeepCopy(input);
 
             if (IsShallowCopyable())

@@ -113,7 +113,7 @@ namespace Orleans.Serialization
             public ISerializerBuilder Builder { get; }
         }
 
-        private class SerializerBuilder : ISerializerBuilder
+        private sealed class SerializerBuilder : ISerializerBuilder
         {
             public SerializerBuilder(IServiceCollection services) => Services = services;
 

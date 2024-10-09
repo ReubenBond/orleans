@@ -81,7 +81,7 @@ namespace Orleans.Serialization.Codecs
                         length = (int)UInt32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
-                            ThrowInvalidSizeException(length);
+                            ThrowInvalidSizeException(typeof(T), length);
                         }
 
                         result = new T[length];
@@ -95,7 +95,7 @@ namespace Orleans.Serialization.Codecs
 
                         if (index >= length)
                         {
-                            ThrowIndexOutOfRangeException(length);
+                            ThrowIndexOutOfRangeException(typeof(T), length);
                         }
 
                         result[index] = _fieldCodec.ReadValue(ref reader, header);
@@ -109,20 +109,20 @@ namespace Orleans.Serialization.Codecs
 
             if (result is null)
             {
-                result = Array.Empty<T>();
+                result = [];
                 ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
             }
 
             return result;
         }
 
-        private void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
-            $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
+        private static void ThrowIndexOutOfRangeException(Type type, int length) => throw new InvalidOperationException(
+            $"Encountered too many elements in array of type {type}[] with declared length {length}.");
 
-        private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(T[])}, {length}, is greater than total length of input.");
+        private static void ThrowInvalidSizeException(Type type, int length) => throw new InvalidOperationException(
+            $"Declared length of {type}[], {length}, is greater than total length of input.");
 
-        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
     }
 
     /// <summary>
@@ -237,7 +237,7 @@ namespace Orleans.Serialization.Codecs
                         length = (int)UInt32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
-                            ThrowInvalidSizeException(length);
+                            ThrowInvalidSizeException(typeof(ReadOnlyMemory<T>), length);
                         }
 
                         result = new T[length];
@@ -251,7 +251,7 @@ namespace Orleans.Serialization.Codecs
 
                         if (index >= length)
                         {
-                            ThrowIndexOutOfRangeException(length);
+                            ThrowArgumentOutOfRangeException(typeof(ReadOnlyMemory<T>), length);
                         }
 
                         result[index] = _fieldCodec.ReadValue(ref reader, header);
@@ -266,13 +266,13 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        private void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
-            $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
+        private static void ThrowArgumentOutOfRangeException(Type type, int length) => throw new InvalidOperationException(
+            $"Encountered too many elements in array of type {type} with declared length {length}.");
 
-        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
-        private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(ReadOnlyMemory<T>)}, {length}, is greater than total length of input.");
+        private static void ThrowInvalidSizeException(Type type, int length) => throw new InvalidOperationException(
+            $"Declared length of {type}, {length}, is greater than total length of input.");
     }
 
     /// <summary>
@@ -323,7 +323,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
     }
-    
+
     /// <summary>
     /// Serializer for <see cref="Memory{T}"/>.
     /// </summary>
@@ -399,7 +399,7 @@ namespace Orleans.Serialization.Codecs
                         length = (int)UInt32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
-                            ThrowInvalidSizeException(length);
+                            ThrowInvalidSizeException(typeof(Memory<T>), length);
                         }
 
                         result = new T[length];
@@ -413,7 +413,7 @@ namespace Orleans.Serialization.Codecs
 
                         if (index >= length)
                         {
-                            ThrowIndexOutOfRangeException(length);
+                            ThrowArgumentOutOfRangeException(typeof(Memory<T>), length);
                         }
 
                         result[index] = _fieldCodec.ReadValue(ref reader, header);
@@ -428,13 +428,13 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        private void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
-            $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
+        private static void ThrowArgumentOutOfRangeException(Type type, int length) => throw new InvalidOperationException(
+            $"Encountered too many elements in sequence of type {type} with declared length {length}.");
 
-        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
-        private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(Memory<T>)}, {length}, is greater than total length of input.");
+        private static void ThrowInvalidSizeException(Type type, int length) => throw new InvalidOperationException(
+            $"Declared length of {type}, {length}, is greater than total length of input.");
     }
 
     /// <summary>
@@ -485,7 +485,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
     }
-    
+
     /// <summary>
     /// Serializer for <see cref="ArraySegment{T}"/>.
     /// </summary>
@@ -564,7 +564,7 @@ namespace Orleans.Serialization.Codecs
                         length = (int)UInt32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
-                            ThrowInvalidSizeException(length);
+                            ThrowInvalidSizeException(typeof(ArraySegment<T>), length);
                         }
 
                         result = new T[length];
@@ -578,7 +578,7 @@ namespace Orleans.Serialization.Codecs
 
                         if (index >= length)
                         {
-                            ThrowIndexOutOfRangeException(length);
+                            ThrowArgumentOutOfRangeException(typeof(ArraySegment<T>), length);
                         }
 
                         result[index] = _fieldCodec.ReadValue(ref reader, header);
@@ -593,13 +593,13 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        private void ThrowIndexOutOfRangeException(int length) => throw new IndexOutOfRangeException(
-            $"Encountered too many elements in array of type {typeof(T[])} with declared length {length}.");
+        private static void ThrowArgumentOutOfRangeException(Type type, int length) => throw new InvalidOperationException(
+            $"Encountered too many elements in sequence of type {type} with declared length {length}.");
 
-        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 
-        private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(ArraySegment<T>)}, {length}, is greater than total length of input.");
+        private static void ThrowInvalidSizeException(Type type, int length) => throw new InvalidOperationException(
+            $"Declared length of {type}, {length}, is greater than total length of input.");
     }
 
     /// <summary>

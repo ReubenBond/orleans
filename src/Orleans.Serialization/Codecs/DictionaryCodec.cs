@@ -108,7 +108,7 @@ namespace Orleans.Serialization.Codecs
                         var length = (int)UInt32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
-                            ThrowInvalidSizeException(length);
+                            ThrowInvalidSizeException(typeof(Dictionary<TKey, TValue>), length);
                         }
 
                         result = CreateInstance(length, comparer, reader.Session, placeholderReferenceId);
@@ -138,17 +138,17 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        private Dictionary<TKey, TValue> CreateInstance(int length, IEqualityComparer<TKey>? comparer, SerializerSession session, uint placeholderReferenceId)
+        private static Dictionary<TKey, TValue> CreateInstance(int length, IEqualityComparer<TKey>? comparer, SerializerSession session, uint placeholderReferenceId)
         {
             var result = new Dictionary<TKey, TValue>(length, comparer);
             ReferenceCodec.RecordObject(session, result, placeholderReferenceId);
             return result;
         }
 
-        private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(Dictionary<TKey, TValue>)}, {length}, is greater than total length of input.");
+        private static void ThrowInvalidSizeException(Type type, int length) => throw new InvalidOperationException(
+            $"Declared length of {type}, {length}, is greater than total length of input.");
 
-        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized dictionary is missing its length field.");
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized dictionary is missing its length field.");
     }
 
     /// <summary>
@@ -300,7 +300,7 @@ namespace Orleans.Serialization.Codecs
                         var length = (int)UInt32Codec.ReadValue(ref reader, header);
                         if (length > 10240 && length > reader.Length)
                         {
-                            ThrowInvalidSizeException(length);
+                            ThrowInvalidSizeException(typeof(Dictionary<TKey, TValue>), length);
                         }
 
                         hasLengthField = true;
@@ -338,10 +338,10 @@ namespace Orleans.Serialization.Codecs
             }
         }
 
-        private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-            $"Declared length of {typeof(Dictionary<TKey, TValue>)}, {length}, is greater than total length of input.");
+        private static void ThrowInvalidSizeException(Type type, int length) => throw new InvalidOperationException(
+            $"Declared length of {type}, {length}, is greater than total length of input.");
 
-        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized dictionary is missing its length field.");
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized dictionary is missing its length field.");
 
     }
 }

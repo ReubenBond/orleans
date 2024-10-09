@@ -60,27 +60,27 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The major version component.</value>
         [Id(0)]
-        public int Major;
+        internal int Major;
 
         /// <summary>
         /// Gets or sets the minor version component.
         /// </summary>
         /// <value>The minor version component.</value>
         [Id(1)]
-        public int Minor;
+        internal int Minor;
 
         /// <summary>
         /// Gets or sets the build number.
         /// </summary>
         /// <value>The build number.</value>
         [Id(2)]
-        public int Build;
+        internal int Build;
 
         /// <summary>
         /// Gets or sets the revision.
         /// </summary>
         /// <value>The revision.</value>
         [Id(3)]
-        public int Revision;
+        internal int Revision;
     }
 }

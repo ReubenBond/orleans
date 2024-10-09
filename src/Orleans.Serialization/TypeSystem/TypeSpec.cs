@@ -28,10 +28,14 @@ namespace Orleans.Serialization.TypeSystem
         /// <param name="elementType">The element type.</param>
         public PointerTypeSpec(TypeSpec elementType)
         {
+#if NET8_0_OR_GREATER
+            ArgumentNullException.ThrowIfNull(elementType);
+#else
             if (elementType is null)
             {
                 throw new ArgumentNullException(nameof(elementType));
             }
+#endif
 
             ElementType = elementType;
         }
@@ -59,10 +63,14 @@ namespace Orleans.Serialization.TypeSystem
         /// <param name="elementType">The element type.</param>
         public ReferenceTypeSpec(TypeSpec elementType)
         {
+#if NET8_0_OR_GREATER
+            ArgumentNullException.ThrowIfNull(elementType);
+#else
             if (elementType is null)
             {
                 throw new ArgumentNullException(nameof(elementType));
             }
+#endif
 
             ElementType = elementType;
         }
@@ -91,10 +99,14 @@ namespace Orleans.Serialization.TypeSystem
         /// <param name="dimensions">The number of dimensions for the array.</param>
         public ArrayTypeSpec(TypeSpec elementType, int dimensions)
         {
+#if NET8_0_OR_GREATER
+            ArgumentNullException.ThrowIfNull(elementType);
+#else
             if (elementType is null)
             {
                 throw new ArgumentNullException(nameof(elementType));
             }
+#endif
 
             if (dimensions <= 0)
             {
@@ -140,6 +152,10 @@ namespace Orleans.Serialization.TypeSystem
                 throw new InvalidOperationException();
             }
 
+#if NET8_0_OR_GREATER
+            ArgumentNullException.ThrowIfNull(unconstructedType);
+            ArgumentNullException.ThrowIfNull(arguments);
+#else
             if (unconstructedType is null)
             {
                 throw new ArgumentNullException(nameof(unconstructedType));
@@ -149,6 +165,7 @@ namespace Orleans.Serialization.TypeSystem
             {
                 throw new ArgumentNullException(nameof(arguments));
             }
+#endif
 
             if (arity != arguments.Length)
             {
@@ -268,10 +285,14 @@ namespace Orleans.Serialization.TypeSystem
         /// <param name="assembly">The assembly.</param>
         public AssemblyQualifiedTypeSpec(TypeSpec type, string? assembly)
         {
+#if NET8_0_OR_GREATER
+            ArgumentNullException.ThrowIfNull(type);
+#else
             if (type is null)
             {
                 throw new ArgumentNullException(nameof(type));
             }
+#endif
 
             if (string.IsNullOrWhiteSpace(assembly))
             {
@@ -315,10 +336,14 @@ namespace Orleans.Serialization.TypeSystem
         /// <param name="arity">The number of generic type parameters which the type accepts.</param>
         public TupleTypeSpec(TypeSpec[] elements, int arity)
         {
+#if NET8_0_OR_GREATER
+            ArgumentNullException.ThrowIfNull(elements);
+#else
             if (elements is null)
             {
                 throw new ArgumentNullException(nameof(elements));
             }
+#endif
 
             if (elements is { Length: 0 })
             {

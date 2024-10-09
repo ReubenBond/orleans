@@ -33,10 +33,11 @@ namespace Orleans.Serialization.Internal
 
         public static void AddAssembly(HashSet<Assembly> parts, Assembly assembly)
         {
-            if (assembly == null)
-            {
-                throw new ArgumentNullException(nameof(assembly));
-            }
+#if NET8_0_OR_GREATER
+            ArgumentNullException.ThrowIfNull(assembly);
+#else
+            if (assembly is null) throw new ArgumentNullException(nameof(assembly));
+#endif
 
             if (!assembly.IsDefined(typeof(ApplicationPartAttribute)))
             {
@@ -60,10 +61,7 @@ namespace Orleans.Serialization.Internal
 #if NETCOREAPP3_1_OR_GREATER
         public static void AddFromAssemblyLoadContext(HashSet<Assembly> parts, AssemblyLoadContext context)
         {
-            if (context is null)
-            {
-                throw new ArgumentNullException(nameof(context));
-            }
+            ArgumentNullException.ThrowIfNull(context);
 
             foreach (var asm in context.Assemblies)
             {
@@ -175,10 +173,12 @@ namespace Orleans.Serialization.Internal
 
             static IEnumerable<Assembly> ExpandApplicationParts(IEnumerable<Assembly> assemblies)
             {
-                if (assemblies == null)
-                {
-                    throw new ArgumentNullException(nameof(assemblies));
-                }
+#if NET8_0_OR_GREATER
+                ArgumentNullException.ThrowIfNull(assemblies);
+#else
+                if (assemblies is null) throw new ArgumentNullException(nameof(assemblies));
+#endif
+
 
                 var relatedAssemblies = new HashSet<Assembly>();
                 foreach (var assembly in assemblies)

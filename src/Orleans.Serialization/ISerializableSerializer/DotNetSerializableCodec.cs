@@ -118,7 +118,7 @@ namespace Orleans.Serialization
             return ReadObject(ref reader, type, placeholderReferenceId);
         }
 
-        private object ReadFallbackException<TInput>(ref Reader<TInput> reader, string typeName, uint placeholderReferenceId)
+        private UnavailableExceptionFallbackException ReadFallbackException<TInput>(ref Reader<TInput> reader, string typeName, uint placeholderReferenceId)
         {
             // Deserialize into a fallback type for unknown exceptions. This means that missing fields will not be represented.
             var result = (UnavailableExceptionFallbackException)ReadObject(ref reader, typeof(UnavailableExceptionFallbackException), placeholderReferenceId);

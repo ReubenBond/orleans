@@ -36,7 +36,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The name.</value>
         [Id(0)]
-        public string Name;
+        internal string Name;
     }
 
     [RegisterCopier]

@@ -43,14 +43,14 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(0)]
-        public List<T> Values;
+        internal List<T> Values;
 
         /// <summary>
         /// Gets or sets the comparer.
         /// </summary>
         /// <value>The comparer.</value>
         [Id(1)]
-        public IComparer<T> Comparer;
+        internal IComparer<T> Comparer;
     }
 
     /// <summary>
@@ -80,7 +80,7 @@ namespace Orleans.Serialization.Codecs
                 return result;
             }
 
-            if (input.GetType() as object != _fieldType as object)
+            if (input.GetType() != _fieldType)
             {
                 return context.DeepCopy(input);
             }

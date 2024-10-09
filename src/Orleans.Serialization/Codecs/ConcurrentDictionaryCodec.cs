@@ -48,7 +48,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(0)]
-        public Dictionary<TKey, TValue> Values;
+        internal Dictionary<TKey, TValue> Values;
     }
 
     /// <summary>
@@ -82,7 +82,7 @@ namespace Orleans.Serialization.Codecs
                 return result;
             }
 
-            if (input.GetType() as object != _fieldType as object)
+            if (input.GetType() != _fieldType)
             {
                 return context.DeepCopy(input);
             }

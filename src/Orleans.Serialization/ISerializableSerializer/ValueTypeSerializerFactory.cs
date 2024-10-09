@@ -6,7 +6,7 @@ using System.Security;
 
 namespace Orleans.Serialization
 {
-    internal class ValueTypeSerializerFactory
+    internal sealed class ValueTypeSerializerFactory
     {
         private readonly SerializationConstructorFactory _constructorFactory;
         private readonly SerializationCallbacksFactory _callbacksFactory;
@@ -45,7 +45,7 @@ namespace Orleans.Serialization
         public ValueTypeSerializer GetSerializer(Type type) => _serializers.GetOrAdd(type, _createSerializerDelegate);
 
         [SecurityCritical]
-        private ValueTypeSerializer CreateTypedSerializer<T>() where T : struct
+        private ValueTypeSerializer<T> CreateTypedSerializer<T>() where T : struct
         {
             var constructor = _constructorFactory.GetSerializationConstructorDelegate<T, ValueTypeSerializer<T>.ValueConstructor>();
             var callbacks =

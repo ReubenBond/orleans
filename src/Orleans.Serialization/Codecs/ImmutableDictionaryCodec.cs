@@ -44,7 +44,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(0)]
-        public Dictionary<TKey, TValue> Values;
+        internal Dictionary<TKey, TValue> Values;
     }
 
     /// <summary>

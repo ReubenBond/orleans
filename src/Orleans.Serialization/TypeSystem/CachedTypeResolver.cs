@@ -88,10 +88,14 @@ namespace Orleans.Serialization.TypeSystem
 
         private bool TryPerformUncachedTypeResolution(string fullName, out Type type, Assembly[] assemblies)
         {
-            if (null == assemblies)
+#if NET8_0_OR_GREATER
+            ArgumentNullException.ThrowIfNull(assemblies);
+#else
+            if (assemblies is null)
             {
                 throw new ArgumentNullException(nameof(assemblies));
             }
+#endif
 
             if (string.IsNullOrWhiteSpace(fullName))
             {

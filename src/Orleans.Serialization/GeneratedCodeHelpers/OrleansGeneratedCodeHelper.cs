@@ -144,9 +144,9 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// </summary>
         public static IDeepCopier<T> GetOptionalCopier<T>(IDeepCopier<T> copier) => copier is IOptionalDeepCopier o && o.IsShallowCopyable() ? null : copier;
 
-        /// <summary>        
+        /// <summary>
         /// Generated code helper method which throws an <see cref="ArgumentOutOfRangeException"/>.
-        /// </summary>                
+        /// </summary>
         public static object InvokableThrowArgumentOutOfRange(int index, int maxArgs)
             => throw new ArgumentOutOfRangeException(message: $"The argument index value {index} must be between 0 and {maxArgs}", null);
 
@@ -290,32 +290,32 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// <summary>
         /// Default copier implementation for (rarely copied) exception classes
         /// </summary>
-        public abstract class ExceptionCopier<T, B> : IDeepCopier<T>, IBaseCopier<T> where T : B where B : Exception
+        public abstract class ExceptionCopier<T, TB> : IDeepCopier<T>, IBaseCopier<T> where T : TB where TB : Exception
         {
             private readonly Type _fieldType = typeof(T);
             private readonly IActivator<T> _activator;
-            private readonly IBaseCopier<B> _baseTypeCopier;
+            private readonly IBaseCopier<TB> _baseTypeCopier;
 
             protected ExceptionCopier(ICodecProvider codecProvider)
             {
                 _activator = GetService<IActivator<T>>(this, codecProvider);
-                _baseTypeCopier = GetService<IBaseCopier<B>>(this, codecProvider);
+                _baseTypeCopier = GetService<IBaseCopier<TB>>(this, codecProvider);
             }
 
-            public T DeepCopy(T original, CopyContext context)
+            public T DeepCopy(T input, CopyContext context)
             {
-                if (original is null)
+                if (input is null)
                 {
                     return null;
                 }
 
-                if (original.GetType() != _fieldType)
+                if (input.GetType() != _fieldType)
                 {
-                    return context.DeepCopy(original);
+                    return context.DeepCopy(input);
                 }
 
                 var result = _activator.Create();
-                DeepCopy(original, result, context);
+                DeepCopy(input, result, context);
                 return result;
             }
 

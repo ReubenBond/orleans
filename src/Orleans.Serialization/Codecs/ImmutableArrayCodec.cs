@@ -42,7 +42,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(0)]
-        public T[] Values;
+        internal T[] Values;
     }
 
     /// <summary>

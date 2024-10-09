@@ -16,7 +16,7 @@ namespace Orleans.Serialization.Codecs;
 [RegisterSerializer]
 public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
 {
-    private readonly Type CodecElementType = typeof(T);
+    private readonly Type _codecElementType = typeof(T);
 
     private readonly IFieldCodec<T> _fieldCodec;
 
@@ -46,7 +46,7 @@ public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
             uint innerFieldIdDelta = 1;
             foreach (var element in value)
             {
-                _fieldCodec.WriteField(ref writer, innerFieldIdDelta, CodecElementType, element);
+                _fieldCodec.WriteField(ref writer, innerFieldIdDelta, _codecElementType, element);
                 innerFieldIdDelta = 0;
             }
         }
@@ -83,7 +83,7 @@ public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
                     var length = (int)UInt32Codec.ReadValue(ref reader, header);
                     if (length > 10240 && length > reader.Length)
                     {
-                        ThrowInvalidSizeException(length);
+                        ThrowInvalidSizeException(typeof(Stack<T>), length);
                     }
 
                     array = new T[length];
@@ -109,10 +109,10 @@ public sealed class StackCodec<T> : IFieldCodec<Stack<T>>
         return result;
     }
 
-    private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-        $"Declared length of {typeof(Stack<T>)}, {length}, is greater than total length of input.");
+    private static void ThrowInvalidSizeException(Type type, int length) => throw new InvalidOperationException(
+        $"Declared length of {type}, {length}, is greater than total length of input.");
 
-    private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized stack is missing its length field.");
+    private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized stack is missing its length field.");
 }
 
 /// <summary>

@@ -315,7 +315,7 @@ public static class RuntimeTypeNameParser
         }
         else
         {
-            throw new IndexOutOfRangeException("Attempted to read past the end of the input buffer.");
+            throw new InvalidOperationException("Attempted to read past the end of the input buffer.");
         }
     }
 

@@ -67,14 +67,14 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
 
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Advance(int bytes)
+    public void Advance(int count)
     {
         if (WriteHead is null || CurrentPosition > WriteHead.Array.Length)
         {
             ThrowInvalidOperation();
         }
 
-        CurrentPosition += bytes;
+        CurrentPosition += count;
 
         [DoesNotReturn]
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -490,7 +490,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
             {
                 _slice = slice;
                 _segment = InitialSegmentSentinel;
-                Current = Span<byte>.Empty;
+                Current = [];
             }
 
             internal readonly PooledBuffer Buffer => _slice._buffer;
@@ -543,7 +543,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                     var segmentLength = Math.Min(segment.Length - segmentOffset, endPosition - (_position + segmentOffset));
                     if (segmentLength == 0)
                     {
-                        Current = Span<byte>.Empty;
+                        Current = [];
                         _segment = FinalSegmentSentinel;
                         return false;
                     }
@@ -563,7 +563,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
                     var finalLength = Math.Min(Buffer.CurrentPosition, endPosition - (_position + finalOffset));
                     if (finalLength == 0)
                     {
-                        Current = Span<byte>.Empty;
+                        Current = [];
                         _segment = FinalSegmentSentinel;
                         return false;
                     }
@@ -626,7 +626,7 @@ public partial struct PooledBuffer : IBufferWriter<byte>, IDisposable
     {
         internal SequenceSegment()
         {
-            Array = System.Array.Empty<byte>();
+            Array = [];
         }
 
         internal SequenceSegment(int length)

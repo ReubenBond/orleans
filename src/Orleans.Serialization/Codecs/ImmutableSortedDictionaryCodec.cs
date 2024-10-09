@@ -48,20 +48,20 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(0)]
-        public List<KeyValuePair<TKey, TValue>> Values;
+        internal List<KeyValuePair<TKey, TValue>> Values;
 
         /// <summary>
         /// Gets or sets the key comparer.
         /// </summary>
         /// <value>The key comparer.</value>
         [Id(1)]
-        public IComparer<TKey> KeyComparer;
+        internal IComparer<TKey> KeyComparer;
 
         /// <summary>
         /// Gets or sets the value comparer.
         /// </summary>
         [Id(2)]
-        public IEqualityComparer<TValue> ValueComparer;
+        internal IEqualityComparer<TValue> ValueComparer;
     }
 
     /// <summary>

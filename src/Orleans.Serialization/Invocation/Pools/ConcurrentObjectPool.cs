@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using Microsoft.Extensions.ObjectPool;
@@ -11,7 +12,7 @@ namespace Orleans.Serialization.Invocation
         }
     }
 
-    internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T> where T : class where TPoolPolicy : IPooledObjectPolicy<T>
+    internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T>, IDisposable where T : class where TPoolPolicy : IPooledObjectPolicy<T>
     {
         private readonly ThreadLocal<Stack<T>> _objects = new(() => new());
 
@@ -42,6 +43,11 @@ namespace Orleans.Serialization.Invocation
                     stack.Push(obj);
                 }
             }
+        }
+
+        public virtual void Dispose()
+        {
+            _objects.Dispose();
         }
     }
 }

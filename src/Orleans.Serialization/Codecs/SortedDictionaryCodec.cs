@@ -54,14 +54,14 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(0)]
-        public List<KeyValuePair<TKey, TValue>> Values;
+        internal List<KeyValuePair<TKey, TValue>> Values;
 
         /// <summary>
         /// Gets or sets the comparer.
         /// </summary>
         /// <value>The comparer.</value>
         [Id(1)]
-        public IComparer<TKey> Comparer;
+        internal IComparer<TKey> Comparer;
     }
 
     /// <summary>
@@ -95,7 +95,7 @@ namespace Orleans.Serialization.Codecs
                 return result;
             }
 
-            if (input.GetType() as object != _fieldType as object)
+            if (input.GetType() != _fieldType)
             {
                 return context.DeepCopy(input);
             }

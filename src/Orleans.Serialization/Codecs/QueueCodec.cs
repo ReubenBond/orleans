@@ -103,7 +103,7 @@ namespace Orleans.Serialization.Codecs
             return result;
         }
 
-        private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized queue is missing its length field.");
+        private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized queue is missing its length field.");
     }
 
     /// <summary>
@@ -133,7 +133,7 @@ namespace Orleans.Serialization.Codecs
                 return result;
             }
 
-            if (input.GetType() as object != _fieldType as object)
+            if (input.GetType() != _fieldType)
             {
                 return context.DeepCopy(input);
             }

@@ -36,7 +36,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(0)]
-        public object[] Values;
+        internal object[] Values;
     }
 
     /// <summary>

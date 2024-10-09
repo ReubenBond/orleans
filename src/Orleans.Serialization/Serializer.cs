@@ -11,18 +11,24 @@ using System.IO;
 
 namespace Orleans.Serialization
 {
+#pragma warning disable CA1822 // Mark members as static
     /// <summary>
     /// Serializes and deserializes values.
     /// </summary>
     public sealed class Serializer 
     {
+        private readonly CodecProvider _codecProvider;
         private readonly SerializerSessionPool _sessionPool;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Serializer"/> class.
         /// </summary>
         /// <param name="sessionPool">The session pool.</param>
-        public Serializer(SerializerSessionPool sessionPool) => _sessionPool = sessionPool;
+        public Serializer(CodecProvider codecProvider, SerializerSessionPool sessionPool)
+        {
+            _codecProvider = codecProvider;
+            _sessionPool = sessionPool;
+        }
 
         /// <summary>
         /// Gets the serializer session pool.
@@ -38,12 +44,12 @@ namespace Orleans.Serialization
         /// <summary>
         /// Returns <see langword="true"/> if the provided type, <typeparamref name="T"/>, can be serialized, and <see langword="false"/> otherwise.
         /// </summary>
-        public bool CanSerialize<T>() => _sessionPool.CodecProvider.TryGetCodec(typeof(T)) is { };
+        public bool CanSerialize<T>() => _codecProvider.TryGetCodec(typeof(T)) is { };
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided type, <paramref name="type"/>, can be serialized, and <see langword="false"/> otherwise.
         /// </summary>
-        public bool CanSerialize(Type type) => _sessionPool.CodecProvider.TryGetCodec(type) is { };
+        public bool CanSerialize(Type type) => _codecProvider.TryGetCodec(type) is { };
 
         /// <summary>
         /// Serializes the provided <paramref name="value"/> into a new array.
@@ -57,7 +63,7 @@ namespace Orleans.Serialization
             var writer = Writer.CreatePooled(session);
             try
             {
-                var codec = session.CodecProvider.GetCodec<T>();
+                var codec = _codecProvider.GetCodec<T>();
                 codec.WriteField(ref writer, 0, typeof(T), value);
                 writer.Commit();
                 return writer.Output.ToArray();
@@ -79,7 +85,7 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var writer = Writer.Create(destination, session);
-            var codec = session.CodecProvider.GetCodec<T>();
+            var codec = _codecProvider.GetCodec<T>();
             codec.WriteField(ref writer, 0, typeof(T), value);
             writer.Commit();
             destination = destination[..writer.Position];
@@ -96,7 +102,7 @@ namespace Orleans.Serialization
         public void Serialize<T>(T value, ref Memory<byte> destination, SerializerSession session)
         {
             var writer = Writer.Create(destination, session);
-            var codec = session.CodecProvider.GetCodec<T>();
+            var codec = _codecProvider.GetCodec<T>();
             codec.WriteField(ref writer, 0, typeof(T), value);
             writer.Commit();
             destination = destination[..writer.Position];
@@ -116,7 +122,7 @@ namespace Orleans.Serialization
             {
                 using var session = _sessionPool.GetSession();
                 var writer = Writer.Create(memoryStream, session);
-                var codec = session.CodecProvider.GetCodec<T>();
+                var codec = _codecProvider.GetCodec<T>();
                 codec.WriteField(ref writer, 0, typeof(T), value);
                 writer.Commit();
             }
@@ -126,7 +132,7 @@ namespace Orleans.Serialization
                 var writer = Writer.CreatePooled(destination, session, sizeHint);
                 try
                 {
-                    var codec = session.CodecProvider.GetCodec<T>();
+                    var codec = _codecProvider.GetCodec<T>();
                     codec.WriteField(ref writer, 0, typeof(T), value);
                     writer.Commit();
                 }
@@ -152,7 +158,7 @@ namespace Orleans.Serialization
             {
                 var buffer = new MemoryStreamBufferWriter(memoryStream);
                 var writer = Writer.Create(buffer, session);
-                var codec = session.CodecProvider.GetCodec<T>();
+                var codec = _codecProvider.GetCodec<T>();
                 codec.WriteField(ref writer, 0, typeof(T), value);
                 writer.Commit();
             }
@@ -162,7 +168,7 @@ namespace Orleans.Serialization
                 var writer = Writer.Create(buffer, session);
                 try
                 {
-                    var codec = session.CodecProvider.GetCodec<T>();
+                    var codec = _codecProvider.GetCodec<T>();
                     codec.WriteField(ref writer, 0, typeof(T), value);
                     writer.Commit();
                 }
@@ -184,7 +190,7 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var writer = Writer.Create(destination, session);
-            var codec = session.CodecProvider.GetCodec<T>();
+            var codec = _codecProvider.GetCodec<T>();
             codec.WriteField(ref writer, 0, typeof(T), value);
             writer.Commit();
 
@@ -202,7 +208,7 @@ namespace Orleans.Serialization
         public void Serialize<T, TBufferWriter>(T value, TBufferWriter destination, SerializerSession session) where TBufferWriter : IBufferWriter<byte>
         {
             var writer = Writer.Create(destination, session);
-            var codec = session.CodecProvider.GetCodec<T>();
+            var codec = _codecProvider.GetCodec<T>();
             codec.WriteField(ref writer, 0, typeof(T), value);
             writer.Commit();
 
@@ -234,7 +240,7 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var writer = Writer.Create(destination, session);
-            var codec = session.CodecProvider.GetCodec<T>();
+            var codec = _codecProvider.GetCodec<T>();
             codec.WriteField(ref writer, 0, typeof(T), value);
             writer.Commit();
             destination = destination[..writer.Position];
@@ -251,7 +257,7 @@ namespace Orleans.Serialization
         public void Serialize<T>(T value, ref Span<byte> destination, SerializerSession session)
         {
             var writer = Writer.Create(destination, session);
-            var codec = session.CodecProvider.GetCodec<T>();
+            var codec = _codecProvider.GetCodec<T>();
             codec.WriteField(ref writer, 0, typeof(T), value);
             writer.Commit();
             destination = destination[..writer.Position];
@@ -268,7 +274,7 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var writer = Writer.Create(destination, session);
-            var codec = session.CodecProvider.GetCodec<T>();
+            var codec = _codecProvider.GetCodec<T>();
             codec.WriteField(ref writer, 0, typeof(T), value);
             writer.Commit();
             return writer.Position;
@@ -314,7 +320,7 @@ namespace Orleans.Serialization
         public int Serialize<T>(T value, byte[] destination, SerializerSession session)
         {
             var writer = Writer.Create(destination, session);
-            var codec = session.CodecProvider.GetCodec<T>();
+            var codec = _codecProvider.GetCodec<T>();
             codec.WriteField(ref writer, 0, typeof(T), value);
             writer.Commit();
             return writer.Position;
@@ -330,7 +336,7 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
-            var codec = session.CodecProvider.GetCodec<T>();
+            var codec = _codecProvider.GetCodec<T>();
             var field = reader.ReadFieldHeader();
             return codec.ReadValue(ref reader, field);
         }
@@ -345,7 +351,7 @@ namespace Orleans.Serialization
         public T Deserialize<T>(Stream source, SerializerSession session)
         {
             var reader = Reader.Create(source, session);
-            var codec = session.CodecProvider.GetCodec<T>();
+            var codec = _codecProvider.GetCodec<T>();
             var field = reader.ReadFieldHeader();
             return codec.ReadValue(ref reader, field);
         }
@@ -360,7 +366,7 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
-            var codec = session.CodecProvider.GetCodec<T>();
+            var codec = _codecProvider.GetCodec<T>();
             var field = reader.ReadFieldHeader();
             return codec.ReadValue(ref reader, field);
         }
@@ -375,7 +381,7 @@ namespace Orleans.Serialization
         public T Deserialize<T>(ReadOnlySequence<byte> source, SerializerSession session)
         {
             var reader = Reader.Create(source, session);
-            var codec = session.CodecProvider.GetCodec<T>();
+            var codec = _codecProvider.GetCodec<T>();
             var field = reader.ReadFieldHeader();
             return codec.ReadValue(ref reader, field);
         }
@@ -390,7 +396,7 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
-            var codec = session.CodecProvider.GetCodec<T>();
+            var codec = _codecProvider.GetCodec<T>();
             var field = reader.ReadFieldHeader();
             return codec.ReadValue(ref reader, field);
         }
@@ -405,7 +411,7 @@ namespace Orleans.Serialization
         public T Deserialize<T>(PooledBuffer.BufferSlice source, SerializerSession session)
         {
             var reader = Reader.Create(source, session);
-            var codec = session.CodecProvider.GetCodec<T>();
+            var codec = _codecProvider.GetCodec<T>();
             var field = reader.ReadFieldHeader();
             return codec.ReadValue(ref reader, field);
         }
@@ -420,7 +426,7 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
-            var codec = session.CodecProvider.GetCodec<T>();
+            var codec = _codecProvider.GetCodec<T>();
             var field = reader.ReadFieldHeader();
             return codec.ReadValue(ref reader, field);
         }
@@ -435,7 +441,7 @@ namespace Orleans.Serialization
         public T Deserialize<T>(ReadOnlySpan<byte> source, SerializerSession session)
         {
             var reader = Reader.Create(source, session);
-            var codec = session.CodecProvider.GetCodec<T>();
+            var codec = _codecProvider.GetCodec<T>();
             var field = reader.ReadFieldHeader();
             return codec.ReadValue(ref reader, field);
         }
@@ -1328,18 +1334,23 @@ namespace Orleans.Serialization
     /// </summary>
     public sealed class ObjectSerializer 
     {
+        private readonly CodecProvider _codecProvider;
         private readonly SerializerSessionPool _sessionPool;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ObjectSerializer"/> class.
         /// </summary>
         /// <param name="sessionPool">The session pool.</param>
-        public ObjectSerializer(SerializerSessionPool sessionPool) => _sessionPool = sessionPool;
+        public ObjectSerializer(CodecProvider codecProvider, SerializerSessionPool sessionPool)
+        {
+            _codecProvider = codecProvider;
+            _sessionPool = sessionPool;
+        }
 
         /// <summary>
         /// Returns <see langword="true"/> if the provided type, <paramref name="type"/>, can be serialized, and <see langword="false"/> otherwise.
         /// </summary>
-        public bool CanSerialize(Type type) => _sessionPool.CodecProvider.TryGetCodec(type) is { };
+        public bool CanSerialize(Type type) => _codecProvider.TryGetCodec(type) is { };
 
         /// <summary>
         /// Serializes the provided <paramref name="value"/> into <paramref name="destination"/>.
@@ -1590,7 +1601,7 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
-            var codec = session.CodecProvider.GetCodec(type);
+            var codec = _codecProvider.GetCodec(type);
             var field = reader.ReadFieldHeader();
             return codec.ReadValue(ref reader, field);
         }
@@ -1605,7 +1616,7 @@ namespace Orleans.Serialization
         public object Deserialize(Stream source, SerializerSession session, Type type)
         {
             var reader = Reader.Create(source, session);
-            var codec = session.CodecProvider.GetCodec(type);
+            var codec = _codecProvider.GetCodec(type);
             var field = reader.ReadFieldHeader();
             return codec.ReadValue(ref reader, field);
         }
@@ -1620,7 +1631,7 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
-            var codec = session.CodecProvider.GetCodec(type);
+            var codec = _codecProvider.GetCodec(type);
             var field = reader.ReadFieldHeader();
             return codec.ReadValue(ref reader, field);
         }
@@ -1635,7 +1646,7 @@ namespace Orleans.Serialization
         public object Deserialize(ReadOnlySequence<byte> source, SerializerSession session, Type type)
         {
             var reader = Reader.Create(source, session);
-            var codec = session.CodecProvider.GetCodec(type);
+            var codec = _codecProvider.GetCodec(type);
             var field = reader.ReadFieldHeader();
             return codec.ReadValue(ref reader, field);
         }
@@ -1650,7 +1661,7 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
-            var codec = session.CodecProvider.GetCodec(type);
+            var codec = _codecProvider.GetCodec(type);
             var field = reader.ReadFieldHeader();
             return codec.ReadValue(ref reader, field);
         }
@@ -1665,7 +1676,7 @@ namespace Orleans.Serialization
         public object Deserialize(ReadOnlySpan<byte> source, SerializerSession session, Type type)
         {
             var reader = Reader.Create(source, session);
-            var codec = session.CodecProvider.GetCodec(type);
+            var codec = _codecProvider.GetCodec(type);
             var field = reader.ReadFieldHeader();
             return codec.ReadValue(ref reader, field);
         }
@@ -1805,3 +1816,4 @@ namespace Orleans.Serialization
         }
     }
 }
+#pragma warning restore CA1822 // Mark members as static

@@ -6,9 +6,9 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 #if NET6_0_OR_GREATER
 using System.Reflection.Metadata;
+using System.Runtime.InteropServices;
 #endif
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace Orleans.Serialization.Session
 {

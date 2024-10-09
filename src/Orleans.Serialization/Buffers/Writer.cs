@@ -107,7 +107,9 @@ namespace Orleans.Serialization.Buffers
         /// <remarks>
         /// Modifying the output directly may corrupt the state of the writer.
         /// </remarks>
+#pragma warning disable CA1051 // Do not declare visible instance fields
         public TBufferWriter Output;
+#pragma warning restore CA1051 // Do not declare visible instance fields
 
         /// <summary>
         /// The current write span.

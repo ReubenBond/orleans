@@ -252,7 +252,7 @@ namespace Orleans.Serialization.Utilities
         {
             _ = res
                 .Append($"#{session.ReferencedObjects.CurrentReferenceId} ")
-                .Append((string)field.WireType.ToString());
+                .Append(field.WireType.ToString());
             if (field.HasFieldId)
             {
                 _ = res.Append($" Id: {id}");

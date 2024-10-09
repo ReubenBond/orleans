@@ -83,7 +83,7 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>
                     var length = (int)UInt32Codec.ReadValue(ref reader, header);
                     if (length > 10240 && length > reader.Length)
                     {
-                        ThrowInvalidSizeException(length);
+                        ThrowInvalidSizeException(typeof(Collection<T>), length);
                     }
 
                     result = new Collection<T>(new List<T>(length));
@@ -112,10 +112,10 @@ public sealed class CollectionCodec<T> : IFieldCodec<Collection<T>>
         return result;
     }
 
-    private void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-        $"Declared length of {typeof(Collection<T>)}, {length}, is greater than total length of input.");
+    private static void ThrowInvalidSizeException(Type type, int length) => throw new InvalidOperationException(
+        $"Declared length of {type}, {length}, is greater than total length of input.");
 
-    private void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
+    private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized array is missing its length field.");
 }
 
 /// <summary>

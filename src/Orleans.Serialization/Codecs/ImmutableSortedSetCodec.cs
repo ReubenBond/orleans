@@ -45,14 +45,14 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <value>The values.</value>
         [Id(0)]
-        public List<T> Values;
+        internal List<T> Values;
 
         /// <summary>
         /// Gets or sets the key comparer.
         /// </summary>
         /// <value>The key comparer.</value>
         [Id(1)]
-        public IComparer<T> KeyComparer;
+        internal IComparer<T> KeyComparer;
     }
 
     /// <summary>
