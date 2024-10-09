@@ -68,13 +68,13 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// </summary>
         /// <param name="subscriptionId"></param>
         /// <param name="streamProviderName"></param>
-        /// <param name="streamId"></param>
+        /// <param name="streamIdentity"></param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
+        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity,
             StreamSequenceToken sequenceToken)
         {
-            return OnFailure(subscriptionId, streamProviderName, streamId, sequenceToken);
+            return OnFailure(subscriptionId, streamProviderName, streamIdentity, sequenceToken);
         }
 
         /// <summary>
@@ -82,22 +82,19 @@ namespace Orleans.Providers.Streams.PersistentStreams
         /// </summary>
         /// <param name="subscriptionId"></param>
         /// <param name="streamProviderName"></param>
-        /// <param name="streamId"></param>
+        /// <param name="streamIdentity"></param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
+        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity,
             StreamSequenceToken sequenceToken)
         {
-            return OnFailure(subscriptionId, streamProviderName, streamId, sequenceToken);
+            return OnFailure(subscriptionId, streamProviderName, streamIdentity, sequenceToken);
         }
 
         private async Task OnFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
                 StreamSequenceToken sequenceToken)
         {
-            if (subscriptionId == null)
-            {
-                throw new ArgumentNullException(nameof(subscriptionId));
-            }
+            ArgumentNullException.ThrowIfNull(subscriptionId);
             if (string.IsNullOrWhiteSpace(streamProviderName))
             {
                 throw new ArgumentNullException(nameof(streamProviderName));

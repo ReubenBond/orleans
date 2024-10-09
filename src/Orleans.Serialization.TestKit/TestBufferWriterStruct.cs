@@ -18,7 +18,7 @@ namespace Orleans.Serialization.TestKit
             _written = 0;
         }
 
-        public void Advance(int bytes) => _written += bytes;
+        public void Advance(int count) => _written += count;
 
         [Pure]
         public readonly Memory<byte> GetMemory(int sizeHint = 0) => _buffer.AsMemory()[_written..];

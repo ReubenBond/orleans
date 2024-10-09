@@ -91,7 +91,7 @@ namespace Orleans.Runtime
         public override bool Equals(object? obj) => obj is GrainType kind && Equals(kind);
 
         /// <inheritdoc/>
-        public bool Equals(GrainType obj) => _value.Equals(obj._value);
+        public bool Equals(GrainType other) => _value.Equals(other._value);
 
         /// <inheritdoc/>
         public override int GetHashCode() => _value.GetHashCode();

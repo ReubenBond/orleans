@@ -34,9 +34,9 @@ namespace Tester.AzureUtils.Persistence
         private const int MaxWriteTime = 2000;
         public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseAzureStorageClustering(options =>
+                siloBuilder.UseAzureStorageClustering(options =>
                 {
                     options.ConfigureTestDefaults();
                 });

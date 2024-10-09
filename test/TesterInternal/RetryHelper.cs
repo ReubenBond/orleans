@@ -55,10 +55,7 @@ namespace UnitTests
                 throw new ArgumentOutOfRangeException(nameof(maxAttempts), $"The count of {maxAttempts} needs to be at least {MinAttempts}.");
             }
 
-            if(operation == null)
-            {
-                throw new ArgumentNullException(nameof(operation));
-            }
+            ArgumentNullException.ThrowIfNull(operation);
 
             var attempts = 0;
             while(true)

@@ -30,7 +30,7 @@ namespace Orleans.Providers.Streams.Common
 
         internal void Set(LinkedListNode<SimpleQueueCacheItem> item)
         {
-            if (item == null) throw new NullReferenceException(nameof(item));
+            ArgumentNullException.ThrowIfNull(item);
             Element = item;
             SequenceToken = item.Value.SequenceToken;
         }
@@ -49,10 +49,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="logger">The logger.</param>
         public SimpleQueueCacheCursor(SimpleQueueCache cache, StreamId streamId, ILogger logger)
         {
-            if (cache == null)
-            {
-                throw new ArgumentNullException(nameof(cache));
-            }
+            ArgumentNullException.ThrowIfNull(cache);
 
             this.cache = cache;
             this.streamId = streamId;
@@ -99,11 +96,11 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public virtual void Refresh(StreamSequenceToken sequenceToken)
+        public virtual void Refresh(StreamSequenceToken token)
         {
             if (!IsSet)
             {
-                cache.RefreshCursor(this, sequenceToken);
+                cache.RefreshCursor(this, token);
             }
         }
 
@@ -125,6 +122,7 @@ namespace Orleans.Providers.Streams.Common
         /// <inheritdoc />
         public void Dispose()
         {
+            GC.SuppressFinalize(this);
             Dispose(true);
         }
 

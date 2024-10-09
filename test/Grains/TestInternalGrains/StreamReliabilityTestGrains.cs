@@ -168,14 +168,14 @@ namespace UnitTests.Grains
 #if USE_GENERICS
         public async Task RemoveConsumer(Guid streamId, string providerName, StreamSubscriptionHandle<T> subsHandle)
 #else
-        public async Task RemoveConsumer(Guid streamId, string providerName, StreamSubscriptionHandle<int> subsHandle)
+        public async Task RemoveConsumer(Guid streamId, string providerName, StreamSubscriptionHandle<int> consumerHandle)
 #endif
         {
             _logger.LogInformation("RemoveConsumer StreamId={StreamId} StreamProvider={ProviderName}", streamId, providerName);
             if (State.ConsumerSubscriptionHandles.Count == 0) throw new InvalidOperationException("Not a Consumer");
-            await subsHandle.UnsubscribeAsync();
-            Observers.Remove(subsHandle);
-            State.ConsumerSubscriptionHandles.Remove(subsHandle);
+            await consumerHandle.UnsubscribeAsync();
+            Observers.Remove(consumerHandle);
+            State.ConsumerSubscriptionHandles.Remove(consumerHandle);
             await WriteStateAsync();
         }
 
@@ -268,7 +268,7 @@ namespace UnitTests.Grains
 
         private void TryInitStream(Guid streamId, string providerName)
         {
-            if (providerName == null) throw new ArgumentNullException(nameof(providerName));
+            ArgumentNullException.ThrowIfNull(providerName);
 
             State.StreamProviderName = providerName;
 

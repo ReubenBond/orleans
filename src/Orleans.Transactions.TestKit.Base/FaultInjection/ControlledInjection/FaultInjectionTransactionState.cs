@@ -56,7 +56,7 @@ namespace Orleans.Transactions.TestKit
         FaultInjectionControl FaultInjectionControl { get; set; }
     }
 
-    internal class FaultInjectionTransactionalState<TState> : IFaultInjectionTransactionalState<TState>, ILifecycleParticipant<IGrainLifecycle>
+    internal sealed class FaultInjectionTransactionalState<TState> : IFaultInjectionTransactionalState<TState>, ILifecycleParticipant<IGrainLifecycle>
         where TState : class, new()
     {
         private readonly IGrainRuntime grainRuntime;

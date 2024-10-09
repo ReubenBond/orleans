@@ -14,7 +14,7 @@ namespace BenchmarkGrains.Ping
 
         public IGrainContext GrainContext { get; set; }
 
-        public Task OnActivateAsync(CancellationToken cancellationToken)
+        public Task OnActivateAsync(CancellationToken token)
 
         {
             _self = this.AsReference<IPingGrain>();

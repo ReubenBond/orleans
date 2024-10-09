@@ -24,9 +24,9 @@ namespace Tester.AzureUtils.TimerTests
 
         public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseAzureTableReminderService(options =>
+                siloBuilder.UseAzureTableReminderService(options =>
                 {
                     options.ConfigureTestDefaults();
                 });

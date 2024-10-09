@@ -69,13 +69,13 @@ namespace Tester.StreamingTests
             return Task.CompletedTask;
         }
 
-        public Task SetQueuesAsLeases(IEnumerable<QueueId> queueIds)
+        public Task SetQueuesAsLeases(IEnumerable<QueueId> queues)
         {
             //if already set up, return
             if (this.queueLeaseToRenewTimeMap.Count > 0)
                 return Task.CompletedTask;
             //set up initial lease map
-            foreach (var queueId in queueIds)
+            foreach (var queueId in queues)
             {
                 this.queueLeaseToRenewTimeMap.Add(queueId, UnAssignedLeaseTime);
             }

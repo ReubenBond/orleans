@@ -57,9 +57,9 @@ namespace UnitTests.Grains
 
         public Task<Dictionary<string, ReminderState>> GetReminderStates() => Task.FromResult(allReminders);
 
-        public async Task<IGrainReminder> StartReminder(string reminderName, TimeSpan? p = null, bool validate = false)
+        public async Task<IGrainReminder> StartReminder(string reminderName, TimeSpan? period = null, bool validate = false)
         {
-            TimeSpan usePeriod = p ?? this.period;
+            TimeSpan usePeriod = period ?? this.period;
             this.logger.LogInformation("Starting reminder {ReminderName}.", reminderName);
             TimeSpan dueTime;
             if (reminderOptions.Value.MinimumReminderPeriod < TimeSpan.FromSeconds(2))
@@ -266,9 +266,9 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public async Task<IGrainReminder> StartReminder(string reminderName, TimeSpan? p = null, bool validate = false)
+        public async Task<IGrainReminder> StartReminder(string reminderName, TimeSpan? period = null, bool validate = false)
         {
-            TimeSpan usePeriod = p ?? this.period;
+            TimeSpan usePeriod = period ?? this.period;
             this.logger.LogInformation("Starting reminder {ReminderName} for {GrainId}", reminderName, this.GrainId);
             IGrainReminder r;
             if (validate)

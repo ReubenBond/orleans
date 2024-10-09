@@ -64,7 +64,7 @@ namespace Orleans.Serialization.TestKit
         }
 
         [ExcludeFromCodeCoverage]
-        private class MultiSegmentBufferWriterTester : BufferTester<TestMultiSegmentBufferWriter>
+        private sealed class MultiSegmentBufferWriterTester : BufferTester<TestMultiSegmentBufferWriter>
         {
             private readonly Options _options;
 
@@ -73,7 +73,7 @@ namespace Orleans.Serialization.TestKit
                 _options = options;
             }
 
-            public class Options
+            public sealed class Options
             {
                 public int MaxAllocationSize { get; set; }
             }
@@ -84,7 +84,7 @@ namespace Orleans.Serialization.TestKit
         }
 
         [ExcludeFromCodeCoverage]
-        private class StructBufferWriterTester : BufferTester<TestBufferWriterStruct>
+        private sealed class StructBufferWriterTester : BufferTester<TestBufferWriterStruct>
         {
             protected override TestBufferWriterStruct CreateBufferWriter() => new(new byte[102400]);
 
@@ -112,7 +112,7 @@ namespace Orleans.Serialization.TestKit
         }
 
         [ExcludeFromCodeCoverage]
-        private class PooledBufferWriterTester : BufferTester<PooledOutputBuffer>
+        private sealed class PooledBufferWriterTester : BufferTester<PooledOutputBuffer>
         {
             public PooledBufferWriterTester(IServiceProvider serviceProvider) : base(serviceProvider)
             {

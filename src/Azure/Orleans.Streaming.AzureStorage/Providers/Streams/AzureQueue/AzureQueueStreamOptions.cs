@@ -71,7 +71,7 @@ namespace Orleans.Configuration
         [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
         public void ConfigureQueueServiceClient(Uri serviceUri)
         {
-            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            ArgumentNullException.ThrowIfNull(serviceUri);
             CreateClient = () => Task.FromResult(new QueueServiceClient(serviceUri, ClientOptions));
         }
 
@@ -90,8 +90,8 @@ namespace Orleans.Configuration
         [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
         public void ConfigureQueueServiceClient(Uri serviceUri, TokenCredential tokenCredential)
         {
-            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
-            if (tokenCredential is null) throw new ArgumentNullException(nameof(tokenCredential));
+            ArgumentNullException.ThrowIfNull(serviceUri);
+            ArgumentNullException.ThrowIfNull(tokenCredential);
             CreateClient = () => Task.FromResult(new QueueServiceClient(serviceUri, tokenCredential, ClientOptions));
         }
 
@@ -101,8 +101,8 @@ namespace Orleans.Configuration
         [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
         public void ConfigureQueueServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)
         {
-            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
-            if (azureSasCredential is null) throw new ArgumentNullException(nameof(azureSasCredential));
+            ArgumentNullException.ThrowIfNull(serviceUri);
+            ArgumentNullException.ThrowIfNull(azureSasCredential);
             CreateClient = () => Task.FromResult(new QueueServiceClient(serviceUri, azureSasCredential, ClientOptions));
         }
 
@@ -112,8 +112,8 @@ namespace Orleans.Configuration
         [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
         public void ConfigureQueueServiceClient(Uri serviceUri, StorageSharedKeyCredential sharedKeyCredential)
         {
-            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
-            if (sharedKeyCredential is null) throw new ArgumentNullException(nameof(sharedKeyCredential));
+            ArgumentNullException.ThrowIfNull(serviceUri);
+            ArgumentNullException.ThrowIfNull(sharedKeyCredential);
             CreateClient = () => Task.FromResult(new QueueServiceClient(serviceUri, sharedKeyCredential, ClientOptions));
         }
     }

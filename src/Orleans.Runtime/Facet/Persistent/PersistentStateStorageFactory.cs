@@ -18,17 +18,17 @@ namespace Orleans.Runtime
     public class PersistentStateFactory : IPersistentStateFactory
     {
         /// <inheritdoc/>
-        public IPersistentState<TState> Create<TState>(IGrainContext context, IPersistentStateConfiguration cfg)
+        public IPersistentState<TState> Create<TState>(IGrainContext context, IPersistentStateConfiguration config)
         {
-            var storageProvider = !string.IsNullOrWhiteSpace(cfg.StorageName)
-                ? context.ActivationServices.GetKeyedService<IGrainStorage>(cfg.StorageName)
+            var storageProvider = !string.IsNullOrWhiteSpace(config.StorageName)
+                ? context.ActivationServices.GetKeyedService<IGrainStorage>(config.StorageName)
                 : context.ActivationServices.GetService<IGrainStorage>();
             if (storageProvider == null)
             {
-                ThrowMissingProviderException(context, cfg);
+                ThrowMissingProviderException(context, config);
             }
 
-            var fullStateName = GetFullStateName(context, cfg);
+            var fullStateName = GetFullStateName(context, config);
             return new PersistentState<TState>(fullStateName, context, storageProvider);
         }
 

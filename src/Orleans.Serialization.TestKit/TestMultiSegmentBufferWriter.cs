@@ -19,14 +19,14 @@ namespace Orleans.Serialization.TestKit
             _maxAllocationSize = maxAllocationSize;
         }
 
-        public void Advance(int bytes)
+        public void Advance(int count)
         {
-            if (bytes == 0)
+            if (count == 0)
             {
                 return;
             }
 
-            _committed.Add(_current.AsSpan(0, bytes).ToArray());
+            _committed.Add(_current.AsSpan(0, count).ToArray());
             _current = Array.Empty<byte>();
         }
 

@@ -33,20 +33,11 @@ namespace Orleans.Storage
         /// <param name="clearState">The clause to clear the storage.</param>
         public RelationalStorageProviderQueries(string writeToStorage, string readFromStorage, string clearState)
         {
-            if(writeToStorage == null)
-            {
-                throw new ArgumentNullException(nameof(writeToStorage));
-            }
+            ArgumentNullException.ThrowIfNull(writeToStorage);
 
-            if(readFromStorage == null)
-            {
-                throw new ArgumentNullException(nameof(readFromStorage));
-            }
+            ArgumentNullException.ThrowIfNull(readFromStorage);
 
-            if(clearState == null)
-            {
-                throw new ArgumentNullException(nameof(clearState));
-            }
+            ArgumentNullException.ThrowIfNull(clearState);
 
             WriteToStorage = writeToStorage;
             ReadFromStorage = readFromStorage;

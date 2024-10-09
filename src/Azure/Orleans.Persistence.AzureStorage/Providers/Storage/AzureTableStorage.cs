@@ -60,19 +60,19 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ReadStateAsync{T}"/>
-        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string pk = GetKeyString(grainId);
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_ReadingData,
                 "Reading: GrainType={GrainType} Pk={PartitionKey} Grainid={GrainId} from Table={TableName}",
-                grainType,
+                stateName,
                 pk,
                 grainId,
                 this.options.TableName);
             string partitionKey = pk;
-            string rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
+            string rowKey = AzureTableUtils.SanitizeTableProperty(stateName);
             var entity = await tableDataManager.Read(partitionKey, rowKey).ConfigureAwait(false);
             if (entity is not null)
             {
@@ -86,7 +86,7 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
-        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -94,13 +94,13 @@ namespace Orleans.Storage
             if (logger.IsEnabled(LogLevel.Trace))
                 logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_WritingData,
                     "Writing: GrainType={GrainType} Pk={PartitionKey} Grainid={GrainId} ETag={ETag} to Table={TableName}",
-                    grainType,
+                    stateName,
                     pk,
                     grainId,
                     grainState.ETag,
                     this.options.TableName);
 
-            var rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
+            var rowKey = AzureTableUtils.SanitizeTableProperty(stateName);
             var entity = new TableEntity(pk, rowKey)
             {
                 ETag = new ETag(grainState.ETag)
@@ -108,7 +108,7 @@ namespace Orleans.Storage
             ConvertToStorageFormat(grainState.State, entity);
             try
             {
-                await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                await DoOptimisticUpdate(() => tableDataManager.Write(entity), stateName, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
                 grainState.ETag = entity.ETag.ToString();
                 grainState.RecordExists = true;
             }
@@ -116,7 +116,7 @@ namespace Orleans.Storage
             {
                 logger.LogError((int)AzureProviderErrorCode.AzureTableProvider_WriteError, exc,
                     "Error Writing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to Table={TableName}",
-                    grainType,
+                    stateName,
                     grainId,
                     grainState.ETag,
                     this.options.TableName);
@@ -131,20 +131,20 @@ namespace Orleans.Storage
         /// cleared by overwriting with default / null values.
         /// </remarks>
         /// <see cref="IGrainStorage.ClearStateAsync{T}"/>
-        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
             if (tableDataManager == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string pk = GetKeyString(grainId);
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace((int)AzureProviderErrorCode.AzureTableProvider_WritingData,
                 "Clearing: GrainType={GrainType} Pk={PartitionKey} Grainid={GrainId} ETag={ETag} DeleteStateOnClear={DeleteStateOnClear} from Table={TableName}",
-                grainType,
+                stateName,
                 pk,
                 grainId,
                 grainState.ETag,
                 this.options.DeleteStateOnClear,
                 this.options.TableName);
-            var rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
+            var rowKey = AzureTableUtils.SanitizeTableProperty(stateName);
             var entity = new TableEntity(pk, rowKey)
             {
                 ETag = new ETag(grainState.ETag)
@@ -155,11 +155,11 @@ namespace Orleans.Storage
                 if (this.options.DeleteStateOnClear)
                 {
                     operation = "Deleting";
-                    await DoOptimisticUpdate(() => tableDataManager.Delete(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    await DoOptimisticUpdate(() => tableDataManager.Delete(entity), stateName, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
                 }
                 else
                 {
-                    await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    await DoOptimisticUpdate(() => tableDataManager.Write(entity), stateName, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
                 }
 
                 grainState.ETag = entity.ETag.ToString(); // Update in-memory data to the new ETag
@@ -171,7 +171,7 @@ namespace Orleans.Storage
                     exc,
                     "Error {Operation}: GrainType={GrainType} Grainid={GrainId} ETag={ETag} from Table={TableName}",
                     operation,
-                    grainType,
+                    stateName,
                     grainId,
                     grainState.ETag,
                     this.options.TableName);
@@ -489,9 +489,9 @@ namespace Orleans.Storage
         }
 
         /// <summary> Decodes Storage exceptions.</summary>
-        public bool DecodeException(Exception e, out HttpStatusCode httpStatusCode, out string restStatus, bool getRESTErrors = false)
+        public bool DecodeException(Exception exception, out HttpStatusCode httpStatusCode, out string restStatus, bool getExtendedErrors = false)
         {
-            return AzureTableUtils.EvaluateException(e, out httpStatusCode, out restStatus, getRESTErrors);
+            return AzureTableUtils.EvaluateException(exception, out httpStatusCode, out restStatus, getExtendedErrors);
         }
 
         private async Task Init(CancellationToken ct)

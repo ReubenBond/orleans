@@ -67,8 +67,7 @@ namespace UnitTests.Grains
         public async Task<StreamSubscriptionHandle<int>> Resume(StreamSubscriptionHandle<int> handle)
         {
             logger.LogInformation("Resume");
-            if(handle == null)
-                throw new ArgumentNullException(nameof(handle));
+            ArgumentNullException.ThrowIfNull(handle);
 
             // new counter for this subscription
             Tuple<Counter,Counter> counters;

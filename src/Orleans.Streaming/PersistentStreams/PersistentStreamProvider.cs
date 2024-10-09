@@ -90,7 +90,7 @@ namespace Orleans.Providers.Streams.Common
             ILogger<PersistentStreamProvider> logger)
         {
             if (string.IsNullOrEmpty(name)) throw new ArgumentNullException(nameof(name));
-            if (runtime == null) throw new ArgumentNullException(nameof(runtime));
+            ArgumentNullException.ThrowIfNull(runtime);
             this.pubsubOptions = pubsubOptions ?? throw new ArgumentNullException(nameof(pubsubOptions));
             this.Name = name;
             this.lifeCycleOptions = lifeCycleOptions ?? throw new ArgumentNullException(nameof(lifeCycleOptions));

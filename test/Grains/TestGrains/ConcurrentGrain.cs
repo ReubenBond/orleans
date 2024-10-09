@@ -16,16 +16,16 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public async Task Initialize(int ind)
+        public async Task Initialize(int index)
         {
-            this.index = ind;
-            logger.LogInformation("Initialize({Index})", index);
-            if (index == 0)
+            this.index = index;
+            logger.LogInformation("Initialize({Index})", this.index);
+            if (this.index == 0)
             {
                 children = new List<IConcurrentGrain>();
                 for (int i = 0; i < 1; i++)
                 {
-                    IConcurrentGrain grain = GrainFactory.GetGrain<IConcurrentGrain>((new Random()).Next());
+                    var grain = GrainFactory.GetGrain<IConcurrentGrain>((new Random()).Next());
                     await grain.Initialize(i + 1);
                     children.Add(grain);
                 }
@@ -49,11 +49,11 @@ namespace UnitTests.Grains
             return 1;
         }
 
-        public Task<int> B(int number)
+        public Task<int> B(int time)
         {
-            logger.LogInformation("B({Index}) call {Number}", index, number);
+            logger.LogInformation("B({Index}) call {Number}", index, time);
             Thread.Sleep(100);
-            logger.LogInformation("B({Index}) call {Number} after sleep", index, number);
+            logger.LogInformation("B({Index}) call {Number} after sleep", index, time);
             return Task.FromResult(1);
         }
 
@@ -77,10 +77,10 @@ namespace UnitTests.Grains
             });
         }
 
-        public Task Initialize_2(int ind)
+        public Task Initialize_2(int index)
         {
-            index = ind;
-            logger.LogInformation("Initialize({Index})", index);
+            this.index = index;
+            logger.LogInformation("Initialize({Index})", this.index);
             return Task.CompletedTask;
         }
 
@@ -118,10 +118,10 @@ namespace UnitTests.Grains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
         }
 
-        public Task Initialize_2(int ind)
+        public Task Initialize_2(int index)
         {
-            index = ind;
-            logger.LogInformation("Initialize({Index})", index);
+            this.index = index;
+            logger.LogInformation("Initialize({Index})", this.index);
             return Task.CompletedTask;
         }
 

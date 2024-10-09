@@ -19,10 +19,7 @@ namespace Orleans.Networking.Shared
             IOptions<SocketConnectionOptions> socketConnectionOptions,
             SocketSchedulers schedulers)
         {
-            if (loggerFactory == null)
-            {
-                throw new ArgumentNullException(nameof(loggerFactory));
-            }
+            ArgumentNullException.ThrowIfNull(loggerFactory);
 
             this.socketConnectionOptions = socketConnectionOptions.Value;
             var logger = loggerFactory.CreateLogger("Orleans.Sockets");

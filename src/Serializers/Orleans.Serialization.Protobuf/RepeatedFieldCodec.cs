@@ -82,7 +82,7 @@ public sealed class RepeatedFieldCodec<T> : IFieldCodec<RepeatedField<T>>
                     var length = (int)UInt32Codec.ReadValue(ref reader, header);
                     if (length > 10240 && length > reader.Length)
                     {
-                        ThrowInvalidSizeException(length);
+                        ThrowInvalidSizeException(typeof(RepeatedField<T>), length);
                     }
 
                     result = new RepeatedField<T>{ Capacity = length };
@@ -111,8 +111,8 @@ public sealed class RepeatedFieldCodec<T> : IFieldCodec<RepeatedField<T>>
         return result;
     }
 
-    private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-        $"Declared length of {typeof(RepeatedField<T>)}, {length}, is greater than total length of input.");
+    private static void ThrowInvalidSizeException(Type type, int length) => throw new InvalidOperationException(
+        $"Declared length of {type}, {length}, is greater than total length of input.");
 
     private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized RepeatedField is missing its length field.");
 }

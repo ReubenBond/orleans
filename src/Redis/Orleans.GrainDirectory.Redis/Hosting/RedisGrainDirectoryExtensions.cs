@@ -31,7 +31,7 @@ namespace Orleans.Hosting
             this ISiloBuilder builder,
             Action<OptionsBuilder<RedisGrainDirectoryOptions>> configureOptions)
         {
-            return builder.ConfigureServices(services => services.AddRedisGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, configureOptions));
+            return builder.ConfigureServices(services => services.AddRedisGrainDirectory(GrainDirectoryAttribute.DefaultGrainDirectory, configureOptions));
         }
 
         /// <summary>

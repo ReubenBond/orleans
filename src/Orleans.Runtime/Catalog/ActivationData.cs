@@ -1177,7 +1177,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                             await ActivateAsync(command.RequestContext, command.CancellationToken).SuppressThrowing();
                             break;
                         case Command.Deactivate command:
-                            await FinishDeactivating(command.CancellationToken, command.PreviousState).SuppressThrowing();
+                            await FinishDeactivating(command.PreviousState, command.CancellationToken).SuppressThrowing();
                             break;
                         case Command.Delay command:
                             await Task.Delay(command.Duration, GrainRuntime.TimeProvider, command.CancellationToken);
@@ -1253,7 +1253,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-    private void OnDehydrate(IDehydrationContext context)
+    private void OnDehydrate(MigrationContext context)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Debug))
         {
@@ -1315,7 +1315,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
             OnCompletedRequest(message);
         }
 
-        static async ValueTask OnCompleteAsync(ActivationData activation, Message message, Task task)
+        static async Task OnCompleteAsync(ActivationData activation, Message message, Task task)
         {
             try
             {
@@ -1582,7 +1582,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
                 if (!success)
                 {
-                    Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."));
+                    Deactivate(new(DeactivationReasonCode.DirectoryFailure, registrationException, "Failed to register activation in grain directory."), CancellationToken.None);
 
                     // Activation failed.
                     return;
@@ -1663,7 +1663,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                 }
 
                 // Perform the required deactivation steps.
-                Deactivate(new(DeactivationReasonCode.ActivationFailed, sourceException, "Failed to activate grain."));
+                Deactivate(new(DeactivationReasonCode.ActivationFailed, sourceException, "Failed to activate grain."), CancellationToken.None);
 
                 // Activation failed.
                 return;
@@ -1672,7 +1672,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         catch (Exception exception)
         {
             _shared.Logger.LogError(exception, "Activation of grain {Grain} failed", this);
-            Deactivate(new(DeactivationReasonCode.ApplicationError, exception, "Failed to activate grain."));
+            Deactivate(new(DeactivationReasonCode.ApplicationError, exception, "Failed to activate grain."), CancellationToken.None);
         }
         finally
         {
@@ -1692,7 +1692,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
     /// Completes the deactivation process.
     /// </summary>
     /// <param name="cancellationToken">A cancellation which terminates graceful deactivation when cancelled.</param>
-    private async Task FinishDeactivating(CancellationToken cancellationToken, ActivationState previousState)
+    private async Task FinishDeactivating(ActivationState previousState, CancellationToken cancellationToken)
     {
         var stopwatch = ValueStopwatch.StartNew();
         var migrated = false;
@@ -2087,10 +2087,12 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-    private class DehydrationContextHolder(SerializerSessionPool sessionPool, Dictionary<string, object>? requestContext)
+    private class DehydrationContextHolder(SerializerSessionPool sessionPool, Dictionary<string, object>? requestContext) : IDisposable
     {
         public readonly MigrationContext MigrationContext = new(sessionPool);
         public readonly Dictionary<string, object>? RequestContext = requestContext;
+
+        public void Dispose() => MigrationContext.Dispose();
     }
 
     private class MigrateWorkItem(ActivationData activation, Dictionary<string, object>? requestContext, CancellationTokenSource cts) : WorkItemBase

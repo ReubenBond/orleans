@@ -17,7 +17,7 @@ internal sealed class MigrationContext : IDehydrationContext, IRehydrationContex
     private readonly object _lock = new();
 
     [NonSerialized]
-    internal SerializerSessionPool _sessionPool;
+    private SerializerSessionPool _sessionPool;
 
     [OrleansConstructor]
     public MigrationContext(SerializerSessionPool sessionPool)

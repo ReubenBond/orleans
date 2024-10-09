@@ -29,14 +29,14 @@ namespace Orleans.Streams
         public bool ShouldFaultSubsriptionOnError { get; }
 
         /// <inheritdoc/>
-        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
+        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity,
             StreamSequenceToken sequenceToken)
         {
             return Task.CompletedTask;
         }
 
         /// <inheritdoc/>
-        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamId,
+        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, StreamId streamIdentity,
             StreamSequenceToken sequenceToken)
         {
             return Task.CompletedTask;

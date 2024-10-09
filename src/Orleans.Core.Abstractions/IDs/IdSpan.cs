@@ -100,7 +100,7 @@ namespace Orleans.Runtime
         public override bool Equals(object? obj) => obj is IdSpan kind && Equals(kind);
 
         /// <inheritdoc/>
-        public bool Equals(IdSpan obj) => _value == obj._value || _value.AsSpan().SequenceEqual(obj._value);
+        public bool Equals(IdSpan other) => _value == other._value || _value.AsSpan().SequenceEqual(other._value);
 
         /// <inheritdoc/>
         public override int GetHashCode() => _hashCode;

@@ -57,7 +57,7 @@ namespace Orleans.EventSourcing
         protected virtual void RaiseEvents<TEvent>(IEnumerable<TEvent> events) 
             where TEvent : TEventBase
         {
-            if (events == null) throw new ArgumentNullException(nameof(events));
+            ArgumentNullException.ThrowIfNull(events);
 
             LogViewAdaptor.SubmitRange((IEnumerable<TEventBase>) events);
         }
@@ -85,7 +85,7 @@ namespace Orleans.EventSourcing
         protected virtual Task<bool> RaiseConditionalEvents<TEvent>(IEnumerable<TEvent> events)
             where TEvent : TEventBase
         {
-            if (events == null) throw new ArgumentNullException(nameof(events));
+            ArgumentNullException.ThrowIfNull(events);
             return LogViewAdaptor.TryAppendRange((IEnumerable<TEventBase>) events);
         }
 
@@ -252,10 +252,10 @@ namespace Orleans.EventSourcing
         /// Called right after grain is constructed, to install the adaptor.
         /// The log-consistency provider contains a factory method that constructs the adaptor with chosen types for this grain
         /// </summary>
-        protected override void InstallAdaptor(ILogViewAdaptorFactory factory, object initialState, string graintypename, IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
+        protected override void InstallAdaptor(ILogViewAdaptorFactory factory, object state, string grainTypeName, IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
         {
             // call the log consistency provider to construct the adaptor, passing the type argument
-            LogViewAdaptor = factory.MakeLogViewAdaptor<TGrainState, TEventBase>(this, (TGrainState)initialState, graintypename, grainStorage, services);
+            LogViewAdaptor = factory.MakeLogViewAdaptor<TGrainState, TEventBase>(this, (TGrainState)state, grainTypeName, grainStorage, services);
         }
 
         /// <summary>

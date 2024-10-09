@@ -50,9 +50,9 @@ namespace Orleans.Transactions.TestKit
     {
         private static readonly MethodInfo create =
             typeof(IFaultInjectionTransactionalStateFactory).GetMethod("Create");
-        public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, FaultInjectionTransactionalStateAttribute attribute)
+        public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, FaultInjectionTransactionalStateAttribute metadata)
         {
-            IFaultInjectionTransactionalStateConfiguration config = attribute;
+            IFaultInjectionTransactionalStateConfiguration config = metadata;
             // use generic type args to define collection type.
             MethodInfo genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
             object[] args = new object[] { config };

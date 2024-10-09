@@ -28,9 +28,9 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc />
-        public bool IsMatch(string streamNameSpace)
+        public bool IsMatch(string streamNamespace)
         {
-            return regex.IsMatch(streamNameSpace);
+            return regex.IsMatch(streamNamespace);
         }
     }
 }

@@ -517,10 +517,14 @@ namespace Orleans.Serialization.UnitTests
 
         public static bool IsStronglyTypedId(Type type, out Type idType)
         {
+#if NET8_0_OR_GREATER
+            ArgumentNullException.ThrowIfNull(type);
+#else
             if (type is null)
             {
                 throw new ArgumentNullException(nameof(type));
             }
+#endif
 
             if (type.BaseType is Type baseType &&
                 baseType.IsGenericType &&

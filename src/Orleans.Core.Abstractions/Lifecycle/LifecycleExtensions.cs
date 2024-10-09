@@ -20,15 +20,9 @@ namespace Orleans
         /// <returns>A <see cref="IDisposable"/> instance which can be disposed to unsubscribe the observer from the lifecycle.</returns>
         public static IDisposable Subscribe(this ILifecycleObservable observable, string observerName, int stage, Func<CancellationToken, Task> onStart, Func<CancellationToken, Task> onStop)
         {
-            if (observable is null)
-            {
-                throw new ArgumentNullException(nameof(observable));
-            }
+            ArgumentNullException.ThrowIfNull(observable);
 
-            if (onStart is null)
-            {
-                throw new ArgumentNullException(nameof(onStart));
-            }
+            ArgumentNullException.ThrowIfNull(onStart);
 
             if (onStop is null)
             {

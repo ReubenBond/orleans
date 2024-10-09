@@ -45,7 +45,7 @@ namespace Orleans.Transactions
         /// <inheritdoc/>
         public Task OnCommit(ITransactionCommitOperation<TService> operation)
         {
-            if (operation == null) throw new ArgumentNullException(nameof(operation));
+            ArgumentNullException.ThrowIfNull(operation);
             if (detectReentrancy)
             {
                 throw new LockRecursionException("cannot perform an update operation from within another operation");

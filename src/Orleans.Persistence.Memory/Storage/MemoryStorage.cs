@@ -59,9 +59,9 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public virtual async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public virtual async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
-            var key = MakeKey(grainType, grainId);
+            var key = MakeKey(stateName, grainId);
 
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Read Keys={Keys}", key);
 
@@ -77,9 +77,9 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public virtual async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public virtual async Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
-            var key = MakeKey(grainType, grainId);
+            var key = MakeKey(stateName, grainId);
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Write Keys={Keys} Data={Data} Etag={Etag}", key, grainState.State, grainState.ETag);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try
@@ -99,9 +99,9 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public virtual async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public virtual async Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
-            var key = MakeKey(grainType, grainId);
+            var key = MakeKey(stateName, grainId);
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Delete Keys={Keys} Etag={Etag}", key, grainState.ETag);
             IMemoryStorageGrain storageGrain = GetStorageGrain(key);
             try

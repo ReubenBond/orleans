@@ -30,7 +30,7 @@ namespace Orleans.Runtime.Messaging
             ConnectionFactory connectionFactory,
             NetworkingTrace trace)
         {
-            if (trace == null) throw new ArgumentNullException(nameof(trace));
+            ArgumentNullException.ThrowIfNull(trace);
             this.connectionOptions = connectionOptions.Value;
             this.connectionFactory = connectionFactory;
             this.trace = trace;

@@ -21,10 +21,7 @@ namespace Orleans.Streams
         public ConsistentRingQueueBalancer(IConsistentRingProvider consistentRingProvider, ILoggerFactory loggerFactory, IServiceProvider services, ILogger<ConsistentRingQueueBalancer> logger)
             : base(services, logger)
         {
-            if (consistentRingProvider == null)
-            {
-                throw new ArgumentNullException("streamProviderRuntime");
-            }
+            ArgumentNullException.ThrowIfNull(consistentRingProvider);
 
             _myRange = consistentRingProvider.GetMyRange();
             consistentRingProvider.SubscribeToRangeChangeEvents(this);
@@ -32,10 +29,7 @@ namespace Orleans.Streams
 
         public override Task Initialize(IStreamQueueMapper queueMapper)
         {
-            if (queueMapper == null)
-            {
-                throw new ArgumentNullException(nameof(queueMapper));
-            }
+            ArgumentNullException.ThrowIfNull(queueMapper);
 
             if (queueMapper is not IConsistentRingStreamQueueMapper streamQueueMapper)
             {

@@ -82,12 +82,9 @@ namespace UnitTests.StorageTests.Relational
         /// <exception cref="ArgumentOutOfRangeException"/>.
         public static string GetRandomCharacters(SymbolSet symbolSet, long count)
         {
-            if(symbolSet == null)
-            {
-                throw new ArgumentNullException(nameof(symbolSet));
-            }
+            ArgumentNullException.ThrowIfNull(symbolSet);
 
-            if(count < 1)
+            if (count < 1)
             {
                 throw new ArgumentOutOfRangeException(nameof(count), "The count news to be more than zero.");
             }
@@ -108,10 +105,7 @@ namespace UnitTests.StorageTests.Relational
         /// <exception cref="ArgumentException"/>.
         internal static GrainId GetRandomGrainId<TGrainKey, TGrainGeneric>(SymbolSet symbolSet, long symbolCount = 15)
         {
-            if (symbolSet == null)
-            {
-                throw new ArgumentNullException(nameof(symbolSet));
-            }
+            ArgumentNullException.ThrowIfNull(symbolSet);
 
             if (typeof(TGrainKey) == typeof(string))
             {

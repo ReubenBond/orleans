@@ -2571,17 +2571,17 @@ namespace Orleans.Serialization.UnitTests
         [GenerateSerializer]
         public class CaseInsensitiveEqualityComparer : IEqualityComparer<string>
         {
-            public bool Equals(string left, string right)
+            public bool Equals(string x, string y)
             {
-                if (left == null && right == null)
+                if (x == null && y == null)
                 {
                     return true;
                 }
-                else if (left == null || right == null)
+                else if (x == null || y == null)
                 {
                     return false;
                 }
-                else if (left.ToUpper() == right.ToUpper())
+                else if (x.ToUpper() == y.ToUpper())
                 {
                     return true;
                 }
@@ -2591,7 +2591,7 @@ namespace Orleans.Serialization.UnitTests
                 }
             }
 
-            public int GetHashCode(string s) => s.ToUpper().GetHashCode();
+            public int GetHashCode(string obj) => obj.ToUpper().GetHashCode();
         }
     }
 

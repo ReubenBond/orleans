@@ -15,9 +15,9 @@ namespace Orleans.Transactions.TestKit
     }
     public class FaultInjectionTransactionCoordinatorGrain : Grain, IFaultInjectionTransactionCoordinatorGrain
     {
-        public Task MultiGrainSet(List<IFaultInjectionTransactionTestGrain> grains, int newValue)
+        public Task MultiGrainSet(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd)
         {
-            return Task.WhenAll(grains.Select(g => g.Set(newValue)));
+            return Task.WhenAll(grains.Select(g => g.Set(numberToAdd)));
         }
 
         public Task MultiGrainAddAndFaultInjection(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd,

@@ -22,9 +22,9 @@ namespace Tester.ZooKeeperUtils
 
         public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseZooKeeperClustering(options => { options.ConnectionString = TestDefaultConfiguration.ZooKeeperConnectionString; });
+                siloBuilder.UseZooKeeperClustering(options => { options.ConnectionString = TestDefaultConfiguration.ZooKeeperConnectionString; });
             }
         }
 

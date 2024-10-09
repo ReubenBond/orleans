@@ -79,7 +79,7 @@ namespace Orleans.Providers
         /// <param name="requestContext">Context in which this message was sent.</param>        
         public MemoryMessageBody(IEnumerable<object> events, Dictionary<string, object> requestContext)
         {
-            if (events == null) throw new ArgumentNullException(nameof(events));
+            ArgumentNullException.ThrowIfNull(events);
             Events = events.ToList();
             RequestContext = requestContext;
         }

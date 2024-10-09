@@ -33,10 +33,10 @@ namespace Orleans.Streams
             ILogger logger,
             bool isRewindable)
         {
-            if (stream == null) throw new ArgumentNullException(nameof(stream));
-            if (runtime == null) throw new ArgumentNullException(nameof(runtime));
-            if (pubSub == null) throw new ArgumentNullException(nameof(pubSub));
-            if (logger == null) throw new ArgumentNullException(nameof(logger));
+            ArgumentNullException.ThrowIfNull(stream);
+            ArgumentNullException.ThrowIfNull(runtime);
+            ArgumentNullException.ThrowIfNull(pubSub);
+            ArgumentNullException.ThrowIfNull(logger);
 
             this.logger = logger;
             this.stream = stream;
@@ -254,8 +254,7 @@ namespace Orleans.Streams
 
         private StreamSubscriptionHandleImpl<T> CheckHandleValidity(StreamSubscriptionHandle<T> handle)
         {
-            if (handle == null)
-                throw new ArgumentNullException(nameof(handle));
+            ArgumentNullException.ThrowIfNull(handle);
             if (!handle.StreamId.Equals(stream.StreamId))
                 throw new ArgumentException("Handle is not for this stream.", nameof(handle));
             var handleImpl = handle as StreamSubscriptionHandleImpl<T>;

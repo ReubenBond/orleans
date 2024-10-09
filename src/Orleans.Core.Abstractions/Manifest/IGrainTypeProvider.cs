@@ -35,13 +35,13 @@ namespace Orleans.Metadata
         }
 
         /// <inheritdoc />
-        public bool TryGetGrainType(Type grainClass, out GrainType grainType)
+        public bool TryGetGrainType(Type type, out GrainType grainType)
         {
-            foreach (var attr in grainClass.GetCustomAttributes(inherit: false))
+            foreach (var attr in type.GetCustomAttributes(inherit: false))
             {
                 if (attr is IGrainTypeProviderAttribute typeProviderAttribute)
                 {
-                    grainType = typeProviderAttribute.GetGrainType(this._serviceProvider, grainClass);
+                    grainType = typeProviderAttribute.GetGrainType(this._serviceProvider, type);
                     return true;
                 }
             }

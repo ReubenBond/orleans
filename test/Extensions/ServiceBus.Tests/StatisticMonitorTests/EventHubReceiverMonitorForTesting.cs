@@ -16,7 +16,7 @@ namespace ServiceBus.Tests.MonitorTests
             if (success) Interlocked.Increment(ref this.CallCounters.TrackReadCallCounter);
         }
 
-        public void TrackMessagesReceived(long count, DateTime? oldestEnqueueTime, DateTime? newestEnqueueTime)
+        public void TrackMessagesReceived(long count, DateTime? oldestMessageEnqueueTimeUtc, DateTime? newestMessageEnqueueTimeUtc)
         {
             Interlocked.Increment(ref this.CallCounters.TrackMessagesReceivedCallCounter);
         }

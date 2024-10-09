@@ -72,33 +72,33 @@ namespace TestGrains
             return Task.CompletedTask; // do not wait for initial load
         }
 
-        public async Task SetAGlobal(int x)
+        public async Task SetAGlobal(int a)
         {
-            RaiseEvent(new UpdateA() { Val = x });
+            RaiseEvent(new UpdateA() { Val = a });
             await ConfirmEvents();
         }
 
-        public async Task<Tuple<int, bool>> SetAConditional(int x)
+        public async Task<Tuple<int, bool>> SetAConditional(int a)
         {
             int version = this.Version;
-            bool success = await RaiseConditionalEvent(new UpdateA() { Val = x });
+            bool success = await RaiseConditionalEvent(new UpdateA() { Val = a });
             return new Tuple<int, bool>(version, success);
         }
 
-        public Task SetALocal(int x)
+        public Task SetALocal(int a)
         {
-            RaiseEvent(new UpdateA() { Val = x });
+            RaiseEvent(new UpdateA() { Val = a });
             return Task.CompletedTask;
         }
-        public async Task SetBGlobal(int x)
+        public async Task SetBGlobal(int b)
         {
-            RaiseEvent(new UpdateB() { Val = x });
+            RaiseEvent(new UpdateB() { Val = b });
             await ConfirmEvents();
         }
 
-        public Task SetBLocal(int x)
+        public Task SetBLocal(int b)
         {
-            RaiseEvent(new UpdateB() { Val = x });
+            RaiseEvent(new UpdateB() { Val = b });
             return Task.CompletedTask;
         }
 
@@ -137,15 +137,15 @@ namespace TestGrains
             return Task.FromResult(new AB() { A = TentativeState.A, B = TentativeState.B });
         }
 
-        public Task AddReservationLocal(int val)
+        public Task AddReservationLocal(int x)
         {
-            RaiseEvent(new AddReservation() { Val = val });
+            RaiseEvent(new AddReservation() { Val = x });
             return Task.CompletedTask;
 
         }
-        public Task RemoveReservationLocal(int val)
+        public Task RemoveReservationLocal(int x)
         {
-            RaiseEvent(new RemoveReservation() { Val = val });
+            RaiseEvent(new RemoveReservation() { Val = x });
             return Task.CompletedTask;
 
         }

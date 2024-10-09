@@ -55,10 +55,7 @@ namespace Orleans.Tests.SqlUtils
                 throw new ArgumentException("The name must be a legal SQL table name", nameof(tableName));
             }
 
-            if(parameters == null)
-            {
-                throw new ArgumentNullException(nameof(parameters));
-            }
+            ArgumentNullException.ThrowIfNull(parameters);
 
             var storageConsts = DbConstantsStore.GetDbConstants(storage.InvariantName);
 

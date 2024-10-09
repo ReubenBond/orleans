@@ -66,7 +66,7 @@ namespace Orleans.Hosting
         /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
         public static IClientBuilder ConfigureServices(this IClientBuilder builder, Action<IServiceCollection> configureDelegate)
         {
-            if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
+            ArgumentNullException.ThrowIfNull(configureDelegate);
             configureDelegate(builder.Services);
             return builder;
         }

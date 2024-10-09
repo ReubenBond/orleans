@@ -74,10 +74,10 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public void PerformPurge(DateTime nowUtc)
+        public void PerformPurge(DateTime utcNow)
         {
-            PerformPurgeInternal(nowUtc);
-            this.periodicMonitoring?.TryAction(nowUtc);
+            PerformPurgeInternal(utcNow);
+            this.periodicMonitoring?.TryAction(utcNow);
         }
 
         /// <summary>

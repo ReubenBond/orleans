@@ -99,7 +99,7 @@ namespace Orleans.Transactions.TestKit
             try
             {
                 var etag1 = await stateStorage.Store("wrong-etag", loadresponse.Metadata, emptyPendingStates, null, null);
-                throw new Exception("storage did not catch e-tag mismatch");
+                throw new InvalidOperationException("storage did not catch e-tag mismatch");
             }
             catch (Exception) { }
 
@@ -124,7 +124,7 @@ namespace Orleans.Transactions.TestKit
                 var now2 = DateTime.UtcNow;
                 var metadata2 = new TransactionalStateMetaData() { TimeStamp = now2, CommitRecords = MakeCommitRecords(3,3) };
                 await stateStorage.Store(null, metadata, emptyPendingStates, null, null);
-                throw new Exception("storage did not catch e-tag mismatch");
+                throw new InvalidOperationException("storage did not catch e-tag mismatch");
             }
             catch (Exception) { }
 
@@ -147,7 +147,7 @@ namespace Orleans.Transactions.TestKit
                 actual.Should().BeEquivalentTo(expected, assertConfig);
         }
 
-        private PendingTransactionState<TState> MakePendingState(long seqno, TState val, bool tm)
+        private static PendingTransactionState<TState> MakePendingState(long seqno, TState val, bool tm)
         {
             var result = new PendingTransactionState<TState>()
             {
@@ -161,7 +161,7 @@ namespace Orleans.Transactions.TestKit
             return result;
         }
 
-        private ParticipantId MakeParticipantId()
+        private static ParticipantId MakeParticipantId()
         {
             return new ParticipantId(
                                     "tm",
@@ -170,7 +170,7 @@ namespace Orleans.Transactions.TestKit
                                     ParticipantId.Role.Resource | ParticipantId.Role.Manager);
         }
 
-        private Dictionary<Guid, CommitRecord> MakeCommitRecords(int count, int size)
+        private static Dictionary<Guid, CommitRecord> MakeCommitRecords(int count, int size)
         {
             var result = new Dictionary<Guid, CommitRecord>();
             for (int j = 0; j < size; j++)

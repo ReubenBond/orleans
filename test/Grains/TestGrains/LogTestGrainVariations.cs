@@ -50,9 +50,9 @@ namespace TestGrains
         }
  
 
-        public Task<bool> ApplyUpdatesToStorage(IReadOnlyList<object> updates, int expectedversion)
+        public Task<bool> ApplyUpdatesToStorage(IReadOnlyList<object> updates, int expectedVersion)
         {
-            return GetStorageGrain().Update(updates, expectedversion);
+            return GetStorageGrain().Update(updates, expectedVersion);
         }
 
         public async Task<KeyValuePair<int, MyGrainState>> ReadStateFromStorage()
@@ -89,7 +89,7 @@ namespace TestGrains
         }
 
 
-        public Task<bool> ApplyUpdatesToStorage(IReadOnlyList<object> updates, int expectedversion)
+        public Task<bool> ApplyUpdatesToStorage(IReadOnlyList<object> updates, int expectedVersion)
         {
             if (state == null)
             {
@@ -97,7 +97,7 @@ namespace TestGrains
                 version = 0;
             }
 
-            if (expectedversion != version)
+            if (expectedVersion != version)
                 return Task.FromResult(false);
 
             foreach (var u in updates)

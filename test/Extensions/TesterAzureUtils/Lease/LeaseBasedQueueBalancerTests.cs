@@ -29,9 +29,9 @@ namespace Tester.AzureUtils.Lease
 
         public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder
+                siloBuilder
                     .UseAzureBlobLeaseProvider(ob => ob.Configure<IOptions<ClusterOptions>>((options, cluster) =>
                     {
                         options.ConfigureTestDefaults();

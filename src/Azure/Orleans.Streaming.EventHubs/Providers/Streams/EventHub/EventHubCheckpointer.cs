@@ -73,10 +73,7 @@ namespace Orleans.Streaming.EventHubs
 
         private EventHubCheckpointer(AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, string serviceId, ILoggerFactory loggerFactory)
         {
-            if (options == null)
-            {
-                throw new ArgumentNullException(nameof(options));
-            }
+            ArgumentNullException.ThrowIfNull(options);
             if (string.IsNullOrWhiteSpace(streamProviderName))
             {
                 throw new ArgumentNullException(nameof(streamProviderName));

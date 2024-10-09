@@ -14,7 +14,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             :base("test", EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, dataAdapter, evictionStrategy, checkpointer, logger, null, null, null)
             { }
 
-        public int ItemCount => this.cache.ItemCount;
+        public int ItemCount => this.Cache.ItemCount;
     }
     public class EHEvictionStrategyForTesting : ChronologicalEvictionStrategy
     {

@@ -71,7 +71,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             this.cachePressureInjectionMonitor.UnderPressure = !this.cachePressureInjectionMonitor.UnderPressure;
         }
 
-        protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions cacheOptions)
+        protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions eventHubCacheOptions)
         {
             var loggerFactory = this.serviceProvider.GetRequiredService<ILoggerFactory>();
             var eventHubPath = this.ehOptions.EventHubName;

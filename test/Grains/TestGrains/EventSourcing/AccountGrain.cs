@@ -47,20 +47,20 @@ namespace TestGrains
             return Task.FromResult(State.Balance);
         }
 
-        public Task Deposit(uint amount, Guid guid, string description)
+        public Task Deposit(uint amount, Guid guid, string desc)
         {
             RaiseEvent(new DepositTransaction() {
                 Guid = guid,
                 IssueTime = DateTime.UtcNow,
                 DepositAmount = amount,
-                Description = description
+                Description = desc
             });
 
             // we wait for storage ack
             return ConfirmEvents();
         }
 
-        public Task<bool> Withdraw(uint amount, Guid guid, string description)
+        public Task<bool> Withdraw(uint amount, Guid guid, string desc)
         {
             // if the balance is too low, can't withdraw
             // reject it immediately
@@ -76,7 +76,7 @@ namespace TestGrains
                 Guid = guid,
                 IssueTime = DateTime.UtcNow,
                 WithdrawalAmount = amount,
-                Description = description
+                Description = desc
             });
         }
 

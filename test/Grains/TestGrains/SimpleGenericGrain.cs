@@ -22,12 +22,12 @@ namespace UnitTests.Grains
             return Task.FromResult(Value);
         }
 
-        public Task CompareGrainReferences(ISimpleGenericGrain<TType> clientReference)
+        public Task CompareGrainReferences(ISimpleGenericGrain<TType> clientRef)
         {
             // Compare reference to this grain created by the client 
             var thisReference = GrainFactory.GetGrain<ISimpleGenericGrain<TType>>(this.GetPrimaryKeyLong());
-            if (!thisReference.Equals(clientReference))
-                throw new Exception(string.Format("Case_3: 2 grain references are different, while should have been the same: gr1={0}, gr2={1}", thisReference, clientReference));
+            if (!thisReference.Equals(clientRef))
+                throw new Exception(string.Format("Case_3: 2 grain references are different, while should have been the same: gr1={0}, gr2={1}", thisReference, clientRef));
 
             return Task.CompletedTask;
         }

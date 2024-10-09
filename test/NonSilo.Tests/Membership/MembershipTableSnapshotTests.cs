@@ -81,7 +81,7 @@ namespace NonSilo.Tests.Membership
 
         private static MembershipTableSnapshot AddOrUpdateEntry(MembershipTableSnapshot table, MembershipEntry localSiloEntry)
         {
-            if (table is null) throw new ArgumentNullException(nameof(table));
+            ArgumentNullException.ThrowIfNull(table);
 
             var entries = table.Entries.ToBuilder();
 

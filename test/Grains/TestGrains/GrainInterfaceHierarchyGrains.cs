@@ -93,9 +93,9 @@ namespace TestGrains
             return Task.FromResult(A);
         }
 
-        public Task SetB(int b)
+        public Task SetB(int a)
         {
-            B = b;
+            B = a;
             return Task.CompletedTask;
         }
 
@@ -184,9 +184,9 @@ namespace TestGrains
             return Task.FromResult(A);
         }
 
-        public Task SetB(int b)
+        public Task SetB(int a)
         {
-            B = b;
+            B = a;
             return Task.CompletedTask;
         }
 
@@ -201,9 +201,9 @@ namespace TestGrains
             return Task.FromResult(B);
         }
 
-        public Task SetC(int c)
+        public Task SetC(int a)
         {
-            C = c;
+            C = a;
             return Task.CompletedTask;
         }
 

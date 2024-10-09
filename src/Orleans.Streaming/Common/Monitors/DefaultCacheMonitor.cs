@@ -94,7 +94,7 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public void ReportCacheSize(long totalCacheSizeInByte) => _totalCacheSize = totalCacheSizeInByte;
+        public void ReportCacheSize(long totalCacheSizeInBytes) => _totalCacheSize = totalCacheSizeInBytes;
 
         /// <inheritdoc />
         public void ReportMessageStatistics(DateTime? oldestMessageEnqueueTimeUtc, DateTime? oldestMessageDequeueTimeUtc, DateTime? newestMessageEnqueueTimeUtc, long totalMessageCount)
@@ -113,16 +113,16 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public void TrackMemoryAllocated(int memoryInByte) => Interlocked.Add(ref _memoryAllocated, memoryInByte);
+        public void TrackMemoryAllocated(int memoryInBytes) => Interlocked.Add(ref _memoryAllocated, memoryInBytes);
 
         /// <inheritdoc />
-        public void TrackMemoryReleased(int memoryInByte) => Interlocked.Add(ref _memoryReleased, memoryInByte);
+        public void TrackMemoryReleased(int memoryInBytes) => Interlocked.Add(ref _memoryReleased, memoryInBytes);
 
         /// <inheritdoc />
-        public void TrackMessagesAdded(long messageAdded) => Interlocked.Add(ref _messagesAdded, messageAdded);
+        public void TrackMessagesAdded(long messagesAdded) => Interlocked.Add(ref _messagesAdded, messagesAdded);
 
         /// <inheritdoc />
-        public void TrackMessagesPurged(long messagePurged) => Interlocked.Add(ref _messagesPurged, messagePurged);
+        public void TrackMessagesPurged(long messagesPurged) => Interlocked.Add(ref _messagesPurged, messagesPurged);
 
         private sealed class PressureMonitorStatistics
         {

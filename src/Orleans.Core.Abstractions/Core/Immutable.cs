@@ -17,7 +17,9 @@ namespace Orleans.Concurrency
     {
         /// <summary> Return reference to the original value stored in this Immutable wrapper. </summary>
         [Id(0)]
+#pragma warning disable CA1051 // Do not declare visible instance fields
         public readonly T Value;
+#pragma warning restore CA1051 // Do not declare visible instance fields
 
         /// <summary>
         /// Constructor to wrap the specified data object in new Immutable wrapper.

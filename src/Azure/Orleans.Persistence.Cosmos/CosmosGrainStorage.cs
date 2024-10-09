@@ -42,16 +42,16 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
         _partitionKeyPath = _options.PartitionKeyPath;
     }
 
-    public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+    public async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
     {
         var id = GetKeyString(grainId);
-        var partitionKey = await BuildPartitionKey(grainType, grainId);
+        var partitionKey = await BuildPartitionKey(stateName, grainId);
 
         if (_logger.IsEnabled(LogLevel.Trace))
         {
             _logger.LogTrace(
                 "Reading: GrainType={GrainType} Key={Id} GrainId={GrainId} from Container={Container} with PartitionKey={PartitionKey}",
-                grainType,
+                stateName,
                 id,
                 grainId,
                 _options.ContainerName,
@@ -91,29 +91,29 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
                 return;
             }
 
-            _logger.LogError(dce, "Failure reading state for Grain Type {GrainType} with Id {Id}", grainType, id);
+            _logger.LogError(dce, "Failure reading state for Grain Type {GrainType} with Id {Id}", stateName, id);
             WrappedException.CreateAndRethrow(dce);
             throw;
         }
         catch (Exception exc)
         {
-            _logger.LogError(exc, "Failure reading state for Grain Type {GrainType} with Id {id}", grainType, id);
+            _logger.LogError(exc, "Failure reading state for Grain Type {GrainType} with Id {id}", stateName, id);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
     }
 
-    public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+    public async Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
     {
         var id = GetKeyString(grainId);
 
-        var partitionKey = await BuildPartitionKey(grainType, grainId);
+        var partitionKey = await BuildPartitionKey(stateName, grainId);
 
         if (_logger.IsEnabled(LogLevel.Trace))
         {
             _logger.LogTrace(
                 "Writing: GrainType={GrainType} Key={id} GrainId={GrainId} ETag={ETag} from Container={Container} with PartitionKey={PartitionKey}",
-                grainType,
+                stateName,
                 id,
                 grainId,
                 grainState.ETag,
@@ -129,7 +129,7 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
             {
                 ETag = grainState.ETag,
                 Id = id,
-                GrainType = grainType,
+                GrainType = stateName,
                 State = grainState.State,
                 PartitionKey = partitionKey
             };
@@ -176,25 +176,25 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
         }
         catch (CosmosException dce) when (dce.StatusCode == HttpStatusCode.PreconditionFailed)
         {
-            throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, "Unknown", grainState.ETag);
+            throw new CosmosConditionNotSatisfiedException(stateName, grainId, _options.ContainerName, "Unknown", grainState.ETag);
         }
         catch (Exception exc)
         {
-            _logger.LogError(exc, "Failure writing state for Grain Type {GrainType} with Id {Id}", grainType, id);
+            _logger.LogError(exc, "Failure writing state for Grain Type {GrainType} with Id {Id}", stateName, id);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
     }
 
-    public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+    public async Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
     {
         var id = GetKeyString(grainId);
-        var partitionKey = await BuildPartitionKey(grainType, grainId);
+        var partitionKey = await BuildPartitionKey(stateName, grainId);
         if (_logger.IsEnabled(LogLevel.Trace))
         {
             _logger.LogTrace(
                 "Clearing: GrainType={GrainType} Key={Id} GrainId={GrainId} ETag={ETag} DeleteStateOnClear={DeleteOnClear} from Container={Container} with PartitionKey {PartitionKey}",
-                 grainType,
+                 stateName,
                  id,
                  grainId,
                  grainState.ETag,
@@ -211,11 +211,11 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
             {
                 if (string.IsNullOrWhiteSpace(grainState.ETag))
                 {
-                    await ReadStateAsync<T>(grainType, grainId, grainState);
+                    await ReadStateAsync<T>(stateName, grainId, grainState);
                     if (grainState.RecordExists)
                     {
                         // State exists but the current activation has not observed state creation. Therefore, we have inconsistent state and should throw to give the grain a chance to deactivate and recover.
-                        throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, grainState.ETag, "None");
+                        throw new CosmosConditionNotSatisfiedException(stateName, grainId, _options.ContainerName, grainState.ETag, "None");
                     }
 
                     // State does not exist.
@@ -238,7 +238,7 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
                 {
                     ETag = grainState.ETag,
                     Id = id,
-                    GrainType = grainType,
+                    GrainType = stateName,
                     State = default!,
                     PartitionKey = partitionKey
                 };
@@ -261,7 +261,7 @@ public class CosmosGrainStorage : IGrainStorage, ILifecycleParticipant<ISiloLife
         }
         catch (Exception exc)
         {
-            _logger.LogError(exc, "Failure clearing state for Grain Type {GrainType} with Id {Id}", grainType, id);
+            _logger.LogError(exc, "Failure clearing state for Grain Type {GrainType} with Id {Id}", stateName, id);
             WrappedException.CreateAndRethrow(exc);
             throw;
         }

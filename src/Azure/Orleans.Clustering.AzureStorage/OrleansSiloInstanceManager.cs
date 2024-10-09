@@ -170,7 +170,7 @@ namespace Orleans.AzureUtils
 
         internal async Task<int> DeleteTableEntries(string clusterId)
         {
-            if (clusterId == null) throw new ArgumentNullException(nameof(clusterId));
+            ArgumentNullException.ThrowIfNull(clusterId);
 
             var entries = await storage.ReadAllTableEntriesForPartitionAsync(clusterId);
 

@@ -44,15 +44,9 @@ namespace Orleans.Streams
         /// <param name="resources">Resources to be distributed.</param>
         public BestFitBalancer(IEnumerable<TBucket> buckets, IEnumerable<TResource> resources)
         {
-            if (buckets == null)
-            {
-                throw new ArgumentNullException(nameof(buckets));
-            }
+            ArgumentNullException.ThrowIfNull(buckets);
 
-            if (resources == null)
-            {
-                throw new ArgumentNullException(nameof(resources));
-            }
+            ArgumentNullException.ThrowIfNull(resources);
 
             idealDistribution = BuildIdealDistribution(buckets, resources);
         }
@@ -66,10 +60,7 @@ namespace Orleans.Streams
         /// <returns></returns>
         public Dictionary<TBucket, List<TResource>> GetDistribution(IEnumerable<TBucket> activeBuckets)
         {
-            if (activeBuckets == null)
-            {
-                throw new ArgumentNullException(nameof(activeBuckets));
-            }
+            ArgumentNullException.ThrowIfNull(activeBuckets);
 
             // sanitize active buckets.  Remove duplicates, ensure all buckets are valid
             HashSet<TBucket> activeBucketsSet = new HashSet<TBucket>(activeBuckets);

@@ -29,11 +29,11 @@ namespace AWSUtils.Tests.StorageTests
 
             public class SiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloBuilder hostBuilder)
+                public void Configure(ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.AddMemoryGrainStorage("MemoryStore");
-                    hostBuilder.AddMemoryGrainStorage("test1");
-                    hostBuilder.AddDynamoDBGrainStorage("DDBStore", options => options.Service = AWSTestConstants.DynamoDbService);
+                    siloBuilder.AddMemoryGrainStorage("MemoryStore");
+                    siloBuilder.AddMemoryGrainStorage("test1");
+                    siloBuilder.AddDynamoDBGrainStorage("DDBStore", options => options.Service = AWSTestConstants.DynamoDbService);
                 }
             }
         }

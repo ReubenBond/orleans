@@ -49,7 +49,7 @@ namespace Orleans.Serialization.TestKit
             return ToReadOnlySequence(list.ToArray());
         }
 
-        private class ReadOnlyBufferSegment : ReadOnlySequenceSegment<byte>
+        private sealed class ReadOnlyBufferSegment : ReadOnlySequenceSegment<byte>
         {
             public static ReadOnlySequence<byte> Create(IEnumerable<Memory<byte>> buffers)
             {

@@ -141,15 +141,15 @@ public abstract partial class Grain : IGrainBase, IAddressable
     /// It is called before any messages have been dispatched to the grain.
     /// For grains with declared persistent state, this method is called after the State property has been populated.
     /// </summary>
-    /// <param name="cancellationToken">A cancellation token which signals when activation is being canceled.</param>
-    public virtual Task OnActivateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    /// <param name="token">A cancellation token which signals when activation is being canceled.</param>
+    public virtual Task OnActivateAsync(CancellationToken token) => Task.CompletedTask;
 
     /// <summary>
     /// This method is called at the beginning of the process of deactivating a grain.
     /// </summary>
     /// <param name="reason">The reason for deactivation. Informational only.</param>
-    /// <param name="cancellationToken">A cancellation token which signals when deactivation should complete promptly.</param>
-    public virtual Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken) => Task.CompletedTask;
+    /// <param name="token">A cancellation token which signals when deactivation should complete promptly.</param>
+    public virtual Task OnDeactivateAsync(DeactivationReason reason, CancellationToken token) => Task.CompletedTask;
 
     internal void EnsureRuntime()
     {

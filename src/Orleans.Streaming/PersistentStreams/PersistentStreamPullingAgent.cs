@@ -56,7 +56,7 @@ namespace Orleans.Streams
             IBackoffProvider queueReaderBackoffProvider)
             : base(id, siloAddress, loggerFactory)
         {
-            if (strProviderName == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: strProviderName should not be null");
+            ArgumentNullException.ThrowIfNull(strProviderName);
 
             QueueId = queueId;
             streamProviderName = strProviderName;
@@ -810,7 +810,7 @@ namespace Orleans.Streams
         {
             try
             {
-                if (pubSub == null) throw new NullReferenceException("Found pubSub reference not set up correctly in RetrieveNewStream");
+                if (pubSub == null) throw new InvalidOperationException("Found pubSub reference not set up correctly in RetrieveNewStream");
 
                 ISet<PubSubSubscriptionState> streamData = null;
                 await AsyncExecutorWithRetries.ExecuteWithRetries(

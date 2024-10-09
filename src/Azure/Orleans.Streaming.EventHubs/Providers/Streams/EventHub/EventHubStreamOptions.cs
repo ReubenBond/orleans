@@ -73,10 +73,7 @@ namespace Orleans.Configuration
 
             ValidateValues(eventHubName, consumerGroup);
 
-            if (credential is null)
-            {
-                throw new ArgumentNullException(nameof(credential));
-            }
+            ArgumentNullException.ThrowIfNull(credential);
 
             CreateConnection = connectionOptions => new EventHubConnection(fullyQualifiedNamespace, EventHubName, credential, connectionOptions);
         }
@@ -96,10 +93,7 @@ namespace Orleans.Configuration
 
             ValidateValues(eventHubName, consumerGroup);
 
-            if (credential is null)
-            {
-                throw new ArgumentNullException(nameof(credential));
-            }
+            ArgumentNullException.ThrowIfNull(credential);
 
             CreateConnection = connectionOptions => new EventHubConnection(fullyQualifiedNamespace, EventHubName, credential, connectionOptions);
         }
@@ -117,11 +111,8 @@ namespace Orleans.Configuration
             }
 
             ValidateValues(eventHubName, consumerGroup);
-            if (credential is null)
-            {
-                throw new ArgumentNullException(nameof(credential));
-            }
-            
+            ArgumentNullException.ThrowIfNull(credential);
+
             CreateConnection = connectionOptions => new EventHubConnection(fullyQualifiedNamespace, EventHubName, credential, connectionOptions);
         }
 
@@ -133,7 +124,7 @@ namespace Orleans.Configuration
             EventHubName = connection.EventHubName;
             ConsumerGroup = consumerGroup;
             ValidateValues(connection.EventHubName, consumerGroup);
-            if (connection is null) throw new ArgumentNullException(nameof(connection));
+            ArgumentNullException.ThrowIfNull(connection);
             CreateConnection = _ => connection;
         }
 

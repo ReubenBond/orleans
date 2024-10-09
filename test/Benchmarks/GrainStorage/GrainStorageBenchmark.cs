@@ -53,17 +53,17 @@ namespace Benchmarks.GrainStorage
 
         public class SiloMemoryStorageConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddMemoryGrainStorageAsDefault();
+                siloBuilder.AddMemoryGrainStorageAsDefault();
             }
         }
 
         public class SiloAzureTableStorageConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddAzureTableGrainStorageAsDefault(options =>
+                siloBuilder.AddAzureTableGrainStorageAsDefault(options =>
                 {
                     options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
                 });
@@ -72,9 +72,9 @@ namespace Benchmarks.GrainStorage
 
         public class SiloAzureBlobStorageConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddAzureBlobGrainStorageAsDefault(options =>
+                siloBuilder.AddAzureBlobGrainStorageAsDefault(options =>
                 {
                     options.BlobServiceClient = new(TestDefaultConfiguration.DataConnectionString);
                 });
@@ -83,9 +83,9 @@ namespace Benchmarks.GrainStorage
 
         public class SiloAdoNetStorageConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddAdoNetGrainStorageAsDefault(options =>
+                siloBuilder.AddAdoNetGrainStorageAsDefault(options =>
                 {
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 });

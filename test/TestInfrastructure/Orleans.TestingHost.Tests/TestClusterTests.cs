@@ -251,9 +251,9 @@ namespace Orleans.TestingHost.Tests
 
         public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddMemoryGrainStorageAsDefault();
+                siloBuilder.AddMemoryGrainStorageAsDefault();
             }
         }
         public void Dispose()

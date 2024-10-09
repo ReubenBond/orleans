@@ -543,7 +543,7 @@ namespace Orleans.TestingHost
         /// <param name="siloName">Silo to be restarted.</param>
         public async Task<SiloHandle> RestartStoppedSecondarySiloAsync(string siloName)
         {
-            if (siloName == null) throw new ArgumentNullException(nameof(siloName));
+            ArgumentNullException.ThrowIfNull(siloName);
             var siloHandle = this.Silos.Single(s => s.Name.Equals(siloName, StringComparison.Ordinal));
             var newInstance = await this.StartSiloAsync(this.Silos.IndexOf(siloHandle), this.options);
             lock (additionalSilos)
@@ -691,7 +691,7 @@ namespace Orleans.TestingHost
         /// <returns>A handle to the silo deployed</returns>
         public static async Task<SiloHandle> StartSiloAsync(TestCluster cluster, int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false)
         {
-            if (cluster == null) throw new ArgumentNullException(nameof(cluster));
+            ArgumentNullException.ThrowIfNull(cluster);
             return await cluster.StartSiloAsync(instanceNumber, clusterOptions, configurationOverrides, startSiloOnNewPort);
         }
 

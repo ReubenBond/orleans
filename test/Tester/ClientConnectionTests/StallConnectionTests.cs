@@ -25,9 +25,9 @@ namespace Tester.ClientConnectionTests
 
         public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.Configure<ConnectionOptions>(options => options.OpenConnectionTimeout = Timeout);
+                siloBuilder.Configure<ConnectionOptions>(options => options.OpenConnectionTimeout = Timeout);
             }
         }
 

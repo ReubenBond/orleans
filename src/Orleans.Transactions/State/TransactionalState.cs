@@ -53,7 +53,7 @@ namespace Orleans.Transactions
         /// <summary>
         /// Read the current state.
         /// </summary>
-        public Task<TResult> PerformRead<TResult>(Func<TState, TResult> operation)
+        public Task<TResult> PerformRead<TResult>(Func<TState, TResult> readFunction)
         {
             if (detectReentrancy)
             {
@@ -97,7 +97,7 @@ namespace Orleans.Transactions
                      {
                          detectReentrancy = true;
 
-                         result = CopyResult(operation(record.State));
+                         result = CopyResult(readFunction(record.State));
                      }
                      finally
                      {
@@ -112,9 +112,9 @@ namespace Orleans.Transactions
         }
 
         /// <inheritdoc/>
-        public Task<TResult> PerformUpdate<TResult>(Func<TState, TResult> updateAction)
+        public Task<TResult> PerformUpdate<TResult>(Func<TState, TResult> updateFunction)
         {
-            if (updateAction == null) throw new ArgumentNullException(nameof(updateAction));
+            ArgumentNullException.ThrowIfNull(updateFunction);
             if (detectReentrancy)
             {
                 throw new LockRecursionException("Cannot perform an update operation from within another operation");
@@ -175,7 +175,7 @@ namespace Orleans.Transactions
                     {
                         detectReentrancy = true;
 
-                        return CopyResult(updateAction(record.State));
+                        return CopyResult(updateFunction(record.State));
                     }
                     finally
                     {

@@ -21,7 +21,7 @@ namespace BenchmarkGrains.MapReduce
 
         public Task Initialize(ITransformProcessor<TInput, TOutput> processor)
         {
-            if (processor == null) throw new ArgumentNullException(nameof(processor));
+            ArgumentNullException.ThrowIfNull(processor);
             this._processor = processor;
             return Task.CompletedTask;
         }

@@ -19,9 +19,9 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public BinaryData Serialize<T>(T value)
+        public BinaryData Serialize<T>(T input)
         {
-            var data = _orleansJsonSerializer.Serialize(value, typeof(T));
+            var data = _orleansJsonSerializer.Serialize(input, typeof(T));
             return new BinaryData(data);
         }
 

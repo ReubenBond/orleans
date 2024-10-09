@@ -26,9 +26,9 @@ namespace UnitTests.StreamingTests
 
         public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
+                siloBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
                     .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1)
                     .ConfigureServices(services =>
                     {

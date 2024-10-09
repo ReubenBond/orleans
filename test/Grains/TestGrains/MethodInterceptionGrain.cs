@@ -295,7 +295,7 @@ namespace UnitTests.Grains
 
         public Task<string> GetRequestContext() => Task.FromResult((string)RequestContext.Get(Key) + "4");
 
-        public async Task Invoke(IIncomingGrainCallContext ctx)
+        public async Task Invoke(IIncomingGrainCallContext context)
         {
             var attemptsRemaining = 2;
 
@@ -303,8 +303,8 @@ namespace UnitTests.Grains
             {
                 try
                 {
-                    var interfaceMethod = ctx.InterfaceMethod ?? throw new ArgumentException("InterfaceMethod is null!");
-                    var implementationMethod = ctx.ImplementationMethod ?? throw new ArgumentException("ImplementationMethod is null!");
+                    var interfaceMethod = context.InterfaceMethod ?? throw new ArgumentException("InterfaceMethod is null!");
+                    var implementationMethod = context.ImplementationMethod ?? throw new ArgumentException("ImplementationMethod is null!");
                     if (!string.Equals(implementationMethod.Name, interfaceMethod.Name))
                     {
                         throw new ArgumentException("InterfaceMethod.Name != ImplementationMethod.Name");
@@ -317,14 +317,14 @@ namespace UnitTests.Grains
                     }
 
                     if (RequestContext.Get(Key) is string value) RequestContext.Set(Key, value + '3');
-                    await ctx.Invoke();
+                    await context.Invoke();
                     return;
                 }
                 catch (ArgumentOutOfRangeException) when (attemptsRemaining > 1)
                 {
-                    if (string.Equals(ctx.ImplementationMethod?.Name, nameof(ThrowIfGreaterThanZero)) && ctx.Request.GetArgument(0) is int value)
+                    if (string.Equals(context.ImplementationMethod?.Name, nameof(ThrowIfGreaterThanZero)) && context.Request.GetArgument(0) is int value)
                     {
-                        ctx.Request.SetArgument(0, value - 1);
+                        context.Request.SetArgument(0, value - 1);
                     }
 
                     --attemptsRemaining;
@@ -355,7 +355,7 @@ namespace UnitTests.Grains
 
         public Task<string> GetRequestContext() => Task.FromResult((string)RequestContext.Get(Key) + "4");
 
-        public async Task Invoke(IIncomingGrainCallContext ctx)
+        public async Task Invoke(IIncomingGrainCallContext context)
         {
             var attemptsRemaining = 2;
 
@@ -363,8 +363,8 @@ namespace UnitTests.Grains
             {
                 try
                 {
-                    var interfaceMethod = ctx.InterfaceMethod ?? throw new ArgumentException("InterfaceMethod is null!");
-                    var implementationMethod = ctx.ImplementationMethod ?? throw new ArgumentException("ImplementationMethod is null!");
+                    var interfaceMethod = context.InterfaceMethod ?? throw new ArgumentException("InterfaceMethod is null!");
+                    var implementationMethod = context.ImplementationMethod ?? throw new ArgumentException("ImplementationMethod is null!");
                     if (!string.Equals(implementationMethod.Name, interfaceMethod.Name))
                     {
                         throw new ArgumentException("InterfaceMethod.Name != ImplementationMethod.Name");
@@ -377,14 +377,14 @@ namespace UnitTests.Grains
                     }
 
                     if (RequestContext.Get(Key) is string value) RequestContext.Set(Key, value + '3');
-                    await ctx.Invoke();
+                    await context.Invoke();
                     return;
                 }
                 catch (ArgumentOutOfRangeException) when (attemptsRemaining > 1)
                 {
-                    if (string.Equals(ctx.ImplementationMethod?.Name, nameof(ThrowIfGreaterThanZero)) && ctx.Request.GetArgument(0) is int value)
+                    if (string.Equals(context.ImplementationMethod?.Name, nameof(ThrowIfGreaterThanZero)) && context.Request.GetArgument(0) is int value)
                     {
-                        ctx.Request.SetArgument(0, value - 1);
+                        context.Request.SetArgument(0, value - 1);
                     }
 
                     --attemptsRemaining;

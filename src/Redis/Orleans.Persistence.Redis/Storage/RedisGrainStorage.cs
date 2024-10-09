@@ -102,9 +102,9 @@ namespace Orleans.Persistence
         }
 
         /// <inheritdoc />
-        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
-            var key = _getKeyFunc(grainType, grainId);
+            var key = _getKeyFunc(stateName, grainId);
 
             try
             {
@@ -136,15 +136,15 @@ namespace Orleans.Persistence
             {
                 _logger.LogError(
                     "Failed to read grain state for {GrainType} grain with ID {GrainId} and storage key {Key}.",
-                    grainType,
+                    stateName,
                     grainId,
                     key);
-                throw new RedisStorageException(Invariant($"Failed to read grain state for {grainType} with ID {grainId} and storage key {key}. {exception.GetType()}: {exception.Message}"));
+                throw new RedisStorageException(Invariant($"Failed to read grain state for {stateName} with ID {grainId} and storage key {key}. {exception.GetType()}: {exception.Message}"));
             }
         }
 
         /// <inheritdoc />
-        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
             const string WriteScript =
                 """
@@ -160,7 +160,7 @@ namespace Orleans.Persistence
                 end
                 """;
 
-            var key = _getKeyFunc(grainType, grainId);
+            var key = _getKeyFunc(stateName, grainId);
             RedisValue etag = grainState.ETag ?? "";
             RedisValue newEtag = Guid.NewGuid().ToString("N");
 
@@ -173,7 +173,7 @@ namespace Orleans.Persistence
 
                 if (response is not null && (int)response == -1)
                 {
-                    throw new InconsistentStateException($"Version conflict ({nameof(WriteStateAsync)}): ServiceId={_serviceId} ProviderName={_name} GrainType={grainType} GrainId={grainId} ETag={grainState.ETag}.");
+                    throw new InconsistentStateException($"Version conflict ({nameof(WriteStateAsync)}): ServiceId={_serviceId} ProviderName={_name} GrainType={stateName} GrainId={grainId} ETag={grainState.ETag}.");
                 }
 
                 grainState.ETag = newEtag;
@@ -183,11 +183,11 @@ namespace Orleans.Persistence
             {
                 _logger.LogError(
                     "Failed to write grain state for {GrainType} grain with ID {GrainId} and storage key {Key}.",
-                    grainType,
+                    stateName,
                     grainId,
                     key);
                 throw new RedisStorageException(
-                    Invariant($"Failed to write grain state for {grainType} grain with ID {grainId} and storage key {key}. {exception.GetType()}: {exception.Message}"));
+                    Invariant($"Failed to write grain state for {stateName} grain with ID {grainId} and storage key {key}. {exception.GetType()}: {exception.Message}"));
 
             }
         }
@@ -221,14 +221,14 @@ namespace Orleans.Persistence
         }
 
         /// <inheritdoc />
-        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
             try
             {
                 RedisValue etag = grainState.ETag ?? "";
                 RedisResult response;
                 string newETag;
-                var key = _getKeyFunc(grainType, grainId);
+                var key = _getKeyFunc(stateName, grainId);
                 if (_options.DeleteStateOnClear)
                 {
                     const string DeleteScript =
@@ -262,7 +262,7 @@ namespace Orleans.Persistence
 
                 if (response is not null && (int)response == -1)
                 {
-                    throw new InconsistentStateException($"Version conflict ({nameof(ClearStateAsync)}): ServiceId={_serviceId} ProviderName={_name} GrainType={grainType} GrainId={grainId} ETag={grainState.ETag}.");
+                    throw new InconsistentStateException($"Version conflict ({nameof(ClearStateAsync)}): ServiceId={_serviceId} ProviderName={_name} GrainType={stateName} GrainId={grainId} ETag={grainState.ETag}.");
                 }
 
                 grainState.ETag = newETag;
@@ -270,7 +270,7 @@ namespace Orleans.Persistence
             }
             catch (Exception exception) when (exception is not InconsistentStateException)
             {
-                throw new RedisStorageException(Invariant($"Failed to clear grain state for grain {grainType} with ID {grainId}. {exception.GetType()}: {exception.Message}"));
+                throw new RedisStorageException(Invariant($"Failed to clear grain state for grain {stateName} with ID {grainId}. {exception.GetType()}: {exception.Message}"));
             }
         }
 

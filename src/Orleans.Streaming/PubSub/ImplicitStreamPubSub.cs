@@ -14,10 +14,7 @@ namespace Orleans.Streams
 
         public ImplicitStreamPubSub(IInternalGrainFactory grainFactory, ImplicitStreamSubscriberTable implicitPubSubTable)
         {
-            if (implicitPubSubTable == null)
-            {
-                throw new ArgumentNullException(nameof(implicitPubSubTable));
-            }
+            ArgumentNullException.ThrowIfNull(implicitPubSubTable);
 
             this.grainFactory = grainFactory;
             this.implicitTable = implicitPubSubTable;

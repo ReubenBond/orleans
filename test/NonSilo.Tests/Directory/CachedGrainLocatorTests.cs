@@ -37,7 +37,7 @@ namespace UnitTests.Directory
 
             this.grainDirectory = Substitute.For<IGrainDirectory>();
             var services = new ServiceCollection()
-                .AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (sp, name) => this.grainDirectory)
+                .AddGrainDirectory(GrainDirectoryAttribute.DefaultGrainDirectory, (sp, name) => this.grainDirectory)
                 .BuildServiceProvider();
 
             this.grainDirectoryResolver = new GrainDirectoryResolver(

@@ -72,12 +72,12 @@ namespace Orleans.Runtime.Scheduler
         }
 
         /// <summary>
-        /// Determines whether the provided <see cref="T:System.Threading.Tasks.Task"/> can be executed synchronously in this call, and if it can, executes it.
+        /// Determines whether the provided <see cref="System.Threading.Tasks.Task"/> can be executed synchronously in this call, and if it can, executes it.
         /// </summary>
         /// <returns>
         /// A Boolean value indicating whether the task was executed inline.
         /// </returns>
-        /// <param name="task">The <see cref="T:System.Threading.Tasks.Task"/> to be executed.</param>
+        /// <param name="task">The <see cref="System.Threading.Tasks.Task"/> to be executed.</param>
         /// <param name="taskWasPreviouslyQueued">A Boolean denoting whether or not task has previously been queued. If this parameter is True, then the task may have been previously queued (scheduled); if False, then the task is known not to have been queued, and this call is being made in order to execute the task inline without queuing it.</param>
         protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
         {

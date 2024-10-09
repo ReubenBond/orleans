@@ -23,7 +23,7 @@ namespace Orleans.Streaming.EventHubs
         /// Underlying message cache implementation
         /// Protected for test purposes
         /// </summary>
-        protected readonly PooledQueueCache cache;
+        protected PooledQueueCache Cache { get; }
         private readonly IObjectPool<FixedSizeBuffer> bufferPool;
         private readonly IEventHubDataAdapter dataAdapter;
         private readonly IEvictionStrategy evictionStrategy;
@@ -63,11 +63,11 @@ namespace Orleans.Streaming.EventHubs
             this.bufferPool = bufferPool;
             this.dataAdapter = dataAdapter;
             this.checkpointer = checkpointer;
-            this.cache = new PooledQueueCache(dataAdapter, logger, cacheMonitor, cacheMonitorWriteInterval, metadataMinTimeInCache);
+            this.Cache = new PooledQueueCache(dataAdapter, logger, cacheMonitor, cacheMonitorWriteInterval, metadataMinTimeInCache);
             this.cacheMonitor = cacheMonitor;
             this.evictionStrategy = evictionStrategy;
             this.evictionStrategy.OnPurged = this.OnPurge;
-            this.evictionStrategy.PurgeObservable = this.cache;
+            this.evictionStrategy.PurgeObservable = this.Cache;
             this.cachePressureMonitor = new AggregatedCachePressureMonitor(logger, cacheMonitor);
             this.logger = logger;
         }
@@ -94,6 +94,7 @@ namespace Orleans.Streaming.EventHubs
         /// <filterpriority>2</filterpriority>
         public void Dispose()
         {
+            GC.SuppressFinalize(this);
             this.evictionStrategy.OnPurged = null;
         }
 
@@ -121,7 +122,7 @@ namespace Orleans.Streaming.EventHubs
                 cachedMessages.Add(this.dataAdapter.FromQueueMessage(position, message, dequeueTimeUtc, this.GetSegment));
                 positions.Add(position);
             }
-            cache.Add(cachedMessages, dequeueTimeUtc);
+            Cache.Add(cachedMessages, dequeueTimeUtc);
             return positions;
         }
 
@@ -133,7 +134,7 @@ namespace Orleans.Streaming.EventHubs
         /// <returns></returns>
         public object GetCursor(StreamId streamId, StreamSequenceToken sequenceToken)
         {
-            return cache.GetCursor(streamId, sequenceToken);
+            return Cache.GetCursor(streamId, sequenceToken);
         }
 
         /// <summary>
@@ -144,7 +145,7 @@ namespace Orleans.Streaming.EventHubs
         /// <returns></returns>
         public bool TryGetNextMessage(object cursorObj, out IBatchContainer message)
         {
-            if (!cache.TryGetNextMessage(cursorObj, out message))
+            if (!Cache.TryGetNextMessage(cursorObj, out message))
                 return false;
             double cachePressureContribution;
             cachePressureMonitor.RecordCachePressureContribution(
@@ -185,17 +186,17 @@ namespace Orleans.Streaming.EventHubs
         {
             cachePressureContribution = 0;
             // if cache is empty or has few items, don't calculate pressure
-            if (cache.IsEmpty ||
-                !cache.Newest.HasValue ||
-                !cache.Oldest.HasValue ||
-                cache.Newest.Value.SequenceNumber - cache.Oldest.Value.SequenceNumber < 10 * defaultMaxAddCount) // not enough items in cache.
+            if (Cache.IsEmpty ||
+                !Cache.Newest.HasValue ||
+                !Cache.Oldest.HasValue ||
+                Cache.Newest.Value.SequenceNumber - Cache.Oldest.Value.SequenceNumber < 10 * defaultMaxAddCount) // not enough items in cache.
             {
                 return false;
             }
 
             IEventHubPartitionLocation location = (IEventHubPartitionLocation)token;
-            double cacheSize = cache.Newest.Value.SequenceNumber - cache.Oldest.Value.SequenceNumber;
-            long distanceFromNewestMessage = cache.Newest.Value.SequenceNumber - location.SequenceNumber;
+            double cacheSize = Cache.Newest.Value.SequenceNumber - Cache.Oldest.Value.SequenceNumber;
+            long distanceFromNewestMessage = Cache.Newest.Value.SequenceNumber - location.SequenceNumber;
             // pressure is the ratio of the distance from the front of the cache to the
             cachePressureContribution = distanceFromNewestMessage / cacheSize;
 

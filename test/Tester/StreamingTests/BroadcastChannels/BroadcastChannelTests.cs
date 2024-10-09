@@ -31,10 +31,10 @@ namespace Tester.StreamingTests.BroadcastChannel
             }
             public class SiloConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloBuilder hostBuilder)
+                public void Configure(ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.AddBroadcastChannel(ProviderName);
-                    hostBuilder.AddBroadcastChannel(ProviderNameNonFireAndForget, options => options.FireAndForgetDelivery = false);
+                    siloBuilder.AddBroadcastChannel(ProviderName);
+                    siloBuilder.AddBroadcastChannel(ProviderNameNonFireAndForget, options => options.FireAndForgetDelivery = false);
                 }
             }
             public class ClientConfigurator : IClientBuilderConfigurator

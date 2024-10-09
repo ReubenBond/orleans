@@ -212,8 +212,7 @@ namespace OrleansAWSUtils.Storage
         {
             try
             {
-                if (message == null)
-                    throw new ArgumentNullException(nameof(message));
+                ArgumentNullException.ThrowIfNull(message);
 
                 if (string.IsNullOrWhiteSpace(message.ReceiptHandle))
                     throw new ArgumentNullException(nameof(message.ReceiptHandle));

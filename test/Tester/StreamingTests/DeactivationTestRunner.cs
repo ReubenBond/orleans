@@ -36,7 +36,7 @@ namespace UnitTests.StreamingTests
                 throw new ArgumentNullException(nameof(streamProviderName));
             }
 
-            if (client == null) throw new ArgumentNullException(nameof(client));
+            ArgumentNullException.ThrowIfNull(client);
 
             this.streamProviderName = streamProviderName;
             this.client = client;

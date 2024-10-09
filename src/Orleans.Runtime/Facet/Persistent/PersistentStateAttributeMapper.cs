@@ -12,13 +12,13 @@ namespace Orleans
         private static readonly MethodInfo create = typeof(IPersistentStateFactory).GetMethod("Create");
 
         /// <inheritdoc/>
-        public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, PersistentStateAttribute attribute)
+        public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, PersistentStateAttribute metadata)
         {
-            IPersistentStateConfiguration config = attribute;
+            IPersistentStateConfiguration config = metadata;
             // set state name to parameter name, if not already specified
             if (string.IsNullOrEmpty(config.StateName))
             {
-                config = new PersistentStateConfiguration() { StateName = parameter.Name, StorageName = attribute.StorageName };
+                config = new PersistentStateConfiguration() { StateName = parameter.Name, StorageName = metadata.StorageName };
             }
             // use generic type args to define collection type.
             MethodInfo genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());

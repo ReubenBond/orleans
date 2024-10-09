@@ -31,7 +31,7 @@ namespace Orleans
         private IGrainCancellationTokenRuntime _cancellationTokenRuntime;
 
         /// <summary>
-        /// Initializes the <see cref="T:Orleans.GrainCancellationToken"/>.
+        /// Initializes the <see cref="Orleans.GrainCancellationToken"/>.
         /// </summary>
         /// <param name="id">
         /// The token id.
@@ -45,7 +45,7 @@ namespace Orleans
 
 
         /// <summary>
-        /// Initializes the <see cref="T:Orleans.GrainCancellationToken"/>.
+        /// Initializes the <see cref="Orleans.GrainCancellationToken"/>.
         /// </summary>
         /// <param name="id">
         /// The token id.

@@ -14,12 +14,17 @@ namespace Orleans.GrainDirectory
         /// <summary>
         /// The default grain directory.
         /// </summary>
-        public const string DEFAULT_GRAIN_DIRECTORY = "default";
+        public const string DefaultGrainDirectory = "default";
+
+        [Obsolete("Use DefaultGrainDirectory instead.")]
+#pragma warning disable CA1707 // Identifiers should not contain underscores
+        public const string DEFAULT_GRAIN_DIRECTORY = DefaultGrainDirectory;
+#pragma warning restore CA1707 // Identifiers should not contain underscores
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainDirectoryAttribute"/> class.
         /// </summary>
-        public GrainDirectoryAttribute() : this(DEFAULT_GRAIN_DIRECTORY)
+        public GrainDirectoryAttribute() : this(DefaultGrainDirectory)
         {
         }
 
@@ -42,7 +47,7 @@ namespace Orleans.GrainDirectory
         /// <inheritdoc />
         public void Populate(IServiceProvider services, Type grainClass, GrainType grainType, Dictionary<string, string> properties)
         {
-            properties[WellKnownGrainTypeProperties.GrainDirectory] = this.GrainDirectoryName ?? DEFAULT_GRAIN_DIRECTORY;
+            properties[WellKnownGrainTypeProperties.GrainDirectory] = this.GrainDirectoryName ?? DefaultGrainDirectory;
         }
     }
 }

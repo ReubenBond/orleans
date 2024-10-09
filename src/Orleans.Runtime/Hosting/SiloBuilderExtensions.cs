@@ -18,7 +18,7 @@ namespace Orleans.Hosting
         /// <returns>The same instance of the <see cref="ISiloBuilder"/> for chaining.</returns>
         public static ISiloBuilder ConfigureServices(this ISiloBuilder builder, Action<IServiceCollection> configureDelegate)
         {
-            if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
+            ArgumentNullException.ThrowIfNull(configureDelegate);
             configureDelegate(builder.Services);
             return builder;
         }

@@ -600,13 +600,13 @@ namespace UnitTests.Grains
             this.DeactivateOnIdle();
         }
 
-        public Task OnActivateAsync(CancellationToken cancellationToken)
+        public Task OnActivateAsync(CancellationToken token)
         {
             this.logger.LogDebug("***Activating*** {0}", this.GetPrimaryKey());
             return Task.CompletedTask;
         }
 
-        public Task OnDeactivateAsync(DeactivationReason deactivationReason, CancellationToken cancellationToken)
+        public Task OnDeactivateAsync(DeactivationReason reason, CancellationToken token)
         {
             this.logger.LogDebug("***Deactivating*** {0}", this.GetPrimaryKey());
             return Task.CompletedTask;

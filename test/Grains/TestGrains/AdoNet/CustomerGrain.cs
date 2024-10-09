@@ -29,8 +29,7 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
 
         public async Task AddDevice(IDeviceGrain device)
         {
-            if (device == null)
-                throw new ArgumentNullException(nameof(device));
+            ArgumentNullException.ThrowIfNull(device);
 
             if (null == State.Devices)
                 State.Devices = new List<IDeviceGrain>();

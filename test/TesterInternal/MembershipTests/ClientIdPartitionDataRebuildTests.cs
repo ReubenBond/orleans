@@ -136,16 +136,16 @@ namespace UnitTests.MembershipTests
 
         public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.Configure<ClusterMembershipOptions>(options =>
+                siloBuilder.Configure<ClusterMembershipOptions>(options =>
                 {
                     options.NumMissedProbesLimit = 1;
                     options.ProbeTimeout = TimeSpan.FromMilliseconds(500);
                     options.NumVotesForDeathDeclaration = 1;
                 });
 
-                hostBuilder.Configure<GrainDirectoryOptions>(options => options.CacheSize = 0);
+                siloBuilder.Configure<GrainDirectoryOptions>(options => options.CacheSize = 0);
             }
         }
 

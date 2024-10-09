@@ -38,21 +38,21 @@ namespace Orleans.Runtime.Development
         }
 
         /// <inheritdoc/>
-        public Task Release(string category, AcquiredLease[] acquiredLeases)
+        public Task Release(string category, AcquiredLease[] aquiredLeases)
         {
-            return this.leaseProvider.Release(category, acquiredLeases);
+            return this.leaseProvider.Release(category, aquiredLeases);
         }
 
         /// <inheritdoc/>
-        public async Task<AcquireLeaseResult[]> Renew(string category, AcquiredLease[] acquiredLeases)
+        public async Task<AcquireLeaseResult[]> Renew(string category, AcquiredLease[] aquiredLeases)
         {
             try
             {
-                return await this.leaseProvider.Renew(category, acquiredLeases);
+                return await this.leaseProvider.Renew(category, aquiredLeases);
             }
             catch (Exception ex)
             {
-                return acquiredLeases.Select(request => new AcquireLeaseResult(new AcquiredLease(request.ResourceKey), ResponseCode.TransientFailure, ex)).ToArray();
+                return aquiredLeases.Select(request => new AcquireLeaseResult(new AcquiredLease(request.ResourceKey), ResponseCode.TransientFailure, ex)).ToArray();
             }
         }
 

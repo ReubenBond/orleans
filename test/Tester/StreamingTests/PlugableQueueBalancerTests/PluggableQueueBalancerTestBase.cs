@@ -20,9 +20,9 @@ namespace Tester.StreamingTests
 
         public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.ConfigureServices(services => services.AddTransient<LeaseBasedQueueBalancerForTest>());
+                siloBuilder.ConfigureServices(services => services.AddTransient<LeaseBasedQueueBalancerForTest>());
             }
         }
 

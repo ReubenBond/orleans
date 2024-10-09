@@ -53,9 +53,9 @@ namespace Orleans.Runtime.Membership
         }
 
 
-        public async Task<MembershipTableData> ReadRow(SiloAddress siloAddress)
+        public async Task<MembershipTableData> ReadRow(SiloAddress key)
         {
-            var (siloRegistration, tableVersion) = await GetConsulSiloRegistration(siloAddress);
+            var (siloRegistration, tableVersion) = await GetConsulSiloRegistration(key);
 
             return AssembleMembershipTableData(tableVersion, siloRegistration);
         }

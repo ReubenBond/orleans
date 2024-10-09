@@ -23,9 +23,9 @@ namespace Tester.AzureUtils
 
         public class Configurator : ISiloConfigurator, IClientBuilderConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseAzureStorageClustering(options => options.ConfigureTestDefaults());
+                siloBuilder.UseAzureStorageClustering(options => options.ConfigureTestDefaults());
             }
 
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)

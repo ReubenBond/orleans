@@ -23,15 +23,15 @@ namespace Orleans.BroadcastChannel
         /// <param name="regex">The stream namespace regular expression.</param>
         public RegexChannelNamespacePredicate(string regex)
         {
-            if (regex is null) throw new ArgumentNullException(nameof(regex));
-            
+            ArgumentNullException.ThrowIfNull(regex);
+
             this.regex = new Regex(regex, RegexOptions.Compiled);
         }
 
         /// <inheritdoc />
-        public bool IsMatch(string streamNameSpace)
+        public bool IsMatch(string streamNamespace)
         {
-            return regex.IsMatch(streamNameSpace);
+            return regex.IsMatch(streamNamespace);
         }
     }
 }

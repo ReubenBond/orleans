@@ -106,7 +106,11 @@ namespace Orleans.Serialization.TestKit
         protected virtual Action<Action<TValue>> ValueProvider { get; }
 
         /// <inheritdoc/>
-        void IDisposable.Dispose() => (_serviceProvider as IDisposable)?.Dispose();
+        void IDisposable.Dispose()
+        {
+            GC.SuppressFinalize(this);
+            (_serviceProvider as IDisposable)?.Dispose();
+        }
 
         protected virtual TValue GetWriteCopy(TValue input) => input;
 

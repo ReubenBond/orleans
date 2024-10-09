@@ -32,7 +32,7 @@ namespace Orleans.Runtime.GrainDirectory
                 this.directoryPerName.Add(svc.Name, serviceProvider.GetRequiredKeyedService<IGrainDirectory>(svc.Name));
             }
 
-            this.directoryPerName.TryGetValue(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, out var defaultDirectory);
+            this.directoryPerName.TryGetValue(GrainDirectoryAttribute.DefaultGrainDirectory, out var defaultDirectory);
             this.DefaultGrainDirectory = defaultDirectory;
             this.grainPropertiesResolver = grainPropertiesResolver;
         }

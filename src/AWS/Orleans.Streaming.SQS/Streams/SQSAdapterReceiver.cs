@@ -38,7 +38,7 @@ namespace OrleansAWSUtils.Streams
         private SQSAdapterReceiver(Serializer<SQSBatchContainer> serializer, ILoggerFactory loggerFactory, QueueId queueId, SQSStorage queue)
         {
             if (queueId.IsDefault) throw new ArgumentNullException(nameof(queueId));
-            if (queue == null) throw new ArgumentNullException(nameof(queue));
+            ArgumentNullException.ThrowIfNull(queue);
 
             Id = queueId;
             this.queue = queue;

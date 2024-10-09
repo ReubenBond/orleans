@@ -373,15 +373,15 @@ namespace Orleans.Serialization.UnitTests
 
         public class ObjectWithNewFieldTypeSerializer : IBaseCodec<ObjectWithNewField>
         {
-            public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, ObjectWithNewField obj) where TBufferWriter : IBufferWriter<byte>
+            public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, ObjectWithNewField value) where TBufferWriter : IBufferWriter<byte>
             {
                 // not serializing newField to simulate a binary that's created from a previous version of the object
-                StringCodec.WriteField(ref writer, 0, obj.Blah);
-                Int32Codec.WriteField(ref writer, 2, obj.Version);
+                StringCodec.WriteField(ref writer, 0, value.Blah);
+                Int32Codec.WriteField(ref writer, 2, value.Version);
             }
 
             // using a generated deserializer for deserialization
-            public void Deserialize<TInput>(ref Reader<TInput> reader, ObjectWithNewField obj)
+            public void Deserialize<TInput>(ref Reader<TInput> reader, ObjectWithNewField value)
             {
             }
         }
@@ -406,16 +406,16 @@ namespace Orleans.Serialization.UnitTests
 
         public class ObjectWithoutNewFieldTypeSerializer : IBaseCodec<ObjectWithoutNewField>
         {
-            public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, ObjectWithoutNewField obj) where TBufferWriter : IBufferWriter<byte>
+            public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, ObjectWithoutNewField value) where TBufferWriter : IBufferWriter<byte>
             {
-                StringCodec.WriteField(ref writer, 0, obj.Blah);
-                Int32Codec.WriteField(ref writer, 1, obj.Version);
+                StringCodec.WriteField(ref writer, 0, value.Blah);
+                Int32Codec.WriteField(ref writer, 1, value.Version);
                 // serializing a new field to simulate a binary that's created from a newer version of the object
                 ObjectCodec.WriteField(ref writer, 6, "I will be stuck in binary limbo! (I shouldn't be part of the deserialized object)");
             }
 
             // using a generated deserializer for deserialization
-            public void Deserialize<TInput>(ref Reader<TInput> reader, ObjectWithoutNewField obj)
+            public void Deserialize<TInput>(ref Reader<TInput> reader, ObjectWithoutNewField value)
             {
             }
         }
@@ -502,24 +502,24 @@ namespace Orleans.Serialization.UnitTests
                 _objectCodec = OrleansGeneratedCodeHelper.UnwrapService(this, objectCodec);
             }
 
-            public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, SubType obj) where TBufferWriter : IBufferWriter<byte>
+            public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, SubType value) where TBufferWriter : IBufferWriter<byte>
             {
-                _baseTypeSerializer.Serialize(ref writer, obj);
+                _baseTypeSerializer.Serialize(ref writer, value);
                 writer.WriteEndBase(); // the base object is complete.
 
-                _stringCodec.WriteField(ref writer, 0, typeof(string), obj.String);
-                _intCodec.WriteField(ref writer, 1, typeof(int), obj.Int);
-                _objectCodec.WriteField(ref writer, 1, typeof(object), obj.Ref);
-                _intCodec.WriteField(ref writer, 1, typeof(int), obj.Int);
-                _intCodec.WriteField(ref writer, 409, typeof(int), obj.Int);
+                _stringCodec.WriteField(ref writer, 0, typeof(string), value.String);
+                _intCodec.WriteField(ref writer, 1, typeof(int), value.Int);
+                _objectCodec.WriteField(ref writer, 1, typeof(object), value.Ref);
+                _intCodec.WriteField(ref writer, 1, typeof(int), value.Int);
+                _intCodec.WriteField(ref writer, 409, typeof(int), value.Int);
                 /*writer.WriteFieldHeader(session, 1025, typeof(Guid), Guid.Empty.GetType(), WireType.Fixed128);
                 writer.WriteFieldHeader(session, 1020, typeof(object), typeof(Program), WireType.Reference);*/
             }
 
-            public void Deserialize<TInput>(ref Reader<TInput> reader, SubType obj)
+            public void Deserialize<TInput>(ref Reader<TInput> reader, SubType value)
             {
                 uint fieldId = 0;
-                _baseTypeSerializer.Deserialize(ref reader, obj);
+                _baseTypeSerializer.Deserialize(ref reader, value);
                 while (true)
                 {
                     var header = reader.ReadFieldHeader();
@@ -532,13 +532,13 @@ namespace Orleans.Serialization.UnitTests
                     switch (fieldId)
                     {
                         case 0:
-                            obj.String = _stringCodec.ReadValue(ref reader, header);
+                            value.String = _stringCodec.ReadValue(ref reader, header);
                             break;
                         case 1:
-                            obj.Int = _intCodec.ReadValue(ref reader, header);
+                            value.Int = _intCodec.ReadValue(ref reader, header);
                             break;
                         case 2:
-                            obj.Ref = _objectCodec.ReadValue(ref reader, header);
+                            value.Ref = _objectCodec.ReadValue(ref reader, header);
                             break;
                         default:
                             reader.ConsumeUnknownField(header);
@@ -550,13 +550,13 @@ namespace Orleans.Serialization.UnitTests
 
         public class BaseTypeSerializer : IBaseCodec<BaseType>
         {
-            public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, BaseType obj) where TBufferWriter : IBufferWriter<byte>
+            public void Serialize<TBufferWriter>(ref Writer<TBufferWriter> writer, BaseType value) where TBufferWriter : IBufferWriter<byte>
             {
-                StringCodec.WriteField(ref writer, 0, obj.BaseTypeString);
-                StringCodec.WriteField(ref writer, 234, obj.AddedLaterString);
+                StringCodec.WriteField(ref writer, 0, value.BaseTypeString);
+                StringCodec.WriteField(ref writer, 234, value.AddedLaterString);
             }
 
-            public void Deserialize<TInput>(ref Reader<TInput> reader, BaseType obj)
+            public void Deserialize<TInput>(ref Reader<TInput> reader, BaseType value)
             {
                 uint fieldId = 0;
                 while (true)
@@ -571,7 +571,7 @@ namespace Orleans.Serialization.UnitTests
                     switch (fieldId)
                     {
                         case 0:
-                            obj.BaseTypeString = StringCodec.ReadValue(ref reader, header);
+                            value.BaseTypeString = StringCodec.ReadValue(ref reader, header);
                             break;
                         default:
                             reader.ConsumeUnknownField(header);

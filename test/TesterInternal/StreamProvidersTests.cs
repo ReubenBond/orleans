@@ -29,9 +29,9 @@ namespace UnitTests.Streaming
 
             public class SiloHostConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloBuilder hostBuilder)
+                public void Configure(ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .AddMemoryGrainStorage("MemoryStore")
                         .ConfigureServices(services =>
                         {

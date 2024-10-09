@@ -11,9 +11,9 @@ namespace Orleans.Transactions.TestKit
     [StatelessWorker]
     public class TransactionCoordinatorGrain : Grain, ITransactionCoordinatorGrain
     {
-        public Task MultiGrainSet(List<ITransactionTestGrain> grains, int newValue)
+        public Task MultiGrainSet(List<ITransactionTestGrain> grains, int numberToAdd)
         {
-            return Task.WhenAll(grains.Select(g => g.Set(newValue)));
+            return Task.WhenAll(grains.Select(g => g.Set(numberToAdd)));
         }
 
         public Task MultiGrainAdd(List<ITransactionTestGrain> grains, int numberToAdd)
@@ -35,13 +35,13 @@ namespace Orleans.Transactions.TestKit
         public async Task AddAndThrow(ITransactionTestGrain grain, int numberToAdd)
         {
             await grain.Add(numberToAdd);
-            throw new Exception("This should abort the transaction");
+            throw new InvalidOperationException("This should abort the transaction");
         }
 
-        public async Task MultiGrainAddAndThrow(List<ITransactionTestGrain> throwGrains, List<ITransactionTestGrain> grains, int numberToAdd)
+        public async Task MultiGrainAddAndThrow(List<ITransactionTestGrain> grain, List<ITransactionTestGrain> grains, int numberToAdd)
         {
             await Task.WhenAll(grains.Select(g => g.Add(numberToAdd)));
-            await Task.WhenAll(throwGrains.Select(tg => tg.AddAndThrow(numberToAdd)));
+            await Task.WhenAll(grain.Select(tg => tg.AddAndThrow(numberToAdd)));
         }
 
         public Task MultiGrainSetBit(List<ITransactionalBitArrayGrain> grains, int bitIndex)

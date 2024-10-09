@@ -14,15 +14,9 @@ namespace Orleans.Streams
 
         public StreamPubSubImpl(IStreamPubSub explicitPubSub, ImplicitStreamPubSub implicitPubSub)
         {
-            if (explicitPubSub == null)
-            {
-                throw new ArgumentNullException(nameof(explicitPubSub));
-            }
+            ArgumentNullException.ThrowIfNull(explicitPubSub);
 
-            if (implicitPubSub == null)
-            {
-                throw new ArgumentNullException(nameof(implicitPubSub));
-            }
+            ArgumentNullException.ThrowIfNull(implicitPubSub);
 
             this.explicitPubSub = explicitPubSub;
             this.implicitPubSub = implicitPubSub;

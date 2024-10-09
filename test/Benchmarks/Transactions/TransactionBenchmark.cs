@@ -60,17 +60,17 @@ namespace Benchmarks.Transactions
 
         public class SiloMemoryStorageConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddMemoryGrainStorageAsDefault();
+                siloBuilder.AddMemoryGrainStorageAsDefault();
             }
         }
 
         public class SiloAzureStorageConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.AddAzureTableTransactionalStateStorageAsDefault(options =>
+                siloBuilder.AddAzureTableTransactionalStateStorageAsDefault(options =>
                 {
                     options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
                 });
@@ -79,9 +79,9 @@ namespace Benchmarks.Transactions
 
         public class SiloTransactionThrottlingConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.Configure<TransactionRateLoadSheddingOptions>(options =>
+                siloBuilder.Configure<TransactionRateLoadSheddingOptions>(options =>
                 {
                     options.Enabled = true;
                     options.Limit = 50;
@@ -144,9 +144,9 @@ namespace Benchmarks.Transactions
 
         public sealed class SiloTransactionConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseTransactions();
+                siloBuilder.UseTransactions();
             }
         }
     }

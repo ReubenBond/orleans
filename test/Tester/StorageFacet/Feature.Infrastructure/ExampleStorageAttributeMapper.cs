@@ -9,9 +9,9 @@ namespace Tester.StorageFacet.Infrastructure
     {
         private static readonly MethodInfo create = typeof(INamedExampleStorageFactory).GetMethod("Create");
 
-        public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, ExampleStorageAttribute attribute)
+        public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, ExampleStorageAttribute metadata)
         {
-            IExampleStorageConfig config = attribute;
+            IExampleStorageConfig config = metadata;
             // set state name to parameter name, if not already specified
             if (string.IsNullOrEmpty(config.StateName))
             {
@@ -19,7 +19,7 @@ namespace Tester.StorageFacet.Infrastructure
             }
             // use generic type args to define collection type.
             MethodInfo genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
-            object[] args = new object[] {attribute.StorageProviderName, config};
+            object[] args = new object[] {metadata.StorageProviderName, config};
             return context => Create(context, genericCreate, args);
         }
 

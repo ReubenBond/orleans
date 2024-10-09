@@ -27,9 +27,9 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         public static IQueueAdapterReceiver Create(ILoggerFactory loggerFactory, string azureQueueName, AzureQueueOptions queueOptions, IQueueDataAdapter<string, IBatchContainer> dataAdapter)
         {
-            if (azureQueueName == null) throw new ArgumentNullException(nameof(azureQueueName));
-            if (queueOptions == null) throw new ArgumentNullException(nameof(queueOptions));
-            if (dataAdapter == null) throw new ArgumentNullException(nameof(dataAdapter));
+            ArgumentNullException.ThrowIfNull(azureQueueName);
+            ArgumentNullException.ThrowIfNull(queueOptions);
+            ArgumentNullException.ThrowIfNull(dataAdapter);
 
             var queue = new AzureQueueDataManager(loggerFactory, azureQueueName, queueOptions);
             return new AzureQueueAdapterReceiver(azureQueueName, loggerFactory, queue, dataAdapter);

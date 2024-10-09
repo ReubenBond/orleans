@@ -22,11 +22,10 @@ namespace Orleans.Transactions.TestKit
 
         protected void Log(string message)
         {
-            this.testOutput($"[{DateTime.Now}] {message}");
             this.logger.LogInformation(message);
         }
 
-        private class ExpectedGrainActivity
+        private sealed class ExpectedGrainActivity
         {
             public ExpectedGrainActivity(Guid grainId, ITransactionalBitArrayGrain grain)
             {

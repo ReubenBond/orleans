@@ -141,7 +141,7 @@ namespace Orleans.Runtime.GrainDirectory
         /// <inheritdoc />
         public void SetSiloRemovedCatalogCallback(Action<SiloAddress, SiloStatus> callback)
         {
-            if (callback == null) throw new ArgumentNullException(nameof(callback));
+            ArgumentNullException.ThrowIfNull(callback);
             lock (this.writeLock)
             {
                 this.catalogOnSiloRemoved = callback;

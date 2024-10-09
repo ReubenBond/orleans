@@ -39,7 +39,7 @@ namespace ServiceBus.Tests.TestStreamProviders
             this.evictionOptions = evictionOptions;
         }
 
-        protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions options)
+        protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions eventHubCacheOptions)
         {
             var eventHubPath = this.ehOptions.EventHubName;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);

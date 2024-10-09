@@ -268,7 +268,7 @@ internal class CosmosMembershipTable : IMembershipTable
 
             if (response.StatusCode != HttpStatusCode.OK)
             {
-                _logger.LogWarning((int)ErrorCode.MembershipBase, "Unable to query entry {Entry}", entry.ToFullString());
+                _logger.LogWarning("Unable to query entry {Entry}", entry.ToFullString());
                 throw new OrleansException((string?)$"Unable to query for SiloEntity {entry.ToFullString()}");
             }
 
@@ -371,7 +371,7 @@ internal class CosmosMembershipTable : IMembershipTable
                 ? response.Resource
                 : response.StatusCode == HttpStatusCode.NotFound
                     ? null
-                    : throw new Exception($"Error reading Cluster Version entity. Status code: {response.StatusCode}");
+                    : throw new InvalidOperationException($"Error reading Cluster Version entity. Status code: {response.StatusCode}");
         }
         catch (Exception ex)
         {

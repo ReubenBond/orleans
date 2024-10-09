@@ -60,8 +60,7 @@ namespace UnitTests.Grains
 
         public static ConsumerObserver NewObserver(ILogger logger)
         {
-            if (null == logger)
-                throw new ArgumentNullException(nameof(logger));
+            ArgumentNullException.ThrowIfNull(logger);
             return new ConsumerObserver(logger);
         }
 
@@ -194,8 +193,7 @@ namespace UnitTests.Grains
 
         public static ProducerObserver NewObserver(ILogger logger, IGrainFactory grainFactory)
         {
-            if (null == logger)
-                throw new ArgumentNullException(nameof(logger));
+            ArgumentNullException.ThrowIfNull(logger);
             return new ProducerObserver(logger, grainFactory);
         }
 
@@ -297,8 +295,7 @@ namespace UnitTests.Grains
         private void RemoveTimer(IDisposable handle)
         {
             _logger.LogInformation("ProducerObserver.RemoveTimer: streamId={StreamId}.", _streamId);
-            if (handle == null)
-                throw new ArgumentNullException(nameof(handle));
+            ArgumentNullException.ThrowIfNull(handle);
             if (!_timers.Remove(handle))
                 throw new InvalidOperationException("handle not found");
         }
@@ -397,12 +394,9 @@ namespace UnitTests.Grains
 
             public static TimerState NewTimer(Func<Func<object, Task>, IDisposable> startTimerFunc, Func<string, Task<bool>> produceItemFunc, Action<IDisposable> onDisposeFunc, int count)
             {
-                if (null == startTimerFunc)
-                    throw new ArgumentNullException(nameof(startTimerFunc));
-                if (null == produceItemFunc)
-                    throw new ArgumentNullException(nameof(produceItemFunc));
-                if (null == onDisposeFunc)
-                    throw new ArgumentNullException(nameof(onDisposeFunc));
+                ArgumentNullException.ThrowIfNull(startTimerFunc);
+                ArgumentNullException.ThrowIfNull(produceItemFunc);
+                ArgumentNullException.ThrowIfNull(onDisposeFunc);
                 if (0 >= count)
                     throw new ArgumentOutOfRangeException(nameof(count), count, "argument must be > 0");
                 var newOb = new TimerState(produceItemFunc, onDisposeFunc, count);

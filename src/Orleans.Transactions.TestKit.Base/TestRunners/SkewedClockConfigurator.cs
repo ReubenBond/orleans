@@ -10,9 +10,9 @@ namespace Orleans.Transactions.TestKit
         private static readonly TimeSpan MinSkew = TimeSpan.FromSeconds(3);
         private static readonly TimeSpan MaxSkew = TimeSpan.FromSeconds(5);
 
-        public void Configure(ISiloBuilder hostBuilder)
+        public void Configure(ISiloBuilder siloBuilder)
         {
-            hostBuilder
+            siloBuilder
                 .ConfigureServices(services => services.AddSingleton<IClock>(sp => new SkewedClock(MinSkew, MaxSkew)));
         }
     }

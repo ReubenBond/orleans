@@ -15,7 +15,7 @@ namespace UnitTests.General
 
         public AllowCallChainReentrancyTests(ITestOutputHelper output, Fixture fixture)
         {
-            if (output == null) throw new ArgumentNullException(nameof(output));
+            ArgumentNullException.ThrowIfNull(output);
 
             _testHelper = new CallChainReentrancyTestHelper
             {

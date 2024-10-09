@@ -127,21 +127,21 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc />
-        public void SetComponent<TComponent>(TComponent instance) where TComponent : class
+        public void SetComponent<TComponent>(TComponent value) where TComponent : class
         {
             if (this is TComponent)
             {
                 throw new ArgumentException("Cannot override a component which is implemented by this grain");
             }
 
-            if (instance == null)
+            if (value == null)
             {
                 _components?.Remove(typeof(TComponent));
                 return;
             }
 
             if (_components is null) _components = new Dictionary<Type, object>();
-            _components[typeof(TComponent)] = instance;
+            _components[typeof(TComponent)] = value;
         }
 
         internal void HandleNewRequest(Message request)

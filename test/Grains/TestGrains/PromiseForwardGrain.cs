@@ -49,9 +49,9 @@ namespace UnitTests.Grains
         {
             await GetSimpleGrain().SetA(a);
         }
-        public async Task SetB(int a)
+        public async Task SetB(int b)
         {
-            await GetSimpleGrain().SetB(a);
+            await GetSimpleGrain().SetB(b);
         }
         public Task<int> GetAxB()
         {

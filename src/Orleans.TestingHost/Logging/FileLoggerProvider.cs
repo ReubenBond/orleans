@@ -47,8 +47,7 @@ namespace Orleans.TestingHost.Logging
             this ILoggingBuilder builder,
             string filePathName)
         {
-            if (builder == null)
-                throw new ArgumentNullException(nameof(builder));
+            ArgumentNullException.ThrowIfNull(builder);
             builder.AddProvider(new FileLoggerProvider(filePathName));
             return builder;
         }

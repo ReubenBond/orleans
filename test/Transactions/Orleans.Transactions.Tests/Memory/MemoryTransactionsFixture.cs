@@ -15,9 +15,9 @@ namespace Orleans.Transactions.Tests
 
         public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder
+                siloBuilder
                     .ConfigureServices(services => services.AddKeyedSingleton<IRemoteCommitService, RemoteCommitService>(TransactionTestConstants.RemoteCommitService))
                     .ConfigureTracingForTransactionTests()
                     .AddMemoryGrainStorage(TransactionTestConstants.TransactionStore)

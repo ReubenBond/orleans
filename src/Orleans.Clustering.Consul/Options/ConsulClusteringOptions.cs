@@ -32,8 +32,8 @@ namespace Orleans.Configuration
         /// </summary>
         public void ConfigureConsulClient(Uri address, string aclClientToken = null)
         {
-            if (address is null) throw new ArgumentNullException(nameof(address));            
-            
+            ArgumentNullException.ThrowIfNull(address);
+
             CreateClient = () => new ConsulClient(config =>
             {
                 config.Address = address;

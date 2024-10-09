@@ -19,7 +19,7 @@ namespace Orleans.Hosting
             this ISiloBuilder builder,
             Action<OptionsBuilder<AzureTableGrainDirectoryOptions>> configureOptions)
         {
-            return builder.ConfigureServices(services => services.AddAzureTableGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, configureOptions));
+            return builder.ConfigureServices(services => services.AddAzureTableGrainDirectory(GrainDirectoryAttribute.DefaultGrainDirectory, configureOptions));
         }
 
         public static ISiloBuilder AddAzureTableGrainDirectory(

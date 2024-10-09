@@ -50,23 +50,23 @@ namespace Orleans.Providers.Streams.Common
         private Measurement<long> GetAllocatedMemory() => new(_allocatedMemory, _dimensions);
 
         /// <inheritdoc />
-        public void Report(long totalMemoryInByte, long availableMemoryInByte, long claimedMemoryInByte)
+        public void Report(long totalSizeInByte, long availableMemoryInByte, long claimedMemoryInByte)
         {
-            _totalMemory = totalMemoryInByte;
+            _totalMemory = totalSizeInByte;
             _availableMemory = availableMemoryInByte;
             _claimedMemory = claimedMemoryInByte;
         }
 
         /// <inheritdoc />
-        public void TrackMemoryReleased(long releasedMemoryInByte)
+        public void TrackMemoryReleased(long releasedMemoryInBytes)
         {
-            Interlocked.Add(ref _releasedMemory, releasedMemoryInByte);
+            Interlocked.Add(ref _releasedMemory, releasedMemoryInBytes);
         }
 
         /// <inheritdoc />
-        public void TrackMemoryAllocated(long allocatedMemoryInByte)
+        public void TrackMemoryAllocated(long allocatedMemoryInBytes)
         {
-            Interlocked.Add(ref _allocatedMemory, allocatedMemoryInByte);
+            Interlocked.Add(ref _allocatedMemory, allocatedMemoryInBytes);
         }
     }
 }

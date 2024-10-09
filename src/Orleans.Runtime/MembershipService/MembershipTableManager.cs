@@ -476,7 +476,7 @@ namespace Orleans.Runtime.MembershipService
 
         private void ProcessTableUpdate(MembershipTableData table, string caller)
         {
-            if (table is null) throw new ArgumentNullException(nameof(table));
+            ArgumentNullException.ThrowIfNull(table);
             if (this.log.IsEnabled(LogLevel.Debug)) this.log.LogDebug($"{nameof(ProcessTableUpdate)} (called from {{Caller}}) membership table {{Table}}", caller, table.ToString());
 
             var updated = MembershipTableSnapshot.Create(table);

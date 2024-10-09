@@ -40,7 +40,7 @@ namespace Orleans.Transactions.TestKit.Consistency
 
         public const double recursionProbability = .1 - .9 * (1.0 / (10 * 40 - 1));
 
-        public async Task<Observation[]> Run(ConsistencyTestOptions options, int depth, string stack, int maxgrain, DateTime stopAfter)
+        public async Task<Observation[]> Run(ConsistencyTestOptions options, int depth, string stack, int max, DateTime stopAfter)
         {
             if (random == null)
                 random = new Random(options.RandomSeed* options.NumGrains + MyNumber);
@@ -50,11 +50,11 @@ namespace Orleans.Transactions.TestKit.Consistency
                 switch (random.Next(2))
                 {
                     case 0:
-                        return await Recurse(options, depth, stack, random, 10, ! options.AvoidDeadlocks, maxgrain, stopAfter);
+                        return await Recurse(options, depth, stack, random, 10, ! options.AvoidDeadlocks, max, stopAfter);
                     case 1:
-                        return await Recurse(options, depth, stack, random, 10, false, maxgrain, stopAfter);
+                        return await Recurse(options, depth, stack, random, 10, false, max, stopAfter);
                     case 2:
-                        return await Recurse(options, depth, stack, random, 3, false, maxgrain, stopAfter);
+                        return await Recurse(options, depth, stack, random, 3, false, max, stopAfter);
                 }
             }
 

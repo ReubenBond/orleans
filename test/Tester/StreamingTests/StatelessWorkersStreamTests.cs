@@ -25,9 +25,9 @@ namespace UnitTests.StreamingTests
 
             public class SiloConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloBuilder hostBuilder)
+                public void Configure(ISiloBuilder siloBuilder)
                 {
-                    hostBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProvider)
+                    siloBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProvider)
                          .AddMemoryGrainStorage("PubSubStore");
                 }
             }

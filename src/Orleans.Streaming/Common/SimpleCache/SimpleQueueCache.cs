@@ -132,16 +132,16 @@ namespace Orleans.Providers.Streams.Common
         }
 
         /// <inheritdoc />
-        public virtual void AddToCache(IList<IBatchContainer> msgs)
+        public virtual void AddToCache(IList<IBatchContainer> messages)
         {
-            if (msgs == null) throw new ArgumentNullException(nameof(msgs));
+            ArgumentNullException.ThrowIfNull(messages);
 
             if (logger.IsEnabled(LogLevel.Debug))
             {
-                logger.LogDebug("AddToCache: added {ItemCount} items to cache.", msgs.Count);
+                logger.LogDebug("AddToCache: added {ItemCount} items to cache.", messages.Count);
             }
 
-            foreach (var message in msgs)
+            foreach (var message in messages)
             {
                 Add(message, message.SequenceToken);
             }
@@ -291,7 +291,7 @@ namespace Orleans.Providers.Streams.Common
 
         private void Add(IBatchContainer batch, StreamSequenceToken sequenceToken)
         {
-            if (batch == null) throw new ArgumentNullException(nameof(batch));
+            ArgumentNullException.ThrowIfNull(batch);
             // this should never happen, but just in case
             if (Size >= maxCacheSize) throw new CacheFullException();
 

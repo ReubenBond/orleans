@@ -14,10 +14,7 @@ namespace Orleans.Runtime
     {
         public static Timer Create(TimerCallback callback, object state, TimeSpan dueTime, TimeSpan period)
         {
-            if (callback == null)
-            {
-                throw new ArgumentNullException(nameof(callback));
-            }
+            ArgumentNullException.ThrowIfNull(callback);
 
             // Don't capture the current ExecutionContext and its AsyncLocals onto the timer
             using var suppressExecutionContext = new ExecutionContextSuppressor();

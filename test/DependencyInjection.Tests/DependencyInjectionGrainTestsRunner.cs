@@ -15,9 +15,9 @@ namespace DependencyInjection.Tests
         //while different ServiceProviderFactory set up should be in the more concrete test files
         protected class TestSiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.ConfigureServices(services =>
+                siloBuilder.ConfigureServices(services =>
                 {
                     services.AddSingleton<IReducer<string, Reducer1Action>>(x => new Reducer1());
                     services.AddSingleton<IReducer<int, Reducer2Action>>(x => new Reducer2());

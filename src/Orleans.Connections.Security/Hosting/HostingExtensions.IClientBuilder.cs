@@ -25,10 +25,7 @@ namespace Orleans.Hosting
             StoreLocation location,
             Action<TlsOptions> configureOptions)
         {
-            if (configureOptions is null)
-            {
-                throw new ArgumentNullException(nameof(configureOptions));
-            }
+            ArgumentNullException.ThrowIfNull(configureOptions);
 
             return builder.UseTls(
                 CertificateLoader.LoadFromStoreCert(subject, storeName.ToString(), location, allowInvalid, server: false),
@@ -47,15 +44,9 @@ namespace Orleans.Hosting
             X509Certificate2 certificate,
             Action<TlsOptions> configureOptions)
         {
-            if (certificate is null)
-            {
-                throw new ArgumentNullException(nameof(certificate));
-            }
+            ArgumentNullException.ThrowIfNull(certificate);
 
-            if (configureOptions is null)
-            {
-                throw new ArgumentNullException(nameof(configureOptions));
-            }
+            ArgumentNullException.ThrowIfNull(configureOptions);
 
             if (!certificate.HasPrivateKey)
             {
@@ -79,10 +70,7 @@ namespace Orleans.Hosting
             this IClientBuilder builder,
             X509Certificate2 certificate)
         {
-            if (certificate is null)
-            {
-                throw new ArgumentNullException(nameof(certificate));
-            }
+            ArgumentNullException.ThrowIfNull(certificate);
 
             if (!certificate.HasPrivateKey)
             {
@@ -105,10 +93,7 @@ namespace Orleans.Hosting
             this IClientBuilder builder,
             Action<TlsOptions> configureOptions)
         {
-            if (configureOptions is null)
-            {
-                throw new ArgumentNullException(nameof(configureOptions));
-            }
+            ArgumentNullException.ThrowIfNull(configureOptions);
 
             var options = new TlsOptions();
             configureOptions(options);

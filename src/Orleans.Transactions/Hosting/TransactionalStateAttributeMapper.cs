@@ -18,9 +18,9 @@ namespace Orleans.Transactions
     {
         private static readonly MethodInfo create = typeof(ITransactionalStateFactory).GetMethod("Create");
 
-        public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, TAttribute attribute)
+        public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, TAttribute metadata)
         {
-            TransactionalStateConfiguration config = AttributeToConfig(attribute);
+            TransactionalStateConfiguration config = AttributeToConfig(metadata);
             // use generic type args to define collection type.
             MethodInfo genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
             object[] args = new object[] { config };

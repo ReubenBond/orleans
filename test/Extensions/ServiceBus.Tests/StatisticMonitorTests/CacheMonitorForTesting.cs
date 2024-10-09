@@ -12,7 +12,7 @@ namespace ServiceBus.Tests.MonitorTests
             Interlocked.Increment(ref CallCounters.TrackCachePressureMonitorStatusChangeCallCounter);
         }
 
-        public void ReportCacheSize(long totalCacheSizeInByte)
+        public void ReportCacheSize(long totalCacheSizeInBytes)
         {
             Interlocked.Increment(ref CallCounters.ReportCacheSizeCallCounter);
         }
@@ -22,22 +22,22 @@ namespace ServiceBus.Tests.MonitorTests
             Interlocked.Increment(ref CallCounters.ReportMessageStatisticsCallCounter);
         }
 
-        public void TrackMemoryAllocated(int memoryInByte)
+        public void TrackMemoryAllocated(int memoryInBytes)
         {
             Interlocked.Increment(ref CallCounters.TrackMemoryAllocatedCallCounter);
         }
 
-        public void TrackMemoryReleased(int memoryInByte)
+        public void TrackMemoryReleased(int memoryInBytes)
         {
             Interlocked.Increment(ref CallCounters.TrackMemoryReleasedCallCounter);
         }
 
-        public void TrackMessagesAdded(long mesageAdded)
+        public void TrackMessagesAdded(long messagesAdded)
         {
             Interlocked.Increment(ref CallCounters.TrackMessageAddedCounter);
         }
 
-        public void TrackMessagesPurged(long messagePurged)
+        public void TrackMessagesPurged(long messagesPurged)
         {
             Interlocked.Increment(ref CallCounters.TrackMessagePurgedCounter);
         }

@@ -58,9 +58,9 @@ namespace UnitTests.Grains
                 });
         }
 
-        public Task SetFailPeriod(TimeSpan failurePeriod)
+        public Task SetFailPeriod(TimeSpan failPeriod)
         {
-            failPeriod = failurePeriod;
+            this.failPeriod = failPeriod;
             failPeriodTimer = Stopwatch.StartNew();
             return Task.CompletedTask;
         }

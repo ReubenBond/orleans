@@ -79,7 +79,7 @@ namespace Orleans.EventSourcing.Common
             throw new NotImplementedException();
         }
 
-        public virtual Task<IReadOnlyList<TLogEntry>> RetrieveLogSegment(int fromVersion, int length)
+        public virtual Task<IReadOnlyList<TLogEntry>> RetrieveLogSegment(int fromVersion, int toVersion)
         {
             throw new NotSupportedException();
         }
@@ -270,7 +270,7 @@ namespace Orleans.EventSourcing.Common
         }
 
         /// <inheritdoc />
-        public void Submit(TLogEntry logEntry)
+        public void Submit(TLogEntry entry)
         {
             if (!SupportSubmissions)
                 throw new InvalidOperationException("provider does not support submissions on cluster " + Services.MyClusterId);
@@ -279,13 +279,13 @@ namespace Orleans.EventSourcing.Common
 
             Services.Log(LogLevel.Trace, "Submit");
 
-            SubmitInternal(DateTime.UtcNow, logEntry);
+            SubmitInternal(DateTime.UtcNow, entry);
 
             worker.Notify();
         }
 
         /// <inheritdoc />
-        public void SubmitRange(IEnumerable<TLogEntry> logEntries)
+        public void SubmitRange(IEnumerable<TLogEntry> entries)
         {
             if (!SupportSubmissions)
                 throw new InvalidOperationException("Provider does not support submissions on cluster " + Services.MyClusterId);
@@ -296,14 +296,14 @@ namespace Orleans.EventSourcing.Common
 
             var time = DateTime.UtcNow;
 
-            foreach (var e in logEntries)
+            foreach (var e in entries)
                 SubmitInternal(time, e);
 
             worker.Notify();
         }
 
         /// <inheritdoc />
-        public Task<bool> TryAppend(TLogEntry logEntry)
+        public Task<bool> TryAppend(TLogEntry entry)
         {
             if (!SupportSubmissions)
                 throw new InvalidOperationException("Provider does not support submissions on cluster " + Services.MyClusterId);
@@ -314,7 +314,7 @@ namespace Orleans.EventSourcing.Common
 
             var promise = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            SubmitInternal(DateTime.UtcNow, logEntry, GetConfirmedVersion() + pending.Count, promise);
+            SubmitInternal(DateTime.UtcNow, entry, GetConfirmedVersion() + pending.Count, promise);
 
             worker.Notify();
 
@@ -322,7 +322,7 @@ namespace Orleans.EventSourcing.Common
         }
 
         /// <inheritdoc />
-        public Task<bool> TryAppendRange(IEnumerable<TLogEntry> logEntries)
+        public Task<bool> TryAppendRange(IEnumerable<TLogEntry> entries)
         {
             if (!SupportSubmissions)
                 throw new InvalidOperationException("Provider does not support submissions on cluster " + Services.MyClusterId);
@@ -336,7 +336,7 @@ namespace Orleans.EventSourcing.Common
             var pos = GetConfirmedVersion() + pending.Count;
 
             bool first = true;
-            foreach (var e in logEntries)
+            foreach (var e in entries)
             {
                 SubmitInternal(time, e, pos++, first ? promise : null);
                 first = false;

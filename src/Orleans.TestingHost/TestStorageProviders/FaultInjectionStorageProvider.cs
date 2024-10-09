@@ -59,9 +59,9 @@ namespace Orleans.TestingHost
            
         /// <summary>Faults if exception is provided, otherwise calls through to  decorated storage provider.</summary>
         /// <returns>Completion promise for the Read operation on the specified grain.</returns>
-        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
-            IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
+            IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(stateName);
             try
             {
                 await InsertDelay();
@@ -72,21 +72,21 @@ namespace Orleans.TestingHost
                 logger.LogInformation(
                     "Fault injected for ReadState for grain {GrainId} of type {GrainType}",
                     grainId,
-                    grainType);
+                    stateName);
                 throw;
             }
             logger.LogInformation(
                 "ReadState for grain {GrainId} of type {GrainType}",
                 grainId,
-                grainType);
-            await realStorageProvider.ReadStateAsync(grainType, grainId, grainState);
+                stateName);
+            await realStorageProvider.ReadStateAsync(stateName, grainId, grainState);
         }
 
         /// <summary>Faults if exception is provided, otherwise calls through to  decorated storage provider.</summary>
         /// <returns>Completion promise for the Write operation on the specified grain.</returns>
-        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
-            IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
+            IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(stateName);
             try
             {
                 await InsertDelay();
@@ -97,21 +97,21 @@ namespace Orleans.TestingHost
                 logger.LogInformation(
                     "Fault injected for WriteState for grain {GrainId} of type {GrainType}",
                     grainId,
-                    grainType);
+                    stateName);
                 throw;
             }
             logger.LogInformation(
                 "WriteState for grain {GrainId} of type {GrainType}",
                 grainId,
-                grainType);
-            await realStorageProvider.WriteStateAsync(grainType, grainId, grainState);
+                stateName);
+            await realStorageProvider.WriteStateAsync(stateName, grainId, grainState);
         }
 
         /// <summary>Faults if exception is provided, otherwise calls through to  decorated storage provider.</summary>
         /// <returns>Completion promise for the Delete operation on the specified grain.</returns>
-        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
-            IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(grainType);
+            IStorageFaultGrain faultGrain = grainFactory.GetGrain<IStorageFaultGrain>(stateName);
             try
             {
                 await InsertDelay();
@@ -122,15 +122,15 @@ namespace Orleans.TestingHost
                 logger.LogInformation(
                     "Fault injected for ClearState for grain {GrainId} of type {GrainType}",
                     grainId,
-                    grainType);
+                    stateName);
                 throw;
             }
 
             logger.LogInformation(
                 "ClearState for grain {GrainId} of type {GrainType}",
                 grainId,
-                grainType);
-            await realStorageProvider.ClearStateAsync(grainType, grainId, grainState);
+                stateName);
+            await realStorageProvider.ClearStateAsync(stateName, grainId, grainState);
         }
 
         /// <inheritdoc />

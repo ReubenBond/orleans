@@ -24,9 +24,9 @@ namespace AWSUtils.Tests.Liveness
 
         public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseDynamoDBClustering(options => { options.Service = AWSTestConstants.DynamoDbService; });
+                siloBuilder.UseDynamoDBClustering(options => { options.Service = AWSTestConstants.DynamoDbService; });
             }
         }
 

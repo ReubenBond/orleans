@@ -76,7 +76,7 @@ namespace Orleans.Transactions.DynamoDB
             bool createIfNotExists = true,
             bool updateIfExists = true)
         {
-            if (service == null) throw new ArgumentNullException(nameof(service));
+            ArgumentNullException.ThrowIfNull(service);
             this._accessKey = accessKey;
             this.secretKey = secretKey;
             this._token = token;
@@ -643,7 +643,7 @@ namespace Orleans.Transactions.DynamoDB
         {
             if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Deleting {TableName} table entries", tableName);
 
-            if (toDelete == null) throw new ArgumentNullException(nameof(toDelete));
+            ArgumentNullException.ThrowIfNull(toDelete);
 
             if (toDelete.Count == 0)
                 return Task.CompletedTask;
@@ -868,7 +868,7 @@ namespace Orleans.Transactions.DynamoDB
         {
             if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Put entries {TableName} table", tableName);
 
-            if (toCreate == null) throw new ArgumentNullException(nameof(toCreate));
+            ArgumentNullException.ThrowIfNull(toCreate);
 
             if (toCreate.Count == 0)
                 return Task.CompletedTask;

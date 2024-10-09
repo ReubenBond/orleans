@@ -23,9 +23,9 @@ public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTe
 
     public class SiloConfigurator : ISiloConfigurator
     {
-        public void Configure(ISiloBuilder hostBuilder)
+        public void Configure(ISiloBuilder siloBuilder)
         {
-            hostBuilder.UseCosmosReminderService(options =>
+            siloBuilder.UseCosmosReminderService(options =>
             {
                 options.ConfigureTestDefaults();
             });

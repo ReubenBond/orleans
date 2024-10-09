@@ -227,14 +227,14 @@ namespace Orleans.Transactions.TestKit.Correctnesss
             return Task.CompletedTask;
         }
 
-        public Task SetBit(int index)
+        public Task SetBit(int newValue)
         {
             return Task.WhenAll(this.dataArray
                 .Select(data => data.PerformUpdate(state =>
                 {
-                    this.logger.LogTrace("Setting bit {Index} in state {State}. Transaction {CurrentTransactionId}", index, state, TransactionContext.CurrentTransactionId);
-                    state.Set(index, true);
-                    this.logger.LogTrace("Set bit {Index} in state {State}.", index, state);
+                    this.logger.LogTrace("Setting bit {Index} in state {State}. Transaction {CurrentTransactionId}", newValue, state, TransactionContext.CurrentTransactionId);
+                    state.Set(newValue, true);
+                    this.logger.LogTrace("Set bit {Index} in state {State}.", newValue, state);
                 })));
         }
 

@@ -31,9 +31,9 @@ namespace Tester.AzureUtils.Streaming
 
             public class SiloConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloBuilder hostBuilder)
+                public void Configure(ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .AddAzureQueueStreams(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, ob => ob.Configure<IOptions<ClusterOptions>>(
                             (options, dep) =>
                             {

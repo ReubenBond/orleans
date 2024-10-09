@@ -15,7 +15,7 @@ namespace Orleans
         private readonly GrainCancellationToken _grainCancellationToken;
 
         /// <summary>
-        /// Initializes the <see cref="T:Orleans.GrainCancellationTokenSource"/>.
+        /// Initializes the <see cref="Orleans.GrainCancellationTokenSource"/>.
         /// </summary>
         public GrainCancellationTokenSource()
         {
@@ -74,7 +74,7 @@ namespace Orleans
         }
 
         /// <summary>
-        /// Releases the resources used by this <see cref="T:Orleans.Async.GrainCancellationTokenSource" />.
+        /// Releases the resources used by this <see cref="GrainCancellationTokenSource" />.
         /// </summary>
         /// <remarks>
         /// This method is not thread-safe for any other concurrent calls.

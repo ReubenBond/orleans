@@ -85,8 +85,7 @@ namespace UnitTests.StreamingTests
 
         public static Streaming_ProducerClientObject NewObserver(ILogger logger, IClusterClient client)
         {
-            if (null == logger)
-                throw new ArgumentNullException(nameof(logger));
+            ArgumentNullException.ThrowIfNull(logger);
             return new Streaming_ProducerClientObject(logger, client);
         }
 
@@ -190,14 +189,12 @@ namespace UnitTests.StreamingTests
 
         private static async Task<ConsumerProxy> NewConsumerProxy(Guid streamId, string streamProvider, IStreaming_ConsumerGrain[] targets, ILogger logger, IInternalGrainFactory grainFactory)
         {
-            if (targets == null)
-                throw new ArgumentNullException(nameof(targets));
+            ArgumentNullException.ThrowIfNull(targets);
             if (targets.Length == 0)
                 throw new ArgumentException("caller must specify at least one target");
             if (string.IsNullOrWhiteSpace(streamProvider))
                 throw new ArgumentException("Stream provider name is either null or whitespace", nameof(streamProvider));
-            if (logger == null)
-                throw new ArgumentNullException(nameof(logger));
+            ArgumentNullException.ThrowIfNull(logger);
 
             ConsumerProxy newObj = new ConsumerProxy(targets, logger, grainFactory);
             await newObj.BecomeConsumer(streamId, streamProvider);
@@ -278,8 +275,7 @@ namespace UnitTests.StreamingTests
 
         public static ConsumerProxy NewConsumerGrainAsync_WithoutBecomeConsumer(Guid consumerGrainId, ILogger logger, IInternalGrainFactory grainFactory, string grainClassName = "")
         {
-            if (logger == null)
-                throw new ArgumentNullException(nameof(logger));
+            ArgumentNullException.ThrowIfNull(logger);
 
             if (string.IsNullOrEmpty(grainClassName)) 
             {
@@ -388,12 +384,10 @@ namespace UnitTests.StreamingTests
 
         private static async Task<ProducerProxy> NewProducerProxy(IStreaming_ProducerGrain[] targets, Guid streamId, string streamProvider, string streamNamespace, ILogger logger)
         {
-            if (targets == null)
-                throw new ArgumentNullException(nameof(targets));
+            ArgumentNullException.ThrowIfNull(targets);
             if (string.IsNullOrWhiteSpace(streamProvider))
                 throw new ArgumentException("Stream provider name is either null or whitespace", nameof(streamProvider));
-            if (logger == null)
-                throw new ArgumentNullException(nameof(logger));
+            ArgumentNullException.ThrowIfNull(logger);
 
             ProducerProxy newObj = new ProducerProxy(targets, streamId, streamProvider, logger);
             await newObj.BecomeProducer(streamId, streamProvider, streamNamespace);

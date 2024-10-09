@@ -31,10 +31,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="monitorWriteInterval"></param>
         public ObjectPool(Func<T> factoryFunc, IObjectPoolMonitor monitor = null, TimeSpan? monitorWriteInterval = null)
         {
-            if (factoryFunc == null)
-            {
-                throw new ArgumentNullException(nameof(factoryFunc));
-            }
+            ArgumentNullException.ThrowIfNull(factoryFunc);
 
             this.factoryFunc = factoryFunc;
             pool = new ConcurrentStack<T>();

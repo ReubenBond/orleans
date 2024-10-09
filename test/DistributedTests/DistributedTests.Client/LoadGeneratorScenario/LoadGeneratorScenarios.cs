@@ -26,6 +26,6 @@ namespace DistributedTests.Client.LoadGeneratorScenario
 
         public ITreeGrain GetStateForWorker(IClusterClient client, int workerId) => client.GetGrain<ITreeGrain>(primaryKey: 0, keyExtension: workerId.ToString());
 
-        public ValueTask IssueRequest(ITreeGrain root) => root.Ping();
+        public ValueTask IssueRequest(ITreeGrain state) => state.Ping();
     }
 }

@@ -57,10 +57,7 @@ namespace Orleans.Streams
 
         public override Task Initialize(IStreamQueueMapper queueMapper)
         {
-            if (queueMapper == null)
-            {
-                throw new ArgumentNullException(nameof(queueMapper));
-            }
+            ArgumentNullException.ThrowIfNull(queueMapper);
             this.allQueues = queueMapper.GetAllQueues().ToList();
             NotifyAfterStart().Ignore();
             return base.Initialize(queueMapper);

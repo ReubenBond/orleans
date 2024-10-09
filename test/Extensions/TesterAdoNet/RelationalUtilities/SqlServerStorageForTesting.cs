@@ -51,13 +51,13 @@ namespace UnitTests.General
         }
 
 
-        protected override IEnumerable<string> ConvertToExecutableBatches(string setupScript, string dataBaseName)
+        protected override IEnumerable<string> ConvertToExecutableBatches(string setupScript, string databaseName)
         {
             var batches = setupScript.Split(new[] {"GO"}, StringSplitOptions.RemoveEmptyEntries).ToList();
 
             //This removes the use of recovery log in case of database crashes, which
             //improves performance to some degree, depending on usage. For non-performance testing only.
-            batches.Add(string.Format("ALTER DATABASE [{0}] SET RECOVERY SIMPLE;", dataBaseName));
+            batches.Add(string.Format("ALTER DATABASE [{0}] SET RECOVERY SIMPLE;", databaseName));
             batches.Add(CreateStreamTestTable);
 
             return batches;

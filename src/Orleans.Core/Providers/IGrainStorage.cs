@@ -167,7 +167,7 @@ namespace Orleans.Storage
         [Obsolete]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            if (info == null) throw new ArgumentNullException(nameof(info));
+            ArgumentNullException.ThrowIfNull(info);
 
             info.AddValue(nameof(StoredEtag), this.StoredEtag);
             info.AddValue(nameof(CurrentEtag), this.CurrentEtag);

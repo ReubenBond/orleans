@@ -42,14 +42,14 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ReadStateAsync{T}"/>
-        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
-            var blobName = GetBlobName(grainType, grainId);
+            var blobName = GetBlobName(stateName, grainId);
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
             if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_Reading,
                 "Reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
-                grainType,
+                stateName,
                 grainId,
                 grainState.ETag,
                 blobName,
@@ -70,7 +70,7 @@ namespace Orleans.Storage
                 {
                     if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_BlobNotFound,
                         "BlobNotFound reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
-                        grainType,
+                        stateName,
                         grainId,
                         grainState.ETag,
                         blobName,
@@ -81,7 +81,7 @@ namespace Orleans.Storage
                 {
                     if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_ContainerNotFound,
                         "ContainerNotFound reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
-                        grainType,
+                        stateName,
                         grainId,
                         grainState.ETag,
                         blobName,
@@ -93,7 +93,7 @@ namespace Orleans.Storage
                 {
                     if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_BlobEmpty,
                         "BlobEmpty reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
-                        grainType,
+                        stateName,
                         grainId,
                         grainState.ETag,
                         blobName,
@@ -111,7 +111,7 @@ namespace Orleans.Storage
 
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_DataRead,
                     "Read: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
-                    grainType,
+                    stateName,
                     grainId,
                     grainState.ETag,
                     blobName,
@@ -122,7 +122,7 @@ namespace Orleans.Storage
                 logger.LogError((int)AzureProviderErrorCode.AzureBlobProvider_ReadError,
                     ex,
                     "Error reading: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}",
-                    grainType,
+                    stateName,
                     grainId,
                     grainState.ETag,
                     blobName,
@@ -136,16 +136,16 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
-        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
-            var blobName = GetBlobName(grainType, grainId);
+            var blobName = GetBlobName(stateName, grainId);
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
             try
             {
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_Writing,
                     "Writing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to BlobName={BlobName} in Container={ContainerName}",
-                    grainType,
+                    stateName,
                     grainId,
                     grainState.ETag,
                     blobName,
@@ -155,11 +155,11 @@ namespace Orleans.Storage
 
                 var blob = container.GetBlobClient(blobName);
 
-                await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, "application/octet-stream", blob);
+                await WriteStateAndCreateContainerIfNotExists(stateName, grainId, grainState, contents, "application/octet-stream", blob);
 
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Storage_DataRead,
                     "Written: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to BlobName={BlobName} in Container={ContainerName}",
-                    grainType,
+                    stateName,
                     grainId,
                     grainState.ETag,
                     blobName,
@@ -170,7 +170,7 @@ namespace Orleans.Storage
                 logger.LogError((int)AzureProviderErrorCode.AzureBlobProvider_WriteError,
                     ex,
                     "Error writing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} to BlobName={BlobName} in Container={ContainerName}",
-                    grainType,
+                    stateName,
                     grainId,
                     grainState.ETag,
                     blobName,
@@ -182,16 +182,16 @@ namespace Orleans.Storage
 
         /// <summary> Clear / Delete state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ClearStateAsync{T}"/>
-        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
-            var blobName = GetBlobName(grainType, grainId);
+            var blobName = GetBlobName(stateName, grainId);
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
             try
             {
                 if (this.logger.IsEnabled(LogLevel.Trace)) this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_ClearingData,
                     "Clearing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} BlobName={BlobName} in Container={ContainerName}",
-                    grainType,
+                    stateName,
                     grainId,
                     grainState.ETag,
                     blobName,
@@ -214,7 +214,7 @@ namespace Orleans.Storage
                     var properties = await blob.GetPropertiesAsync();
                     this.logger.LogTrace((int)AzureProviderErrorCode.AzureBlobProvider_Cleared,
                         "Cleared: GrainType={GrainType} GrainId={GrainId} ETag={ETag} BlobName={BlobName} in Container={ContainerName}",
-                        grainType,
+                        stateName,
                         grainId,
                         properties.Value.ETag,
                         blobName,
@@ -226,7 +226,7 @@ namespace Orleans.Storage
                 logger.LogError((int)AzureProviderErrorCode.AzureBlobProvider_ClearError,
                     ex,
                     "Error clearing: GrainType={GrainType} GrainId={GrainId} ETag={ETag} BlobName={BlobName} in Container={ContainerName}",
-                    grainType,
+                    stateName,
                     grainId,
                     grainState.ETag,
                     blobName,

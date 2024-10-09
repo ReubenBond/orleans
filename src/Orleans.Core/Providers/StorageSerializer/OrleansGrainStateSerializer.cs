@@ -21,10 +21,10 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public BinaryData Serialize<T>(T value)
+        public BinaryData Serialize<T>(T input)
         {
             var buffer = new ArrayBufferWriter<byte>();
-            this.serializer.Serialize(value, buffer);
+            this.serializer.Serialize(input, buffer);
             return new BinaryData(buffer.WrittenMemory);
         }
 

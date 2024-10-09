@@ -112,7 +112,7 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ReadStateAsync{T}"/>
-        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -121,12 +121,12 @@ namespace Orleans.Storage
                 this.logger.LogTrace(
                     (int)ErrorCode.StorageProviderBase,
                     "Reading: GrainType={GrainType} Pk={PartitionKey} GrainId={GrainId} from Table={TableName}",
-                    grainType,
+                    stateName,
                     partitionKey,
                     grainId,
                     this.options.TableName);
 
-            string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
+            string rowKey = AWSUtils.ValidateDynamoDBRowKey(stateName);
 
             var record = await this.storage.ReadSingleEntryAsync(this.options.TableName,
                 new Dictionary<string, AttributeValue>
@@ -158,12 +158,12 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
-        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string partitionKey = GetKeyString(grainId);
-            string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
+            string rowKey = AWSUtils.ValidateDynamoDBRowKey(stateName);
 
             var record = new GrainStateRecord { GrainReference = partitionKey, GrainType = rowKey };
 
@@ -182,7 +182,7 @@ namespace Orleans.Storage
                     (int)ErrorCode.StorageProviderBase,
                     exc,
                     "Error Writing: GrainType={GrainType} Grainid={GrainId} ETag={ETag} to Table={TableName}",
-                    grainType,
+                    stateName,
                     grainId,
                     grainState.ETag,
                     this.options.TableName);
@@ -258,7 +258,7 @@ namespace Orleans.Storage
         /// cleared by overwriting with default / null values.
         /// </remarks>
         /// <see cref="IGrainStorage.ClearStateAsync{T}"/>
-        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public async Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
@@ -268,14 +268,14 @@ namespace Orleans.Storage
                 this.logger.LogTrace(
                     (int)ErrorCode.StorageProviderBase,
                     "Clearing: GrainType={GrainType} Pk={PartitionKey} GrainId={GrainId} ETag={ETag} DeleteStateOnClear={DeleteStateOnClear} from Table={TableName}",
-                    grainType,
+                    stateName,
                     partitionKey,
                     grainId,
                     grainState.ETag,
                     this.options.DeleteStateOnClear,
                     this.options.TableName);
             }
-            string rowKey = AWSUtils.ValidateDynamoDBRowKey(grainType);
+            string rowKey = AWSUtils.ValidateDynamoDBRowKey(stateName);
             var record = new GrainStateRecord { GrainReference = partitionKey, ETag = string.IsNullOrWhiteSpace(grainState.ETag) ? 0 : int.Parse(grainState.ETag), GrainType = rowKey };
 
             var operation = "Clearing";
@@ -303,7 +303,7 @@ namespace Orleans.Storage
                     exc,
                     "Error {Operation}: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from Table={TableName}",
                     operation,
-                    grainType,
+                    stateName,
                     grainId,
                     grainState.ETag,
                     this.options.TableName);

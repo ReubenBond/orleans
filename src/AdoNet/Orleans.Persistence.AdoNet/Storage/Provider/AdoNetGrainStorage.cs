@@ -145,12 +145,12 @@ namespace Orleans.Storage
         }
         /// <summary>Clear state data function for this storage provider.</summary>
         /// <see cref="IGrainStorage.ClearStateAsync{T}"/>.
-        public async Task ClearStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
+        public async Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown,
             //even if not as clear as when using explicitly checked parameters.
-            var grainId = GrainIdAndExtensionAsString(grainReference);
-            var baseGrainType = ExtractBaseClass(grainType);
+            var adoGrainKey = GrainIdAndExtensionAsString(grainId);
+            var baseGrainType = ExtractBaseClass(stateName);
             if(logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogTrace(
@@ -166,16 +166,16 @@ namespace Orleans.Storage
             string storageVersion = null;
             try
             {
-                var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
-                var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
+                var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainId, grainState).Hash(adoGrainKey.GetHashBytes());
+                var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainId, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
                 var clearRecord = (await Storage.ReadAsync(CurrentOperationalQueries.ClearState, command =>
                 {
                     command.AddParameter("GrainIdHash", grainIdHash);
-                    command.AddParameter("GrainIdN0", grainId.N0Key);
-                    command.AddParameter("GrainIdN1", grainId.N1Key);
+                    command.AddParameter("GrainIdN0", adoGrainKey.N0Key);
+                    command.AddParameter("GrainIdN1", adoGrainKey.N1Key);
                     command.AddParameter("GrainTypeHash", grainTypeHash);
                     command.AddParameter("GrainTypeString", baseGrainType);
-                    command.AddParameter("GrainIdExtensionString", grainId.StringKey);
+                    command.AddParameter("GrainIdExtensionString", adoGrainKey.StringKey);
                     command.AddParameter("ServiceId", serviceId);
                     command.AddParameter("GrainStateVersion", !string.IsNullOrWhiteSpace(grainState.ETag) ? int.Parse(grainState.ETag, CultureInfo.InvariantCulture) : default(int?));
                 }, (selector, resultSetCount, token) => Task.FromResult(selector.GetValue(0).ToString()), cancellationToken: CancellationToken.None).ConfigureAwait(false));
@@ -218,15 +218,14 @@ namespace Orleans.Storage
             }
         }
 
-
         /// <summary> Read state data function for this storage provider.</summary>
         /// <see cref="IGrainStorage.ReadStateAsync{T}"/>.
-        public async Task ReadStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
+        public async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
             //as with explicitly checked parameters.
-            var grainId = GrainIdAndExtensionAsString(grainReference);
-            var baseGrainType = ExtractBaseClass(grainType);
+            var adoGrainKey = GrainIdAndExtensionAsString(grainId);
+            var baseGrainType = ExtractBaseClass(stateName);
             if (logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogTrace(
@@ -242,18 +241,18 @@ namespace Orleans.Storage
             try
             {
                 var commandBehavior = CommandBehavior.Default;
-                var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
-                var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
+                var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainId, grainState).Hash(adoGrainKey.GetHashBytes());
+                var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainId, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
                 var readRecords = (await Storage.ReadAsync(
                     CurrentOperationalQueries.ReadFromStorage,
                     command =>
                     {
                         command.AddParameter("GrainIdHash", grainIdHash);
-                        command.AddParameter("GrainIdN0", grainId.N0Key);
-                        command.AddParameter("GrainIdN1", grainId.N1Key);
+                        command.AddParameter("GrainIdN0", adoGrainKey.N0Key);
+                        command.AddParameter("GrainIdN1", adoGrainKey.N1Key);
                         command.AddParameter("GrainTypeHash", grainTypeHash);
                         command.AddParameter("GrainTypeString", baseGrainType);
-                        command.AddParameter("GrainIdExtensionString", grainId.StringKey);
+                        command.AddParameter("GrainIdExtensionString", adoGrainKey.StringKey);
                         command.AddParameter("ServiceId", serviceId);
                     },
                     (selector, resultSetCount, token) =>
@@ -321,13 +320,13 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider.</summary>
         /// <see cref="IGrainStorage.WriteStateAsync{T}"/>
-        public async Task WriteStateAsync<T>(string grainType, GrainId grainReference, IGrainState<T> grainState)
+        public async Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         {
             //It assumed these parameters are always valid. If not, an exception will be thrown, even if not as clear
             //as with explicitly checked parameters.
             var data = grainState.State;
-            var grainId = GrainIdAndExtensionAsString(grainReference);
-            var baseGrainType = ExtractBaseClass(grainType);
+            var adoGrainKey = GrainIdAndExtensionAsString(grainId);
+            var baseGrainType = ExtractBaseClass(stateName);
             if (logger.IsEnabled(LogLevel.Trace))
             {
                 logger.LogTrace(
@@ -343,18 +342,18 @@ namespace Orleans.Storage
             string storageVersion = null;
             try
             {
-                var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
-                var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
+                var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainId, grainState).Hash(adoGrainKey.GetHashBytes());
+                var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainId, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
                 var writeRecord = await Storage.ReadAsync(CurrentOperationalQueries.WriteToStorage, command =>
                 {
                     var serialized = this.Serializer.Serialize<T>(grainState.State);
 
                     command.AddParameter("GrainIdHash", grainIdHash);
-                    command.AddParameter("GrainIdN0", grainId.N0Key);
-                    command.AddParameter("GrainIdN1", grainId.N1Key);
+                    command.AddParameter("GrainIdN0", adoGrainKey.N0Key);
+                    command.AddParameter("GrainIdN1", adoGrainKey.N1Key);
                     command.AddParameter("GrainTypeHash", grainTypeHash);
                     command.AddParameter("GrainTypeString", baseGrainType);
-                    command.AddParameter("GrainIdExtensionString", grainId.StringKey);
+                    command.AddParameter("GrainIdExtensionString", adoGrainKey.StringKey);
                     command.AddParameter("ServiceId", serviceId);
                     command.AddParameter("GrainStateVersion", !string.IsNullOrWhiteSpace(grainState.ETag) ? int.Parse(grainState.ETag, CultureInfo.InvariantCulture) : default(int?));
                     command.AddParameter("PayloadBinary", serialized.ToArray());
@@ -407,7 +406,8 @@ namespace Orleans.Storage
             var queries = await Storage.ReadAsync(DefaultInitializationQuery, command => { }, (selector, resultSetCount, token) =>
             {
                 return Task.FromResult(Tuple.Create(selector.GetValue<string>("QueryKey"), selector.GetValue<string>("QueryText")));
-            }).ConfigureAwait(false);
+            },
+            cancellationToken: cancellationToken).ConfigureAwait(false);
 
             CurrentOperationalQueries = new RelationalStorageProviderQueries(
                 queries.Single(i => i.Item1 == "WriteToStorageKey").Item2,
@@ -431,7 +431,6 @@ namespace Orleans.Storage
         {
             return Task.CompletedTask;
         }
-
 
         /// <summary>
         /// Checks for version inconsistency as defined in the database scripts.
@@ -492,8 +491,8 @@ namespace Orleans.Storage
         /// <returns>The extracted base class or the one given as a parameter if it didn't have a generic part.</returns>
         private static string ExtractBaseClass(string typeName)
         {
-            var genericPosition = typeName.IndexOf("`", StringComparison.OrdinalIgnoreCase);
-            if (genericPosition != -1)
+            var genericPosition = typeName.Contains('`', StringComparison.OrdinalIgnoreCase);
+            if (genericPosition)
             {
                 //The following relies the generic argument list to be in form as described
                 //at https://msdn.microsoft.com/en-us/library/w3f99sx1.aspx.

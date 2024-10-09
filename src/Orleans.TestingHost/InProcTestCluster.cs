@@ -468,7 +468,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <param name="siloName">Silo to be restarted.</param>
     public async Task<InProcessSiloHandle> RestartStoppedSecondarySiloAsync(string siloName)
     {
-        if (siloName == null) throw new ArgumentNullException(nameof(siloName));
+        ArgumentNullException.ThrowIfNull(siloName);
         var siloHandle = Silos.Single(s => s.Name.Equals(siloName, StringComparison.Ordinal));
         var newInstance = await StartSiloAsync(Silos.IndexOf(siloHandle), Options);
         lock (_silos)
@@ -577,7 +577,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 if (Options.UseTestClusterMembership)
                 {
                     services.AddSingleton<IMembershipTable>(_membershipTable);
-                    siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (_, _) => _grainDirectory);
+                    siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DefaultGrainDirectory, (_, _) => _grainDirectory);
                 }
 
                 siloBuilder.UseInMemoryConnectionTransport(_transportHub);
@@ -621,7 +621,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <returns>A handle to the silo deployed</returns>
     public static async Task<InProcessSiloHandle> StartSiloAsync(InProcessTestCluster cluster, int instanceNumber, InProcessTestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false)
     {
-        if (cluster == null) throw new ArgumentNullException(nameof(cluster));
+        ArgumentNullException.ThrowIfNull(cluster);
         return await cluster.StartSiloAsync(instanceNumber, clusterOptions, configurationOverrides, startSiloOnNewPort);
     }
 

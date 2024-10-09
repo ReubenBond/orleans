@@ -155,41 +155,41 @@ namespace UnitTestGrains
             return Task.CompletedTask;
         }
 
-        public Task StartTimer(string name, TimeSpan delay)
+        public Task StartTimer(string name, TimeSpan dueTime)
         {
-            logger.LogInformation("StartTimer Name={Name} Delay={Delay}", name, delay);
+            logger.LogInformation("StartTimer Name={Name} Delay={Delay}", name, dueTime);
             if (timer is not null) throw new InvalidOperationException("Expected timer to be null");
-            this.timer = this.RegisterGrainTimer(TimerTick, name, new(delay, Timeout.InfiniteTimeSpan) { Interleave = true }); // One shot timer
+            this.timer = this.RegisterGrainTimer(TimerTick, name, new(dueTime, Timeout.InfiniteTimeSpan) { Interleave = true }); // One shot timer
             this.timerName = name;
 
             return Task.CompletedTask;
         }
 
-        public Task StartTimer(string name, TimeSpan delay, string operationType)
+        public Task StartTimer(string name, TimeSpan dueTime, string operationType)
         {
-            logger.LogInformation("StartTimer Name={Name} Delay={Delay}", name, delay);
+            logger.LogInformation("StartTimer Name={Name} Delay={Delay}", name, dueTime);
             if (timer is not null) throw new InvalidOperationException("Expected timer to be null");
             var state = Tuple.Create<string, object>(operationType, name);
-            this.timer = this.RegisterGrainTimer(TimerTickAdvanced, state, new(delay, Timeout.InfiniteTimeSpan) { Interleave = true }); // One shot timer
+            this.timer = this.RegisterGrainTimer(TimerTickAdvanced, state, new(dueTime, Timeout.InfiniteTimeSpan) { Interleave = true }); // One shot timer
             this.timerName = name;
 
             return Task.CompletedTask;
         }
 
-        public Task RestartTimer(string name, TimeSpan delay)
+        public Task RestartTimer(string name, TimeSpan dueTime)
         {
-            logger.LogInformation("RestartTimer Name={Name} Delay={Delay}", name, delay);
+            logger.LogInformation("RestartTimer Name={Name} Delay={Delay}", name, dueTime);
             this.timerName = name;
-            timer.Change(delay, Timeout.InfiniteTimeSpan);
+            timer.Change(dueTime, Timeout.InfiniteTimeSpan);
 
             return Task.CompletedTask;
         }
 
-        public Task RestartTimer(string name, TimeSpan delay, TimeSpan period)
+        public Task RestartTimer(string name, TimeSpan dueTime, TimeSpan period)
         {
-            logger.LogInformation("RestartTimer Name={Name} Delay={Delay} Period={Period}", name, delay, period);
+            logger.LogInformation("RestartTimer Name={Name} Delay={Delay} Period={Period}", name, dueTime, period);
             this.timerName = name;
-            timer.Change(delay, period);
+            timer.Change(dueTime, period);
 
             return Task.CompletedTask;
         }
@@ -676,7 +676,7 @@ namespace UnitTestGrains
             this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{context.GrainId}");
         }
 
-        public Task OnActivateAsync(CancellationToken cancellationToken)
+        public Task OnActivateAsync(CancellationToken token)
         {
             ThrowIfDeactivating();
             context = RuntimeContext.Current;
@@ -805,48 +805,48 @@ namespace UnitTestGrains
         public Task<int> GetTickCount() { return Task.FromResult(tickCount); }
         public Task<Exception> GetException() { return Task.FromResult(tickException); }
 
-        public Task OnActivateAsync(CancellationToken cancellationToken)
+        public Task OnActivateAsync(CancellationToken token)
         {
             context = RuntimeContext.Current;
             activationTaskScheduler = TaskScheduler.Current;
             return Task.CompletedTask;
         }
 
-        public Task StartTimer(string name, TimeSpan delay)
+        public Task StartTimer(string name, TimeSpan dueTime)
         {
-            logger.LogInformation("StartTimer Name={Name} Delay={Delay}", name, delay);
+            logger.LogInformation("StartTimer Name={Name} Delay={Delay}", name, dueTime);
             if (timer is not null) throw new InvalidOperationException("Expected timer to be null");
-            this.timer = this.RegisterGrainTimer(TimerTick, name, new(delay, Timeout.InfiniteTimeSpan)); // One shot timer
+            this.timer = this.RegisterGrainTimer(TimerTick, name, new(dueTime, Timeout.InfiniteTimeSpan)); // One shot timer
             this.timerName = name;
 
             return Task.CompletedTask;
         }
 
-        public Task StartTimer(string name, TimeSpan delay, string operationType)
+        public Task StartTimer(string name, TimeSpan dueTime, string operationType)
         {
-            logger.LogInformation("StartTimer Name={Name} Delay={Delay}", name, delay);
+            logger.LogInformation("StartTimer Name={Name} Delay={Delay}", name, dueTime);
             if (timer is not null) throw new InvalidOperationException("Expected timer to be null");
             var state = Tuple.Create<string, object>(operationType, name);
-            this.timer = this.RegisterGrainTimer(TimerTickAdvanced, state, delay, Timeout.InfiniteTimeSpan); // One shot timer
+            this.timer = this.RegisterGrainTimer(TimerTickAdvanced, state, dueTime, Timeout.InfiniteTimeSpan); // One shot timer
             this.timerName = name;
 
             return Task.CompletedTask;
         }
 
-        public Task RestartTimer(string name, TimeSpan delay)
+        public Task RestartTimer(string name, TimeSpan dueTime)
         {
-            logger.LogInformation("RestartTimer Name={Name} Delay={Delay}", name, delay);
+            logger.LogInformation("RestartTimer Name={Name} Delay={Delay}", name, dueTime);
             this.timerName = name;
-            timer.Change(delay, Timeout.InfiniteTimeSpan);
+            timer.Change(dueTime, Timeout.InfiniteTimeSpan);
 
             return Task.CompletedTask;
         }
 
-        public Task RestartTimer(string name, TimeSpan delay, TimeSpan period)
+        public Task RestartTimer(string name, TimeSpan dueTime, TimeSpan period)
         {
-            logger.LogInformation("RestartTimer Name={Name} Delay={Delay} Period={Period}", name, delay, period);
+            logger.LogInformation("RestartTimer Name={Name} Delay={Delay} Period={Period}", name, dueTime, period);
             this.timerName = name;
-            timer.Change(delay, period);
+            timer.Change(dueTime, period);
 
             return Task.CompletedTask;
         }
@@ -1189,7 +1189,7 @@ namespace UnitTestGrains
             await ProcessTimerTick(name, CancellationToken.None);
         }
 
-        public Task OnActivateAsync(CancellationToken cancellationToken)
+        public Task OnActivateAsync(CancellationToken token)
         {
             _context = RuntimeContext.Current;
             _activationTaskScheduler = TaskScheduler.Current;

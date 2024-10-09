@@ -73,9 +73,9 @@ namespace Orleans.Runtime.Membership
         /// <summary>
         /// Initializes the ZooKeeper based membership table.
         /// </summary>
-        /// <param name="tryInitPath">if set to true, we'll try to create a node named "/ClusterId"</param>
+        /// <param name="tryInitTableVersion">if set to true, we'll try to create a node named "/ClusterId"</param>
         /// <returns></returns>
-        public async Task InitializeMembershipTable(bool tryInitPath)
+        public async Task InitializeMembershipTable(bool tryInitTableVersion)
         {
             // even if I am not the one who created the path, 
             // try to insert an initial path if it is not already there,
@@ -102,14 +102,14 @@ namespace Orleans.Runtime.Membership
         /// The returned MembershipTableData includes one MembershipEntry entry for a given silo and the 
         /// TableVersion for this table. The MembershipEntry and the TableVersion have to be read atomically.
         /// </summary>
-        /// <param name="siloAddress">The address of the silo whose membership information needs to be read.</param>
+        /// <param name="key">The address of the silo whose membership information needs to be read.</param>
         /// <returns>The membership information for a given silo: MembershipTableData consisting one MembershipEntry entry and
         /// TableVersion, read atomically.</returns>
-        public Task<MembershipTableData> ReadRow(SiloAddress siloAddress)
+        public Task<MembershipTableData> ReadRow(SiloAddress key)
         {
             return UsingZookeeper(async zk =>
             {
-                var getRowTask = GetRow(zk, siloAddress);
+                var getRowTask = GetRow(zk, key);
                 var getTableNodeTask = zk.getDataAsync("/");//get the current table version
 
                 List<Tuple<MembershipEntry, string>> rows = new List<Tuple<MembershipEntry, string>>(1);

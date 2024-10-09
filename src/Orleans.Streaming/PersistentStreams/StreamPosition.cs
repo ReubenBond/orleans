@@ -17,10 +17,7 @@ namespace Orleans.Streams
         /// <param name="sequenceToken">The stream sequence token.</param>
         public StreamPosition(StreamId streamId, StreamSequenceToken sequenceToken)
         {
-            if (sequenceToken == null)
-            {
-                throw new ArgumentNullException(nameof(sequenceToken));
-            }
+            ArgumentNullException.ThrowIfNull(sequenceToken);
             StreamId = streamId;
             SequenceToken = sequenceToken;
         }

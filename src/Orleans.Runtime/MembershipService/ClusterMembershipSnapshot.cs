@@ -70,7 +70,7 @@ namespace Orleans.Runtime
         /// <returns>A <see cref="ClusterMembershipUpdate"/> which represents the change in cluster membership from the provided snapshot to this instance.</returns>
         public ClusterMembershipUpdate CreateUpdate(ClusterMembershipSnapshot previous)
         {
-            if (previous is null) throw new ArgumentNullException(nameof(previous));
+            ArgumentNullException.ThrowIfNull(previous);
             if (this.Version < previous.Version)
             {
                 throw new ArgumentException($"Argument must have a previous version to the current instance. Expected <= {this.Version}, encountered {previous.Version}", nameof(previous));

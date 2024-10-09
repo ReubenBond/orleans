@@ -74,9 +74,9 @@ namespace UnitTests.Streaming.Reliability
 
         public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseAzureStorageClustering(options =>
+                siloBuilder.UseAzureStorageClustering(options =>
                 {
                     options.ConfigureTestDefaults();
                 })

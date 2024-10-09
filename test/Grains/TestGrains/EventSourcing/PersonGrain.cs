@@ -7,11 +7,11 @@ namespace TestGrains
     public class PersonGrain : JournaledGrain<PersonState,IPersonEvent>, IPersonGrain
     {
 
-        public Task RegisterBirth(PersonAttributes props)
+        public Task RegisterBirth(PersonAttributes person)
         {
             if (this.State.FirstName == null)
             {
-                RaiseEvent(new PersonRegistered(props.FirstName, props.LastName, props.Gender));
+                RaiseEvent(new PersonRegistered(person.FirstName, person.LastName, person.Gender));
 
                 return ConfirmEvents();
             }

@@ -6,17 +6,17 @@ namespace ServiceBus.Tests.MonitorTests
     {
         public ObjectPoolMonitorCounters CallCounters { get; } = new ObjectPoolMonitorCounters();
  
-        public void TrackMemoryAllocated(long allocatedMemoryInByte)
+        public void TrackMemoryAllocated(long allocatedMemoryInBytes)
         {
             Interlocked.Increment(ref this.CallCounters.TrackObjectAllocatedByCacheCallCounter);
         }
 
-        public void TrackMemoryReleased(long releasedMemoryInByte)
+        public void TrackMemoryReleased(long releasedMemoryInBytes)
         {
             Interlocked.Increment(ref this.CallCounters.TrackObjectReleasedFromCacheCallCounter);
         }
 
-        public void Report(long totalMemoryInByte, long availableMemoryInByte, long claimedMemoryInByte)
+        public void Report(long totalSizeInByte, long availableMemoryInByte, long claimedMemoryInByte)
         {
             Interlocked.Increment(ref this.CallCounters.ReportCallCounter);
         }

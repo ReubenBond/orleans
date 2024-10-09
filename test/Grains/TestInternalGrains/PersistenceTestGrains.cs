@@ -239,9 +239,9 @@ namespace UnitTests.Grains
             return WriteStateAsync();
         }
 
-        public async Task DoWriteError(int val, bool errorBeforeUpdate)
+        public async Task DoWriteError(int val, bool errorBeforeWrite)
         {
-            if (errorBeforeUpdate) throw new ApplicationException("Before Update");
+            if (errorBeforeWrite) throw new ApplicationException("Before Update");
             State.Field1 = val;
             await WriteStateAsync();
             throw new ApplicationException("After Update");

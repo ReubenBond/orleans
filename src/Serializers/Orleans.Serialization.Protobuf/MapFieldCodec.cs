@@ -91,7 +91,7 @@ public sealed class MapFieldCodec<TKey, TValue> : IFieldCodec<MapField<TKey, TVa
                     var length = (int)UInt32Codec.ReadValue(ref reader, header);
                     if (length > 10240 && length > reader.Length)
                     {
-                        ThrowInvalidSizeException(length);
+                        ThrowInvalidSizeException(typeof(MapField<TKey, TValue>), length);
                     }
 
                     result = CreateInstance(reader.Session, placeholderReferenceId);
@@ -128,8 +128,8 @@ public sealed class MapFieldCodec<TKey, TValue> : IFieldCodec<MapField<TKey, TVa
         return result;
     }
 
-    private static void ThrowInvalidSizeException(int length) => throw new IndexOutOfRangeException(
-        $"Declared length of {typeof(MapField<TKey, TValue>)}, {length}, is greater than total length of input.");
+    private static void ThrowInvalidSizeException(Type type, int length) => throw new InvalidOperationException(
+        $"Declared length of {type}, {length}, is greater than total length of input.");
 
     private static void ThrowLengthFieldMissing() => throw new RequiredFieldMissingException("Serialized MapField is missing its length field.");
 }

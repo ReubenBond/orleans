@@ -20,9 +20,9 @@ namespace UnitTests.StreamingTests
 
             public class SiloHostConfigurator : ISiloConfigurator
             {
-                public void Configure(ISiloBuilder hostBuilder)
+                public void Configure(ISiloBuilder siloBuilder)
                 {
-                    hostBuilder
+                    siloBuilder
                         .AddFaultInjectionMemoryStorage("PubSubStore")
                         .Services.AddSiloStreaming();
                 }

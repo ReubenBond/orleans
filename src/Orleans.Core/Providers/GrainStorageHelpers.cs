@@ -21,7 +21,7 @@ public static class GrainStorageHelpers
     /// </returns>
     public static IGrainStorage GetGrainStorage(Type grainType, IServiceProvider services)
     {
-        if (grainType is null) throw new ArgumentNullException(nameof(grainType));
+        ArgumentNullException.ThrowIfNull(grainType);
         var attrs = grainType.GetCustomAttributes(typeof(StorageProviderAttribute), true);
         var attr = attrs.Length > 0 ? (StorageProviderAttribute)attrs[0] : null;
         var storageProvider = attr != null

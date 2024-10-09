@@ -227,7 +227,7 @@ namespace Orleans
 
         public virtual IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
         {
-            if (observer == null) throw new ArgumentNullException(nameof(observer));
+            ArgumentNullException.ThrowIfNull(observer);
             if (this._highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
 
             var orderedObserver = new OrderedObserver(stage, observer);

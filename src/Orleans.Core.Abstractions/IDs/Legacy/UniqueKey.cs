@@ -188,7 +188,7 @@ namespace Orleans.Runtime
             return Guid;
         }
 
-        public override bool Equals(object o) => o is UniqueKey key && Equals(key);
+        public override bool Equals(object obj) => obj is UniqueKey key && Equals(key);
 
         // We really want Equals to be as fast as possible, as a minimum cost, as close to native as possible.
         // No function calls, no boxing, inline.

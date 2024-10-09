@@ -306,14 +306,14 @@ namespace DefaultCluster.Tests.General
             return default;
         }
 
-        public void OnDehydrate(IDehydrationContext migrationContext)
+        public void OnDehydrate(IDehydrationContext dehydrationContext)
         {
-            migrationContext.TryAddValue("state", _state);
+            dehydrationContext.TryAddValue("state", _state);
 
             {
                 if (RequestContext.Get("fail_rehydrate") is bool fail && fail)
                 {
-                    migrationContext.TryAddValue("fail_rehydrate", true);
+                    dehydrationContext.TryAddValue("fail_rehydrate", true);
                 }
             }
 
@@ -325,14 +325,14 @@ namespace DefaultCluster.Tests.General
             }
         }
 
-        public void OnRehydrate(IRehydrationContext migrationContext)
+        public void OnRehydrate(IRehydrationContext rehydrationContext)
         {
-            if (migrationContext.TryGetValue("fail_rehydrate", out bool fail) && fail)
+            if (rehydrationContext.TryGetValue("fail_rehydrate", out bool fail) && fail)
             {
                 throw new InvalidOperationException("Failing to rehydrate on-command");
             }
 
-            migrationContext.TryGetValue("state", out _state);
+            rehydrationContext.TryGetValue("state", out _state);
         }
 
         public ValueTask<GrainAddress> GetGrainAddress() => new(GrainContext.Address);

@@ -154,6 +154,14 @@ namespace Orleans.Tests.SqlUtils
         }
 
         /// <inheritdoc/>
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var bytesRead = Read(buffer.Span);
+            return ValueTask.FromResult(bytesRead);
+        }
+
+        /// <inheritdoc/>
         public override async Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken)
         {
             if (!cancellationToken.IsCancellationRequested)

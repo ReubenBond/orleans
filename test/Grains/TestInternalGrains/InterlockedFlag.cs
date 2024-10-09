@@ -28,8 +28,7 @@ namespace UnitTests.TestHelper
 
         public void ThrowDisposedIfSet(Type type)
         {
-            if (type == null)
-                throw new ArgumentNullException(nameof(type));
+            ArgumentNullException.ThrowIfNull(type);
             if (IsSet)
                 throw new ObjectDisposedException(type.Name);
         }

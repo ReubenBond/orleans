@@ -78,7 +78,7 @@ namespace Orleans.GrainDirectory.AzureStorage
         [Obsolete($"Set the {nameof(TableServiceClient)} property directly.")]
         public void ConfigureTableServiceClient(Uri serviceUri)
         {
-            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+            ArgumentNullException.ThrowIfNull(serviceUri);
             TableServiceClient = new TableServiceClient(serviceUri, ClientOptions);
         }
 

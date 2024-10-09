@@ -13,8 +13,7 @@ namespace Orleans.SqlUtils.StorageProvider.GrainClasses
 
         public async Task SetOwner(ICustomerGrain customer)
         {
-            if (customer == null)
-                throw new ArgumentNullException(nameof(customer));
+            ArgumentNullException.ThrowIfNull(customer);
 
             State.Owner = customer;
 

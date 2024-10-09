@@ -66,11 +66,11 @@ namespace Orleans.Runtime
         /// <summary>
         /// Parses a <see cref="GrainId"/> from the span.
         /// </summary>
-        public static GrainId Parse(ReadOnlySpan<char> value, IFormatProvider? provider = null)
+        public static GrainId Parse(ReadOnlySpan<char> s, IFormatProvider? provider = null)
         {
-            if (!TryParse(value, provider, out var result))
+            if (!TryParse(s, provider, out var result))
             {
-                ThrowInvalidGrainId(value);
+                ThrowInvalidGrainId(s);
 
                 static void ThrowInvalidGrainId(ReadOnlySpan<char> value) => throw new ArgumentException($"Unable to parse \"{value}\" as a grain id");
             }
@@ -82,20 +82,20 @@ namespace Orleans.Runtime
         /// Tries to parse a <see cref="GrainId"/> from the span.
         /// </summary>
         /// <returns><see langword="true"/> if a valid <see cref="GrainId"/> was parsed. <see langword="false"/> otherwise</returns>
-        public static bool TryParse(ReadOnlySpan<char> value, IFormatProvider? provider, out GrainId result)
+        public static bool TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, out GrainId result)
         {
             int i;
-            if ((i = value.IndexOf('/')) < 0)
+            if ((i = s.IndexOf('/')) < 0)
             {
                 result = default;
                 return false;
             }
 
-            var typeSpan = value[0..i];
+            var typeSpan = s[0..i];
             var type = new byte[Encoding.UTF8.GetByteCount(typeSpan)];
             Encoding.UTF8.GetBytes(typeSpan, type);
 
-            var idSpan = value[(i + 1)..];
+            var idSpan = s[(i + 1)..];
             var id = new byte[Encoding.UTF8.GetByteCount(idSpan)];
             Encoding.UTF8.GetBytes(idSpan, id);
 
@@ -112,8 +112,8 @@ namespace Orleans.Runtime
         /// <summary>
         /// Parses a <see cref="GrainId"/> from the string.
         /// </summary>
-        public static GrainId Parse(string value, IFormatProvider? provider = null)
-            => Parse(value.AsSpan(), provider);
+        public static GrainId Parse(string s, IFormatProvider? provider = null)
+            => Parse(s.AsSpan(), provider);
 
         /// <summary>
         /// Tries to parse a <see cref="GrainId"/> from the string.
@@ -126,8 +126,8 @@ namespace Orleans.Runtime
         /// Tries to parse a <see cref="GrainId"/> from the string.
         /// </summary>
         /// <returns><see langword="true"/> if a valid <see cref="GrainId"/> was parsed. <see langword="false"/> otherwise</returns>
-        public static bool TryParse(string? value, IFormatProvider? provider, out GrainId result)
-            => TryParse(value.AsSpan(), provider, out result);
+        public static bool TryParse(string? s, IFormatProvider? provider, out GrainId result)
+            => TryParse(s.AsSpan(), provider, out result);
 
         /// <summary>
         /// <see langword="true"/> if this instance is the default value, <see langword="false"/> if it is not.

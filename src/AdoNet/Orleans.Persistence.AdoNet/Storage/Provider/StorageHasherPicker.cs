@@ -24,10 +24,7 @@ namespace Orleans.Storage
         /// <param name="hashProviders">The hash providers this picker uses.</param>
         public StorageHasherPicker(IEnumerable<IHasher> hashProviders)
         {
-            if(hashProviders == null)
-            {
-                throw new ArgumentNullException(nameof(hashProviders));
-            }
+            ArgumentNullException.ThrowIfNull(hashProviders);
 
             HashProviders = new Collection<IHasher>(new List<IHasher>(hashProviders));
         }

@@ -20,10 +20,7 @@ internal class TransactionClient : ITransactionClient
 
     public async Task RunTransaction(TransactionOption transactionOption, Func<Task> transactionDelegate)
     {
-        if (transactionDelegate is null)
-        {
-            throw new ArgumentNullException(nameof(transactionDelegate));
-        }
+        ArgumentNullException.ThrowIfNull(transactionDelegate);
 
         await RunTransaction(transactionOption, async () =>
         {
@@ -34,10 +31,7 @@ internal class TransactionClient : ITransactionClient
 
     public async Task RunTransaction(TransactionOption transactionOption, Func<Task<bool>> transactionDelegate)
     {
-        if (transactionDelegate is null)
-        {
-            throw new ArgumentNullException(nameof(transactionDelegate));
-        }
+        ArgumentNullException.ThrowIfNull(transactionDelegate);
 
         // Pick up ambient transaction context
         var ambientTransactionInfo = TransactionContext.GetTransactionInfo();

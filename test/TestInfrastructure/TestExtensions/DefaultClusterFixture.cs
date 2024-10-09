@@ -53,9 +53,9 @@ namespace TestExtensions
 
         public class SiloHostConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder
+                siloBuilder
                     .Configure<SiloMessagingOptions>(o => o.ClientGatewayShutdownNotificationTimeout = default)
                     .UseInMemoryReminderService()
                     .AddMemoryGrainStorageAsDefault()

@@ -22,9 +22,9 @@ namespace Consul.Tests
 
         public class SiloBuilderConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseConsulSiloClustering(options =>
+                siloBuilder.UseConsulSiloClustering(options =>
                 {
                     var address = new Uri(ConsulTestUtils.ConsulConnectionString);
                     options.ConfigureConsulClient(address);

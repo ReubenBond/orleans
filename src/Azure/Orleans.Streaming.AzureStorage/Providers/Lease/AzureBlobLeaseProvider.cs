@@ -79,11 +79,11 @@ namespace Orleans.LeaseProviders
             }
         }
 
-        public async Task Release(string category, AcquiredLease[] acquiredLeases)
+        public async Task Release(string category, AcquiredLease[] aquiredLeases)
         {
             await InitContainerIfNotExistsAsync();
-            var tasks = new List<Task>(acquiredLeases.Length);
-            foreach (var acquiredLease in acquiredLeases)
+            var tasks = new List<Task>(aquiredLeases.Length);
+            foreach (var acquiredLease in aquiredLeases)
             {
                 tasks.Add(Release(category, acquiredLease));
             }
@@ -96,11 +96,11 @@ namespace Orleans.LeaseProviders
             return leaseClient.ReleaseAsync();
         }
 
-        public async Task<AcquireLeaseResult[]> Renew(string category, AcquiredLease[] acquiredLeases)
+        public async Task<AcquireLeaseResult[]> Renew(string category, AcquiredLease[] aquiredLeases)
         {
             await InitContainerIfNotExistsAsync();
-            var tasks = new List<Task<AcquireLeaseResult>>(acquiredLeases.Length);
-            foreach (var acquiredLease in acquiredLeases)
+            var tasks = new List<Task<AcquireLeaseResult>>(aquiredLeases.Length);
+            foreach (var acquiredLease in aquiredLeases)
             {
                 tasks.Add(Renew(category, acquiredLease));
             }

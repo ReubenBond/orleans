@@ -267,10 +267,7 @@ namespace Orleans.Providers.Streams.Common
         {
             message = null;
 
-            if (cursorObj == null)
-            {
-                throw new ArgumentNullException(nameof(cursorObj));
-            }
+            ArgumentNullException.ThrowIfNull(cursorObj);
 
             var cursor = cursorObj as Cursor;
             if (cursor == null)

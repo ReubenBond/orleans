@@ -168,10 +168,7 @@ namespace Orleans.Providers.Streams.Generator
         /// <inheritdoc />
         public Task<object> ExecuteCommand(int command, object arg)
         {
-            if (arg == null)
-            {
-                throw new ArgumentNullException(nameof(arg));
-            }
+            ArgumentNullException.ThrowIfNull(arg);
             generatorConfig = arg as IStreamGeneratorConfig;
             if (generatorConfig == null)
             {

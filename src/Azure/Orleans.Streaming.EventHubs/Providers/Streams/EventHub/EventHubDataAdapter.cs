@@ -59,13 +59,13 @@ namespace Orleans.Streaming.EventHubs
             return EventHubBatchContainer.ToEventData(this.serializer, streamId, events, requestContext);
         }
 
-        public virtual CachedMessage FromQueueMessage(StreamPosition streamPosition, EventData queueMessage, DateTime dequeueTime, Func<int, ArraySegment<byte>> getSegment)
+        public virtual CachedMessage FromQueueMessage(StreamPosition position, EventData queueMessage, DateTime dequeueTime, Func<int, ArraySegment<byte>> getSegment)
         {
             return new CachedMessage()
             {
-                StreamId = streamPosition.StreamId, 
+                StreamId = position.StreamId, 
                 SequenceNumber = queueMessage.SequenceNumber,
-                EventIndex = streamPosition.SequenceToken.EventIndex,
+                EventIndex = position.SequenceToken.EventIndex,
                 EnqueueTimeUtc = queueMessage.EnqueuedTime.UtcDateTime,
                 DequeueTimeUtc = dequeueTime,
                 Segment = EncodeMessageIntoSegment(queueMessage, getSegment)
@@ -83,11 +83,11 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Get offset from cached message.  Left to derived class, as only it knows how to get this from the cached message.
         /// </summary>
-        public virtual string GetOffset(CachedMessage lastItemPurged)
+        public virtual string GetOffset(CachedMessage cachedMessage)
         {
             // TODO figure out how to get this from the adapter
             int readOffset = 0;
-            return SegmentBuilder.ReadNextString(lastItemPurged.Segment, ref readOffset); // read offset
+            return SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset); // read offset
         }
 
         /// <summary>
