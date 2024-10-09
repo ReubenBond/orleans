@@ -13,6 +13,7 @@ namespace Orleans.Serialization
     /// </summary>
     [Serializable]
     [GenerateSerializer]
+    [Alias("Orleans.Serialization.SerializerException")]
     public class SerializerException : Exception
     {
         /// <summary>
@@ -42,10 +43,10 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="SerializerException"/> class.
         /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="StreamingContext" /> that contains contextual information about the source or destination.</param>
 #if NET8_0_OR_GREATER
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
 #endif
         protected SerializerException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
@@ -69,8 +70,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="FieldIdNotPresentException"/> class.
         /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
 #if NET8_0_OR_GREATER
         [Obsolete]
 #endif
@@ -96,8 +97,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="SchemaTypeInvalidException"/> class.
         /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
 #if NET8_0_OR_GREATER
         [Obsolete]
 #endif
@@ -123,8 +124,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="FieldTypeInvalidException"/> class.
         /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
 #if NET8_0_OR_GREATER
         [Obsolete]
 #endif
@@ -151,8 +152,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="FieldTypeMissingException"/> class.
         /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
 #if NET8_0_OR_GREATER
         [Obsolete]
 #endif
@@ -179,8 +180,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="ExtendedWireTypeInvalidException"/> class.
         /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
 #if NET8_0_OR_GREATER
         [Obsolete]
 #endif
@@ -214,8 +215,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="UnsupportedWireTypeException"/> class.
         /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
 #if NET8_0_OR_GREATER
         [Obsolete]
 #endif
@@ -260,8 +261,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="ReferenceNotFoundException"/> class.
         /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
 #if NET8_0_OR_GREATER
         [Obsolete]
 #endif
@@ -273,7 +274,7 @@ namespace Orleans.Serialization
 
         /// <inheritdoc/>
         #if NET8_0_OR_GREATER
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         #endif
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
@@ -302,8 +303,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="UnknownReferencedTypeException"/> class.
         /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
 #if NET8_0_OR_GREATER
         [Obsolete]
 #endif
@@ -321,7 +322,7 @@ namespace Orleans.Serialization
 
         /// <inheritdoc/>
 #if NET8_0_OR_GREATER
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
 #endif
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
@@ -357,8 +358,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="ReferenceFieldNotSupportedException"/> class.
         /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
 #if NET8_0_OR_GREATER
         [Obsolete]
 #endif
@@ -369,7 +370,7 @@ namespace Orleans.Serialization
 
         /// <inheritdoc/>
 #if NET8_0_OR_GREATER
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
 #endif
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
@@ -397,8 +398,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="UnknownWellKnownTypeException"/> class.
         /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
 #if NET8_0_OR_GREATER
         [Obsolete]
 #endif
@@ -416,7 +417,7 @@ namespace Orleans.Serialization
 
         /// <inheritdoc />
 #if NET8_0_OR_GREATER
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
 #endif
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
@@ -444,8 +445,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="IllegalTypeException"/> class.
         /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
 #if NET8_0_OR_GREATER
         [Obsolete]
 #endif
@@ -463,7 +464,7 @@ namespace Orleans.Serialization
 
         /// <inheritdoc/>
 #if NET8_0_OR_GREATER
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
 #endif
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
@@ -489,8 +490,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="TypeMissingException"/> class.
         /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
 #if NET8_0_OR_GREATER
         [Obsolete]
 #endif
@@ -517,8 +518,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="RequiredFieldMissingException"/> class.
         /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
 #if NET8_0_OR_GREATER
         [Obsolete]
 #endif
@@ -545,8 +546,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="CodecNotFoundException"/> class.
         /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
 #if NET8_0_OR_GREATER
         [Obsolete]
 #endif
@@ -584,8 +585,8 @@ namespace Orleans.Serialization
         /// <summary>
         /// Initializes a new instance of the <see cref="UnexpectedLengthPrefixValueException"/> class.
         /// </summary>
-        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
-        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+        /// <param name="info">The <see cref="System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
 #if NET8_0_OR_GREATER
         [Obsolete]
 #endif

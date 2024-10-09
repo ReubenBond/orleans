@@ -9,7 +9,9 @@ namespace Orleans.Transactions.TestKit
     {
         Task<bool> Pass(Guid transactionId, string data);
         Task<bool> Fail(Guid transactionId, string data);
+#pragma warning disable CA1716 // Identifiers should not match keywords
         Task<bool> Throw(Guid transactionId, string data);
+#pragma warning restore CA1716 // Identifiers should not match keywords
     }
 
     // TODO : Replace with more complete service implementation which:
@@ -42,7 +44,7 @@ namespace Orleans.Transactions.TestKit
         {
             this.logger.LogInformation("Transaction {TransactionId} Threw with data: {Data}", transactionId, data);
             await Task.Delay(30);
-            throw new ApplicationException("Transaction {transactionId} Threw with data: {data}");
+            throw new InvalidOperationException("Transaction {transactionId} Threw with data: {data}");
         }
     }
 

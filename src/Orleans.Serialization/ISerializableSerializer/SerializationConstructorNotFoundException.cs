@@ -16,7 +16,7 @@ namespace Orleans.Serialization
         /// <param name="type">The type.</param>
         [SecurityCritical]
         public SerializationConstructorNotFoundException(Type type) : base(
-            (string)$"Could not find a suitable serialization constructor on type {type.FullName}")
+            $"Could not find a suitable serialization constructor on type {type.FullName}")
         {
         }
 
@@ -27,7 +27,7 @@ namespace Orleans.Serialization
         /// <param name="context">The context.</param>
         [SecurityCritical]
 #if NET8_0_OR_GREATER
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
 #endif
         protected SerializationConstructorNotFoundException(SerializationInfo info, StreamingContext context) : base(info, context)
         {

@@ -105,7 +105,7 @@ namespace Orleans.Storage
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         protected InconsistentStateException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -164,10 +164,10 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            if (info == null) throw new ArgumentNullException(nameof(info));
+            ArgumentNullException.ThrowIfNull(info);
 
             info.AddValue(nameof(StoredEtag), this.StoredEtag);
             info.AddValue(nameof(CurrentEtag), this.CurrentEtag);

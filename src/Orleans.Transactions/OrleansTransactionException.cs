@@ -17,7 +17,7 @@ namespace Orleans.Transactions
 
         public OrleansTransactionException(string message, Exception innerException) : base(message, innerException) { }
 
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         protected OrleansTransactionException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -108,7 +108,7 @@ namespace Orleans.Transactions
             this.TransactionId = info.GetString(nameof(this.TransactionId));
         }
 
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
@@ -145,14 +145,14 @@ namespace Orleans.Transactions
             TransactionId = transactionId;
         }
 
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         protected OrleansTransactionAbortedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
             this.TransactionId = info.GetString(nameof(this.TransactionId));
         }
 
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
@@ -186,14 +186,14 @@ namespace Orleans.Transactions
         {
         }
 
-        [Obsolete]
+    [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         private OrleansCascadingAbortException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
             this.DependentTransactionId = info.GetString(nameof(this.DependentTransactionId));
         }
 
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
@@ -336,7 +336,7 @@ namespace Orleans.Transactions
         {
         }
 
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         protected OrleansTransactionTransientFailureException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {

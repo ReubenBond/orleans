@@ -79,7 +79,7 @@ namespace Orleans.Transactions.TestKit
             List<string>[][] tiersResults = await Task.WhenAll(nextTier.Select(g => g.GetNestedTransactionIds(tier+1, nextTiers)));
             foreach (List<string>[] result in tiersResults)
             {
-                if (result.Length != results.Length) throw new ApplicationException("Invalid result length");
+                if (result.Length != results.Length) throw new InvalidOperationException("Invalid result length");
                 for (int i = tier + 1; i < results.Length; i++)
                 {
                     if (results[i] != null)

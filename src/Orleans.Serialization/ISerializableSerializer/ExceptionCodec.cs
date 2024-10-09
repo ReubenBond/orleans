@@ -176,7 +176,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="exception">The exception.</param>
         /// <returns>The provided exception's <see cref="Exception.Data"/> property.</returns>
-        public Dictionary<object, object> GetDataProperty(Exception exception)
+        public static Dictionary<object, object> GetDataProperty(Exception exception)
         {
             if (exception.Data is null or { Count: 0 })
             {
@@ -388,7 +388,7 @@ namespace Orleans.Serialization
             {
                 try
                 {
-                    if (type.GetConstructor(Array.Empty<Type>()) is not null)
+                    if (type.GetConstructor([]) is not null)
                     {
                         result = (Exception)Activator.CreateInstance(type);
                     }
@@ -472,7 +472,7 @@ namespace Orleans.Serialization
             var data = info.GetValue("Data", typeof(IDictionary));
             if (data is { })
             {
-                surrogate.Data = _baseCodec.GetDataProperty(value);
+                surrogate.Data = ExceptionCodec.GetDataProperty(value);
             }
 
             surrogate.InnerExceptions = value.InnerExceptions;

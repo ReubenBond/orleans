@@ -8,7 +8,7 @@ using Orleans.Transactions.State;
 
 namespace Orleans.Transactions.TestKit
 {
-    internal class FaultInjectionTransactionManager<TState> : ITransactionManager
+    internal sealed class FaultInjectionTransactionManager<TState> : ITransactionManager
         where TState : class, new()
     {
         private readonly TransactionManager<TState> tm;
@@ -95,7 +95,7 @@ namespace Orleans.Transactions.TestKit
 
     }
 
-    internal class FaultInjectionTransactionalResource<TState> : ITransactionalResource
+    internal sealed class FaultInjectionTransactionalResource<TState> : ITransactionalResource
         where TState : class, new()
     {
 

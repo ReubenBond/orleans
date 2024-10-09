@@ -80,7 +80,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="info">The serialization info.</param>
         /// <param name="context">The context.</param>
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         private QueueCacheMissException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -90,7 +90,7 @@ namespace Orleans.Streams
         }
 
         /// <inheritdoc/>
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             info.AddValue("Requested", Requested);

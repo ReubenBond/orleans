@@ -37,9 +37,9 @@ namespace Orleans.Runtime
         /// <param name="context">
         /// The context.
         /// </param>
-        /// <exception cref="SerializationException">The class name is <see langword="null" /> or <see cref="P:System.Exception.HResult" /> is zero (0).</exception>
+        /// <exception cref="SerializationException">The class name is <see langword="null" /> or <see cref="System.Exception.HResult" /> is zero (0).</exception>
         /// <exception cref="ArgumentNullException"><paramref name="info" /> is <see langword="null" />.</exception>
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         protected WrappedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -53,7 +53,7 @@ namespace Orleans.Runtime
         public string OriginalExceptionType { get; set; }
 
         /// <inheritdoc/>
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);

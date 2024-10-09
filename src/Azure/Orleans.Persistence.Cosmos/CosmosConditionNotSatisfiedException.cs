@@ -93,7 +93,7 @@ public class CosmosConditionNotSatisfiedException : InconsistentStateException
     /// <summary>
     /// Exception thrown when a Cosmos DB exception is thrown due to update conditions not being satisfied.
     /// </summary>
-    [Obsolete]
+    [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
     protected CosmosConditionNotSatisfiedException(SerializationInfo info, StreamingContext context)
         : base(info, context)
     {
@@ -103,10 +103,10 @@ public class CosmosConditionNotSatisfiedException : InconsistentStateException
     }
 
     /// <inheritdoc />
-    [Obsolete]
+    [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
     public override void GetObjectData(SerializationInfo info, StreamingContext context)
     {
-        if (info == null) throw new ArgumentNullException(nameof(info));
+        ArgumentNullException.ThrowIfNull(info);
 
         info.AddValue("GrainType", GrainType);
         info.AddValue("GrainId", GrainId);
