@@ -14,10 +14,10 @@ namespace Orleans.Streaming.EventHubs
         /// <summary>
         /// Add a list of EventHub EventData to the cache.
         /// </summary>
-        /// <param name="message"></param>
+        /// <param name="messages"></param>
         /// <param name="dequeueTimeUtc"></param>
         /// <returns></returns>
-        List<StreamPosition> Add(List<EventData> message, DateTime dequeueTimeUtc);
+        List<StreamPosition> Add(List<EventData> messages, DateTime dequeueTimeUtc);
 
         /// <summary>
         /// Get a cursor into the cache to read events from a stream.

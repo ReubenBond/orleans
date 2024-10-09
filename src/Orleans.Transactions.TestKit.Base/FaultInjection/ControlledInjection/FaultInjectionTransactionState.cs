@@ -11,10 +11,10 @@ namespace Orleans.Transactions.TestKit
     public class FaultInjectionControl
     {
         [Id(0)]
-        public TransactionFaultInjectPhase FaultInjectionPhase = TransactionFaultInjectPhase.None;
+        public TransactionFaultInjectPhase FaultInjectionPhase { get; set; } = TransactionFaultInjectPhase.None;
 
         [Id(1)]
-        public FaultInjectionType FaultInjectionType = FaultInjectionType.None;
+        public FaultInjectionType FaultInjectionType { get; set; } = FaultInjectionType.None;
 
         public void Reset()
         {

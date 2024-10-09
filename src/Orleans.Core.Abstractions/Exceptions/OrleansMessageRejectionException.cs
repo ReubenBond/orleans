@@ -50,7 +50,7 @@ namespace Orleans.Runtime
         /// <exception cref="ArgumentNullException">
         /// <paramref name="info"/> is <see langword="null"/>.
         /// </exception>
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         protected OrleansMessageRejectionException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {

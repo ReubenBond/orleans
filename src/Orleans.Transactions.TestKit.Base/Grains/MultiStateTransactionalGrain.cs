@@ -63,47 +63,48 @@ namespace Orleans.Transactions.TestKit
 
     public class MultiStateTransactionalGrainBaseClass : Grain, ITransactionTestGrain
     {
-        protected ITransactionalState<GrainData>[] dataArray;
         private readonly ILoggerFactory loggerFactory;
-        protected ILogger logger;
+
+        protected ITransactionalState<GrainData>[] DataArray { get; set; }
+        protected ILogger Logger { get; set; }
 
         public MultiStateTransactionalGrainBaseClass(
             ITransactionalState<GrainData>[] dataArray,
             ILoggerFactory loggerFactory)
         {
-            this.dataArray = dataArray;
+            this.DataArray = dataArray;
             this.loggerFactory = loggerFactory;
         }
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            this.logger = this.loggerFactory.CreateLogger(this.GetGrainId().ToString());
+            this.Logger = this.loggerFactory.CreateLogger(this.GetGrainId().ToString());
             return base.OnActivateAsync(cancellationToken);
         }
 
         public async Task Set(int newValue)
         {
-            foreach(var data in this.dataArray)
+            foreach(var data in this.DataArray)
             {
                 await data.PerformUpdate(state =>
                 {
-                    this.logger.LogInformation("Setting from {Value} to {NewValue}.", state.Value, newValue);
+                    this.Logger.LogInformation("Setting from {Value} to {NewValue}.", state.Value, newValue);
                     state.Value = newValue;
-                    this.logger.LogInformation("Set to {Value}.", state.Value);
+                    this.Logger.LogInformation("Set to {Value}.", state.Value);
                 });
             }
         }
 
         public async Task<int[]> Add(int numberToAdd)
         {
-            var result = new int[dataArray.Length];
-            for(int i = 0; i < dataArray.Length; i++)
+            var result = new int[DataArray.Length];
+            for(int i = 0; i < DataArray.Length; i++)
             {
-                result[i] = await dataArray[i].PerformUpdate(state =>
+                result[i] = await DataArray[i].PerformUpdate(state =>
                 {
-                    this.logger.LogInformation("Adding {NumberToAdd} to value {Value}.", numberToAdd, state.Value);
+                    this.Logger.LogInformation("Adding {NumberToAdd} to value {Value}.", numberToAdd, state.Value);
                     state.Value += numberToAdd;
-                    this.logger.LogInformation("Value after Adding {NumberToAdd} is {Value}.", numberToAdd, state.Value);
+                    this.Logger.LogInformation("Value after Adding {NumberToAdd} is {Value}.", numberToAdd, state.Value);
                     return state.Value;
                 });
             }
@@ -112,12 +113,12 @@ namespace Orleans.Transactions.TestKit
 
         public async Task<int[]> Get()
         {
-            var result = new int[dataArray.Length];
-            for (int i = 0; i < dataArray.Length; i++)
+            var result = new int[DataArray.Length];
+            for (int i = 0; i < DataArray.Length; i++)
             {
-                result[i] = await dataArray[i].PerformRead(state =>
+                result[i] = await DataArray[i].PerformRead(state =>
                 {
-                    this.logger.LogInformation("Get {Value}.", state.Value);
+                    this.Logger.LogInformation("Get {Value}.", state.Value);
                     return state.Value;
                 });
             }

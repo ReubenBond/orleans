@@ -78,7 +78,7 @@ internal readonly struct Edge(EdgeVertex source, EdgeVertex target) : IEquatable
 /// Data structure representing one side of a <see cref="Edge"/>.
 /// </summary>
 [GenerateSerializer, Immutable]
-public readonly struct EdgeVertex(
+internal readonly struct EdgeVertex(
     GrainId id,
     SiloAddress silo,
     bool isMigratable) : IEquatable<EdgeVertex>

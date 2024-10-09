@@ -18,7 +18,9 @@ namespace Orleans.Runtime
         /// The underlying <see cref="Guid"/>.
         /// </summary>
         [Id(0)]
-        public readonly Guid Guid;
+#pragma warning disable CA1720 // Identifier contains type name
+        public Guid Guid { get; }
+#pragma warning restore CA1720 // Identifier contains type name
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GuidId"/> class.
@@ -43,11 +45,11 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns a <see cref="GuidId"/> instance corresponding to the provided <see cref="Guid"/>.
         /// </summary>
-        /// <param name="guid">The guid.</param>
+        /// <param name="value">The guid.</param>
         /// <returns>A <see cref="GuidId"/> instance corresponding to the provided <see cref="Guid"/>.</returns>
-        public static GuidId GetGuidId(Guid guid)
+        public static GuidId GetGuidId(Guid value)
         {
-            return FindOrCreateGuidId(guid);
+            return FindOrCreateGuidId(value);
         }
 
         /// <summary>
@@ -90,6 +92,26 @@ namespace Orleans.Runtime
         /// <param name="right">The right operand.</param>
         /// <returns><see langword="true"/> if the provided values are not equal, otherwise <see langword="false"/>.</returns>
         public static bool operator !=(GuidId? left, GuidId? right) => !(left == right);
+
+        /// <summary>
+        /// Returns true if left is less than right.
+        /// </summary>
+        public static bool operator <(GuidId left, GuidId right) => left.CompareTo(right) < 0;
+
+        /// <summary>
+        /// Returns true if left is less than or equal to right.
+        /// </summary>
+        public static bool operator <=(GuidId left, GuidId right) => left.CompareTo(right) <= 0;
+
+        /// <summary>
+        /// Returns true if left is greater than right.
+        /// </summary>
+        public static bool operator >(GuidId left, GuidId right) => left.CompareTo(right) > 0;
+
+        /// <summary>
+        /// Returns true if left is greater than or equal to right.
+        /// </summary>
+        public static bool operator >=(GuidId left, GuidId right) => left.CompareTo(right) >= 0;
 
         /// <inheritdoc />
         public void GetObjectData(SerializationInfo info, StreamingContext context)

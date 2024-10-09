@@ -17,7 +17,7 @@ namespace Orleans.Concurrency
     {
         /// <summary> Return reference to the original value stored in this Immutable wrapper. </summary>
         [Id(0)]
-        public readonly T Value;
+        public T Value { get; }
 
         /// <summary>
         /// Constructor to wrap the specified data object in new Immutable wrapper.

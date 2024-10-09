@@ -24,8 +24,9 @@ namespace Orleans
     public abstract class LifecycleSubject : ILifecycleSubject
     {
         private readonly List<OrderedObserver> subscribers = [];
-        protected readonly ILogger Logger;
-        private int? _highStage = null;
+
+        protected ILogger Logger { get; }
+        public int? HighStage { get; set; } = null;
 
         protected LifecycleSubject(ILogger logger)
         {
@@ -99,7 +100,7 @@ namespace Orleans
         /// <inheritdoc />
         public virtual async Task OnStart(CancellationToken cancellationToken = default)
         {
-            if (this._highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
+            if (this.HighStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
             try
             {
                 foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers
@@ -112,7 +113,7 @@ namespace Orleans
                     }
 
                     var stage = observerGroup.Key;
-                    this._highStage = stage;
+                    this.HighStage = stage;
                     var stopWatch = ValueStopwatch.StartNew();
                     await Task.WhenAll(observerGroup.Select(orderedObserver => CallOnStart(orderedObserver, cancellationToken)));
                     stopWatch.Stop();
@@ -127,7 +128,7 @@ namespace Orleans
                     (int)ErrorCode.LifecycleStartFailure,
                     ex,
                     "Lifecycle start canceled due to errors at stage {Stage}",
-                    this._highStage);
+                    this.HighStage);
                 throw;
             }
 
@@ -171,11 +172,11 @@ namespace Orleans
         public virtual async Task OnStop(CancellationToken cancellationToken = default)
         {
             // if not started, do nothing
-            if (!this._highStage.HasValue) return;
+            if (!this.HighStage.HasValue) return;
             var loggedCancellation = false;
             foreach (IGrouping<int, OrderedObserver> observerGroup in this.subscribers
                 // include up to highest started stage
-                .Where(orderedObserver => orderedObserver.Stage <= _highStage && orderedObserver.Observer != null)
+                .Where(orderedObserver => orderedObserver.Stage <= HighStage && orderedObserver.Observer != null)
                 .GroupBy(orderedObserver => orderedObserver.Stage)
                 .OrderByDescending(group => group.Key))
             {
@@ -186,7 +187,7 @@ namespace Orleans
                 }
 
                 var stage = observerGroup.Key;
-                this._highStage = stage;
+                this.HighStage = stage;
                 try
                 {
                     var stopwatch = ValueStopwatch.StartNew();
@@ -200,7 +201,7 @@ namespace Orleans
                         (int)ErrorCode.LifecycleStopFailure,
                         ex,
                         "Stopping lifecycle encountered an error at stage {Stage}. Continuing to stop.",
-                        this._highStage);
+                        this.HighStage);
                 }
 
                 this.OnStopStageCompleted(stage);
@@ -228,7 +229,7 @@ namespace Orleans
         public virtual IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
         {
             if (observer == null) throw new ArgumentNullException(nameof(observer));
-            if (this._highStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
+            if (this.HighStage.HasValue) throw new InvalidOperationException("Lifecycle has already been started.");
 
             var orderedObserver = new OrderedObserver(stage, observer);
             this.subscribers.Add(orderedObserver);
