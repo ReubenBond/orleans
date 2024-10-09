@@ -12,7 +12,7 @@ namespace UnitTests.Grains
         private static readonly Dictionary<Guid, int> counters = new Dictionary<Guid, int>();
         private static readonly HashSet<Guid> grains = new HashSet<Guid>();
         private readonly ILogger<StuckGrain> _log;
-        private bool isDeactivatingBlocking = false;
+        private bool isDeactivatingBlocking;
 
         private static readonly ConcurrentDictionary<GrainId, ManualResetEventSlim> blockingMREMap =
             new ConcurrentDictionary<GrainId, ManualResetEventSlim>();

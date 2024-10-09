@@ -76,7 +76,7 @@ namespace Orleans.Hosting.Kubernetes
         /// <summary>
         /// Whether or not to delete pods which correspond to silos which have become defunct since this silo became active.
         /// </summary>
-        public bool DeleteDefunctSiloPods { get; set; } = false;
+        public bool DeleteDefunctSiloPods { get; set; }
 
         /// <summary>
         /// The Kubernetes namespace which this silo and all other silos belong to.

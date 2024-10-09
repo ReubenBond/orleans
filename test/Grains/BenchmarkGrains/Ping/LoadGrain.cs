@@ -6,7 +6,7 @@ namespace BenchmarkGrains.Ping
     public class LoadGrain : Grain, ILoadGrain
     {
         private Task<Report> runTask;
-        private bool end = false;
+        private bool end;
 
         public Task Generate(int run, int conncurrent)
         {

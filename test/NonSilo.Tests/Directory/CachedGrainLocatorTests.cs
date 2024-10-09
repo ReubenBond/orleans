@@ -487,7 +487,7 @@ namespace UnitTests.Directory
             };
         }
 
-        private int generation = 0;
+        private int generation;
         private SiloAddress GenerateSiloAddress() => SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), ++generation);
 
         private async Task WaitUntilClusterChangePropagated()

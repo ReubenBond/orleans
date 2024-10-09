@@ -248,7 +248,7 @@ namespace Orleans.EventSourcing.Common
 
 
         /// statistics gathering. Is null unless stats collection is turned on.
-        protected LogConsistencyStatistics stats = null;
+        protected LogConsistencyStatistics stats;
 
 
         /// For use by protocols. Determines if this cluster is part of the configured multicluster.

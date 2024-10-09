@@ -67,7 +67,7 @@ public interface ILoaderGrain : IGrainWithStringKey
 
 public class LoaderGrain : Grain, ILoaderGrain
 {
-    private int _numForests = 0;
+    private int _numForests;
     private int _resetCount;
 
     public async ValueTask AddForest()

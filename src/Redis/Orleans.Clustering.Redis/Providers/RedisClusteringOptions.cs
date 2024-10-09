@@ -26,7 +26,7 @@ namespace Orleans.Clustering.Redis
         /// Entry expiry, null by default. A value should be set ONLY for ephemeral environments (like in tests).
         /// Setting a value different from null will cause entries to be deleted after some period of time.
         /// </summary>
-        public TimeSpan? EntryExpiry { get; set; } = null;
+        public TimeSpan? EntryExpiry { get; set; }
 
         /// <summary>
         /// The default multiplexer creation delegate.

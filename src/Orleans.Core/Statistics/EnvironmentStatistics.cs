@@ -65,7 +65,7 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
 
     private sealed class EventCounterListener : EventListener
     {
-        public float CpuUsage { get; private set; } = 0f;
+        public float CpuUsage { get; private set; }
 
         protected override void OnEventSourceCreated(EventSource source)
         {

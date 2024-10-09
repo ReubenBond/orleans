@@ -13,7 +13,7 @@ namespace Tester.StreamingTests
     public class SystemTargetRouteTests : OrleansTestingBase, IClassFixture<SystemTargetRouteTests.Fixture>
     {
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
-        private int eventsConsumed = 0;
+        private int eventsConsumed;
 
         public class Fixture : BaseTestClusterFixture
         {

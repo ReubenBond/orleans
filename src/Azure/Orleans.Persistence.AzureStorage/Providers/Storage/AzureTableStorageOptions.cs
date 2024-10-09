@@ -17,7 +17,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Indicates if grain data should be deleted or reset to defaults when a grain clears it's state.
         /// </summary>
-        public bool DeleteStateOnClear { get; set; } = false;
+        public bool DeleteStateOnClear { get; set; }
 
         /// <summary>
         /// Indicates if grain data should be stored in string or in binary format.

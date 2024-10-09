@@ -11,7 +11,7 @@ namespace UnitTestGrains
     public class TimerGrain : Grain, ITimerGrain
     {
         private bool deactivating;
-        private int counter = 0;
+        private int counter;
         private Dictionary<string, IDisposable> allTimers;
         private IDisposable defaultTimer;
         private static readonly TimeSpan period = TimeSpan.FromMilliseconds(100);
@@ -659,7 +659,7 @@ namespace UnitTestGrains
     public class PocoTimerGrain : IGrainBase, IPocoTimerGrain
     {
         private bool deactivating;
-        private int counter = 0;
+        private int counter;
         private Dictionary<string, IDisposable> allTimers;
         private IDisposable defaultTimer;
         private static readonly TimeSpan period = TimeSpan.FromMilliseconds(100);

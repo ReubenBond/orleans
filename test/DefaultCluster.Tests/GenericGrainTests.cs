@@ -14,7 +14,7 @@ namespace DefaultCluster.Tests.General
     [TestCategory("BVT"), TestCategory("Generics")]
     public class GenericGrainTests : HostedTestClusterEnsureDefaultStarted
     {
-        private static int grainId = 0;
+        private static int grainId;
 
         public GenericGrainTests(DefaultClusterFixture fixture) : base(fixture)
         {

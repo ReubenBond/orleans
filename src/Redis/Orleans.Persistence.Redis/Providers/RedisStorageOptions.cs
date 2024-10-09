@@ -43,7 +43,7 @@ namespace Orleans.Persistence
         /// Entry expiry, null by default. A value should be set only for ephemeral environments, such as testing environments.
         /// Setting a value different from <see langword="null"/> will cause duplicate activations in the cluster.
         /// </summary>
-        public TimeSpan? EntryExpiry { get; set; } = null;
+        public TimeSpan? EntryExpiry { get; set; }
 
         /// <summary>
         /// Gets the Redis key for the provided grain type and grain identifier. If not set, the default implementation will be used, which is equivalent to <c>{ServiceId}/state/{grainId}/{grainType}</c>.

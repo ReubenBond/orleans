@@ -8,7 +8,7 @@ namespace Orleans.Runtime;
 internal sealed class CounterAggregator
 {
     private readonly KeyValuePair<string, object>[] _tags;
-    private long _value = 0;
+    private long _value;
     public CounterAggregator()
     {
         _tags = Array.Empty<KeyValuePair<string, object>>();

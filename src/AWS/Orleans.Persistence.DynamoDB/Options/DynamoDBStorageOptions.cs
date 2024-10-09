@@ -46,7 +46,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// Indicates if grain data should be deleted or reset to defaults when a grain clears it's state.
         /// </summary>
-        public bool DeleteStateOnClear { get; set; } = false;
+        public bool DeleteStateOnClear { get; set; }
 
         /// <summary>
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.

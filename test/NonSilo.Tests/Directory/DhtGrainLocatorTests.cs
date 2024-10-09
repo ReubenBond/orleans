@@ -106,7 +106,7 @@ namespace UnitTests.Directory
             this.localGrainDirectory.Reset();
         }
 
-        private int generation = 0;
+        private int generation;
         private GrainAddress GenerateActivationAddress()
         {
             var grainId = LegacyGrainId.GetGrainIdForTesting(Guid.NewGuid());

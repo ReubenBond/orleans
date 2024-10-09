@@ -19,7 +19,7 @@ namespace UnitTests.Grains
     public class PromiseForwardGrain : Grain<SimpleGrainState>, IPromiseForwardGrain
     {
         protected  ISimpleGrain MySimpleGrain { get; set; }
-        protected int b = 0;
+        protected int b;
         public Task<int> GetAxB_Async()
         {
             return GetSimpleGrain().GetAxB();

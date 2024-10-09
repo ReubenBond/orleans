@@ -27,7 +27,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
 
     public class MockEventHubCacheAdaptor : EventHubDataAdapter
     {
-        private long sequenceNumberCounter = 0;
+        private long sequenceNumberCounter;
         private readonly int eventIndex = 1;
         private readonly string eventHubOffset = "OffSet";
         public MockEventHubCacheAdaptor(Orleans.Serialization.Serializer serializer) : base(serializer)

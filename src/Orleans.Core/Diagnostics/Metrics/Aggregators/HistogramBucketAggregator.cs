@@ -8,7 +8,7 @@ namespace Orleans.Runtime;
 
 internal class HistogramBucketAggregator
 {
-    private long _value = 0;
+    private long _value;
     private readonly KeyValuePair<string, object>[] _tags;
     public long Bound { get; }
 

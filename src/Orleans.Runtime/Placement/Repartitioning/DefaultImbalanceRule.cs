@@ -18,7 +18,7 @@ internal sealed class DefaultImbalanceRule(ISiloStatusOracle siloStatusOracle) :
     private readonly ConcurrentDictionary<SiloAddress, SiloStatus> _silos = new();
     private readonly ISiloStatusOracle _siloStatusOracle = siloStatusOracle;
 
-    private uint _allowedImbalance = 0;
+    private uint _allowedImbalance;
 
     public bool IsSatisfiedBy(uint imbalance) => imbalance <= _allowedImbalance;
 

@@ -53,9 +53,9 @@ namespace Tester
             this.config = options.Value;
         }
 
-        private bool started = false;
-        private bool startedInBackground = false;
-        private bool init = false;
+        private bool started;
+        private bool startedInBackground;
+        private bool init;
 
         public async override Task Init(IServiceProvider serviceProvider)
         {

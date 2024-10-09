@@ -422,7 +422,7 @@ namespace Tester
 
         private class TestOptions
         {
-            public int IntField { get; set; } = 0;
+            public int IntField { get; set; }
         }
 
         private class TestOptionsWithListAndDictionary
@@ -431,9 +431,9 @@ namespace Tester
 
             public Dictionary<string, string> SomeDictionary { get; set; } = new Dictionary<string, string>();
 
-            public List<int> NullList { get; set; } = null;
+            public List<int> NullList { get; set; }
 
-            public Dictionary<string, string> NullDictionary { get; set; } = null;
+            public Dictionary<string, string> NullDictionary { get; set; }
         }
 
         private class TestOptionsFormatter2 : IOptionFormatter<TestOptions>

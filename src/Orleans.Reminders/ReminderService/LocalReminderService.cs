@@ -31,7 +31,7 @@ namespace Orleans.Runtime.ReminderService
         private readonly GrainReferenceActivator _referenceActivator;
         private readonly GrainInterfaceType _grainInterfaceType;
         private long localTableSequence;
-        private uint initialReadCallCount = 0;
+        private uint initialReadCallCount;
         private Task runTask;
 
         public LocalReminderService(

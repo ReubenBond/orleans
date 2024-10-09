@@ -11,7 +11,7 @@ namespace Benchmarks.MapReduce
         private readonly int _intermediateStagesCount = 15;
         private readonly int _pipelineParallelization = 4;
         private readonly int _repeats = 50000;
-        private int _currentRepeat = 0;
+        private int _currentRepeat;
 
         [GlobalSetup]
         public void BenchmarkSetup()

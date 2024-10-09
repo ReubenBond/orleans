@@ -32,7 +32,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
-        private long clientsCollectionVersion = 0;
+        private long clientsCollectionVersion;
         private readonly TimeSpan clientDropTimeout;
 
         public Gateway(

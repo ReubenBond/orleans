@@ -18,8 +18,8 @@ namespace Orleans.Runtime
         // be invoked.
         public event Action RaiseFlushEvent;
 
-        private long nextGeneration = 0;
-        private long generationToFree = 0;
+        private long nextGeneration;
+        private long generationToFree;
         private readonly TimeSpan requiredFreshness;
         // We want this to be a reference type so that we can update the values in the cache
         // without having to call AddOrUpdate, which is a nuisance

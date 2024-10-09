@@ -7,7 +7,7 @@ namespace UnitTests.Grains.Directories
     [GrainDirectory(GrainDirectoryName = DIRECTORY), GrainType(DIRECTORY)]
     public class CustomDirectoryGrain : ICustomDirectoryGrain
     {
-        private int counter = 0;
+        private int counter;
         private readonly SiloAddress _siloAddress;
 
         public const string DIRECTORY = "CustomGrainDirectory";

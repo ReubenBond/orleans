@@ -21,7 +21,7 @@ namespace Orleans
 
     internal sealed class LinearBackoffClientConnectionRetryFilter : IClientConnectionRetryFilter
     {
-        private int _retryCount = 0;
+        private int _retryCount;
 
         private const int MaxRetry = 5;
         private const int Delay = 1_500;

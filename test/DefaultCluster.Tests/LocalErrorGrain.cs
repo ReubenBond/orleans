@@ -2,8 +2,8 @@
 {
     internal class LocalErrorGrain
     {
-        private int m_a = 0;
-        private int m_b = 0;
+        private int m_a;
+        private int m_b;
 
         public LocalErrorGrain() { }
 

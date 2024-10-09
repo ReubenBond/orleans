@@ -26,7 +26,7 @@ namespace Orleans
         private readonly List<OrderedObserver> subscribers = [];
 
         protected ILogger Logger { get; }
-        public int? HighStage { get; set; } = null;
+        public int? HighStage { get; set; }
 
         protected LifecycleSubject(ILogger logger)
         {

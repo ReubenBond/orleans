@@ -16,7 +16,7 @@ namespace Orleans.Runtime.TestHooks
     /// </summary>
     internal class TestHooksEnvironmentStatisticsProvider : IEnvironmentStatisticsProvider
     {
-        private EnvironmentStatistics? _currentStats = null;
+        private EnvironmentStatistics? _currentStats;
 
         public EnvironmentStatistics GetEnvironmentStatistics() => _currentStats ?? new();
         public void SetHardwareStatistics(EnvironmentStatistics stats) => _currentStats = stats;

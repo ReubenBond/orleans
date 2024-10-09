@@ -13,7 +13,7 @@ namespace Orleans.Runtime
         private readonly GrainManifest _siloManifest;
         private readonly IClusterMembershipService _clusterMembershipService;
         private readonly IClusterManifestProvider _clusterManifestProvider;
-        private readonly ClusterManifestUpdate _noUpdate = default;
+        private readonly ClusterManifestUpdate _noUpdate;
         private MembershipVersion _cachedMembershipVersion;
         private ClusterManifestUpdate _cachedUpdate;
 

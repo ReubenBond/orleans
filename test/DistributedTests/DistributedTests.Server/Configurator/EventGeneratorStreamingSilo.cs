@@ -92,7 +92,7 @@ namespace DistributedTests.Server.Configurator
         private DateTime _startTime;
         private DateTime _endTime;
         private readonly List<StreamId> _streamIds = new List<StreamId>();
-        private int _sequenceId = 0;
+        private int _sequenceId;
         private object _payload;
 
         public void Configure(IServiceProvider serviceProvider, IStreamGeneratorConfig generatorConfig)

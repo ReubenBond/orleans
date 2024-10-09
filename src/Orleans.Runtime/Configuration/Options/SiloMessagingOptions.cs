@@ -117,7 +117,7 @@ namespace Orleans.Configuration
         /// <remarks>
         /// For testing purposes only.
         /// </remarks>
-        public bool AssumeHomogenousSilosForTesting { get; set; } = false;
+        public bool AssumeHomogenousSilosForTesting { get; set; }
 
         /// <summary>
         /// Gets or sets the period of time the silo will wait to reroute queued messages before it continues shutting down. 

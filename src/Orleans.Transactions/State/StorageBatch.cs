@@ -44,13 +44,13 @@ namespace Orleans.Transactions
         private readonly List<Func<Task<bool>>> storeConditions;
         
         // counters for each type of event
-        private int total = 0;
-        private int prepare = 0;
-        private int read = 0;
-        private int commit = 0;
-        private int confirm = 0;
-        private int collect = 0;
-        private int cancel = 0;
+        private int total;
+        private int prepare;
+        private int read;
+        private int commit;
+        private int confirm;
+        private int collect;
+        private int cancel;
 
         public TransactionalStateMetaData MetaData { get; private set; }
 

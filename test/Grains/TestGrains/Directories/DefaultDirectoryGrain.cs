@@ -5,7 +5,7 @@ namespace UnitTests.Grains.Directories
     [GrainType(DIRECTORY)]
     public class DefaultDirectoryGrain : Grain, IDefaultDirectoryGrain
     {
-        private int counter = 0;
+        private int counter;
 
         public const string DIRECTORY = "Default";
 

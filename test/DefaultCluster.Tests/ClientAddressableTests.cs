@@ -13,7 +13,7 @@ namespace DefaultCluster.Tests
 
         private class MyPseudoGrain : IClientAddressableTestClientObject
         {
-            private int counter = 0;
+            private int counter;
             private readonly List<int> numbers = new List<int>();
 
             public Task<string> OnHappyPath(string message)
@@ -56,7 +56,7 @@ namespace DefaultCluster.Tests
 
         private class MyProducer : IClientAddressableTestProducer
         {
-            private int counter = 0;
+            private int counter;
 
             public Task<int> Poll()
             {

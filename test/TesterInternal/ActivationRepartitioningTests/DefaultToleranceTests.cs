@@ -505,7 +505,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
     [ImplicitStreamSubscription(Fixture.StreamNamespaceName)]
     public class SR : GrainBase, ISR
     {
-        private bool _streamHit = false;
+        private bool _streamHit;
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {

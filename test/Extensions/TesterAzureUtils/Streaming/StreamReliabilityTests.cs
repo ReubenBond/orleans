@@ -406,7 +406,7 @@ namespace UnitTests.Streaming.Reliability
             return grains;
         }
 
-        private static int _baseConsumerId = 0;
+        private static int _baseConsumerId;
 
         private async Task Test_AddMany_Consumers(string testName, string streamProviderName)
         {

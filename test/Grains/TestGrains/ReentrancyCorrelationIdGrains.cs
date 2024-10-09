@@ -35,7 +35,7 @@ namespace UnitTests.Grains
 
     public class ThirdGrain : Grain<ThirdGrainState>, IThirdGrain
     {
-        private int inFlightCounter = 0;
+        private int inFlightCounter;
 
         public async Task ThirdGrainMethod(Guid userId)
         {

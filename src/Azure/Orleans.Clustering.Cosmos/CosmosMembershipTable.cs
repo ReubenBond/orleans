@@ -15,7 +15,7 @@ internal class CosmosMembershipTable : IMembershipTable
     private readonly QueryRequestOptions _queryRequestOptions;
     private CosmosClient _client = default!;
     private Container _container = default!;
-    private SiloEntity? _self = null;
+    private SiloEntity? _self;
 
     public CosmosMembershipTable(
         ILoggerFactory loggerFactory,

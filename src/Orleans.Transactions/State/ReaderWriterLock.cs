@@ -21,7 +21,7 @@ namespace Orleans.Transactions.State
 
         // the linked list of lock groups
         // the head is the group that is currently holding the lock
-        private LockGroup currentGroup = null;
+        private LockGroup currentGroup;
 
         // cache the last known minimum so we don't have to recompute it as much
         private DateTime cachedMin = DateTime.MaxValue;

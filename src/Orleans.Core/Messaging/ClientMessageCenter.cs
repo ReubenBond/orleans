@@ -59,7 +59,7 @@ namespace Orleans.Messaging
         private readonly WeakReference<ClientOutboundConnection>[] grainBuckets;
         private readonly ILogger logger;
         public SiloAddress MyAddress => _localClientDetails.ClientAddress;
-        private int numberOfConnectedGateways = 0;
+        private int numberOfConnectedGateways;
         private readonly MessageFactory messageFactory;
         private readonly IClusterConnectionStatusListener connectionStatusListener;
         private readonly ConnectionManager connectionManager;
