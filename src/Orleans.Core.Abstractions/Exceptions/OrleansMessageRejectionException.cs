@@ -45,7 +45,7 @@ namespace Orleans.Runtime
         /// The context.
         /// </param>
         /// <exception cref="SerializationException">
-        /// The class name is <see langword="null"/> or <see cref="P:System.Exception.HResult"/> is zero (0).
+        /// The class name is <see langword="null"/> or <see cref="System.Exception.HResult"/> is zero (0).
         /// </exception>
         /// <exception cref="ArgumentNullException">
         /// <paramref name="info"/> is <see langword="null"/>.

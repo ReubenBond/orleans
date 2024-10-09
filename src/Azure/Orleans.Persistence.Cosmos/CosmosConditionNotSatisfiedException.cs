@@ -106,7 +106,7 @@ public class CosmosConditionNotSatisfiedException : InconsistentStateException
     [Obsolete]
     public override void GetObjectData(SerializationInfo info, StreamingContext context)
     {
-        if (info == null) throw new ArgumentNullException(nameof(info));
+        ArgumentNullException.ThrowIfNull(info);
 
         info.AddValue("GrainType", GrainType);
         info.AddValue("GrainId", GrainId);

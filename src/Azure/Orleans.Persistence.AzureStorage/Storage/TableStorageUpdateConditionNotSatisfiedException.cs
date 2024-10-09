@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.Serialization;
+using System.Text;
 
 namespace Orleans.Storage
 {
@@ -10,7 +11,7 @@ namespace Orleans.Storage
     [GenerateSerializer]
     public class TableStorageUpdateConditionNotSatisfiedException : InconsistentStateException
     {
-        private const string DefaultMessageFormat = "Table storage condition not Satisfied.  GrainType: {0}, GrainId: {1}, TableName: {2}, StoredETag: {3}, CurrentETag: {4}";
+        private static readonly CompositeFormat DefaultMessageFormat = CompositeFormat.Parse("Table storage condition not Satisfied.  GrainType: {0}, GrainId: {1}, TableName: {2}, StoredETag: {3}, CurrentETag: {4}");
 
         /// <summary>
         /// Exception thrown when an azure table storage exception is thrown due to update conditions not being satisfied.
@@ -98,7 +99,7 @@ namespace Orleans.Storage
         /// <summary>
         /// Exception thrown when an azure table storage exception is thrown due to update conditions not being satisfied.
         /// </summary>
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         protected TableStorageUpdateConditionNotSatisfiedException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -108,10 +109,10 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc />   
-        [Obsolete]
+        [Obsolete("This API supports obsolete formatter-based serialization. It should not be called or extended by application code.")]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
-            if (info == null) throw new ArgumentNullException(nameof(info));
+            ArgumentNullException.ThrowIfNull(info);
 
             info.AddValue("GrainType", this.GrainType);
             info.AddValue("GrainId", this.GrainId);
