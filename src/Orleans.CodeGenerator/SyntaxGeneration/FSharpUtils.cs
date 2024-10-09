@@ -105,7 +105,7 @@ namespace Orleans.CodeGenerator
             return true;
         }
 
-        public class FSharpUnionCaseTypeDescription : SerializableTypeDescription
+        public sealed class FSharpUnionCaseTypeDescription : SerializableTypeDescription
         {
             public FSharpUnionCaseTypeDescription(Compilation compilation, INamedTypeSymbol type, LibraryTypes libraryTypes) : base(compilation, type, false, GetUnionCaseDataMembers(libraryTypes, type), libraryTypes)
             {
@@ -154,7 +154,7 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            private class FSharpUnionCaseFieldDescription : IMemberDescription, ISerializableMember
+            private sealed class FSharpUnionCaseFieldDescription : IMemberDescription, ISerializableMember
             {
                 private readonly LibraryTypes _libraryTypes;
                 private readonly IFieldSymbol _field;
@@ -233,7 +233,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        public class FSharpRecordTypeDescription : SerializableTypeDescription
+        public sealed class FSharpRecordTypeDescription : SerializableTypeDescription
         {
             public FSharpRecordTypeDescription(Compilation compilation, INamedTypeSymbol type, LibraryTypes libraryTypes) : base(compilation, type, false, GetRecordDataMembers(libraryTypes, type), libraryTypes)
             {
@@ -259,7 +259,7 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            private class FSharpRecordPropertyDescription : IMemberDescription, ISerializableMember
+            private sealed class FSharpRecordPropertyDescription : IMemberDescription, ISerializableMember
             {
                 private readonly LibraryTypes _libraryTypes;
                 private readonly IPropertySymbol _property;
@@ -285,7 +285,7 @@ namespace Orleans.CodeGenerator
 
                 public INamedTypeSymbol ContainingType => _property.ContainingType;
 
-                public string FieldName => _property.Name + "@"; 
+                public string FieldName => _property.Name + "@";
 
                 /// <summary>
                 /// Gets the name of the setter field.
@@ -296,7 +296,7 @@ namespace Orleans.CodeGenerator
                 /// Gets syntax representing the type of this field.
                 /// </summary>
                 public TypeSyntax TypeSyntax => Type.TypeKind == TypeKind.Dynamic
-                    ? PredefinedType(Token(SyntaxKind.ObjectKeyword)) 
+                    ? PredefinedType(Token(SyntaxKind.ObjectKeyword))
                     : GetTypeSyntax(Type);
 
                 /// <summary>

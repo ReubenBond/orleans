@@ -6,11 +6,11 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator
 {
-    internal interface IPropertyDescription : IMemberDescription 
+    internal interface IPropertyDescription : IMemberDescription
     {
     }
 
-    internal class PropertyDescription : IPropertyDescription
+    internal sealed class PropertyDescription : IPropertyDescription
     {
         public PropertyDescription(uint fieldId, bool isPrimaryConstructorParameter, IPropertySymbol property)
         {

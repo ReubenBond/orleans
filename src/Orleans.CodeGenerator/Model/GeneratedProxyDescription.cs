@@ -5,7 +5,7 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator
 {
-    internal class GeneratedProxyDescription
+    internal sealed class GeneratedProxyDescription
     {
         public GeneratedProxyDescription(ProxyInterfaceDescription interfaceDescription, string generatedClassName)
         {

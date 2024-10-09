@@ -12,7 +12,7 @@ using Orleans.CodeGenerator.SyntaxGeneration;
 
 namespace Orleans.CodeGenerator;
 
-internal class FieldIdAssignmentHelper
+internal sealed class FieldIdAssignmentHelper
 {
     private readonly GenerateFieldIds _implicitMemberSelectionStrategy;
     private readonly ImmutableArray<IParameterSymbol> _constructorParameters;

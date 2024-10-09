@@ -10,7 +10,7 @@ using static Orleans.CodeGenerator.SerializerGenerator;
 
 namespace Orleans.CodeGenerator
 {
-    internal class CopierGenerator
+    internal sealed class CopierGenerator
     {
         private const string BaseTypeCopierFieldName = "_baseTypeCopier";
         private const string ActivatorFieldName = "_activator";

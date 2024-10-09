@@ -1154,7 +1154,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// Represents a serializable member (field/property) of a type.
         /// </summary>
-        internal class SerializableMethodMember : ISerializableMember
+        internal sealed class SerializableMethodMember : ISerializableMember
         {
             private readonly MethodParameterFieldDescription _member;
 

@@ -6,7 +6,7 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator
 {
-    internal class FieldDescription : IFieldDescription
+    internal sealed class FieldDescription : IFieldDescription
     {
         public FieldDescription(uint fieldId, bool isPrimaryConstructorParameter, IFieldSymbol member)
         {
