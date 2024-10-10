@@ -13,6 +13,7 @@ using Orleans.Configuration;
 using Orleans.Core.Internal;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
@@ -26,7 +27,7 @@ namespace Orleans.Runtime;
 /// MUST lock this object for any concurrent access
 /// Consider: compartmentalize by usage, e.g., using separate interfaces for data for catalog, etc.
 /// </summary>
-internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, IGrainExtensionBinder, IActivationWorkingSetMember, IGrainTimerRegistry, IGrainManagementExtension, ICallChainReentrantGrainContext, IAsyncDisposable, IDisposable
+internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, IGrainExtensionBinder, IActivationWorkingSetMember, IGrainTimerRegistry, IGrainManagementExtension, ICallChainReentrantGrainContext, IAsyncDisposable, IDisposable, IMessageReceiver
 {
     private const string GrainAddressMigrationContextKey = "sys.addr";
     private readonly GrainTypeSharedContext _shared;
@@ -245,7 +246,8 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         return result;
     }
 
-    public TComponent? GetComponent<TComponent>() where TComponent : class
+    public TComponent? GetComponent<TComponent>() where TComponent : class => (TComponent?)GetComponent(typeof(TComponent));
+    public object? GetComponent(Type componentType)
     {
         object? result = null;
         if (componentType.IsAssignableFrom(GrainInstance?.GetType()))
@@ -260,7 +262,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         {
             result = resultObj;
         }
-        else if (_shared.GetComponent(typeof(TComponent)) is { } sharedComponent)
+        else if (_shared.GetComponent(componentType) is { } sharedComponent)
         {
             result = sharedComponent;
         }
@@ -678,7 +680,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
     }
 
-    public void AnalyzeWorkload(DateTime now, IMessageCenter messageCenter, MessageFactory messageFactory, SiloMessagingOptions options)
+    public void AnalyzeWorkload(DateTime now, MessageCenter messageCenter, MessageFactory messageFactory, SiloMessagingOptions options)
     {
         var slowRunningRequestDuration = options.RequestProcessingWarningTime;
         var longQueueTimeDuration = options.RequestQueueDelayWarningTime;
@@ -714,7 +716,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                     }
 
                     var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, diagnostics);
-                    messageCenter.SendMessage(response);
+                    messageCenter.SendMessage(response, receiverCache: null);
                 }
             }
 
@@ -736,7 +738,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                     };
 
                     var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, messageDiagnostics);
-                    messageCenter.SendMessage(response);
+                    messageCenter.SendMessage(response, receiverCache: null);
                 }
             }
 
@@ -755,7 +757,7 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
                     };
 
                     var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: false, isWaiting: true, messageDiagnostics);
-                    messageCenter.SendMessage(response);
+                    messageCenter.SendMessage(response, receiverCache: null);
                 }
 
                 queueLength++;
@@ -1390,24 +1392,24 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
 
     private void ReceiveResponse(Message message)
     {
-        lock (this)
+        var state = State;
+        if (state is ActivationState.Invalid)
         {
-            if (State == ActivationState.Invalid)
-            {
-                _shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveInvalidActivation(message, State);
+            _shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveInvalidActivation(message, State);
 
-                // Always process responses
-                _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
-                return;
-            }
-
-            MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
+            // Always process responses
             _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
+            return;
         }
+
+        MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
+        _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
     }
 
     private void ReceiveRequest(Message message)
     {
+        _shared.IncomingRequestObserver?.Invoke(message);
+
         var overloadException = CheckOverloaded();
         if (overloadException != null && !message.IsLocalOnly)
         {
@@ -1923,6 +1925,16 @@ internal sealed class ActivationData : IGrainContext, ICollectibleGrainContext, 
         }
 
         return tracker.IsReentrantSectionActive(reentrancyId);
+    }
+
+    public void ReceiveMessage(Message message, IMessageReceiverCache cache)
+    {
+        if (!IsValid)
+        {
+            cache.MessageReceiver = null;
+        }
+
+        ReceiveMessage(message);
     }
 
     #endregion

@@ -9,6 +9,7 @@ using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
+using Orleans.Placement.Repartitioning;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.Session;
@@ -45,6 +46,7 @@ public class GrainTypeSharedContext
         }
 
         SerializerSessionPool = serializerSessionPool;
+        IncomingRequestObserver = serviceProvider.GetRequiredService<IMessageStatisticsSink>().GetMessageObserver();
         GrainTypeName = RuntimeTypeNameFormatter.Format(grainClass);
         Logger = loggerFactory.CreateLogger("Orleans.Grain");
         MessagingOptions = messagingOptions.Value;
@@ -110,9 +112,9 @@ public class GrainTypeSharedContext
             return component;
         }
 
-        if (typeof(TComponent) == typeof(ILogger))
+        if (componentType == typeof(ILogger))
         {
-            return (TComponent)Logger;
+            return Logger;
         }
 
         if (_components is null) return default;
@@ -199,6 +201,11 @@ public class GrainTypeSharedContext
     /// Gets the internal grain runtime.
     /// </summary>
     internal InternalGrainRuntime InternalRuntime => _internalGrainRuntime ??= _serviceProvider.GetRequiredService<InternalGrainRuntime>();
+
+    /// <summary>
+    /// Gets the incoming request observer.
+    /// </summary>
+    internal Action<Message>? IncomingRequestObserver { get; }
 
     /// <summary>
     /// Called on creation of an activation.
