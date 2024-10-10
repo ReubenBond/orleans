@@ -2,11 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.Runtime
 {
     [Id(101)]
-    internal sealed class Message : ISpanFormattable
+    internal sealed class Message : ISpanFormattable, IMessageTargetCache
     {
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
@@ -264,6 +265,9 @@ namespace Orleans.Runtime
                 _headers.SetFlag(MessageFlags.HasInterfaceType, !value.IsDefault);
             }
         }
+
+        [field: NonSerialized]
+        public object MessageReceiver { get; set; }
 
         public bool IsExpirableMessage()
         {

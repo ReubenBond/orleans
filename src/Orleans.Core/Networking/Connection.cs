@@ -16,7 +16,7 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal abstract class Connection
+    internal abstract class Connection : IMessageReceiver
     {
         private static readonly Func<ConnectionContext, Task> OnConnectedDelegate = context => OnConnectedAsync(context);
         private static readonly Action<object> OnConnectionClosedDelegate = state => ((Connection)state).OnTransportConnectionClosed();
@@ -354,7 +354,7 @@ namespace Orleans.Runtime.Messaging
 
             Exception error = default;
             var serializer = this.shared.ServiceProvider.GetRequiredService<MessageSerializer>();
-            var messageObserver = this.shared.MessageStatisticsSink.GetMessageObserver();
+            var messageObserver = this.shared.MessageStatisticsSink;
             try
             {
                 var output = this._transport.Output;
@@ -544,6 +544,18 @@ namespace Orleans.Runtime.Messaging
             }
 
             return true;
+        }
+
+        void IMessageReceiver.ReceiveMessage(Message message, IMessageTargetCache cache)
+        {
+            if (!IsValid)
+            {
+                cache.MessageReceiver = null;
+                RetryMessage(message);
+                return;
+            }
+
+            Send(message);
         }
 
         private sealed class MessageHandlerPoolPolicy : PooledObjectPolicy<MessageHandler>

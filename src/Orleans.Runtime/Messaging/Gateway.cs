@@ -16,9 +16,9 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class Gateway : IConnectedClientCollection
     {
-        // clients is the main authorative collection of all connected clients.
+        // clients is the main authoritative collection of all connected clients.
         // Any client currently in the system appears in this collection.
-        // In addition, we use clientConnections collection for fast retrival of ClientState.
+        // In addition, we use clientConnections collection for fast retrieval of ClientState.
         // Anything that appears in those 2 collections should also appear in the main clients collection.
         private readonly ConcurrentDictionary<ClientGrainId, ClientState> clients = new();
         private readonly Dictionary<GatewayInboundConnection, ClientState> clientConnections = new();
@@ -122,7 +122,7 @@ namespace Orleans.Runtime.Messaging
 
         internal void RecordOpenedConnection(GatewayInboundConnection connection, ClientGrainId clientId)
         {
-            logger.LogInformation((int)ErrorCode.GatewayClientOpenedSocket, "Recorded opened connection from endpoint {EndPoint}, client ID {ClientId}.", connection.RemoteEndPoint, clientId);
+            logger.LogInformation((int)ErrorCode.GatewayClientOpenedSocket, "Recorded opened connection {Connection}. Client Id {ClientId}.", connection, clientId);
             lock (clients)
             {
                 if (clients.TryGetValue(clientId, out var clientState))
@@ -161,8 +161,8 @@ namespace Orleans.Runtime.Messaging
 
             logger.LogInformation(
                 (int)ErrorCode.GatewayClientClosedSocket,
-                "Recorded closed socket from endpoint {Endpoint}, client ID {clientId}.",
-                connection.RemoteEndPoint?.ToString() ?? "null",
+                "Recorded closed connection: {Connection}. Client Id: {ClientId}.",
+                connection,
                 clientState.Id);
         }
 
@@ -272,29 +272,19 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            // when this Gateway receives a message from client X to client addressable object Y
-            // it needs to record the original Gateway address through which this message came from (the address of the Gateway that X is connected to)
-            // it will use this Gateway to re-route the REPLY from Y back to X.
-            if (msg.SendingGrain.IsClient())
-            {
-                clientsReplyRoutingCache.RecordClientRoute(msg.SendingGrain, msg.SendingSilo);
-            }
-
-            msg.TargetSilo = null;
-            msg.SendingSilo ??= gatewayAddress;
-
-            client.Send(msg);
+            //targetCache.MessageReceiver = client;
+            client.ReceiveMessage(msg);
             return true;
         }
 
-        private class ClientState
+        private class ClientState : IMessageReceiver
         {
             private readonly Gateway _gateway;
             private readonly Task _messageLoop;
             private readonly ConcurrentQueue<Message> _pendingToSend = new();
             private readonly SingleWaiterAutoResetEvent _signal = new()
             {
-                RunContinuationsAsynchronously = true
+                RunContinuationsAsynchronously = false
             };
 
             private GatewayInboundConnection _connection;
@@ -368,12 +358,49 @@ namespace Orleans.Runtime.Messaging
                 _signal.Signal();
             }
 
-            public void Send(Message msg)
+            public void ReceiveMessage(Message msg, IMessageTargetCache cache)
             {
-                _pendingToSend.Enqueue(msg);
-                _signal.Signal();
+                if (IsDropped)
+                {
+                    // Invalidate the cache.
+                    // The message will be be handled by the message loop.
+                    cache.MessageReceiver = null;
+                }
+
+                ReceiveMessage(msg);
+            }
+
+            public void ReceiveMessage(Message msg)
+            {
+                // When this Gateway receives a message from client X to client addressable object Y
+                // it needs to record the original Gateway address through which this message came from (the address of the Gateway that X is connected to)
+                // it will use this Gateway to re-route the REPLY from Y back to X.
+                if (msg.SendingGrain.IsClient())
+                {
+                    _gateway.clientsReplyRoutingCache.RecordClientRoute(msg.SendingGrain, msg.SendingSilo);
+                }
+
+                msg.TargetSilo = null;
+
+                // Override the SendingSilo only if the sending grain is not
+                // a system target
+                if (!msg.SendingGrain.IsSystemTarget())
+                {
+                    msg.SendingSilo = _gateway.gatewayAddress;
+                }
+
+                var connection = Volatile.Read(ref _connection);
+                if (connection is null || !TrySend(connection, msg))
+                {
+                    _pendingToSend.Enqueue(msg);
+                    _signal.Signal();
 #if DEBUG
-                if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Queued message {Message} for client {TargetGrain}", msg, msg.TargetGrain);
+                    if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Queued message {Message} for client {TargetGrain}", msg, msg.TargetGrain);
+#endif
+                    return;
+                }
+#if DEBUG
+                if (_gateway.logger.IsEnabled(LogLevel.Trace)) _gateway.logger.LogTrace("Sent message {Message} to client {ClientId}", msg, Id);
 #endif
             }
 

@@ -245,7 +245,7 @@ namespace Orleans
             OrleansOutsideRuntimeClientEvent.Log.SendResponse(message);
             message.BodyObject = response;
 
-            MessageCenter.SendMessage(message);
+            MessageCenter.SendMessage(message, targetCache: request);
         }
 
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource context, InvokeMethodOptions options)
@@ -285,7 +285,7 @@ namespace Orleans
             }
 
             if (logger.IsEnabled(LogLevel.Trace)) logger.LogTrace("Send {Message}", message);
-            MessageCenter.SendMessage(message);
+            MessageCenter.SendMessage(message, targetCache: target);
         }
 
         public void ReceiveResponse(Message response)
