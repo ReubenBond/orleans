@@ -305,7 +305,6 @@ namespace Orleans.Runtime.Messaging
                                 if (requiredBytes == 0)
                                 {
                                     Debug.Assert(message is not null);
-                                    message.MessageReceiver = this;
                                     RecordMessageReceive(message, bodyLength + headerLength, headerLength);
                                     var handler = MessageHandlerPool.Get();
                                     handler.Set(message, this);

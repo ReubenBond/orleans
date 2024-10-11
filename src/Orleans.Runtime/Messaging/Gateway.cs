@@ -289,7 +289,7 @@ namespace Orleans.Runtime.Messaging
             private readonly ConcurrentQueue<Message> _pendingToSend = new();
             private readonly SingleWaiterAutoResetEvent _signal = new()
             {
-                RunContinuationsAsynchronously = false
+                RunContinuationsAsynchronously = true
             };
 
             private GatewayInboundConnection _connection;
