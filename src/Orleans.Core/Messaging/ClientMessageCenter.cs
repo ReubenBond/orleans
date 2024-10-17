@@ -261,8 +261,7 @@ namespace Orleans.Messaging
             // If there's a specific gateway specified, use it
             if (msg.TargetSilo != null && gatewayManager.IsGatewayAvailable(msg.TargetSilo))
             {
-                var siloAddress = SiloAddress.New(msg.TargetSilo.Endpoint, 0);
-                var connectionTask = this.connectionManager.GetConnection(siloAddress);
+                var connectionTask = this.connectionManager.GetConnection(msg.TargetSilo);
                 if (connectionTask.IsCompletedSuccessfully) return connectionTask;
 
                 return ConnectAsync(msg.TargetSilo, connectionTask, msg, directGatewayMessage: true);

@@ -55,6 +55,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override void OnReceivedMessage(Message message)
         {
+            message.SendingSilo ??= RemoteSiloAddress;
             this.messageCenter.DispatchLocalMessage(message);
         }
 

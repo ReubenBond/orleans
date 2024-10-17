@@ -272,7 +272,6 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            //targetCache.MessageReceiver = client;
             client.ReceiveMessage(msg);
             if (targetCache is not null)
             {
