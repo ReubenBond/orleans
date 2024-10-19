@@ -17,12 +17,21 @@ using System.Runtime.InteropServices;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Orleans.Placement.Repartitioning;
+using System.Collections.Concurrent;
 
 namespace Orleans.Runtime.Placement.Repartitioning;
 
 // See: https://www.microsoft.com/en-us/research/wp-content/uploads/2016/06/eurosys16loca_camera_ready-1.pdf
 internal sealed partial class ActivationRepartitioner : SystemTarget, IActivationRepartitionerSystemTarget, ILifecycleParticipant<ISiloLifecycle>, IDisposable, ISiloStatusListener
 {
+    internal sealed class DeactivatedGrainQueue : IActivationWorkingSetObserver
+    {
+        public ConcurrentQueue<GrainId> DeactivatedGrains { get; } = new();
+
+        void IActivationWorkingSetObserver.OnDeactivated(IActivationWorkingSetMember member) => DeactivatedGrains.Enqueue(member.GrainId);
+    }
+
+    private readonly ConcurrentQueue<GrainId> _deactivatedGrains;
     private readonly ILogger _logger;
     private readonly ISiloStatusOracle _siloStatusOracle;
     private readonly IInternalGrainFactory _grainFactory;
@@ -50,11 +59,13 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         IImbalanceToleranceRule toleranceRule,
         IActivationMigrationManager migrationManager,
         ActivationDirectory activationDirectory,
+    DeactivatedGrainQueue deactivatedGrainQueue,
         Catalog catalog,
         IOptions<ActivationRepartitionerOptions> options,
         TimeProvider timeProvider)
         : base(Constants.ActivationRepartitionerType, localSiloDetails.SiloAddress, loggerFactory)
     {
+        _deactivatedGrains = deactivatedGrainQueue.DeactivatedGrains;
         _logger = loggerFactory.CreateLogger<ActivationRepartitioner>();
         _options = options.Value;
         _siloStatusOracle = siloStatusOracle;
@@ -461,6 +472,12 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
     private async Task FinalizeProtocol(ImmutableArray<GrainId> giving, ImmutableArray<GrainId> accepting, SiloAddress targetSilo, HashSet<GrainId> newlyAnchoredGrains)
     {
         // The protocol concluded that 'this' silo should take on 'set', so we hint to the director accordingly.
+        var affected = new HashSet<GrainId>(giving.Length + accepting.Length);
+        while (_deactivatedGrains.TryDequeue(out var id))
+        {
+            affected.Add(id);
+        }
+
         try
         {
             Dictionary<string, object> migrationRequestContext = new() { [IPlacementDirector.PlacementHintKey] = targetSilo };
@@ -471,6 +488,10 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
                 {
                     localActivation.Migrate(migrationRequestContext);
                     deactivationTasks.Add(localActivation.Deactivated);
+                }
+                else
+                {
+                    affected.Add(grainId);
                 }
             }
 
@@ -486,7 +507,6 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         // Avoid mutating the source while enumerating it.
         var iterations = 0;
         var toRemove = new List<Edge>();
-        var affected = new HashSet<GrainId>(giving.Length + accepting.Length);
 
         if (_anchoredFilter is { } filter)
         {

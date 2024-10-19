@@ -40,6 +40,8 @@ public static class ActivationRepartitioningExtensions
         services.AddSingleton<ActivationRepartitioner>();
         services.AddSingleton<IRepartitionerMessageFilter, RepartitionerMessageFilter>();
         services.AddFromExisting<IMessageStatisticsSink, ActivationRepartitioner>();
+        services.AddSingleton<ActivationRepartitioner.DeactivatedGrainQueue>();
+        services.AddFromExisting<IActivationWorkingSetObserver, ActivationRepartitioner.DeactivatedGrainQueue>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationRepartitioner>();
         services.AddTransient<IConfigurationValidator, ActivationRepartitionerOptionsValidator>();
 
