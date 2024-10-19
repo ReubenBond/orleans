@@ -9,7 +9,6 @@
     <Nullable>enable</Nullable>
 
     <IsAspireHost>true</IsAspireHost>
-    <UserSecretsId>6a521b87-2bf9-4af8-b7c7-4947536e1d50</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,7 +18,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DashboardToy.Frontend\DashboardToy.Frontend.csproj" />
+    <ProjectReference Include="..\ActivationRebalancing.Cluster\ActivationRebalancing.Cluster.csproj" />
+    <ProjectReference Include="..\ActivationRebalancing.Frontend\ActivationRebalancing.Frontend.csproj" />
   </ItemGroup>
 
 </Project>
