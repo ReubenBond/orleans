@@ -11,7 +11,7 @@ namespace Orleans.Configuration
         /// Gets or sets the number of missed "I am alive" updates in the table from a silo that causes warning to be logged.
         /// </summary>
         /// <seealso cref="IAmAliveTablePublishTimeout"/>
-        public int NumMissedTableIAmAliveLimit { get; set; } = 2;
+        public int NumMissedTableIAmAliveLimit { get; set; } = 4;
 
         /// <summary>
         /// Gets or sets a value indicating whether to disable silo liveness protocol (should be used only for testing).
@@ -49,7 +49,7 @@ namespace Orleans.Configuration
         /// is used to skip hosts in the membership table when performing an initial connectivity check upon startup.
         /// </remarks>
         /// <value>Publish an update every 5 minutes by default.</value>
-        public TimeSpan IAmAliveTablePublishTimeout { get; set; } = TimeSpan.FromMinutes(5);
+        public TimeSpan IAmAliveTablePublishTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
         /// <summary>
         /// Gets or sets the maximum amount of time to attempt to join a cluster before giving up.
@@ -72,7 +72,7 @@ namespace Orleans.Configuration
         /// When a silo becomes suspicious of another silo, additional silos may begin to probe that silo to speed up the detection of non-functioning silos.
         /// </remarks>
         /// <value>Each silo will actively monitor up to three other silos by default.</value>
-        public int NumProbedSilos { get; set; } = 3;
+        public int NumProbedSilos { get; set; } = 50;
 
         /// <summary>
         /// Gets or sets the number of missed probe requests from a silo that lead to suspecting this silo as down.

@@ -48,7 +48,7 @@ internal sealed partial class GrainDirectoryPartition(
     // Requests in these ranges must wait for the range to become available.
     private readonly List<(RingRange Range, MembershipVersion Version, TaskCompletionSource Completion)> _rangeLocks = [];
 
-    // Ranges which were previously at least partially owned by this partition, but which are pending transfer to a new partition.  
+    // Ranges which were previously at least partially owned by this partition, but which are pending transfer to a new partition.
     private readonly List<PartitionSnapshotState> _partitionSnapshots = [];
 
     // Tracked for diagnostic purposes only.
@@ -238,6 +238,7 @@ internal sealed partial class GrainDirectoryPartition(
             _drainSnapshotsCts.Cancel();
             if (_partitionSnapshots.Count > 0)
             {
+                _logger.LogInformation("Waiting for '{SnapshotCount}' pending partition snapshots to be transferred before shutting down.", _partitionSnapshots.Count);
                 await _snapshotsDrainedTcs.Task.WaitAsync(token).SuppressThrowing();
             }
         });
@@ -715,6 +716,10 @@ internal sealed partial class GrainDirectoryPartition(
                 if (ex is not OrleansMessageRejectionException)
                 {
                     _logger.LogError(ex, "Error invoking operation '{Operation}' on silo '{SiloAddress}'.", operationName, siloAddress);
+                }
+                else
+                {
+                    _logger.LogWarning(ex, "Rejection error invoking operation '{Operation}' on silo '{SiloAddress}'.", operationName, siloAddress);
                 }
 
                 await _owner.RefreshViewAsync(default, CancellationToken.None);
