@@ -7,8 +7,7 @@ var orleans = builder.AddOrleans("cluster")
     .WithClustering(redis);
 orleans.EnableDistributedTracing = false;
 
-builder.AddProject<DashboardToy_Frontend>("frontend")
-    .WithReference(orleans)
-    .WithReplicas(5);
+builder.AddProject<ActivationRebalancing_Cluster>("silo").WithReplicas(5).WithReference(orleans);
+builder.AddProject<ActivationRebalancing_Frontend>("frontend").WithReference(orleans);
 
 builder.Build().Run();
