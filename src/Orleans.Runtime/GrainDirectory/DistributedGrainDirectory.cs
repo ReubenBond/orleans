@@ -157,6 +157,16 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         }
     }
 
+    public async ValueTask<Immutable<List<GrainAddress>>> RecoverRegisteredActivations(MembershipVersion membershipVersion, RingRange range, SiloAddress siloAddress, int partitionIndex)
+    {
+        foreach (var partition in _partitions)
+        {
+            partition.OnRecoveringPartition(membershipVersion, range, siloAddress, partitionIndex).Ignore();
+        }
+
+        return await GetRegisteredActivations(membershipVersion, range, false);
+    }
+
     public async ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRange range, bool isValidation)
     {
         if (!isValidation && _logger.IsEnabled(LogLevel.Debug))

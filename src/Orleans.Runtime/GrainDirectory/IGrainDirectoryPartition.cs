@@ -17,12 +17,11 @@ internal interface IGrainDirectoryPartition : ISystemTarget
     [Alias("DeregisterAsync")]
     ValueTask<DirectoryResult<bool>> DeregisterAsync(MembershipVersion version, GrainAddress address);
 
-    [Alias("RequestSnapshotAsync")]
-    ValueTask<bool> RequestSnapshotAsync(MembershipVersion version, SiloAddress siloAddress, int partitionIndex, RingRange range);
+    [Alias("GetSnapshotAsync")]
+    ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range);
 
-    // Called to transfer a snapshot to the new owner of the range.
-    [Alias("InstallSnapshotAsync")]
-    ValueTask InstallSnapshotAsync(MembershipVersion version, GrainDirectoryPartitionSnapshot snapshot);
+    [Alias("AcknowledgeSnapshotTransferAsync")]
+    ValueTask<bool> AcknowledgeSnapshotTransferAsync(SiloAddress silo, int partitionIndex, MembershipVersion version);
 }
 
 [Alias("IGrainDirectoryReplicaClient")]
@@ -30,6 +29,9 @@ internal interface IGrainDirectoryClient : ISystemTarget
 {
     [Alias("GetRegisteredActivations")]
     ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRange range, bool isValidation);
+
+    [Alias("RecoverRegisteredActivations")]
+    ValueTask<Immutable<List<GrainAddress>>> RecoverRegisteredActivations(MembershipVersion membershipVersion, RingRange range, SiloAddress siloAddress, int partitionId);
 }
 
 [Alias("IGrainDirectoryReplicaTestHooks")]
