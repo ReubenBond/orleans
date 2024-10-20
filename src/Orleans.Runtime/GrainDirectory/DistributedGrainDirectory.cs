@@ -296,6 +296,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             {
                 tasks.Add(partition.OnShuttingDown(token));
             }
+
             await Task.WhenAll(tasks).SuppressThrowing();
         }
     }
@@ -309,6 +310,8 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         {
             try
             {
+                DirectoryMembershipSnapshot previous = _membershipService.CurrentView;
+                var previousRanges = RingRangeCollection.Empty;
                 await foreach (var update in _membershipService.ViewUpdates.WithCancellation(_stoppedCts.Token))
                 {
                     tasks.RemoveAll(t => t.IsCompleted);
@@ -326,6 +329,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                     }
 
                     var current = update;
+                    var currentRanges = current.GetMemberRanges(Silo);
 
                     foreach (var partition in _partitions)
                     {
@@ -334,10 +338,21 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
                     if (_logger.IsEnabled(LogLevel.Debug))
                     {
-                        _logger.LogDebug("Updated view from '{PreviousVersion}' to '{Version}'.", previousUpdate.Version, update.Version);
+                        var deltaSize = currentRanges.SizePercent - previousRanges.SizePercent;
+                        var meanSizePercent = current.Members.Length > 0 ? 100.0 / current.Members.Length : 0f;
+                        var deviationFromMean = Math.Abs(meanSizePercent - currentRanges.SizePercent);
+                        _logger.LogDebug(
+                            "Updated view from '{PreviousVersion}' to '{Version}'. Now responsible for {Range:0.00}% (Δ {DeltaPercent:0.00}%). {DeviationFromMean:0.00}% from ideal share.",
+                             previous.Version,
+                             current.Version,
+                             currentRanges.SizePercent,
+                             deltaSize,
+                             deviationFromMean);
                     }
 
                     previousUpdate = update.ClusterMembershipSnapshot;
+                    previous = current;
+                    previousRanges = currentRanges;
                 }
             }
             catch (Exception exception)

@@ -1,0 +1,219 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: mcr.microsoft.com/oss/bitnami/redis:6.0.8
+        env:
+        - name: ALLOW_EMPTY_PASSWORD
+          value: "yes"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+        ports:
+        - containerPort: 6379
+          name: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+spec:
+  ports:
+  - port: 6379
+  selector:
+    app: redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chaos-silo
+  labels:
+    app: chaos-silo
+spec:
+  selector:
+    matchLabels:
+      app: chaos-silo
+  replicas: 5
+  template:
+    metadata:
+      labels:
+        app: chaos-silo
+
+        # The serviceId label is used to identify the service to Orleans
+        orleans/serviceId: chaos
+
+        # The clusterId label is used to identify an instance of a cluster to Orleans.
+        # Typically, this will be the same value as serviceId or any fixed value.
+        # In cases where you are not using rolling deployments (for example, blue/green deployments),
+        # this value can allow for distinct clusters which do not communicate directly with each others,
+        # but which still share the same storage and other resources.
+        orleans/clusterId: chaos
+    spec:
+      containers:
+      - name: main
+        image: orlaks.azurecr.io/chaos-silo
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        - containerPort: 11111
+        - containerPort: 30000
+        - containerPort: 8888
+        resources:
+          limits:
+            memory: 4Gi
+          requests:
+            memory: 4Gi
+        env:
+        # Configure OTLP
+        - name: OTEL_EXPORTER_OTLP_PROTOCOL
+          value: grpc
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://aspire-dashboard:18889
+        - name: OTEL_SERVICE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ORLEANS_SERVICE_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['orleans/serviceId']
+        - name: ORLEANS_CLUSTER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['orleans/clusterId']
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: DOTNET_SHUTDOWNTIMEOUTSECONDS
+          value: "120"
+        - name: REDIS
+          value: "redis" # The name of the redis service
+      terminationGracePeriodSeconds: 180
+  minReadySeconds: 10
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 10
+      maxSurge: 10
+
+---
+# In order to be able to access the service from outside the cluster, we will need to add a Service object
+apiVersion: v1
+kind: Service
+metadata:
+  name: chaos-silo
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  - name: orleans-dashboard
+    port: 8888
+    targetPort: 8888
+  selector:
+    app: chaos-silo
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aspire-dashboard
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 18888
+    targetPort: 18888
+  - name: otlp
+    port: 18889
+    targetPort: 18889
+  selector:
+    app: aspire-dashboard
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aspire-dashboard
+  labels:
+    app: aspire-dashboard
+spec:
+  selector:
+    matchLabels:
+      app: aspire-dashboard
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: aspire-dashboard
+    spec:
+      containers:
+        - name: main
+          image: mcr.microsoft.com/dotnet/aspire-dashboard:8.2
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 18888
+          - containerPort: 18889
+          env:
+            - name: DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS
+              value: "true"
+          resources:
+            limits:
+              memory: 8Gi
+            requests:
+              memory: 8Gi
+      terminationGracePeriodSeconds: 180
+  minReadySeconds: 10
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
+
+# For RBAC-enabled clusters, the Kubernetes service account for the pods may also need to be granted the required access:
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: pod-reader
+rules:
+- apiGroups: [ "" ]
+  resources: ["pods"]
+  verbs: ["get", "watch", "list"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: pod-reader-binding
+subjects:
+- kind: ServiceAccount
+  name: default
+  apiGroup: ''
+roleRef:
+  kind: Role
+  name: pod-reader
+  apiGroup: ''

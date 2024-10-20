@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+option csharp_namespace = "DistributedChaos";
+
+package ChaosApi;
+
+service Chaos {
+	rpc Ping(PingRequest) returns (PingResponse) {}
+}
+
+message PingRequest {
+	string id = 1;
+}
+
+message PingResponse {
+}
