@@ -42,7 +42,7 @@ public sealed class GrainDirectoryResilienceTests
         log.LogInformation("ServiceId: '{ServiceId}'", testCluster.Options.ServiceId);
         log.LogInformation("ClusterId: '{ClusterId}'.", testCluster.Options.ClusterId);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         var reconfigurationTimer = CoarseStopwatch.StartNew();
         var upperLimit = 10;
         var lowerLimit = 1; // Membership is kept on the primary, so we can't go below 1
@@ -173,9 +173,9 @@ public sealed class GrainDirectoryResilienceTests
         public void Configure(ISiloBuilder siloBuilder)
         {
             siloBuilder.Configure<SiloMessagingOptions>(o => o.ResponseTimeout = o.SystemResponseTimeout = TimeSpan.FromMinutes(2));
-#pragma warning disable ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+#pragma warning disable ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
             siloBuilder.AddDistributedGrainDirectory();
-#pragma warning restore ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+#pragma warning restore ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         }
     }
 }
