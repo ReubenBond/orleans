@@ -42,7 +42,7 @@
     <PackageVersion Include="Microsoft.Extensions.ObjectPool" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Http" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="8.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="7.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
     <PackageVersion Include="Azure.Data.Tables" Version="12.9.0" />
@@ -109,10 +109,14 @@
     <PackageVersion Include="Utf8Json" Version="1.3.7" />
     <PackageVersion Include="SpanJson" Version="4.0.1" />
     <PackageVersion Include="Hyperion" Version="0.12.2" />
-    <PackageVersion Include="Grpc.Tools" Version="2.58.0" />
+    <PackageVersion Include="Grpc.Tools" Version="2.66.0" />
+    <PackageVersion Include="Grpc.AspNetCore" Version="2.66.0" />
     <PackageVersion Include="Testcontainers" Version="3.8.0" />
     <!-- Tooling related packages -->
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="8.0.0" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+
+    <!-- Playground packages -->
+    <PackageVersion Include="OrleansDashboard" Version="8.2.0" />
   </ItemGroup>
 </Project>
