@@ -671,14 +671,22 @@ internal sealed partial class GrainDirectoryReplica(
                 siloAddress,
                 async () =>
                 {
-                    if (isValidation)
-                    {
-                        return await client.GetRegisteredActivations(version, range, isValidation: true);
-                    }
-                    else
-                    {
-                        return await client.RecoverRegisteredActivations(version, range, _id, _partitionIndex);
-                    }
+                    var innerSw = ValueStopwatch.StartNew();
+                    Immutable<List<GrainAddress>> result = default;
+                        if (isValidation)
+                        {
+                            result = await client.GetRegisteredActivations(version, range, isValidation: true);
+                        }
+                        else
+                        {
+                            result = await client.RecoverRegisteredActivations(version, range, _id, _partitionIndex);
+                        }
+                        if (_logger.IsEnabled(LogLevel.Debug))
+                        {
+                            _logger.LogDebug("INNER Recovered '{Count}' entries from silo '{SiloAddress}' for ranges '{Range}' at version '{Version}' in {ElapsedMilliseconds}ms.", result.Value.Count, siloAddress, range, version, innerSw.Elapsed.TotalMilliseconds);
+                        }
+
+                    return result;
                 },
                 new Immutable<List<GrainAddress>>([]),
                 nameof(GetRegisteredActivations));
@@ -712,6 +720,10 @@ internal sealed partial class GrainDirectoryReplica(
                 if (ex is not OrleansMessageRejectionException)
                 {
                     _logger.LogError(ex, "Error invoking operation '{Operation}' on silo '{SiloAddress}'.", operationName, siloAddress);
+                }
+                else
+                {
+                    _logger.LogWarning(ex, "Rejection error invoking operation '{Operation}' on silo '{SiloAddress}'.", operationName, siloAddress);
                 }
 
                 await _owner.RefreshViewAsync(default, CancellationToken.None);

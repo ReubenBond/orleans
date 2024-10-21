@@ -8,6 +8,10 @@ builder.Host.UseOrleans((ctx, orleans) =>
     orleans.AddDistributedGrainDirectory();
 #pragma warning restore ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 
+#pragma warning disable ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+    orleans.AddActivationRebalancer();
+#pragma warning restore ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+
     if (ctx.HostingEnvironment.IsDevelopment())
     {
         // During development time, we don't want to have to deal with
@@ -25,13 +29,11 @@ builder.Host.UseOrleans((ctx, orleans) =>
         orleans.UseRedisClustering(options => options.ConfigurationOptions = ConfigurationOptions.Parse(redisAddress));
     }
 
-    /*
     orleans.UseDashboard(o =>
     {
         o.HostSelf = true;
         o.Port = 8888;
     });
-    */
 });
 
 builder.Logging.AddFilter("Orleans.Runtime.GrainDirectory.DistributedGrainDirectory", LogLevel.Debug);
@@ -41,4 +43,5 @@ builder.Services.AddGrpc();
 builder.Services.AddHostedService<WorkerService>();
 var app = builder.Build();
 app.MapGrpcService<ChaosService>();
-app.Run();
+await app.StartAsync();
+await app.WaitForShutdownAsync();

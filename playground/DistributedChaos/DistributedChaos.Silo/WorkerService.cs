@@ -12,7 +12,7 @@ internal sealed class WorkerService(IClusterClient client, ILogger<WorkerService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        const int NumGrains = 1000;
+        const int NumGrains = 100_000;
         var host = localSiloDetails.DnsHostName;
 
         try
@@ -21,18 +21,18 @@ internal sealed class WorkerService(IClusterClient client, ILogger<WorkerService
             var grains = new List<IPingGrain>(NumGrains);
             for (var i = 0; i < NumGrains; i++)
             {
-                grains.Add(client.GetGrain<IPingGrain>($"ping-{host}-{i}"));
+                grains.Add(client.GetGrain<IPingGrain>($"ping-{i}"));
             }
 
-            var grainNum = 0;
             Stopwatch stopwatch = new();
+            var random = new Random();
+            var iteration = 0;
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
                     stopwatch.Restart();
-                    await grains[grainNum].Ping();
-                    grainNum = (grainNum + 1) % grains.Count;
+                    await grains[random.Next(grains.Count)].Ping();
                     Success.Add(1);
                     SuccessDurationMs.Record(stopwatch.ElapsedMilliseconds);
                 }
@@ -44,7 +44,11 @@ internal sealed class WorkerService(IClusterClient client, ILogger<WorkerService
                 }
                 finally
                 {
-                    await Task.Delay(15, stoppingToken);
+                    iteration = (iteration + 1) % 100;
+                    if (iteration == 0)
+                    {
+                        await Task.Delay(15, stoppingToken);
+                    }
                 }
             }
         }

@@ -191,7 +191,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         foreach (var (grainId, activation) in localActivations)
         {
             var directory = GetGrainDirectory(activation, grainDirectoryResolver);
-            if (directory is not null && directory == this)
+            if (directory == this)
             {
                 var address = activation.Address;
                 if (!range.Contains(address.GrainId))

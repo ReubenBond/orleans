@@ -1,4 +1,5 @@
-internal sealed class PingGrain : IPingGrain
+
+internal sealed class PingGrain : Grain, IPingGrain
 {
     public ValueTask Ping() => ValueTask.CompletedTask;
 }
