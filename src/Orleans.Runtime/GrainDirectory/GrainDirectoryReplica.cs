@@ -48,7 +48,7 @@ internal sealed partial class GrainDirectoryReplica(
     // Requests in these ranges must wait for the range to become available.
     private readonly List<(RingRange Range, MembershipVersion Version, TaskCompletionSource Completion)> _rangeLocks = [];
 
-    // Ranges which were previously at least partially owned by this replica, but which are pending transfer to a new replica.  
+    // Ranges which were previously at least partially owned by this replica, but which are pending transfer to a new replica.
     private readonly List<PartitionSnapshotState> _partitionSnapshots = [];
 
     // Tracked for diagnostic purposes only.
@@ -124,14 +124,20 @@ internal sealed partial class GrainDirectoryReplica(
             (silo, partitionIndex, rangeVersion),
             snapshotFilter: (state, snapshot) => snapshot.DirectoryMembershipVersion == state.rangeVersion,
             partnerFilter: (state, silo, partitionIndex) => silo.Equals(state.silo) && partitionIndex == state.partitionIndex);
+        RemoveSnapshotTransferPartner(
+            (silo, partitionIndex, rangeVersion),
+            snapshotFilter: (state, snapshot) => snapshot.DirectoryMembershipVersion == state.rangeVersion,
+            partnerFilter: (state, silo, partitionIndex) => silo.Equals(state.silo) && partitionIndex == state.partitionIndex);
         return new(true);
     }
 
+    private void RemoveSnapshotTransferPartner<TState>(TState state, Func<TState, PartitionSnapshotState, bool> snapshotFilter, Func<TState, SiloAddress, int, bool> partnerFilter)
     private void RemoveSnapshotTransferPartner<TState>(TState state, Func<TState, PartitionSnapshotState, bool> snapshotFilter, Func<TState, SiloAddress, int, bool> partnerFilter)
     {
         for (var i = 0; i < _partitionSnapshots.Count; ++i)
         {
             var partitionSnapshot = _partitionSnapshots[i];
+            if (!snapshotFilter(state, partitionSnapshot))
             if (!snapshotFilter(state, partitionSnapshot))
             {
                 continue;
@@ -680,10 +686,6 @@ internal sealed partial class GrainDirectoryReplica(
                         else
                         {
                             result = await client.RecoverRegisteredActivations(version, range, _id, _partitionIndex);
-                        }
-                        if (_logger.IsEnabled(LogLevel.Debug))
-                        {
-                            _logger.LogDebug("INNER Recovered '{Count}' entries from silo '{SiloAddress}' for ranges '{Range}' at version '{Version}' in {ElapsedMilliseconds}ms.", result.Value.Count, siloAddress, range, version, innerSw.Elapsed.TotalMilliseconds);
                         }
 
                     return result;
