@@ -16,7 +16,7 @@ namespace Benchmarks.Comparison
 {
     [Trait("Category", "Benchmark")]
     [Config(typeof(BenchmarkConfig))]
-    //[DisassemblyDiagnoser(recursiveDepth: 2, printSource: true)]
+    [DisassemblyDiagnoser(maxDepth: 5, printSource: true, exportHtml: true)]
     //[EtwProfiler]
     public class ClassDeserializeBenchmark
     {

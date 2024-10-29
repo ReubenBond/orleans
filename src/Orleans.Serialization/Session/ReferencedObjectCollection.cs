@@ -15,33 +15,70 @@ namespace Orleans.Serialization.Session
     /// <summary>
     /// A collection of objects which are referenced while serializing, deserializing, or copying.
     /// </summary>
-    public sealed class ReferencedObjectCollection
+    public struct ReferencedObjectCollection
     {
-        private struct ReferencePair
+        private const int InlineArraySize = 64;
+        private readonly struct ReferencePair(uint id, object obj)
         {
-            public ReferencePair(uint id, object @object)
-            {
-                Id = id;
-                Object = @object;
-            }
-
-            public uint Id;
-            public object Object;
+            public readonly uint Id = id;
+            public readonly object Object = obj;
         }
+
+#if NET8_0_OR_GREATER
+        [InlineArray(InlineArraySize)]
+        private struct ReferencePairCollection
+        {
+#pragma warning disable IDE0044 // Add readonly modifier
+#pragma warning disable IDE0051 // Remove unused private members
+            private ReferencePair _element0;
+#pragma warning restore IDE0051 // Remove unused private members
+#pragma warning restore IDE0044 // Add readonly modifier
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public Span<ReferencePair> AsSpan() => MemoryMarshal.CreateSpan(ref _element0, InlineArraySize);
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public Span<ReferencePair> AsSpan(int offset, int length) => MemoryMarshal.CreateSpan(ref _element0, length);
+        }
+#endif
 
         /// <summary>
         /// Gets or sets the reference to object count.
         /// </summary>
         /// <value>The reference to object count.</value>
         internal int ReferenceToObjectCount;
-        private readonly ReferencePair[] _referenceToObject = new ReferencePair[64];
+
+#if NET8_0_OR_GREATER
+        private ReferencePairCollection _referenceToObject;
+
+#else
+        private readonly ReferencePair[] _referenceToObject = new ReferencePair[InlineArraySize];
+#endif
+
+        private Span<ReferencePair> ReferenceToObjectValid
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => _referenceToObject.AsSpan(0, ReferenceToObjectCount);
+        }
 
         private int _objectToReferenceCount;
-        private readonly ReferencePair[] _objectToReference = new ReferencePair[64];
+#if NET8_0_OR_GREATER
+        private ReferencePairCollection _objectToReference;
+#else
+        private readonly ReferencePair[] _objectToReference = new ReferencePair[InlineArraySize];
+#endif
+        private Span<ReferencePair> ObjectToReferenceValid
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => _objectToReference.AsSpan(0, _objectToReferenceCount);
+        }
 
         private Dictionary<uint, object> _referenceToObjectOverflow;
         private Dictionary<object, uint> _objectToReferenceOverflow;
         private uint _currentReferenceId;
+
+        public ReferencedObjectCollection()
+        {
+        }
 
         /// <summary>
         /// Tries to get the referenced object with the specified id.
@@ -58,7 +95,9 @@ namespace Orleans.Serialization.Session
             }
 
             if (_referenceToObjectOverflow is { } overflow && overflow.TryGetValue(reference, out var value))
+            {
                 return value;
+            }
 
             return null;
         }
@@ -129,13 +168,11 @@ namespace Orleans.Serialization.Session
             }
 
             // Add the reference.
-            var objectsArray = _objectToReference;
             var objectsCount = _objectToReferenceCount;
-            if ((uint)objectsCount < (uint)objectsArray.Length)
+            if ((uint)objectsCount < InlineArraySize)
             {
                 _objectToReferenceCount = objectsCount + 1;
-                objectsArray[objectsCount].Id = nextReference;
-                objectsArray[objectsCount].Object = value;
+                _objectToReference[objectsCount] = new(nextReference, value);
             }
             else
             {
@@ -175,12 +212,11 @@ namespace Orleans.Serialization.Session
         private void CreateObjectToReferenceOverflow(object value)
         {
             var result = new Dictionary<object, uint>(_objectToReferenceCount * 2, ReferenceEqualsComparer.Default);
-            var objects = _objectToReference;
-            for (var i = 0; i < objects.Length; i++)
+            for (var i = 0; i < InlineArraySize; i++)
             {
-                var record = objects[i];
+                var record = _objectToReference[i];
                 result[record.Object] = record.Id;
-                objects[i] = default;
+                _objectToReference[i] = default;
             }
 
             result[value] = _currentReferenceId;
@@ -224,34 +260,34 @@ namespace Orleans.Serialization.Session
                             // Unknown field markers can be replaced once the type is known.
                             ThrowReferenceExistsException(reference);
                         }
-                        refs[i].Object = value;
+
+                        refs[i] = new(reference, value);
                         return;
                     }
                 }
 
                 _referenceToObject[ReferenceToObjectCount++] = new ReferencePair(reference, value);
-
-                if (ReferenceToObjectCount >= _referenceToObject.Length)
+                if (ReferenceToObjectCount >= InlineArraySize)
                 {
                     CreateReferenceToObjectOverflow();
                 }
             }
+        }
 
-            [MethodImpl(MethodImplOptions.NoInlining)]
-            void CreateReferenceToObjectOverflow()
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void CreateReferenceToObjectOverflow()
+        {
+            var result = new Dictionary<uint, object>(ReferenceToObjectCount * 2);
+            var refs = _referenceToObject.AsSpan(0, ReferenceToObjectCount);
+            for (var i = 0; i < refs.Length; i++)
             {
-                var result = new Dictionary<uint, object>(ReferenceToObjectCount * 2);
-                var refs = _referenceToObject.AsSpan(0, ReferenceToObjectCount);
-                for (var i = 0; i < refs.Length; i++)
-                {
-                    var record = refs[i];
-                    result[record.Id] = record.Object;
-                    refs[i] = default;
-                }
-
-                ReferenceToObjectCount = 0;
-                _referenceToObjectOverflow = result;
+                var record = refs[i];
+                result[record.Id] = record.Object;
+                refs[i] = default;
             }
+
+            ReferenceToObjectCount = 0;
+            _referenceToObjectOverflow = result;
         }
 
         [DoesNotReturn]
@@ -284,13 +320,13 @@ namespace Orleans.Serialization.Session
         /// Copies the reference table.
         /// </summary>
         /// <returns>A copy of the reference table.</returns>
-        public Dictionary<uint, object> CopyReferenceTable() => _referenceToObject.Take(ReferenceToObjectCount).ToDictionary(r => r.Id, r => r.Object);
+        public Dictionary<uint, object> CopyReferenceTable() => ReferenceToObjectValid.ToArray().ToDictionary(r => r.Id, r => r.Object);
 
         /// <summary>
         /// Copies the identifier table.
         /// </summary>
         /// <returns>A copy of the identifier table.</returns>
-        public Dictionary<object, uint> CopyIdTable() => _objectToReference.Take(_objectToReferenceCount).ToDictionary(r => r.Object, r => r.Id);
+        public Dictionary<object, uint> CopyIdTable() => ObjectToReferenceValid.ToArray().ToDictionary(r => r.Object, r => r.Id);
 
         /// <summary>
         /// Gets or sets the current reference identifier.

@@ -3,6 +3,39 @@ using System.Buffers;
 
 namespace Orleans.Serialization.Serializers
 {
+    public delegate void ValueReader<TValue, TInput>(ref Reader<TInput> reader, scoped ref TValue value);
+    public delegate void ValueWriter<TValue, TOutput>(ref Writer<TOutput> reader, scoped ref TValue value) where TOutput : IBufferWriter<byte>;
+
+    /// <summary>
+    /// Functionality for serializing a value type.
+    /// </summary>
+    /// <typeparam name="TValue">The value type.</typeparam>
+    /// <typeparam name="TOutput">The buffer writer type.</typeparam>
+    public interface IValueEncoder<TValue, TOutput> where TValue : struct where TOutput : IBufferWriter<byte>
+    {
+        /// <summary>
+        /// Serializes the provided value.
+        /// </summary>
+        /// <param name="writer">The writer.</param>
+        /// <param name="value">The value.</param>
+        void Serialize(ref Writer<TOutput> writer, scoped ref TValue value);
+    }
+
+    /// <summary>
+    /// Functionality for serializing a value type.
+    /// </summary>
+    /// <typeparam name="TValue">The value type.</typeparam>
+    /// <typeparam name="TInput">The buffer type.</typeparam>
+    public interface IValueDecoder<TValue, TInput> where TValue : struct
+    {
+        /// <summary>
+        /// Deserializes the specified type.
+        /// </summary>
+        /// <param name="reader">The reader.</param>
+        /// <param name="value">The value.</param>
+        void Deserialize(ref Reader<TInput> reader, scoped ref TValue value);
+    }
+
     /// <summary>
     /// Functionality for serializing a value type.
     /// </summary>

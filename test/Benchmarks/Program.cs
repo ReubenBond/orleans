@@ -4,6 +4,11 @@ using Benchmarks.MapReduce;
 using Benchmarks.Ping;
 using Benchmarks.Transactions;
 using Benchmarks.GrainStorage;
+using Benchmarks.Comparison;
+
+#if NET8_0_OR_GREATER
+[module: System.Runtime.CompilerServices.SkipLocalsInit]
+#endif
 
 namespace Benchmarks
 {
@@ -266,6 +271,14 @@ namespace Benchmarks
                 },
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
+            },
+            ["StructDeserializeLoop"] = _ =>
+            {
+                var benchmark = new StructDeserializeBenchmark();
+                while (!Console.KeyAvailable)
+                {
+                    benchmark.Orleans();
+                }
             },
             ["suite"] = args =>
             {

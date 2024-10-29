@@ -47,7 +47,7 @@ namespace Orleans.Serialization.Session
         /// </summary>
         /// <param name="type">The type.</param>
         /// <param name="reference">The reference.</param>
-        /// <returns><see langword="true" /> if the type has been previoulsy referenced, <see langword="false" /> otherwise.</returns>
+        /// <returns><see langword="true" /> if the type has been previously referenced, <see langword="false" /> otherwise.</returns>
         public bool TryGetTypeReference(Type type, out uint reference) => _referencedTypeToIdMap.TryGetValue(type, out reference);
 
         /// <summary>

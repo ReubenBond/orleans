@@ -599,7 +599,8 @@ namespace Orleans.CodeGenerator
                         AttributeArgument(typeof(CodeGenerator).Assembly.GetName().Version.ToString().GetLiteralExpression())),
                 Attribute(ParseName("global::System.ComponentModel.EditorBrowsableAttribute"))
                     .AddArgumentListArguments(
-                        AttributeArgument(ParseName("global::System.ComponentModel.EditorBrowsableState").Member("Never")))
+                        AttributeArgument(ParseName("global::System.ComponentModel.EditorBrowsableState").Member("Never")))//,
+                //Attribute(ParseName("global::System.Runtime.CompilerServices.SkipLocalsInitAttribute"))
             );
 
         internal static AttributeSyntax GetMethodImplAttributeSyntax() => MethodImplAttributeSyntax;

@@ -8,6 +8,7 @@ using Orleans.Serialization.Session;
 using System;
 using System.Buffers;
 using System.IO;
+using System.Runtime.CompilerServices;
 
 namespace Orleans.Serialization
 {
@@ -513,6 +514,8 @@ namespace Orleans.Serialization
         private readonly IFieldCodec<T> _codec;
         private readonly SerializerSessionPool _sessionPool;
         private readonly Type _expectedType = typeof(T);
+        private readonly FieldReader<T, SpanReaderInput> _spanReader;
+        private readonly FieldWriter<T, SpanBufferWriter> _spanWriter;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Serializer{T}"/> class.
@@ -531,6 +534,8 @@ namespace Orleans.Serialization
         {
             _codec = codec;
             _sessionPool = sessionPool;
+            _spanReader = codec.ReadValue;
+            _spanWriter = codec.WriteField;
         }
 
         /// <summary>
@@ -634,11 +639,12 @@ namespace Orleans.Serialization
         /// <param name="value">The value to serialize.</param>
         /// <param name="destination">The destination where serialized data will be written.</param>
         /// <remarks>This method slices the <paramref name="destination"/> to the serialized data length.</remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Serialize(T value, ref Span<byte> destination)
         {
             using var session = _sessionPool.GetSession();
             var writer = Writer.Create(destination, session);
-            _codec.WriteField(ref writer, 0, _expectedType, value);
+            _spanWriter(ref writer, 0, _expectedType, value);
             writer.Commit();
             destination = destination[..writer.Position];
         }
@@ -650,10 +656,11 @@ namespace Orleans.Serialization
         /// <param name="destination">The destination where serialized data will be written.</param>
         /// <param name="session">The serializer session.</param>
         /// <remarks>This method slices the <paramref name="destination"/> to the serialized data length.</remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Serialize(T value, ref Span<byte> destination, SerializerSession session)
         {
             var writer = Writer.Create(destination, session);
-            _codec.WriteField(ref writer, 0, _expectedType, value);
+            _spanWriter(ref writer, 0, _expectedType, value);
             writer.Commit();
             destination = destination[..writer.Position];
         }
@@ -664,11 +671,12 @@ namespace Orleans.Serialization
         /// <param name="value">The value to serialize.</param>
         /// <param name="destination">The destination where serialized data will be written.</param>
         /// <returns>The length of the serialized data.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int Serialize(T value, byte[] destination)
         {
             using var session = _sessionPool.GetSession();
             var writer = Writer.Create(destination, session);
-            _codec.WriteField(ref writer, 0, _expectedType, value);
+            _spanWriter(ref writer, 0, _expectedType, value);
             writer.Commit();
             return writer.Position;
         }
@@ -680,10 +688,11 @@ namespace Orleans.Serialization
         /// <param name="destination">The destination where serialized data will be written.</param>
         /// <param name="session">The serializer session.</param>
         /// <returns>The length of the serialized data.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int Serialize(T value, byte[] destination, SerializerSession session)
         {
             var writer = Writer.Create(destination, session);
-            _codec.WriteField(ref writer, 0, _expectedType, value);
+            _spanWriter(ref writer, 0, _expectedType, value);
             writer.Commit();
             return writer.Position;
         }
@@ -855,12 +864,13 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="source">The source buffer.</param>
         /// <returns>The deserialized value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T Deserialize(ReadOnlySpan<byte> source)
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
             var field = reader.ReadFieldHeader();
-            return _codec.ReadValue(ref reader, field);
+            return _spanReader(ref reader, field);
         }
 
         /// <summary>
@@ -869,11 +879,12 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="session">The serializer session.</param>
         /// <returns>The deserialized value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T Deserialize(ReadOnlySpan<byte> source, SerializerSession session)
         {
             var reader = Reader.Create(source, session);
             var field = reader.ReadFieldHeader();
-            return _codec.ReadValue(ref reader, field);
+            return _spanReader(ref reader, field);
         }
 
         /// <summary>
@@ -881,6 +892,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="source">The source buffer.</param>
         /// <returns>The deserialized value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T Deserialize(byte[] source) => Deserialize(source.AsSpan());
 
         /// <summary>
@@ -889,6 +901,7 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="session">The serializer session.</param>
         /// <returns>The deserialized value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T Deserialize(byte[] source, SerializerSession session) => Deserialize(source.AsSpan(), session);
 
         /// <summary>
@@ -896,6 +909,7 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="source">The source buffer.</param>
         /// <returns>The deserialized value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T Deserialize(ReadOnlyMemory<byte> source) => Deserialize(source.Span);
 
         /// <summary>
@@ -904,6 +918,7 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="session">The serializer session.</param>
         /// <returns>The deserialized value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T Deserialize(ReadOnlyMemory<byte> source, SerializerSession session) => Deserialize(source.Span, session);
 
         /// <summary>
@@ -912,6 +927,7 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="session">The serializer session.</param>
         /// <returns>The deserialized value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T Deserialize(ArraySegment<byte> source, SerializerSession session) => Deserialize(source.AsSpan(), session);
     }
 
@@ -921,6 +937,8 @@ namespace Orleans.Serialization
     /// <typeparam name="T">The type which this instance operates on.</typeparam>
     public sealed class ValueSerializer<T> where T : struct
     {
+        private readonly ValueReader<T, SpanReaderInput> _spanReader;
+        private readonly ValueWriter<T, SpanBufferWriter> _spanWriter;
         private readonly IValueSerializer<T> _codec;
         private readonly SerializerSessionPool _sessionPool;
 
@@ -933,6 +951,8 @@ namespace Orleans.Serialization
         {
             _sessionPool = sessionPool;
             _codec = OrleansGeneratedCodeHelper.UnwrapService(null, codecProvider.GetValueSerializer<T>());
+            _spanReader = _codec.Deserialize;
+            _spanWriter = _codec.Serialize;
         }
 
         /// <summary>
@@ -1058,7 +1078,7 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var writer = Writer.Create(destination, session);
-            _codec.Serialize(ref writer, ref value);
+            _spanWriter(ref writer, ref value);
             writer.WriteEndObject();
             writer.Commit();
             destination = destination[..writer.Position];
@@ -1074,7 +1094,7 @@ namespace Orleans.Serialization
         public void Serialize(scoped ref T value, ref Span<byte> destination, SerializerSession session)
         {
             var writer = Writer.Create(destination, session);
-            _codec.Serialize(ref writer, ref value);
+            _spanWriter(ref writer, ref value);
             writer.WriteEndObject();
             writer.Commit();
             destination = destination[..writer.Position];
@@ -1090,7 +1110,7 @@ namespace Orleans.Serialization
         {
             using var session = _sessionPool.GetSession();
             var writer = Writer.Create(destination, session);
-            _codec.Serialize(ref writer, ref value);
+            _spanWriter(ref writer, ref value);
             writer.WriteEndObject();
             writer.Commit();
             return writer.Position;
@@ -1106,7 +1126,7 @@ namespace Orleans.Serialization
         public int Serialize(scoped ref T value, byte[] destination, SerializerSession session)
         {
             var writer = Writer.Create(destination, session);
-            _codec.Serialize(ref writer, ref value);
+            _spanWriter(ref writer, ref value);
             writer.WriteEndObject();
             writer.Commit();
             return writer.Position;
@@ -1260,11 +1280,12 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="result">The deserialized value.</param>
         /// <returns>The deserialized value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Deserialize(ReadOnlySpan<byte> source, scoped ref T result)
         {
             using var session = _sessionPool.GetSession();
             var reader = Reader.Create(source, session);
-            _codec.Deserialize(ref reader, ref result);
+            _spanReader(ref reader, ref result);
         }
 
         /// <summary>
@@ -1274,10 +1295,11 @@ namespace Orleans.Serialization
         /// <param name="result">The deserialized value.</param>
         /// <param name="session">The serializer session.</param>
         /// <returns>The deserialized value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Deserialize(ReadOnlySpan<byte> source, scoped ref T result, SerializerSession session)
         {
             var reader = Reader.Create(source, session);
-            _codec.Deserialize(ref reader, ref result);
+            _spanReader(ref reader, ref result);
         }
 
         /// <summary>
@@ -1286,6 +1308,7 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="result">The deserialized value.</param>
         /// <returns>The deserialized value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Deserialize(byte[] source, scoped ref T result) => Deserialize(source.AsSpan(), ref result);
 
         /// <summary>
@@ -1295,6 +1318,7 @@ namespace Orleans.Serialization
         /// <param name="result">The deserialized value.</param>
         /// <param name="session">The serializer session.</param>
         /// <returns>The deserialized value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Deserialize(byte[] source, scoped ref T result, SerializerSession session) => Deserialize(source.AsSpan(), ref result, session);
 
         /// <summary>
@@ -1303,6 +1327,7 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="result">The deserialized value.</param>
         /// <returns>The deserialized value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Deserialize(ReadOnlyMemory<byte> source, scoped ref T result) => Deserialize(source.Span, ref result);
 
         /// <summary>
@@ -1312,6 +1337,7 @@ namespace Orleans.Serialization
         /// <param name="result">The deserialized value.</param>
         /// <param name="session">The serializer session.</param>
         /// <returns>The deserialized value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Deserialize(ReadOnlyMemory<byte> source, scoped ref T result, SerializerSession session) => Deserialize(source.Span, ref result, session);
 
         /// <summary>
@@ -1320,6 +1346,7 @@ namespace Orleans.Serialization
         /// <param name="source">The source buffer.</param>
         /// <param name="result">The deserialized value.</param>
         /// <returns>The deserialized value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Deserialize(ArraySegment<byte> source, scoped ref T result) => Deserialize(source.AsSpan(), ref result);
     }
 

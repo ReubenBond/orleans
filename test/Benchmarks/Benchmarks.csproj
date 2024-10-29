@@ -2,14 +2,16 @@
   <PropertyGroup>
     <RootNamespace>Benchmarks</RootNamespace>
     <AssemblyName>Benchmarks</AssemblyName>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
     <ServerGarbageCollection>true</ServerGarbageCollection>
     <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <GenerateProgramFile>false</GenerateProgramFile>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
     <!-- Do not warn on errors caused by Protocol Buffers codegen, eg: "error CS8981: The type name 'pb' only contains lower-cased ascii characters. Such names may become reserved for the language." -->
     <NoWarn>$(NoWarn);8981</NoWarn>
   </PropertyGroup>

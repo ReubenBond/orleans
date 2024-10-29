@@ -21,6 +21,32 @@ namespace Orleans.Serialization.Codecs
         object ReadValue<TInput>(ref Reader<TInput> reader, Field field);
     }
 
+    public delegate T FieldReader<T, TInput>(ref Reader<TInput> reader, Field field);
+    public delegate void FieldWriter<T, TBufferWriter>(ref Writer<TBufferWriter> reader, uint fieldIdDelta, Type expectedType, T value) where TBufferWriter : IBufferWriter<byte>;
+
+    public interface IFieldWriter<TField, TBufferWriter> where TBufferWriter : IBufferWriter<byte>
+    {
+        /// <summary>
+        /// Writes a field.
+        /// </summary>
+        /// <param name="writer">The writer.</param>
+        /// <param name="fieldIdDelta">The field identifier delta.</param>
+        /// <param name="expectedType">The expected type.</param>
+        /// <param name="value">The value.</param>
+        void WriteField(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, TField value);
+    }
+
+    public interface IFieldReader<TField, TInput>
+    {
+        /// <summary>
+        /// Reads a value.
+        /// </summary>
+        /// <param name="reader">The reader.</param>
+        /// <param name="field">The field.</param>
+        /// <returns>The value.</returns>
+        TField ReadValue(ref Reader<TInput> reader, Field field);
+    }
+
     /// <summary>
     /// Provides functionality for reading and writing values of a specified type.
     /// Implements the <see cref="Orleans.Serialization.Codecs.IFieldCodec" />

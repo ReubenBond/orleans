@@ -116,6 +116,32 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <typeparam name="TInput">The reader input type.</typeparam>
         /// <param name="reader">The reader.</param>
+        /// <param name="field">The field header.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool ReadFieldHeader<TInput>(ref this Reader<TInput> reader, scoped ref Field field, scoped ref uint id)
+        {
+            var tag = (uint)reader.ReadByte();
+            field.Tag = new(tag);
+            // If the id or schema type are required and were not encoded into the tag, read the extended header data.
+            if (tag < (byte)WireType.Extended && (tag & (Tag.FieldIdCompleteMask | Tag.SchemaTypeMask)) >= Tag.FieldIdCompleteMask)
+            {
+                ReadExtendedFieldHeader(ref reader, ref field);
+            }
+            else
+            {
+                field.FieldIdDeltaRaw = tag & Tag.FieldIdMask;
+                field.FieldTypeRaw = default;
+            }
+
+            id += field.FieldIdDelta;
+            return !field.IsEndBaseOrEndObject;
+        }
+
+        /// <summary>
+        /// Reads a field header.
+        /// </summary>
+        /// <typeparam name="TInput">The reader input type.</typeparam>
+        /// <param name="reader">The reader.</param>
         /// <returns>The field header.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Field ReadFieldHeader<TInput>(ref this Reader<TInput> reader)
