@@ -7,18 +7,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddKeyedRedisClient("orleans-redis");
 builder.UseOrleans(orleans =>
 {
-#pragma warning disable ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-    orleans.AddActivationRebalancer();
-    orleans.Configure<ActivationRebalancerOptions>(o =>
-    {
-        o.RebalancerDueTime = TimeSpan.FromSeconds(5);
-        o.SessionCyclePeriod = TimeSpan.FromSeconds(5);
-    });
+    // Other config is provided by Aspire via IConfiguration
 
-#pragma warning restore ORLEANSEXP002 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-#pragma warning disable ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
     orleans.AddActivationRepartitioner<HardLimitRule>();
-#pragma warning restore ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+
+    // Make it extra aggressive (quick) for our demo
     orleans.Configure<ActivationRepartitionerOptions>(o =>
     {
         o.MinRoundPeriod = TimeSpan.FromSeconds(5);

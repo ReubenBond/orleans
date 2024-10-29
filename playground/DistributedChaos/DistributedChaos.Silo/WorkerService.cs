@@ -25,14 +25,13 @@ internal sealed class WorkerService(IClusterClient client, ILogger<WorkerService
             }
 
             Stopwatch stopwatch = new();
-            var random = new Random();
             var iteration = 0;
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
                     stopwatch.Restart();
-                    await grains[random.Next(grains.Count)].Ping();
+                    await grains[iteration].Ping();
                     Success.Add(1);
                     SuccessDurationMs.Record(stopwatch.ElapsedMilliseconds);
                 }
@@ -44,8 +43,8 @@ internal sealed class WorkerService(IClusterClient client, ILogger<WorkerService
                 }
                 finally
                 {
-                    iteration = (iteration + 1) % 100;
-                    if (iteration == 0)
+                    iteration = (iteration + 1) % NumGrains;
+                    if (iteration % 100 == 0)
                     {
                         await Task.Delay(15, stoppingToken);
                     }

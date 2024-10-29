@@ -10,6 +10,7 @@
     <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
     <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
     <ContainerRepository>chaos-silo</ContainerRepository>
+    <NoWarn>$(NoWarn);ORLEANSEXP002;ORLEANSEXP003</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
