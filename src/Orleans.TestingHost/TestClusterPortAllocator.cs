@@ -132,10 +132,10 @@ namespace Orleans.TestingHost
             throw new InvalidOperationException("Cannot find enough free ports to spin up a cluster");
         }
 
-        private class MutexManager
+        private sealed class MutexManager
         {
-            private readonly Dictionary<string, Mutex> _mutexes = new Dictionary<string, Mutex>();
-            private readonly BlockingCollection<Action> _workItems = new BlockingCollection<Action>();
+            private readonly Dictionary<string, Mutex> _mutexes = [];
+            private readonly BlockingCollection<Action> _workItems = [];
             private readonly Thread _thread;
 
             public static MutexManager Instance { get; } = new MutexManager();

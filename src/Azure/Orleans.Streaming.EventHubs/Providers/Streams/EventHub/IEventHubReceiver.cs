@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 namespace Orleans.Streaming.EventHubs
 {
     /// <summary>
-    /// Abstraction on EventhubReceiver class, used to configure EventHubReceiver class in EventhubAdapterReceiver,
+    /// Abstraction on EventHubReceiver class, used to configure EventHubReceiver class in EventHubAdapterReceiver,
     /// also used to configure EHGeneratorReceiver in EventHubAdapterReceiver for testing purpose
     /// </summary>
     public interface IEventHubReceiver
@@ -32,9 +32,9 @@ namespace Orleans.Streaming.EventHubs
     /// <summary>
     /// pass through decorator class for EventHubReceiver
     /// </summary>
-    internal class EventHubReceiverProxy : IEventHubReceiver
+    internal class EventHubReceiverProxy : IEventHubReceiver, IAsyncDisposable
     {
-        private readonly PartitionReceiver client;
+        private readonly PartitionReceiver _client;
 
         public EventHubReceiverProxy(EventHubPartitionSettings partitionSettings, string offset, ILogger logger)
         {
@@ -47,7 +47,7 @@ namespace Orleans.Streaming.EventHubs
             var options = partitionSettings.Hub;
             receiverOptions.ConnectionOptions = options.ConnectionOptions;
             var connection = options.CreateConnection(options.ConnectionOptions);
-            this.client = new PartitionReceiver(options.ConsumerGroup, partitionSettings.Partition, GetEventPosition(), connection, receiverOptions);
+            _client = new PartitionReceiver(options.ConsumerGroup, partitionSettings.Partition, GetEventPosition(), connection, receiverOptions);
 
             EventPosition GetEventPosition()
             {
@@ -61,34 +61,30 @@ namespace Orleans.Streaming.EventHubs
                         throw new InvalidOperationException("Offset must be a number.");
                     }
 
-                    logger.LogInformation("Starting to read from EventHub partition {0}-{1} at offset {2}", options.EventHubName, partitionSettings.Partition, offset);
+                    logger.LogInformation("Starting to read from EventHub partition {EventHubName}-{Partition} at offset {Offset}", options.EventHubName, partitionSettings.Partition, offset);
                     eventPosition = EventPosition.FromOffset(longOffset, true);
                 }
                 // else, if configured to start from now, start reading from most recent data
                 else if (partitionSettings.ReceiverOptions.StartFromNow)
                 {
                     eventPosition = EventPosition.Latest;
-                    logger.LogInformation("Starting to read latest messages from EventHub partition {0}-{1}.", options.EventHubName, partitionSettings.Partition);
+                    logger.LogInformation("Starting to read latest messages from EventHub partition {EventHubName}-{Partition}.", options.EventHubName, partitionSettings.Partition);
                 }
                 else
-                // else, start reading from begining of the partition
+                // else, start reading from beginning of the partition
                 {
                     eventPosition = EventPosition.Earliest;
-                    logger.LogInformation("Starting to read messages from begining of EventHub partition {0}-{1}.", options.EventHubName, partitionSettings.Partition);
+                    logger.LogInformation("Starting to read messages from beginning of EventHub partition {EventHubName}-{Partition}.", options.EventHubName, partitionSettings.Partition);
                 }
 
                 return eventPosition;
             }
         }
 
-        public async Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
-        {
-            return await client.ReceiveBatchAsync(maxCount, waitTime);
-        }
+        public async Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime) => await _client.ReceiveBatchAsync(maxCount, waitTime);
 
-        public async Task CloseAsync()
-        {
-            await client.CloseAsync();
-        }
+        public async Task CloseAsync() => await _client.CloseAsync();
+
+        public ValueTask DisposeAsync() => ((IAsyncDisposable)_client).DisposeAsync();
     }
 }

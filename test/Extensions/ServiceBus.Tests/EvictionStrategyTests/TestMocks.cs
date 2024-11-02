@@ -22,7 +22,7 @@ namespace ServiceBus.Tests.EvictionStrategyTests
             :base(logger, timePurage, cacheMonitor, monitorWriteInterval)
         { }
 
-        public Queue<FixedSizeBuffer> InUseBuffers => this.inUseBuffers;
+        public Queue<FixedSizeBuffer> InUseBuffers => this.InUseBuffers;
     }
 
     public class MockEventHubCacheAdaptor : EventHubDataAdapter

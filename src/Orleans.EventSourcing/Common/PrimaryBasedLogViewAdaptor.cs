@@ -200,10 +200,8 @@ namespace Orleans.EventSourcing.Common
             Services.Log(LogLevel.Trace, "Deactivation Complete");
         }
 
-
         // the currently submitted, unconfirmed entries. 
         private readonly List<TSubmissionEntry> pending = new List<TSubmissionEntry>();
-
 
         /// called at beginning of WriteAsync to the current tentative state
         protected TLogView CopyTentativeState()
@@ -244,12 +242,8 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         private readonly BatchWorker worker;
 
-
-
-
         /// statistics gathering. Is null unless stats collection is turned on.
-        protected LogConsistencyStatistics stats;
-
+        protected LogConsistencyStatistics Statistics { get; set; }
 
         /// For use by protocols. Determines if this cluster is part of the configured multicluster.
         protected bool IsMyClusterJoined()
@@ -275,7 +269,7 @@ namespace Orleans.EventSourcing.Common
             if (!SupportSubmissions)
                 throw new InvalidOperationException("provider does not support submissions on cluster " + Services.MyClusterId);
 
-            if (stats != null) stats.EventCounters["SubmitCalled"]++;
+            if (Statistics != null) Statistics.EventCounters["SubmitCalled"]++;
 
             Services.Log(LogLevel.Trace, "Submit");
 
@@ -290,7 +284,7 @@ namespace Orleans.EventSourcing.Common
             if (!SupportSubmissions)
                 throw new InvalidOperationException("Provider does not support submissions on cluster " + Services.MyClusterId);
 
-            if (stats != null) stats.EventCounters["SubmitRangeCalled"]++;
+            if (Statistics != null) Statistics.EventCounters["SubmitRangeCalled"]++;
 
             Services.Log(LogLevel.Trace, "SubmitRange");
 
@@ -308,7 +302,7 @@ namespace Orleans.EventSourcing.Common
             if (!SupportSubmissions)
                 throw new InvalidOperationException("Provider does not support submissions on cluster " + Services.MyClusterId);
 
-            if (stats != null) stats.EventCounters["TryAppendCalled"]++;
+            if (Statistics != null) Statistics.EventCounters["TryAppendCalled"]++;
 
             Services.Log(LogLevel.Trace, "TryAppend");
 
@@ -327,7 +321,7 @@ namespace Orleans.EventSourcing.Common
             if (!SupportSubmissions)
                 throw new InvalidOperationException("Provider does not support submissions on cluster " + Services.MyClusterId);
 
-            if (stats != null) stats.EventCounters["TryAppendRangeCalled"]++;
+            if (Statistics != null) Statistics.EventCounters["TryAppendRangeCalled"]++;
 
             Services.Log(LogLevel.Trace, "TryAppendRange");
 
@@ -389,8 +383,8 @@ namespace Orleans.EventSourcing.Common
         {
             get
             {
-                if (stats != null)
-                    stats.EventCounters["TentativeViewCalled"]++;
+                if (Statistics != null)
+                    Statistics.EventCounters["TentativeViewCalled"]++;
 
                 if (tentativeStateInternal == null)
                     CalculateTentativeState();
@@ -404,8 +398,8 @@ namespace Orleans.EventSourcing.Common
         {
             get
             {
-                if (stats != null)
-                    stats.EventCounters["ConfirmedViewCalled"]++;
+                if (Statistics != null)
+                    Statistics.EventCounters["ConfirmedViewCalled"]++;
 
                 return LastConfirmedView();
             }
@@ -416,8 +410,8 @@ namespace Orleans.EventSourcing.Common
         {
             get
             {
-                if (stats != null)
-                    stats.EventCounters["ConfirmedVersionCalled"]++;
+                if (Statistics != null)
+                    Statistics.EventCounters["ConfirmedVersionCalled"]++;
 
                 return GetConfirmedVersion();
             }
@@ -456,25 +450,25 @@ namespace Orleans.EventSourcing.Common
         public virtual void EnableStatsCollection()
         {
 
-            stats = new LogConsistencyStatistics()
+            Statistics = new LogConsistencyStatistics()
             {
                 EventCounters = new Dictionary<string, long>(),
                 StabilizationLatenciesInMsecs = new List<int>()
             };
 
-            stats.EventCounters.Add("TentativeViewCalled", 0);
-            stats.EventCounters.Add("ConfirmedViewCalled", 0);
-            stats.EventCounters.Add("ConfirmedVersionCalled", 0);
-            stats.EventCounters.Add("SubmitCalled", 0);
-            stats.EventCounters.Add("SubmitRangeCalled", 0);
-            stats.EventCounters.Add("TryAppendCalled", 0);
-            stats.EventCounters.Add("TryAppendRangeCalled", 0);
-            stats.EventCounters.Add("ConfirmSubmittedEntriesCalled", 0);
-            stats.EventCounters.Add("SynchronizeNowCalled", 0);
+            Statistics.EventCounters.Add("TentativeViewCalled", 0);
+            Statistics.EventCounters.Add("ConfirmedViewCalled", 0);
+            Statistics.EventCounters.Add("ConfirmedVersionCalled", 0);
+            Statistics.EventCounters.Add("SubmitCalled", 0);
+            Statistics.EventCounters.Add("SubmitRangeCalled", 0);
+            Statistics.EventCounters.Add("TryAppendCalled", 0);
+            Statistics.EventCounters.Add("TryAppendRangeCalled", 0);
+            Statistics.EventCounters.Add("ConfirmSubmittedEntriesCalled", 0);
+            Statistics.EventCounters.Add("SynchronizeNowCalled", 0);
 
-            stats.EventCounters.Add("WritebackEvents", 0);
+            Statistics.EventCounters.Add("WritebackEvents", 0);
 
-            stats.StabilizationLatenciesInMsecs = new List<int>();
+            Statistics.StabilizationLatenciesInMsecs = new List<int>();
         }
 
         /// <summary>
@@ -482,7 +476,7 @@ namespace Orleans.EventSourcing.Common
         /// </summary>
         public void DisableStatsCollection()
         {
-            stats = null;
+            Statistics = null;
         }
 
         /// <summary>
@@ -491,7 +485,7 @@ namespace Orleans.EventSourcing.Common
         /// <returns></returns>
         public LogConsistencyStatistics GetStats()
         {
-            return stats;
+            return Statistics;
         }
 
         private void CalculateTentativeState()
@@ -551,7 +545,7 @@ namespace Orleans.EventSourcing.Common
 
                     await UpdatePrimary();
 
-                    if (stats != null) stats.EventCounters["WritebackEvents"]++;
+                    if (Statistics != null) Statistics.EventCounters["WritebackEvents"]++;
                 }
 
             }
@@ -607,13 +601,13 @@ namespace Orleans.EventSourcing.Common
                     NotifyPromises(writeResult, true);
 
                     // record stabilization time, for statistics
-                    if (stats != null)
+                    if (Statistics != null)
                     {
                         var timeNow = DateTime.UtcNow;
                         for (int i = 0; i < writeResult; i++)
                         {
                             var latency = timeNow - pending[i].SubmissionTime;
-                            stats.StabilizationLatenciesInMsecs.Add(latency.Milliseconds);
+                            Statistics.StabilizationLatenciesInMsecs.Add(latency.Milliseconds);
                         }
                     }
 
@@ -656,15 +650,13 @@ namespace Orleans.EventSourcing.Common
         /// Store the last issue that occurred while reading or updating primary.
         /// Is null if successful.
         /// </summary>
-        protected RecordedConnectionIssue LastPrimaryIssue;
-
-     
+        protected RecordedConnectionIssue LastPrimaryIssue { get; set; }
 
         /// <inheritdoc />
         public async Task Synchronize()
         {
-            if (stats != null)
-                stats.EventCounters["SynchronizeNowCalled"]++;
+            if (Statistics != null)
+                Statistics.EventCounters["SynchronizeNowCalled"]++;
 
             Services.Log(LogLevel.Debug, "SynchronizeNowStart");
 
@@ -686,8 +678,8 @@ namespace Orleans.EventSourcing.Common
         /// <inheritdoc />
         public async Task ConfirmSubmittedEntries()
         {
-            if (stats != null)
-                stats.EventCounters["ConfirmSubmittedEntriesCalled"]++;
+            if (Statistics != null)
+                Statistics.EventCounters["ConfirmSubmittedEntriesCalled"]++;
 
             Services.Log(LogLevel.Debug, "ConfirmSubmittedEntriesStart");
 
@@ -753,18 +745,16 @@ namespace Orleans.EventSourcing.Common
     /// <typeparam name="TLogEntry">The type of entry for this submission</typeparam>
     public class SubmissionEntry<TLogEntry>
     {
-        /// <summary> The log entry that is submitted. </summary>
-        public TLogEntry Entry;
+        /// <summary>The log entry that is submitted.</summary>
+        public TLogEntry Entry { get; set; }
 
-        /// <summary> A timestamp for this submission. </summary>
-        public DateTime SubmissionTime;
+        /// <summary>A timestamp for this submission.</summary>
+        public DateTime SubmissionTime { get; set; }
 
-        /// <summary> For conditional updates, a promise that resolves once it is known whether the update was successful or not.</summary>
-        public TaskCompletionSource<bool> ResultPromise;
+        /// <summary>For conditional updates, a promise that resolves once it is known whether the update was successful or not.</summary>
+        public TaskCompletionSource<bool> ResultPromise { get; set; }
 
-        /// <summary> For conditional updates, the log position at which this update is supposed to be applied. </summary>
-        public int ConditionalPosition;
+        /// <summary>For conditional updates, the log position at which this update is supposed to be applied.</summary>
+        public int ConditionalPosition { get; set; }
     }
-
-
 }

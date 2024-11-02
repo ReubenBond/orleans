@@ -224,7 +224,7 @@ namespace Orleans
         /// <param name="interfaceType">The interface type which the reference must implement..</param>
         /// <param name="grainId">The grain id which the reference will target.</param>
         /// <returns>A grain reference.</returns>
-        private object CreateGrainReference(Type interfaceType, GrainId grainId)
+        private GrainReference CreateGrainReference(Type interfaceType, GrainId grainId)
         {
             var grainInterfaceType = this.interfaceTypeResolver.GetGrainInterfaceType(interfaceType);
             return this.referenceActivator.CreateReference(grainId, grainInterfaceType);

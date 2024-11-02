@@ -266,7 +266,7 @@ namespace Orleans.Streaming.EventHubs
             }
         }
 
-        private static IEventHubReceiver CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, ILogger logger)
+        private static EventHubReceiverProxy CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, ILogger logger)
         {
             return new EventHubReceiverProxy(partitionSettings, offset, logger);
         }

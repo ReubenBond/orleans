@@ -392,6 +392,7 @@ namespace Orleans.Hosting
             services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, ConfigureOrleansJsonSerializerOptions>();
             services.AddSingleton<OrleansJsonSerializer>();
 
+            // Created using a factory to prevent the container from holding a reference to instances (for disposal).
             services.TryAddTransient(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
                 sp,
                 sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value));

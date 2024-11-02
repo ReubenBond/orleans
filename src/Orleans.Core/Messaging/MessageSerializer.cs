@@ -21,13 +21,13 @@ using static Orleans.Runtime.Message;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class MessageSerializer
+    internal sealed class MessageSerializer : IDisposable
     {
         private const int FramingLength = Message.LENGTH_HEADER_SIZE;
         private const int MessageSizeHint = 4096;
         private readonly Dictionary<Type, ResponseCodec> _rawResponseCodecs = new();
         private readonly CodecProvider _codecProvider;
-        private readonly IFieldCodec<GrainAddressCacheUpdate> _activationAddressCodec;
+         readonly IFieldCodec<GrainAddressCacheUpdate> _activationAddressCodec;
         private readonly CachingSiloAddressCodec _readerSiloAddressCodec = new();
         private readonly CachingSiloAddressCodec _writerSiloAddressCodec = new();
         private readonly CachingIdSpanCodec _idSpanCodec = new();
@@ -394,6 +394,13 @@ namespace Orleans.Runtime.Messaging
         {
             _idSpanCodec.WriteRaw(ref writer, value.Type.Value);
             IdSpanCodec.WriteRaw(ref writer, value.Key);
+        }
+
+        public void Dispose()
+        {
+            _bufferWriter.Dispose();
+            _deserializationSession.Dispose();
+            _serializationSession.Dispose();
         }
     }
 

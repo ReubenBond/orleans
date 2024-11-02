@@ -10,10 +10,10 @@ namespace Orleans.Runtime
     public readonly struct QualifiedStreamId : IEquatable<QualifiedStreamId>, IComparable<QualifiedStreamId>, ISerializable, ISpanFormattable
     {
         [Id(0)]
-        public readonly StreamId StreamId;
+        public readonly StreamId StreamId { get; }
 
         [Id(1)]
-        public readonly string ProviderName;
+        public readonly string ProviderName { get; }
 
         public QualifiedStreamId(string providerName, StreamId streamId)
         {

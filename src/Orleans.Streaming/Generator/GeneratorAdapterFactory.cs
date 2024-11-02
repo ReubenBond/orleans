@@ -59,19 +59,19 @@ namespace Orleans.Providers.Streams.Generator
         /// Create a cache monitor to report cache related metrics
         /// Return a ICacheMonitor
         /// </summary>
-        protected Func<CacheMonitorDimensions, ICacheMonitor> CacheMonitorFactory;
+        protected Func<CacheMonitorDimensions, ICacheMonitor> CacheMonitorFactory { get; set; }
 
         /// <summary>
         /// Create a block pool monitor to monitor block pool related metrics
         /// Return a IBlockPoolMonitor
         /// </summary>
-        protected Func<BlockPoolMonitorDimensions, IBlockPoolMonitor> BlockPoolMonitorFactory;
+        protected Func<BlockPoolMonitorDimensions, IBlockPoolMonitor> BlockPoolMonitorFactory { get; set; }
 
         /// <summary>
         /// Create a monitor to monitor QueueAdapterReceiver related metrics
         /// Return a IQueueAdapterReceiverMonitor
         /// </summary>
-        protected Func<ReceiverMonitorDimensions, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
+        protected Func<ReceiverMonitorDimensions, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory { get; set; }
         
         public GeneratorAdapterFactory(
             string providerName,

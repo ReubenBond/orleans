@@ -27,10 +27,11 @@ namespace Orleans.EventSourcing
         /// <summary>
         /// A map from event names to event counts
         /// </summary>
-        public Dictionary<string, long> EventCounters;
+        public Dictionary<string, long> EventCounters { get; set; }
+
         /// <summary>
         /// A list of all measured stabilization latencies
         /// </summary>
-        public List<int> StabilizationLatenciesInMsecs;
+        public List<int> StabilizationLatenciesInMsecs { get; set; }
     }
 }

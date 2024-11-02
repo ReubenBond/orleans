@@ -10,7 +10,7 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     public class DefaultBlockPoolMonitor : IBlockPoolMonitor
     {
-        protected KeyValuePair<string, object>[] _dimensions;
+        private KeyValuePair<string, object>[] _dimensions;
         private readonly ObservableCounter<long> _totalMemoryCounter;
         private readonly ObservableCounter<long> _availableMemoryCounter;
         private readonly ObservableCounter<long> _claimedMemoryCounter;

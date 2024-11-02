@@ -62,8 +62,8 @@ namespace Orleans.GrainDirectory.AzureStorage
             this.options = options ?? throw new ArgumentNullException(nameof(options));
 
             Logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            TableName = options.TableName ?? throw new ArgumentNullException(nameof(options.TableName));
-            StoragePolicyOptions = options.StoragePolicyOptions ?? throw new ArgumentNullException(nameof(options.StoragePolicyOptions));
+            TableName = options.TableName ?? throw new InvalidOperationException($"The value of {nameof(AzureStorageOperationOptions)}.{nameof(options.TableName)} is null.");
+            StoragePolicyOptions = options.StoragePolicyOptions ?? throw new InvalidOperationException(($"The value of {nameof(AzureStorageOperationOptions)}.{nameof(options.StoragePolicyOptions)} is null."));
 
             AzureTableUtils.ValidateTableName(TableName);
         }
@@ -485,7 +485,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                 catch (Exception exc)
                 {
                     Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_08, exc,
-                        "Intermediate error deleting entries {Data} from the table {TableName}.", Utils.EnumerableToString(collection), TableName);
+                        "Intermediate error deleting entries '{Data}' from the table '{TableName}'.", Utils.EnumerableToString(collection), TableName);
                     throw;
                 }
             }
@@ -507,7 +507,6 @@ namespace Orleans.GrainDirectory.AzureStorage
 
             try
             {
-
                 try
                 {
                     async Task<List<(T Entity, string ETag)>> executeQueryHandleContinuations()
@@ -543,10 +542,10 @@ namespace Orleans.GrainDirectory.AzureStorage
                     // Out of retries...
                     if (!AzureTableUtils.TableStorageDataNotFound(exc))
                     {
-                        Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_09, exc, "Failed to read Azure Storage table {TableName}", TableName);
+                        Logger.LogWarning((int)Utilities.ErrorCode.AzureTable_09, exc, "Failed to read Azure Storage table '{TableName}'", TableName);
                     }
 
-                    throw new OrleansException($"Failed to read Azure Storage table {TableName}", exc);
+                    throw new OrleansException($"Failed to read Azure Storage table '{TableName}'", exc);
                 }
             }
             finally

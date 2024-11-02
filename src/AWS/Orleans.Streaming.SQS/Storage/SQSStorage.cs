@@ -15,7 +15,7 @@ namespace OrleansAWSUtils.Storage
     /// <summary>
     /// Wrapper/Helper class around AWS SQS queue service
     /// </summary>
-    internal class SQSStorage
+    internal class SQSStorage : IDisposable
     {
         /// <summary>
         /// Maximum number of messages allowed by SQS to peak per request
@@ -235,5 +235,7 @@ namespace OrleansAWSUtils.Storage
             Logger.LogError((int)errorCode, exc, "Error doing {Operation} for SQS queue {QueueName}", operation, QueueName);
             throw new AggregateException($"Error doing {operation} for SQS queue {QueueName}", exc);
         }
+
+        public void Dispose() => ((IDisposable)sqsClient).Dispose();
     }
 }

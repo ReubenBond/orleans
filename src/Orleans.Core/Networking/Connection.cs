@@ -282,7 +282,7 @@ namespace Orleans.Runtime.Messaging
             await Task.Yield();
 
             Exception error = default;
-            var serializer = this.shared.ServiceProvider.GetRequiredService<MessageSerializer>();
+            using var serializer = this.shared.ServiceProvider.GetRequiredService<MessageSerializer>();
             try
             {
                 var input = this._transport.Input;
@@ -352,7 +352,7 @@ namespace Orleans.Runtime.Messaging
             await Task.Yield();
 
             Exception error = default;
-            var serializer = this.shared.ServiceProvider.GetRequiredService<MessageSerializer>();
+            using var serializer = this.shared.ServiceProvider.GetRequiredService<MessageSerializer>();
             var messageObserver = this.shared.MessageStatisticsSink.GetMessageObserver();
             try
             {

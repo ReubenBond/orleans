@@ -16,7 +16,7 @@ namespace Orleans.Providers.Streams.Common
         /// Buffers which are currently in use in the cache
         /// Protected for test purposes
         /// </summary>
-        protected readonly Queue<FixedSizeBuffer> inUseBuffers;
+        protected Queue<FixedSizeBuffer> InUseBuffers { get; }
         private FixedSizeBuffer currentBuffer;
         private readonly ICacheMonitor cacheMonitor;
         private readonly PeriodicAction periodicMonitoring;
@@ -35,7 +35,7 @@ namespace Orleans.Providers.Streams.Common
             if (timePurage == null) throw new ArgumentException(nameof(timePurage));
             this.logger = logger;
             this.timePurge = timePurage;
-            this.inUseBuffers = new Queue<FixedSizeBuffer>();
+            this.InUseBuffers = new Queue<FixedSizeBuffer>();
 
             // monitoring
             this.cacheMonitor = cacheMonitor;
@@ -62,11 +62,11 @@ namespace Orleans.Providers.Streams.Common
         public void OnBlockAllocated(FixedSizeBuffer newBlock)
         {
             if (this.PurgeObservable.IsEmpty && this.currentBuffer != null
-                && this.inUseBuffers.Contains(this.currentBuffer) && this.inUseBuffers.Count == 1)
+                && this.InUseBuffers.Contains(this.currentBuffer) && this.InUseBuffers.Count == 1)
             {
-                this.inUseBuffers.Dequeue().Dispose();
+                this.InUseBuffers.Dequeue().Dispose();
             }
-            this.inUseBuffers.Enqueue(newBlock);
+            this.InUseBuffers.Enqueue(newBlock);
             this.currentBuffer = newBlock;
             //report metrics
             this.cacheSizeInByte += newBlock.SizeInByte;
@@ -128,16 +128,16 @@ namespace Orleans.Providers.Streams.Common
 
         private void FreePurgedBuffers(CachedMessage? lastMessagePurged, CachedMessage? oldestMessageInCache)
         {
-            if (this.inUseBuffers.Count <= 0 || !lastMessagePurged.HasValue)
+            if (this.InUseBuffers.Count <= 0 || !lastMessagePurged.HasValue)
                 return;
             int memoryReleasedInByte = 0;
             object IdOfLastPurgedBufferId = lastMessagePurged?.Segment.Array;
             // IdOfLastBufferInCache will be null if cache is empty after purge
             object IdOfLastBufferInCacheId = oldestMessageInCache?.Segment.Array;
             //all buffers older than LastPurgedBuffer should be purged 
-            while (this.inUseBuffers.Peek().Id != IdOfLastPurgedBufferId)
+            while (this.InUseBuffers.Peek().Id != IdOfLastPurgedBufferId)
             {
-                var purgedBuffer = this.inUseBuffers.Dequeue();
+                var purgedBuffer = this.InUseBuffers.Dequeue();
                 memoryReleasedInByte += purgedBuffer.SizeInByte;
                 purgedBuffer.Dispose();
             }
@@ -145,7 +145,7 @@ namespace Orleans.Providers.Streams.Common
             //then last purged buffer should be purged too
             if (IdOfLastBufferInCacheId != null && IdOfLastPurgedBufferId != IdOfLastBufferInCacheId)
             {
-                var purgedBuffer = this.inUseBuffers.Dequeue();
+                var purgedBuffer = this.InUseBuffers.Dequeue();
                 memoryReleasedInByte += purgedBuffer.SizeInByte;
                 purgedBuffer.Dispose();
             }

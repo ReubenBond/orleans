@@ -33,7 +33,7 @@ namespace Orleans.Providers
         private readonly ILogger logger;
         private readonly TSerializer serializer;
         private readonly ulong _nameHash;
-        private IStreamQueueMapper streamQueueMapper;
+        private HashRingBasedStreamQueueMapper streamQueueMapper;
         private ConcurrentDictionary<QueueId, IMemoryStreamQueueGrain> queueGrains;
         private IObjectPool<FixedSizeBuffer> bufferPool;
         private BlockPoolMonitorDimensions blockPoolMonitorDimensions;
@@ -58,19 +58,19 @@ namespace Orleans.Providers
         /// Create a cache monitor to report cache related metrics
         /// Return a ICacheMonitor
         /// </summary>
-        protected Func<CacheMonitorDimensions, ICacheMonitor> CacheMonitorFactory;
+        protected Func<CacheMonitorDimensions, ICacheMonitor> CacheMonitorFactory { get; set; }
 
         /// <summary>
         /// Create a block pool monitor to monitor block pool related metrics
         /// Return a IBlockPoolMonitor
         /// </summary>
-        protected Func<BlockPoolMonitorDimensions, IBlockPoolMonitor> BlockPoolMonitorFactory;
+        protected Func<BlockPoolMonitorDimensions, IBlockPoolMonitor> BlockPoolMonitorFactory { get; set; }
 
         /// <summary>
         /// Create a monitor to monitor QueueAdapterReceiver related metrics
         /// Return a IQueueAdapterReceiverMonitor
         /// </summary>
-        protected Func<ReceiverMonitorDimensions, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory;
+        protected Func<ReceiverMonitorDimensions, IQueueAdapterReceiverMonitor> ReceiverMonitorFactory { get; set; }
 
         public MemoryAdapterFactory(
             string providerName,
@@ -84,7 +84,7 @@ namespace Orleans.Providers
             this.Name = providerName;
             this.queueMapperOptions = queueMapperOptions ?? throw new ArgumentNullException(nameof(queueMapperOptions));
             this.cacheOptions = cacheOptions ?? throw new ArgumentNullException(nameof(cacheOptions));
-            this.statisticOptions = statisticOptions ?? throw new ArgumentException(nameof(statisticOptions));
+            this.statisticOptions = statisticOptions ?? throw new ArgumentNullException(nameof(statisticOptions));
             this.grainFactory = grainFactory ?? throw new ArgumentNullException(nameof(grainFactory));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.logger = loggerFactory.CreateLogger<ILogger<MemoryAdapterFactory<TSerializer>>>();
@@ -210,7 +210,9 @@ namespace Orleans.Providers
         /// <param name="services">The services.</param>
         /// <param name="name">The provider name.</param>
         /// <returns>A mew <see cref="MemoryAdapterFactory{TSerializer}"/> instance.</returns>
+#pragma warning disable CA1000 // Do not declare static members on generic types
         public static MemoryAdapterFactory<TSerializer> Create(IServiceProvider services, string name)
+#pragma warning restore CA1000 // Do not declare static members on generic types
         {
             var cachePurgeOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
