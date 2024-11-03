@@ -1293,7 +1293,7 @@ namespace Orleans.Serialization.UnitTests
             UInt128.MaxValue,
         ];
 
-        protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.V0, value.V1)));
+        protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.Item1, value.Item2)));
     }
 
     public class UInt128CopierTests(ITestOutputHelper output) : CopierTester<UInt128, IDeepCopier<UInt128>>(output)
@@ -1316,7 +1316,7 @@ namespace Orleans.Serialization.UnitTests
             UInt128.MaxValue,
         ];
 
-        protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.V0, value.V1)));
+        protected override Action<Action<UInt128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.Item1, value.Item2)));
     }
 #endif
 
@@ -1492,7 +1492,7 @@ namespace Orleans.Serialization.UnitTests
             Int128.MaxValue,
         ];
 
-        protected override Action<Action<Int128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.V0, value.V1)));
+        protected override Action<Action<Int128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.Item1, value.Item2)));
     }
 
     public class Int128CopierTests(ITestOutputHelper output) : CopierTester<Int128, IDeepCopier<Int128>>(output)
@@ -1515,7 +1515,7 @@ namespace Orleans.Serialization.UnitTests
             Int128.MaxValue,
         ];
 
-        protected override Action<Action<Int128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.V0, value.V1)));
+        protected override Action<Action<Int128>> ValueProvider => assert => Gen.ULong.Select(Gen.ULong).Sample(value => assert(new (value.Item1, value.Item2)));
     }
 #endif
 
