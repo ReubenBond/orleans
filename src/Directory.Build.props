@@ -30,7 +30,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <AssemblyAttribute Include="Orleans.Metadata.FrameworkPartAttribute" />
+    <AssemblyAttribute Condition="'$(IsOrleansFrameworkPart)' != 'false'" Include="Orleans.Metadata.FrameworkPartAttribute" />
   </ItemGroup>
 
 </Project>

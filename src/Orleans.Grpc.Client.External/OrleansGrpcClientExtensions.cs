@@ -22,6 +22,7 @@ public sealed class GrpcGrainClientFactory
 {
     public TClient GetGrpcGrainClient<TClient>(string grainType, string grainKey) where TClient : ClientBase<TClient>
     {
+        throw null!;
         // create a call invoker which wraps another invoker and adds grain headers
         // create the client type, providing the invoker
         // return the client
