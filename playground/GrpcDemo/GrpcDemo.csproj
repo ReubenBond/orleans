@@ -21,7 +21,7 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Analyzers\Orleans.Analyzers.csproj" />
     <ProjectReference Include="..\..\src\Orleans.Grpc.Server\Orleans.Grpc.Server.csproj" />
-    <ProjectReference Include="..\..\src\Orleans.Grpc.Client\Orleans.Grpc.Client.csproj" />
+    <ProjectReference Include="..\..\src\Orleans.Grpc.Client.External\Orleans.Grpc.Client.External.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Core\Orleans.Core.csproj" />
   </ItemGroup>
 

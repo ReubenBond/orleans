@@ -280,6 +280,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DistributedChaos.ServiceDef
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Grpc.Client", "src\Orleans.Grpc.Client\Orleans.Grpc.Client.csproj", "{8DC5A7C2-26E5-4CD9-AE6A-33ECACDD1D29}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Grpc.Client.External", "src\Orleans.Grpc.Client.External\Orleans.Grpc.Client.External.csproj", "{7DEA4426-A328-42D8-93BE-5723BD396FF9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -726,6 +728,10 @@ Global
 		{8DC5A7C2-26E5-4CD9-AE6A-33ECACDD1D29}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8DC5A7C2-26E5-4CD9-AE6A-33ECACDD1D29}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8DC5A7C2-26E5-4CD9-AE6A-33ECACDD1D29}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7DEA4426-A328-42D8-93BE-5723BD396FF9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7DEA4426-A328-42D8-93BE-5723BD396FF9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7DEA4426-A328-42D8-93BE-5723BD396FF9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7DEA4426-A328-42D8-93BE-5723BD396FF9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -859,6 +865,7 @@ Global
 		{D6A7671F-B790-4496-B51C-69755EA2753C} = {3359BA89-1C90-4FDF-AF49-54CFEEE3548E}
 		{8EC8E0DA-707A-4452-A42F-9A1967BE541E} = {3359BA89-1C90-4FDF-AF49-54CFEEE3548E}
 		{8DC5A7C2-26E5-4CD9-AE6A-33ECACDD1D29} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
+		{7DEA4426-A328-42D8-93BE-5723BD396FF9} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}

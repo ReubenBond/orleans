@@ -28,7 +28,6 @@ public sealed class GrpcGrainClientFactory
     }
 }
 
-
 public class OrleansServerCallContext(DateTime deadline, CancellationToken cancellationToken) : ServerCallContext
 {
     protected override string MethodCore { get; } = "Method";
