@@ -3,9 +3,8 @@
   <PropertyGroup>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <PackageDescription>gRPC support for Microsoft Orleans</PackageDescription>
-    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <Nullable>enable</Nullable>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
   </PropertyGroup>
 
   <ItemGroup>
