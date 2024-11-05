@@ -1,3 +1,4 @@
+/*
 namespace {{- namespace }};
 {% for service in services %}
     {% for method in service.methods %}
@@ -7,3 +8,4 @@ namespace {{- namespace }};
         return await client.{{ method.name }}Async(request, options);
     }
 {% endfor %}
+*/

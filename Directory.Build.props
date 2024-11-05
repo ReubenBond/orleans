@@ -61,6 +61,7 @@
   </PropertyGroup>
 
   <Import Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " Project="$(MSBuildThisFileDirectory)src/Orleans.CodeGenerator/build/Microsoft.Orleans.CodeGenerator.props" />
+  <Import Condition=" '$(OrleansBuildTimeProtoGen)' == 'true' " Project="$(MSBuildThisFileDirectory)src/Orleans.Grpc.CodeGenerator/build/Microsoft.Orleans.Grpc.CodeGenerator.props" />
 
   <!-- Set output folder for created NuGet packages -->
   <PropertyGroup>
