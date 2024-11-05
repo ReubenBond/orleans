@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <Title>Microsoft Orleans gRPC Grain Source Generator</Title>
+    <Description>C# Source Generator for Microsoft Orleans, generating code for gRPC interfaces.</Description>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <Nullable>enable</Nullable>
+    <WarnOnNullable>true</WarnOnNullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Templates\ClientProxy.liquid" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Fluid.Core" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <PackageReference Include="protobuf-net.Reflection" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Templates\ClientProxy.liquid" />
+  </ItemGroup>
+
+</Project>

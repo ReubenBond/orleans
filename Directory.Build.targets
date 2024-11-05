@@ -23,4 +23,14 @@
       Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' "/>
   </ItemGroup>
 
+  <Import Condition=" '$(OrleansBuildTimeProtoGen)' == 'true' " Project="$(MSBuildThisFileDirectory)src/Grpc/Orleans.Grpc.CodeGenerator/build/Microsoft.Orleans.Grpc.CodeGenerator.props" />
+  <ItemGroup>
+    <!-- Enable code generator -->
+    <ProjectReference
+      Include="$(SourceRoot)src/Grpc/Orleans.Grpc.CodeGenerator/Orleans.Grpc.CodeGenerator.csproj"
+      ReferenceOutputAssembly="false"
+      OutputItemType="Analyzer"
+      Condition=" '$(OrleansBuildTimeProtoGen)' == 'true' "/>
+  </ItemGroup>
+
 </Project>

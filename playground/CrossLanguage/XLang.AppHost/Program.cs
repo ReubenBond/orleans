@@ -5,11 +5,10 @@ var redis = builder.AddRedis("orleans-redis");
 
 var orleansConfig = builder.AddOrleans("cluster")
     .WithClustering(redis);
-orleansConfig.EnableDistributedTracing = false;
 
-builder.AddProject<DashboardToy_Frontend>("frontend")
+builder.AddProject<XLang_Server>("server")
     .WithReference(orleansConfig)
-    .WithReplicas(5)
+    .WithReplicas(2)
     .WaitFor(redis);
 
 builder.Build().Run();

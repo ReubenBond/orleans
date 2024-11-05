@@ -14,7 +14,13 @@
 
 syntax = "proto3";
 
+import "google/protobuf/descriptor.proto";
+
 package greet;
+
+extend google.protobuf.ServiceOptions {
+  string grain_type = 50000;
+}
 
 // The greeting service definition.
 service Greeter {

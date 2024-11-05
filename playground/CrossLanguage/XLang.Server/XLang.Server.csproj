@@ -5,6 +5,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <OrleansBuildTimeProtoGen>true</OrleansBuildTimeProtoGen>
   </PropertyGroup>
 
   <ItemGroup>

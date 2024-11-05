@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DashboardToy.Frontend\DashboardToy.Frontend.csproj" />
+    <ProjectReference Include="..\XLang.Server\XLang.Server.csproj" />
   </ItemGroup>
 
 </Project>

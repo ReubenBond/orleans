@@ -2,9 +2,8 @@ using System;
 using System.Reflection;
 using System.Threading.Tasks;
 using Google.Protobuf;
-using Microsoft.Hosting;
+using Microsoft.Extensions.Hosting;
 using Orleans.Runtime;
-using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Serialization.gRPC;
@@ -24,12 +23,10 @@ internal sealed class GrpcGrainUnaryCall : IInvokable
     private IGrainContext? _context;
     public void Dispose() => throw new NotImplementedException();
     public string GetActivityName() => throw new NotImplementedException();
-    public object GetArgument(int index)
+    public object? GetArgument(int index)
     {
         ArgumentOutOfRangeException.ThrowIfNotEqual(0, index);
-        throw new NotImplementedException();
-
-        //return Argument; // TODO: Deserialize if not deserialized already.
+        return Argument;
     }
 
     public int GetArgumentCount() => 1;
@@ -46,10 +43,12 @@ internal sealed class GrpcGrainUnaryCall : IInvokable
         return invoker.Invoke(_context.GrainInstance!, this);
     }
 
-    public void SetArgument(int index, object value) => throw new NotImplementedException();
-   
-    public void SetTarget(ITargetHolder holder)
+    public void SetArgument(int index, object value)
     {
-        _context = holder.GetComponent<IGrainContext>();
+        ArgumentOutOfRangeException.ThrowIfNotEqual(0, index);
+        Argument = (IMessage?)value;
     }
+
+
+    public void SetTarget(ITargetHolder holder) => _context = holder.GetComponent<IGrainContext>();
 }

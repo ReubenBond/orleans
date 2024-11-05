@@ -1,0 +1,9 @@
+namespace {{- namespace }};
+{% for service in services %}
+    {% for method in service.methods %}
+    public async Task<{{ method.outputType }}> {{ method.name }}({{ method.inputType }} request, CallOptions options = null)
+    {
+        var client = new {{ service.name }}.{{ service.name }}Client(_channel);
+        return await client.{{ method.name }}Async(request, options);
+    }
+{% endfor %}

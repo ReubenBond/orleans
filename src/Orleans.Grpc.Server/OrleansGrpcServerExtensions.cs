@@ -1,11 +1,17 @@
 using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Grpc.AspNetCore.Server.Model;
 using Grpc.Core;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Routing.Patterns;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Metadata;
@@ -15,25 +21,91 @@ using Orleans.Serialization.gRPC;
 using Orleans.Serialization.Grpc.Internal;
 using Orleans.Serialization.Invocation;
 
-namespace Microsoft.Hosting;
+namespace Microsoft.Extensions.Hosting;
 
 public static class OrleansGrpcClientExtension
 {
 }
 
-public static class OrleansGrpcExtensions
+public static class OrleansGrpcServerExtensions
 {
     public static ISiloBuilder AddGrpcGrains(this ISiloBuilder siloBuilder)
     {
         siloBuilder.Services.AddSingleton<IConfigureGrainTypeComponents, GrpcGrainTypeConfigurator>();
+        siloBuilder.Services.AddSingleton<IGrainPropertiesProvider, GrpcGrainPropertiesPopulator>();
         siloBuilder.Services.AddSerializer(s => s.AddProtobufSerializer());
         return siloBuilder;
+    }
+
+    public static IEndpointRouteBuilder MapGrpcGrains(this IEndpointRouteBuilder endpoints)
+    {
+        // Note that this will not work in dynamic scenarios or when the service is not locally known at runtime.
+        var grainManifest = endpoints.ServiceProvider.GetRequiredService<IClusterManifestProvider>().LocalGrainManifest;
+        var servicesMap = new Dictionary<string, Dictionary<string, MethodType>>();
+        foreach (var (grainType, properties) in grainManifest.Grains)
+        {
+            foreach (var (key, value) in properties.Properties)
+            {
+                if (!key.StartsWith(GrpcWellKnownGrainProperties.GrpcMethodPrefix, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var fullName = key[GrpcWellKnownGrainProperties.GrpcMethodPrefix.Length..].Split('/');
+                if (fullName.Length != 2)
+                {
+                    throw new InvalidOperationException($"Invalid gRPC method property '{key}' on grain '{grainType}': key must contain a single service name and method name separated by a '/'.");
+                }
+
+                var serviceName = fullName[0];
+                var methodName = fullName[1];
+
+                if (!Enum.TryParse<MethodType>(value, ignoreCase: true, out var methodType))
+                {
+                    throw new InvalidOperationException($"Invalid gRPC method property '{key}' on grain '{grainType}': value '{value}' is not a valid method type.");
+                }
+
+                ref var serviceMap = ref CollectionsMarshal.GetValueRefOrAddDefault(servicesMap, serviceName, out _);
+                serviceMap ??= [];
+                serviceMap[methodName] = methodType;
+            }
+        }
+
+        foreach (var (serviceName, methods) in servicesMap)
+        {
+            foreach (var (methodName, methodType) in methods)
+            {
+                var pattern = RoutePatternFactory.Parse($"/{serviceName}/{methodName}");
+                /*
+                var requestDelegate = methodType switch
+                {
+                    MethodType.Unary => new RequestDelegate(context => HandleUnaryCall(context, serviceName, methodName)),
+                };
+                endpoints.Map(pattern);
+                */
+                throw new NotImplementedException();
+            }
+        }
+
+        return endpoints;
     }
 }
 
 internal sealed class GrpcServiceGrainCallInvoker(Dictionary<string, GrpcMethodModel> methods)
 {
     private readonly FrozenDictionary<string, GrpcMethodModel> _methods = methods.ToFrozenDictionary();
+
+    public bool TryGetMethod(GrpcGrainUnaryCall call, [NotNullWhen(true)] out IMethod? method)
+    {
+        if (_methods.TryGetValue(call.MethodName!, out var model))
+        {
+            method = model.Method;
+            return true;
+        }
+
+        method = null;
+        return false;
+    }
 
     public ValueTask<Response> Invoke(object serviceInstance, GrpcGrainUnaryCall call)
     {
@@ -107,7 +179,8 @@ internal sealed class GrpcGrainTypeConfigurator(GrainClassMap grainClassMap) : I
 
         public override void AddMethod<TRequest, TResponse>(Method<TRequest, TResponse> method, UnaryServerMethod<TRequest, TResponse>? handler)
         {
-            var methodDelegate = GetMethodDelegate<UnaryServerMethod<object, TRequest, TRequest>>(method.Name, [serviceType, typeof(TRequest), typeof(ServerCallContext)]);
+            var delegateType = typeof(UnaryServerMethod<,,>).MakeGenericType(serviceType, typeof(TRequest), typeof(TResponse));
+            var methodDelegate = GetMethodDelegate(delegateType, method.Name, serviceType, [typeof(TRequest), typeof(ServerCallContext)]);
 
             Methods.Add(method.Name, new GrpcMethodModel(method, Invoker));
 
@@ -117,7 +190,8 @@ internal sealed class GrpcGrainTypeConfigurator(GrainClassMap grainClassMap) : I
                 var requestArgument = (TRequest)call.Argument!;
                 try
                 {
-                    var response = await methodDelegate(serviceInstance, requestArgument, callContext);
+                    var immediateResult = methodDelegate.DynamicInvoke([serviceInstance, requestArgument, callContext]);
+                    var response = await (Task<TResponse>)immediateResult!;
 
                     return Response.FromResult(response);
                 }
@@ -137,10 +211,10 @@ internal sealed class GrpcGrainTypeConfigurator(GrainClassMap grainClassMap) : I
 
         private void AddMethodCore<TDelegate>(IMethod method, Type[] methodParameters) where TDelegate : Delegate
         {
-
+            throw new NotImplementedException();
         }
 
-        private TDelegate GetMethodDelegate<TDelegate>(string methodName, Type[] methodParameters) where TDelegate : Delegate
+        private Delegate GetMethodDelegate(Type delegateType, string methodName, Type serviceType, Type[] methodParameters)
         {
             var handlerMethod = GetMethodCore(methodName, methodParameters);
 
@@ -149,7 +223,7 @@ internal sealed class GrpcGrainTypeConfigurator(GrainClassMap grainClassMap) : I
                 throw new InvalidOperationException($"Could not find '{methodName}' on {serviceType}.");
             }
 
-            return (TDelegate)Delegate.CreateDelegate(typeof(TDelegate), handlerMethod);
+            return Delegate.CreateDelegate(type: delegateType, firstArgument: null, method: handlerMethod, throwOnBindFailure: true)!;
 
             MethodInfo? GetMethodCore(string methodName, Type[] methodParameters)
             {
@@ -187,5 +261,45 @@ internal sealed class GrpcGrainTypeConfigurator(GrainClassMap grainClassMap) : I
                 return null;
             }
         }
+    }
+}
+
+internal static class GrpcWellKnownGrainProperties
+{
+    public const string GrpcMethodPrefix = "gRPC/";
+}
+
+internal sealed class GrpcGrainPropertiesPopulator : IGrainPropertiesProvider
+{
+    public void Populate(Type grainClass, GrainType grainType, Dictionary<string, string> properties)
+    {
+        var bindMethodInfo = BindMethodFinder.GetBindMethod(grainClass);
+        if (bindMethodInfo is null)
+        {
+            // Not a gRPC service grain.
+            return;
+        }
+
+        // The second parameter is always the service base type
+        // See: https://github.com/grpc/grpc-dotnet/blob/e9cc7e15796d39f1d2656178f56a45c09147d0fe/src/Grpc.AspNetCore.Server/Model/Internal/BinderServiceModelProvider.cs#L48
+        var serviceParameter = bindMethodInfo.GetParameters()[1];
+
+        var binder = new ServiceMethodCollection();
+        bindMethodInfo.Invoke(null, [binder, null]);
+
+        foreach (var method in binder.Methods)
+        {
+            properties[$"{GrpcWellKnownGrainProperties.GrpcMethodPrefix}{method.ServiceName}/{method.Name}"] = method.Type.ToString();
+        }
+    }
+
+    private sealed class ServiceMethodCollection : ServiceBinderBase
+    {
+        public List<IMethod> Methods { get; } = [];
+
+        public override void AddMethod<TRequest, TResponse>(Method<TRequest, TResponse> method, UnaryServerMethod<TRequest, TResponse>? handler) => Methods.Add(method);
+        public override void AddMethod<TRequest, TResponse>(Method<TRequest, TResponse> method, ClientStreamingServerMethod<TRequest, TResponse>? handler) => Methods.Add(method);
+        public override void AddMethod<TRequest, TResponse>(Method<TRequest, TResponse> method, ServerStreamingServerMethod<TRequest, TResponse>? handler) => Methods.Add(method);
+        public override void AddMethod<TRequest, TResponse>(Method<TRequest, TResponse> method, DuplexStreamingServerMethod<TRequest, TResponse>? handler) => Methods.Add(method);
     }
 }
