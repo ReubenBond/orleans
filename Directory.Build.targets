@@ -12,6 +12,7 @@
       Include="$(SourceRoot)src/Orleans.CodeGenerator/Orleans.CodeGenerator.csproj"
       ReferenceOutputAssembly="false"
       OutputItemType="Analyzer"
+      AdditionalProperties="IsRidAgnostic=true"
       Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' "/>
     <ProjectReference
       Include="$(SourceRoot)src/Orleans.Analyzers/Orleans.Analyzers.csproj"
@@ -20,16 +21,36 @@
       UndefineProperties="TargetFramework"
       SkipGetTargetFrameworkProperties="true"
       OutputItemType="Analyzer"
+      AdditionalProperties="IsRidAgnostic=true"
       Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' "/>
   </ItemGroup>
 
   <Import Condition=" '$(OrleansBuildTimeProtoGen)' == 'true' " Project="$(MSBuildThisFileDirectory)src/Grpc/Orleans.Grpc.CodeGenerator/build/Microsoft.Orleans.Grpc.CodeGenerator.props" />
+  <PropertyGroup>
+    <RestoreSources>
+      $(RestoreSources);
+      $(MSBuildThisFileDirectory)Artifacts/
+    </RestoreSources>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- Enable code generator -->
     <ProjectReference
       Include="$(SourceRoot)src/Grpc/Orleans.Grpc.CodeGenerator/Orleans.Grpc.CodeGenerator.csproj"
       ReferenceOutputAssembly="false"
       OutputItemType="Analyzer"
+      AdditionalProperties="IsRidAgnostic=true"
+      Condition=" '$(OrleansBuildTimeProtoGen)' == 'true' "/>
+    <!-- Enable code generator -->
+    <ProjectReference
+      Include="$(SourceRoot)src/Grpc/Orleans.Grpc.CodeGenerator/Orleans.Grpc.CodeGenerator.csproj"
+      ReferenceOutputAssembly="false"
+      AdditionalProperties="IsRidAgnostic=true"
+      PrivateAssets="all"
+      OutputItemType="None"
+      Condition=" '$(OrleansBuildTimeProtoGen)' == 'true' "/>
+    <PackageReference Include="Orleans.Grpc.CodeGenerator"
+      ReferenceOutputAssembly="false"
       Condition=" '$(OrleansBuildTimeProtoGen)' == 'true' "/>
   </ItemGroup>
 

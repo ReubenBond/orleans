@@ -1,11 +1,18 @@
 /*
-namespace {{- namespace }};
+
+Name: {{- name }}
+Package: {{- package }}
+Namespace: {{- namespace }}
 {% for service in services %}
-    {% for method in service.methods %}
-    public async Task<{{ method.outputType }}> {{ method.name }}({{ method.inputType }} request, CallOptions options = null)
-    {
-        var client = new {{ service.name }}.{{ service.name }}Client(_channel);
-        return await client.{{ method.name }}Async(request, options);
-    }
+Service: {{- service.name }}
+  {% for method in service.methods %}
+  Method: {{- method.name }}
+    InputType: {{- method.input_type }}
+    OutputType: {{- method.output_type }}
+    QualifiedInputType: {{- method.qualified_input_type }}
+    QualifiedOutputType: {{- method.qualified_utput_type }}
+    IsClientStreaming: {{- method.is_client_streaming }}
+    IsServerStreaming: {{- method.is_server_streaming }}
+  {% endfor %}
 {% endfor %}
 */

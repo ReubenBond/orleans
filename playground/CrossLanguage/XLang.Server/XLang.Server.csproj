@@ -5,12 +5,14 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <OrleansBuildTimeProtoGen>true</OrleansBuildTimeProtoGen>
+    <OrleansBuildTimeProtoGen>false</OrleansBuildTimeProtoGen>
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
   </PropertyGroup>
 
   <ItemGroup>
-      <Protobuf Include="greet.proto" GrpcServices="Client;Server" Link="greet.proto" />
+      <!--<Protobuf Include="greet.proto" GrpcServices="Client;Server" Link="greet.proto" />
+      -->
+      <ProtoGrain Include="greet.proto" />
   </ItemGroup>
 
   <ItemGroup>

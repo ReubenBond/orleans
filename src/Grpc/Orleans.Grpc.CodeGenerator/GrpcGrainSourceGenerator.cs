@@ -17,7 +17,6 @@ public sealed class GrpcGrainSourceGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-                    Debugger.Launch();
         var sourceProtoFiles = context.AdditionalTextsProvider
             .Where(static file => file.Path.EndsWith(".proto"))
             .SelectMany(static (file, ct) =>
@@ -40,7 +39,7 @@ public sealed class GrpcGrainSourceGenerator : IIncrementalGenerator
             static (context, output) =>
             {
                 var errors = output.Errors.Errors;
-                if (errors.Length > 0)
+                if (errors is { Length: > 0 })
                 {
                     foreach (var error in errors)
                     {
@@ -130,9 +129,9 @@ internal readonly struct ErrorList(Error[] errors)
         && string.Equals(left.Message, right.Message, StringComparison.Ordinal);
 }
 
-internal readonly record struct FileModel(string Name, string Package, string Namespace, List<ServiceModel> Services);
-internal readonly record struct ServiceModel(string Name, List<MethodModel> Methods);
-internal readonly record struct MethodModel(
+internal record class FileModel(string Name, string Package, string Namespace, List<ServiceModel> Services);
+internal record class  ServiceModel(string Name, List<MethodModel> Methods);
+internal record class  MethodModel(
     string Name,
     string InputType,
     string OutputType,
@@ -151,7 +150,8 @@ internal static class GrpcGrainGeneratorCore
     internal static IEnumerable<GeneratorOutput> GenerateSourceForInput(AdditionalText file, CancellationToken cancellationToken)
     {
         var protos = new FileDescriptorSet();
-        protos.Add(file.Path, includeInOutput: true, new AdditionalFileTextReader(file.GetText(cancellationToken)!));
+        protos.AddImportPath(Path.GetDirectoryName(file.Path)!);
+        protos.Add(Path.GetFileName(file.Path), includeInOutput: true, new AdditionalFileTextReader(file.GetText(cancellationToken)!));
         protos.Process();
         var errors = protos.GetErrors();
         if (errors is { Length: > 0 })
@@ -202,10 +202,11 @@ internal static class GrpcGrainGeneratorCore
                 services.Add(new ServiceModel(service.Name, methods));
             }
 
-            var ns = file.Options.CsharpNamespace;
+            var ns = file.Options?.CsharpNamespace ?? file.Package;
             var model = new FileModel(file.Name, file.Package, ns, services);
             var templateContext = new TemplateContext(model);
-            ctx.Output.Write(Templates.ClientProxy.Render(templateContext));
+            var templates = new Templates();
+            ctx.Output.Write(templates.ClientProxy.Render(templateContext));
 
             DescriptorProto GetType(string typeName) => ctx.TryFind<DescriptorProto>(typeName) ?? throw new InvalidOperationException($"Unable to find type, '{typeName}'.");
         }
