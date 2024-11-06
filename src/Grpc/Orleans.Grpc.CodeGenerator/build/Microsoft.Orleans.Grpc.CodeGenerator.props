@@ -1,26 +1,24 @@
 <Project>
 
   <ItemGroup>
-    <CompilerVisibleProperty Include="Orleans_DesignTimeBuild" />
-    <CompilerVisibleProperty Include="Orleans_AttachDebugger" />
-    <CompilerVisibleProperty Include="Orleans_GenerateFieldIds" />
-    <CompilerVisibleProperty Include="Orleans_ImmutableAttributes" />
-    <CompilerVisibleProperty Include="Orleans_IdAttributes" />
-    <CompilerVisibleProperty Include="Orleans_AliasAttributes" />
-    <CompilerVisibleProperty Include="Orleans_GenerateSerializerAttributes" />
-    <CompilerVisibleProperty Include="Orleans_ConstructorAttributes" />
-    <CompilerVisibleProperty Include="OrleansGenerateCompatibilityInvokers" />
+  <!--
+    <ProtoGrainClients Include="@(Protobuf)" Condition="'@(Protobuf->'%(GrainServices).Contains('Client')')' != ''"/>
+    <ProtoGrainServers Include="@(Protobuf)" Condition="'@(Protobuf->'%(GrainServices).Contains('Server')')' != ''"/>
+    -->
+    <AdditionalFiles Include="@(Protobuf)" Condition="'@(Protobuf->'%(GrainServices)')' != ''"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <CompilerVisibleItemMetadata Include="Protobuf" MetadataName="GrainServices" />
+
+    <CompilerVisibleProperty Include="Orleans_Grpc_CodeGenerator_Clients" />
+    <CompilerVisibleProperty Include="Orleans_Grpc_CodeGenerator_Servers" />
   </ItemGroup>
 
   <PropertyGroup>
-    <Orleans_DesignTimeBuild>$(DesignTimeBuild)</Orleans_DesignTimeBuild>
-    <Orleans_GenerateFieldIds>$(OrleansGenerateFieldIds)</Orleans_GenerateFieldIds>
-    <Orleans_ImmutableAttributes>$(OrleansImmutableAttributes)</Orleans_ImmutableAttributes>
-    <Orleans_IdAttributes>$(OrleansIdAttributes)</Orleans_IdAttributes>
-    <Orleans_AliasAttributes>$(OrleansAliasAttributes)</Orleans_AliasAttributes>
-    <Orleans_GenerateSerializerAttributes>$(OrleansGenerateSerializerAttributes)</Orleans_GenerateSerializerAttributes>
-    <Orleans_ConstructorAttributes>$(OrleansConstructorAttributes)</Orleans_ConstructorAttributes>
-    <AdditionalFileItemNames>$(AdditionalFileItemNames);Protobuf</AdditionalFileItemNames>
+    <Orleans_Grpc_CodeGenerator_Clients>@(ProtoGrianClients)</Orleans_Grpc_CodeGenerator_Clients>
+    <Orleans_Grpc_CodeGenerator_Servers>@(ProtoGrianServers)</Orleans_Grpc_CodeGenerator_Servers>
   </PropertyGroup>
+
 
 </Project>

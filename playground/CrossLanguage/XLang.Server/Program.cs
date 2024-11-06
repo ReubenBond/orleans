@@ -1,5 +1,5 @@
 using Grpc.Core;
-using Greet;
+using Foo.Bar;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.UseOrleans(o =>

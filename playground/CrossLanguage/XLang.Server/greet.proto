@@ -18,6 +18,8 @@ import "google/protobuf/descriptor.proto";
 
 package greet;
 
+option csharp_namespace = "Foo.Bar";
+
 extend google.protobuf.ServiceOptions {
   string grain_type = 50000;
 }

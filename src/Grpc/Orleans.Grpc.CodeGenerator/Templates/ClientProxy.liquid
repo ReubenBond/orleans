@@ -1,18 +1,18 @@
 /*
 
-Name: {{- name }}
-Package: {{- package }}
-Namespace: {{- namespace }}
-{% for service in services %}
-Service: {{- service.name }}
-  {% for method in service.methods %}
-  Method: {{- method.name }}
-    InputType: {{- method.input_type }}
-    OutputType: {{- method.output_type }}
-    QualifiedInputType: {{- method.qualified_input_type }}
-    QualifiedOutputType: {{- method.qualified_utput_type }}
-    IsClientStreaming: {{- method.is_client_streaming }}
-    IsServerStreaming: {{- method.is_server_streaming }}
+Name: {{- Name }}
+Package: {{- Package }}
+Namespace: {{- Namespace }}
+{% for service in Services %}
+Service: {{- service.Name }}
+  {% for method in service.Methods %}
+  Method: {{- method.Name }}
+    InputType: {{- method.InputType }}
+    OutputType: {{- method.OutputType }}
+    QualifiedInputType: {{- method.QualifiedInputType }}
+    QualifiedOutputType: {{- method.QualifiedOutputType }}
+    IsClientStreaming: {{- method.IsClientStreaming }}
+    IsServerStreaming: {{- method.IsServerStreaming }}
   {% endfor %}
 {% endfor %}
 */

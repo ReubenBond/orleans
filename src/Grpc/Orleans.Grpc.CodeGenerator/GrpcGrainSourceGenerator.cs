@@ -9,9 +9,6 @@ using ProtoBuf.Reflection;
 using Google.Protobuf.Reflection;
 using Fluid;
 using System.Text;
-using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace Orleans.Grpc.CodeGenerator;
 
@@ -132,8 +129,8 @@ internal readonly struct ErrorList(Error[] errors)
 }
 
 internal record class FileModel(string Name, string Package, string Namespace, List<ServiceModel> Services);
-internal record class  ServiceModel(string Name, List<MethodModel> Methods);
-internal record class  MethodModel(
+internal record class ServiceModel(string Name, List<MethodModel> Methods);
+internal record class MethodModel(
     string Name,
     string InputType,
     string OutputType,
@@ -207,6 +204,7 @@ internal static class GrpcGrainGeneratorCore
             var ns = file.Options?.CsharpNamespace ?? file.Package;
             var model = new FileModel(file.Name, file.Package, ns, services);
             var templateContext = new TemplateContext(model);
+            templateContext.Options.MemberAccessStrategy = new UnsafeMemberAccessStrategy();
             var templates = new Templates();
             ctx.Output.Write(templates.ClientProxy.Render(templateContext));
 
