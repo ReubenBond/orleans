@@ -9,6 +9,7 @@ using ProtoBuf.Reflection;
 using Google.Protobuf.Reflection;
 using Fluid;
 using System.Text;
+using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Orleans.Grpc.CodeGenerator;
 
@@ -19,12 +20,18 @@ public sealed class GrpcGrainSourceGenerator : IIncrementalGenerator
     {
         AppDomain.CurrentDomain.AssemblyResolve += EmbeddedAssemblyResolver.AssemblyResolve;
         var sourceProtoFiles = context.AdditionalTextsProvider
-            .Where(static file => file.Path.EndsWith(".proto"))
-            .SelectMany(static (file, ct) =>
+            .Combine(context.AnalyzerConfigOptionsProvider)
+            .Where(static (pair) => pair.Left.Path.EndsWith(".proto"))
+            .SelectMany(static (pair, ct) =>
             {
+                var file = pair.Left;
+                var config = pair.Right;
+                var fileOptions = config.GetOptions(file);
+
                 try
                 {
-                    return GrpcGrainGeneratorCore.GenerateSourceForInput(file, ct).ToList();
+                    var input = new GeneratorInput(file, fileOptions);
+                    return GrpcGrainGeneratorCore.GenerateSourceForInput(input, ct).ToList();
                 }
                 catch (Exception ex)
                 {
@@ -52,6 +59,7 @@ public sealed class GrpcGrainSourceGenerator : IIncrementalGenerator
                 context.AddSource(output.HintName, output.SourceText!);
             });
     }
+
 }
 
 internal readonly record struct GeneratorOutput(
@@ -128,7 +136,7 @@ internal readonly struct ErrorList(Error[] errors)
         && string.Equals(left.Message, right.Message, StringComparison.Ordinal);
 }
 
-internal record class FileModel(string Name, string Package, string Namespace, List<ServiceModel> Services);
+internal record class FileModel(string Name, string Package, string Namespace, List<ServiceModel> Services, string[] GrainServices, string[] AdditionalImportDirs);
 internal record class ServiceModel(string Name, List<MethodModel> Methods);
 internal record class MethodModel(
     string Name,
@@ -144,10 +152,15 @@ internal record class MethodModel(
     private static bool IsVoid(string type) => type.Equals(".google.protobuf.Empty", StringComparison.Ordinal); 
 }
 
+public record class GeneratorInput(AdditionalText File, AnalyzerConfigOptions? FileOptions);
+
 internal static class GrpcGrainGeneratorCore
 {
-    internal static IEnumerable<GeneratorOutput> GenerateSourceForInput(AdditionalText file, CancellationToken cancellationToken)
+    internal static IEnumerable<GeneratorOutput> GenerateSourceForInput(
+        GeneratorInput input,
+        CancellationToken cancellationToken)
     {
+        var file = input.File;  
         var protos = new FileDescriptorSet();
         protos.AddImportPath(Path.GetDirectoryName(file.Path)!);
         protos.Add(Path.GetFileName(file.Path), includeInOutput: true, new AdditionalFileTextReader(file.GetText(cancellationToken)!));
@@ -159,20 +172,22 @@ internal static class GrpcGrainGeneratorCore
             yield break;
         }
 
-        var generator = new ProtobufCodeGenerator();
+        var generator = new ProtobufCodeGenerator(input);
         foreach (var output in generator.Generate(protos))
         {
             yield return new GeneratorOutput(output.Name, SourceText.From(output.Text, Encoding.UTF8), default);
         }
     }
 
-    private sealed class ProtobufCodeGenerator : CommonCodeGenerator
+    private sealed class ProtobufCodeGenerator(GeneratorInput input) : CommonCodeGenerator
     {
         public override string Name => "Orleans.Grpc";
         protected override string DefaultFileExtension => ".cs";
 
         protected override void WriteFile(GeneratorContext ctx, FileDescriptorProto file)
         {
+            var grainServices = GetMetadataValues(input.FileOptions, "GrainServices");
+            var additionalImportDirs = GetMetadataValues(input.FileOptions, "AdditionalImportDirs");
             var services = new List<ServiceModel>(file.Services.Count);
             foreach (var service in file.Services)
             {
@@ -202,13 +217,24 @@ internal static class GrpcGrainGeneratorCore
             }
 
             var ns = file.Options?.CsharpNamespace ?? file.Package;
-            var model = new FileModel(file.Name, file.Package, ns, services);
+            var model = new FileModel(file.Name, file.Package, ns, services, grainServices, additionalImportDirs);
             var templateContext = new TemplateContext(model);
             templateContext.Options.MemberAccessStrategy = new UnsafeMemberAccessStrategy();
             var templates = new Templates();
             ctx.Output.Write(templates.ClientProxy.Render(templateContext));
 
             DescriptorProto GetType(string typeName) => ctx.TryFind<DescriptorProto>(typeName) ?? throw new InvalidOperationException($"Unable to find type, '{typeName}'.");
+        }
+
+        private static string[] GetMetadataValues(AnalyzerConfigOptions? fileOptions, string metadataName)
+        {
+            if (fileOptions is null)
+            {
+                return [];
+            }
+
+            fileOptions.TryGetValue($"build_metadata.AdditionalFiles.{metadataName}", out var value);
+            return value?.Split(';') ?? [];
         }
 
         protected override string Escape(string identifier) => identifier;

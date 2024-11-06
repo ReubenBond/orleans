@@ -10,7 +10,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Protobuf Include="greet.proto" GrpcServices="Client;Server" GrainServices="Client;Server" Link="greet.proto" />
+    <Protobuf Include="greet.proto" GrpcServices="Client;Server" GrainServices="Client;Server" AdditionalImportDirs="protos" />
+    <Protobuf Include="protos/grombo.proto" />
   </ItemGroup>
 
   <ItemGroup>

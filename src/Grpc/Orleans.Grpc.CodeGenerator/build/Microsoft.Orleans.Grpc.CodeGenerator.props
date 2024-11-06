@@ -1,24 +1,18 @@
 <Project>
 
   <ItemGroup>
-  <!--
-    <ProtoGrainClients Include="@(Protobuf)" Condition="'@(Protobuf->'%(GrainServices).Contains('Client')')' != ''"/>
-    <ProtoGrainServers Include="@(Protobuf)" Condition="'@(Protobuf->'%(GrainServices).Contains('Server')')' != ''"/>
-    -->
-    <AdditionalFiles Include="@(Protobuf)" Condition="'@(Protobuf->'%(GrainServices)')' != ''"/>
+    <AdditionalFiles
+      Include="@(Protobuf)"
+      GrpcServices="'@(Protobuf->'%(GrpcServices)')'"
+      GrainServices="'@(Protobuf->'%(GrainServices)')'"
+      AdditionalImportDirs="'@(Protobuf->'%(AdditionalImportDirs)')'"
+      Condition="'@(Protobuf->'%(GrainServices)')' != ''"/>
   </ItemGroup>
 
   <ItemGroup>
+    <CompilerVisibleItemMetadata Include="Protobuf" MetadataName="GrpcServices" />
     <CompilerVisibleItemMetadata Include="Protobuf" MetadataName="GrainServices" />
-
-    <CompilerVisibleProperty Include="Orleans_Grpc_CodeGenerator_Clients" />
-    <CompilerVisibleProperty Include="Orleans_Grpc_CodeGenerator_Servers" />
+    <CompilerVisibleItemMetadata Include="Protobuf" MetadataName="AdditionalImportDirs" />
   </ItemGroup>
-
-  <PropertyGroup>
-    <Orleans_Grpc_CodeGenerator_Clients>@(ProtoGrianClients)</Orleans_Grpc_CodeGenerator_Clients>
-    <Orleans_Grpc_CodeGenerator_Servers>@(ProtoGrianServers)</Orleans_Grpc_CodeGenerator_Servers>
-  </PropertyGroup>
-
 
 </Project>

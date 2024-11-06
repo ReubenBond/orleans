@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package grombo;
+
+service NaySayers {
+  rpc SayNay (SayNayRequest) returns (SayNayReply);
+}
+
+message SayNayRequest {
+  string name = 1;
+}
+
+message SayNayReply {
+  string message = 1;
+}

@@ -3,6 +3,12 @@
 Name: {{- Name }}
 Package: {{- Package }}
 Namespace: {{- Namespace }}
+GrainServices: {{- GrainServices }}
+AdditionalImportDirs: {{- AdditionalImportDirs }}
+{% for import in AdditionalImportDirs %}
+* import: {{- import }}
+{% endfor %}
+
 {% for service in Services %}
 Service: {{- service.Name }}
   {% for method in service.Methods %}
