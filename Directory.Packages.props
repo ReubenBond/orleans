@@ -17,6 +17,8 @@
     <PackageVersion Include="System.Memory.Data" Version="8.0.1" />
     <PackageVersion Include="System.Net.NameResolution" Version="4.3.0" />
     <PackageVersion Include="System.Collections.Immutable" Version="8.0.0" />
+    <PackageVersion Include="System.Text.Encodings.Web" Version="8.0.0" />
+    <PackageVersion Include="System.Runtime.Loader" Version="4.3.0" />
     <!-- Microsoft packages -->
     <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.45.0" />
     <PackageVersion Include="Microsoft.Build" Version="17.10.4" />

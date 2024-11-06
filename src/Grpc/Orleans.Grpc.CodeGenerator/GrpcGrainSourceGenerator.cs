@@ -8,7 +8,10 @@ using Microsoft.CodeAnalysis.Text;
 using ProtoBuf.Reflection;
 using Google.Protobuf.Reflection;
 using Fluid;
-using System.Diagnostics;
+using System.Text;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace Orleans.Grpc.CodeGenerator;
 
@@ -17,6 +20,7 @@ public sealed class GrpcGrainSourceGenerator : IIncrementalGenerator
 {
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
+        AppDomain.CurrentDomain.AssemblyResolve += EmbeddedAssemblyResolver.AssemblyResolve;
         var sourceProtoFiles = context.AdditionalTextsProvider
             .Where(static file => file.Path.EndsWith(".proto"))
             .SelectMany(static (file, ct) =>
@@ -27,9 +31,7 @@ public sealed class GrpcGrainSourceGenerator : IIncrementalGenerator
                 }
                 catch (Exception ex)
                 {
-                    Debugger.Launch();
-                    Debugger.Break();
-                    Debug.WriteLine(ex);
+                    Console.Error.WriteLine(ex);
                     throw;
                 }
             });
@@ -163,7 +165,7 @@ internal static class GrpcGrainGeneratorCore
         var generator = new ProtobufCodeGenerator();
         foreach (var output in generator.Generate(protos))
         {
-            yield return new GeneratorOutput(output.Name, SourceText.From(output.Text), default);
+            yield return new GeneratorOutput(output.Name, SourceText.From(output.Text, Encoding.UTF8), default);
         }
     }
 

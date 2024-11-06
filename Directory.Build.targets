@@ -47,10 +47,7 @@
       ReferenceOutputAssembly="false"
       AdditionalProperties="IsRidAgnostic=true"
       PrivateAssets="all"
-      OutputItemType="None"
-      Condition=" '$(OrleansBuildTimeProtoGen)' == 'true' "/>
-    <PackageReference Include="Orleans.Grpc.CodeGenerator"
-      ReferenceOutputAssembly="false"
+      OutputItemType="Analyzer"
       Condition=" '$(OrleansBuildTimeProtoGen)' == 'true' "/>
   </ItemGroup>
 

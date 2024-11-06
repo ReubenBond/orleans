@@ -3,37 +3,51 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <PackageId>Microsoft.Orleans.Grpc.CodeGenerator</PackageId>
     <Title>Microsoft Orleans gRPC Grain Source Generator</Title>
     <Description>C# Source Generator for Microsoft Orleans, generating code for gRPC interfaces.</Description>
     <TargetFramework>netstandard2.0</TargetFramework>
     <NoPackageAnalysis>true</NoPackageAnalysis>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <!--<GeneratePackageOnBuild>true</GeneratePackageOnBuild>-->
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <DevelopmentDependency>true</DevelopmentDependency>
     <IsOrleansFrameworkPart>false</IsOrleansFrameworkPart>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <Nullable>enable</Nullable>
     <WarnOnNullable>true</WarnOnNullable>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!--<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>-->
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Fluid.Core" PrivateAssets="all" GeneratePathProperty="true" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <PackageReference Include="System.Runtime.Loader" PrivateAssets="all" />
+    <PackageReference Include="Fluid.Core" PrivateAssets="all" GeneratePathProperty="true" />
     <PackageReference Include="protobuf-net.Reflection" PrivateAssets="all" GeneratePathProperty="true" />
     <PackageReference Include="protobuf-net.Core" PrivateAssets="all" GeneratePathProperty="true" />
     <PackageReference Include="Microsoft.Extensions.FileProviders.Abstractions" PrivateAssets="all" GeneratePathProperty="true" />
     <PackageReference Include="Parlot" PrivateAssets="all" GeneratePathProperty="true" />
     <PackageReference Include="TimeZoneConverter" PrivateAssets="all" GeneratePathProperty="true" />
+    <PackageReference Include="System.Text.Encodings.Web" PrivateAssets="all" GeneratePathProperty="true" />
 
     <!-- NuGet package layout -->
-    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
+
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" Condition="Exists('$(OutputPath)\$(AssemblyName)')"/>
+    <!--
     <None Include="$(PkgFluid_Core)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(Pkgprotobuf-net_Reflection)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(Pkgprotobuf-net_Core)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(PkgMicrosoft_Extensions_FileProviders_Abstractions)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(PkgSystem_Text_Encodings_Web)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(PkgParlot)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
     <None Include="$(PkgTimeZoneConverter)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
+    -->
+    <EmbeddedResource Include="$(PkgFluid_Core)\lib\netstandard2.0\*.dll" Visible="false" />
+    <EmbeddedResource Include="$(Pkgprotobuf-net_Reflection)\lib\netstandard2.0\*.dll" Visible="false" />
+    <EmbeddedResource Include="$(Pkgprotobuf-net_Core)\lib\netstandard2.0\*.dll" Visible="false" />
+    <EmbeddedResource Include="$(PkgMicrosoft_Extensions_FileProviders_Abstractions)\lib\netstandard2.0\*.dll" Visible="false" />
+    <EmbeddedResource Include="$(PkgSystem_Text_Encodings_Web)\lib\netstandard2.0\*.dll" Visible="false" />
+    <EmbeddedResource Include="$(PkgParlot)\lib\netstandard2.0\*.dll" Visible="false" />
+    <EmbeddedResource Include="$(PkgTimeZoneConverter)\lib\netstandard2.0\*.dll" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>

@@ -20,7 +20,7 @@
     <Orleans_AliasAttributes>$(OrleansAliasAttributes)</Orleans_AliasAttributes>
     <Orleans_GenerateSerializerAttributes>$(OrleansGenerateSerializerAttributes)</Orleans_GenerateSerializerAttributes>
     <Orleans_ConstructorAttributes>$(OrleansConstructorAttributes)</Orleans_ConstructorAttributes>
-    <AdditionalFileItemNames>$(AdditionalFileItemNames);ProtoGrain</AdditionalFileItemNames>
+    <AdditionalFileItemNames>$(AdditionalFileItemNames);Protobuf</AdditionalFileItemNames>
   </PropertyGroup>
 
 </Project>
