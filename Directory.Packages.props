@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
     <!-- Shared Package Versions -->
     <xUnitVersion>2.5.3</xUnitVersion>
     <xUnitVersion Condition=" '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netstandard2.1' ">2.4.2</xUnitVersion>
@@ -9,13 +10,14 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- System packages -->
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.0" />
     <PackageVersion Include="System.Diagnostics.PerformanceCounter" Version="8.0.0" />
     <PackageVersion Include="System.IO.Hashing" Version="8.0.0" NoWarn="NU5104" />
     <PackageVersion Include="System.IO.Pipelines" Version="8.0.0" />
     <PackageVersion Include="System.Memory.Data" Version="8.0.0" />
     <PackageVersion Include="System.Net.NameResolution" Version="4.3.0" />
     <PackageVersion Include="System.Collections.Immutable" Version="8.0.0" />
+    <PackageVersion Include="System.Text.Json" Version="8.0.5" />
     <!-- Microsoft packages -->
     <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.35.4" />
     <PackageVersion Include="Microsoft.Build" Version="17.10.4" />
@@ -29,32 +31,32 @@
     <PackageVersion Include="Microsoft.DotNet.PlatformAbstractions" Version="3.1.6" />
     <PackageVersion Include="Microsoft.AspNetCore.Connections.Abstractions" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.2" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="8.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
     <PackageVersion Include="Microsoft.Extensions.DependencyModel" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.Testing" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.ObjectPool" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="8.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="8.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="8.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.ObjectPool" Version="8.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="8.0.2" />
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Http" Version="8.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="7.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="9.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
     <PackageVersion Include="Azure.Data.Tables" Version="12.9.0" />
     <PackageVersion Include="Azure.Core" Version="1.41.0" />
     <PackageVersion Include="Azure.Messaging.EventHubs" Version="5.9.3" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.21.1" />
     <PackageVersion Include="Azure.Storage.Queues" Version="12.19.1" />
     <!-- Aspire -->
-    <PackageVersion Include="Aspire.Hosting.AppHost" Version="8.2.0" />
-    <PackageVersion Include="Aspire.Hosting.Orleans" Version="8.2.0" />
-    <PackageVersion Include="Aspire.Hosting.Redis" Version="8.2.0" />
-    <PackageVersion Include="Aspire.StackExchange.Redis" Version="8.2.0" />
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="9.0.0" />
+    <PackageVersion Include="Aspire.Hosting.Orleans" Version="9.0.0" />
+    <PackageVersion Include="Aspire.Hosting.Redis" Version="9.0.0" />
+    <PackageVersion Include="Aspire.StackExchange.Redis" Version="9.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="8.8.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="8.2.0" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.9.0" />
@@ -67,12 +69,12 @@
     <PackageVersion Include="AWSSDK.DynamoDBv2" Version="3.7.300.6" />
     <PackageVersion Include="AWSSDK.SQS" Version="3.7.300" />
     <PackageVersion Include="Consul" Version="1.6.10.9" />
-    <PackageVersion Include="Google.Protobuf" Version="3.24.4" />
+    <PackageVersion Include="Google.Protobuf" Version="3.28.2" />
     <PackageVersion Include="protobuf-net" Version="3.2.26" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
-    <PackageVersion Include="StackExchange.Redis" Version="2.6.122" />
-    <PackageVersion Include="KubernetesClient" Version="12.1.1" />
+    <PackageVersion Include="StackExchange.Redis" Version="2.8.16" />
+    <PackageVersion Include="KubernetesClient" Version="15.0.1" />
     <PackageVersion Include="CassandraCSharpDriver" Version="3.20.1" />
     <!-- Test related packages -->
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />
@@ -100,7 +102,7 @@
     <PackageVersion Include="System.Data.SqlClient" Version="4.8.6" />
     <PackageVersion Include="Npgsql" Version="8.0.3" />
     <PackageVersion Include="MySql.Data" Version="8.0.31" />
-    <PackageVersion Include="System.Drawing.Common" Version="4.7.3" />
+    <PackageVersion Include="System.Drawing.Common" Version="6.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.AzureKeyVault" Version="3.1.24" />
     <PackageVersion Include="System.CommandLine" Version="2.0.0-beta1.21308.1" />
     <PackageVersion Include="Microsoft.Crank.EventSources" Version="0.2.0-alpha.23422.5" />
@@ -109,7 +111,7 @@
     <PackageVersion Include="Utf8Json" Version="1.3.7" />
     <PackageVersion Include="SpanJson" Version="4.0.1" />
     <PackageVersion Include="Hyperion" Version="0.12.2" />
-    <PackageVersion Include="Grpc.Tools" Version="2.58.0" />
+    <PackageVersion Include="Grpc.Tools" Version="2.67.0" />
     <PackageVersion Include="Testcontainers" Version="3.8.0" />
     <!-- Tooling related packages -->
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="8.0.0" />
