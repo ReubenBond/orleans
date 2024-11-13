@@ -1,6 +1,7 @@
 using Projects;
 
 var builder = DistributedApplication.CreateBuilder(args);
+
 var redis = builder.AddRedis("orleans-redis");
 
 var orleans = builder.AddOrleans("cluster")
@@ -8,6 +9,7 @@ var orleans = builder.AddOrleans("cluster")
 
 builder.AddProject<DashboardToy_Frontend>("frontend")
     .WithReference(orleans)
+    .WaitFor(redis)
     .WithReplicas(5);
 
 builder.Build().Run();
