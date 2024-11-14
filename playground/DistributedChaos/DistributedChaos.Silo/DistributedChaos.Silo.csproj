@@ -8,12 +8,24 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <IsPublishable>true</IsPublishable>
     <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
-    <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
     <ContainerRepository>chaos-silo</ContainerRepository>
     <NoWarn>$(NoWarn);ORLEANSEXP002;ORLEANSEXP003</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="..\..\..\src\AdoNet\Shared\SQLServer-*.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\..\src\AdoNet\Orleans.Clustering.AdoNet\Migrations\SQLServer-*.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\..\src\AdoNet\Orleans.Clustering.AdoNet\SQLServer-*.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\AdoNet\Orleans.Clustering.AdoNet\Orleans.Clustering.AdoNet.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Core\Orleans.Core.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Hosting.Kubernetes\Orleans.Hosting.Kubernetes.csproj" />
@@ -31,6 +43,7 @@
   <ItemGroup>
     <PackageReference Include="Grpc.AspNetCore" />
     <PackageReference Include="OrleansDashboard" />
+    <PackageReference Include="System.Data.SqlClient" />
   </ItemGroup>
 
 </Project>
