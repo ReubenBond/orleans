@@ -8,33 +8,18 @@ namespace Orleans.Runtime
     [Id(101)]
     internal sealed class Message : ISpanFormattable
     {
-        public const int LENGTH_HEADER_SIZE = 8;
-        public const int LENGTH_META_HEADER = 4;
-
-        [NonSerialized]
-        private short _retryCount;
-
-        public CoarseStopwatch _timeToExpiry;
+        private CoarseStopwatch _timeToExpiry;
 
         public object BodyObject { get; set; }
 
-        public PackedHeaders _headers;
-        public CorrelationId _id;
+        private PackedHeaders _headers;
+        private Dictionary<string, object> _requestContextData;
+        private ushort _interfaceVersion;
+        private GrainInterfaceType _interfaceType;
 
-        public Dictionary<string, object> _requestContextData;
+        private List<GrainAddressCacheUpdate> _cacheInvalidationHeader;
 
-        public SiloAddress _targetSilo;
-        public GrainId _targetGrain;
-
-        public SiloAddress _sendingSilo;
-        public GrainId _sendingGrain;
-
-        public ushort _interfaceVersion;
-        public GrainInterfaceType _interfaceType;
-
-        public List<GrainAddressCacheUpdate> _cacheInvalidationHeader;
-
-        public PackedHeaders Headers { get => _headers; set => _headers = value; }
+        internal PackedHeaders Headers { get => _headers; set => _headers = value; }
 
         [GenerateSerializer]
         public enum Directions : byte
@@ -79,11 +64,8 @@ namespace Orleans.Runtime
 
         public bool IsExpired => _timeToExpiry is { IsDefault: false, ElapsedMilliseconds: > 0 };
 
-        public short RetryCount
-        {
-            get => _retryCount;
-            set => _retryCount = value;
-        }
+        [field: NonSerialized]
+        public short RetryCount { get; set; }
 
         public bool HasCacheInvalidationHeader => CacheInvalidationHeader is { Count: > 0 };
 
@@ -141,11 +123,7 @@ namespace Orleans.Runtime
             set => _headers.SetFlag(MessageFlags.SuppressKeepAlive, !value);
         }
 
-        public CorrelationId Id
-        {
-            get => _id;
-            set => _id = value;
-        }
+        public CorrelationId Id { get; set; }
 
         public int ForwardCount
         {
@@ -153,41 +131,13 @@ namespace Orleans.Runtime
             set => _headers.ForwardCount = value;
         }
 
-        public SiloAddress TargetSilo
-        {
-            get => _targetSilo;
-            set
-            {
-                _targetSilo = value;
-            }
-        }
+        public SiloAddress TargetSilo { get; set; }
 
-        public GrainId TargetGrain
-        {
-            get => _targetGrain;
-            set
-            {
-                _targetGrain = value;
-            }
-        }
+        public GrainId TargetGrain { get; set; }
 
-        public SiloAddress SendingSilo
-        {
-            get => _sendingSilo;
-            set
-            {
-                _sendingSilo = value;
-            }
-        }
+        public SiloAddress SendingSilo { get; set; }
 
-        public GrainId SendingGrain
-        {
-            get => _sendingGrain;
-            set
-            {
-                _sendingGrain = value;
-            }
-        }
+        public GrainId SendingGrain { get; set; }
 
         public ushort InterfaceVersion
         {

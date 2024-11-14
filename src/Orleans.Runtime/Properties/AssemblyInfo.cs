@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 
+[assembly: InternalsVisibleTo("Orleans.Worker.Gateway.Core")]
 [assembly: InternalsVisibleTo("Orleans.Streaming")]
 [assembly: InternalsVisibleTo("Orleans.Reminders")]
 [assembly: InternalsVisibleTo("Orleans.TestingHost")]

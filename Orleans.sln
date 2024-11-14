@@ -290,6 +290,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Grpc", "Grpc", "{7861302B-0
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Grpc.CodeGenerator", "src\Grpc\Orleans.Grpc.CodeGenerator\Orleans.Grpc.CodeGenerator.csproj", "{DE35BB7E-2A58-4D76-AFB4-F9596DB5D8EC}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Shared", "Shared", "{7016CC2B-8427-4C48-A8E3-FFC420B128B0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Worker.Gateway.Core", "src\Orleans.Worker.Gateway.Core\Orleans.Worker.Gateway.Core.csproj", "{7E22B5DC-3255-43D3-A7E4-75DC7AE66E1F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -748,6 +752,10 @@ Global
 		{DE35BB7E-2A58-4D76-AFB4-F9596DB5D8EC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DE35BB7E-2A58-4D76-AFB4-F9596DB5D8EC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DE35BB7E-2A58-4D76-AFB4-F9596DB5D8EC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7E22B5DC-3255-43D3-A7E4-75DC7AE66E1F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7E22B5DC-3255-43D3-A7E4-75DC7AE66E1F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7E22B5DC-3255-43D3-A7E4-75DC7AE66E1F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7E22B5DC-3255-43D3-A7E4-75DC7AE66E1F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -886,6 +894,8 @@ Global
 		{D3EE39EF-A9C7-4A45-B8CF-9F2DDD66EA4A} = {9852E554-2DC3-4391-80CC-0F3D763C826D}
 		{7861302B-05AB-47C6-9C5C-118369F73266} = {FE2E08C6-9C3B-4AEE-AE07-CCA387580D7A}
 		{DE35BB7E-2A58-4D76-AFB4-F9596DB5D8EC} = {7861302B-05AB-47C6-9C5C-118369F73266}
+		{7016CC2B-8427-4C48-A8E3-FFC420B128B0} = {7861302B-05AB-47C6-9C5C-118369F73266}
+		{7E22B5DC-3255-43D3-A7E4-75DC7AE66E1F} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}

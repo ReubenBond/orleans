@@ -20,17 +20,14 @@ internal static class EmbeddedAssemblyResolver
 
     private static Assembly LoadFromResource(ResolveEventArgs args)
     {
-        var type = typeof(GrpcGrainGeneratorCore);
-
+        var type = typeof(ProtoProcessor);
         var assemblyName = new AssemblyName(args.Name);
         using var stream = type.Assembly.GetManifestResourceStream($"{type.Namespace}.{assemblyName.Name}.dll");
         if (stream is null)
         {
-            Console.WriteLine("Could not find assembly: " + args.Name);
             return null!;
         }
 
-        Console.WriteLine("Loading assembly: " + args.Name);
         var isFramework = RuntimeInformation.FrameworkDescription.Contains(".NET Framework");
         if (isFramework)
         {

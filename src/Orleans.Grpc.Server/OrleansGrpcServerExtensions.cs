@@ -2,14 +2,12 @@ using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Grpc.AspNetCore.Server.Model;
 using Grpc.Core;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Routing.Patterns;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,10 +20,6 @@ using Orleans.Serialization.Grpc.Internal;
 using Orleans.Serialization.Invocation;
 
 namespace Microsoft.Extensions.Hosting;
-
-public static class OrleansGrpcClientExtension
-{
-}
 
 public static class OrleansGrpcServerExtensions
 {

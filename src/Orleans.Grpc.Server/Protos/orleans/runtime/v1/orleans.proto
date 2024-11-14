@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+package orleans;
+
+option csharp_namespace = "Microsoft.Orleans.ProtocolBuffers";
+
+import "google/protobuf/any.proto";
+
+message GrainId {
+    string type = 1;
+    string key = 2;
+}
+
+message EncodedValue {
+    string type = 1;
+    map<string, EncodedValueAttribute> attributes = 2;
+    oneof data {
+        bytes binary_data = 3;
+        string text_data = 4;
+        google.protobuf.Any proto_data = 5;
+    }
+}
+
+message EncodedValueAttribute {
+    oneof value {
+        bool boolean_value = 1;
+        int32 int32_value = 2;
+        string string_value = 3;
+        bytes bytes_value = 4;
+    }
+}
+
+message Request {
+    uint64 request_id = 1; // Worker-assigned request id.
+    GrainId target = 2;
+    EncodedValue body = 3;
+    map<string, string> metadata = 4;
+}
+
+message Response {
+    uint64 request_id = 1; // Worker-assigned request id.
+    ResultOrError body = 3;
+    map<string, string> metadata = 4;
+}
+
+message ResultOrError {
+    oneof value {
+        EncodedValue result = 1;
+        EncodedValue error = 2; 
+    }
+}
+
+// Metadata about a cluster
+message ClusterManifest {
+    repeated HostManifest hosts = 1;
+}
+
+// Metadata about a host
+message HostManifest {
+    NodeId id = 1;
+    int32 version = 2;
+    map<string, GrainProperties> grain_types = 3;
+    map<string, GrainInterfaceProperties> grain_interface_types = 4;
+}
+
+// Metadata about a worker
+message WorkerManifest {
+    int32 version = 1;
+    map<string, GrainProperties> grain_types = 2;
+    map<string, GrainInterfaceProperties> grain_interface_types = 3;
+}
+
+message WorkerHandshake {
+    WorkerManifest manifest = 1;
+    // token, sdk identifier and version, worker hash, etc
+}
+
+// Metadata about grain implementations
+message GrainProperties {
+    map<string, string> properties = 1;
+}
+
+// Metadata about grain interfaces
+message GrainInterfaceProperties {
+    map<string, string> properties = 1;
+}
+
+message WorkerId {
+    string id = 1;
+}
+
+message NodeId {
+    string address = 1;
+    int32 port = 2;
+    int32 generation = 3;
+}
+
+service GrpcWorkerGateway {
+    rpc Connect(stream WorkerMessage) returns (stream GatewayMessage);
+}
+
+// Messages sent from workers
+message WorkerMessage {
+    oneof message {
+        Request request = 1;
+        Response response = 2;
+        //Event event = 3;
+        WorkerHandshake handshake = 4;
+    }
+}
+
+// Messages sent from gateways
+message GatewayMessage {
+    oneof message {
+        Request request = 1;
+        Response response = 2;
+        //Event event = 3;
+        //RegisterGrainTypeRequest registerGrainTypeRequest = 4;
+    }
+}

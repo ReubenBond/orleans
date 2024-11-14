@@ -45,18 +45,7 @@
     <PackageReference Include="TimeZoneConverter" PrivateAssets="all" GeneratePathProperty="true" />
     <PackageReference Include="System.Text.Encodings.Web" PrivateAssets="all" GeneratePathProperty="true" />
 
-    <!-- NuGet package layout -->
-
     <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" Condition="Exists('$(OutputPath)\$(AssemblyName)')"/>
-    <!--
-    <None Include="$(PkgFluid_Core)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(Pkgprotobuf-net_Reflection)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(Pkgprotobuf-net_Core)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(PkgMicrosoft_Extensions_FileProviders_Abstractions)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(PkgSystem_Text_Encodings_Web)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(PkgParlot)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(PkgTimeZoneConverter)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" CopyToOutputDirectory="PreserveNewest" />
-    -->
     <EmbeddedResource Include="$(PkgFluid_Core)\lib\netstandard2.0\*.dll" Visible="false" />
     <EmbeddedResource Include="$(Pkgprotobuf-net_Reflection)\lib\netstandard2.0\*.dll" Visible="false" />
     <EmbeddedResource Include="$(Pkgprotobuf-net_Core)\lib\netstandard2.0\*.dll" Visible="false" />

@@ -3,10 +3,12 @@
   <ItemGroup>
     <AdditionalFiles
       Include="@(Protobuf)"
+      Condition="'@(Protobuf->'%(GrainServices)')' != ''"/>
+      <!--
       GrpcServices="'@(Protobuf->'%(GrpcServices)')'"
       GrainServices="'@(Protobuf->'%(GrainServices)')'"
       AdditionalImportDirs="'@(Protobuf->'%(AdditionalImportDirs)')'"
-      Condition="'@(Protobuf->'%(GrainServices)')' != ''"/>
+      -->
   </ItemGroup>
 
   <ItemGroup>

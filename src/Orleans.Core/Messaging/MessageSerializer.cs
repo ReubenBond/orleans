@@ -23,7 +23,7 @@ namespace Orleans.Runtime.Messaging
 {
     internal sealed class MessageSerializer
     {
-        private const int FramingLength = Message.LENGTH_HEADER_SIZE;
+        private const int FramingLength = 8;
         private const int MessageSizeHint = 4096;
         private readonly Dictionary<Type, ResponseCodec> _rawResponseCodecs = new();
         private readonly CodecProvider _codecProvider;
