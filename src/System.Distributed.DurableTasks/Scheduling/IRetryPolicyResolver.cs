@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 
-namespace Orleans.DurableTasks.Scheduling;
+namespace System.Distributed.DurableTasks.Scheduling;
 
 public interface IRetryPolicyResolver
 {

@@ -1,6 +1,6 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 
-namespace Orleans.DurableTasks;
+namespace System.Distributed.DurableTasks;
 
 /// <summary>
 /// Async method builder for methods which return <see cref="DurableTask"/>.
@@ -11,7 +11,7 @@ public struct DurableTaskMethodBuilder
 
     public readonly DurableTask Task => _taskSource;
 
-    public static DurableTaskMethodBuilder Create() => new ();
+    public static DurableTaskMethodBuilder Create() => new();
 
     public void Start<TStateMachine>(ref TStateMachine stateMachine)
         where TStateMachine : IAsyncStateMachine

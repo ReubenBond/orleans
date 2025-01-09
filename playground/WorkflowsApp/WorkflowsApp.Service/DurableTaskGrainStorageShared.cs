@@ -1,4 +1,4 @@
-﻿using Orleans.DurableTasks;
+﻿using System.Distributed.DurableTasks;
 using Orleans.DurableTasks.Remoting;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Invocation;

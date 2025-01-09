@@ -1,10 +1,11 @@
 ﻿using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Distributed.DurableTasks;
+using System.Distributed.DurableTasks.Scheduling;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
-using Orleans.DurableTasks.Scheduling;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.Invocation;
 

@@ -1,8 +1,8 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Distributed.DurableTasks;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Orleans.DurableTasks;
 using Orleans.Serialization;
 using PaymentWorkflowApp.Runtime;
 

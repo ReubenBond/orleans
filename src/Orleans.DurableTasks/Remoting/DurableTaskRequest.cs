@@ -10,7 +10,8 @@ using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
 using Orleans.Serialization;
 using System.Buffers;
-using Orleans.DurableTasks.Scheduling;
+using System.Distributed.DurableTasks;
+using System.Distributed.DurableTasks.Scheduling;
 
 namespace Orleans.DurableTasks.Remoting;
 
@@ -133,7 +134,7 @@ public abstract class DurableTaskRequest(IGrainContextAccessor grainContextAcces
     }
 
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext executionContext)
+    protected override async ValueTask<Response> RunAsync(DurableTaskContext executionContext)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
@@ -165,7 +166,7 @@ public abstract class DurableTaskRequest(IGrainContextAccessor grainContextAcces
         => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
-    ValueTask<Response> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => InvokeInner().RunAsync(executionContext);
+    ValueTask<Response> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
 
     // Generated
     protected abstract DurableTask InvokeInner();
@@ -283,7 +284,7 @@ public abstract class DurableTaskRequest<TResult>(IGrainContextAccessor grainCon
     }
 
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext executionContext)
+    protected override async ValueTask<Response> RunAsync(DurableTaskContext executionContext)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
@@ -313,7 +314,7 @@ public abstract class DurableTaskRequest<TResult>(IGrainContextAccessor grainCon
     ValueTask<Response> IInvokable.Invoke() => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
-    ValueTask<Response> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => InvokeInner().RunAsync(executionContext);
+    ValueTask<Response> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
 
     // Generated
     protected abstract DurableTask<TResult> InvokeInner();

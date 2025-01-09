@@ -1,4 +1,5 @@
-﻿using Orleans.DurableTasks.Scheduling;
+﻿using System.Distributed.DurableTasks;
+using System.Distributed.DurableTasks.Scheduling;
 
 namespace Orleans.DurableTasks.Remoting;
 

@@ -1,9 +1,10 @@
-﻿using System.Runtime.CompilerServices;
-using Orleans.DurableTasks.Remoting;
-using Orleans.DurableTasks.Scheduling;
+﻿using System.Distributed.DurableTasks.Scheduling;
+using System.Runtime.CompilerServices;
+using Orleans;
+using Orleans.DurableTasks;
 using Orleans.Serialization.Invocation;
 
-namespace Orleans.DurableTasks;
+namespace System.Distributed.DurableTasks;
 
 [InvokableBaseType(typeof(GrainReference), typeof(DurableTask), typeof(DurableTaskRequest))]
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
@@ -90,7 +91,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask>(TDurableTask task) where
 
     internal void SetTaskIdCore(string name)
     {
-        ArgumentNullException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (!Id.IsDefault)
         {
             throw new InvalidOperationException($"This task's {nameof(TaskId)} has already been specified.");
@@ -107,7 +108,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask>(TDurableTask task) where
         }
     }
 
-    private static InvalidOperationException GetNonSchedulableTaskException() => new (
+    private static InvalidOperationException GetNonSchedulableTaskException() => new(
         $"The provided task does not support scheduling and was not executed in the context of an existing {nameof(DurableTask)}. This may be because it is a local method or another non-serializable task type.");
 }
 
@@ -115,7 +116,7 @@ public struct ConfiguredDurableTask(DurableTask task)
 {
     private ConfiguredDurableTaskCore<DurableTask> _core = new(task);
 
-    public DurableTaskAwaiter GetAwaiter() => new (_core.RunAsync());
+    public DurableTaskAwaiter GetAwaiter() => new(_core.RunAsync());
 
     internal readonly DurableTask Task => _core.Task;
     internal TaskId Id { set => _core.Id = value; readonly get => _core.Id; }
@@ -144,7 +145,7 @@ public struct ConfiguredDurableTask(DurableTask task)
         return new ScheduledDurableTask(executionContext);
     }
 
-    internal static InvalidOperationException GetNonSchedulableTaskException() => new ("The provided task does not support scheduling. This may be because it is a local method or another non-serializable task type.");
+    internal static InvalidOperationException GetNonSchedulableTaskException() => new("The provided task does not support scheduling. This may be because it is a local method or another non-serializable task type.");
 }
 
 public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
@@ -177,7 +178,7 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
         return new ScheduledDurableTask<TResult>(executionContext);
     }
 
-    public DurableTaskAwaiter<TResult> GetAwaiter() => new (_core.RunAsync());
+    public DurableTaskAwaiter<TResult> GetAwaiter() => new(_core.RunAsync());
 }
 
 /// <summary>

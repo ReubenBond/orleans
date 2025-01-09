@@ -1,6 +1,6 @@
 ﻿using Orleans.Serialization.Invocation;
 
-namespace Orleans.DurableTasks.Remoting;
+namespace System.Distributed.DurableTasks;
 
 /// <summary>
 /// A task which can be polled for completion.

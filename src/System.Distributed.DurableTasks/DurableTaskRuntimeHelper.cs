@@ -1,6 +1,7 @@
-﻿using Orleans.Serialization.Invocation;
+﻿using Orleans.DurableTasks;
+using Orleans.Serialization.Invocation;
 
-namespace Orleans.DurableTasks;
+namespace System.Distributed.DurableTasks;
 
 public static class DurableTaskRuntimeHelper
 {

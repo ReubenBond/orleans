@@ -1,8 +1,9 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Sources;
+using Orleans.DurableTasks;
 using Orleans.Serialization.Invocation;
 
-namespace Orleans.DurableTasks;
+namespace System.Distributed.DurableTasks;
 
 internal static class DurableTaskMethodInvocation
 {
@@ -59,7 +60,7 @@ internal sealed class UntypedDurableTaskMethodInvocation<TStateMachine> : Untype
 
     void IAsyncStateMachine.SetStateMachine(IAsyncStateMachine stateMachine) => _stateMachine.SetStateMachine(stateMachine);
 
-    protected internal override ValueTask<Response> RunAsync(DurableTaskContext executionContext) 
+    protected internal override ValueTask<Response> RunAsync(DurableTaskContext executionContext)
     {
         _executionContext = executionContext;
         StartInvocation();
