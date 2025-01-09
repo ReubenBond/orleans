@@ -1,4 +1,4 @@
-using System.Buffers;
+﻿using System.Buffers;
 using System.Collections;
 using Orleans.Serialization.Buffers;
 using System.Diagnostics;
@@ -8,21 +8,19 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Represents a log segment which has been sealed and is no longer mutable.
 /// </summary>
-public sealed class LogExtent(PooledBuffer buffer) : IDisposable
+public sealed class LogExtent(ArcBuffer buffer) : IDisposable
 {
-    private PooledBuffer _buffer = buffer;
+    private ArcBuffer _buffer = buffer;
 
     public LogExtent() : this(new())
     {
     }
 
-    //public ref PooledBuffer Buffer => ref _buffer;
-
     public bool IsEmpty => _buffer.Length == 0;
 
     internal EntryEnumerator Entries => EntryEnumerator.Create(this);
 
-    public void Dispose() => _buffer.Reset();
+    public void Dispose() => _buffer.Dispose();
 
     public readonly record struct Entry(StateMachineId StreamId, ReadOnlySequence<byte> Payload);
 

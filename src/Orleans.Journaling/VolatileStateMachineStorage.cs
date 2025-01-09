@@ -16,12 +16,12 @@ public class VolatileStateMachineStorage : IStateMachineStorage
     public async IAsyncEnumerable<LogExtent> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await Task.CompletedTask;
+        using var buffer = new ArcBufferWriter();
         foreach (var segment in _segments)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var buffer = new PooledBuffer();
             buffer.Write(segment);
-            yield return new LogExtent(buffer);
+            yield return new LogExtent(buffer.ConsumeSlice(segment.Length));
         }
     }
 
