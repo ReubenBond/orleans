@@ -168,8 +168,10 @@ public class Program
             Console.WriteLine(randomId);
 
             // If the task is interrupted (eg, power outage) and is retried, it will only sleep for the remaining time.
+            /*
             var slept = await DurableTask.Delay(TimeSpan.FromSeconds(1)).WithId("wait-for-confirmation");
             Console.WriteLine("slept? " + slept);
+            */
 
             var scheduledTask = await bankGrain
                 .Transfer(customer, business, 20)
@@ -649,6 +651,7 @@ public class OrderProcessorGrain(
 
     public async DurableTask ProcessOrderAsync(IBuyerAccount buyer, Order order)
     {
+        /*
         var confirmed = await DurableTask.Delay(TimeSpan.FromMinutes(1)).WithId("wait-for-confirmation");
         if (!confirmed)
         {
@@ -656,6 +659,7 @@ public class OrderProcessorGrain(
             State.Status = OrderStatus.Canceled;
             return;
         }
+        */
 
         var stockLevelResult = await _catalogService.CheckOrderStock(order).WithId("check-stock");
         if (stockLevelResult.Any(item => !item.HasStock))

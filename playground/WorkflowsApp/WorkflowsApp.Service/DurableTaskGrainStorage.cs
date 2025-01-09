@@ -114,7 +114,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
         (_shared, taskId, response, completedAt));
     }
 
-    public void AddObserver(TaskId taskId, IDurableTaskState state, IDurableTaskObserverGrainExtension observer)
+    public void AddObserver(TaskId taskId, IDurableTaskState state, IDurableTaskObserver observer)
     {
         if (ApplyAddObserverCore(CastState(state), observer))
         {
@@ -126,7 +126,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
                 writer.WriteByte(VersionByte);
                 writer.WriteVarUInt32((uint)CommandType.AddObserver);
                 shared.KeyCodec.WriteField(ref writer, 0, typeof(TaskId), taskId);
-                shared.ObserverCodec.WriteField(ref writer, 0, typeof(IDurableTaskObserverGrainExtension), observer);
+                shared.ObserverCodec.WriteField(ref writer, 0, typeof(IDurableTaskObserver), observer);
                 writer.Commit();
             },
             (_shared, taskId, observer));
@@ -209,7 +209,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        IDurableTaskObserverGrainExtension ReadObserver(ref Reader<ReadOnlySequenceInput> reader)
+        IDurableTaskObserver ReadObserver(ref Reader<ReadOnlySequenceInput> reader)
         {
             var field = reader.ReadFieldHeader();
             return _shared.ObserverCodec.ReadValue(ref reader, field);
@@ -312,9 +312,9 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
         task.CompletedAt = completedAt;
     }
 
-    private bool ApplyAddObserver(TaskId key, IDurableTaskObserverGrainExtension observer) => ApplyAddObserverCore(_items[key], observer);
+    private bool ApplyAddObserver(TaskId key, IDurableTaskObserver observer) => ApplyAddObserverCore(_items[key], observer);
 
-    private static bool ApplyAddObserverCore(DurableTaskState state, IDurableTaskObserverGrainExtension observer)
+    private static bool ApplyAddObserverCore(DurableTaskState state, IDurableTaskObserver observer)
     {
         var observers = state.Observers ??= [];
         return observers.Add(observer);

@@ -11,7 +11,7 @@ internal sealed class DurableTaskGrainStorageShared(
     IFieldCodec<TaskId> taskIdCodec,
     IFieldCodec<DurableTaskState> taskStateCodec,
     IFieldCodec<Response> responseCodec,
-    IFieldCodec<IDurableTaskObserverGrainExtension> observerCodec,
+    IFieldCodec<IDurableTaskObserver> observerCodec,
     IFieldCodec<DateTimeOffset> dateTimeOffsetCodec,
     IFieldCodec<IDurableTaskRequest> requestCodec,
     SerializerSessionPool serializerSessionPool,
@@ -22,7 +22,7 @@ internal sealed class DurableTaskGrainStorageShared(
     public readonly IFieldCodec<TaskId> KeyCodec = taskIdCodec;
     public readonly IFieldCodec<DurableTaskState> ValueCodec = taskStateCodec;
     public readonly IFieldCodec<Response> ResponseCodec = responseCodec;
-    public readonly IFieldCodec<IDurableTaskObserverGrainExtension> ObserverCodec = observerCodec;
+    public readonly IFieldCodec<IDurableTaskObserver> ObserverCodec = observerCodec;
     public readonly IFieldCodec<DateTimeOffset> DateTimeOffsetCodec = dateTimeOffsetCodec;
     public readonly IFieldCodec<IDurableTaskRequest> RequestCodec = requestCodec;
     public readonly SerializerSessionPool SerializerSessionPool = serializerSessionPool;

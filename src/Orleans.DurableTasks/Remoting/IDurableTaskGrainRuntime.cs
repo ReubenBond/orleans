@@ -10,23 +10,8 @@ using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks.Remoting;
 
-public sealed class MyDurableTask : DurableTask
-{
-    protected internal override ValueTask<Response> RunAsync(DurableTaskContext context)
-    {
-        throw new NotImplementedException();
-    }
-}
-
-public interface IDurableTaskObserver
-{
-    // Called when a remotely scheduled request completes
-    // Successful completion of this method indicates that the observer has durably acknowledged the response and should not rely on receiving any further notifications about the specified `taskId`
-    ValueTask OnResponseAsync(TaskId taskId, Response response);
-}
-
 [Alias("IDurableTaskObserverGrainExtension")]
-public interface IDurableTaskObserverGrainExtension : IGrainExtension
+public interface IDurableTaskObserver : IGrainExtension
 {
     // Called when a remotely scheduled request completes
     // Successful completion of this method indicates that the observer has durably acknowledged the response and should not rely on receiving any further notifications about the specified `taskId`
@@ -36,7 +21,7 @@ public interface IDurableTaskObserverGrainExtension : IGrainExtension
 }
 
 [Alias("IDurableTaskServerGrainExtension")]
-public interface IDurableTaskServerGrainExtension : IGrainExtension
+public interface IDurableTaskServer : IGrainExtension
 {
     // Called by DurableTaskRequest.Invoke to ensure that a task is scheduled
     [Alias("ScheduleAsync")]
@@ -45,11 +30,11 @@ public interface IDurableTaskServerGrainExtension : IGrainExtension
     // API used by ScheduledTask/<T> to check for a result for a task.
     // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
     [Alias("SubscribeOrPollAsync")]
-    ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserverGrainExtension? client);
+    ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver? client);
 }
 
 [Alias("IDurableTaskGrainExtension")]
-public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServerGrainExtension, IDurableTaskObserverGrainExtension
+public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServer, IDurableTaskObserver
 {
     [Alias("GetTasksAsync")]
     IAsyncEnumerable<(TaskId TaskId, DurableTaskDiagnosticState State)> GetTasksAsync();
@@ -243,7 +228,7 @@ internal sealed class DurableTaskGrainRuntime(
     /// <param name="taskId">The task id.</param>
     /// <param name="response">The task result.</param>
     /// <returns>A <see cref="ValueTask"/> representing the work performed.</returns>
-    async ValueTask IDurableTaskObserverGrainExtension.OnResponseAsync(TaskId taskId, Response response)
+    async ValueTask IDurableTaskObserver.OnResponseAsync(TaskId taskId, Response response)
     {
         if (!TryGetExecutionContext(taskId, out var context))
         {
@@ -269,7 +254,7 @@ internal sealed class DurableTaskGrainRuntime(
     /// <param name="request">The request.</param>
     /// <returns>A <see cref="Response"/> indicating the status of the request. A response of type <see cref="PendingResponse"/> indicates that the caller can call this method again to poll for completion.</returns>
     /// <exception cref="InvalidOperationException"></exception>
-    async ValueTask<Response> IDurableTaskServerGrainExtension.ScheduleAsync(IDurableTaskRequest request)
+    async ValueTask<Response> IDurableTaskServer.ScheduleAsync(IDurableTaskRequest request)
     {
         if (request.Context is not { } requestContext)
         {
@@ -278,7 +263,6 @@ internal sealed class DurableTaskGrainRuntime(
 
         var taskId = requestContext.TaskId;
         var client = GetCallerClientReference(requestContext);
-        var clientAddress = 
 
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
@@ -340,7 +324,7 @@ internal sealed class DurableTaskGrainRuntime(
         };
     }
 
-    private async ValueTask SubscribeClientAsync(TaskId taskId, GrainDurableTaskContext executionContext, IDurableTaskObserverGrainExtension? client, CancellationToken cancellationToken)
+    private async ValueTask SubscribeClientAsync(TaskId taskId, GrainDurableTaskContext executionContext, IDurableTaskObserver? client, CancellationToken cancellationToken)
     {
         if (client is not null)
         {
@@ -544,7 +528,7 @@ internal sealed class DurableTaskGrainRuntime(
                     var response = state.Result;
                     foreach (var client in clients)
                     {
-                        clientTasks.Add(client.OnResponse(taskId, response).AsTask());
+                        clientTasks.Add(client.OnResponseAsync(taskId, response).AsTask());
                     }
                 }
 
@@ -689,7 +673,7 @@ internal sealed class DurableTaskGrainRuntime(
     }
 
     /// <inheritdoc/>
-    public ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserverGrainExtension? client)
+    public ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver? client)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
@@ -766,42 +750,4 @@ internal sealed class DurableTaskGrainRuntime(
             yield return task.Key;
         }
     }
-}
-
-public sealed class DurableTaskObserverAddressConverter(IEnumerable<IDurableTaskClientConverter> converters)
-{
-    private readonly ImmutableArray<IDurableTaskClientConverter> _converters = [.. converters];
-    public bool TryGetAddress(IDurableTaskObserverGrainExtension client, out DurableTaskObserverAddress address)
-    {
-        foreach (var converter in _converters)
-        {
-            if (converter.TryGetAddress(client, out address))
-            {
-                return true;
-            }
-        }
-
-        address = default;
-        return false;
-    }
-
-    public bool TryGetClient(DurableTaskObserverAddress address, [NotNullWhen(true)] out IDurableTaskObserverGrainExtension? client)
-    {
-        foreach (var converter in _converters)
-        {
-            if (converter.TryGetClient(address, out client))
-            {
-                return true;
-            }
-        }
-
-        client = default;
-        return false;
-    }
-}
-
-public interface IDurableTaskClientConverter
-{
-    bool TryGetAddress(IDurableTaskObserverGrainExtension client, out DurableTaskObserverAddress address);
-    bool TryGetClient(DurableTaskObserverAddress address, [NotNullWhen(true)] out IDurableTaskObserverGrainExtension? client);
 }

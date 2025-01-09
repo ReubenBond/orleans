@@ -23,6 +23,7 @@
     <ProjectReference Include="..\Orleans.Serialization\Orleans.Serialization.csproj" />
     <ProjectReference Include="..\Orleans.Transactions\Orleans.Transactions.csproj" />
     <ProjectReference Include="..\Orleans.Server\Orleans.Server.csproj" />
+    <ProjectReference Include="..\System.Distributed.DurableTasks\System.Distributed.DurableTasks.csproj" />
   </ItemGroup>
 
 </Project>
