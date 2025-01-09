@@ -245,7 +245,7 @@ public sealed class AzureAppendBlobLogStorage : IStateMachineStorage
         var result = await _client.AppendBlockAsync(_stream, _appendOptions, cancellationToken).ConfigureAwait(false);
         if (_logger.IsEnabled(LogLevel.Debug))
         {
-            var length = value.Buffer.Length;
+            var length = value.Length;
             _logger.LogDebug("Appended {Length} bytes to blob \"{ContainerName}/{BlobName}\"", length, _client.BlobContainerName, _client.Name);
         }
 
@@ -361,7 +361,7 @@ public sealed class AzureAppendBlobLogStorage : IStateMachineStorage
         var result = await _client.AppendBlockAsync(_stream, _appendOptions, cancellationToken).ConfigureAwait(false);
         if (_logger.IsEnabled(LogLevel.Debug))
         {
-            var length = value.Buffer.Length;
+            var length = value.Length;
             _logger.LogDebug("Replaced blob \"{ContainerName}/{BlobName}\", writing {Length} bytes", _client.BlobContainerName, _client.Name, length);
         }
 

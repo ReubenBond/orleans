@@ -1,4 +1,4 @@
-using System.Buffers;
+﻿using System.Buffers;
 using System.Diagnostics;
 using Orleans.Serialization.Buffers;
 
@@ -7,17 +7,23 @@ namespace Orleans.Journaling;
 /// <summary>
 /// A mutable builder for creating log segments.
 /// </summary>
-public sealed partial class LogExtentBuilder(PooledBuffer buffer) : IDisposable, IBufferWriter<byte>
+public sealed partial class LogExtentBuilder(ArcBufferWriter buffer) : IDisposable, IBufferWriter<byte>
 {
     private readonly List<uint> _entryLengths = [];
     private readonly byte[] _scratch = new byte[8];  
-    private PooledBuffer _buffer = buffer;
+    private readonly ArcBufferWriter _buffer = buffer;
 
     public LogExtentBuilder() : this(new())
     {
     }
 
-    public ref PooledBuffer Buffer => ref _buffer;
+    public long Length => _buffer.Length;
+
+    public byte[] ToArray()
+    {
+        using var slice = _buffer.PeekSlice(_buffer.Length);
+        return slice.ToArray();
+    }
 
     public StateMachineStorageWriter CreateLogWriter(StateMachineId id) => new(id, this);
 
@@ -77,13 +83,14 @@ public sealed partial class LogExtentBuilder(PooledBuffer buffer) : IDisposable,
     public void Dispose() => Reset();
 
     // Implemented on this class to prevent the need to repeatedly box & unbox _buffer.
-    void IBufferWriter<byte>.Advance(int count) => _buffer.Advance(count);
+    void IBufferWriter<byte>.Advance(int count) => _buffer.AdvanceWriter(count);
     Memory<byte> IBufferWriter<byte>.GetMemory(int sizeHint) => _buffer.GetMemory(sizeHint);
     Span<byte> IBufferWriter<byte>.GetSpan(int sizeHint) => _buffer.GetSpan(sizeHint);
 
     public async ValueTask CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken)
     {
-        var segments = _buffer.MemorySegments.GetEnumerator();
+        using var buffer = _buffer.PeekSlice(_buffer.Length);
+        var segments = buffer.MemorySegments;
         var currentSegment = ReadOnlyMemory<byte>.Empty;
         foreach (var entryLength in _entryLengths)
         {

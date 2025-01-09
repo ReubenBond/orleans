@@ -1,4 +1,4 @@
-using Orleans.Serialization.Buffers;
+﻿using Orleans.Serialization.Buffers;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.Journaling;
@@ -29,7 +29,7 @@ public class VolatileStateMachineStorage : IStateMachineStorage
     public ValueTask AppendAsync(LogExtentBuilder segment, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _segments.Add(segment.Buffer.ToArray());
+        _segments.Add(segment.ToArray());
         return default;
     }
 
@@ -38,7 +38,7 @@ public class VolatileStateMachineStorage : IStateMachineStorage
     {
         cancellationToken.ThrowIfCancellationRequested();
         _segments.Clear();
-        _segments.Add(snapshot.Buffer.ToArray());
+        _segments.Add(snapshot.ToArray());
         return default;
     }
 
