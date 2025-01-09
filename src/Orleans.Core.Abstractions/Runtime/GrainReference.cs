@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.Serialization.Cloning;
@@ -513,7 +513,7 @@ namespace Orleans.Runtime
         public static string ToMethodCallString(IRequest request)
         {
             var result = new StringBuilder();
-            result.Append(request.GetInterfaceName());
+            result.Append(request.GetInterfaceType()?.Name ?? request.GetInterfaceName());
             result.Append('.');
             result.Append(request.GetMethodName());
             result.Append('(');

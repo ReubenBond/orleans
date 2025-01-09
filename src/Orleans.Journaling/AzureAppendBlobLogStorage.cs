@@ -297,28 +297,28 @@ public sealed class AzureAppendBlobLogStorage : IStateMachineStorage
         // Read everything into a single log segment. We could change this to read in chunks,
         // yielding when the stream does not return synchronously, if we wanted to support larger state machines.
         var rawStream = result.Value.Content;
-        var buf = new PooledBuffer();
+        using var buffer = new ArcBufferWriter();
         while (true)
         {
-            var mem = buf.GetMemory();
+            var mem = buffer.GetMemory();
             var bytesRead = await rawStream.ReadAsync(mem, cancellationToken);
             if (bytesRead == 0)
             {
-                if (buf.Length > 0)
+                if (buffer.Length > 0)
                 {
                     if (_logger.IsEnabled(LogLevel.Debug))
                     {
-                        var length = buf.Length;
+                        var length = buffer.Length;
                         _logger.LogDebug("Read {Length} bytes from blob \"{ContainerName}/{BlobName}\"", length, _client.BlobContainerName, _client.Name);
                     }
 
-                    yield return new LogExtent(buf);
+                    yield return new LogExtent(buffer.ConsumeSlice(buffer.Length));
                 }
 
                 yield break;
             }
 
-            buf.Advance(bytesRead);
+            buffer.AdvanceWriter(bytesRead);
         }
     }
 

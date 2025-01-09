@@ -1,4 +1,4 @@
-using System.Buffers;
+﻿using System.Buffers;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -745,7 +745,7 @@ internal sealed class DurableTaskGrainExtension(
                 CompletedAt = taskState.CompletedAt,
                 CreatedAt = taskState.CreatedAt,
                 Response = taskState.Result?.ToString(),
-                Request = taskState.Request?.ToString(),
+                Request = taskState.Request?.ToMethodCallString(),
                 Status = taskState.Result switch
                 {
                     { } response when response.Exception is null => "Completed",
