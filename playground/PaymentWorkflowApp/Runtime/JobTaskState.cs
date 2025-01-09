@@ -1,6 +1,6 @@
-using Orleans.DurableTasks;
+﻿using Orleans.DurableTasks;
 using Orleans.Serialization.Invocation;
-namespace PaymentWorkflowApp;
+namespace PaymentWorkflowApp.Runtime;
 
 [GenerateSerializer]
 public class JobTaskState

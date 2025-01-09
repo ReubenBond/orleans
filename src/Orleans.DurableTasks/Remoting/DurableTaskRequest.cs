@@ -1,6 +1,5 @@
 ﻿using System.Reflection;
 using Orleans.CodeGeneration;
-using Orleans.Runtime;
 using Orleans.Invocation;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Activators;
@@ -11,6 +10,7 @@ using Orleans.Serialization.Cloning;
 using Orleans.Serialization.WireProtocol;
 using Orleans.Serialization;
 using System.Buffers;
+using Orleans.DurableTasks.Scheduling;
 
 namespace Orleans.DurableTasks.Remoting;
 
@@ -40,19 +40,14 @@ public interface IDurableTaskRequest : IRequest
 [GenerateSerializer]
 [ReturnValueProxy(initializerMethodName: nameof(InitializeRequest))]
 [Alias("DurableTaskRequest")]
-public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISchedulableTask, IPollableTask
+[method: GeneratedActivatorConstructor]
+public abstract class DurableTaskRequest(IGrainContextAccessor grainContextAccessor) : DurableTask, IDurableTaskRequest, ISchedulableTask, IPollableTask
 {
     // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
     // For now, we're not doing that, just to make sure that we can get far without needing it, demonstrating the extensibility of Orleans.
     // It might be worthwhile making RuntimeContext public at some point, even if it is not the recommended approach.
     [NonSerialized]
-    private readonly IGrainContextAccessor _grainContextAccessor;
-
-    [GeneratedActivatorConstructor]
-    protected DurableTaskRequest(IGrainContextAccessor grainContextAccessor)
-    {
-        _grainContextAccessor = grainContextAccessor;
-    }
+    private readonly IGrainContextAccessor _grainContextAccessor = grainContextAccessor;
 
     /// <inheritdoc />
     [Id(0)]
@@ -134,11 +129,11 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
         var callerContext = _grainContextAccessor.GrainContext;
         var runtime = GetRuntime(callerContext);
 
-        return await runtime.EvaluateAsync(taskId, this, CancellationToken.None);
+        return await runtime.ScheduleAsync(taskId, this, CancellationToken.None);
     }
 
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext executionContext)
+    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext executionContext)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
@@ -168,7 +163,7 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
     ValueTask<Response> IInvokable.Invoke() => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
-    ValueTask<Response> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => InvokeInner().InvokeAsync(executionContext);
+    ValueTask<Response> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => InvokeInner().RunAsync(executionContext);
 
     // Generated
     protected abstract DurableTask InvokeInner();
@@ -198,19 +193,14 @@ public abstract class DurableTaskRequest : DurableTask, IDurableTaskRequest, ISc
 [GenerateSerializer]
 [ReturnValueProxy(initializerMethodName: nameof(InitializeRequest))]
 [Alias("DurableTaskRequest`1")]
-public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurableTaskRequest, ISchedulableTask, IPollableTask
+[method: GeneratedActivatorConstructor]
+public abstract class DurableTaskRequest<TResult>(IGrainContextAccessor grainContextAccessor) : DurableTask<TResult>, IDurableTaskRequest, ISchedulableTask, IPollableTask
 {
     // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
     // For now, we're not doing that, just to make sure that we can get far without needing it, demonstrating the extensibility of Orleans.
     // It might be worthwhile making RuntimeContext public at some point, even if it is not the recommended approach.
     [NonSerialized]
-    private readonly IGrainContextAccessor _grainContextAccessor;
-
-    [GeneratedActivatorConstructor]
-    protected DurableTaskRequest(IGrainContextAccessor grainContextAccessor)
-    {
-        _grainContextAccessor = grainContextAccessor;
-    }
+    private readonly IGrainContextAccessor _grainContextAccessor = grainContextAccessor;
 
     /// <inheritdoc/>
     [Id(0)]
@@ -287,11 +277,11 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
         var callerContext = _grainContextAccessor.GrainContext;
         var runtime = DurableTaskRequest.GetRuntime(callerContext);
 
-        return await runtime.EvaluateAsync(taskId, this, CancellationToken.None);
+        return await runtime.ScheduleAsync(taskId, this, CancellationToken.None);
     }
 
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext executionContext)
+    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext executionContext)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
@@ -321,7 +311,7 @@ public abstract class DurableTaskRequest<TResult> : DurableTask<TResult>, IDurab
     ValueTask<Response> IInvokable.Invoke() => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
-    ValueTask<Response> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => InvokeInner().InvokeAsync(executionContext);
+    ValueTask<Response> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => InvokeInner().RunAsync(executionContext);
 
     // Generated
     protected abstract DurableTask<TResult> InvokeInner();

@@ -1,8 +1,8 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Runtime.InteropServices;
 using Orleans.DurableTasks;
 using Orleans.Serialization.Invocation;
-namespace PaymentWorkflowApp;
+namespace PaymentWorkflowApp.Runtime;
 
 internal sealed class JobDurableTaskExecutionContext(TaskId taskId, JobScheduler jobScheduler, JobTaskState state) : DurableTaskContext(taskId)
 {
@@ -16,10 +16,7 @@ internal sealed class JobDurableTaskExecutionContext(TaskId taskId, JobScheduler
 
     public JobTaskState State { get; } = state;
 
-    protected override ValueTask<DurableTaskContext> EvaluateAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
-        => _jobScheduler.EvaluateStepAsync(taskId, taskDefinition, cancellationToken);
-
-    protected override ValueTask<Response> InvokeAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+    protected override ValueTask<Response> RunAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
         => _jobScheduler.InvokeAsync(taskId, taskDefinition, cancellationToken);
 
     protected override TaskId CreateChildTaskId(string? name)

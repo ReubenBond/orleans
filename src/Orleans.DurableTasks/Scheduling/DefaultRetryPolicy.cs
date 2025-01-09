@@ -1,6 +1,6 @@
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.DurableTasks.Scheduling;
 
 public class DefaultRetryPolicy(IOptions<RetryOptions> retryOptions) : RetryPolicy
 {

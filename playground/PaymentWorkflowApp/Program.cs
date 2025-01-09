@@ -1,10 +1,10 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans.DurableTasks;
 using Orleans.Serialization;
-using PaymentWorkflowApp;
+using PaymentWorkflowApp.Runtime;
 
 using var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices(services =>
@@ -30,7 +30,7 @@ jobScheduler.AddHandler("SayHello", async args =>
     string result;
     if (args is { Length: > 1 })
     {
-        result = await jobScheduler.GetOrCreateJob("stringJoin", args).WithId("join");
+        result = await jobScheduler.CreateJob("stringJoin", args).WithId("join");
     }
     else
     {
@@ -43,9 +43,9 @@ jobScheduler.AddHandler("SayHello", async args =>
 await jobScheduler.StartAsync();
 
 // Later, or somewhere else:
-var job1 = await jobScheduler.GetOrCreateJob("SayHello", "Xiao").ScheduleAsync("job-1");
-var job2 = await jobScheduler.GetOrCreateJob("SayHello", "Julian", "Benjamin", "Phil").ScheduleAsync("job-2");
-var job3 = await jobScheduler.GetOrCreateJob("SayHello", "Sergey", "Gabriel", "Jason").ScheduleAsync("job-3");
+var job1 = await jobScheduler.CreateJob("SayHello", "Xiao").ScheduleAsync("job-1");
+var job2 = await jobScheduler.CreateJob("SayHello", "Julian", "Benjamin", "Phil").ScheduleAsync("job-2");
+var job3 = await jobScheduler.CreateJob("SayHello", "Sergey", "Gabriel", "Jason").ScheduleAsync("job-3");
 var result3 = await job3;
 
 // Some time later, maybe an app crash happens in between.
@@ -96,7 +96,7 @@ while (!lifetime.ApplicationStopping.IsCancellationRequested)
         var jobType = "SayHello";
         var jobArgs = Enumerable.Range(0, Random.Shared.Next(3)).Select(_ => names[Random.Shared.Next(names.Length)]).ToArray();
         var jobId = $"jeb-{Random.Shared.Next(0, int.MaxValue):X}";
-        await jobScheduler.GetOrCreateJob(jobType, jobArgs).ScheduleAsync(jobId);
+        await jobScheduler.CreateJob(jobType, jobArgs).ScheduleAsync(jobId);
     }
 }
 

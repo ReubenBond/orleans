@@ -1,4 +1,4 @@
-using System.Buffers;
+﻿using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -16,7 +16,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
     private const byte VersionByte = 0;
     private readonly DurableTaskGrainStorageShared _shared;
     private readonly IStateMachineManager _stateMachineManager;
-    private readonly Dictionary<TaskId, DurableTaskState> _items = new();
+    private readonly Dictionary<TaskId, DurableTaskState> _items = [];
     private IStateMachineLogWriter? _storage;
 
     public DurableTaskGrainStorage(IStateMachineManager stateMachineManager, DurableTaskGrainStorageShared shared)
@@ -316,7 +316,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
 
     private static bool ApplyAddObserverCore(DurableTaskState state, IDurableTaskClient observer)
     {
-        var observers = state.Observers ??= new();
+        var observers = state.Observers ??= [];
         return observers.Add(observer);
     }
 

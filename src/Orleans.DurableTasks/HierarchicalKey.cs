@@ -1,4 +1,4 @@
-using System.Buffers;
+﻿using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
@@ -20,7 +20,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
     private readonly ReadOnlyMemory<char> _value;
 
     private HierarchicalKey(ReadOnlyMemory<char> value)
-    { 
+    {
         _value = value;
     }
 

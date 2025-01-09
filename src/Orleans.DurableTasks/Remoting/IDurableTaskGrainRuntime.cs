@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
-using Orleans.Runtime;
+using Orleans.DurableTasks.Scheduling;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
@@ -75,10 +75,7 @@ public struct DurableTaskDiagnosticState
 
 public interface IDurableTaskGrainRuntime
 {
-    ValueTask<DurableTaskContext> EvaluateAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
-
-    // Evaluate and return result.
-    ValueTask<Response> InvokeAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
+    ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
 
     bool GetResponseOrCreateInternalTask(TaskId taskId, [NotNullWhen(true)] out Response? response);
     void SetInternalTaskResponse(TaskId taskId, Response response);
@@ -360,13 +357,7 @@ internal sealed class DurableTaskGrainExtension(
         }
     }
 
-    public async ValueTask<Response> InvokeAsync(TaskId taskId, DurableTask durableTask, CancellationToken cancellationToken)
-    {
-        var ctx = await EvaluateAsync(taskId, durableTask, cancellationToken);
-        return await ctx.AsValueTask();
-    }
-
-    public async ValueTask<DurableTaskContext> EvaluateAsync(TaskId taskId, DurableTask durableTask, CancellationToken cancellationToken)
+    public async ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, DurableTask durableTask, CancellationToken cancellationToken)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
@@ -386,7 +377,7 @@ internal sealed class DurableTaskGrainExtension(
             try
             {
                 // Invoke the method immediately.
-                var immediateResponse = await durableTask.InvokeAsync(executionContext);
+                var immediateResponse = await durableTask.RunAsync(executionContext);
 
                 if (immediateResponse is PendingResponse)
                 {
@@ -414,7 +405,7 @@ internal sealed class DurableTaskGrainExtension(
                                 else
                                 {
                                     // Resubmit the request, relying on idempotency.
-                                    response = await durableTask.InvokeAsync(executionContext);
+                                    response = await durableTask.RunAsync(executionContext);
                                 }
 
                                 if (response is not PendingResponse)
@@ -821,7 +812,10 @@ public readonly struct DurableTaskClientAddress : IEquatable<DurableTaskClientAd
     /// <param name="value">
     /// The value.
     /// </param>
-    public DurableTaskClientAddress(IdSpan value) => _value = value;
+    public DurableTaskClientAddress(IdSpan value)
+    {
+        _value = value;
+    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DurableTaskClientAddress"/> struct. 
@@ -829,7 +823,10 @@ public readonly struct DurableTaskClientAddress : IEquatable<DurableTaskClientAd
     /// <param name="value">
     /// The raw id value.
     /// </param>
-    public DurableTaskClientAddress(byte[] value) => _value = new(value);
+    public DurableTaskClientAddress(byte[] value)
+    {
+        _value = new(value);
+    }
 
     /// <summary>
     /// Gets the underlying value.

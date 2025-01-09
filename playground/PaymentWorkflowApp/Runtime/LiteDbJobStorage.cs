@@ -1,9 +1,9 @@
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using LiteDB;
 using Orleans.DurableTasks;
 using Orleans.Serialization;
 
-namespace PaymentWorkflowApp;
+namespace PaymentWorkflowApp.Runtime;
 
 public sealed class LiteDbJobStorage(Serializer<JobTaskState> serializer, DeepCopier<JobTaskState> copier) : IJobStorage
 {

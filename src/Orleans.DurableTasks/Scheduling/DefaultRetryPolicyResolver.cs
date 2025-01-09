@@ -1,6 +1,6 @@
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.DurableTasks.Scheduling;
 
 public class DefaultRetryPolicyResolver(DefaultRetryPolicy defaultRetryPolicy) : IRetryPolicyResolver
 {
