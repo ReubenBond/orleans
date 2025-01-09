@@ -1,4 +1,4 @@
-using Orleans.DurableTasks;
+﻿using Orleans.DurableTasks;
 using Orleans.DurableTasks.Remoting;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Invocation;
@@ -11,7 +11,7 @@ internal sealed class DurableTaskGrainStorageShared(
     IFieldCodec<TaskId> taskIdCodec,
     IFieldCodec<DurableTaskState> taskStateCodec,
     IFieldCodec<Response> responseCodec,
-    IFieldCodec<IDurableTaskClient> observerCodec,
+    IFieldCodec<IDurableTaskObserverGrainExtension> observerCodec,
     IFieldCodec<DateTimeOffset> dateTimeOffsetCodec,
     IFieldCodec<IDurableTaskRequest> requestCodec,
     SerializerSessionPool serializerSessionPool,
@@ -22,7 +22,7 @@ internal sealed class DurableTaskGrainStorageShared(
     public readonly IFieldCodec<TaskId> KeyCodec = taskIdCodec;
     public readonly IFieldCodec<DurableTaskState> ValueCodec = taskStateCodec;
     public readonly IFieldCodec<Response> ResponseCodec = responseCodec;
-    public readonly IFieldCodec<IDurableTaskClient> ObserverCodec = observerCodec;
+    public readonly IFieldCodec<IDurableTaskObserverGrainExtension> ObserverCodec = observerCodec;
     public readonly IFieldCodec<DateTimeOffset> DateTimeOffsetCodec = dateTimeOffsetCodec;
     public readonly IFieldCodec<IDurableTaskRequest> RequestCodec = requestCodec;
     public readonly SerializerSessionPool SerializerSessionPool = serializerSessionPool;

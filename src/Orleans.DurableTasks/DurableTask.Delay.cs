@@ -34,8 +34,8 @@ public abstract partial class DurableTask
         while (delay > maxDelay)
         {
             delay -= maxDelay;
-            var task2 = await Task.WhenAny(Task.Delay(maxDelay, cancellationToken)).ConfigureAwait(false);
-            if (task2.IsCanceled)
+            var task = await Task.WhenAny(Task.Delay(maxDelay, cancellationToken)).ConfigureAwait(false);
+            if (task.IsCanceled)
             {
                 await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
                 return false;
