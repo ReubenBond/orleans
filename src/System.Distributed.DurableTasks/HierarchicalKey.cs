@@ -2,8 +2,9 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using Orleans;
 
-namespace Orleans.DurableTasks;
+namespace System.Distributed.DurableTasks;
 
 [GenerateSerializer, Immutable]
 [Alias("HierarchicalKey")]

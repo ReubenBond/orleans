@@ -1,7 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using Orleans.Serialization.Invocation;
 
-namespace Orleans.DurableTasks;
+namespace System.Distributed.DurableTasks;
 
 /// <summary>
 /// Provides an awaiter for <see cref="DurableTask"/> instances.

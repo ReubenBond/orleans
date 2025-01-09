@@ -11,6 +11,7 @@ using Azure.Core.Pipeline;
 using Azure.Core;
 using System.Diagnostics;
 using Newtonsoft.Json;
+using System.Distributed.DurableTasks;
 
 namespace Orleans.DurableTasks.Playground;
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously

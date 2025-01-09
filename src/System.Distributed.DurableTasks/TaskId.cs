@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using Orleans;
 
-namespace Orleans.DurableTasks;
+namespace System.Distributed.DurableTasks;
 
 [GenerateSerializer, Immutable]
 [Alias("TaskId")]
@@ -57,7 +58,7 @@ public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<
         return false;
     }
 
-    public static TaskId Parse(ReadOnlySpan<char> s, IFormatProvider? provider) => new (HierarchicalKey.Parse(s, provider));
+    public static TaskId Parse(ReadOnlySpan<char> s, IFormatProvider? provider) => new(HierarchicalKey.Parse(s, provider));
 
     public static bool TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, [MaybeNullWhen(false)] out TaskId result)
     {

@@ -1,10 +1,10 @@
 ﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Distributed.DurableTasks;
+using System.Distributed.DurableTasks.Scheduling;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Orleans.DurableTasks;
-using Orleans.DurableTasks.Remoting;
-using Orleans.DurableTasks.Scheduling;
 using Orleans.Serialization.Invocation;
 namespace PaymentWorkflowApp.Runtime;
 

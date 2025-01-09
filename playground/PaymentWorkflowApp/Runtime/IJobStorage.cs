@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
-using Orleans.DurableTasks;
+using System.Distributed.DurableTasks;
+
 namespace PaymentWorkflowApp.Runtime;
 
 public interface IJobStorage

@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics.Contracts;
-using Orleans.DurableTasks.Scheduling;
+using System.Distributed.DurableTasks.Scheduling;
 
-namespace Orleans.DurableTasks;
+namespace System.Distributed.DurableTasks;
 
 /// <summary>
 /// Extension methods for working with <see cref="DurableTask"/> and <see cref="DurableTask{TResult}"/> instances.
@@ -58,7 +58,7 @@ public static class DurableTaskExtensions
     /// <typeparam name="TResult">The task result type.</typeparam>
     /// <param name="task">The task.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task) => ScheduleAsync(task, taskId: null, options: null);
+    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task) => task.ScheduleAsync(taskId: null, options: null);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask{TResult}"/> as a workflow using the provided identifier.
@@ -67,7 +67,7 @@ public static class DurableTaskExtensions
     /// <param name="taskDefinition">The task.</param>
     /// <param name="taskId">The task identifier.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> taskDefinition, string taskId) => ScheduleAsync(taskDefinition, taskId, options: null);
+    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> taskDefinition, string taskId) => taskDefinition.ScheduleAsync(taskId, options: null);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask{TResult}"/> as a workflow using the provided identifier.
@@ -98,7 +98,7 @@ public static class DurableTaskExtensions
     /// </summary>
     /// <param name="taskDefinition">The task.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition) => ScheduleAsync(taskDefinition, taskId: null, options: null);
+    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition) => taskDefinition.ScheduleAsync(taskId: null, options: null);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask"/> as a workflow using the provided identifier.
@@ -106,7 +106,7 @@ public static class DurableTaskExtensions
     /// <param name="taskDefinition">The task.</param>
     /// <param name="taskId">The task identifier.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition, string taskId) => ScheduleAsync(taskDefinition, taskId, options: null);
+    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition, string taskId) => taskDefinition.ScheduleAsync(taskId, options: null);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask"/> as a workflow using the provided identifier.

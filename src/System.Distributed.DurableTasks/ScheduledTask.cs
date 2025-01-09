@@ -1,7 +1,8 @@
 ﻿using System.Runtime.CompilerServices;
+using Orleans.DurableTasks;
 using Orleans.Serialization.Invocation;
 
-namespace Orleans.DurableTasks;
+namespace System.Distributed.DurableTasks;
 
 /// <summary>
 /// Represents an operation which is scheduled and will complete at an indefinite point in the future.

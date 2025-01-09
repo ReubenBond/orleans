@@ -1,8 +1,8 @@
 ﻿using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Distributed.DurableTasks;
 using System.Runtime.CompilerServices;
-using Orleans.DurableTasks;
 using Orleans.DurableTasks.Remoting;
 using Orleans.Journaling;
 using Orleans.Serialization.Buffers;

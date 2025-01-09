@@ -1,6 +1,7 @@
-﻿using Orleans.DurableTasks.Scheduling;
+﻿using System.Distributed.DurableTasks.Scheduling;
+using Orleans.DurableTasks;
 
-namespace Orleans.DurableTasks.Remoting;
+namespace System.Distributed.DurableTasks;
 
 /// <summary>
 /// Interface implemented by <see cref="DurableTask"/> and <see cref="DurableTask{TResult}"/> implementations allowing them to be scheduled.

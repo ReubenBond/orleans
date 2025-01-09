@@ -1,4 +1,4 @@
-﻿namespace Orleans.DurableTasks.Scheduling;
+﻿namespace System.Distributed.DurableTasks.Scheduling;
 
 // Something like this?
 public class ExecutionAttemptSummary
