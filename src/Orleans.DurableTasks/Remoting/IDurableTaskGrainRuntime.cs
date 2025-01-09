@@ -1,32 +1,42 @@
-﻿using System.Buffers;
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.DurableTasks.Scheduling;
 using Orleans.Runtime.Placement;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Invocation;
-using Orleans.Serialization.WireProtocol;
 
 namespace Orleans.DurableTasks.Remoting;
 
-[Alias("IDurableTaskClient")]
-public interface IDurableTaskClient : IGrainExtension
+public sealed class MyDurableTask : DurableTask
 {
-    // Called when a remotely scheduled request completes
-    [AlwaysInterleave]
-    [Alias("OnResponse")]
-    ValueTask OnResponse(TaskId taskId, Response response);
+    protected internal override ValueTask<Response> RunAsync(DurableTaskContext context)
+    {
+        throw new NotImplementedException();
+    }
 }
 
-[Alias("IDurableTaskServer")]
-public interface IDurableTaskServer : IGrainExtension
+public interface IDurableTaskObserver
+{
+    // Called when a remotely scheduled request completes
+    // Successful completion of this method indicates that the observer has durably acknowledged the response and should not rely on receiving any further notifications about the specified `taskId`
+    ValueTask OnResponseAsync(TaskId taskId, Response response);
+}
+
+[Alias("IDurableTaskObserverGrainExtension")]
+public interface IDurableTaskObserverGrainExtension : IGrainExtension
+{
+    // Called when a remotely scheduled request completes
+    // Successful completion of this method indicates that the observer has durably acknowledged the response and should not rely on receiving any further notifications about the specified `taskId`
+    [AlwaysInterleave]
+    [Alias("OnResponse")]
+    ValueTask OnResponseAsync(TaskId taskId, Response response);
+}
+
+[Alias("IDurableTaskServerGrainExtension")]
+public interface IDurableTaskServerGrainExtension : IGrainExtension
 {
     // Called by DurableTaskRequest.Invoke to ensure that a task is scheduled
     [Alias("ScheduleAsync")]
@@ -35,11 +45,11 @@ public interface IDurableTaskServer : IGrainExtension
     // API used by ScheduledTask/<T> to check for a result for a task.
     // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
     [Alias("SubscribeOrPollAsync")]
-    ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskClient? client);
+    ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserverGrainExtension? client);
 }
 
 [Alias("IDurableTaskGrainExtension")]
-public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServer, IDurableTaskClient
+public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServerGrainExtension, IDurableTaskObserverGrainExtension
 {
     [Alias("GetTasksAsync")]
     IAsyncEnumerable<(TaskId TaskId, DurableTaskDiagnosticState State)> GetTasksAsync();
@@ -76,31 +86,30 @@ public struct DurableTaskDiagnosticState
 public interface IDurableTaskGrainRuntime
 {
     ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
-
-    bool GetResponseOrCreateInternalTask(TaskId taskId, [NotNullWhen(true)] out Response? response);
-    void SetInternalTaskResponse(TaskId taskId, Response response);
+    bool GetResponseOrCreateChildTask(TaskId taskId, [NotNullWhen(true)] out Response? response);
+    void SetChildTaskResponse(TaskId taskId, Response response);
 }
 
-internal sealed class DurableTaskGrainExtensionShared(
+internal sealed class DurableTaskGrainRuntimeShared(
     IGrainContextAccessor grainContextAccessor,
     TimeProvider timeProvider,
     PlacementStrategyResolver placementStrategyResolver,
-    ILogger<DurableTaskGrainExtension> logger)
+    ILogger<DurableTaskGrainRuntime> logger)
 {
     public IGrainContextAccessor GrainContextAccessor { get; } = grainContextAccessor;
     public TimeProvider TimeProvider { get; } = timeProvider;
-    public ILogger<DurableTaskGrainExtension> Logger { get; } = logger;
+    public ILogger<DurableTaskGrainRuntime> Logger { get; } = logger;
     public PlacementStrategyResolver PlacementStrategyResolver { get; } = placementStrategyResolver;
     public CleanupPolicy DefaultCleanupPolicy { get; } = new() { CleanupAge = TimeSpan.FromDays(1) };
 }
 
-internal sealed class DurableTaskGrainExtension(
+internal sealed class DurableTaskGrainRuntime(
     IDurableTaskGrainStorage storage,
-    DurableTaskGrainExtensionShared shared) : IDurableTaskGrainRuntime, IDurableTaskGrainExtension
+    DurableTaskGrainRuntimeShared shared) : IDurableTaskGrainRuntime, IDurableTaskGrainExtension
 {
     private readonly Dictionary<TaskId, GrainDurableTaskContext> _pendingTasks = [];
     private readonly Dictionary<TaskId, Task> _runningTasks = [];
-    private readonly DurableTaskGrainExtensionShared _shared = shared;
+    private readonly DurableTaskGrainRuntimeShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
 
     private GrainId GrainId => _shared.GrainContextAccessor.GrainContext.GrainId;
@@ -178,9 +187,9 @@ internal sealed class DurableTaskGrainExtension(
     /// <param name="response">The response.</param>
     /// <returns>A value indicating whether the response exists.</returns>
     /// <remarks>
-    /// An internal task is a task which executes as part of another task and whose result it not externally visible.
+    /// A child task is a task which executes as part of another task and whose result it not externally visible.
     /// </remarks>
-    public bool GetResponseOrCreateInternalTask(TaskId taskId, [NotNullWhen(true)] out Response? response)
+    public bool GetResponseOrCreateChildTask(TaskId taskId, [NotNullWhen(true)] out Response? response)
     {
         if (TryGetExecutionContext(taskId, out var context))
         {
@@ -210,9 +219,9 @@ internal sealed class DurableTaskGrainExtension(
     /// <param name="response">The response.</param>
     /// <exception cref="InvalidOperationException">The response has already been set.</exception>
     /// <remarks>
-    /// An internal task is a task which executes as part of another task and whose result it not externally visible.
+    /// An child task is a task which executes as part of another task and whose result it not externally visible.
     /// </remarks>
-    public void SetInternalTaskResponse(TaskId taskId, Response response)
+    public void SetChildTaskResponse(TaskId taskId, Response response)
     {
         if (!TryGetExecutionContext(taskId, out var context))
         {
@@ -234,7 +243,7 @@ internal sealed class DurableTaskGrainExtension(
     /// <param name="taskId">The task id.</param>
     /// <param name="response">The task result.</param>
     /// <returns>A <see cref="ValueTask"/> representing the work performed.</returns>
-    async ValueTask IDurableTaskClient.OnResponse(TaskId taskId, Response response)
+    async ValueTask IDurableTaskObserverGrainExtension.OnResponseAsync(TaskId taskId, Response response)
     {
         if (!TryGetExecutionContext(taskId, out var context))
         {
@@ -260,7 +269,7 @@ internal sealed class DurableTaskGrainExtension(
     /// <param name="request">The request.</param>
     /// <returns>A <see cref="Response"/> indicating the status of the request. A response of type <see cref="PendingResponse"/> indicates that the caller can call this method again to poll for completion.</returns>
     /// <exception cref="InvalidOperationException"></exception>
-    async ValueTask<Response> IDurableTaskServer.ScheduleAsync(IDurableTaskRequest request)
+    async ValueTask<Response> IDurableTaskServerGrainExtension.ScheduleAsync(IDurableTaskRequest request)
     {
         if (request.Context is not { } requestContext)
         {
@@ -269,6 +278,7 @@ internal sealed class DurableTaskGrainExtension(
 
         var taskId = requestContext.TaskId;
         var client = GetCallerClientReference(requestContext);
+        var clientAddress = 
 
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
@@ -330,7 +340,7 @@ internal sealed class DurableTaskGrainExtension(
         };
     }
 
-    private async ValueTask SubscribeClientAsync(TaskId taskId, GrainDurableTaskContext executionContext, IDurableTaskClient? client, CancellationToken cancellationToken)
+    private async ValueTask SubscribeClientAsync(TaskId taskId, GrainDurableTaskContext executionContext, IDurableTaskObserverGrainExtension? client, CancellationToken cancellationToken)
     {
         if (client is not null)
         {
@@ -345,7 +355,7 @@ internal sealed class DurableTaskGrainExtension(
                     // TODO: Would it be better/simpler to convert such calls into polling responses?
                     // This implementation means that the call to SubscribeAsync returns a 'SubscribedResponse' even though the client
                     // has already received the final response via 'OnResponse'.
-                    await client.OnResponse(taskId, response);
+                    await client.OnResponseAsync(taskId, response);
                 }
                 else
                 {
@@ -679,7 +689,7 @@ internal sealed class DurableTaskGrainExtension(
     }
 
     /// <inheritdoc/>
-    public ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskClient? client)
+    public ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserverGrainExtension? client)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
@@ -758,10 +768,10 @@ internal sealed class DurableTaskGrainExtension(
     }
 }
 
-public sealed class DurableTaskClientConverter(IEnumerable<IDurableTaskClientConverter> converters)
+public sealed class DurableTaskObserverAddressConverter(IEnumerable<IDurableTaskClientConverter> converters)
 {
-    private readonly ImmutableArray<IDurableTaskClientConverter> _converters = converters.ToImmutableArray();
-    public bool TryGetAddress(IDurableTaskClient client, out DurableTaskClientAddress address)
+    private readonly ImmutableArray<IDurableTaskClientConverter> _converters = [.. converters];
+    public bool TryGetAddress(IDurableTaskObserverGrainExtension client, out DurableTaskObserverAddress address)
     {
         foreach (var converter in _converters)
         {
@@ -775,7 +785,7 @@ public sealed class DurableTaskClientConverter(IEnumerable<IDurableTaskClientCon
         return false;
     }
 
-    public bool TryGetClient(DurableTaskClientAddress address, [NotNullWhen(true)] out IDurableTaskClient? client)
+    public bool TryGetClient(DurableTaskObserverAddress address, [NotNullWhen(true)] out IDurableTaskObserverGrainExtension? client)
     {
         foreach (var converter in _converters)
         {
@@ -792,237 +802,6 @@ public sealed class DurableTaskClientConverter(IEnumerable<IDurableTaskClientCon
 
 public interface IDurableTaskClientConverter
 {
-    bool TryGetAddress(IDurableTaskClient client, out DurableTaskClientAddress address);
-    bool TryGetClient(DurableTaskClientAddress address, [NotNullWhen(true)] out IDurableTaskClient? client);
-}
-
-/// <summary>
-/// Represents the address of a <see cref="IDurableTaskClient"/>.
-/// </summary>
-[Serializable, GenerateSerializer, Immutable]
-[Alias("DurableTaskClientAddress")]
-public readonly struct DurableTaskClientAddress : IEquatable<DurableTaskClientAddress>, IComparable<DurableTaskClientAddress>, ISpanFormattable, IParsable<DurableTaskClientAddress>
-{
-    [Id(0)]
-    private readonly IdSpan _value;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="DurableTaskClientAddress"/> struct. 
-    /// </summary>
-    /// <param name="value">
-    /// The value.
-    /// </param>
-    public DurableTaskClientAddress(IdSpan value)
-    {
-        _value = value;
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="DurableTaskClientAddress"/> struct. 
-    /// </summary>
-    /// <param name="value">
-    /// The raw id value.
-    /// </param>
-    public DurableTaskClientAddress(byte[] value)
-    {
-        _value = new(value);
-    }
-
-    /// <summary>
-    /// Gets the underlying value.
-    /// </summary>
-    public IdSpan Value => _value;
-
-    /// <summary>
-    /// Returns a span representation of this instance.
-    /// </summary>
-    /// <returns>
-    /// A <see cref="ReadOnlySpan{Byte}"/> representation of the value.
-    /// </returns>
-    public ReadOnlySpan<byte> AsSpan() => _value.AsSpan();
-
-    /// <summary>
-    /// Creates a new <see cref="DurableTaskClientAddress"/> instance.
-    /// </summary>
-    /// <param name="value">
-    /// The value.
-    /// </param>
-    /// <returns>
-    /// The newly created <see cref="DurableTaskClientAddress"/> instance.
-    /// </returns>
-    public static DurableTaskClientAddress Create(string value) => new(Encoding.UTF8.GetBytes(value));
-
-    /// <summary>
-    /// Converts a <see cref="DurableTaskClientAddress"/> to a <see cref="IdSpan"/>.
-    /// </summary>
-    /// <param name="kind">The grain type to convert.</param>
-    /// <returns>The corresponding <see cref="IdSpan"/>.</returns>
-    public static explicit operator IdSpan(DurableTaskClientAddress kind) => kind._value;
-
-    /// <summary>
-    /// Converts a <see cref="IdSpan"/> to a <see cref="DurableTaskClientAddress"/>.
-    /// </summary>
-    /// <param name="id">The id span to convert.</param>
-    /// <returns>The corresponding <see cref="DurableTaskClientAddress"/>.</returns>
-    public static explicit operator DurableTaskClientAddress(IdSpan id) => new(id);
-
-    /// <summary>
-    /// Gets a value indicating whether this instance is the default value.
-    /// </summary>
-    public bool IsDefault => _value.IsDefault;
-
-    /// <inheritdoc/>
-    public override bool Equals(object? obj) => obj is DurableTaskClientAddress kind && Equals(kind);
-
-    /// <inheritdoc/>
-    public bool Equals(DurableTaskClientAddress obj) => _value.Equals(obj._value);
-
-    /// <inheritdoc/>
-    public override int GetHashCode() => _value.GetHashCode();
-
-    /// <summary>
-    /// Generates a uniform, stable hash code for this grain type. 
-    /// </summary>
-    /// <returns>
-    /// A uniform, stable hash of this instance.
-    /// </returns>
-    public uint GetUniformHashCode() => _value.GetUniformHashCode();
-
-    /// <summary>
-    /// Returns the array underlying a grain type instance.
-    /// </summary>
-    /// <param name="id">The grain type.</param>
-    /// <returns>The array underlying a grain type instance.</returns>
-    /// <remarks>
-    /// The returned array must not be modified.
-    /// </remarks>
-    public static byte[]? UnsafeGetArray(DurableTaskClientAddress id) => IdSpan.UnsafeGetArray(id._value);
-
-    /// <inheritdoc/>
-    public int CompareTo(DurableTaskClientAddress other) => _value.CompareTo(other._value);
-
-    /// <summary>
-    /// Returns a string representation of this instance, decoding the value as UTF8.
-    /// </summary>
-    /// <returns>
-    /// A <see cref="string"/> representation of this instance.
-    /// </returns>
-    public override string? ToString() => _value.ToString();
-
-    string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString() ?? "";
-
-    bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
-        => _value.TryFormat(destination, out charsWritten);
-
-    public static DurableTaskClientAddress Parse(string s, IFormatProvider? provider) => Create(s);
-    public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, [MaybeNullWhen(false)] out DurableTaskClientAddress result)
-    {
-        if (s is { Length: > 0 })
-        {
-            result = Create(s);
-            return true;
-        }
-
-        result = default;
-        return false;
-    }
-
-    /// <summary>
-    /// Compares the provided operands for equality.
-    /// </summary>
-    /// <param name="left">The left operand.</param>
-    /// <param name="right">The right operand.</param>
-    /// <returns><see langword="true"/> if the provided values are equal, otherwise <see langword="false"/>.</returns>
-    public static bool operator ==(DurableTaskClientAddress left, DurableTaskClientAddress right) => left.Equals(right);
-
-    /// <summary>
-    /// Compares the provided operands for inequality.
-    /// </summary>
-    /// <param name="left">The left operand.</param>
-    /// <param name="right">The right operand.</param>
-    /// <returns><see langword="true"/> if the provided values are not equal, otherwise <see langword="false"/>.</returns>
-    public static bool operator !=(DurableTaskClientAddress left, DurableTaskClientAddress right) => !(left == right);
-}
-
-/// <summary>
-/// Functionality for serializing and deserializing <see cref="DurableTaskClientAddress"/> instances.
-/// </summary>
-[RegisterSerializer]
-public sealed class DurableTaskClientAddressCodec : IFieldCodec<DurableTaskClientAddress>
-{
-    private readonly Type _codecType = typeof(DurableTaskClientAddress);
-
-    /// <inheritdoc />
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void WriteField<TBufferWriter>(
-        ref Writer<TBufferWriter> writer,
-        uint fieldIdDelta,
-        Type expectedType,
-        DurableTaskClientAddress value)
-        where TBufferWriter : IBufferWriter<byte>
-    {
-        ReferenceCodec.MarkValueField(writer.Session);
-        writer.WriteFieldHeader(fieldIdDelta, expectedType, _codecType, WireType.LengthPrefixed);
-        var bytes = value.AsSpan();
-        if (bytes.IsEmpty) writer.WriteByte(1); // Equivalent to `writer.WriteVarUInt32(0);`
-        else
-        {
-            writer.WriteVarUInt32((uint)(sizeof(int) + bytes.Length));
-            writer.WriteInt32(value.GetHashCode());
-            writer.Write(bytes);
-        }
-    }
-
-    /// <summary>
-    /// Writes an <see cref="DurableTaskClientAddress"/> value to the provided writer without field framing.
-    /// </summary>
-    /// <param name="writer">The writer.</param>
-    /// <param name="value">The value to write.</param>
-    /// <typeparam name="TBufferWriter">The underlying buffer writer type.</typeparam>
-    public static void WriteRaw<TBufferWriter>(
-        ref Writer<TBufferWriter> writer,
-        DurableTaskClientAddress value)
-        where TBufferWriter : IBufferWriter<byte>
-    {
-        var bytes = value.AsSpan();
-        writer.WriteVarUInt32((uint)bytes.Length);
-        if (!bytes.IsEmpty)
-        {
-            writer.WriteInt32(value.GetHashCode());
-            writer.Write(bytes);
-        }
-    }
-
-    /// <summary>
-    /// Reads an <see cref="DurableTaskClientAddress"/> value from a reader without any field framing.
-    /// </summary>
-    /// <typeparam name="TInput">The underlying reader input type.</typeparam>
-    /// <param name="reader">The reader.</param>
-    /// <returns>An <see cref="DurableTaskClientAddress"/>.</returns>
-    public static DurableTaskClientAddress ReadRaw<TInput>(ref Reader<TInput> reader)
-    {
-        var length = reader.ReadVarUInt32();
-        if (length == 0)
-            return default;
-
-        var hashCode = reader.ReadInt32();
-        var payloadArray = reader.ReadBytes(length);
-        return new(IdSpan.UnsafeCreate(payloadArray, hashCode));
-    }
-
-    /// <inheritdoc />
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public DurableTaskClientAddress ReadValue<TInput>(ref Reader<TInput> reader, Field field)
-    {
-        field.EnsureWireType(WireType.LengthPrefixed);
-        ReferenceCodec.MarkValueField(reader.Session);
-
-        var length = reader.ReadVarUInt32();
-        if (length == 0)
-            return default;
-
-        var hashCode = reader.ReadInt32();
-        var payloadArray = reader.ReadBytes(length - sizeof(int));
-        return new(IdSpan.UnsafeCreate(payloadArray, hashCode));
-    }
+    bool TryGetAddress(IDurableTaskObserverGrainExtension client, out DurableTaskObserverAddress address);
+    bool TryGetClient(DurableTaskObserverAddress address, [NotNullWhen(true)] out IDurableTaskObserverGrainExtension? client);
 }

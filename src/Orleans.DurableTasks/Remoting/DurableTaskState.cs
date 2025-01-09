@@ -5,7 +5,7 @@ namespace Orleans.DurableTasks.Remoting;
 /*
  * Grain activates
  * Grain enumerates stored pending tasks and re-invokes any which are not completed.
- *   * Some tasks will not be directly invokable, since they represent local methods on a grain (not remote requests to the grain)
+ *   * Some tasks will not be directly invokable since they represent local methods on a grain (not remote requests to the grain)
      * Those tasks do not need to be invoked.
  */
 
@@ -25,7 +25,7 @@ public interface IDurableTaskState
     /// In the case of nested tasks (eg, defined by local methods), there will typically be no clients.
     /// In that case, the result will not be 
     /// </remarks>
-    public IReadOnlySet<IDurableTaskClient>? Observers { get; }
+    public IReadOnlySet<DurableTaskObserverAddress>? Observers { get; }
 
     /// <summary>
     /// Gets or sets the invokable request.
@@ -62,10 +62,8 @@ public class DurableTaskState : IDurableTaskState
     /// In the case of nested tasks (eg, defined by local methods), there will typically be no clients.
     /// In that case, the result will not be 
     /// </remarks>
-    // TODO: Use GrainId or some other simply-serializable type instead of IDurableTaskClient, and potentially pair it with
-    // IDurableTaskClientReferenceFactory or some such to create the IDurableTaskClient references from the stored value.
     [Id(1)]
-    public HashSet<IDurableTaskClient>? Observers { get; set; }
+    public HashSet<DurableTaskObserverAddress>? Observers { get; set; }
 
     /// <summary>
     /// Gets or sets the invokable request.
@@ -86,7 +84,7 @@ public class DurableTaskState : IDurableTaskState
     public DateTimeOffset CreatedAt { get; set; }
 
     Response? IDurableTaskState.Result => Result;
-    IReadOnlySet<IDurableTaskClient>? IDurableTaskState.Observers => Observers;
+    IReadOnlySet<DurableTaskObserverAddress>? IDurableTaskState.Observers => Observers;
     IDurableTaskRequest? IDurableTaskState.Request => Request;
     DateTimeOffset? IDurableTaskState.CompletedAt => CompletedAt;
     DateTimeOffset IDurableTaskState.CreatedAt => CreatedAt;

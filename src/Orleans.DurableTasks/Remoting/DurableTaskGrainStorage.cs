@@ -1,4 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
@@ -11,7 +11,7 @@ public interface IDurableTaskGrainStorage
     IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request);
     void SetResponse(TaskId taskId, IDurableTaskState state, Response response);
 
-    void AddObserver(TaskId taskId, IDurableTaskState state, IDurableTaskClient observer);
+    void AddObserver(TaskId taskId, IDurableTaskState state, DurableTaskObserverAddress observer);
     void ClearObservers(TaskId taskId, IDurableTaskState state);
 
     bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state);
@@ -85,7 +85,7 @@ public class VolatileDurableTaskGrainStorage(
         AddOrUpdateTask(taskId, typedState);
     }
 
-    public void AddObserver(TaskId taskId, IDurableTaskState state, IDurableTaskClient observer) 
+    public void AddObserver(TaskId taskId, IDurableTaskState state, DurableTaskObserverAddress observer) 
     {
         var typedState = GetState(state);
         var clients = typedState.Observers ??= [];

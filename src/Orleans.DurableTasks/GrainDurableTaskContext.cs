@@ -44,6 +44,6 @@ internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskGrainRu
         }
     }
 
-    public bool TryGetTaskResponse(TaskId taskId, [NotNullWhen(true)] out Response? response) => Runtime.GetResponseOrCreateInternalTask(taskId, out response);
-    public void SetTaskResponse(TaskId taskId, Response response) => Runtime.SetInternalTaskResponse(taskId, response);
+    public bool TryGetTaskResponse(TaskId taskId, [NotNullWhen(true)] out Response? response) => Runtime.GetResponseOrCreateChildTask(taskId, out response);
+    public void SetTaskResponse(TaskId taskId, Response response) => Runtime.SetChildTaskResponse(taskId, response);
 }

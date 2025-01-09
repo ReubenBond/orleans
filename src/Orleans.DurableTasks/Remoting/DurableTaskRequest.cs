@@ -160,7 +160,9 @@ public abstract class DurableTaskRequest(IGrainContextAccessor grainContextAcces
     }
 
     /// <inheritdoc/>
-    ValueTask<Response> IInvokable.Invoke() => throw new NotImplementedException("Durable task requests can not be invoked directly");
+    ValueTask<Response> IInvokable.Invoke()
+        // This could be made to work... maybe pick a random task id, for example.
+        => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
     ValueTask<Response> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => InvokeInner().RunAsync(executionContext);
