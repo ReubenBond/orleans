@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Serialization</PackageId>
@@ -27,6 +27,10 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.Abstractions\Orleans.Serialization.Abstractions.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Analyzers\Orleans.Analyzers.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Serialization.UnitTests" />
   </ItemGroup>
 
 </Project>
