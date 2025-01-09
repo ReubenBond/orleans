@@ -14,8 +14,8 @@ public static class DurableTaskHostingExtensions
         siloBuilder.Services.AddScoped<DurableTaskGrainRuntime>();
         siloBuilder.Services.AddFromExisting<IDurableTaskGrainRuntime, DurableTaskGrainRuntime>();
         siloBuilder.Services.AddKeyedTransient<IGrainExtension>(typeof(IDurableTaskGrainExtension), (sp, _) => sp.GetRequiredService<DurableTaskGrainRuntime>());
-        siloBuilder.Services.AddKeyedTransient<IGrainExtension>(typeof(IDurableTaskServerGrainExtension), (sp, _) => sp.GetRequiredService<DurableTaskGrainRuntime>());
-        siloBuilder.Services.AddKeyedTransient<IGrainExtension>(typeof(IDurableTaskObserverGrainExtension), (sp, _) => sp.GetRequiredService<DurableTaskGrainRuntime>());
+        siloBuilder.Services.AddKeyedTransient<IGrainExtension>(typeof(IDurableTaskServer), (sp, _) => sp.GetRequiredService<DurableTaskGrainRuntime>());
+        siloBuilder.Services.AddKeyedTransient<IGrainExtension>(typeof(IDurableTaskObserver), (sp, _) => sp.GetRequiredService<DurableTaskGrainRuntime>());
 
         siloBuilder.Services.AddSingleton<DefaultRetryPolicy>();
         siloBuilder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);

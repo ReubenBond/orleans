@@ -4,7 +4,7 @@ using System.Text;
 namespace Orleans.DurableTasks.Remoting;
 
 /// <summary>
-/// Represents the address of a <see cref="IDurableTaskObserverGrainExtension"/>.
+/// Represents the address of a <see cref="IDurableTaskObserver"/>.
 /// </summary>
 [Serializable, GenerateSerializer, Immutable]
 [Alias("DurableTaskClientAddress")]

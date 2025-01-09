@@ -1,5 +1,6 @@
 ﻿namespace Orleans.DurableTasks;
 
+/*
 public abstract partial class DurableTask
 {
     public static async DurableTask<bool> Delay(TimeSpan duration)
@@ -45,4 +46,5 @@ public abstract partial class DurableTask
         return true;
     }
 }
+*/
 

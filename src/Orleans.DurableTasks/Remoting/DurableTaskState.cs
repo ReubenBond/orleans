@@ -25,7 +25,7 @@ public interface IDurableTaskState
     /// In the case of nested tasks (eg, defined by local methods), there will typically be no clients.
     /// In that case, the result will not be 
     /// </remarks>
-    public IReadOnlySet<DurableTaskObserverAddress>? Observers { get; }
+    public IReadOnlySet<IDurableTaskObserver>? Observers { get; }
 
     /// <summary>
     /// Gets or sets the invokable request.
@@ -63,7 +63,7 @@ public class DurableTaskState : IDurableTaskState
     /// In that case, the result will not be 
     /// </remarks>
     [Id(1)]
-    public HashSet<DurableTaskObserverAddress>? Observers { get; set; }
+    public HashSet<IDurableTaskObserver>? Observers { get; set; }
 
     /// <summary>
     /// Gets or sets the invokable request.
@@ -84,7 +84,7 @@ public class DurableTaskState : IDurableTaskState
     public DateTimeOffset CreatedAt { get; set; }
 
     Response? IDurableTaskState.Result => Result;
-    IReadOnlySet<DurableTaskObserverAddress>? IDurableTaskState.Observers => Observers;
+    IReadOnlySet<IDurableTaskObserver>? IDurableTaskState.Observers => Observers;
     IDurableTaskRequest? IDurableTaskState.Request => Request;
     DateTimeOffset? IDurableTaskState.CompletedAt => CompletedAt;
     DateTimeOffset IDurableTaskState.CreatedAt => CreatedAt;
