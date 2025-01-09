@@ -1,4 +1,5 @@
-using System.Diagnostics.Contracts;
+﻿using System.Diagnostics.Contracts;
+using Orleans.DurableTasks.Scheduling;
 
 namespace Orleans.DurableTasks;
 

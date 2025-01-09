@@ -1,4 +1,4 @@
-namespace Orleans.DurableTasks;
+﻿namespace Orleans.DurableTasks.Scheduling;
 
 public abstract class RetryPolicy
 {

@@ -1,6 +1,6 @@
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using Orleans.DurableTasks;
-namespace PaymentWorkflowApp;
+namespace PaymentWorkflowApp.Runtime;
 
 public interface IJobStorage
 {
@@ -10,7 +10,7 @@ public interface IJobStorage
 
     // Removes a request and its state
     bool RemoveTask(TaskId taskId);
-    
+
     ValueTask WriteAsync();
     ValueTask ReadAsync();
 }

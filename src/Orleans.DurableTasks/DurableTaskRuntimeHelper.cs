@@ -1,4 +1,4 @@
-using Orleans.Serialization.Invocation;
+﻿using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;
 
@@ -10,7 +10,7 @@ public static class DurableTaskRuntimeHelper
     /// <param name="task">The task.</param>
     /// <param name="context">The task context.</param>
     /// <returns>The result of invocation.</returns>
-    public static ValueTask<Response> InvokeAsync(DurableTask task, DurableTaskContext context) => task.InvokeAsync(context);
+    public static ValueTask<Response> RunAsync(DurableTask task, DurableTaskContext context) => task.RunAsync(context);
 
     /// <summary>
     /// Sets the result of a durable task context.

@@ -11,9 +11,6 @@ using Azure.Core.Pipeline;
 using Azure.Core;
 using System.Diagnostics;
 using Newtonsoft.Json;
-using Microsoft.Extensions.Azure;
-using Orleans.CodeGeneration;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.DurableTasks.Playground;
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
@@ -39,7 +36,6 @@ public static class DurableTaskHostingExtensions
 public class Program
 {
     [Alias("Program.IBankGrain")]
-    [Version(1)]
     public interface IBankGrain : IGrainWithStringKey
     {
         [Alias("Transfer")]

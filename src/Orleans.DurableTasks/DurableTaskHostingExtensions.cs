@@ -1,8 +1,8 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration.Internal;
 using Orleans.DurableTasks.Remoting;
-using Orleans.Runtime;
+using Orleans.DurableTasks.Scheduling;
 
 namespace Orleans.DurableTasks;
 

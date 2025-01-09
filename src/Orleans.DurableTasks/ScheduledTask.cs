@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;
@@ -84,12 +84,11 @@ public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 {
     private readonly ValueTaskAwaiter _awaiter;
 
-    internal ScheduledTaskAwaiter(ScheduledTask durableTaskInvocation)
-    {
+    internal ScheduledTaskAwaiter(ScheduledTask durableTaskInvocation) =>
 #pragma warning disable CA2012 // Use ValueTasks correctly
         _awaiter = durableTaskInvocation.AsUntypedValueTask().GetAwaiter();
 #pragma warning restore CA2012 // Use ValueTasks correctly
-    }
+
 
     /// <summary>
     /// Gets the result of the task.
@@ -116,12 +115,11 @@ public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
 {
     private readonly ValueTaskAwaiter<Response> _awaiter;
 
-    internal ScheduledTaskAwaiter(ScheduledTask<TResult> durableTaskInvocation)
-    {
+    internal ScheduledTaskAwaiter(ScheduledTask<TResult> durableTaskInvocation) =>
 #pragma warning disable CA2012 // Use ValueTasks correctly
         _awaiter = durableTaskInvocation.AsValueTask().GetAwaiter();
 #pragma warning restore CA2012 // Use ValueTasks correctly
-    }
+
 
     /// <summary>
     /// Gets the result of the task.

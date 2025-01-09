@@ -1,11 +1,12 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Remoting;
+using Orleans.DurableTasks.Scheduling;
 using Orleans.Serialization.Invocation;
-namespace PaymentWorkflowApp;
+namespace PaymentWorkflowApp.Runtime;
 
 public class JobDescription
 {
@@ -121,7 +122,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
     }
     public void AddHandler(string jobType, Func<string[], string> handler) => _handlers[jobType] = handler;
 
-    public DurableTask<string> GetOrCreateJob(string jobType, params string[]? args) => new JobTask(jobType, args, this);
+    public DurableTask<string> CreateJob(string jobType, params string[]? args) => new JobTask(jobType, args, this);
 
     public async IAsyncEnumerable<JobDescription> GetJobsAsync(bool includeCompleted = true)
     {
@@ -155,18 +156,6 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
             yield return description;
         }
     }
-
-    /*
-    public async ValueTask Cancel(TaskId jobId)
-    {
-        if (!_tasks.TryGetValue(jobId, out var jobContext))
-        {
-            return;
-        }
-
-        jobContext.
-    }
-    */
 
     internal async ValueTask<DurableTaskContext> ScheduleAsync(JobTask job, TaskId taskId, SchedulingOptions? options)
     {
@@ -204,11 +193,12 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         var ctx = await EvaluateStepAsync(taskId, taskDefinition, cancellationToken);
         return await DurableTaskRuntimeHelper.AsValueTask(ctx);
     }
-    public async ValueTask<DurableTaskContext> EvaluateStepAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+
+    private async ValueTask<DurableTaskContext> EvaluateStepAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
     {
         try
         {
-            await _asyncLock.WaitAsync();
+            await _asyncLock.WaitAsync(cancellationToken);
 
             if (!TryGetExecutionContext(taskId, out var executionContext))
             {
@@ -217,7 +207,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
 
             try
             {
-                var response = await DurableTaskRuntimeHelper.InvokeAsync(taskDefinition, executionContext);
+                var response = await DurableTaskRuntimeHelper.RunAsync(taskDefinition, executionContext);
                 await CompleteRequestWithResponse(taskId, response, executionContext);
             }
             catch (Exception exception)
@@ -244,7 +234,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
 
         try
         {
-            var response = await DurableTaskRuntimeHelper.InvokeAsync(job, executionContext);
+            var response = await DurableTaskRuntimeHelper.RunAsync(job, executionContext);
 
             await CompleteRequestWithResponse(taskId, response, executionContext);
         }
@@ -384,7 +374,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
             return _jobScheduler.ScheduleAsync(this, taskId, options);
         }
 
-        protected override async ValueTask<Response> InvokeAsync(DurableTaskContext executionContext)
+        protected override async ValueTask<Response> RunAsync(DurableTaskContext executionContext)
         {
             var handler = _jobScheduler._handlers[Type];
             Response response;
@@ -397,7 +387,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
             else if (handler is Func<string[]?, DurableTask<string>> durableTaskJob)
             {
                 // This might be a bit confusing: we are forwarding the invocation on to the async method.
-                response = await DurableTaskRuntimeHelper.InvokeAsync(durableTaskJob(Arguments), executionContext);
+                response = await DurableTaskRuntimeHelper.RunAsync(durableTaskJob(Arguments), executionContext);
             }
             else
             {

@@ -1,6 +1,6 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using Orleans.DurableTasks.Remoting;
-using Orleans.Runtime;
+using Orleans.DurableTasks.Scheduling;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;
@@ -32,7 +32,7 @@ public abstract partial class DurableTask
     /// </summary>
     /// <param name="context">The task context.</param>
     /// <returns>The response.</returns>
-    protected internal abstract ValueTask<Response> InvokeAsync(DurableTaskContext context);
+    protected internal abstract ValueTask<Response> RunAsync(DurableTaskContext context);
 }
 
 [InvokableBaseType(typeof(GrainReference), typeof(DurableTask<>), typeof(DurableTaskRequest<>))]
@@ -50,7 +50,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask>(TDurableTask task) where
     internal TaskId Id;
     internal SchedulingOptions? SchedulingOptions;
 
-    internal ValueTask<Response> InvokeAsync()
+    internal ValueTask<Response> RunAsync()
     {
         if (ParentContext is { } parentContext)
         {
@@ -62,7 +62,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask>(TDurableTask task) where
 
             // Evaluates the task: if it is a local method, it will be executed immediately.
             // This will return once the task has completed.
-            return parentContext.InvokeAsync(Id, Task, CancellationToken.None);
+            return parentContext.RunAsync(Id, Task, CancellationToken.None);
         }
         else if (Task is ISchedulableTask schedulableTask)
         {
@@ -82,7 +82,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask>(TDurableTask task) where
         }
     }
 
-    private async readonly ValueTask<Response> ScheduleAndAwaitAsync(ISchedulableTask schedulableTask)
+    private readonly async ValueTask<Response> ScheduleAndAwaitAsync(ISchedulableTask schedulableTask)
     {
         var context = await schedulableTask.ScheduleAsync(Id, SchedulingOptions);
         return await context.AsValueTask();
@@ -115,7 +115,7 @@ public struct ConfiguredDurableTask(DurableTask task)
 {
     private ConfiguredDurableTaskCore<DurableTask> _core = new(task);
 
-    public DurableTaskAwaiter GetAwaiter() => new (_core.InvokeAsync());
+    public DurableTaskAwaiter GetAwaiter() => new (_core.RunAsync());
 
     internal readonly DurableTask Task => _core.Task;
     internal TaskId Id { set => _core.Id = value; readonly get => _core.Id; }
@@ -132,7 +132,8 @@ public struct ConfiguredDurableTask(DurableTask task)
         return this;
     }
 
-    public async readonly ValueTask<ScheduledTask> ScheduleAsync()
+    // Schedules a durable task without waiting for the task to complete
+    public readonly async ValueTask<ScheduledTask> ScheduleAsync()
     {
         if (Task is not ISchedulableTask schedulableTask)
         {
@@ -165,7 +166,7 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
         return this;
     }
 
-    public async readonly ValueTask<ScheduledTask<TResult>> ScheduleAsync()
+    public readonly async ValueTask<ScheduledTask<TResult>> ScheduleAsync()
     {
         if (Task is not ISchedulableTask schedulableTask)
         {
@@ -176,7 +177,7 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
         return new ScheduledDurableTask<TResult>(executionContext);
     }
 
-    public DurableTaskAwaiter<TResult> GetAwaiter() => new (_core.InvokeAsync());
+    public DurableTaskAwaiter<TResult> GetAwaiter() => new (_core.RunAsync());
 }
 
 /// <summary>
@@ -185,7 +186,7 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
 internal sealed class CompletedDurableTask<TResult>(TResult value) : DurableTask<TResult>
 {
     /// <inheritdoc/>
-    protected internal override ValueTask<Response> InvokeAsync(DurableTaskContext context) => new(Response.FromResult(value));
+    protected internal override ValueTask<Response> RunAsync(DurableTaskContext context) => new(Response.FromResult(value));
 }
 
 /// <summary>
@@ -194,7 +195,7 @@ internal sealed class CompletedDurableTask<TResult>(TResult value) : DurableTask
 internal sealed class AsyncTaskDelegateDurableTask<TResult>(Func<CancellationToken, Task<TResult>> func) : DurableTask<TResult>
 {
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext context)
+    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext context)
     {
         try
         {
@@ -214,7 +215,7 @@ internal sealed class AsyncTaskDelegateDurableTask<TResult>(Func<CancellationTok
 internal sealed class AsyncTaskDelegateDurableTask(Func<CancellationToken, Task> func) : DurableTask
 {
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext context)
+    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext context)
     {
         try
         {
@@ -235,7 +236,7 @@ internal sealed class AsyncTaskDelegateDurableTask(Func<CancellationToken, Task>
 internal sealed class AsyncDelegateDurableTask<TResult>(Func<CancellationToken, ValueTask<TResult>> func) : DurableTask<TResult>
 {
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext context)
+    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext context)
     {
         try
         {
@@ -255,7 +256,7 @@ internal sealed class AsyncDelegateDurableTask<TResult>(Func<CancellationToken, 
 internal sealed class AsyncDelegateDurableTask(Func<CancellationToken, ValueTask> func) : DurableTask
 {
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext context)
+    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext context)
     {
         try
         {
@@ -276,7 +277,7 @@ internal sealed class AsyncDelegateDurableTask(Func<CancellationToken, ValueTask
 internal sealed class DelegateDurableTask<TResult>(Func<CancellationToken, TResult> func) : DurableTask<TResult>
 {
     /// <inheritdoc/>
-    protected internal override ValueTask<Response> InvokeAsync(DurableTaskContext context)
+    protected internal override ValueTask<Response> RunAsync(DurableTaskContext context)
     {
         try
         {
@@ -296,7 +297,7 @@ internal sealed class DelegateDurableTask<TResult>(Func<CancellationToken, TResu
 internal sealed class DelegateDurableTask(Action<CancellationToken> func) : DurableTask
 {
     /// <inheritdoc/>
-    protected internal override ValueTask<Response> InvokeAsync(DurableTaskContext context)
+    protected internal override ValueTask<Response> RunAsync(DurableTaskContext context)
     {
         try
         {
@@ -311,19 +312,13 @@ internal sealed class DelegateDurableTask(Action<CancellationToken> func) : Dura
     }
 }
 
-
-//
-
-
-
-
 /// <summary>
 /// Represents a <see cref="DurableTask{TResult}"/> instance which invokes a delegate.
 /// </summary>
 internal sealed class AsyncTaskDelegateDurableTaskWithState<TState, TResult>(Func<TState, CancellationToken, Task<TResult>> func, TState state) : DurableTask<TResult>
 {
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext context)
+    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext context)
     {
         try
         {
@@ -343,7 +338,7 @@ internal sealed class AsyncTaskDelegateDurableTaskWithState<TState, TResult>(Fun
 internal sealed class AsyncTaskDelegateDurableTaskWithState<TState>(Func<TState, CancellationToken, Task> func, TState state) : DurableTask
 {
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext context)
+    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext context)
     {
         try
         {
@@ -364,7 +359,7 @@ internal sealed class AsyncTaskDelegateDurableTaskWithState<TState>(Func<TState,
 internal sealed class AsyncDelegateDurableTaskWithState<TState, TResult>(Func<TState, CancellationToken, ValueTask<TResult>> func, TState state) : DurableTask<TResult>
 {
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext context)
+    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext context)
     {
         try
         {
@@ -384,7 +379,7 @@ internal sealed class AsyncDelegateDurableTaskWithState<TState, TResult>(Func<TS
 internal sealed class AsyncDelegateDurableTaskWithState<TState>(Func<TState, CancellationToken, ValueTask> func, TState state) : DurableTask
 {
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> InvokeAsync(DurableTaskContext context)
+    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext context)
     {
         try
         {
@@ -405,7 +400,7 @@ internal sealed class AsyncDelegateDurableTaskWithState<TState>(Func<TState, Can
 internal sealed class DelegateDurableTaskWithState<TState, TResult>(Func<TState, CancellationToken, TResult> func, TState state) : DurableTask<TResult>
 {
     /// <inheritdoc/>
-    protected internal override ValueTask<Response> InvokeAsync(DurableTaskContext context)
+    protected internal override ValueTask<Response> RunAsync(DurableTaskContext context)
     {
         try
         {
@@ -425,7 +420,7 @@ internal sealed class DelegateDurableTaskWithState<TState, TResult>(Func<TState,
 internal sealed class DelegateDurableTaskWithState<TState>(Action<TState, CancellationToken> func, TState state) : DurableTask
 {
     /// <inheritdoc/>
-    protected internal override ValueTask<Response> InvokeAsync(DurableTaskContext context)
+    protected internal override ValueTask<Response> RunAsync(DurableTaskContext context)
     {
         try
         {

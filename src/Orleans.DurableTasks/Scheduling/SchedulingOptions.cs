@@ -1,4 +1,4 @@
-namespace Orleans.DurableTasks;
+﻿namespace Orleans.DurableTasks.Scheduling;
 
 [GenerateSerializer]
 [Alias("SchedulingOptions")]

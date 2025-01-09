@@ -1,7 +1,7 @@
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using Orleans.DurableTasks;
 using Orleans.Serialization;
-namespace PaymentWorkflowApp;
+namespace PaymentWorkflowApp.Runtime;
 
 internal class VolatileJobStorage(DeepCopier<Dictionary<TaskId, JobTaskState>> storageCopier, DeepCopier<JobTaskState> stateCopier) : IJobStorage
 {
