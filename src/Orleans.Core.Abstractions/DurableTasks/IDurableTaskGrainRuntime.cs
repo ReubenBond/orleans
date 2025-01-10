@@ -1,0 +1,76 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Distributed.DurableTasks;
+using System.Threading;
+using System.Threading.Tasks;
+using Orleans.Concurrency;
+using Orleans.Runtime;
+using Orleans.Serialization.Invocation;
+
+namespace Orleans.DurableTasks;
+
+[Alias("IDurableTaskObserverGrainExtension")]
+public interface IDurableTaskObserver : IGrainExtension
+{
+    // Called when a remotely scheduled request completes
+    // Successful completion of this method indicates that the observer has durably acknowledged the response and should not rely on receiving any further notifications about the specified `taskId`
+    [AlwaysInterleave]
+    [Alias("OnResponse")]
+    ValueTask OnResponseAsync(TaskId taskId, Response response);
+}
+
+[Alias("IDurableTaskServerGrainExtension")]
+public interface IDurableTaskServer : IGrainExtension
+{
+    // Called by DurableTaskRequest.Invoke to ensure that a task is scheduled
+    [Alias("ScheduleAsync")]
+    ValueTask<Response> ScheduleAsync(IDurableTaskRequest request);
+
+    // API used by ScheduledTask/<T> to check for a result for a task.
+    // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
+    [Alias("SubscribeOrPollAsync")]
+    ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver client);
+}
+
+[Alias("IDurableTaskGrainExtension")]
+public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServer, IDurableTaskObserver
+{
+    [Alias("GetTasksAsync")]
+    IAsyncEnumerable<(TaskId TaskId, DurableTaskDiagnosticState State)> GetTasksAsync();
+
+    [Alias("GetRunningTasksAsync")]
+    IAsyncEnumerable<TaskId> GetRunningTasksAsync();
+}
+
+[GenerateSerializer]
+[Alias("DurableTaskDiagnosticState")]
+public struct DurableTaskDiagnosticState
+{
+    [Id(0)]
+    public DateTimeOffset? CreatedAt { get; set; }
+
+    [Id(1)]
+    public DateTimeOffset? CompletedAt { get; set; }
+
+    [Id(2)]
+    public string Status { get; set; }
+
+    [Id(3)]
+    public string Request { get; set; }
+
+    [Id(4)]
+    public string Response { get; set; }
+
+    [Id(5)]
+    public List<string> Waiters { get; set; }
+
+    public override readonly string ToString() => $"[{Status}, Created: {CreatedAt}, Completed: {CompletedAt}, Request: {Request}, Response: {Response}, Waiters: {string.Join(", ", Waiters ?? [])}]";
+}
+
+public interface IDurableTaskGrainRuntime
+{
+    ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
+    bool GetResponseOrCreateChildTask(TaskId taskId, [NotNullWhen(true)] out Response response);
+    void SetChildTaskResponse(TaskId taskId, Response response);
+}

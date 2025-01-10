@@ -1,8 +1,12 @@
-﻿using System.Distributed.DurableTasks.Scheduling;
+﻿#nullable enable
+using System;
+using System.Distributed.DurableTasks.Scheduling;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration.Internal;
-using Orleans.DurableTasks.Remoting;
+using Orleans.Hosting;
+using Orleans.Runtime;
+using Orleans.Runtime.DurableTasks;
 
 namespace Orleans.DurableTasks;
 

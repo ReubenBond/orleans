@@ -1,29 +1,15 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿#nullable enable
+using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
-namespace Orleans.DurableTasks.Remoting;
-
-public interface IDurableTaskGrainStorage
-{
-    IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks { get; }
-
-    IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request);
-    void SetResponse(TaskId taskId, IDurableTaskState state, Response response);
-
-    void AddObserver(TaskId taskId, IDurableTaskState state, IDurableTaskObserver observer);
-    void ClearObservers(TaskId taskId, IDurableTaskState state);
-
-    bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state);
-
-    // Removes a request and its state
-    bool RemoveTask(TaskId taskId);
-    void Clear();
-    
-    ValueTask WriteAsync(CancellationToken cancellationToken);
-    ValueTask ReadAsync(CancellationToken cancellationToken);
-}
+namespace Orleans.DurableTasks;
 
 public class VolatileDurableTaskGrainStorage(
     DeepCopier<Dictionary<TaskId, DurableTaskState>> storageCopier,
@@ -64,7 +50,7 @@ public class VolatileDurableTaskGrainStorage(
         return default;
     }
 
-    public IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request)
+    public IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest request)
     {
         if (!TryGetTask(taskId, out var result))
         {
@@ -86,7 +72,7 @@ public class VolatileDurableTaskGrainStorage(
         AddOrUpdateTask(taskId, typedState);
     }
 
-    public void AddObserver(TaskId taskId, IDurableTaskState state, IDurableTaskObserver observer) 
+    public void AddObserver(TaskId taskId, IDurableTaskState state, IDurableTaskObserver observer)
     {
         var typedState = GetState(state);
         var clients = typedState.Observers ??= [];

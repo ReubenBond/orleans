@@ -1,5 +1,4 @@
-﻿using Orleans.DurableTasks;
-using Orleans.Serialization.Invocation;
+﻿using Orleans.Serialization.Invocation;
 
 namespace System.Distributed.DurableTasks;
 
@@ -23,5 +22,5 @@ public static class DurableTaskRuntimeHelper
     public static void SetCurrentContext(DurableTaskContext? context) => DurableTaskContext.SetCurrentContext(context);
     public static void SetCurrentContext(DurableTaskContext? context, out DurableTaskContext? previous) => DurableTaskContext.SetCurrentContext(context, out previous);
 
-    public static ValueTask<Response> AsValueTask(DurableTaskContext context) => context.AsValueTask();
+    public static ValueTask<Response> GetResponseAsync(DurableTaskContext context) => context.AsValueTask();
 }

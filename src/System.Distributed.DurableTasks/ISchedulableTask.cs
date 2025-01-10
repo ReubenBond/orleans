@@ -1,5 +1,4 @@
 ﻿using System.Distributed.DurableTasks.Scheduling;
-using Orleans.DurableTasks;
 
 namespace System.Distributed.DurableTasks;
 

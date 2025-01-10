@@ -1,80 +1,20 @@
-﻿using System.Collections.Immutable;
+﻿#nullable enable
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
 using System.Distributed.DurableTasks.Scheduling;
+using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Concurrency;
+using Orleans.DurableTasks;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.Invocation;
 
-namespace Orleans.DurableTasks.Remoting;
-
-[Alias("IDurableTaskObserverGrainExtension")]
-public interface IDurableTaskObserver : IGrainExtension
-{
-    // Called when a remotely scheduled request completes
-    // Successful completion of this method indicates that the observer has durably acknowledged the response and should not rely on receiving any further notifications about the specified `taskId`
-    [AlwaysInterleave]
-    [Alias("OnResponse")]
-    ValueTask OnResponseAsync(TaskId taskId, Response response);
-}
-
-[Alias("IDurableTaskServerGrainExtension")]
-public interface IDurableTaskServer : IGrainExtension
-{
-    // Called by DurableTaskRequest.Invoke to ensure that a task is scheduled
-    [Alias("ScheduleAsync")]
-    ValueTask<Response> ScheduleAsync(IDurableTaskRequest request);
-
-    // API used by ScheduledTask/<T> to check for a result for a task.
-    // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
-    [Alias("SubscribeOrPollAsync")]
-    ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver? client);
-}
-
-[Alias("IDurableTaskGrainExtension")]
-public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServer, IDurableTaskObserver
-{
-    [Alias("GetTasksAsync")]
-    IAsyncEnumerable<(TaskId TaskId, DurableTaskDiagnosticState State)> GetTasksAsync();
-
-    [Alias("GetRunningTasksAsync")]
-    IAsyncEnumerable<TaskId> GetRunningTasksAsync();
-}
-
-[GenerateSerializer]
-[Alias("DurableTaskDiagnosticState")]
-public struct DurableTaskDiagnosticState
-{
-    [Id(0)]
-    public DateTimeOffset? CreatedAt { get; set; }
-
-    [Id(1)]
-    public DateTimeOffset? CompletedAt { get; set; }
-
-    [Id(2)]
-    public string Status { get; set; }
-
-    [Id(3)]
-    public string? Request { get; set; }
-
-    [Id(4)]
-    public string? Response { get; set; }
-
-    [Id(5)]
-    public List<string>? Waiters { get; set; }
-
-    public override readonly string? ToString() => $"[{Status}, Created: {CreatedAt}, Completed: {CompletedAt}, Request: {Request}, Response: {Response}, Waiters: {string.Join(", ", Waiters ?? [])}]";
-}
-
-public interface IDurableTaskGrainRuntime
-{
-    ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
-    bool GetResponseOrCreateChildTask(TaskId taskId, [NotNullWhen(true)] out Response? response);
-    void SetChildTaskResponse(TaskId taskId, Response response);
-}
+namespace Orleans.Runtime.DurableTasks;
 
 internal sealed class DurableTaskGrainRuntimeShared(
     IGrainContextAccessor grainContextAccessor,
@@ -130,7 +70,7 @@ internal sealed class DurableTaskGrainRuntime(
             // If the task has completed, set the result now.
             if (state.Result is { } response)
             {
-                executionContext.SetResult(response);
+                DurableTaskRuntimeHelper.SetResult(executionContext, response);
             }
 
             // Move the task into the list of active tasks.
@@ -220,7 +160,7 @@ internal sealed class DurableTaskGrainRuntime(
         }
 
         _storage.SetResponse(taskId, context.State, response);
-        context.SetResult(response);
+        DurableTaskRuntimeHelper.SetResult(context, response);
     }
 
     /// <summary>
@@ -246,7 +186,7 @@ internal sealed class DurableTaskGrainRuntime(
         await _storage.WriteAsync(CancellationToken.None);
 
         // Propagate the response to the application.
-        context.SetResult(response);
+        DurableTaskRuntimeHelper.SetResult(context, response);
     }
 
     /// <summary>
@@ -273,20 +213,20 @@ internal sealed class DurableTaskGrainRuntime(
 
         if (TryGetExecutionContext(taskId, out var executionContext))
         {
-/*
-            // Checking equivalence like this is fraught with danger. It might be better to compare serialized or stringified versions of the requests instead of
-            // Using object.Equals(left, right) on the arguments
-            // Alternatively/optionally, we could support configurable equality comparer implementations per argument type.
-            var existingRequest = executionContext.State.Request;
-            if (!AreRequestsEquivalent(existingRequest!, request))
-            {
-                var message = $"Attempt to schedule a duplicate task, non-equivalent tasks with id {taskId}.\nExisting: {existingRequest?.ToMethodCallString()}.\nIncoming: {request.ToMethodCallString()}";
-                throw new InvalidOperationException(message);
-            }
-*/
+            /*
+                        // Checking equivalence like this is fraught with danger. It might be better to compare serialized or stringified versions of the requests instead of
+                        // Using object.Equals(left, right) on the arguments
+                        // Alternatively/optionally, we could support configurable equality comparer implementations per argument type.
+                        var existingRequest = executionContext.State.Request;
+                        if (!AreRequestsEquivalent(existingRequest!, request))
+                        {
+                            var message = $"Attempt to schedule a duplicate task, non-equivalent tasks with id {taskId}.\nExisting: {existingRequest?.ToMethodCallString()}.\nIncoming: {request.ToMethodCallString()}";
+                            throw new InvalidOperationException(message);
+                        }
+            */
 
             // This is not a new request, so either poll it or subscribe the client to receive a notification once it has completed.
-            var responseTask = executionContext.AsValueTask();
+            var responseTask = DurableTaskRuntimeHelper.GetResponseAsync(executionContext);
             if (client is not null)
             {
                 // The client will receive a callback with the response, rather than receiving an immediate response.
@@ -325,7 +265,7 @@ internal sealed class DurableTaskGrainRuntime(
         };
     }
 
-    private async ValueTask SubscribeClientAsync(TaskId taskId, GrainDurableTaskContext executionContext, IDurableTaskObserver? client, CancellationToken cancellationToken)
+    private async ValueTask SubscribeClientAsync(TaskId taskId, GrainDurableTaskContext executionContext, IDurableTaskObserver client, CancellationToken cancellationToken)
     {
         if (client is not null)
         {
@@ -364,7 +304,7 @@ internal sealed class DurableTaskGrainRuntime(
             executionContext = await CreateExecutionContextAsync(taskId, cancellationToken);
         }
 
-        var storedResponse = executionContext.AsValueTask();
+        var storedResponse = DurableTaskRuntimeHelper.GetResponseAsync(executionContext);
 
         // If the task has already completed, there is no need to start it again.
         if (!storedResponse.IsCompleted)
@@ -372,7 +312,7 @@ internal sealed class DurableTaskGrainRuntime(
             try
             {
                 // Invoke the method immediately.
-                var immediateResponse = await durableTask.RunAsync(executionContext);
+                var immediateResponse = await DurableTaskRuntimeHelper.RunAsync(durableTask, executionContext);
 
                 if (immediateResponse is PendingResponse)
                 {
@@ -400,7 +340,7 @@ internal sealed class DurableTaskGrainRuntime(
                                 else
                                 {
                                     // Resubmit the request, relying on idempotency.
-                                    response = await durableTask.RunAsync(executionContext);
+                                    response = await DurableTaskRuntimeHelper.RunAsync(durableTask, executionContext);
                                 }
 
                                 if (response is not PendingResponse)
@@ -495,7 +435,7 @@ internal sealed class DurableTaskGrainRuntime(
             // That is ok: we want to ensure that every client always sees the same result for a task, so it is important to persist the task before notifying the first client.
             _storage.SetResponse(taskId, state, response);
             await _storage.WriteAsync(cancellationToken);
-            executionContext.SetResult(response);
+            DurableTaskRuntimeHelper.SetResult(executionContext, response);
         }
 
         await NotifyClientsAndCleanupTask(taskId, executionContext, cancellationToken);
@@ -516,7 +456,7 @@ internal sealed class DurableTaskGrainRuntime(
             {
                 var clientTasks = new List<Task>();
                 var clientCount = 0;
-                
+
                 var state = executionContext.State;
                 if (state.Observers is { } clients)
                 {
@@ -674,7 +614,7 @@ internal sealed class DurableTaskGrainRuntime(
     }
 
     /// <inheritdoc/>
-    public ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver? client)
+    public ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver client)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {

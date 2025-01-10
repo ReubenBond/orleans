@@ -1,4 +1,4 @@
-﻿namespace Orleans.DurableTasks.Playground;
+﻿namespace WorkflowsApp.Service;
 
 [GenerateSerializer, Immutable]
 [Alias("CompletionState`1")]

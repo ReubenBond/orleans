@@ -1,10 +1,12 @@
-﻿using System.Buffers;
+﻿using System;
+using System.Buffers;
 using System.Runtime.CompilerServices;
+using Orleans.Runtime;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.WireProtocol;
 
-namespace Orleans.DurableTasks.Remoting;
+namespace Orleans.DurableTasks;
 
 /// <summary>
 /// Functionality for serializing and deserializing <see cref="DurableTaskObserverAddress"/> instances.

@@ -15,4 +15,8 @@
     <InternalsVisibleTo Include="Orleans.DurableTasks.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Serialization\Orleans.Serialization.csproj" />
+  </ItemGroup>
+
 </Project>

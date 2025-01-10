@@ -1,12 +1,10 @@
 ﻿using System.Distributed.DurableTasks.Scheduling;
 using System.Runtime.CompilerServices;
 using Orleans;
-using Orleans.DurableTasks;
 using Orleans.Serialization.Invocation;
 
 namespace System.Distributed.DurableTasks;
 
-[InvokableBaseType(typeof(GrainReference), typeof(DurableTask), typeof(DurableTaskRequest))]
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
 [GenerateSerializer, SerializerTransparent]
 [Alias("DurableTask")]
@@ -36,7 +34,6 @@ public abstract partial class DurableTask
     protected internal abstract ValueTask<Response> RunAsync(DurableTaskContext context);
 }
 
-[InvokableBaseType(typeof(GrainReference), typeof(DurableTask<>), typeof(DurableTaskRequest<>))]
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder<>))]
 [GenerateSerializer, SerializerTransparent]
 [Alias("DurableTask`1")]

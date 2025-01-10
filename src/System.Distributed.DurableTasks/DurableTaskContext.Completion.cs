@@ -1,9 +1,8 @@
 ﻿using System.Buffers;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Distributed.DurableTasks;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Sources;
+using Orleans;
 using Orleans.Serialization;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Buffers;
@@ -67,7 +66,6 @@ public readonly struct DurableTaskResultAwaiter<TResult> : INotifyCompletion, IC
 [Immutable, UseActivator, SuppressReferenceTracking]
 [Alias("PendingResponse")]
 public sealed class PendingResponse : Response
-
 {
     /// <summary>
     /// Gets the singleton instance of this class.
@@ -182,7 +180,6 @@ internal sealed class UnknownTaskResponseActivator : IActivator<UnknownTaskRespo
 {
     /// <inheritdoc/>
     public UnknownTaskResponse Create() => UnknownTaskResponse.Instance;
-
 }
 
 [RegisterSerializer, RegisterCopier]

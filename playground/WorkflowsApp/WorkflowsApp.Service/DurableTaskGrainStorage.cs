@@ -3,13 +3,13 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
 using System.Runtime.CompilerServices;
-using Orleans.DurableTasks.Remoting;
+using Orleans.DurableTasks;
 using Orleans.Journaling;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Invocation;
 
-namespace Orleans.DurableTask.Playground;
+namespace WorkflowsApp.Service;
 
 internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurableStateMachine
 {

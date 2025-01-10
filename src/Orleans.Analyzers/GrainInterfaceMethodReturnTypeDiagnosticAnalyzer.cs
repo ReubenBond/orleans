@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -18,8 +18,8 @@ namespace Orleans.Analyzers
             (new [] { "System", "Threading", "Tasks" }, "ValueTask"),
             (new [] { "System", "Threading", "Tasks" }, "ValueTask`1"),
             (new [] { "System", "Collections", "Generic" }, "IAsyncEnumerable`1"),
-            (new [] { "Orleans", "DurableTasks" }, "DurableTask"),
-            (new [] { "Orleans", "DurableTasks" }, "DurableTask`1"),
+            (new [] { "System", "Distributed", "DurableTasks" }, "DurableTask"),
+            (new [] { "System", "Distributed", "DurableTasks" }, "DurableTask`1"),
             (new [] { "System" }, "Void")
         };
         public const string DiagnosticId = "ORLEANS0009";

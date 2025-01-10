@@ -1,7 +1,7 @@
 ﻿using System.Distributed.DurableTasks;
 using Orleans.Journaling;
 
-namespace Orleans.DurableTasks.Playground;
+namespace WorkflowsApp.Service;
 
 [Alias("IDurableTaskCompletionSourceGrain`1")]
 public interface IDurableTaskCompletionSourceGrain<T> : IGrain

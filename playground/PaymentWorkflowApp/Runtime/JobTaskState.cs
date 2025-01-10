@@ -3,6 +3,7 @@ using Orleans.Serialization.Invocation;
 namespace PaymentWorkflowApp.Runtime;
 
 [GenerateSerializer]
+[Alias("JobTaskState")]
 public class JobTaskState
 {
     /// <summary>
@@ -38,5 +39,6 @@ public class JobTaskState
     /// <summary>
     /// Gets or sets the tasks which 
     /// </summary>
+    [Id(5)]
     public TaskId[]? CanceledAfter { get; set; }
 }
