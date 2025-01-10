@@ -4,7 +4,6 @@ using System.Distributed.DurableTasks;
 using System.Distributed.DurableTasks.Scheduling;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
-using Orleans.DurableTasks;
 using Orleans.Serialization.Invocation;
 namespace PaymentWorkflowApp.Runtime;
 
@@ -191,7 +190,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
     public async ValueTask<Response> InvokeAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
     {
         var ctx = await EvaluateStepAsync(taskId, taskDefinition, cancellationToken);
-        return await DurableTaskRuntimeHelper.AsValueTask(ctx);
+        return await DurableTaskRuntimeHelper.GetResponseAsync(ctx);
     }
 
     private async ValueTask<DurableTaskContext> EvaluateStepAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)

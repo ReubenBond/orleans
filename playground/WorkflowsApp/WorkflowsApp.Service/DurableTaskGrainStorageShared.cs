@@ -1,10 +1,10 @@
 ﻿using System.Distributed.DurableTasks;
-using Orleans.DurableTasks.Remoting;
+using Orleans.DurableTasks;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Session;
 
-namespace Orleans.DurableTask.Playground;
+namespace WorkflowsApp.Service;
 
 internal sealed class DurableTaskGrainStorageShared(
     IGrainFactory grainFactory,

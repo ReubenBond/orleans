@@ -2,7 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
-namespace Orleans.DurableTasks.Playground;
+namespace WorkflowsApp.Service;
 
 public class DurableTaskCompletionSourceGrain<T>([FromKeyedServices("state")] IDurableTaskCompletionSource<T> state) : DurableGrain, IDurableTaskCompletionSourceGrain<T>
 {

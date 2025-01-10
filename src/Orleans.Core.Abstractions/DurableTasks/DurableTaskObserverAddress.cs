@@ -1,7 +1,9 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
+using Orleans.Runtime;
 
-namespace Orleans.DurableTasks.Remoting;
+namespace Orleans.DurableTasks;
 
 /// <summary>
 /// Represents the address of a <see cref="IDurableTaskObserver"/>.
@@ -79,7 +81,7 @@ public readonly struct DurableTaskObserverAddress : IEquatable<DurableTaskObserv
     public bool IsDefault => _value.IsDefault;
 
     /// <inheritdoc/>
-    public override bool Equals(object? obj) => obj is DurableTaskObserverAddress kind && Equals(kind);
+    public override bool Equals(object obj) => obj is DurableTaskObserverAddress kind && Equals(kind);
 
     /// <inheritdoc/>
     public bool Equals(DurableTaskObserverAddress obj) => _value.Equals(obj._value);
@@ -103,7 +105,7 @@ public readonly struct DurableTaskObserverAddress : IEquatable<DurableTaskObserv
     /// <remarks>
     /// The returned array must not be modified.
     /// </remarks>
-    public static byte[]? UnsafeGetArray(DurableTaskObserverAddress id) => IdSpan.UnsafeGetArray(id._value);
+    public static byte[] UnsafeGetArray(DurableTaskObserverAddress id) => IdSpan.UnsafeGetArray(id._value);
 
     /// <inheritdoc/>
     public int CompareTo(DurableTaskObserverAddress other) => _value.CompareTo(other._value);
@@ -114,15 +116,15 @@ public readonly struct DurableTaskObserverAddress : IEquatable<DurableTaskObserv
     /// <returns>
     /// A <see cref="string"/> representation of this instance.
     /// </returns>
-    public override string? ToString() => _value.ToString();
+    public override string ToString() => _value.ToString();
 
-    string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString() ?? "";
+    string IFormattable.ToString(string format, IFormatProvider formatProvider) => ToString() ?? "";
 
-    bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
+    bool ISpanFormattable.TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider provider)
         => _value.TryFormat(destination, out charsWritten);
 
-    public static DurableTaskObserverAddress Parse(string s, IFormatProvider? provider) => Create(s);
-    public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, [MaybeNullWhen(false)] out DurableTaskObserverAddress result)
+    public static DurableTaskObserverAddress Parse(string s, IFormatProvider provider) => Create(s);
+    public static bool TryParse([NotNullWhen(true)] string s, IFormatProvider provider, [MaybeNullWhen(false)] out DurableTaskObserverAddress result)
     {
         if (s is { Length: > 0 })
         {

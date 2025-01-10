@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Orleans.DurableTasks\Orleans.DurableTasks.csproj" />
+    <ProjectReference Include="..\..\src\System.Distributed.DurableTasks\System.Distributed.DurableTasks.csproj" />
     <ProjectReference Include="..\..\src\Orleans.Server\Orleans.Server.csproj" />
   </ItemGroup>
 

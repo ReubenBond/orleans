@@ -1,8 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Orleans.DurableTask.Playground;
 using Orleans.Journaling;
 
-namespace Orleans.DurableTasks.Playground;
+namespace WorkflowsApp.Service;
 
 public abstract class DurableGrain : Grain, IGrainBase
 {
@@ -17,7 +16,7 @@ public abstract class DurableGrain : Grain, IGrainBase
         // Currently, we need to initialize this in the constructor so that it's registered when logs start being read.
         _ = ServiceProvider.GetRequiredService<DurableTaskGrainStorage>();
     }
-    
+
     protected IStateMachineManager StateMachineManager { get; }
 
     protected TStateMachine GetOrCreateStateMachine<TStateMachine>(string name) where TStateMachine : class, IDurableStateMachine

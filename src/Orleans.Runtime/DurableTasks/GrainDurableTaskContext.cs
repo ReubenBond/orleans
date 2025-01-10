@@ -1,8 +1,11 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿#nullable enable
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
 using System.Globalization;
 using System.Runtime.InteropServices;
-using Orleans.DurableTasks.Remoting;
+using System.Threading;
+using System.Threading.Tasks;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;
@@ -19,13 +22,13 @@ internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskGrainRu
 
     internal IDurableTaskState State { get; } = state;
 
-    protected internal override async ValueTask<Response> RunAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+    protected override async ValueTask<Response> RunAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
     {
         var context = await Runtime.ScheduleAsync(taskId, taskDefinition, cancellationToken);
-        return await context.AsValueTask();
+        return await GetResponseAsync(context);
     }
 
-    protected internal override TaskId CreateChildTaskId(string? name)
+    protected override TaskId CreateChildTaskId(string? name)
     {
         if (string.IsNullOrWhiteSpace(name))
         {

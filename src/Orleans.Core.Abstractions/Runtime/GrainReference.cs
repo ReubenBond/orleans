@@ -10,6 +10,8 @@ using Orleans.CodeGeneration;
 using System.Text;
 using System.Diagnostics;
 using System.Collections.Generic;
+using System.Distributed.DurableTasks;
+using Orleans.DurableTasks;
 
 namespace Orleans.Runtime
 {
@@ -250,6 +252,8 @@ namespace Orleans.Runtime
     [DefaultInvokableBaseType(typeof(Task), typeof(TaskRequest))]
     [DefaultInvokableBaseType(typeof(void), typeof(VoidRequest))]
     [DefaultInvokableBaseType(typeof(IAsyncEnumerable<>), typeof(AsyncEnumerableRequest<>))]
+    [DefaultInvokableBaseType(typeof(DurableTask), typeof(DurableTaskRequest))]
+    [DefaultInvokableBaseType(typeof(DurableTask<>), typeof(DurableTaskRequest<>))]
     public class GrainReference : IAddressable, IEquatable<GrainReference>, ISpanFormattable
     {
         /// <summary>

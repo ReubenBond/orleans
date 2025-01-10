@@ -97,13 +97,13 @@ namespace Orleans.DurableTasks.Tests
             var aKey = HierarchicalKey.Create("aaa");
 
             Assert.True(aKey.IsParentOf(HierarchicalKey.Create(aKey, "bbb")));
-            Assert.True(aKey.IsPrefixOf(HierarchicalKey.Create("aaa/bbb/ccc")));
+            Assert.True(aKey.IsAncestorOf(HierarchicalKey.Create("aaa/bbb/ccc")));
             Assert.True(aKey.IsParentOf(HierarchicalKey.Create("aaa/bbb")));
             Assert.False(aKey.IsParentOf(HierarchicalKey.Create("aaa/bbb/ccc")));
-            Assert.False(aKey.IsPrefixOf(HierarchicalKey.Create("bbb/ccc")));
-            Assert.False(HierarchicalKey.Create("a").IsPrefixOf(HierarchicalKey.Create("aa")));
+            Assert.False(aKey.IsAncestorOf(HierarchicalKey.Create("bbb/ccc")));
+            Assert.False(HierarchicalKey.Create("a").IsAncestorOf(HierarchicalKey.Create("aa")));
 
-            Assert.True(aKey.IsPrefixOf(aKey));
+            Assert.True(aKey.IsAncestorOf(aKey));
             Assert.False(aKey.IsParentOf(aKey));
             Assert.False(aKey.IsParentOf(HierarchicalKey.Create("aaa")));
             Assert.False(aKey.IsParentOf(HierarchicalKey.Create("bbb")));

@@ -293,11 +293,11 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
     }
 
     /// <summary>
-    /// Returns <value>true</value> if this key is a prefix of the provided key, <value>false</value> otherwise.
+    /// Returns <value>true</value> if this key is an ancestor (parent or earlier) of the provided key, <value>false</value> otherwise.
     /// </summary>
     /// <param name="other">The key to check this key against.</param>
     /// <returns><value>true</value> if this key is a prefix of <paramref name="other"/>, <value>false</value> otherwise.</returns>
-    public bool IsPrefixOf(HierarchicalKey? other)
+    public bool IsAncestorOf(HierarchicalKey? other)
     {
         if (other is null) return false;
         var left = GetEnumerator();

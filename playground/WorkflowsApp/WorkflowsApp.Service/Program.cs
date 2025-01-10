@@ -1,10 +1,8 @@
-﻿using Orleans.DurableTasks.Remoting;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration.Internal;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans.DurableTask.Playground;
 using Orleans.Journaling;
 using Azure.Storage.Blobs;
 using Azure.Core.Pipeline;
@@ -12,8 +10,9 @@ using Azure.Core;
 using System.Diagnostics;
 using Newtonsoft.Json;
 using System.Distributed.DurableTasks;
+using Orleans.DurableTasks;
 
-namespace Orleans.DurableTasks.Playground;
+namespace WorkflowsApp.Service;
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
 
 public static class DurableTaskHostingExtensions
@@ -51,7 +50,7 @@ public class Program
 
         [Alias("Deposit")]
         DurableTask Deposit(long amount);
-        
+
         [Alias("GetBalance")]
         ValueTask<long> GetBalance();
     }
@@ -198,7 +197,8 @@ public class Program
                 siloBuilder.AddJournaledDurableTaskStorage();
                 siloBuilder.AddAzureAppendBlobStateMachineStorage(optionsBuilder =>
                 {
-                    optionsBuilder.Configure((AzureAppendBlobStateMachineStorageOptions options, IServiceProvider serviceProvider) => {
+                    optionsBuilder.Configure((AzureAppendBlobStateMachineStorageOptions options, IServiceProvider serviceProvider) =>
+                    {
                         options.ConfigureBlobServiceClient(ct => Task.FromResult(serviceProvider.GetRequiredKeyedService<BlobServiceClient>("state")));
                     });
                 });
@@ -864,9 +864,9 @@ internal partial class LoggingPolicy(ILoggerFactory loggerFactory) : HttpPipelin
         var after = Stopwatch.GetTimestamp();
 
         var response = message.Response;
-        bool isError = response.IsError;
+        var isError = response.IsError;
 
-        double elapsed = (after - before) / (double)Stopwatch.Frequency;
+        var elapsed = (after - before) / (double)Stopwatch.Frequency;
 
         if (isError)
         {
