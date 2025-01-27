@@ -172,6 +172,7 @@ namespace Orleans.Runtime.MembershipService
             var additionalSilos = new List<SiloAddress>();
 
             var tmpList = new List<(SiloAddress SiloAddress, int HashCode)>();
+            var timeEstimate = membership.LatestTime(now);
             foreach (var (candidate, entry) in membership.Entries)
             {
                 // Watch shutting-down silos as well, so we can properly ensure they become dead.
@@ -189,8 +190,8 @@ namespace Orleans.Runtime.MembershipService
                 }
 
                 // Monitor all suspected and stale silos.
-                if (entry.GetFreshVotes(now, options.DeathVoteExpirationTimeout).Count > 0
-                    || entry.HasMissedIAmAlives(options, now))
+                if (entry.GetFreshVotes(timeEstimate.UtcDateTime, options.DeathVoteExpirationTimeout).Count > 0
+                    || entry.HasMissedIAmAlives(options, timeEstimate))
                 {
                     additionalSilos.Add(candidate);
                 }

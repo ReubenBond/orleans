@@ -244,7 +244,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 var targetMilliseconds = (int)this.clusterMembershipOptions.TableRefreshTimeout.TotalMilliseconds;
-                
+
                 TimeSpan? onceOffDelay = RandomTimeSpan.Next(this.clusterMembershipOptions.TableRefreshTimeout);
                 while (await this.membershipUpdateTimer.NextTick(onceOffDelay))
                 {
@@ -295,8 +295,8 @@ namespace Orleans.Runtime.MembershipService
                     taskFunction,
                     NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS,
                     NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS,
-                    retryValueFilter,   // if failed to Update on contention - retry   
-                    (exc, i) => true,            // Retry on errors.          
+                    retryValueFilter,   // if failed to Update on contention - retry
+                    (exc, i) => true,            // Retry on errors.
                     timeout,
                     new ExponentialBackoff(EXP_BACKOFF_CONTENTION_MIN, EXP_BACKOFF_CONTENTION_MAX, EXP_BACKOFF_STEP), // how long to wait between successful retries
                     new ExponentialBackoff(EXP_BACKOFF_ERROR_MIN, EXP_BACKOFF_ERROR_MAX, EXP_BACKOFF_STEP)  // how long to wait between error retries
@@ -307,7 +307,7 @@ namespace Orleans.Runtime.MembershipService
         {
             bool wasThrownLocally = false;
             int numCalls = 0;
-            
+
             try
             {
                 async Task<bool> UpdateMyStatusTask(int counter)
@@ -529,7 +529,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 var entry = tuple.Item1;
                 var siloAddress = entry.SiloAddress;
-                
+
                 if (siloAddress.Generation.Equals(myAddress.Generation))
                 {
                     if (entry.Status == SiloStatus.Dead)
@@ -539,7 +539,7 @@ namespace Orleans.Runtime.MembershipService
                     }
                     continue;
                 }
-                
+
                 if (entry.Status == SiloStatus.Dead)
                 {
                     if (log.IsEnabled(LogLevel.Trace)) log.LogTrace("Skipping my previous old Dead entry in membership table: {Entry}", entry.ToFullString());
@@ -612,12 +612,13 @@ namespace Orleans.Runtime.MembershipService
 
             var now = GetDateTimeUtcNow();
             var gossipPartners = new List<SiloAddress>();
+            var timeEstimate = MembershipTableSnapshot.LatestTime(now);
             foreach (var item in this.MembershipTableSnapshot.Entries)
             {
                 var entry = item.Value;
                 if (entry.SiloAddress.IsSameLogicalSilo(this.myAddress)) continue;
                 if (!IsFunctionalForMembership(entry.Status)) continue;
-                if (entry.HasMissedIAmAlives(this.clusterMembershipOptions, now)) continue;
+                if (entry.HasMissedIAmAlives(this.clusterMembershipOptions, timeEstimate)) continue;
 
                 gossipPartners.Add(entry.SiloAddress);
 
@@ -771,13 +772,14 @@ namespace Orleans.Runtime.MembershipService
                 entry.AddOrUpdateSuspector(indirectProbingSilo, now, clusterMembershipOptions.NumVotesForDeathDeclaration);
             }
 
-            freshVotes = entry.GetFreshVotes(now, this.clusterMembershipOptions.DeathVoteExpirationTimeout);
+            var timeEstimate = snapshot.LatestTime(now);
+            freshVotes = entry.GetFreshVotes(timeEstimate.UtcDateTime, this.clusterMembershipOptions.DeathVoteExpirationTimeout);
 
             // Determine if there are enough votes to evict the silo.
             // Handle the corner case when the number of active silos is very small (then my only vote is enough)
             int activeNonStaleSilos = table.Members.Count(kv =>
                 kv.Item1.Status == SiloStatus.Active &&
-                !kv.Item1.HasMissedIAmAlives(clusterMembershipOptions, now));
+                !kv.Item1.HasMissedIAmAlives(clusterMembershipOptions, timeEstimate));
             var numVotesRequiredToEvict = Math.Min(clusterMembershipOptions.NumVotesForDeathDeclaration, (activeNonStaleSilos + 1) / 2);
             if (freshVotes.Count >= numVotesRequiredToEvict)
             {
@@ -800,8 +802,8 @@ namespace Orleans.Runtime.MembershipService
             log.LogInformation(
                 (int)ErrorCode.MembershipVotingForKill,
                 "Voting to evict '{SiloAddress}'. Previous suspect list is '{PreviousSuspecters}', trying to update to '{Suspecters}', ETag: '{ETag}', Fresh vote count: '{FreshVotes}'",
-                entry.SiloAddress, 
-                PrintSuspectList(prevList), 
+                entry.SiloAddress,
+                PrintSuspectList(prevList),
                 PrintSuspectList(entry.SuspectTimes),
                 eTag,
                 PrintSuspectList(freshVotes));
@@ -846,14 +848,14 @@ namespace Orleans.Runtime.MembershipService
                     GossipToOthers(entry.SiloAddress, entry.Status).Ignore();
                     return true;
                 }
-                
+
                 log.LogInformation(
                     (int)ErrorCode.MembershipMarkDeadWriteFailed,
                     "Failed to update {SiloAddress} status to Dead in the membership table, due to write conflicts. Will retry.",
                     entry.SiloAddress);
                 return false;
             }
-            
+
             log.LogInformation((int)ErrorCode.MembershipCantWriteLivenessDisabled, "Want to mark silo {SiloAddress} as DEAD, but will ignore because Liveness is Disabled.", entry.SiloAddress);
             return true;
         }
