@@ -1,6 +1,9 @@
 
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
@@ -10,11 +13,24 @@ namespace Orleans.Runtime
 {
     internal class MessageFactory
     {
-        private static ulong _nextId;
+        private static readonly int ProcessorCount = CeilingPowerOfTwo(Environment.ProcessorCount);
+        private static readonly int ProcessorMask = ProcessorCount - 1;
+        private static readonly PaddedULong[] _nextIds = new PaddedULong[ProcessorCount];
 
         // The nonce reduces the chance of an id collision for a given grain to effectively zero. Id collisions are only relevant in scenarios
         // where where the infinitesimally small chance of a collision is acceptable, such as call cancellation.
-        private readonly ulong _seed;
+        public readonly ulong _seed = unchecked((ulong)Random.Shared.NextInt64());
+
+        public CorrelationId GetNextCorrelationId()
+        {
+            var coreId = Thread.GetCurrentProcessorId() & ProcessorMask;
+            var tid = BinaryPrimitives.ReverseEndianness((ulong)coreId);
+            var id = _seed ^ tid ^ _nextIds[coreId].Increment();
+            return new(unchecked((long)id));
+        }
+
+        public static int CeilingPowerOfTwo(int x) => (int)(1u << -BitOperations.LeadingZeroCount((uint)x - 1));
+
         private readonly DeepCopier _deepCopier;
         private readonly ILogger _logger;
         private readonly MessagingTrace _messagingTrace;
@@ -25,8 +41,6 @@ namespace Orleans.Runtime
             _logger = logger;
             _messagingTrace = messagingTrace;
 
-            // Generate a 64-bit nonce for the host, to be combined with per-message correlation ids to get a unique, per-host value.
-            // This avoids id collisions across different hosts for a given grain.
             _seed = unchecked((ulong)Random.Shared.NextInt64());
         }
 
@@ -47,11 +61,13 @@ namespace Orleans.Runtime
             return message;
         }
 
+        /*
         private CorrelationId GetNextCorrelationId()
         {
             var id = _seed ^ Interlocked.Increment(ref _nextId);
             return new CorrelationId(unchecked((long)id));
         }
+        */
 
         public Message CreateResponseMessage(Message request)
         {
@@ -105,5 +121,21 @@ namespace Orleans.Runtime
 
             return response;
         }
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 2 * Padding.CACHE_LINE_SIZE)] // padding before/between/after fields
+    public struct PaddedULong
+    {
+        [FieldOffset(Padding.CACHE_LINE_SIZE)] public ulong value;
+        public ulong Increment() => Interlocked.Increment(ref value);
+    }
+
+    internal static class Padding
+    {
+#if TARGET_ARM64 || TARGET_LOONGARCH64
+        internal const int CACHE_LINE_SIZE = 128;
+#else
+        internal const int CACHE_LINE_SIZE = 64;
+#endif
     }
 }
