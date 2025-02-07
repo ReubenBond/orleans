@@ -497,6 +497,11 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             DisableDefaults = true,
         });
 
+        foreach (var hostDelegate in Options.ClientHostConfigurationDelegates)
+        {
+            hostDelegate(hostBuilder);
+        }
+
         hostBuilder.UseOrleansClient(clientBuilder =>
         {
             if (Options.UseTestClusterMembership)
@@ -508,11 +513,6 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         });
 
         TryConfigureFileLogging(Options, hostBuilder.Services, "TestClusterClient");
-
-        foreach (var hostDelegate in Options.ClientHostConfigurationDelegates)
-        {
-            hostDelegate(hostBuilder);
-        }
 
         ClientHost = hostBuilder.Build();
         await ClientHost.StartAsync();
@@ -557,6 +557,11 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 services.Configure<SiloMessagingOptions>(op => op.ResponseTimeout = TimeSpan.FromMilliseconds(1000000));
             }
 
+            foreach (var hostDelegate in Options.SiloHostConfigurationDelegates)
+            {
+                hostDelegate(siloOptions, appBuilder);
+            }
+
             appBuilder.UseOrleans(siloBuilder =>
             {
                 siloBuilder.Configure<SiloOptions>(o =>
@@ -589,11 +594,6 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                     services.AddFromExisting<IEnvironmentStatisticsProvider, TestHooksEnvironmentStatisticsProvider>();
                 }
             });
-
-            foreach (var hostDelegate in Options.SiloHostConfigurationDelegates)
-            {
-                hostDelegate(siloOptions, appBuilder);
-            }
 
             var host = appBuilder.Build();
             InitializeTestHooksSystemTarget(host);
