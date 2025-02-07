@@ -15,6 +15,7 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddAzureQueueStreams(this ISiloBuilder builder, string name,
             Action<SiloAzureQueueStreamConfigurator> configure)
         {
+            builder.AddStreaming();
             var configurator = new SiloAzureQueueStreamConfigurator(name,
                 configureServicesDelegate => builder.ConfigureServices(configureServicesDelegate));
             configure?.Invoke(configurator);
