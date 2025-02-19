@@ -20,12 +20,14 @@ internal sealed class DurableTaskGrainRuntimeShared(
     IGrainContextAccessor grainContextAccessor,
     TimeProvider timeProvider,
     PlacementStrategyResolver placementStrategyResolver,
+    IGrainFactory grainFactory,
     ILogger<DurableTaskGrainRuntime> logger)
 {
     public IGrainContextAccessor GrainContextAccessor { get; } = grainContextAccessor;
     public TimeProvider TimeProvider { get; } = timeProvider;
     public ILogger<DurableTaskGrainRuntime> Logger { get; } = logger;
     public PlacementStrategyResolver PlacementStrategyResolver { get; } = placementStrategyResolver;
+    public IGrainFactory GrainFactory { get; } = grainFactory;
     public CleanupPolicy DefaultCleanupPolicy { get; } = new() { CleanupAge = TimeSpan.FromDays(1) };
 }
 
@@ -88,19 +90,19 @@ internal sealed class DurableTaskGrainRuntime(
     /// <returns>A reference to the caller if the caller supports notifications callbacks, otherwise <see langword="null"/>.</returns>
     private IDurableTaskGrainExtension? GetCallerClientReference(DurableTaskRequestContext requestContext)
     {
-        var caller = requestContext.Caller;
-        if (caller is null)
+        var caller = requestContext.CallerId;
+        if (caller.IsDefault)
         {
             return null;
         }
 
-        var type = caller.GetGrainId().Type;
+        var type = caller.Type;
 
         // TODO: Consider using (cleaner?) grain manifest lookup instead. Placement can configure manifest (eg, see StatelessWorkerPlacement)
         var placement = _shared.PlacementStrategyResolver.GetPlacementStrategy(type);
         if (placement.IsGrain)
         {
-            return caller.Cast<IDurableTaskGrainExtension>();
+            return _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(caller);
         }
 
         return null;
@@ -690,5 +692,59 @@ internal sealed class DurableTaskGrainRuntime(
         {
             yield return task.Key;
         }
+    }
+
+    private bool TrySignalCancellationCore(TaskId taskId, IDurableTaskState taskState)
+    {
+        if (taskState.CompletedAt.HasValue)
+        {
+            // If the task has completed then all child tasks have completed.
+            return false;
+        }   
+
+        if (taskState.CancellationRequestedAt.HasValue)
+        {
+            return true;
+        }   
+
+        // Find all immediate children of the task and start canceling them.
+        foreach (var (childTaskId, childTaskState) in _storage.Tasks)
+        {
+            if (!childTaskId.IsChildOf(taskId))
+            {
+                continue;
+            }
+
+            _ = TrySignalCancellationCore(childTaskId, childTaskState);
+        }
+
+        _storage.RequestCancellation(taskId, taskState);
+        return true;
+    }
+
+    public async ValueTask SignalCancellationAsync(TaskId taskId, CancellationToken cancellationToken)
+    {
+        if (taskId.IsDefault)
+        {
+            throw new ArgumentException("Invalid TaskId.", nameof(taskId));
+        }
+
+        if (!_storage.TryGetTask(taskId, out var taskState))
+        {
+            // The task may have been pruned or may never have existed.
+            return;
+        }
+
+        if (!TrySignalCancellationCore(taskId, taskState))
+        {
+            return;
+        }
+
+        // Write state.
+        await _storage.WriteAsync(cancellationToken);
+
+        // Wait for the children to terminate.
+        // Set the result to 'cancelled' (TaskCanceledException) if the task is not already completed.
+        // Write state.
     }
 }

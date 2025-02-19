@@ -50,4 +50,25 @@ internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskGrainRu
 
     public bool TryGetTaskResponse(TaskId taskId, [NotNullWhen(true)] out Response? response) => Runtime.GetResponseOrCreateChildTask(taskId, out response);
     public void SetTaskResponse(TaskId taskId, Response response) => Runtime.SetChildTaskResponse(taskId, response);
+
+    protected override ValueTask SignalCancellationAsyncCore(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // If already cancelling or terminated, return.
+        // Update state to signal cancellation if not already.
+        // Persist state.
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Cancel the CTS passed to child tasks.
+        // Wait for children to terminate.
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Set response to canceled (TaskCanceledException).
+        // (optional) write state.
+        // Return
+        return default;
+    }
 }

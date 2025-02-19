@@ -25,4 +25,5 @@ public interface IDurableTaskGrainStorage
 
     ValueTask WriteAsync(CancellationToken cancellationToken);
     ValueTask ReadAsync(CancellationToken cancellationToken);
+    void RequestCancellation(TaskId taskId, IDurableTaskState state);
 }

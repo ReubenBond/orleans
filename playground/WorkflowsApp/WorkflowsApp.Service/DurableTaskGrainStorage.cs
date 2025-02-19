@@ -48,6 +48,23 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
         return false;
     }
 
+    public void RequestCancellation(TaskId taskId, IDurableTaskState state)
+    {
+        if (ApplyRequestTaskCancellation(taskId))
+        {
+            GetStorage().AppendEntry(static (state, bufferWriter) =>
+            {
+                var (shared, taskId) = state;
+                using var session = shared.SerializerSessionPool.GetSession();
+                var writer = Writer.Create(bufferWriter, session);
+                writer.WriteByte(VersionByte);
+                writer.WriteVarUInt32((uint)CommandType.RequestTaskCancellation);
+                shared.KeyCodec.WriteField(ref writer, 0, typeof(TaskId), taskId);
+                writer.Commit();
+            }, (_shared, taskId));
+        }
+    }
+
     public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state)
     {
         if (_items.TryGetValue(taskId, out var internalState))
@@ -183,6 +200,9 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
                 break;
             case CommandType.RemoveTask:
                 ApplyRemoveTask(ReadKey(ref reader));
+                break;
+            case CommandType.RequestTaskCancellation:
+                ApplyRequestTaskCancellation(ReadKey(ref reader));
                 break;
             case CommandType.Clear:
                 ApplyClear();
@@ -335,6 +355,21 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
 
     private bool ApplyRemoveTask(TaskId key) => _items.Remove(key);
     private void ApplyClear() => _items.Clear();
+    private bool ApplyRequestTaskCancellation(TaskId taskId)
+    {
+        if (!_items.TryGetValue(taskId, out var taskState))
+        {
+            return false;
+        }
+
+        if (taskState.CancellationRequestedAt.HasValue || taskState.CompletedAt.HasValue)
+        {
+            return false;
+        }
+
+        taskState.CancellationRequestedAt = _shared.TimeProvider.GetUtcNow();
+        return true;
+    }
 
     [DoesNotReturn]
     private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");
@@ -364,6 +399,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
         AddObserver,
         ClearObservers,
         RemoveTask,
+        RequestTaskCancellation,
         Clear,
         Snapshot
     }

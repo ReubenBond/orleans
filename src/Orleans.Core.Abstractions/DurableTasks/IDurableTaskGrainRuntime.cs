@@ -73,4 +73,5 @@ public interface IDurableTaskGrainRuntime
     ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
     bool GetResponseOrCreateChildTask(TaskId taskId, [NotNullWhen(true)] out Response response);
     void SetChildTaskResponse(TaskId taskId, Response response);
+    ValueTask SignalCancellationAsync(TaskId taskId, CancellationToken cancellationToken);
 }

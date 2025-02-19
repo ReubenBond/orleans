@@ -24,6 +24,8 @@ public abstract class ScheduledTask
     public ScheduledTaskAwaiter GetAwaiter() => new(this);
 
     protected internal abstract ValueTask AsUntypedValueTask();
+
+    public abstract ValueTask CancelAsync(CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -59,6 +61,12 @@ internal sealed class ScheduledDurableTask<TResult> : ScheduledTask<TResult>
 
     public override TaskId Id => _executionContext.Id;
     public override async Task<TResult> AsTask() => await this;
+
+    public override ValueTask CancelAsync(CancellationToken cancellationToken)
+    {
+        return _executionContext.SignalCancellationAsync(cancellationToken);
+    }
+
     protected internal override ValueTask AsUntypedValueTask() => _executionContext.AsUntypedValueTask();
     internal override ValueTask<Response> AsValueTask() => _executionContext.AsValueTask();
 }
@@ -74,6 +82,12 @@ internal sealed class ScheduledDurableTask : ScheduledTask
 
     public override TaskId Id => _executionContext.Id;
     public override Task AsTask() => _executionContext.AsUntypedValueTask().AsTask();
+
+    public override ValueTask CancelAsync(CancellationToken cancellationToken)
+    {
+        return _executionContext.SignalCancellationAsync(cancellationToken);
+    }
+
     protected internal override ValueTask AsUntypedValueTask() => _executionContext.AsUntypedValueTask();
 }
 

@@ -102,4 +102,11 @@ public class VolatileDurableTaskGrainStorage(
     {
         _workingCopy.Clear();
     }
+
+    public void RequestCancellation(TaskId taskId, IDurableTaskState state)
+    {
+        var typedState = GetState(state);
+        typedState.CancellationRequestedAt = _timeProvider.GetUtcNow();
+        AddOrUpdateTask(taskId, typedState);
+    }
 }

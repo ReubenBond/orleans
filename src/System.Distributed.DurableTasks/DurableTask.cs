@@ -8,7 +8,7 @@ namespace System.Distributed.DurableTasks;
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
 [GenerateSerializer, SerializerTransparent]
 [Alias("DurableTask")]
-public abstract partial class DurableTask
+public abstract class DurableTask
 {
     public static DurableTask<TResult> FromResult<TResult>(TResult value) => new CompletedDurableTask<TResult>(value);
 
@@ -136,6 +136,18 @@ public struct ConfiguredDurableTask(DurableTask task)
         if (Task is not ISchedulableTask schedulableTask)
         {
             throw GetNonSchedulableTaskException();
+        }
+
+        var executionContext = await schedulableTask.ScheduleAsync(Id, SchedulingOptions);
+        return new ScheduledDurableTask(executionContext);
+    }
+
+    // Schedules a durable task without waiting for the task to complete
+    public readonly async ValueTask<bool> TryCancelAsync()
+    {
+        if (Task is not ICancellableTask schedulableTask)
+        {
+            return false;
         }
 
         var executionContext = await schedulableTask.ScheduleAsync(Id, SchedulingOptions);

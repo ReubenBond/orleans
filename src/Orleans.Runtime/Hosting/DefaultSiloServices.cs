@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration;
@@ -43,7 +43,13 @@ using Microsoft.Extensions.Configuration;
 using Orleans.Serialization.Internal;
 using Orleans.Core;
 using Orleans.Placement.Repartitioning;
+<<<<<<< HEAD
 using Orleans.Runtime.Placement.Filtering;
+=======
+using Orleans.GrainDirectory;
+using Orleans.Runtime.Hosting;
+using Orleans.DurableTasks;
+>>>>>>> 0db3117dd1 (wip)
 
 namespace Orleans.Hosting
 {
@@ -415,6 +421,9 @@ namespace Orleans.Hosting
             services.AddFromExisting<IActivationMigrationManager, ActivationMigrationManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationMigrationManager>();
             services.AddSingleton<GrainMigratabilityChecker>();
+
+            // DurableTasks
+            services.TryAddSingleton<DurableTaskRequestShared>();
 
             ApplyConfiguration(builder);
         }

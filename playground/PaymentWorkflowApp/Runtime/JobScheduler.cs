@@ -269,6 +269,8 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
             state.CompletedAt = DateTime.UtcNow;
             _storage.AddOrUpdateTask(taskId, state);
             await _storage.WriteAsync();
+            
+            // TODO: visibility of results must only happen once all child tasks have completed.
             DurableTaskRuntimeHelper.SetResult(executionContext, response);
         }
     }
@@ -360,6 +362,12 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         }
 
         return completedTaskIds is not null;
+    }
+
+    internal ValueTask SignalCancellationAsync(TaskId id, JobTaskState state)
+    {
+        throw new NotImplementedException();
+        //_storage.
     }
 
     internal class JobTask(string type, string[]? args, JobScheduler jobScheduler) : DurableTask<string>, ISchedulableTask

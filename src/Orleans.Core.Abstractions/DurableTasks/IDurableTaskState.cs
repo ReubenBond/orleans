@@ -14,12 +14,12 @@ namespace Orleans.DurableTasks;
 public interface IDurableTaskState
 {
     /// <summary>
-    /// Gets the result of the task, which will be <see langword="null"/> if the task has not yet completed.
+    /// The result of the task, which will be <see langword="null"/> if the task has not yet completed.
     /// </summary>
     public Response Result { get; }
 
     /// <summary>
-    /// Gets or sets the set of clients which are interested in the result of this task.
+    /// The set of clients which are interested in the result of this task.
     /// </summary>
     /// <remarks>
     /// This task cannot be retired until all clients have acknowledged the task's result.
@@ -30,17 +30,22 @@ public interface IDurableTaskState
     public IReadOnlySet<IDurableTaskObserver> Observers { get; }
 
     /// <summary>
-    /// Gets or sets the invokable request.
+    /// The invokable request.
     /// </summary>
     public IDurableTaskRequest Request { get; }
 
     /// <summary>
-    /// Gets or sets the time that the task completed.
+    /// The time at which the task completed.
     /// </summary>
     public DateTimeOffset? CompletedAt { get; }
 
     /// <summary>
-    /// Gets or sets the time that the task was created.
+    /// The time at which cancellation was requested.
+    /// </summary>
+    public DateTimeOffset? CancellationRequestedAt { get; }
+
+    /// <summary>
+    /// The time at which the task was created.
     /// </summary>
     public DateTimeOffset CreatedAt { get; }
 }

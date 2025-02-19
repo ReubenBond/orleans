@@ -6,8 +6,6 @@ namespace PaymentWorkflowApp.Runtime;
 
 internal sealed class JobDurableTaskExecutionContext(TaskId taskId, JobScheduler jobScheduler, JobTaskState state) : DurableTaskContext(taskId)
 {
-    private readonly JobScheduler _jobScheduler = jobScheduler;
-
     // The sequence number for named children.
     private Dictionary<string, int>? _nextChildIds;
 
@@ -17,7 +15,7 @@ internal sealed class JobDurableTaskExecutionContext(TaskId taskId, JobScheduler
     public JobTaskState State { get; } = state;
 
     protected override ValueTask<Response> RunAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
-        => _jobScheduler.InvokeAsync(taskId, taskDefinition, cancellationToken);
+        => jobScheduler.InvokeAsync(taskId, taskDefinition, cancellationToken);
 
     protected override TaskId CreateChildTaskId(string? name)
     {
@@ -37,5 +35,10 @@ internal sealed class JobDurableTaskExecutionContext(TaskId taskId, JobScheduler
 
             return Id.Child(name);
         }
+    }
+
+    protected override async ValueTask SignalCancellationAsyncCore(CancellationToken cancellationToken)
+    {
+        await jobScheduler.SignalCancellationAsync(Id, State);
     }
 }

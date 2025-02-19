@@ -13,10 +13,10 @@ public class DurableTaskRequestContext
     public TaskId TaskId { get; set; }
 
     [Id(1)]
-    public IAddressable Caller { get; set; }
+    public GrainId CallerId { get; set; }
 
     [Id(2)]
-    public IAddressable Target { get; set; }
+    public GrainId TargetId { get; set; }
 
     [Id(3)]
     public SchedulingOptions SchedulingOptions { get; set; }

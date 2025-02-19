@@ -36,17 +36,23 @@ public interface IDurableTaskRequest : IRequest
     public string ToMethodCallString() => ToMethodCallString(this);
 }
 
+public sealed class DurableTaskRequestShared(IGrainContextAccessor grainContextAccessor, IGrainFactory grainFactory)
+{
+    public IGrainContextAccessor GrainContextAccessor { get; } = grainContextAccessor;
+    public IGrainFactory GrainFactory { get; } = grainFactory;
+}
+
 [GenerateSerializer]
 [ReturnValueProxy(initializerMethodName: nameof(InitializeRequest))]
 [Alias("DurableTaskRequest")]
 [method: GeneratedActivatorConstructor]
-public abstract class DurableTaskRequest(IGrainContextAccessor grainContextAccessor) : DurableTask, IDurableTaskRequest, ISchedulableTask, IPollableTask
+public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : DurableTask, IDurableTaskRequest, ISchedulableTask, IPollableTask
 {
     // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
     // For now, we're not doing that, just to make sure that we can get far without needing it, demonstrating the extensibility of Orleans.
     // It might be worthwhile making RuntimeContext public at some point, even if it is not the recommended approach.
     [NonSerialized]
-    private readonly IGrainContextAccessor _grainContextAccessor = grainContextAccessor;
+    private readonly DurableTaskRequestShared _shared = shared;
 
     /// <inheritdoc />
     [Id(0)]
@@ -115,7 +121,7 @@ public abstract class DurableTaskRequest(IGrainContextAccessor grainContextAcces
         Context = new()
         {
             // TaskId will be filled in later, before submission, via an extension method at the call site.
-            Target = targetGrainReference,
+            TargetId = targetGrainReference.GrainId,
         };
         return this;
     }
@@ -125,7 +131,7 @@ public abstract class DurableTaskRequest(IGrainContextAccessor grainContextAcces
         Debug.Assert(Context is not null);
         Context.SchedulingOptions = options;
 
-        var callerContext = _grainContextAccessor.GrainContext;
+        var callerContext = _shared.GrainContextAccessor.GrainContext;
         var runtime = GetRuntime(callerContext);
 
         return await runtime.ScheduleAsync(taskId, this, CancellationToken.None);
@@ -144,8 +150,13 @@ public abstract class DurableTaskRequest(IGrainContextAccessor grainContextAcces
         // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
         Debug.Assert(Context is not null);
         Context.TaskId = executionContext.Id;
-        Context.Caller = _grainContextAccessor.GrainContext?.GrainReference;
-        var remote = Context.Target.Cast<IDurableTaskGrainExtension>();
+        var currentContext = _shared.GrainContextAccessor.GrainContext;
+        if (currentContext is not null)
+        {
+            Context.CallerId = currentContext.GrainId;
+        }
+
+        var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         return await remote.ScheduleAsync(this);
     }
 
@@ -154,7 +165,7 @@ public abstract class DurableTaskRequest(IGrainContextAccessor grainContextAcces
     {
         Debug.Assert(Context is not null);
         Debug.Assert(Context.TaskId != TaskId.None);
-        var remote = Context.Target.Cast<IDurableTaskGrainExtension>();
+        var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         return remote.SubscribeOrPollAsync(Context.TaskId, null);
     }
 
@@ -195,13 +206,13 @@ public abstract class DurableTaskRequest(IGrainContextAccessor grainContextAcces
 [ReturnValueProxy(initializerMethodName: nameof(InitializeRequest))]
 [Alias("DurableTaskRequest`1")]
 [method: GeneratedActivatorConstructor]
-public abstract class DurableTaskRequest<TResult>(IGrainContextAccessor grainContextAccessor) : DurableTask<TResult>, IDurableTaskRequest, ISchedulableTask, IPollableTask
+public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared shared) : DurableTask<TResult>, IDurableTaskRequest, ISchedulableTask, IPollableTask
 {
     // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
     // For now, we're not doing that, just to make sure that we can get far without needing it, demonstrating the extensibility of Orleans.
     // It might be worthwhile making RuntimeContext public at some point, even if it is not the recommended approach.
     [NonSerialized]
-    private readonly IGrainContextAccessor _grainContextAccessor = grainContextAccessor;
+    private readonly DurableTaskRequestShared _shared = shared;
 
     /// <inheritdoc/>
     [Id(0)]
@@ -264,7 +275,7 @@ public abstract class DurableTaskRequest<TResult>(IGrainContextAccessor grainCon
         Context = new()
         {
             // TaskId will be filled in later, before submission, via an extension method at the call site.
-            Target = targetGrainReference,
+            TargetId = targetGrainReference.GrainId,
         };
         return this;
     }
@@ -275,7 +286,7 @@ public abstract class DurableTaskRequest<TResult>(IGrainContextAccessor grainCon
         Debug.Assert(Context is not null);
         Context.SchedulingOptions = options;
 
-        var callerContext = _grainContextAccessor.GrainContext;
+        var callerContext = _shared.GrainContextAccessor.GrainContext;
         var runtime = DurableTaskRequest.GetRuntime(callerContext);
 
         return await runtime.ScheduleAsync(taskId, this, CancellationToken.None);
@@ -294,8 +305,13 @@ public abstract class DurableTaskRequest<TResult>(IGrainContextAccessor grainCon
         // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
         Debug.Assert(Context is not null);
         Context.TaskId = executionContext.Id;
-        Context.Caller = _grainContextAccessor.GrainContext?.GrainReference;
-        var remote = Context.Target.Cast<IDurableTaskGrainExtension>();
+        var callerContext = _shared.GrainContextAccessor.GrainContext;
+        if (callerContext is not null)
+        {
+            Context.CallerId = callerContext.GrainId;
+        }
+
+        var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         return await remote.ScheduleAsync(this);
     }
 
@@ -304,7 +320,7 @@ public abstract class DurableTaskRequest<TResult>(IGrainContextAccessor grainCon
     {
         Debug.Assert(Context is not null);
         Debug.Assert(Context.TaskId != TaskId.None);
-        var remote = Context.Target.Cast<IDurableTaskGrainExtension>();
+        var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         return remote.SubscribeOrPollAsync(Context.TaskId, null);
     }
 

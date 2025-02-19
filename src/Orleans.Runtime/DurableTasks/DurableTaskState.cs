@@ -8,9 +8,7 @@ namespace Orleans.DurableTasks;
 [Alias("DurableTaskState")]
 public class DurableTaskState : IDurableTaskState
 {
-    /// <summary>
-    /// Gets or sets the result of this task.
-    /// </summary>
+    /// <inheritdoc cref="IDurableTaskState.Result"/>
     [Id(0)]
     public Response Result { get; set; }
 
@@ -26,23 +24,21 @@ public class DurableTaskState : IDurableTaskState
     [Id(1)]
     public HashSet<IDurableTaskObserver> Observers { get; set; }
 
-    /// <summary>
-    /// Gets or sets the invokable request.
-    /// </summary>
+    /// <inheritdoc cref="IDurableTaskState.Request"/>
     [Id(2)]
     public IDurableTaskRequest Request { get; set; }
 
-    /// <summary>
-    /// Gets or sets the time that the task completed.
-    /// </summary>
+    /// <inheritdoc cref="IDurableTaskState.CompletedAt"/>
     [Id(3)]
     public DateTimeOffset? CompletedAt { get; set; }
 
-    /// <summary>
-    /// Gets or sets the time that the task was created.
-    /// </summary>
+    /// <inheritdoc cref="IDurableTaskState.CreatedAt"/>
     [Id(4)]
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <inheritdoc cref="IDurableTaskState.CancellationRequestedAt"/>
+    [Id(5)] 
+    public DateTimeOffset? CancellationRequestedAt { get; set; }
 
     Response IDurableTaskState.Result => Result;
     IReadOnlySet<IDurableTaskObserver> IDurableTaskState.Observers => Observers;
