@@ -19,7 +19,6 @@ public abstract partial class DurableTaskContext(TaskId id)
     internal CancellationToken CancellationToken => _cancellationTokenSource.Token;
     protected internal abstract ValueTask<DurableTaskResponse> RunAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
     protected internal abstract TaskId CreateChildTaskId(string? name);
-    protected static ValueTask<DurableTaskResponse> GetResponseAsync(DurableTaskContext context) => context.AsValueTask();
 
     // Note that blocking on cancellation of a task from within that task would result in a deadlock
     // Cancels the task if it is scheduled or running. If the task is not scheduled or running, this method does nothing.

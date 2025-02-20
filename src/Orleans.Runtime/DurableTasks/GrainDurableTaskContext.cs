@@ -25,7 +25,7 @@ internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskGrainRu
     protected override async ValueTask<DurableTaskResponse> RunAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
     {
         var context = await Runtime.ScheduleAsync(taskId, taskDefinition, cancellationToken);
-        return await GetResponseAsync(context);
+        return await DurableTaskRuntimeHelper.GetResponseAsync(context).AsTask().WaitAsync(cancellationToken);
     }
 
     protected override TaskId CreateChildTaskId(string? name)
