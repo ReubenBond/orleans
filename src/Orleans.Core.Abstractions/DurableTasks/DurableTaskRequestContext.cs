@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Distributed.DurableTasks;
-using System.Distributed.DurableTasks.Scheduling;
 using Orleans.Runtime;
 using Orleans.Serialization.Cloning;
 
@@ -96,31 +95,3 @@ internal readonly struct TaskIdSurrogate(string value)
     public string Value { get; } = value;
 }
 
-[RegisterConverter]
-internal sealed class SchedulingOptionsConverter : IConverter<SchedulingOptions, SchedulingOptionsSurrogate>
-{
-    public SchedulingOptions ConvertFromSurrogate(in SchedulingOptionsSurrogate surrogate)
-    {
-        return new SchedulingOptions
-        {
-            DueTime = surrogate.DueTime,
-            PolicyId = surrogate.PolicyId
-        };
-    }
-
-    public SchedulingOptionsSurrogate ConvertToSurrogate(in SchedulingOptions value) => new()
-    {
-        DueTime = value.DueTime,
-        PolicyId = value.PolicyId
-    };
-}
-
-[GenerateSerializer, Immutable]
-internal readonly struct SchedulingOptionsSurrogate(SchedulingOptions value)
-{
-    [Id(0)]
-    public DateTimeOffset? DueTime { get; init; } = value.DueTime;
-
-    [Id(1)]
-    public string? PolicyId { get; init; } = value.PolicyId;
-}

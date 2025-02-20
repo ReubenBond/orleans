@@ -12,14 +12,14 @@ public static class DurableTaskExtensions
     /// </summary>
     /// <param name="task">The task.</param>
     /// <returns>An awaiter for the task.</returns>
-    public static DurableTaskAwaiter GetAwaiter(this DurableTask task) => new ConfiguredDurableTask(task).GetAwaiter();
+    public static DurableTaskAwaiter GetAwaiter(this DurableTask task) => new ConfiguredDurableTask(task, TaskId.CreateRandom()).GetAwaiter();
 
     /// <summary>
     /// Gets an awaiter for the durable task. This schedules the task and awaits completion.
     /// </summary>
     /// <param name="task">The task.</param>
     /// <returns>An awaiter for the task.</returns>
-    public static DurableTaskAwaiter<TResult> GetAwaiter<TResult>(this DurableTask<TResult> task) => new ConfiguredDurableTask<TResult>(task).GetAwaiter();
+    public static DurableTaskAwaiter<TResult> GetAwaiter<TResult>(this DurableTask<TResult> task) => new ConfiguredDurableTask<TResult>(task, TaskId.CreateRandom()).GetAwaiter();
 
     /// <summary>
     /// Returns a configured task with an identifier set.
@@ -31,9 +31,8 @@ public static class DurableTaskExtensions
     [Pure]
     public static ConfiguredDurableTask WithId(this DurableTask task, string id)
     {
-        var result = new ConfiguredDurableTask(task);
-        result.WithId(id);
-        return result;
+        ArgumentNullException.ThrowIfNull(id);
+        return new ConfiguredDurableTask(task, TaskId.Create(id));
     }
 
     /// <summary>
@@ -46,9 +45,8 @@ public static class DurableTaskExtensions
     [Pure]
     public static ConfiguredDurableTask<TResult> WithId<TResult>(this DurableTask<TResult> task, string id)
     {
-        var result = new ConfiguredDurableTask<TResult>(task);
-        result.WithId(id);
-        return result;
+        ArgumentNullException.ThrowIfNull(id);
+        return new ConfiguredDurableTask<TResult>(task, TaskId.Create(id));
     }
 
     /// <summary>
@@ -57,7 +55,7 @@ public static class DurableTaskExtensions
     /// <typeparam name="TResult">The task result type.</typeparam>
     /// <param name="task">The task.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task) => task.ScheduleAsyncCore(taskId: null);
+    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task, CancellationToken cancellationToken = default) => task.ScheduleAsyncCore(taskId: null, cancellationToken);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask{TResult}"/> as a workflow using the provided identifier.
@@ -66,7 +64,7 @@ public static class DurableTaskExtensions
     /// <param name="taskDefinition">The task.</param>
     /// <param name="taskId">The task identifier.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> taskDefinition, string taskId) => taskDefinition.ScheduleAsyncCore(taskId);
+    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> taskDefinition, string taskId, CancellationToken cancellationToken = default) => taskDefinition.ScheduleAsyncCore(taskId, cancellationToken);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask{TResult}"/> as a workflow using the provided identifier.
@@ -75,15 +73,10 @@ public static class DurableTaskExtensions
     /// <param name="taskDefinition">The task.</param>
     /// <param name="taskId">The task identifier.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    internal static ValueTask<ScheduledTask<TResult>> ScheduleAsyncCore<TResult>(this DurableTask<TResult> taskDefinition, string? taskId)
+    internal static ValueTask<ScheduledTask<TResult>> ScheduleAsyncCore<TResult>(this DurableTask<TResult> taskDefinition, string? taskId, CancellationToken cancellationToken)
     {
-        var configuredTask = new ConfiguredDurableTask<TResult>(taskDefinition);
-        if (taskId is not null)
-        {
-            configuredTask = configuredTask.WithId(taskId);
-        }
-
-        return configuredTask.ScheduleAsync();
+        var configuredTask = new ConfiguredDurableTask<TResult>(taskDefinition, taskId is null ? TaskId.CreateRandom() : TaskId.Create(taskId));
+        return configuredTask.ScheduleAsync(cancellationToken);
     }
 
     /// <summary>
@@ -109,12 +102,7 @@ public static class DurableTaskExtensions
     /// <returns>A handle for the scheduled task.</returns>
     public static ValueTask<ScheduledTask> ScheduleAsyncCore(this DurableTask taskDefinition, string? taskId, CancellationToken cancellationToken)
     {
-        var configuredTask = new ConfiguredDurableTask(taskDefinition);
-        if (taskId is not null)
-        {
-            configuredTask = configuredTask.WithId(taskId);
-        }
-
-        return configuredTask.ScheduleAsync();
+        var configuredTask = new ConfiguredDurableTask(taskDefinition, taskId is null ? TaskId.CreateRandom() : TaskId.Create(taskId));
+        return configuredTask.ScheduleAsync(cancellationToken);
     }
 }

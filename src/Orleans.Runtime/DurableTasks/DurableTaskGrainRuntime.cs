@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
-using System.Distributed.DurableTasks.Scheduling;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;

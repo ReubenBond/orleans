@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
-using System.Distributed.DurableTasks.Scheduling;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 namespace PaymentWorkflowApp.Runtime;

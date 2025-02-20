@@ -77,5 +77,6 @@ public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<
     public TaskId Parent() => _key?.GetParent() is { } parent ? new(parent) : None;
     public TaskId Child(string value) => _key is { } key ? new(key.CreateEscapedChildKey(value)) : new(value);
     public static TaskId Create(string value) => new(HierarchicalKey.CreateEscaped(value));
+    public static TaskId CreateRandom() => new(HierarchicalKey.CreateEscaped(Guid.NewGuid().ToString()));
 }
 

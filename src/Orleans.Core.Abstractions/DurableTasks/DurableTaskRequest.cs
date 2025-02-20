@@ -6,7 +6,6 @@ using Orleans.Invocation;
 using Orleans.Serialization.Invocation;
 using System.Diagnostics;
 using System.Distributed.DurableTasks;
-using System.Distributed.DurableTasks.Scheduling;
 using Orleans.Runtime;
 using System.Threading.Tasks;
 using System.Threading;
