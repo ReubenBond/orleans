@@ -21,11 +21,8 @@ public class DurableTaskRequestContext
     [Id(2)]
     public GrainId TargetId { get; set; }
 
-    [Id(3)]
-    public SchedulingOptions? SchedulingOptions { get; set; }
-
     // TODO: Use a specialized collection type which allows for late materialization when deserialized.
-    [Id(4)]
+    [Id(3)]
     public Dictionary<string, byte[]>? Values { get; set; }
 }
 

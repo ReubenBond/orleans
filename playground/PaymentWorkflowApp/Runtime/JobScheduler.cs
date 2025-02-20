@@ -155,7 +155,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         }
     }
 
-    internal async ValueTask<DurableTaskContext> ScheduleAsync(JobTask job, TaskId taskId, SchedulingOptions? options)
+    internal async ValueTask<DurableTaskContext> ScheduleAsync(JobTask job, TaskId taskId)
     {
         try
         {
@@ -375,9 +375,9 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         public string[]? Arguments { get; } = args;
         public string Type { get; } = type;
 
-        public ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, SchedulingOptions? options)
+        public ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId)
         {
-            return _jobScheduler.ScheduleAsync(this, taskId, options);
+            return _jobScheduler.ScheduleAsync(this, taskId);
         }
 
         protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)

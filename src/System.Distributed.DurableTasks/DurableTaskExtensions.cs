@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics.Contracts;
-using System.Distributed.DurableTasks.Scheduling;
 
 namespace System.Distributed.DurableTasks;
 
@@ -58,7 +57,7 @@ public static class DurableTaskExtensions
     /// <typeparam name="TResult">The task result type.</typeparam>
     /// <param name="task">The task.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task) => task.ScheduleAsync(taskId: null, options: null);
+    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task) => task.ScheduleAsyncCore(taskId: null);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask{TResult}"/> as a workflow using the provided identifier.
@@ -67,7 +66,7 @@ public static class DurableTaskExtensions
     /// <param name="taskDefinition">The task.</param>
     /// <param name="taskId">The task identifier.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> taskDefinition, string taskId) => taskDefinition.ScheduleAsync(taskId, options: null);
+    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> taskDefinition, string taskId) => taskDefinition.ScheduleAsyncCore(taskId);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask{TResult}"/> as a workflow using the provided identifier.
@@ -75,19 +74,13 @@ public static class DurableTaskExtensions
     /// <typeparam name="TResult">The task result type.</typeparam>
     /// <param name="taskDefinition">The task.</param>
     /// <param name="taskId">The task identifier.</param>
-    /// <param name="options">The task scheduling options.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> taskDefinition, string? taskId, SchedulingOptions? options = null)
+    internal static ValueTask<ScheduledTask<TResult>> ScheduleAsyncCore<TResult>(this DurableTask<TResult> taskDefinition, string? taskId)
     {
         var configuredTask = new ConfiguredDurableTask<TResult>(taskDefinition);
         if (taskId is not null)
         {
             configuredTask = configuredTask.WithId(taskId);
-        }
-
-        if (options is not null)
-        {
-            configuredTask = configuredTask.WithSchedulingOptions(options);
         }
 
         return configuredTask.ScheduleAsync();
@@ -98,7 +91,7 @@ public static class DurableTaskExtensions
     /// </summary>
     /// <param name="taskDefinition">The task.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition) => taskDefinition.ScheduleAsync(taskId: null, options: null);
+    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition) => taskDefinition.ScheduleAsyncCore(taskId: null);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask"/> as a workflow using the provided identifier.
@@ -106,30 +99,20 @@ public static class DurableTaskExtensions
     /// <param name="taskDefinition">The task.</param>
     /// <param name="taskId">The task identifier.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition, string taskId) => taskDefinition.ScheduleAsync(taskId, options: null);
+    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition, string taskId) => taskDefinition.ScheduleAsyncCore(taskId);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask"/> as a workflow using the provided identifier.
     /// </summary>
     /// <param name="taskDefinition">The task.</param>
     /// <param name="taskId">The task identifier.</param>
-    /// <param name="options">The task scheduling options.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition, string? taskId, SchedulingOptions? options)
+    public static ValueTask<ScheduledTask> ScheduleAsyncCore(this DurableTask taskDefinition, string? taskId)
     {
         var configuredTask = new ConfiguredDurableTask(taskDefinition);
         if (taskId is not null)
         {
             configuredTask = configuredTask.WithId(taskId);
-        }
-        else
-        {
-            configuredTask = configuredTask.WithId(Guid.NewGuid().ToString());
-        }
-
-        if (options is not null)
-        {
-            configuredTask = configuredTask.WithSchedulingOptions(options);
         }
 
         return configuredTask.ScheduleAsync();

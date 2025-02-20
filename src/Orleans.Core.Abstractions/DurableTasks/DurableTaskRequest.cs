@@ -126,10 +126,9 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         return this;
     }
 
-    async ValueTask<DurableTaskContext> ISchedulableTask.ScheduleAsync(TaskId taskId, SchedulingOptions? options)
+    async ValueTask<DurableTaskContext> ISchedulableTask.ScheduleAsync(TaskId taskId)
     {
         Debug.Assert(Context is not null);
-        Context.SchedulingOptions = options;
 
         var callerContext = _shared.GrainContextAccessor.GrainContext;
         var runtime = GetRuntime(callerContext);
@@ -281,10 +280,9 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     }
 
     /// <inheritdoc/>
-    public async ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, SchedulingOptions? options)
+    public async ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId)
     {
         Debug.Assert(Context is not null);
-        Context.SchedulingOptions = options;
 
         var callerContext = _shared.GrainContextAccessor.GrainContext;
         var runtime = DurableTaskRequest.GetRuntime(callerContext);

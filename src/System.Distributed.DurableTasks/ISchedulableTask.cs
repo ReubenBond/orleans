@@ -11,9 +11,8 @@ public interface ISchedulableTask
     /// Schedules the task, returning a <see cref="DurableTaskContext"/> representing the scheduled task.
     /// </summary>
     /// <param name="taskId">The task identifier.</param>
-    /// <param name="options">The scheduling options.</param>
     /// <returns>A context representing the scheduled task.</returns>
-    ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, SchedulingOptions? options);
+    ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId);
 }
 
 /// <summary>

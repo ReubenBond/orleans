@@ -41,7 +41,6 @@ internal struct ConfiguredDurableTaskCore<TDurableTask>(TDurableTask task) where
     internal readonly TDurableTask Task = task;
     internal readonly DurableTaskContext? ParentContext = DurableTaskContext.CurrentContext;
     internal TaskId Id;
-    internal SchedulingOptions? SchedulingOptions;
 
     internal ValueTask<DurableTaskResponse> RunAsync()
     {
@@ -77,7 +76,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask>(TDurableTask task) where
 
     private readonly async ValueTask<DurableTaskResponse> ScheduleAndAwaitAsync(ISchedulableTask schedulableTask)
     {
-        var context = await schedulableTask.ScheduleAsync(Id, SchedulingOptions);
+        var context = await schedulableTask.ScheduleAsync(Id);
         return await context.AsValueTask();
     }
 
@@ -112,16 +111,9 @@ public struct ConfiguredDurableTask(DurableTask task)
 
     internal readonly DurableTask Task => _core.Task;
     internal TaskId Id { set => _core.Id = value; readonly get => _core.Id; }
-    internal SchedulingOptions? SchedulingOptions { set => _core.SchedulingOptions = value; readonly get => _core.SchedulingOptions; }
     internal ConfiguredDurableTask WithId(string id)
     {
         _core.SetTaskIdCore(id);
-        return this;
-    }
-
-    internal ConfiguredDurableTask WithSchedulingOptions(SchedulingOptions? options)
-    {
-        SchedulingOptions = options;
         return this;
     }
 
@@ -133,7 +125,7 @@ public struct ConfiguredDurableTask(DurableTask task)
             throw GetNonSchedulableTaskException();
         }
 
-        var executionContext = await schedulableTask.ScheduleAsync(Id, SchedulingOptions);
+        var executionContext = await schedulableTask.ScheduleAsync(Id);
         return new ScheduledDurableTask(executionContext);
     }
 
@@ -158,16 +150,9 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
 
     internal readonly DurableTask<TResult> Task => _core.Task;
     internal TaskId Id { set => _core.Id = value; readonly get => _core.Id; }
-    internal SchedulingOptions? SchedulingOptions { set => _core.SchedulingOptions = value; readonly get => _core.SchedulingOptions; }
     internal ConfiguredDurableTask<TResult> WithId(string id)
     {
         _core.SetTaskIdCore(id);
-        return this;
-    }
-
-    internal ConfiguredDurableTask<TResult> WithSchedulingOptions(SchedulingOptions? options)
-    {
-        SchedulingOptions = options;
         return this;
     }
 
@@ -178,7 +163,7 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
             throw ConfiguredDurableTask.GetNonSchedulableTaskException();
         }
 
-        var executionContext = await schedulableTask.ScheduleAsync(Id, SchedulingOptions);
+        var executionContext = await schedulableTask.ScheduleAsync(Id);
         return new ScheduledDurableTask<TResult>(executionContext);
     }
 
