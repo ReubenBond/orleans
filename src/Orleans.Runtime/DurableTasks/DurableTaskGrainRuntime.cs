@@ -335,7 +335,7 @@ internal sealed class DurableTaskGrainRuntime(
                                 if (pollable is not null)
                                 {
                                     // Poll the task, which is cheaper than sending the initial request again.
-                                    response = await pollable.PollAsync();
+                                    response = await pollable.PollAsync(cancellationToken);
                                 }
                                 else
                                 {

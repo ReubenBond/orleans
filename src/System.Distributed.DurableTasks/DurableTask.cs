@@ -138,14 +138,14 @@ public struct ConfiguredDurableTask(DurableTask task, TaskId taskId)
     }
 
     // Cancels a durable task without waiting for the task to complete
-    public readonly async ValueTask<bool> CancelAsync()
+    public readonly async ValueTask<bool> CancelAsync(CancellationToken cancellationToken)
     {
         if (Task is not ICancellableTask cancellableTask)
         {
             return false;
         }
 
-        await cancellableTask.CancelAsync(Id);
+        await cancellableTask.CancelAsync(Id, cancellationToken);
         return true;
     }
 

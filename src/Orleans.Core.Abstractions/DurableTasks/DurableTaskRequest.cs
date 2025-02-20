@@ -160,12 +160,12 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     }
 
     /// <inheritdoc/>
-    ValueTask<DurableTaskResponse> IPollableTask.PollAsync()
+    async ValueTask<DurableTaskResponse> IPollableTask.PollAsync(CancellationToken cancellationToken)
     {
         Debug.Assert(Context is not null);
         Debug.Assert(Context.TaskId != TaskId.None);
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
-        return remote.SubscribeOrPollAsync(Context.TaskId, null);
+        return await remote.SubscribeOrPollAsync(Context.TaskId, null).AsTask().WaitAsync(cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -314,12 +314,12 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     }
 
     /// <inheritdoc/>
-    ValueTask<DurableTaskResponse> IPollableTask.PollAsync()
+    async ValueTask<DurableTaskResponse> IPollableTask.PollAsync(CancellationToken cancellationToken)
     {
         Debug.Assert(Context is not null);
         Debug.Assert(Context.TaskId != TaskId.None);
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
-        return remote.SubscribeOrPollAsync(Context.TaskId, null);
+        return await remote.SubscribeOrPollAsync(Context.TaskId, null).AsTask().WaitAsync(cancellationToken);
     }
 
     /// <inheritdoc/>

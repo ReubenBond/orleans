@@ -9,5 +9,5 @@ public interface IPollableTask
     /// Polls the task to determine whether it has completed, returning the result if it has completed, or a non-final result (<see cref="DurableTaskResponse.IsCompleted"/> returns <see langword="false"/>) if it has not.
     /// </summary>
     /// <returns>The current task result.</returns>
-    ValueTask<DurableTaskResponse> PollAsync();
+    ValueTask<DurableTaskResponse> PollAsync(CancellationToken cancellationToken);
 }
