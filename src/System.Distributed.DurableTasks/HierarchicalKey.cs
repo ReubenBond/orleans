@@ -35,7 +35,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
         ArgumentException.ThrowIfNullOrEmpty(value);
         if (!IsSegmentationValid(value))
         {
-            throw new ArgumentException("Value must not contain empty segments", nameof(value));
+            throw new ArgumentException("Value must not contain empty segments.", nameof(value));
         }
 
         return new(value.AsMemory());
@@ -68,7 +68,7 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
     {
         if (!TryParse(s, provider, out var result))
         {
-            throw new InvalidOperationException("Unable to parse hierarchical key");
+            throw new InvalidOperationException("Unable to parse hierarchical key.");
         }
 
         return result;
@@ -547,8 +547,8 @@ internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<Hierarchica
 
         public ReadOnlySpan<char> Current => _remaining switch
         {
-            -2 => throw new InvalidOperationException($"{nameof(MoveNext)} must be called before accessing {nameof(Current)}"),
-            -1 => throw new InvalidOperationException("No remaining elements"),
+            -2 => throw new InvalidOperationException($"'{nameof(MoveNext)}' must be called before accessing '{nameof(Current)}'."),
+            -1 => throw new InvalidOperationException("No remaining elements."),
             int depth => GetElement(_current, depth),
         };
 

@@ -142,16 +142,16 @@ public struct ConfiguredDurableTask(DurableTask task)
         return new ScheduledDurableTask(executionContext);
     }
 
-    // Schedules a durable task without waiting for the task to complete
-    public readonly async ValueTask<bool> TryCancelAsync()
+    // Cancels a durable task without waiting for the task to complete
+    public readonly async ValueTask<bool> CancelAsync()
     {
-        if (Task is not ICancellableTask schedulableTask)
+        if (Task is not ICancellableTask cancellableTask)
         {
             return false;
         }
 
-        var executionContext = await schedulableTask.ScheduleAsync(Id, SchedulingOptions);
-        return new ScheduledDurableTask(executionContext);
+        await cancellableTask.CancelAsync(Id);
+        return true;
     }
 
     internal static InvalidOperationException GetNonSchedulableTaskException() => new("The provided task does not support scheduling. This may be because it is a local method or another non-serializable task type.");
