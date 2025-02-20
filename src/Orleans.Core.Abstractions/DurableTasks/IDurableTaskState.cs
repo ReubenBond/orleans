@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using Orleans.Serialization.Invocation;
+using System.Distributed.DurableTasks;
 
 namespace Orleans.DurableTasks;
 
@@ -16,7 +16,7 @@ public interface IDurableTaskState
     /// <summary>
     /// The result of the task, which will be <see langword="null"/> if the task has not yet completed.
     /// </summary>
-    public Response Result { get; }
+    public DurableTaskResponse Result { get; }
 
     /// <summary>
     /// The set of clients which are interested in the result of this task.

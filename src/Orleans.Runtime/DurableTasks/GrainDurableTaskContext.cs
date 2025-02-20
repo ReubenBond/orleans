@@ -6,9 +6,9 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.Serialization.Invocation;
+using Orleans.DurableTasks;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.Runtime.DurableTasks;
 
 internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskGrainRuntime runtime, IDurableTaskState state) : DurableTaskContext(taskId)
 {
@@ -22,7 +22,7 @@ internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskGrainRu
 
     internal IDurableTaskState State { get; } = state;
 
-    protected override async ValueTask<Response> RunAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+    protected override async ValueTask<DurableTaskResponse> RunAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
     {
         var context = await Runtime.ScheduleAsync(taskId, taskDefinition, cancellationToken);
         return await GetResponseAsync(context);
@@ -48,8 +48,8 @@ internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskGrainRu
         }
     }
 
-    public bool TryGetTaskResponse(TaskId taskId, [NotNullWhen(true)] out Response? response) => Runtime.GetResponseOrCreateChildTask(taskId, out response);
-    public void SetTaskResponse(TaskId taskId, Response response) => Runtime.SetChildTaskResponse(taskId, response);
+    public bool TryGetTaskResponse(TaskId taskId, [NotNullWhen(true)] out DurableTaskResponse? response) => Runtime.GetResponseOrCreateChildTask(taskId, out response);
+    public void SetTaskResponse(TaskId taskId, DurableTaskResponse response) => Runtime.SetChildTaskResponse(taskId, response);
 
     protected override ValueTask SignalCancellationAsyncCore(CancellationToken cancellationToken)
     {

@@ -1,5 +1,4 @@
 ﻿using System.Runtime.CompilerServices;
-using Orleans.Serialization.Invocation;
 
 namespace System.Distributed.DurableTasks;
 
@@ -43,7 +42,7 @@ public abstract class ScheduledTask<TResult> : ScheduledTask
     /// Gets a task representing the completion of the operation.
     /// </summary>
     /// <returns>A task representing the completion of the operation.</returns>
-    internal abstract ValueTask<Response> AsValueTask();
+    internal abstract ValueTask<DurableTaskResponse> AsValueTask();
 
     /// <summary>Gets an awaiter used to await this <see cref="ScheduledTask{TResult}"/>.</summary>
     /// <returns>An awaiter instance.</returns>
@@ -68,7 +67,7 @@ internal sealed class ScheduledDurableTask<TResult> : ScheduledTask<TResult>
     }
 
     protected internal override ValueTask AsUntypedValueTask() => _executionContext.AsUntypedValueTask();
-    internal override ValueTask<Response> AsValueTask() => _executionContext.AsValueTask();
+    internal override ValueTask<DurableTaskResponse> AsValueTask() => _executionContext.AsValueTask();
 }
 
 internal sealed class ScheduledDurableTask : ScheduledTask
@@ -127,7 +126,7 @@ public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 /// <typeparam name="TResult">The underlying result type.</typeparam>
 public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
 {
-    private readonly ValueTaskAwaiter<Response> _awaiter;
+    private readonly ValueTaskAwaiter<DurableTaskResponse> _awaiter;
 
     internal ScheduledTaskAwaiter(ScheduledTask<TResult> durableTaskInvocation) =>
 #pragma warning disable CA2012 // Use ValueTasks correctly

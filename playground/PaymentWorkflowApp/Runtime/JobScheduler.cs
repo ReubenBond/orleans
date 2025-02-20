@@ -4,7 +4,6 @@ using System.Distributed.DurableTasks;
 using System.Distributed.DurableTasks.Scheduling;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
-using Orleans.Serialization.Invocation;
 namespace PaymentWorkflowApp.Runtime;
 
 public class JobDescription
@@ -187,7 +186,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         }
     }
 
-    public async ValueTask<Response> InvokeAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+    public async ValueTask<DurableTaskResponse> InvokeAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
     {
         var ctx = await EvaluateStepAsync(taskId, taskDefinition, cancellationToken);
         return await DurableTaskRuntimeHelper.GetResponseAsync(ctx);
@@ -211,7 +210,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
             }
             catch (Exception exception)
             {
-                await CompleteRequestWithResponse(taskId, Response.FromException(exception), executionContext);
+                await CompleteRequestWithResponse(taskId, DurableTaskResponse.FromException(exception), executionContext);
             }
 
             return executionContext;
@@ -242,11 +241,11 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
             var arguments = job.Arguments;
             var argString = arguments switch { { Length: 1 } arg => arg[0], { Length: > 1 } => string.Join(", ", arguments), _ => "" };
             _logger.LogError(exception, "Error invoking durable task request {Type}({Arguments})", job.Type, argString);
-            await CompleteRequestWithResponse(taskId, Response.FromException(exception), executionContext);
+            await CompleteRequestWithResponse(taskId, DurableTaskResponse.FromException(exception), executionContext);
         }
     }
 
-    private async Task CompleteRequestWithResponse(TaskId taskId, Response response, JobDurableTaskExecutionContext executionContext)
+    private async Task CompleteRequestWithResponse(TaskId taskId, DurableTaskResponse response, JobDurableTaskExecutionContext executionContext)
     {
         if (_logger.IsEnabled(LogLevel.Trace))
         {
@@ -381,14 +380,14 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
             return _jobScheduler.ScheduleAsync(this, taskId, options);
         }
 
-        protected override async ValueTask<Response> RunAsync(DurableTaskContext executionContext)
+        protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
         {
             var handler = _jobScheduler._handlers[Type];
-            Response response;
+            DurableTaskResponse response;
             if (handler is Func<string[]?, string> funcJob)
             {
                 DurableTaskRuntimeHelper.SetCurrentContext(executionContext);
-                response = Response.FromResult(funcJob(Arguments));
+                response = DurableTaskResponse.FromResult(funcJob(Arguments));
 
             }
             else if (handler is Func<string[]?, DurableTask<string>> durableTaskJob)

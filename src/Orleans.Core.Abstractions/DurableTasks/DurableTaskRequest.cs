@@ -27,7 +27,7 @@ public interface IDurableTaskRequest : IRequest
     /// Invoke the method on the target.
     /// </summary>
     /// <returns>The result of invocation.</returns>
-    ValueTask<Response> InvokeImplementation(DurableTaskContext executionContext);
+    ValueTask<DurableTaskResponse> InvokeImplementation(DurableTaskContext executionContext);
 
     /// <summary>
     /// Returns a string representation of the request.
@@ -138,7 +138,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     }
 
     /// <inheritdoc/>
-    protected override async ValueTask<Response> RunAsync(DurableTaskContext executionContext)
+    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
@@ -161,7 +161,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     }
 
     /// <inheritdoc/>
-    ValueTask<Response> IPollableTask.PollAsync()
+    ValueTask<DurableTaskResponse> IPollableTask.PollAsync()
     {
         Debug.Assert(Context is not null);
         Debug.Assert(Context.TaskId != TaskId.None);
@@ -170,12 +170,12 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     }
 
     /// <inheritdoc/>
-    ValueTask<Response> IInvokable.Invoke()
+    ValueTask<Orleans.Serialization.Invocation.Response> IInvokable.Invoke()
         // This could be made to work... maybe pick a random task id, for example.
         => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
-    ValueTask<Response> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
+    ValueTask<DurableTaskResponse> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
 
     // Generated
     protected abstract DurableTask InvokeInner();
@@ -293,7 +293,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     }
 
     /// <inheritdoc/>
-    protected override async ValueTask<Response> RunAsync(DurableTaskContext executionContext)
+    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
@@ -316,7 +316,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     }
 
     /// <inheritdoc/>
-    ValueTask<Response> IPollableTask.PollAsync()
+    ValueTask<DurableTaskResponse> IPollableTask.PollAsync()
     {
         Debug.Assert(Context is not null);
         Debug.Assert(Context.TaskId != TaskId.None);
@@ -325,10 +325,10 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     }
 
     /// <inheritdoc/>
-    ValueTask<Response> IInvokable.Invoke() => throw new NotImplementedException("Durable task requests can not be invoked directly");
+    ValueTask<Orleans.Serialization.Invocation.Response> IInvokable.Invoke() => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
-    ValueTask<Response> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
+    ValueTask<DurableTaskResponse> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
 
     // Generated
     protected abstract DurableTask<TResult> InvokeInner();

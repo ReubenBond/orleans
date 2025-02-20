@@ -1,5 +1,4 @@
 ﻿using System.Runtime.CompilerServices;
-using Orleans.Serialization.Invocation;
 
 namespace System.Distributed.DurableTasks;
 
@@ -8,9 +7,9 @@ namespace System.Distributed.DurableTasks;
 /// </summary>
 public readonly struct DurableTaskAwaiter : INotifyCompletion, ICriticalNotifyCompletion
 {
-    private readonly ValueTaskAwaiter<Response> _awaiter;
+    private readonly ValueTaskAwaiter<DurableTaskResponse> _awaiter;
 
-    internal DurableTaskAwaiter(ValueTask<Response> invokedTask)
+    internal DurableTaskAwaiter(ValueTask<DurableTaskResponse> invokedTask)
     {
         _awaiter = invokedTask.GetAwaiter();
     }
@@ -26,9 +25,9 @@ public readonly struct DurableTaskAwaiter : INotifyCompletion, ICriticalNotifyCo
 /// </summary>
 public readonly struct DurableTaskAwaiter<TResult> : INotifyCompletion, ICriticalNotifyCompletion
 {
-    private readonly ValueTaskAwaiter<Response> _awaiter;
+    private readonly ValueTaskAwaiter<DurableTaskResponse> _awaiter;
 
-    internal DurableTaskAwaiter(ValueTask<Response> invokedTask)
+    internal DurableTaskAwaiter(ValueTask<DurableTaskResponse> invokedTask)
     {
         _awaiter = invokedTask.GetAwaiter();
     }

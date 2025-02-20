@@ -1,13 +1,10 @@
 ﻿using System.Distributed.DurableTasks.Scheduling;
 using System.Runtime.CompilerServices;
-using Orleans;
-using Orleans.Serialization.Invocation;
+using System.Runtime.ExceptionServices;
 
 namespace System.Distributed.DurableTasks;
 
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
-[GenerateSerializer, SerializerTransparent]
-[Alias("DurableTask")]
 public abstract class DurableTask
 {
     public static DurableTask<TResult> FromResult<TResult>(TResult value) => new CompletedDurableTask<TResult>(value);
@@ -31,12 +28,10 @@ public abstract class DurableTask
     /// </summary>
     /// <param name="context">The task context.</param>
     /// <returns>The response.</returns>
-    protected internal abstract ValueTask<Response> RunAsync(DurableTaskContext context);
+    protected internal abstract ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context);
 }
 
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder<>))]
-[GenerateSerializer, SerializerTransparent]
-[Alias("DurableTask`1")]
 public abstract class DurableTask<TResult> : DurableTask
 {
 }
@@ -48,7 +43,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask>(TDurableTask task) where
     internal TaskId Id;
     internal SchedulingOptions? SchedulingOptions;
 
-    internal ValueTask<Response> RunAsync()
+    internal ValueTask<DurableTaskResponse> RunAsync()
     {
         if (ParentContext is { } parentContext)
         {
@@ -80,7 +75,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask>(TDurableTask task) where
         }
     }
 
-    private readonly async ValueTask<Response> ScheduleAndAwaitAsync(ISchedulableTask schedulableTask)
+    private readonly async ValueTask<DurableTaskResponse> ScheduleAndAwaitAsync(ISchedulableTask schedulableTask)
     {
         var context = await schedulableTask.ScheduleAsync(Id, SchedulingOptions);
         return await context.AsValueTask();
@@ -196,7 +191,7 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
 internal sealed class CompletedDurableTask<TResult>(TResult value) : DurableTask<TResult>
 {
     /// <inheritdoc/>
-    protected internal override ValueTask<Response> RunAsync(DurableTaskContext context) => new(Response.FromResult(value));
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context) => new(DurableTaskResponse.FromResult(value));
 }
 
 /// <summary>
@@ -205,16 +200,16 @@ internal sealed class CompletedDurableTask<TResult>(TResult value) : DurableTask
 internal sealed class AsyncTaskDelegateDurableTask<TResult>(Func<CancellationToken, Task<TResult>> func) : DurableTask<TResult>
 {
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext context)
+    protected internal override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
         try
         {
             DurableTaskContext.SetCurrentContext(context);
-            return Response.FromResult(await func(context.CancellationToken));
+            return DurableTaskResponse.FromResult(await func(context.CancellationToken));
         }
         catch (Exception exception)
         {
-            return Response.FromException(exception);
+            return DurableTaskResponse.FromException(exception);
         }
     }
 }
@@ -225,17 +220,17 @@ internal sealed class AsyncTaskDelegateDurableTask<TResult>(Func<CancellationTok
 internal sealed class AsyncTaskDelegateDurableTask(Func<CancellationToken, Task> func) : DurableTask
 {
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext context)
+    protected internal override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
         try
         {
             DurableTaskContext.SetCurrentContext(context);
             await func(context.CancellationToken);
-            return Response.Completed;
+            return DurableTaskResponse.Completed;
         }
         catch (Exception exception)
         {
-            return Response.FromException(exception);
+            return DurableTaskResponse.FromException(exception);
         }
     }
 }
@@ -246,16 +241,16 @@ internal sealed class AsyncTaskDelegateDurableTask(Func<CancellationToken, Task>
 internal sealed class AsyncDelegateDurableTask<TResult>(Func<CancellationToken, ValueTask<TResult>> func) : DurableTask<TResult>
 {
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext context)
+    protected internal override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
         try
         {
             DurableTaskContext.SetCurrentContext(context);
-            return Response.FromResult(await func(context.CancellationToken));
+            return DurableTaskResponse.FromResult(await func(context.CancellationToken));
         }
         catch (Exception exception)
         {
-            return Response.FromException(exception);
+            return DurableTaskResponse.FromException(exception);
         }
     }
 }
@@ -266,17 +261,17 @@ internal sealed class AsyncDelegateDurableTask<TResult>(Func<CancellationToken, 
 internal sealed class AsyncDelegateDurableTask(Func<CancellationToken, ValueTask> func) : DurableTask
 {
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext context)
+    protected internal override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
         try
         {
             DurableTaskContext.SetCurrentContext(context);
             await func(context.CancellationToken);
-            return Response.Completed;
+            return DurableTaskResponse.Completed;
         }
         catch (Exception exception)
         {
-            return Response.FromException(exception);
+            return DurableTaskResponse.FromException(exception);
         }
     }
 }
@@ -287,16 +282,16 @@ internal sealed class AsyncDelegateDurableTask(Func<CancellationToken, ValueTask
 internal sealed class DelegateDurableTask<TResult>(Func<CancellationToken, TResult> func) : DurableTask<TResult>
 {
     /// <inheritdoc/>
-    protected internal override ValueTask<Response> RunAsync(DurableTaskContext context)
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
         try
         {
             DurableTaskContext.SetCurrentContext(context);
-            return new(Response.FromResult(func(context.CancellationToken)));
+            return new(DurableTaskResponse.FromResult(func(context.CancellationToken)));
         }
         catch (Exception exception)
         {
-            return new(Response.FromException(exception));
+            return new(DurableTaskResponse.FromException(exception));
         }
     }
 }
@@ -307,17 +302,17 @@ internal sealed class DelegateDurableTask<TResult>(Func<CancellationToken, TResu
 internal sealed class DelegateDurableTask(Action<CancellationToken> func) : DurableTask
 {
     /// <inheritdoc/>
-    protected internal override ValueTask<Response> RunAsync(DurableTaskContext context)
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
         try
         {
             DurableTaskContext.SetCurrentContext(context);
             func(context.CancellationToken);
-            return new(Response.Completed);
+            return new(DurableTaskResponse.Completed);
         }
         catch (Exception exception)
         {
-            return new(Response.FromException(exception));
+            return new(DurableTaskResponse.FromException(exception));
         }
     }
 }
@@ -328,16 +323,16 @@ internal sealed class DelegateDurableTask(Action<CancellationToken> func) : Dura
 internal sealed class AsyncTaskDelegateDurableTaskWithState<TState, TResult>(Func<TState, CancellationToken, Task<TResult>> func, TState state) : DurableTask<TResult>
 {
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext context)
+    protected internal override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
         try
         {
             DurableTaskContext.SetCurrentContext(context);
-            return Response.FromResult(await func(state, context.CancellationToken));
+            return DurableTaskResponse.FromResult(await func(state, context.CancellationToken));
         }
         catch (Exception exception)
         {
-            return Response.FromException(exception);
+            return DurableTaskResponse.FromException(exception);
         }
     }
 }
@@ -348,17 +343,17 @@ internal sealed class AsyncTaskDelegateDurableTaskWithState<TState, TResult>(Fun
 internal sealed class AsyncTaskDelegateDurableTaskWithState<TState>(Func<TState, CancellationToken, Task> func, TState state) : DurableTask
 {
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext context)
+    protected internal override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
         try
         {
             DurableTaskContext.SetCurrentContext(context);
             await func(state, context.CancellationToken);
-            return Response.Completed;
+            return DurableTaskResponse.Completed;
         }
         catch (Exception exception)
         {
-            return Response.FromException(exception);
+            return DurableTaskResponse.FromException(exception);
         }
     }
 }
@@ -369,16 +364,16 @@ internal sealed class AsyncTaskDelegateDurableTaskWithState<TState>(Func<TState,
 internal sealed class AsyncDelegateDurableTaskWithState<TState, TResult>(Func<TState, CancellationToken, ValueTask<TResult>> func, TState state) : DurableTask<TResult>
 {
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext context)
+    protected internal override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
         try
         {
             DurableTaskContext.SetCurrentContext(context);
-            return Response.FromResult(await func(state, context.CancellationToken));
+            return DurableTaskResponse.FromResult(await func(state, context.CancellationToken));
         }
         catch (Exception exception)
         {
-            return Response.FromException(exception);
+            return DurableTaskResponse.FromException(exception);
         }
     }
 }
@@ -389,17 +384,17 @@ internal sealed class AsyncDelegateDurableTaskWithState<TState, TResult>(Func<TS
 internal sealed class AsyncDelegateDurableTaskWithState<TState>(Func<TState, CancellationToken, ValueTask> func, TState state) : DurableTask
 {
     /// <inheritdoc/>
-    protected internal override async ValueTask<Response> RunAsync(DurableTaskContext context)
+    protected internal override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
         try
         {
             DurableTaskContext.SetCurrentContext(context);
             await func(state, context.CancellationToken);
-            return Response.Completed;
+            return DurableTaskResponse.Completed;
         }
         catch (Exception exception)
         {
-            return Response.FromException(exception);
+            return DurableTaskResponse.FromException(exception);
         }
     }
 }
@@ -410,16 +405,16 @@ internal sealed class AsyncDelegateDurableTaskWithState<TState>(Func<TState, Can
 internal sealed class DelegateDurableTaskWithState<TState, TResult>(Func<TState, CancellationToken, TResult> func, TState state) : DurableTask<TResult>
 {
     /// <inheritdoc/>
-    protected internal override ValueTask<Response> RunAsync(DurableTaskContext context)
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
         try
         {
             DurableTaskContext.SetCurrentContext(context);
-            return new(Response.FromResult(func(state, context.CancellationToken)));
+            return new(DurableTaskResponse.FromResult(func(state, context.CancellationToken)));
         }
         catch (Exception exception)
         {
-            return new(Response.FromException(exception));
+            return new(DurableTaskResponse.FromException(exception));
         }
     }
 }
@@ -430,18 +425,261 @@ internal sealed class DelegateDurableTaskWithState<TState, TResult>(Func<TState,
 internal sealed class DelegateDurableTaskWithState<TState>(Action<TState, CancellationToken> func, TState state) : DurableTask
 {
     /// <inheritdoc/>
-    protected internal override ValueTask<Response> RunAsync(DurableTaskContext context)
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
         try
         {
             DurableTaskContext.SetCurrentContext(context);
             func(state, context.CancellationToken);
-            return new(Response.Completed);
+            return new(DurableTaskResponse.Completed);
         }
         catch (Exception exception)
         {
-            return new(Response.FromException(exception));
+            return new(DurableTaskResponse.FromException(exception));
         }
     }
 }
 
+public enum DurableTaskResponseStatus
+{
+    None,
+    Pending,
+    Subscribed,
+    Success,
+    Error,
+}
+
+internal static class ResponseKindExtensions
+{
+    public static bool IsCompleted(this DurableTaskResponseStatus value) => value is DurableTaskResponseStatus.Success or DurableTaskResponseStatus.Error;
+}
+
+/// <summary>
+/// Represents the result of a method invocation.
+/// </summary>
+public abstract class DurableTaskResponse
+{
+    // Internal constructor to prevent external inheritance.
+    internal DurableTaskResponse()
+    {
+    }
+
+    /// <summary>
+    /// Creates a new response representing an exception.
+    /// </summary>
+    /// <param name="exception">The exception.</param>
+    /// <returns>A new response.</returns>
+    public static ExceptionDurableTaskResponse FromException(Exception exception) => new(exception);
+
+    /// <summary>
+    /// Creates a new response object which has been fulfilled with the provided value.
+    /// </summary>
+    /// <typeparam name="TResult">The underlying result type.</typeparam>
+    /// <param name="value">The value.</param>
+    /// <returns>A new response.</returns>
+    public static DurableTaskResponse<TResult> FromResult<TResult>(TResult value) => new(value);
+
+    /// <summary>
+    /// Gets a completed response with no value.
+    /// </summary>
+    public static SuccessDurableTaskResponse Completed => SuccessDurableTaskResponse.Instance;
+
+    /// <summary>
+    /// Gets a pending response.
+    /// </summary>
+    public static PendingDurableTaskResponse Pending => PendingDurableTaskResponse.Instance;
+
+    /// <summary>
+    /// Gets a subscribed response.
+    /// </summary>
+    public static SubscribedDurableTaskResponse Subscribed => SubscribedDurableTaskResponse.Instance;
+
+    /// <summary>
+    /// Gets a value indicating whether the response represents a completed task.
+    /// </summary>
+    public bool IsCompleted => Status.IsCompleted();
+
+    /// <summary>
+    /// Gets the response status.
+    /// </summary>
+    public abstract DurableTaskResponseStatus Status { get; }
+
+    /// <summary>
+    /// Gets the result value.
+    /// </summary>
+    /// <remarks>
+    /// If the response represents an exception, this property will throw the exception.
+    /// If the response represents an incomplete task, this property will throw an exception.
+    /// </remarks>
+    public abstract object? Result { get; }
+
+    /// <summary>
+    /// Gets the static type of the result value, or <see langword="null"/> if this response does not have a result value.
+    /// </summary>
+    public virtual Type? ResultType => null;
+
+    /// <summary>
+    /// Gets the exception or <see langword="null" /> if the response does not represent an exception.
+    /// </summary>
+    public abstract Exception? Exception { get; }
+
+    /// <summary>
+    /// Gets the result value with the specified type.
+    /// </summary>
+    /// <typeparam name="T">The result type.</typeparam>
+    /// <returns>The result value.</returns>
+    public abstract T GetResult<T>();
+}
+
+/// <summary>
+/// Represents a successfully completed task.
+/// </summary>
+public sealed class SuccessDurableTaskResponse : DurableTaskResponse
+{
+    /// <summary>
+    /// Gets the singleton instance of this class.
+    /// </summary>
+    public static SuccessDurableTaskResponse Instance { get; } = new SuccessDurableTaskResponse();
+
+    /// <inheritdoc/>
+    public override object? Result => null;
+
+    /// <inheritdoc/>
+    public override Exception? Exception => null;
+
+    public override DurableTaskResponseStatus Status => DurableTaskResponseStatus.Success;
+
+    /// <inheritdoc/>
+    public override T GetResult<T>() => default!;
+
+    /// <inheritdoc/>
+    public override string ToString() => "[Success]";
+}
+
+/// <summary>
+/// A <see cref="DurableTaskResponse"/> which represents an exception, a broken promise.
+/// </summary>
+public sealed class ExceptionDurableTaskResponse : DurableTaskResponse
+{
+    public ExceptionDurableTaskResponse(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        Exception = exception;
+    }
+
+    /// <inheritdoc/>
+    public override object? Result
+    {
+        get
+        {
+            ExceptionDispatchInfo.Capture(Exception!).Throw();
+            return null;
+        }
+    }
+
+    /// <inheritdoc/>
+    public override Exception Exception { get; }
+
+    /// <inheritdoc/>
+    public override DurableTaskResponseStatus Status => DurableTaskResponseStatus.Error;
+
+    /// <inheritdoc/>
+    public override T GetResult<T>()
+    {
+        ExceptionDispatchInfo.Capture(Exception!).Throw();
+        return default;
+    }
+
+    /// <inheritdoc/>
+    public override string ToString() => $"[Error: {Exception?.ToString()}]";
+}
+
+/// <summary>
+/// A <see cref="DurableTaskResponse"/> which represents a typed value.
+/// </summary>
+/// <typeparam name="TResult">The underlying result type.</typeparam>
+public sealed class DurableTaskResponse<TResult>(TResult result) : DurableTaskResponse
+{
+    public TResult TypedResult { get => result; }
+
+    public override Exception? Exception => null;
+
+    public override object? Result => result;
+
+    public override DurableTaskResponseStatus Status => DurableTaskResponseStatus.Success;
+
+    public override Type ResultType => typeof(TResult);
+
+    public override T GetResult<T>()
+    {
+        if (typeof(TResult).IsValueType && typeof(T).IsValueType && typeof(T) == typeof(TResult))
+            return Unsafe.As<TResult, T>(ref result!);
+
+        return (T)(object)result!;
+    }
+
+    public override string ToString() => $"[Success: '{result?.ToString()}']";
+}
+
+/// <summary>
+/// Represents a pending result for a <see cref="DurableTask"/> or <see cref="DurableTask{TResult}"/> invocation.
+/// </summary>
+public sealed class PendingDurableTaskResponse : DurableTaskResponse
+{
+    /// <summary>
+    /// Gets the singleton instance of this class.
+    /// </summary>
+    public static PendingDurableTaskResponse Instance { get; } = new();
+
+    /// <inheritdoc/>
+    public override object? Result => throw new InvalidOperationException("The task has not completed yet.");
+
+    /// <inheritdoc/>
+    public override Exception? Exception => null;
+
+    /// <inheritdoc/>
+    public override DurableTaskResponseStatus Status => DurableTaskResponseStatus.Pending;
+
+    /// <inheritdoc/>
+    public override T GetResult<T>() => default!;
+
+    /// <inheritdoc/>
+    public override string ToString() => "[Pending]";
+}
+
+/// <summary>
+/// Represents an intermediary response indicating that the caller is subscribed to the task and the task has not completed yet.
+/// </summary>
+public sealed class SubscribedDurableTaskResponse : DurableTaskResponse
+{
+    /// <summary>
+    /// Gets the singleton instance of this class.
+    /// </summary>
+    public static SubscribedDurableTaskResponse Instance { get; } = new();
+
+    /// <inheritdoc/>
+    public override object? Result => throw new InvalidOperationException("The task has not completed yet.");
+
+    /// <inheritdoc/>
+    public override Exception? Exception => null;
+
+    /// <inheritdoc/>
+    public override DurableTaskResponseStatus Status => DurableTaskResponseStatus.Subscribed;
+
+    /// <inheritdoc/>
+    public override T GetResult<T>() => default!;
+
+    /// <inheritdoc/>
+    public override string ToString() => "[Subscribed]";
+}
+
+internal static class ResponseExtensions
+{
+    public static void ThrowIfExceptionResponse(this DurableTaskResponse response)
+    {
+        if (response.Exception is { } exception)
+        {
+            ExceptionDispatchInfo.Capture(exception).Throw();
+        }
+    }
+}

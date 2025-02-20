@@ -3,7 +3,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;
 
@@ -12,7 +11,7 @@ public interface IDurableTaskGrainStorage
     IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks { get; }
 
     IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest request);
-    void SetResponse(TaskId taskId, IDurableTaskState state, Response response);
+    void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response);
 
     void AddObserver(TaskId taskId, IDurableTaskState state, IDurableTaskObserver observer);
     void ClearObservers(TaskId taskId, IDurableTaskState state);

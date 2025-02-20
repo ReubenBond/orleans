@@ -21,6 +21,13 @@ namespace Orleans
         /// Get or sets when Orleans should auto-assign field ids. The default behavior is to not auto-assign field ids.
         /// </summary>
         public GenerateFieldIds GenerateFieldIds { get; init; } = GenerateFieldIds.None;
+
+        /*
+        /// <summary>
+        /// Gets or sets a value indicating whether this type's base type should be excluded during serialization operations.
+        /// </summary>
+        public bool ExcludeBase { get; set; }
+        */
     }
 
     /// <summary>

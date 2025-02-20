@@ -2,22 +2,17 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
-using Orleans;
 
 namespace System.Distributed.DurableTasks;
 
-[GenerateSerializer, Immutable]
-[Alias("HierarchicalKey")]
 internal sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalKey>, IParsable<HierarchicalKey>, ISpanParsable<HierarchicalKey>
 {
     public const char EscapeCharacter = '\\';
     public const char SegmentSeparator = '/';
     private static ReadOnlySpan<char> SegmentSeparatorSpan => "/";
 
-    [Id(0)]
     private readonly HierarchicalKey? _parent;
 
-    [Id(1)]
     private readonly ReadOnlyMemory<char> _value;
 
     private HierarchicalKey(ReadOnlyMemory<char> value)

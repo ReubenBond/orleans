@@ -1,13 +1,4 @@
-﻿using System.Buffers;
-using System.Runtime.CompilerServices;
-using Orleans;
-using Orleans.Serialization;
-using Orleans.Serialization.Activators;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Cloning;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Invocation;
-using Orleans.Serialization.WireProtocol;
+﻿using System.Runtime.CompilerServices;
 
 namespace System.Distributed.DurableTasks;
 
@@ -20,9 +11,9 @@ public readonly struct DurableTaskResultAwaitable<TResult>(DurableTaskContext ex
 
 public readonly struct DurableTaskResultAwaiter<TResult> : INotifyCompletion, ICriticalNotifyCompletion
 {
-    private readonly ValueTaskAwaiter<Response> _awaiter;
+    private readonly ValueTaskAwaiter<DurableTaskResponse> _awaiter;
 
-    internal DurableTaskResultAwaiter(ValueTask<Response> responseTask)
+    internal DurableTaskResultAwaiter(ValueTask<DurableTaskResponse> responseTask)
     {
         _awaiter = responseTask.GetAwaiter();
     }

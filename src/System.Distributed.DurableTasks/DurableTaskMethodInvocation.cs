@@ -1,6 +1,5 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Threading.Tasks.Sources;
-using Orleans.Serialization.Invocation;
 
 namespace System.Distributed.DurableTasks;
 
@@ -20,10 +19,10 @@ internal abstract class UntypedDurableTaskMethodInvocation : DurableTask, IDurab
 /// <summary>
 /// Represents a locally-executing <see cref="DurableTask"/> method.
 /// </summary>
-internal sealed class UntypedDurableTaskMethodInvocation<TStateMachine> : UntypedDurableTaskMethodInvocation, IAsyncStateMachine, IValueTaskSource<Response>
+internal sealed class UntypedDurableTaskMethodInvocation<TStateMachine> : UntypedDurableTaskMethodInvocation, IAsyncStateMachine, IValueTaskSource<DurableTaskResponse>
     where TStateMachine : IAsyncStateMachine
 {
-    private ManualResetValueTaskSourceCore<Response> _completion = new();
+    private ManualResetValueTaskSourceCore<DurableTaskResponse> _completion = new();
     private DurableTaskContext? _executionContext;
 
 #pragma warning disable IDE0044 // Add readonly modifier
@@ -59,16 +58,16 @@ internal sealed class UntypedDurableTaskMethodInvocation<TStateMachine> : Untype
 
     void IAsyncStateMachine.SetStateMachine(IAsyncStateMachine stateMachine) => _stateMachine.SetStateMachine(stateMachine);
 
-    protected internal override ValueTask<Response> RunAsync(DurableTaskContext executionContext)
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
     {
         _executionContext = executionContext;
         StartInvocation();
         return new(this, _completion.Version);
     }
 
-    public override void SetResult() => _completion.SetResult(Response.Completed);
-    public override void SetException(Exception exception) => _completion.SetResult(Response.FromException(exception));
-    public Response GetResult(short token) => _completion.GetResult(token);
+    public override void SetResult() => _completion.SetResult(DurableTaskResponse.Completed);
+    public override void SetException(Exception exception) => _completion.SetResult(DurableTaskResponse.FromException(exception));
+    public DurableTaskResponse GetResult(short token) => _completion.GetResult(token);
     public ValueTaskSourceStatus GetStatus(short token) => _completion.GetStatus(token);
     public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _completion.OnCompleted(continuation, state, token, flags);
 }
@@ -85,10 +84,10 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
 /// <summary>
 /// Represents a locally-executing <see cref="DurableTask{TResult}"/> method.
 /// </summary>
-internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : DurableTaskMethodInvocation<TResult>, IAsyncStateMachine, IValueTaskSource<Response>
+internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : DurableTaskMethodInvocation<TResult>, IAsyncStateMachine, IValueTaskSource<DurableTaskResponse>
     where TStateMachine : IAsyncStateMachine
 {
-    private ManualResetValueTaskSourceCore<Response> _completion = new();
+    private ManualResetValueTaskSourceCore<DurableTaskResponse> _completion = new();
     private DurableTaskContext? _executionContext;
 
 #pragma warning disable IDE0044 // Add readonly modifier
@@ -125,17 +124,17 @@ internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : Dura
 
     void IAsyncStateMachine.SetStateMachine(IAsyncStateMachine stateMachine) => _stateMachine.SetStateMachine(stateMachine);
 
-    protected internal override ValueTask<Response> RunAsync(DurableTaskContext executionContext)
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
     {
         _executionContext = executionContext;
         StartInvocation();
         return new(this, _completion.Version);
     }
 
-    public override void SetResult(TResult result) => _completion.SetResult(Response.FromResult(result));
+    public override void SetResult(TResult result) => _completion.SetResult(DurableTaskResponse.FromResult(result));
     public override void SetException(Exception exception) => _completion.SetException(exception);
 
-    public Response GetResult(short token) => _completion.GetResult(token);
+    public DurableTaskResponse GetResult(short token) => _completion.GetResult(token);
     public ValueTaskSourceStatus GetStatus(short token) => _completion.GetStatus(token);
     public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _completion.OnCompleted(continuation, state, token, flags);
 }

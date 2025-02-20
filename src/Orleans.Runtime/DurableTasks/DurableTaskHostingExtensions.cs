@@ -4,11 +4,10 @@ using System.Distributed.DurableTasks.Scheduling;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration.Internal;
+using Orleans.DurableTasks;
 using Orleans.Hosting;
-using Orleans.Runtime;
-using Orleans.Runtime.DurableTasks;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.Runtime.DurableTasks;
 
 public static class DurableTaskHostingExtensions
 {
@@ -22,7 +21,7 @@ public static class DurableTaskHostingExtensions
         siloBuilder.Services.AddKeyedTransient<IGrainExtension>(typeof(IDurableTaskObserver), (sp, _) => sp.GetRequiredService<DurableTaskGrainRuntime>());
 
         siloBuilder.Services.AddSingleton<DefaultRetryPolicy>();
-        siloBuilder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        siloBuilder.Services.TryAddSingleton(TimeProvider.System);
         return siloBuilder;
     }
 }

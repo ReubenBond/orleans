@@ -1,7 +1,6 @@
 ﻿using System.Distributed.DurableTasks;
 using System.Globalization;
 using System.Runtime.InteropServices;
-using Orleans.Serialization.Invocation;
 namespace PaymentWorkflowApp.Runtime;
 
 internal sealed class JobDurableTaskExecutionContext(TaskId taskId, JobScheduler jobScheduler, JobTaskState state) : DurableTaskContext(taskId)
@@ -14,7 +13,7 @@ internal sealed class JobDurableTaskExecutionContext(TaskId taskId, JobScheduler
 
     public JobTaskState State { get; } = state;
 
-    protected override ValueTask<Response> RunAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+    protected override ValueTask<DurableTaskResponse> RunAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
         => jobScheduler.InvokeAsync(taskId, taskDefinition, cancellationToken);
 
     protected override TaskId CreateChildTaskId(string? name)

@@ -6,10 +6,10 @@ using System.Distributed.DurableTasks;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.DurableTasks;
 using Orleans.Serialization;
-using Orleans.Serialization.Invocation;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.Runtime.DurableTasks;
 
 public class VolatileDurableTaskGrainStorage(
     DeepCopier<Dictionary<TaskId, DurableTaskState>> storageCopier,
@@ -64,7 +64,7 @@ public class VolatileDurableTaskGrainStorage(
         return result;
     }
 
-    public void SetResponse(TaskId taskId, IDurableTaskState state, Response response)
+    public void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
     {
         var typedState = GetState(state);
         typedState.Result = response;

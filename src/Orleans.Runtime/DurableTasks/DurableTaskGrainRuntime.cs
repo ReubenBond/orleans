@@ -12,7 +12,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.DurableTasks;
 using Orleans.Runtime.Placement;
-using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.DurableTasks;
 
@@ -117,7 +116,7 @@ internal sealed class DurableTaskGrainRuntime(
     /// <remarks>
     /// A child task is a task which executes as part of another task and whose result it not externally visible.
     /// </remarks>
-    public bool GetResponseOrCreateChildTask(TaskId taskId, [NotNullWhen(true)] out Response? response)
+    public bool GetResponseOrCreateChildTask(TaskId taskId, [NotNullWhen(true)] out DurableTaskResponse? response)
     {
         if (TryGetExecutionContext(taskId, out var context))
         {
@@ -149,7 +148,7 @@ internal sealed class DurableTaskGrainRuntime(
     /// <remarks>
     /// An child task is a task which executes as part of another task and whose result it not externally visible.
     /// </remarks>
-    public void SetChildTaskResponse(TaskId taskId, Response response)
+    public void SetChildTaskResponse(TaskId taskId, DurableTaskResponse response)
     {
         if (!TryGetExecutionContext(taskId, out var context))
         {
@@ -171,13 +170,13 @@ internal sealed class DurableTaskGrainRuntime(
     /// <param name="taskId">The task id.</param>
     /// <param name="response">The task result.</param>
     /// <returns>A <see cref="ValueTask"/> representing the work performed.</returns>
-    async ValueTask IDurableTaskObserver.OnResponseAsync(TaskId taskId, Response response)
+    async ValueTask IDurableTaskObserver.OnResponseAsync(TaskId taskId, DurableTaskResponse response)
     {
         if (!TryGetExecutionContext(taskId, out var context))
         {
             // No such task. This may be because this client has already received a response for this task and removed its entry for it.
             // TODO: Perhaps this should log at a lower level since it is likely not the symptom of a bug or exceptional condition.
-            _shared.Logger.LogWarning("Received response for unknown task {TaskId}: {Response}", taskId, response);
+            _shared.Logger.LogWarning("Received response for unknown task '{TaskId}': '{Response}'", taskId, response);
             return;
         }
 
@@ -195,9 +194,9 @@ internal sealed class DurableTaskGrainRuntime(
     /// Durably schedules a request for invocation against this instance.
     /// </summary>
     /// <param name="request">The request.</param>
-    /// <returns>A <see cref="Response"/> indicating the status of the request. A response of type <see cref="PendingResponse"/> indicates that the caller can call this method again to poll for completion.</returns>
+    /// <returns>A <see cref="DurableTaskResponse"/> indicating the status of the request. A response of type <see cref="PendingDurableTaskResponse"/> indicates that the caller can call this method again to poll for completion.</returns>
     /// <exception cref="InvalidOperationException"></exception>
-    async ValueTask<Response> IDurableTaskServer.ScheduleAsync(IDurableTaskRequest request)
+    async ValueTask<DurableTaskResponse> IDurableTaskServer.ScheduleAsync(IDurableTaskRequest request)
     {
         if (request.Context is not { } requestContext)
         {
@@ -262,8 +261,8 @@ internal sealed class DurableTaskGrainRuntime(
         // The result indicates whether the caller will receive a callback (subscribed) or whether they must poll for a result.
         return client switch
         {
-            { } => SubscribedResponse.Instance,
-            _ => PendingResponse.Instance
+            { } => SubscribedDurableTaskResponse.Instance,
+            _ => PendingDurableTaskResponse.Instance
         };
     }
 
@@ -316,7 +315,7 @@ internal sealed class DurableTaskGrainRuntime(
                 // Invoke the method immediately.
                 var immediateResponse = await DurableTaskRuntimeHelper.RunAsync(durableTask, executionContext);
 
-                if (immediateResponse is PendingResponse)
+                if (immediateResponse is PendingDurableTaskResponse)
                 {
                     if (_shared.Logger.IsEnabled(LogLevel.Trace))
                     {
@@ -333,7 +332,7 @@ internal sealed class DurableTaskGrainRuntime(
                             await Task.Delay(1_000);
                             try
                             {
-                                Response response;
+                                DurableTaskResponse response;
                                 if (pollable is not null)
                                 {
                                     // Poll the task, which is cheaper than sending the initial request again.
@@ -345,7 +344,7 @@ internal sealed class DurableTaskGrainRuntime(
                                     response = await DurableTaskRuntimeHelper.RunAsync(durableTask, executionContext);
                                 }
 
-                                if (response is not PendingResponse)
+                                if (response is not PendingDurableTaskResponse)
                                 {
                                     await CompleteRequestWithResponse(taskId, response, executionContext, cancellationToken);
                                     break;
@@ -358,7 +357,7 @@ internal sealed class DurableTaskGrainRuntime(
                         }
                     });
                 }
-                else if (immediateResponse is SubscribedResponse)
+                else if (immediateResponse is SubscribedDurableTaskResponse)
                 {
                     // The response will be propagated to the caller asynchronously via a callback.
                     if (_shared.Logger.IsEnabled(LogLevel.Trace))
@@ -375,7 +374,7 @@ internal sealed class DurableTaskGrainRuntime(
             catch (Exception exception)
             {
                 // TODO: apply an internal retry policy here. If only the implementation of the task failed, 
-                await CompleteRequestWithResponse(taskId, Response.FromException(exception), executionContext, cancellationToken);
+                await CompleteRequestWithResponse(taskId, DurableTaskResponse.FromException(exception), executionContext, cancellationToken);
             }
         }
 
@@ -408,13 +407,13 @@ internal sealed class DurableTaskGrainRuntime(
         catch (Exception exception)
         {
             _shared.Logger.LogError(exception, "{Id} error invoking durable task request {Request}", GrainId, request);
-            await CompleteRequestWithResponse(taskId, Response.FromException(exception), context, CancellationToken.None);
+            await CompleteRequestWithResponse(taskId, DurableTaskResponse.FromException(exception), context, CancellationToken.None);
         }
     }
 
     private async Task CompleteRequestWithResponse(
         TaskId taskId,
-        Response response,
+        DurableTaskResponse response,
        GrainDurableTaskContext executionContext,
        CancellationToken cancellationToken)
     {
@@ -616,7 +615,7 @@ internal sealed class DurableTaskGrainRuntime(
     }
 
     /// <inheritdoc/>
-    public ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver client)
+    public ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver client)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
@@ -625,7 +624,7 @@ internal sealed class DurableTaskGrainRuntime(
 
         if (!TryGetExecutionContext(taskId, out var executionContext))
         {
-            return new(UnknownTaskResponse.Instance);
+            return new(DurableTaskResponse.FromException(new KeyNotFoundException($"A task with the identifier '{taskId}' was not found.")));
         }
 
         var response = executionContext.State.Result;
@@ -636,7 +635,7 @@ internal sealed class DurableTaskGrainRuntime(
 
         if (client is null)
         {
-            return new(PendingResponse.Instance);
+            return new(PendingDurableTaskResponse.Instance);
         }
 
         var subscribeTask = SubscribeClientAsync(taskId, executionContext, client, CancellationToken.None);
@@ -646,12 +645,12 @@ internal sealed class DurableTaskGrainRuntime(
             return AwaitSubscribeClientAsync(subscribeTask);
         }
 
-        return new(PendingResponse.Instance);
+        return new(PendingDurableTaskResponse.Instance);
 
-        static async ValueTask<Response> AwaitSubscribeClientAsync(ValueTask subscribeTask)
+        static async ValueTask<DurableTaskResponse> AwaitSubscribeClientAsync(ValueTask subscribeTask)
         {
             await subscribeTask;
-            return SubscribedResponse.Instance;
+            return SubscribedDurableTaskResponse.Instance;
         }
     }
 

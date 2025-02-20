@@ -1,6 +1,4 @@
-﻿using Orleans.Serialization.Invocation;
-
-namespace System.Distributed.DurableTasks;
+﻿namespace System.Distributed.DurableTasks;
 
 public abstract partial class DurableTaskContext(TaskId id)
 {
@@ -19,9 +17,9 @@ public abstract partial class DurableTaskContext(TaskId id)
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     public TaskId Id { get; } = id;
     internal CancellationToken CancellationToken => _cancellationTokenSource.Token;
-    protected internal abstract ValueTask<Response> RunAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
+    protected internal abstract ValueTask<DurableTaskResponse> RunAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
     protected internal abstract TaskId CreateChildTaskId(string? name);
-    protected static ValueTask<Response> GetResponseAsync(DurableTaskContext context) => context.AsValueTask();
+    protected static ValueTask<DurableTaskResponse> GetResponseAsync(DurableTaskContext context) => context.AsValueTask();
 
     // Note that blocking on cancellation of a task from within that task would result in a deadlock
     // Cancels the task if it is scheduled or running. If the task is not scheduled or running, this method does nothing.

@@ -5,9 +5,9 @@ using System.Distributed.DurableTasks;
 using System.Runtime.CompilerServices;
 using Orleans.DurableTasks;
 using Orleans.Journaling;
+using Orleans.Runtime.DurableTasks;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Invocation;
 
 namespace WorkflowsApp.Service;
 
@@ -30,6 +30,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
 
     public bool RemoveTask(TaskId taskId)
     {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         if (ApplyRemoveTask(taskId))
         {
             GetStorage().AppendEntry(static (state, bufferWriter) =>
@@ -50,6 +51,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
 
     public void RequestCancellation(TaskId taskId, IDurableTaskState state)
     {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         if (ApplyRequestTaskCancellation(taskId))
         {
             GetStorage().AppendEntry(static (state, bufferWriter) =>
@@ -67,6 +69,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
 
     public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state)
     {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         if (_items.TryGetValue(taskId, out var internalState))
         {
             state = internalState;
@@ -83,6 +86,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
 
     public IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request)
     {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         if (!TryGetTask(taskId, out var result))
         {
             result = CreateTask(taskId, request!);
@@ -93,6 +97,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
 
     private DurableTaskState CreateTask(TaskId taskId, IDurableTaskRequest request)
     {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         var createdAt = _shared.TimeProvider.GetUtcNow();
         var result = ApplyCreateTask(taskId, request!, createdAt);
         GetStorage().AppendEntry(static (state, bufferWriter) =>
@@ -111,8 +116,9 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
         return result;
     }
 
-    public void SetResponse(TaskId taskId, IDurableTaskState state, Response response)
+    public void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
     {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         var completedAt = _shared.TimeProvider.GetUtcNow();
         ApplySetResultCore(CastState(state), response, completedAt);
 
@@ -124,7 +130,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
             writer.WriteByte(VersionByte);
             writer.WriteVarUInt32((uint)CommandType.SetResult);
             shared.KeyCodec.WriteField(ref writer, 0, typeof(TaskId), taskId);
-            shared.ResponseCodec.WriteField(ref writer, 1, typeof(Response), response);
+            shared.ResponseCodec.WriteField(ref writer, 1, typeof(DurableTaskResponse), response);
             shared.DateTimeOffsetCodec.WriteField(ref writer, 1, typeof(DateTimeOffset), completedAt);
             writer.Commit();
         },
@@ -133,6 +139,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
 
     public void AddObserver(TaskId taskId, IDurableTaskState state, IDurableTaskObserver observer)
     {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         if (ApplyAddObserverCore(CastState(state), observer))
         {
             GetStorage().AppendEntry(static (state, bufferWriter) =>
@@ -152,6 +159,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
 
     public void ClearObservers(TaskId taskId, IDurableTaskState state)
     {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         if (ApplyClearObserversCore(CastState(state)))
         {
             GetStorage().AppendEntry(static (state, bufferWriter) =>
@@ -236,7 +244,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        Response ReadResponse(ref Reader<ReadOnlySequenceInput> reader)
+        DurableTaskResponse ReadResponse(ref Reader<ReadOnlySequenceInput> reader)
         {
             var field = reader.ReadFieldHeader();
             return _shared.ResponseCodec.ReadValue(ref reader, field);
@@ -309,22 +317,31 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
         _shared);
     }
 
-    public bool Contains(TaskId key) => _items.ContainsKey(key);
-
-    private DurableTaskState ApplyCreateTask(TaskId key, IDurableTaskRequest request, DateTimeOffset createdAt)
+    public bool Contains(TaskId taskId)
     {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        return _items.ContainsKey(taskId);
+    }
+
+    private DurableTaskState ApplyCreateTask(TaskId taskId, IDurableTaskRequest request, DateTimeOffset createdAt)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         var result = new DurableTaskState
         {
             Request = request,
             CreatedAt = createdAt,
         };
-        _items.Add(key, result);
+        _items.Add(taskId, result);
         return result;
     }
 
-    private void ApplySetResult(TaskId key, Response result, DateTimeOffset completedAt) => ApplySetResultCore(_items[key], result, completedAt);
+    private void ApplySetResult(TaskId taskId, DurableTaskResponse result, DateTimeOffset completedAt)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        ApplySetResultCore(_items[taskId], result, completedAt);
+    }
 
-    private static void ApplySetResultCore(DurableTaskState task, Response result, DateTimeOffset completedAt)
+    private static void ApplySetResultCore(DurableTaskState task, DurableTaskResponse result, DateTimeOffset completedAt)
     {
         Debug.Assert(task.Result is null);
         Debug.Assert(task.CompletedAt is null);
@@ -332,7 +349,11 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
         task.CompletedAt = completedAt;
     }
 
-    private bool ApplyAddObserver(TaskId key, IDurableTaskObserver observer) => ApplyAddObserverCore(_items[key], observer);
+    private bool ApplyAddObserver(TaskId taskId, IDurableTaskObserver observer)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        return ApplyAddObserverCore(_items[taskId], observer);
+    }
 
     private static bool ApplyAddObserverCore(DurableTaskState state, IDurableTaskObserver observer)
     {
@@ -340,7 +361,11 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
         return observers.Add(observer);
     }
 
-    private void ApplyClearObservers(TaskId taskId) => ApplyClearObserversCore(_items[taskId]);
+    private void ApplyClearObservers(TaskId taskId)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        ApplyClearObserversCore(_items[taskId]);
+    }
 
     private static bool ApplyClearObserversCore(DurableTaskState state)
     {
@@ -353,7 +378,11 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
         return false;
     }
 
-    private bool ApplyRemoveTask(TaskId key) => _items.Remove(key);
+    private bool ApplyRemoveTask(TaskId taskId)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        return _items.Remove(taskId);
+    }
     private void ApplyClear() => _items.Clear();
     private bool ApplyRequestTaskCancellation(TaskId taskId)
     {

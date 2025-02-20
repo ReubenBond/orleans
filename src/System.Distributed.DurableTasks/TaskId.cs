@@ -1,15 +1,11 @@
 ﻿using System.Diagnostics.CodeAnalysis;
-using Orleans;
 
 namespace System.Distributed.DurableTasks;
 
-[GenerateSerializer, Immutable]
-[Alias("TaskId")]
 public readonly struct TaskId : ISpanFormattable, IEquatable<TaskId>, IParsable<TaskId>, ISpanParsable<TaskId>
 {
     public static readonly TaskId None = default;
 
-    [Id(0)]
     private readonly HierarchicalKey? _key;
 
     private TaskId(string value)

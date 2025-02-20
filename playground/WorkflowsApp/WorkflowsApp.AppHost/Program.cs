@@ -1,12 +1,14 @@
 ﻿var builder = DistributedApplication.CreateBuilder(args);
 builder.AddAzureProvisioning();
 
-var azureStorage = builder.AddAzureStorage("az-storage").RunAsEmulator(builder => builder.WithImageTag("3.33.0"));
+var azureStorage = builder.AddAzureStorage("az-storage").RunAsEmulator(builder =>
+    builder
+        .WithImageTag("3.33.0")
+        .WithLifetime(ContainerLifetime.Persistent));
 var azureBlobs = azureStorage.AddBlobs("state");
-var azureTables = azureStorage.AddTables("clustering");
 
 var orleans = builder.AddOrleans("orleans")
-    .WithClustering(azureTables);
+    .WithDevelopmentClustering();
 
 builder.AddProject<Projects.WorkflowsApp_Service>("workflowsapp-service")
     .WithReference(orleans)

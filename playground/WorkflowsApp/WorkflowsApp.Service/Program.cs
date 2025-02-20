@@ -11,6 +11,7 @@ using System.Diagnostics;
 using Newtonsoft.Json;
 using System.Distributed.DurableTasks;
 using Orleans.DurableTasks;
+using Orleans.Runtime.DurableTasks;
 
 namespace WorkflowsApp.Service;
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously

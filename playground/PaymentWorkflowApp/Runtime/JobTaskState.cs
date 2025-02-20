@@ -1,5 +1,4 @@
 ﻿using System.Distributed.DurableTasks;
-using Orleans.Serialization.Invocation;
 namespace PaymentWorkflowApp.Runtime;
 
 [GenerateSerializer]
@@ -10,7 +9,7 @@ public class JobTaskState
     /// Gets or sets the result of this task.
     /// </summary>
     [Id(0)]
-    public Response? Result { get; set; }
+    public DurableTaskResponse? Result { get; set; }
 
     /// <summary>
     /// Gets or sets the invokable request.

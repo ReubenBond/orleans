@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
-using Orleans.Serialization.Invocation;
 
 namespace Orleans.DurableTasks;
 
@@ -17,7 +16,7 @@ public interface IDurableTaskObserver : IGrainExtension
     // Successful completion of this method indicates that the observer has durably acknowledged the response and should not rely on receiving any further notifications about the specified `taskId`
     [AlwaysInterleave]
     [Alias("OnResponse")]
-    ValueTask OnResponseAsync(TaskId taskId, Response response);
+    ValueTask OnResponseAsync(TaskId taskId, DurableTaskResponse response);
 }
 
 [Alias("IDurableTaskServerGrainExtension")]
@@ -25,12 +24,12 @@ public interface IDurableTaskServer : IGrainExtension
 {
     // Called by DurableTaskRequest.Invoke to ensure that a task is scheduled
     [Alias("ScheduleAsync")]
-    ValueTask<Response> ScheduleAsync(IDurableTaskRequest request);
+    ValueTask<DurableTaskResponse> ScheduleAsync(IDurableTaskRequest request);
 
     // API used by ScheduledTask/<T> to check for a result for a task.
     // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
     [Alias("SubscribeOrPollAsync")]
-    ValueTask<Response> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver client);
+    ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver client);
 }
 
 [Alias("IDurableTaskGrainExtension")]
@@ -71,7 +70,7 @@ public struct DurableTaskDiagnosticState
 public interface IDurableTaskGrainRuntime
 {
     ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
-    bool GetResponseOrCreateChildTask(TaskId taskId, [NotNullWhen(true)] out Response response);
-    void SetChildTaskResponse(TaskId taskId, Response response);
+    bool GetResponseOrCreateChildTask(TaskId taskId, [NotNullWhen(true)] out DurableTaskResponse response);
+    void SetChildTaskResponse(TaskId taskId, DurableTaskResponse response);
     ValueTask SignalCancellationAsync(TaskId taskId, CancellationToken cancellationToken);
 }

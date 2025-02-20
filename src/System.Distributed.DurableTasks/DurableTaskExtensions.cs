@@ -122,6 +122,10 @@ public static class DurableTaskExtensions
         {
             configuredTask = configuredTask.WithId(taskId);
         }
+        else
+        {
+            configuredTask = configuredTask.WithId(Guid.NewGuid().ToString());
+        }
 
         if (options is not null)
         {

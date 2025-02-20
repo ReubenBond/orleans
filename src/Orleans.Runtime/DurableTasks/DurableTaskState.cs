@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using Orleans.Serialization.Invocation;
+using System.Distributed.DurableTasks;
+using Orleans.DurableTasks;
 
-namespace Orleans.DurableTasks;
+namespace Orleans.Runtime.DurableTasks;
 
 [GenerateSerializer, SuppressReferenceTracking]
 [Alias("DurableTaskState")]
@@ -10,7 +11,7 @@ public class DurableTaskState : IDurableTaskState
 {
     /// <inheritdoc cref="IDurableTaskState.Result"/>
     [Id(0)]
-    public Response Result { get; set; }
+    public DurableTaskResponse Result { get; set; }
 
     /// <summary>
     /// Gets or sets the set of clients which are interested in the result of this task.
@@ -40,7 +41,6 @@ public class DurableTaskState : IDurableTaskState
     [Id(5)] 
     public DateTimeOffset? CancellationRequestedAt { get; set; }
 
-    Response IDurableTaskState.Result => Result;
     IReadOnlySet<IDurableTaskObserver> IDurableTaskState.Observers => Observers;
     IDurableTaskRequest IDurableTaskState.Request => Request;
     DateTimeOffset? IDurableTaskState.CompletedAt => CompletedAt;
