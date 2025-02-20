@@ -26,13 +26,13 @@ internal class VolatileJobStorage(DeepCopier<Dictionary<TaskId, JobTaskState>> s
         return false;
     }
 
-    public ValueTask ReadAsync()
+    public ValueTask ReadAsync(CancellationToken cancellationToken)
     {
         _workingCopy = _storageCopier.Copy(_persistedCopy);
         return default;
     }
 
-    public ValueTask WriteAsync()
+    public ValueTask WriteAsync(CancellationToken cancellationToken)
     {
         _persistedCopy = _storageCopier.Copy(_workingCopy);
         return default;

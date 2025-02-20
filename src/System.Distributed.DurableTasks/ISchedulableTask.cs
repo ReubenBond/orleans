@@ -1,6 +1,4 @@
-﻿using System.Distributed.DurableTasks.Scheduling;
-
-namespace System.Distributed.DurableTasks;
+﻿namespace System.Distributed.DurableTasks;
 
 /// <summary>
 /// Interface implemented by <see cref="DurableTask"/> and <see cref="DurableTask{TResult}"/> implementations allowing them to be scheduled.
@@ -12,7 +10,7 @@ public interface ISchedulableTask
     /// </summary>
     /// <param name="taskId">The task identifier.</param>
     /// <returns>A context representing the scheduled task.</returns>
-    ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId);
+    ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

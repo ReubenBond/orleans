@@ -12,6 +12,6 @@ public interface IJobStorage
     // Removes a request and its state
     bool RemoveTask(TaskId taskId);
 
-    ValueTask WriteAsync();
-    ValueTask ReadAsync();
+    ValueTask WriteAsync(CancellationToken cancellationToken);
+    ValueTask ReadAsync(CancellationToken cancellationToken);
 }

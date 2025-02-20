@@ -126,14 +126,15 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         return this;
     }
 
-    async ValueTask<DurableTaskContext> ISchedulableTask.ScheduleAsync(TaskId taskId)
+    async ValueTask<DurableTaskContext> ISchedulableTask.ScheduleAsync(TaskId taskId, CancellationToken cancellationToken)
     {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         Debug.Assert(Context is not null);
 
         var callerContext = _shared.GrainContextAccessor.GrainContext;
         var runtime = GetRuntime(callerContext);
 
-        return await runtime.ScheduleAsync(taskId, this, CancellationToken.None);
+        return await runtime.ScheduleAsync(taskId, this, cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -280,14 +281,14 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     }
 
     /// <inheritdoc/>
-    public async ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId)
+    public async ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default)
     {
         Debug.Assert(Context is not null);
 
         var callerContext = _shared.GrainContextAccessor.GrainContext;
         var runtime = DurableTaskRequest.GetRuntime(callerContext);
 
-        return await runtime.ScheduleAsync(taskId, this, CancellationToken.None);
+        return await runtime.ScheduleAsync(taskId, this, cancellationToken);
     }
 
     /// <inheritdoc/>

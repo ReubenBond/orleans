@@ -60,7 +60,7 @@ public sealed class LiteDbJobStorage(Serializer<JobTaskState> serializer, DeepCo
         return false;
     }
 
-    public ValueTask ReadAsync()
+    public ValueTask ReadAsync(CancellationToken cancellationToken)
     {
         lock (_lock)
         {
@@ -78,7 +78,7 @@ public sealed class LiteDbJobStorage(Serializer<JobTaskState> serializer, DeepCo
         return default;
     }
 
-    public ValueTask WriteAsync()
+    public ValueTask WriteAsync(CancellationToken cancellationToken)
     {
         lock (_lock)
         {

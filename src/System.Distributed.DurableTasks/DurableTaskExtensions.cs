@@ -91,7 +91,7 @@ public static class DurableTaskExtensions
     /// </summary>
     /// <param name="taskDefinition">The task.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition) => taskDefinition.ScheduleAsyncCore(taskId: null);
+    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition, CancellationToken cancellationToken = default) => taskDefinition.ScheduleAsyncCore(taskId: null, cancellationToken);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask"/> as a workflow using the provided identifier.
@@ -99,7 +99,7 @@ public static class DurableTaskExtensions
     /// <param name="taskDefinition">The task.</param>
     /// <param name="taskId">The task identifier.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition, string taskId) => taskDefinition.ScheduleAsyncCore(taskId);
+    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask taskDefinition, string taskId, CancellationToken cancellationToken = default) => taskDefinition.ScheduleAsyncCore(taskId, cancellationToken);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask"/> as a workflow using the provided identifier.
@@ -107,7 +107,7 @@ public static class DurableTaskExtensions
     /// <param name="taskDefinition">The task.</param>
     /// <param name="taskId">The task identifier.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask> ScheduleAsyncCore(this DurableTask taskDefinition, string? taskId)
+    public static ValueTask<ScheduledTask> ScheduleAsyncCore(this DurableTask taskDefinition, string? taskId, CancellationToken cancellationToken)
     {
         var configuredTask = new ConfiguredDurableTask(taskDefinition);
         if (taskId is not null)
