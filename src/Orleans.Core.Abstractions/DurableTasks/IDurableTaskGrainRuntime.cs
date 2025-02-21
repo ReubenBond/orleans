@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
@@ -66,7 +67,7 @@ public interface IDurableTaskServer : IGrainExtension
     // API used by ScheduledTask/<T> to check for a result for a task.
     // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
     [Alias("SubscribeOrPollAsync")]
-    ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver client);
+    ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver? client);
 
     ValueTask CancelAsync(TaskId taskId);
 }
@@ -108,8 +109,6 @@ public struct DurableTaskDiagnosticState
 
 public interface IDurableTaskGrainRuntime
 {
-    ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
-    //bool GetResponseOrCreateChildTask(TaskId taskId, [NotNullWhen(true)] out DurableTaskResponse response);
-    //void SetChildTaskResponse(TaskId taskId, DurableTaskResponse response);
-    ValueTask SignalCancellationAsync(TaskId taskId, CancellationToken cancellationToken);
+    ValueTask<IScheduledTaskHandle> ScheduleAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
+    IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId, DurableTask taskDefinition);
 }

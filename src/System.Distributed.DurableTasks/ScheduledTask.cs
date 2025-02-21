@@ -42,7 +42,7 @@ public abstract class ScheduledTask
     /// Gets a task representing the completion of the operation.
     /// </summary>
     /// <returns>A task representing the completion of the operation.</returns>
-    public virtual Task WaitAsync(CancellationToken cancellationToken) => WaitAsyncCore(cancellationToken);
+    public virtual async ValueTask WaitAsync(CancellationToken cancellationToken) => await WaitAsyncCore(cancellationToken);
 
     /// <summary>
     /// Attempts to cancel the operation.
@@ -55,13 +55,13 @@ public abstract class ScheduledTask
     /// Gets a task representing the completion of the operation.
     /// </summary>
     /// <returns>A task representing the completion of the operation.</returns>
-    protected abstract Task<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken);
+    protected internal abstract ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken);
 
     /// <summary>
     /// Gets the current status of the task without waiting for the task to complete.
     /// </summary>
     /// <returns>A task representing the completion of the operation.</returns>
-    protected abstract Task<DurableTaskResponse> PollAsyncCore(CancellationToken cancellationToken);
+    protected abstract ValueTask<DurableTaskResponse> PollAsyncCore(CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -76,55 +76,56 @@ public abstract class ScheduledTask<TResult> : ScheduledTask
 
 internal sealed class ScheduledDurableTask<TResult> : ScheduledTask<TResult>
 {
-    private readonly DurableTaskContext _executionContext;
+    private readonly IScheduledTaskHandle _handle;
 
-    internal ScheduledDurableTask(DurableTaskContext executionContext)
+    internal ScheduledDurableTask(IScheduledTaskHandle handle)
     {
-        _executionContext = executionContext;
+        _handle = handle;
     }
 
-    public override TaskId Id => _executionContext.Id;
+    public override TaskId Id => _handle.TaskId;
 
     public override async ValueTask CancelAsync(CancellationToken cancellationToken)
     {
-        await _executionContext.SignalCancellationAsync(cancellationToken);
+        await _handle.CancelAsync(cancellationToken);
     }
 
-    public override Task<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken) => _executionContext.GetResponseAsync();
-
-    protected override Task<DurableTaskResponse> PollAsyncCore(CancellationToken cancellationToken)
+    protected override async ValueTask<DurableTaskResponse> PollAsyncCore(CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        return await _handle.PollAsync(cancellationToken);
     }
 
-    protected override Task<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken)
+    protected internal override async ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        return await _handle.WaitAsync(cancellationToken);
     }
 }
 
 internal sealed class ScheduledDurableTask : ScheduledTask
 {
-    private readonly DurableTaskContext _executionContext;
+    private readonly IScheduledTaskHandle _handle;
 
-    internal ScheduledDurableTask(DurableTaskContext executionContext)
+    internal ScheduledDurableTask(IScheduledTaskHandle handle)
     {
-        _executionContext = executionContext;
+        _handle = handle;
     }
 
-    public override TaskId Id => _executionContext.Id;
+    public override TaskId Id => _handle.TaskId;
 
     public override async ValueTask CancelAsync(CancellationToken cancellationToken)
     {
-        await _executionContext.SignalCancellationAsync(cancellationToken);
+        await _handle.CancelAsync(cancellationToken);
     }
 
-    public override Task<DurableTaskStatus> GetStatusAsync(CancellationToken cancellationToken)
+    protected override async ValueTask<DurableTaskResponse> PollAsyncCore(CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        return await _handle.PollAsync(cancellationToken);
     }
 
-    public override Task<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken) => _executionContext.GetResponseAsync();
+    protected internal override async ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken)
+    {
+        return await _handle.WaitAsync(cancellationToken);
+    }
 }
 
 /// <summary>
@@ -132,7 +133,7 @@ internal sealed class ScheduledDurableTask : ScheduledTask
 /// </summary>
 public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 {
-    private readonly TaskAwaiter<DurableTaskResponse> _awaiter;
+    private readonly ValueTaskAwaiter _awaiter;
 
     internal ScheduledTaskAwaiter(ScheduledTask durableTaskInvocation) =>
         _awaiter = durableTaskInvocation.WaitAsync(CancellationToken.None).GetAwaiter();
@@ -160,10 +161,10 @@ public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 /// <typeparam name="TResult">The underlying result type.</typeparam>
 public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
 {
-    private readonly TaskAwaiter<DurableTaskResponse> _awaiter;
+    private readonly ValueTaskAwaiter<DurableTaskResponse> _awaiter;
 
     internal ScheduledTaskAwaiter(ScheduledTask<TResult> durableTaskInvocation) =>
-        _awaiter = durableTaskInvocation.WaitAsync(CancellationToken.None).GetAwaiter();
+        _awaiter = durableTaskInvocation.WaitAsyncCore(CancellationToken.None).GetAwaiter();
 
     /// <summary>
     /// Gets the result of the task.

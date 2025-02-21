@@ -146,13 +146,25 @@ public struct ConfiguredDurableTask(DurableTask task, TaskId taskId)
     // Cancels a durable task without waiting for the task to complete
     public readonly async ValueTask<bool> CancelAsync(CancellationToken cancellationToken)
     {
-        if (Task is not ICancellableTask cancellableTask)
+        if (Task is not ISchedulableTask schedulableTask)
         {
-            return false;
+            throw GetNonSchedulableTaskException();
         }
 
-        await cancellableTask.CancelAsync(Id, cancellationToken);
+        await schedulableTask.GetHandle(Id).CancelAsync(cancellationToken);
         return true;
+    }
+
+    // Polls a task, returning the status of the task.
+    public readonly async ValueTask<DurableTaskStatus> PollAsync(CancellationToken cancellationToken)
+    {
+        if (Task is not ISchedulableTask schedulableTask)
+        {
+            throw GetNonSchedulableTaskException();
+        }
+
+        var response = await schedulableTask.GetHandle(Id).PollAsync(cancellationToken);
+        return response.Status;
     }
 
     internal static InvalidOperationException GetNonSchedulableTaskException() => new("The provided task does not support scheduling. This may be because it is a local method or another non-serializable task type.");
@@ -178,9 +190,35 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task, TaskId t
             throw ConfiguredDurableTask.GetNonSchedulableTaskException();
         }
 
-        var executionContext = await schedulableTask.ScheduleAsync(Id, cancellationToken);
-        return new ScheduledDurableTask<TResult>(executionContext);
+        var handle = await schedulableTask.ScheduleAsync(Id, cancellationToken);
+        return new ScheduledDurableTask<TResult>(handle);
     }
+    
+    // Cancels a durable task without waiting for the task to complete
+    public readonly async ValueTask<bool> CancelAsync(CancellationToken cancellationToken)
+    {
+        if (Task is not ISchedulableTask schedulableTask)
+        {
+            throw ConfiguredDurableTask.GetNonSchedulableTaskException();
+        }
+
+        await schedulableTask.GetHandle(Id).CancelAsync(cancellationToken);
+        return true;
+    }
+
+    // Polls a task, returning the status of the task.
+    public readonly async ValueTask<DurableTaskStatus> PollAsync(CancellationToken cancellationToken)
+    {
+        if (Task is not ISchedulableTask schedulableTask)
+        {
+            throw ConfiguredDurableTask.GetNonSchedulableTaskException();
+        }
+
+        var response = await schedulableTask.GetHandle(Id).PollAsync(cancellationToken);
+        return response.Status;
+    }
+
+
 
     public DurableTaskAwaiter<TResult> GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
 }

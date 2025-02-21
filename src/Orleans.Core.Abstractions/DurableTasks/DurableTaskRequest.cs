@@ -45,7 +45,7 @@ public sealed class DurableTaskRequestShared(IGrainContextAccessor grainContextA
 [ReturnValueProxy(initializerMethodName: nameof(InitializeRequest))]
 [Alias("DurableTaskRequest")]
 [method: GeneratedActivatorConstructor]
-public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : DurableTask, IDurableTaskRequest, ISchedulableTask, IPollableTask
+public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : DurableTask, IDurableTaskRequest, ISchedulableTask
 {
     // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
     // For now, we're not doing that, just to make sure that we can get far without needing it, demonstrating the extensibility of Orleans.
@@ -125,7 +125,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         return this;
     }
 
-    async ValueTask<DurableTaskContext> ISchedulableTask.ScheduleAsync(TaskId taskId, CancellationToken cancellationToken)
+    async ValueTask<IScheduledTaskHandle> ISchedulableTask.ScheduleAsync(TaskId taskId, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         Debug.Assert(Context is not null);
@@ -133,7 +133,8 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         var callerContext = _shared.GrainContextAccessor.GrainContext;
         var runtime = GetRuntime(callerContext);
 
-        return await runtime.ScheduleAsync(taskId, this, cancellationToken);
+        var response = await runtime.ScheduleAsync(taskId, this, cancellationToken);
+        return new GrainScheduledTaskHandle(taskId, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: response);
     }
 
     /// <inheritdoc/>
@@ -159,6 +160,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         return await remote.ScheduleAsync(this);
     }
 
+    /*
     /// <inheritdoc/>
     async ValueTask<DurableTaskResponse> IPollableTask.PollAsync(CancellationToken cancellationToken)
     {
@@ -167,9 +169,10 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         return await remote.SubscribeOrPollAsync(Context.TaskId, null).AsTask().WaitAsync(cancellationToken);
     }
+    */
 
     /// <inheritdoc/>
-    ValueTask<Orleans.Serialization.Invocation.Response> IInvokable.Invoke()
+    ValueTask<Response> IInvokable.Invoke()
         // This could be made to work... maybe pick a random task id, for example.
         => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
@@ -196,6 +199,13 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
 
     /// <inheritdoc/>
     public virtual TimeSpan? GetDefaultResponseTimeout() => null;
+
+    public IScheduledTaskHandle GetHandle(TaskId taskId)
+    {
+        Debug.Assert(Context is not null);
+
+        return new GrainScheduledTaskHandle(taskId, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: null);
+    }
 }
 
 /// <summary>
@@ -205,7 +215,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
 [ReturnValueProxy(initializerMethodName: nameof(InitializeRequest))]
 [Alias("DurableTaskRequest`1")]
 [method: GeneratedActivatorConstructor]
-public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared shared) : DurableTask<TResult>, IDurableTaskRequest, ISchedulableTask, IPollableTask
+public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared shared) : DurableTask<TResult>, IDurableTaskRequest, ISchedulableTask
 {
     // Note: we could save a field here by using RuntimeContext, but that will require making internals visible to this assembly.
     // For now, we're not doing that, just to make sure that we can get far without needing it, demonstrating the extensibility of Orleans.
@@ -280,14 +290,15 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     }
 
     /// <inheritdoc/>
-    public async ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default)
+    public async ValueTask<IScheduledTaskHandle> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default)
     {
         Debug.Assert(Context is not null);
 
         var callerContext = _shared.GrainContextAccessor.GrainContext;
         var runtime = DurableTaskRequest.GetRuntime(callerContext);
 
-        return await runtime.ScheduleAsync(taskId, this, cancellationToken);
+        var response = await runtime.ScheduleAsync(taskId, this, cancellationToken);
+        return new GrainScheduledTaskHandle(taskId, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: response);
     }
 
     /// <inheritdoc/>
@@ -313,6 +324,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         return await remote.ScheduleAsync(this);
     }
 
+    /*
     /// <inheritdoc/>
     async ValueTask<DurableTaskResponse> IPollableTask.PollAsync(CancellationToken cancellationToken)
     {
@@ -321,9 +333,10 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         return await remote.SubscribeOrPollAsync(Context.TaskId, null).AsTask().WaitAsync(cancellationToken);
     }
+    */
 
     /// <inheritdoc/>
-    ValueTask<Orleans.Serialization.Invocation.Response> IInvokable.Invoke() => throw new NotImplementedException("Durable task requests can not be invoked directly");
+    ValueTask<Response> IInvokable.Invoke() => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
     ValueTask<DurableTaskResponse> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
@@ -333,5 +346,56 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
 
     /// <inheritdoc/>
     public virtual TimeSpan? GetDefaultResponseTimeout() => null;
+
+    public IScheduledTaskHandle GetHandle(TaskId taskId)
+    {
+        Debug.Assert(Context is not null);
+        return new GrainScheduledTaskHandle(taskId, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: null);
+    }
 }
 
+internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskServer grain, DurableTaskResponse? lastResponse) : IScheduledTaskHandle
+{
+    public TaskId TaskId { get; } = taskId;
+    public DurableTaskResponse? LastResponse { get; private set; } = lastResponse;
+
+    public async ValueTask CancelAsync(CancellationToken cancellationToken)
+    {
+        // TODO: Add resilience via Polly
+        await grain.CancelAsync(TaskId).AsTask().WaitAsync(cancellationToken);
+    }
+
+    public async ValueTask<DurableTaskResponse> PollAsync(CancellationToken cancellationToken)
+    {
+        if (LastResponse is { IsCompleted: true } response)
+        {
+            return response;
+        }
+
+        // TODO: Add resilience via Polly
+        return LastResponse = await grain.SubscribeOrPollAsync(TaskId, client: null).AsTask().WaitAsync(cancellationToken);
+    }
+
+    public async ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
+    {
+        if (LastResponse is { IsCompleted: true } response)
+        {
+            return response;
+        }
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            // TODO: Add resilience via Polly
+
+            response = LastResponse = await grain.SubscribeOrPollAsync(TaskId, client: null).AsTask().WaitAsync(cancellationToken);
+            if (response.IsCompleted)
+            {
+                return response;
+            }
+
+            // TODO: Add exponential backoff via Polly/etc
+            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+        }
+    }
+}

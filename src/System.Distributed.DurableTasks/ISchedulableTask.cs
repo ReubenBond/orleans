@@ -6,15 +6,27 @@
 public interface ISchedulableTask
 {
     /// <summary>
-    /// Schedules the task, returning a <see cref="DurableTaskContext"/> representing the scheduled task.
+    /// Schedules the task, returning a handle to the scheduled task.
     /// </summary>
     /// <param name="taskId">The task identifier.</param>
-    /// <returns>A context representing the scheduled task.</returns>
+    /// <returns>A handle representing the scheduled task.</returns>
     ValueTask<IScheduledTaskHandle> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets a handle to a scheduled task.
+    /// </summary>
+    /// <param name="taskId">The task identifier.</param>
+    /// <returns>A handle representing the scheduled task.</returns>
+    IScheduledTaskHandle GetHandle(TaskId taskId);
 }
 
 public interface IScheduledTaskHandle
 {
+    /// <summary>
+    /// Gets the identifier of the task.
+    /// </summary>
+    TaskId TaskId { get; }
+
     /// <summary>
     /// Waits until the task has completed, returning the response.
     /// </summary>

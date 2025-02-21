@@ -10,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.DurableTasks;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
 
 namespace Orleans.Runtime.DurableTasks;
@@ -302,7 +303,7 @@ internal sealed class DurableTaskGrainRuntime(
         }
     }
 
-    public async ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, DurableTask durableTask, CancellationToken cancellationToken)
+    public async ValueTask<IScheduledTaskHandle> ScheduleAsync(TaskId taskId, DurableTask durableTask, CancellationToken cancellationToken)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
@@ -334,7 +335,7 @@ internal sealed class DurableTaskGrainRuntime(
                     // Ensure that the request is being polled in the background so that the response can be propagated to the caller.
                     _ = Task.Run(async () =>
                     {
-                        var pollable = durableTask as IPollableTask;
+                        var pollable = durableTask as i;
                         while (true)
                         {
                             // TODO: make this configurable, possibly centralize polling, add a way to break out.
