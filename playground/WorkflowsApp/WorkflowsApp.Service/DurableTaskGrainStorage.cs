@@ -28,6 +28,8 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage, IDurab
 
     public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks => _items.Select(static pair => (pair.Key, (IDurableTaskState)pair.Value));
 
+    public IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId parentId) => _items.Where(pair => parentId.IsParentOf(pair.Key)).Select(pair => (pair.Key, (IDurableTaskState)pair.Value));
+
     public bool RemoveTask(TaskId taskId)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);

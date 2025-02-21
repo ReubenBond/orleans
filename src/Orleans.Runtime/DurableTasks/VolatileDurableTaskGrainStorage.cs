@@ -109,4 +109,6 @@ public class VolatileDurableTaskGrainStorage(
         typedState.CancellationRequestedAt = _timeProvider.GetUtcNow();
         AddOrUpdateTask(taskId, typedState);
     }
+
+    public IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId parentId) => Tasks.Where(task => parentId.IsParentOf(task.Id));
 }

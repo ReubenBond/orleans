@@ -67,6 +67,8 @@ public interface IDurableTaskServer : IGrainExtension
     // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
     [Alias("SubscribeOrPollAsync")]
     ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver client);
+
+    ValueTask CancelAsync(TaskId taskId);
 }
 
 [Alias("IDurableTaskGrainExtension")]

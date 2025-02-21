@@ -8,6 +8,8 @@ namespace Orleans.DurableTasks;
 
 public interface IDurableTaskGrainStorage
 {
+    IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId task);
+
     IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks { get; }
 
     IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest request);

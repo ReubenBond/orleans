@@ -38,7 +38,6 @@ internal sealed class DurableTaskGrainRuntime(
     private readonly DurableTaskGrainRuntimeShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
 
-
     // TODO: Cancel during deactivation.
     // Then drain all tasks.
     private readonly CancellationTokenSource _deactivationCts = new();
@@ -660,7 +659,7 @@ internal sealed class DurableTaskGrainRuntime(
         }
     }
 
-    public async IAsyncEnumerable<(TaskId TaskId, DurableTaskDiagnosticState State)> GetTasksAsync()
+    async IAsyncEnumerable<(TaskId TaskId, DurableTaskDiagnosticState State)> IDurableTaskGrainExtension.GetTasksAsync()
     {
         await Task.CompletedTask;
 
@@ -690,41 +689,13 @@ internal sealed class DurableTaskGrainRuntime(
         }
     }
 
-    public async IAsyncEnumerable<TaskId> GetRunningTasksAsync()
+    async IAsyncEnumerable<TaskId> IDurableTaskGrainExtension.GetRunningTasksAsync()
     {
         await Task.CompletedTask;
         foreach (var task in _runningTasks.ToList())
         {
             yield return task.Key;
         }
-    }
-
-    private bool TrySignalCancellationCore(TaskId taskId, IDurableTaskState taskState)
-    {
-        if (taskState.CompletedAt.HasValue)
-        {
-            // If the task has completed then all child tasks have completed.
-            return false;
-        }   
-
-        if (taskState.CancellationRequestedAt.HasValue)
-        {
-            return true;
-        }   
-
-        // Find all immediate children of the task and start canceling them.
-        foreach (var (childTaskId, childTaskState) in _storage.Tasks)
-        {
-            if (!childTaskId.IsChildOf(taskId))
-            {
-                continue;
-            }
-
-            _ = TrySignalCancellationCore(childTaskId, childTaskState);
-        }
-
-        _storage.RequestCancellation(taskId, taskState);
-        return true;
     }
 
     public async ValueTask SignalCancellationAsync(TaskId taskId, CancellationToken cancellationToken)
@@ -740,16 +711,47 @@ internal sealed class DurableTaskGrainRuntime(
             return;
         }
 
-        if (!TrySignalCancellationCore(taskId, taskState))
+        if (!RequestCancellationCore(taskId, taskState))
         {
+            // No need to write state.
             return;
         }
 
         // Write state.
         await _storage.WriteAsync(cancellationToken);
 
-        // Wait for the children to terminate.
-        // Set the result to 'cancelled' (TaskCanceledException) if the task is not already completed.
-        // Write state.
+        // If any task is waiting on this, notify them now.
+
+        bool RequestCancellationCore(TaskId taskId, IDurableTaskState taskState)
+        {
+            if (taskState.CompletedAt.HasValue)
+            {
+                // If the task has completed then all child tasks have completed.
+                return false;
+            }
+
+            if (taskState.CancellationRequestedAt.HasValue)
+            {
+                // Cancellation has already been requested.
+                return false;
+            }
+
+            // Find all immediate children of the task and start canceling them.
+            // TODO: It may be more efficient to get all descendants and to enumerate them in descendant-first order.
+            foreach (var (childTaskId, childTaskState) in _storage.GetChildren(taskId))
+            {
+                Debug.Assert(taskId.IsParentOf(childTaskId));
+
+                _ = RequestCancellationCore(childTaskId, childTaskState);
+            }
+
+            _storage.RequestCancellation(taskId, taskState);
+            return true;
+        }
+    }
+
+    async ValueTask IDurableTaskServer.CancelAsync(TaskId taskId)
+    {
+        await SignalCancellationAsync(taskId, _deactivationCts.Token);
     }
 }
