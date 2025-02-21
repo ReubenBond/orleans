@@ -143,23 +143,20 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         return this;
     }
 
-    /*
-    async ValueTask<IScheduledTaskHandle> ISchedulableTask.ScheduleAsync(TaskId taskId, CancellationToken cancellationToken)
+    async ValueTask<DurableTaskResponse> ISchedulableTask.ScheduleAsync(TaskId taskId, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         Debug.Assert(Context is not null);
+        Context.TaskId = taskId;
 
-        var callerContext = _shared.GrainContextAccessor.GrainContext;
-        if (TryGetProxy(callerContext, out var proxy))
+        if (TryGetProxy(_shared.GrainContextAccessor.GrainContext, out var proxy))
         {
             return await proxy.ScheduleAsync(taskId, this, cancellationToken);
         }
 
         var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
-        var response = await targetGrain.ScheduleAsync(this);
-        return new GrainScheduledTaskHandle(taskId, targetGrain, lastResponse: response);
+        return await targetGrain.ScheduleAsync(this);
     }
-    */
 
     /// <inheritdoc/>
     protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
@@ -195,7 +192,6 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     // Generated
     protected abstract DurableTask InvokeInner();
 
-    /*
     internal static bool TryGetProxy(IGrainContext? callerContext, [NotNullWhen(true)] out IDurableTaskProxy? proxy)
     {
         if (callerContext?.GetComponent<IDurableTaskProxy>() is not { } localProxy)
@@ -207,7 +203,6 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         proxy = localProxy;
         return true;
     }
-    */
 
     /// <inheritdoc/>
     public virtual TimeSpan? GetDefaultResponseTimeout() => null;
@@ -215,12 +210,11 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     public IScheduledTaskHandle GetHandle(TaskId taskId)
     {
         Debug.Assert(Context is not null);
-        /*
-        if (DurableTaskRequest.TryGetProxy(_shared.GrainContextAccessor.GrainContext, out var proxy))
+        Context.TaskId = taskId;
+        if (TryGetProxy(_shared.GrainContextAccessor.GrainContext, out var proxy))
         {
-            return proxy.GetScheduledTaskHandle(taskId, this);
+            return proxy.GetScheduledTaskHandle(taskId);
         }
-        */
 
         return new GrainScheduledTaskHandle(taskId, this, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: null);
     }
@@ -307,25 +301,21 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         return this;
     }
 
-    /*
     /// <inheritdoc/>
-    public async ValueTask<IScheduledTaskHandle> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default)
+    public async ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default)
     {
         Debug.Assert(Context is not null);
+        Context.TaskId = taskId;
 
-        var callerContext = _shared.GrainContextAccessor.GrainContext;
-        if (DurableTaskRequest.TryGetProxy(callerContext, out var proxy))
+        if (DurableTaskRequest.TryGetProxy(_shared.GrainContextAccessor.GrainContext, out var proxy))
         {
-            // Schedule the request via the proxy.
             return await proxy.ScheduleAsync(taskId, this, cancellationToken);
         }
 
         // Schedule the request directly on the target grain.
         var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
-        var response = await targetGrain.ScheduleAsync(this);
-        return new GrainScheduledTaskHandle(taskId, this, targetGrain, lastResponse: response);
+        return await targetGrain.ScheduleAsync(this);
     }
-    */
 
     /// <inheritdoc/>
     protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
@@ -365,12 +355,11 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     public IScheduledTaskHandle GetHandle(TaskId taskId)
     {
         Debug.Assert(Context is not null);
-        /*
+        Context.TaskId = taskId;
         if (DurableTaskRequest.TryGetProxy(_shared.GrainContextAccessor.GrainContext, out var proxy))
         {
-            return proxy.GetScheduledTaskHandle(taskId, this);
+            return proxy.GetScheduledTaskHandle(taskId);
         }
-        */
 
         return new GrainScheduledTaskHandle(taskId, this, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: null);
     }

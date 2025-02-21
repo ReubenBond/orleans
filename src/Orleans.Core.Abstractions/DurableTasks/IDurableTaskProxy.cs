@@ -96,10 +96,10 @@ public struct DurableTaskDiagnosticState
     public string Status { get; set; }
 
     [Id(3)]
-    public string Request { get; set; }
+    public string? Request { get; set; }
 
     [Id(4)]
-    public string Response { get; set; }
+    public string? Response { get; set; }
 
     [Id(5)]
     public List<string> Waiters { get; set; }
@@ -115,6 +115,6 @@ public struct DurableTaskDiagnosticState
 // 2. Client proxy: does not store results locally, does not support subscribing. Available outside the context of a grain.
 internal interface IDurableTaskProxy
 {
-    ValueTask<IScheduledTaskHandle> ScheduleAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
-    IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId, DurableTask taskDefinition);
+    ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
+    IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId);
 }

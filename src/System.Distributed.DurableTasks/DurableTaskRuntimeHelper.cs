@@ -20,7 +20,17 @@ public static class DurableTaskRuntimeHelper
     public static void SetCurrentContext(DurableTaskContext? context) => DurableTaskContext.SetCurrentContext(context);
     public static void SetCurrentContext(DurableTaskContext? context, out DurableTaskContext? previous) => DurableTaskContext.SetCurrentContext(context, out previous);
 
-    public static async ValueTask<DurableTaskResponse> GetResponseAsync(DurableTaskContext context, CancellationToken cancellationToken)
+    public static DurableTaskResponse Poll(DurableTaskContext context)
+    {
+        var task = context.GetResponseAsync();
+        return task.Status switch
+        {
+            TaskStatus.RanToCompletion => task.Result,
+            _ => DurableTaskResponse.Pending,
+        };  
+    }
+
+    public static async ValueTask<DurableTaskResponse> WaitAsync(DurableTaskContext context, CancellationToken cancellationToken)
     {
         return await context.GetResponseAsync().WaitAsync(cancellationToken);
     }

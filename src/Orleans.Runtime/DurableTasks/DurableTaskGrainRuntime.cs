@@ -10,7 +10,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.DurableTasks;
-using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
 
 namespace Orleans.Runtime.DurableTasks;
@@ -237,7 +236,7 @@ internal sealed class DurableTaskGrainRuntime(
             */
 
             // This is not a new request, so either poll it or subscribe the client to receive a notification once it has completed.
-            var responseTask = DurableTaskRuntimeHelper.GetResponseAsync(executionContext, _deactivationCts.Token);
+            var responseTask = DurableTaskRuntimeHelper.WaitAsync(executionContext, _deactivationCts.Token);
             if (client is not null)
             {
                 // The client will receive a callback with the response, rather than receiving an immediate response.
@@ -303,7 +302,7 @@ internal sealed class DurableTaskGrainRuntime(
         }
     }
 
-    public async ValueTask<IScheduledTaskHandle> ScheduleAsync(TaskId taskId, DurableTask durableTask, CancellationToken cancellationToken)
+    public async ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, DurableTask durableTask, CancellationToken cancellationToken)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
@@ -315,7 +314,7 @@ internal sealed class DurableTaskGrainRuntime(
             executionContext = await CreateExecutionContextAsync(taskId, cancellationToken);
         }
 
-        var storedResponse = DurableTaskRuntimeHelper.GetResponseAsync(executionContext, cancellationToken);
+        var storedResponse = DurableTaskRuntimeHelper.Poll(executionContext);
 
         // If the task has already completed, there is no need to start it again.
         if (!storedResponse.IsCompleted)
@@ -335,7 +334,7 @@ internal sealed class DurableTaskGrainRuntime(
                     // Ensure that the request is being polled in the background so that the response can be propagated to the caller.
                     _ = Task.Run(async () =>
                     {
-                        var pollable = durableTask as i;
+                        var handle = (durableTask as ISchedulableTask)?.GetHandle(taskId);
                         while (true)
                         {
                             // TODO: make this configurable, possibly centralize polling, add a way to break out.
@@ -343,10 +342,10 @@ internal sealed class DurableTaskGrainRuntime(
                             try
                             {
                                 DurableTaskResponse response;
-                                if (pollable is not null)
+                                if (handle is not null)
                                 {
                                     // Poll the task, which is cheaper than sending the initial request again.
-                                    response = await pollable.PollAsync(cancellationToken);
+                                    response = await handle.PollAsync(cancellationToken);
                                 }
                                 else
                                 {
@@ -388,7 +387,7 @@ internal sealed class DurableTaskGrainRuntime(
             }
         }
 
-        return executionContext;
+        return DurableTaskRuntimeHelper.Poll(executionContext);
     }
 
     private async Task<GrainDurableTaskContext> CreateExecutionContextAsync(TaskId taskId, CancellationToken cancellationToken)
@@ -636,7 +635,7 @@ internal sealed class DurableTaskGrainRuntime(
     }
 
     /// <inheritdoc/>
-    public ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver client)
+    public ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver? client)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
@@ -768,5 +767,35 @@ internal sealed class DurableTaskGrainRuntime(
     async ValueTask IDurableTaskServer.CancelAsync(TaskId taskId)
     {
         await SignalCancellationAsync(taskId, _deactivationCts.Token);
+    }
+
+    public IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId)
+    {
+        return new ScheduledTaskHandle(taskId, this);
+    }
+
+    private sealed class ScheduledTaskHandle(TaskId taskId, DurableTaskGrainRuntime runtime) : IScheduledTaskHandle
+    {
+        public TaskId TaskId { get; } = taskId;
+
+        public ValueTask CancelAsync(CancellationToken cancellationToken)
+        {
+            return runtime.SignalCancellationAsync(TaskId, cancellationToken);
+        }
+
+        public ValueTask<DurableTaskResponse> PollAsync(CancellationToken cancellationToken)
+        {
+            return runtime.SubscribeOrPollAsync(TaskId, runtime);
+        }
+
+        public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
+        {
+            if (!runtime.TryGetExecutionContext(TaskId, out var context))
+            {
+                throw new KeyNotFoundException($"A task with the identifier '{TaskId}' was not found.");
+            }
+
+            return DurableTaskRuntimeHelper.WaitAsync(context, cancellationToken);
+        }
     }
 }

@@ -154,7 +154,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         }
     }
 
-    internal async ValueTask<DurableTaskContext> ScheduleAsync(JobTask job, TaskId taskId, CancellationToken cancellationToken)
+    internal async ValueTask<DurableTaskResponse> ScheduleAsync(JobTask job, TaskId taskId, CancellationToken cancellationToken)
     {
         try
         {
@@ -168,8 +168,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
                 }
 
                 // and similarly for the job arguments...
-
-                return executionContext;
+                return DurableTaskRuntimeHelper.Poll(executionContext);
             }
 
             executionContext = await CreateExecutionContextAsync(taskId, job.Type, job.Arguments, cancellationToken);
@@ -177,7 +176,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
             // Start invoking the newly defined task.
             InvokeRequestMethod(job, taskId, executionContext, cancellationToken);
 
-            return executionContext;
+            return DurableTaskRuntimeHelper.Poll(executionContext);
         }
         finally
         {
@@ -188,7 +187,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
     public async ValueTask<DurableTaskResponse> InvokeAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
     {
         var ctx = await EvaluateStepAsync(taskId, taskDefinition, cancellationToken);
-        return await DurableTaskRuntimeHelper.GetResponseAsync(ctx, cancellationToken);
+        return await DurableTaskRuntimeHelper.WaitAsync(ctx, cancellationToken);
     }
 
     private async ValueTask<DurableTaskContext> EvaluateStepAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
@@ -374,7 +373,12 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         public string[]? Arguments { get; } = args;
         public string Type { get; } = type;
 
-        public ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default)
+        public IScheduledTaskHandle GetHandle(TaskId taskId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken)
         {
             return _jobScheduler.ScheduleAsync(this, taskId, cancellationToken);
         }

@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace WorkflowsApp.Service.Samples.HelloWorld;
 
+/*
 internal class HelloWorld
 {
     public async Task RunAsync(IServiceProvider serviceProvider)
@@ -71,3 +72,4 @@ internal class HelloWorkflowGrain : DurableGrain, IHelloWorkflowGrain
         return [result1, result2, result3, result4, result5];
     }
 }
+*/

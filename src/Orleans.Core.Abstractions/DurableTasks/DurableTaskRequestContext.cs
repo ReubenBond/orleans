@@ -83,9 +83,17 @@ internal readonly struct DurableTaskSurrogate
 [RegisterConverter]
 internal sealed class TaskIdConverter : IConverter<TaskId, TaskIdSurrogate>
 {
-    public TaskId ConvertFromSurrogate(in TaskIdSurrogate surrogate) => TaskId.Parse(surrogate.Value, provider: null);
+    public TaskId ConvertFromSurrogate(in TaskIdSurrogate surrogate)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(surrogate.Value);
+        return TaskId.Parse(surrogate.Value, provider: null);
+    }
 
-    public TaskIdSurrogate ConvertToSurrogate(in TaskId value) => new(value.ToString());
+    public TaskIdSurrogate ConvertToSurrogate(in TaskId value)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(value, default);
+        return new(value.ToString());
+    }
 }
 
 [GenerateSerializer, Immutable]

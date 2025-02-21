@@ -30,8 +30,14 @@ internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskProxy r
             throw new InvalidOperationException($"The provided task ID '{taskId}' is not a child of this task '{Id}'.");
         }
 
-        var context = await Runtime.ScheduleAsync(taskId, taskDefinition, cancellationToken);
-        return await DurableTaskRuntimeHelper.GetResponseAsync(context, cancellationToken);
+        var response = await Runtime.ScheduleAsync(taskId, taskDefinition, cancellationToken);
+        if (response.IsCompleted)
+        {
+            return response;
+        }
+
+
+        throw new NotImplementedException();
     }
 
     protected override TaskId CreateChildTaskId(string? name)
