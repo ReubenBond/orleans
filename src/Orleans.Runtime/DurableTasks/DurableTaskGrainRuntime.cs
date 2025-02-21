@@ -76,9 +76,12 @@ internal sealed class DurableTaskGrainRuntime(
             {
                 DurableTaskRuntimeHelper.SetResult(executionContext, response);
             }
+            else
+            {
+                // Move the task into the list of active tasks.
+                _pendingTasks[taskId] = executionContext;
+            }
 
-            // Move the task into the list of active tasks.
-            _pendingTasks[taskId] = executionContext;
             return true;
         }
 
@@ -177,7 +180,7 @@ internal sealed class DurableTaskGrainRuntime(
     /// <returns>A <see cref="ValueTask"/> representing the work performed.</returns>
     async ValueTask IDurableTaskObserver.OnResponseAsync(TaskId taskId, DurableTaskResponse response)
     {
-        if (!TryGetExecutionContext(taskId, out var context))
+        if (!TryGetExecutionContext(taskId, out var executionContext))
         {
             // No such task. This may be because this client has already received a response for this task and removed its entry for it.
             // TODO: Perhaps this should log at a lower level since it is likely not the symptom of a bug or exceptional condition.
@@ -188,11 +191,12 @@ internal sealed class DurableTaskGrainRuntime(
         // Persist the response before responding to the caller.
         // TODO: If this write (or just about any state write) fails, then we need to undo the update to the task state.
         // The most straightforward way to do that might be to take a copy before mutating it.
-        _storage.SetResponse(taskId, context.State, response);
-        await _storage.WriteAsync(CancellationToken.None);
+        _storage.SetResponse(taskId, executionContext.State, response);
+        await _storage.WriteAsync(_deactivationCts.Token);
 
         // Propagate the response to the application.
-        DurableTaskRuntimeHelper.SetResult(context, response);
+        DurableTaskRuntimeHelper.SetResult(executionContext, response);
+        _pendingTasks.Remove(taskId);
     }
 
     /// <summary>
@@ -236,7 +240,7 @@ internal sealed class DurableTaskGrainRuntime(
             if (client is not null)
             {
                 // The client will receive a callback with the response, rather than receiving an immediate response.
-                await SubscribeClientAsync(taskId, executionContext, client, CancellationToken.None);
+                await SubscribeClientAsync(taskId, executionContext, client, _deactivationCts.Token);
             }
             else if (responseTask.IsCompleted)
             {
@@ -256,7 +260,7 @@ internal sealed class DurableTaskGrainRuntime(
                 _storage.AddObserver(taskId, newTaskState, client);
             }
 
-            await _storage.WriteAsync(CancellationToken.None);
+            await _storage.WriteAsync(_deactivationCts.Token);
 
             // Schedule the task with the runtime.
             executionContext = CreateExecutionContext(taskId, newTaskState);
@@ -407,12 +411,12 @@ internal sealed class DurableTaskGrainRuntime(
         {
             request.SetTarget(_shared.GrainContextAccessor.GrainContext);
             var response = await request.InvokeImplementation(context);
-            await CompleteRequestWithResponse(taskId, response, context, CancellationToken.None);
+            await CompleteRequestWithResponse(taskId, response, context, _deactivationCts.Token);
         }
         catch (Exception exception)
         {
             _shared.Logger.LogError(exception, "{Id} error invoking durable task request {Request}", GrainId, request);
-            await CompleteRequestWithResponse(taskId, DurableTaskResponse.FromException(exception), context, CancellationToken.None);
+            await CompleteRequestWithResponse(taskId, DurableTaskResponse.FromException(exception), context, _deactivationCts.Token);
         }
     }
 
@@ -441,6 +445,13 @@ internal sealed class DurableTaskGrainRuntime(
             // That is ok: we want to ensure that every client always sees the same result for a task, so it is important to persist the task before notifying the first client.
             _storage.SetResponse(taskId, state, response);
             await _storage.WriteAsync(cancellationToken);
+
+// TODO: 'Structured concurrency':
+// - Cancel all dangling child tasks now.
+// - Wait for all child tasks to complete before propagating the result to the caller.
+// - Emit diagnostic logs indicating that the task is waiting for its children to complete.
+// Only signal clients once the task itself has transitioned.
+
             DurableTaskRuntimeHelper.SetResult(executionContext, response);
         }
 
@@ -456,7 +467,7 @@ internal sealed class DurableTaskGrainRuntime(
     private async Task NotifyClientsAndCleanupTask(TaskId taskId, GrainDurableTaskContext executionContext, CancellationToken cancellationToken)
     {
         Debug.Assert(executionContext.State.Result is not null);
-        while (true)
+        while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
@@ -479,7 +490,7 @@ internal sealed class DurableTaskGrainRuntime(
                     }
                 }
 
-                await Task.WhenAll(clientTasks);
+                await Task.WhenAll(clientTasks).WaitAsync(cancellationToken);
 
                 _storage.ClearObservers(taskId, state);
 
@@ -502,7 +513,7 @@ internal sealed class DurableTaskGrainRuntime(
             }
 
             // TODO: Make this configurable and probably use exponential back-off, potentially with some coordination with other tasks.
-            await Task.Delay(TimeSpan.FromSeconds(10));
+            await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
         }
     }
 
@@ -643,7 +654,7 @@ internal sealed class DurableTaskGrainRuntime(
             return new(PendingDurableTaskResponse.Instance);
         }
 
-        var subscribeTask = SubscribeClientAsync(taskId, executionContext, client, CancellationToken.None);
+        var subscribeTask = SubscribeClientAsync(taskId, executionContext, client, _deactivationCts.Token);
         if (!subscribeTask.IsCompleted)
         {
             // Subscribe the client and return
@@ -741,7 +752,6 @@ internal sealed class DurableTaskGrainRuntime(
             foreach (var (childTaskId, childTaskState) in _storage.GetChildren(taskId))
             {
                 Debug.Assert(taskId.IsParentOf(childTaskId));
-
                 _ = RequestCancellationCore(childTaskId, childTaskState);
             }
 

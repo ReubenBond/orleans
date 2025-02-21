@@ -14,6 +14,7 @@ public interface IDurableTaskGrainStorage
 
     IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest request);
     void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response);
+    void RequestCancellation(TaskId taskId, IDurableTaskState state);
 
     void AddObserver(TaskId taskId, IDurableTaskState state, IDurableTaskObserver observer);
     void ClearObservers(TaskId taskId, IDurableTaskState state);
@@ -26,5 +27,4 @@ public interface IDurableTaskGrainStorage
 
     ValueTask WriteAsync(CancellationToken cancellationToken);
     ValueTask ReadAsync(CancellationToken cancellationToken);
-    void RequestCancellation(TaskId taskId, IDurableTaskState state);
 }
