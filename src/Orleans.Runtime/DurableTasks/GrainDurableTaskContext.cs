@@ -36,8 +36,8 @@ internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskProxy r
             return response;
         }
 
-
-        throw new NotImplementedException();
+        var handle = Runtime.GetScheduledTaskHandle(taskId);
+        return await handle.WaitAsync(cancellationToken);
     }
 
     protected override TaskId CreateChildTaskId(string? name)
