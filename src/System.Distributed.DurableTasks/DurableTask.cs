@@ -49,6 +49,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
         Id = taskId;
     }
 
+    // TODO: move id logic to ctor or a Create method
     internal ValueTask<DurableTaskResponse> RunAsync(CancellationToken cancellationToken)
     {
         if (ParentContext is { } parentContext)
@@ -58,10 +59,15 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
                 // Allocate a child identifier for the task.
                 Id = parentContext.CreateChildTaskId(null);
             }
+            else if (!Id.IsChildOf(parentContext.Id))
+            {
+                // Make the id a child id, since it's running in the context of a parent task.
+                Id = parentContext.CreateChildTaskId(Id.ToString());
+            }
 
             // Evaluates the task: if it is a local method, it will be executed immediately.
             // This will return once the task has completed.
-            return parentContext.RunAsync(Id, Task, cancellationToken);
+            return parentContext.RunChildTaskAsync(Id, Task, cancellationToken);
         }
         else if (Task is ISchedulableTask schedulableTask)
         {
@@ -73,18 +79,18 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
             }
 
             // Schedules the task and await completion.
-            return ScheduleAndAwaitAsync(schedulableTask, cancellationToken);
+            return ScheduleAndWaitAsync(Id, schedulableTask, cancellationToken);
+
+            static async ValueTask<DurableTaskResponse> ScheduleAndWaitAsync(TaskId taskId, ISchedulableTask schedulableTask, CancellationToken cancellationToken)
+            {
+                var context = await schedulableTask.ScheduleAsync(taskId, cancellationToken);
+                return await context.GetResponseAsync().WaitAsync(cancellationToken);
+            }
         }
         else
         {
             throw GetNonSchedulableTaskException();
         }
-    }
-
-    private readonly async ValueTask<DurableTaskResponse> ScheduleAndAwaitAsync(ISchedulableTask schedulableTask, CancellationToken cancellationToken)
-    {
-        var context = await schedulableTask.ScheduleAsync(Id, cancellationToken);
-        return await context.AsValueTask().AsTask().WaitAsync(cancellationToken);
     }
 
     internal void SetTaskIdCore(string name)

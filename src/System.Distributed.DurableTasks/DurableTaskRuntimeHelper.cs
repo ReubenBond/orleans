@@ -20,5 +20,8 @@ public static class DurableTaskRuntimeHelper
     public static void SetCurrentContext(DurableTaskContext? context) => DurableTaskContext.SetCurrentContext(context);
     public static void SetCurrentContext(DurableTaskContext? context, out DurableTaskContext? previous) => DurableTaskContext.SetCurrentContext(context, out previous);
 
-    public static ValueTask<DurableTaskResponse> GetResponseAsync(DurableTaskContext context) => context.AsValueTask();
+    public static async ValueTask<DurableTaskResponse> GetResponseAsync(DurableTaskContext context, CancellationToken cancellationToken)
+    {
+        return await context.GetResponseAsync().WaitAsync(cancellationToken);
+    }
 }

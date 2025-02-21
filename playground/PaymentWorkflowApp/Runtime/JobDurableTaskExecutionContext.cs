@@ -13,7 +13,7 @@ internal sealed class JobDurableTaskExecutionContext(TaskId taskId, JobScheduler
 
     public JobTaskState State { get; } = state;
 
-    protected override ValueTask<DurableTaskResponse> RunAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+    protected override ValueTask<DurableTaskResponse> RunChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
         => jobScheduler.InvokeAsync(taskId, taskDefinition, cancellationToken);
 
     protected override TaskId CreateChildTaskId(string? name)

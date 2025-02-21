@@ -6,14 +6,14 @@ public readonly struct DurableTaskResultAwaitable<TResult>(DurableTaskContext ex
 {
     private readonly DurableTaskContext _executionContext = executionContext;
 
-    public DurableTaskResultAwaiter<TResult> GetAwaiter() => new(_executionContext.AsValueTask());
+    public DurableTaskResultAwaiter<TResult> GetAwaiter() => new(_executionContext.GetResponseAsync());
 }
 
 public readonly struct DurableTaskResultAwaiter<TResult> : INotifyCompletion, ICriticalNotifyCompletion
 {
-    private readonly ValueTaskAwaiter<DurableTaskResponse> _awaiter;
+    private readonly TaskAwaiter<DurableTaskResponse> _awaiter;
 
-    internal DurableTaskResultAwaiter(ValueTask<DurableTaskResponse> responseTask)
+    internal DurableTaskResultAwaiter(Task<DurableTaskResponse> responseTask)
     {
         _awaiter = responseTask.GetAwaiter();
     }

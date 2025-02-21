@@ -9,6 +9,43 @@ using Orleans.Runtime;
 
 namespace Orleans.DurableTasks;
 
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+// TODO: cancellation
+
 [Alias("IDurableTaskObserverGrainExtension")]
 public interface IDurableTaskObserver : IGrainExtension
 {
@@ -70,7 +107,7 @@ public struct DurableTaskDiagnosticState
 public interface IDurableTaskGrainRuntime
 {
     ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
-    bool GetResponseOrCreateChildTask(TaskId taskId, [NotNullWhen(true)] out DurableTaskResponse response);
-    void SetChildTaskResponse(TaskId taskId, DurableTaskResponse response);
+    //bool GetResponseOrCreateChildTask(TaskId taskId, [NotNullWhen(true)] out DurableTaskResponse response);
+    //void SetChildTaskResponse(TaskId taskId, DurableTaskResponse response);
     ValueTask SignalCancellationAsync(TaskId taskId, CancellationToken cancellationToken);
 }

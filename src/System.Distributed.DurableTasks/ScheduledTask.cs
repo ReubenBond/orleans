@@ -7,22 +7,18 @@ namespace System.Distributed.DurableTasks;
 /// </summary>
 public abstract class ScheduledTask
 {
+    internal ScheduledTask() { }
+
     /// <summary>
     /// Gets the task identifier.
     /// </summary>
     public abstract TaskId Id { get; }
 
-    /// <summary>
-    /// Gets a task representing the completion of the operation.
-    /// </summary>
-    /// <returns>A task representing the completion of the operation.</returns>
-    public abstract Task AsTask();
-
     /// <summary>Gets an awaiter used to await this <see cref="ScheduledTask"/>.</summary>
     /// <returns>An awaiter instance.</returns>
     public ScheduledTaskAwaiter GetAwaiter() => new(this);
 
-    protected internal abstract ValueTask AsUntypedValueTask();
+    protected internal abstract Task WaitAsync();
 
     public abstract ValueTask CancelAsync(CancellationToken cancellationToken);
 }
@@ -36,13 +32,7 @@ public abstract class ScheduledTask<TResult> : ScheduledTask
     /// Gets a task representing the completion of the operation.
     /// </summary>
     /// <returns>A task representing the completion of the operation.</returns>
-    public override async Task<TResult> AsTask() => await this;
-
-    /// <summary>
-    /// Gets a task representing the completion of the operation.
-    /// </summary>
-    /// <returns>A task representing the completion of the operation.</returns>
-    internal abstract ValueTask<DurableTaskResponse> AsValueTask();
+    internal abstract Task<DurableTaskResponse> GetResponseAsync();
 
     /// <summary>Gets an awaiter used to await this <see cref="ScheduledTask{TResult}"/>.</summary>
     /// <returns>An awaiter instance.</returns>
@@ -59,15 +49,14 @@ internal sealed class ScheduledDurableTask<TResult> : ScheduledTask<TResult>
     }
 
     public override TaskId Id => _executionContext.Id;
-    public override async Task<TResult> AsTask() => await this;
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken)
     {
         return _executionContext.SignalCancellationAsync(cancellationToken);
     }
 
-    protected internal override ValueTask AsUntypedValueTask() => _executionContext.AsUntypedValueTask();
-    internal override ValueTask<DurableTaskResponse> AsValueTask() => _executionContext.AsValueTask();
+    protected internal override Task WaitAsync() => _executionContext.GetResponseAsync();
+    internal override Task<DurableTaskResponse> GetResponseAsync() => _executionContext.GetResponseAsync();
 }
 
 internal sealed class ScheduledDurableTask : ScheduledTask
@@ -80,14 +69,13 @@ internal sealed class ScheduledDurableTask : ScheduledTask
     }
 
     public override TaskId Id => _executionContext.Id;
-    public override Task AsTask() => _executionContext.AsUntypedValueTask().AsTask();
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken)
     {
         return _executionContext.SignalCancellationAsync(cancellationToken);
     }
 
-    protected internal override ValueTask AsUntypedValueTask() => _executionContext.AsUntypedValueTask();
+    protected internal override Task WaitAsync() => _executionContext.GetResponseAsync();
 }
 
 /// <summary>
@@ -95,11 +83,11 @@ internal sealed class ScheduledDurableTask : ScheduledTask
 /// </summary>
 public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 {
-    private readonly ValueTaskAwaiter _awaiter;
+    private readonly TaskAwaiter _awaiter;
 
     internal ScheduledTaskAwaiter(ScheduledTask durableTaskInvocation) =>
 #pragma warning disable CA2012 // Use ValueTasks correctly
-        _awaiter = durableTaskInvocation.AsUntypedValueTask().GetAwaiter();
+        _awaiter = durableTaskInvocation.WaitAsync().GetAwaiter();
 #pragma warning restore CA2012 // Use ValueTasks correctly
 
 
@@ -126,11 +114,11 @@ public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 /// <typeparam name="TResult">The underlying result type.</typeparam>
 public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
 {
-    private readonly ValueTaskAwaiter<DurableTaskResponse> _awaiter;
+    private readonly TaskAwaiter<DurableTaskResponse> _awaiter;
 
     internal ScheduledTaskAwaiter(ScheduledTask<TResult> durableTaskInvocation) =>
 #pragma warning disable CA2012 // Use ValueTasks correctly
-        _awaiter = durableTaskInvocation.AsValueTask().GetAwaiter();
+        _awaiter = durableTaskInvocation.GetResponseAsync().GetAwaiter();
 #pragma warning restore CA2012 // Use ValueTasks correctly
 
 

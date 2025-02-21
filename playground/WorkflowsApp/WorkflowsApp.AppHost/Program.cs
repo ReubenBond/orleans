@@ -3,8 +3,8 @@ builder.AddAzureProvisioning();
 
 var azureStorage = builder.AddAzureStorage("az-storage").RunAsEmulator(builder =>
     builder
-        .WithImageTag("3.33.0")
-        .WithLifetime(ContainerLifetime.Persistent));
+        .WithImageTag("3.33.0"));
+        //.WithLifetime(ContainerLifetime.Persistent));
 var azureBlobs = azureStorage.AddBlobs("state");
 
 var orleans = builder.AddOrleans("orleans")

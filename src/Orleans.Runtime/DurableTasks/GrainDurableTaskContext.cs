@@ -1,6 +1,6 @@
 ﻿#nullable enable
+using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Distributed.DurableTasks;
 using System.Globalization;
 using System.Runtime.InteropServices;
@@ -22,10 +22,16 @@ internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskGrainRu
 
     internal IDurableTaskState State { get; } = state;
 
-    protected override async ValueTask<DurableTaskResponse> RunAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+    protected override async ValueTask<DurableTaskResponse> RunChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
     {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        if (!Id.IsParentOf(taskId))
+        {
+            throw new InvalidOperationException($"The provided task ID '{taskId}' is not a child of this task '{Id}'.");
+        }
+
         var context = await Runtime.ScheduleAsync(taskId, taskDefinition, cancellationToken);
-        return await DurableTaskRuntimeHelper.GetResponseAsync(context).AsTask().WaitAsync(cancellationToken);
+        return await DurableTaskRuntimeHelper.GetResponseAsync(context, cancellationToken);
     }
 
     protected override TaskId CreateChildTaskId(string? name)
@@ -48,8 +54,8 @@ internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskGrainRu
         }
     }
 
-    public bool TryGetTaskResponse(TaskId taskId, [NotNullWhen(true)] out DurableTaskResponse? response) => Runtime.GetResponseOrCreateChildTask(taskId, out response);
-    public void SetTaskResponse(TaskId taskId, DurableTaskResponse response) => Runtime.SetChildTaskResponse(taskId, response);
+    //public bool TryGetTaskResponse(TaskId taskId, [NotNullWhen(true)] out DurableTaskResponse? response) => Runtime.GetResponseOrCreateChildTask(taskId, out response);
+    //public void SetTaskResponse(TaskId taskId, DurableTaskResponse response) => Runtime.SetChildTaskResponse(taskId, response);
 
     protected override ValueTask SignalCancellationAsyncCore(CancellationToken cancellationToken)
     {

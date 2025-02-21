@@ -38,6 +38,11 @@ internal sealed class DurableTaskGrainRuntime(
     private readonly DurableTaskGrainRuntimeShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
 
+
+    // TODO: Cancel during deactivation.
+    // Then drain all tasks.
+    private readonly CancellationTokenSource _deactivationCts = new();
+
     private GrainId GrainId => _shared.GrainContextAccessor.GrainContext.GrainId;
 
     /// <summary>
@@ -106,6 +111,7 @@ internal sealed class DurableTaskGrainRuntime(
         return null;
     }
 
+    /*
     /// <summary>
     /// Gets a task-internal response if it is available.
     /// </summary>
@@ -162,6 +168,7 @@ internal sealed class DurableTaskGrainRuntime(
         _storage.SetResponse(taskId, context.State, response);
         DurableTaskRuntimeHelper.SetResult(context, response);
     }
+    */
 
     /// <summary>
     /// Called upon completion of a task. The receiver must persist consume the response as the caller may clear task state after this method returns.
@@ -226,7 +233,7 @@ internal sealed class DurableTaskGrainRuntime(
             */
 
             // This is not a new request, so either poll it or subscribe the client to receive a notification once it has completed.
-            var responseTask = DurableTaskRuntimeHelper.GetResponseAsync(executionContext);
+            var responseTask = DurableTaskRuntimeHelper.GetResponseAsync(executionContext, _deactivationCts.Token);
             if (client is not null)
             {
                 // The client will receive a callback with the response, rather than receiving an immediate response.
@@ -304,7 +311,7 @@ internal sealed class DurableTaskGrainRuntime(
             executionContext = await CreateExecutionContextAsync(taskId, cancellationToken);
         }
 
-        var storedResponse = DurableTaskRuntimeHelper.GetResponseAsync(executionContext);
+        var storedResponse = DurableTaskRuntimeHelper.GetResponseAsync(executionContext, cancellationToken);
 
         // If the task has already completed, there is no need to start it again.
         if (!storedResponse.IsCompleted)
