@@ -32,7 +32,7 @@ internal sealed class DurableTaskGrainRuntimeShared(
 
 internal sealed class DurableTaskGrainRuntime(
     IDurableTaskGrainStorage storage,
-    DurableTaskGrainRuntimeShared shared) : IDurableTaskGrainRuntime, IDurableTaskGrainExtension
+    DurableTaskGrainRuntimeShared shared) : IDurableTaskProxy, IDurableTaskGrainExtension
 {
     private readonly Dictionary<TaskId, GrainDurableTaskContext> _pendingTasks = [];
     private readonly Dictionary<TaskId, Task> _runningTasks = [];

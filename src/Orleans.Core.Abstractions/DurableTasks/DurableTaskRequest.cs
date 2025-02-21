@@ -9,8 +9,26 @@ using System.Distributed.DurableTasks;
 using Orleans.Runtime;
 using System.Threading.Tasks;
 using System.Threading;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.DurableTasks;
+
+// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
+// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
+// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
+// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
+// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
+// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
+// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
+// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
+// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
+// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
+// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
+// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
+// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
+// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
+// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
+// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
 
 /// <summary>
 /// Represents a durable task request.
@@ -125,17 +143,23 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         return this;
     }
 
+    /*
     async ValueTask<IScheduledTaskHandle> ISchedulableTask.ScheduleAsync(TaskId taskId, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         Debug.Assert(Context is not null);
 
         var callerContext = _shared.GrainContextAccessor.GrainContext;
-        var runtime = GetRuntime(callerContext);
+        if (TryGetProxy(callerContext, out var proxy))
+        {
+            return await proxy.ScheduleAsync(taskId, this, cancellationToken);
+        }
 
-        var response = await runtime.ScheduleAsync(taskId, this, cancellationToken);
-        return new GrainScheduledTaskHandle(taskId, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: response);
+        var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
+        var response = await targetGrain.ScheduleAsync(this);
+        return new GrainScheduledTaskHandle(taskId, targetGrain, lastResponse: response);
     }
+    */
 
     /// <inheritdoc/>
     protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
@@ -160,17 +184,6 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         return await remote.ScheduleAsync(this);
     }
 
-    /*
-    /// <inheritdoc/>
-    async ValueTask<DurableTaskResponse> IPollableTask.PollAsync(CancellationToken cancellationToken)
-    {
-        Debug.Assert(Context is not null);
-        Debug.Assert(Context.TaskId != TaskId.None);
-        var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
-        return await remote.SubscribeOrPollAsync(Context.TaskId, null).AsTask().WaitAsync(cancellationToken);
-    }
-    */
-
     /// <inheritdoc/>
     ValueTask<Response> IInvokable.Invoke()
         // This could be made to work... maybe pick a random task id, for example.
@@ -182,20 +195,19 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     // Generated
     protected abstract DurableTask InvokeInner();
 
-    internal static IDurableTaskGrainRuntime GetRuntime(IGrainContext callerContext)
+    /*
+    internal static bool TryGetProxy(IGrainContext? callerContext, [NotNullWhen(true)] out IDurableTaskProxy? proxy)
     {
-        if (callerContext is null)
+        if (callerContext?.GetComponent<IDurableTaskProxy>() is not { } localProxy)
         {
-            throw new InvalidOperationException($"No {nameof(IGrainContext)} is in context");
+            proxy = null;
+            return false;
         }
 
-        if (callerContext.GetComponent<IDurableTaskGrainRuntime>() is not { } localRuntime)
-        {
-            throw new InvalidOperationException($"The current grain or client context, {callerContext} does not support calling durable tasks");
-        }
-
-        return localRuntime;
+        proxy = localProxy;
+        return true;
     }
+    */
 
     /// <inheritdoc/>
     public virtual TimeSpan? GetDefaultResponseTimeout() => null;
@@ -203,8 +215,14 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     public IScheduledTaskHandle GetHandle(TaskId taskId)
     {
         Debug.Assert(Context is not null);
+        /*
+        if (DurableTaskRequest.TryGetProxy(_shared.GrainContextAccessor.GrainContext, out var proxy))
+        {
+            return proxy.GetScheduledTaskHandle(taskId, this);
+        }
+        */
 
-        return new GrainScheduledTaskHandle(taskId, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: null);
+        return new GrainScheduledTaskHandle(taskId, this, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: null);
     }
 }
 
@@ -289,17 +307,25 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         return this;
     }
 
+    /*
     /// <inheritdoc/>
     public async ValueTask<IScheduledTaskHandle> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default)
     {
         Debug.Assert(Context is not null);
 
         var callerContext = _shared.GrainContextAccessor.GrainContext;
-        var runtime = DurableTaskRequest.GetRuntime(callerContext);
+        if (DurableTaskRequest.TryGetProxy(callerContext, out var proxy))
+        {
+            // Schedule the request via the proxy.
+            return await proxy.ScheduleAsync(taskId, this, cancellationToken);
+        }
 
-        var response = await runtime.ScheduleAsync(taskId, this, cancellationToken);
-        return new GrainScheduledTaskHandle(taskId, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: response);
+        // Schedule the request directly on the target grain.
+        var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
+        var response = await targetGrain.ScheduleAsync(this);
+        return new GrainScheduledTaskHandle(taskId, this, targetGrain, lastResponse: response);
     }
+    */
 
     /// <inheritdoc/>
     protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
@@ -324,17 +350,6 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         return await remote.ScheduleAsync(this);
     }
 
-    /*
-    /// <inheritdoc/>
-    async ValueTask<DurableTaskResponse> IPollableTask.PollAsync(CancellationToken cancellationToken)
-    {
-        Debug.Assert(Context is not null);
-        Debug.Assert(Context.TaskId != TaskId.None);
-        var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
-        return await remote.SubscribeOrPollAsync(Context.TaskId, null).AsTask().WaitAsync(cancellationToken);
-    }
-    */
-
     /// <inheritdoc/>
     ValueTask<Response> IInvokable.Invoke() => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
@@ -350,11 +365,18 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     public IScheduledTaskHandle GetHandle(TaskId taskId)
     {
         Debug.Assert(Context is not null);
-        return new GrainScheduledTaskHandle(taskId, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: null);
+        /*
+        if (DurableTaskRequest.TryGetProxy(_shared.GrainContextAccessor.GrainContext, out var proxy))
+        {
+            return proxy.GetScheduledTaskHandle(taskId, this);
+        }
+        */
+
+        return new GrainScheduledTaskHandle(taskId, this, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: null);
     }
 }
 
-internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskServer grain, DurableTaskResponse? lastResponse) : IScheduledTaskHandle
+internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskRequest request, IDurableTaskServer grain, DurableTaskResponse? lastResponse) : IScheduledTaskHandle
 {
     public TaskId TaskId { get; } = taskId;
     public DurableTaskResponse? LastResponse { get; private set; } = lastResponse;
@@ -374,6 +396,11 @@ internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskServer
 
         // TODO: Add resilience via Polly
         return LastResponse = await grain.SubscribeOrPollAsync(TaskId, client: null).AsTask().WaitAsync(cancellationToken);
+    }
+
+    public async ValueTask<DurableTaskResponse> ScheduleAsync(CancellationToken cancellationToken)
+    {
+        return await grain.ScheduleAsync(request).AsTask().WaitAsync(cancellationToken);
     }
 
     public async ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)

@@ -107,7 +107,13 @@ public struct DurableTaskDiagnosticState
     public override readonly string ToString() => $"[{Status}, Created: {CreatedAt}, Completed: {CompletedAt}, Request: {Request}, Response: {Response}, Waiters: {string.Join(", ", Waiters ?? [])}]";
 }
 
-public interface IDurableTaskGrainRuntime
+// Intermediates requests from clients / grains to DurableTasks.
+// Either Orleans-backed DurableTasks or other durable tasks.
+// Part of the reason for this is to allow Orleans to intercept requests and ensure that results are stored locally.
+// There are two implementations:
+// 1. Grain proxy: stores results locally, supports subscribing. Only available in the context of a grain.
+// 2. Client proxy: does not store results locally, does not support subscribing. Available outside the context of a grain.
+internal interface IDurableTaskProxy
 {
     ValueTask<IScheduledTaskHandle> ScheduleAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
     IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId, DurableTask taskDefinition);

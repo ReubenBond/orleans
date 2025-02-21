@@ -83,8 +83,14 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
 
             static async ValueTask<DurableTaskResponse> ScheduleAndWaitAsync(TaskId taskId, ISchedulableTask schedulableTask, CancellationToken cancellationToken)
             {
-                var context = await schedulableTask.ScheduleAsync(taskId, cancellationToken);
-                return await context.WaitAsync(cancellationToken);
+                var response = await schedulableTask.ScheduleAsync(taskId, cancellationToken);
+                if (response.IsCompleted)
+                {
+                    return response;
+                }
+
+                var handle = schedulableTask.GetHandle(taskId);
+                return await handle.WaitAsync(cancellationToken);
             }
         }
         else
@@ -139,8 +145,14 @@ public struct ConfiguredDurableTask(DurableTask task, TaskId taskId)
             throw GetNonSchedulableTaskException();
         }
 
-        var executionContext = await schedulableTask.ScheduleAsync(Id, cancellationToken);
-        return new ScheduledDurableTask(executionContext);
+        var response = await schedulableTask.ScheduleAsync(Id, cancellationToken);
+        if (response.IsCompleted)
+        {
+            return new CompletedScheduledDurableTask(Id, response);
+        }
+
+        var handle = schedulableTask.GetHandle(Id);
+        return new ScheduledDurableTask(handle);
     }
 
     // Cancels a durable task without waiting for the task to complete
@@ -190,7 +202,14 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task, TaskId t
             throw ConfiguredDurableTask.GetNonSchedulableTaskException();
         }
 
-        var handle = await schedulableTask.ScheduleAsync(Id, cancellationToken);
+
+        var response = await schedulableTask.ScheduleAsync(Id, cancellationToken);
+        if (response.IsCompleted)
+        {
+            return new CompletedScheduledDurableTask<TResult>(Id, response);
+        }
+
+        var handle = schedulableTask.GetHandle(Id);
         return new ScheduledDurableTask<TResult>(handle);
     }
     

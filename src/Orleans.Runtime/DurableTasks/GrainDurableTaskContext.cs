@@ -10,7 +10,7 @@ using Orleans.DurableTasks;
 
 namespace Orleans.Runtime.DurableTasks;
 
-internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskGrainRuntime runtime, IDurableTaskState state) : DurableTaskContext(taskId)
+internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskProxy runtime, IDurableTaskState state) : DurableTaskContext(taskId)
 {
     // The sequence number for named children.
     private Dictionary<string, int>? _nextChildIds;
@@ -18,7 +18,7 @@ internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskGrainRu
     // The sequence number for unnamed children.
     private int _nextSequenceNumber = 0;
 
-    internal IDurableTaskGrainRuntime Runtime { get; } = runtime;
+    internal IDurableTaskProxy Runtime { get; } = runtime;
 
     internal IDurableTaskState State { get; } = state;
 

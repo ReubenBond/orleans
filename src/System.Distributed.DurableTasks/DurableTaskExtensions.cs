@@ -26,13 +26,13 @@ public static class DurableTaskExtensions
     /// If the caller is executing in the context of a <see cref="DurableTask"/>, this identifier is relative to the parent task.
     /// If the caller is not executing in the context of a <see cref="DurableTask"/>, this identifier is absolute.
     /// </summary>
-    /// <param name="id">The identifier.</param>
+    /// <param name="taskId">The identifier.</param>
     /// <returns>This instance.</returns>
     [Pure]
-    public static ConfiguredDurableTask WithId(this DurableTask task, string id)
+    public static ConfiguredDurableTask WithId(this DurableTask task, TaskId taskId)
     {
-        ArgumentNullException.ThrowIfNull(id);
-        return new ConfiguredDurableTask(task, TaskId.Create(id));
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        return new ConfiguredDurableTask(task, taskId);
     }
 
     /// <summary>
@@ -40,13 +40,41 @@ public static class DurableTaskExtensions
     /// If the caller is executing in the context of a <see cref="DurableTask"/>, this identifier is relative to the parent task.
     /// If the caller is not executing in the context of a <see cref="DurableTask"/>, this identifier is absolute.
     /// </summary>
-    /// <param name="id">The identifier.</param>
+    /// <param name="taskId">The identifier.</param>
     /// <returns>This instance.</returns>
     [Pure]
-    public static ConfiguredDurableTask<TResult> WithId<TResult>(this DurableTask<TResult> task, string id)
+    public static ConfiguredDurableTask WithId(this DurableTask task, string taskId)
     {
-        ArgumentNullException.ThrowIfNull(id);
-        return new ConfiguredDurableTask<TResult>(task, TaskId.Create(id));
+        ArgumentNullException.ThrowIfNull(taskId);
+        return new ConfiguredDurableTask(task, TaskId.Create(taskId));
+    }
+
+    /// <summary>
+    /// Returns a configured task with an identifier set.
+    /// If the caller is executing in the context of a <see cref="DurableTask"/>, this identifier is relative to the parent task.
+    /// If the caller is not executing in the context of a <see cref="DurableTask"/>, this identifier is absolute.
+    /// </summary>
+    /// <param name="taskId">The identifier.</param>
+    /// <returns>This instance.</returns>
+    [Pure]
+    public static ConfiguredDurableTask<TResult> WithId<TResult>(this DurableTask<TResult> task, TaskId taskId)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        return new ConfiguredDurableTask<TResult>(task, taskId);
+    }
+
+    /// <summary>
+    /// Returns a configured task with an identifier set.
+    /// If the caller is executing in the context of a <see cref="DurableTask"/>, this identifier is relative to the parent task.
+    /// If the caller is not executing in the context of a <see cref="DurableTask"/>, this identifier is absolute.
+    /// </summary>
+    /// <param name="taskId">The identifier.</param>
+    /// <returns>This instance.</returns>
+    [Pure]
+    public static ConfiguredDurableTask<TResult> WithId<TResult>(this DurableTask<TResult> task, string taskId)
+    {
+        ArgumentNullException.ThrowIfNull(taskId);
+        return new ConfiguredDurableTask<TResult>(task, TaskId.Create(taskId));
     }
 
     /// <summary>

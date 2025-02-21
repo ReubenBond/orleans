@@ -14,7 +14,7 @@ public static class DurableTaskHostingExtensions
     {
         siloBuilder.Services.AddSingleton<DurableTaskGrainRuntimeShared>();
         siloBuilder.Services.AddScoped<DurableTaskGrainRuntime>();
-        siloBuilder.Services.AddFromExisting<IDurableTaskGrainRuntime, DurableTaskGrainRuntime>();
+        siloBuilder.Services.AddFromExisting<IDurableTaskProxy, DurableTaskGrainRuntime>();
         siloBuilder.Services.AddKeyedTransient<IGrainExtension>(typeof(IDurableTaskGrainExtension), (sp, _) => sp.GetRequiredService<DurableTaskGrainRuntime>());
         siloBuilder.Services.AddKeyedTransient<IGrainExtension>(typeof(IDurableTaskServer), (sp, _) => sp.GetRequiredService<DurableTaskGrainRuntime>());
         siloBuilder.Services.AddKeyedTransient<IGrainExtension>(typeof(IDurableTaskObserver), (sp, _) => sp.GetRequiredService<DurableTaskGrainRuntime>());

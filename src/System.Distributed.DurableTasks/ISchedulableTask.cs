@@ -8,9 +8,8 @@ public interface ISchedulableTask
     /// <summary>
     /// Schedules the task, returning a handle to the scheduled task.
     /// </summary>
-    /// <param name="taskId">The task identifier.</param>
     /// <returns>A handle representing the scheduled task.</returns>
-    ValueTask<IScheduledTaskHandle> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default);
+    ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Gets a handle to a scheduled task.

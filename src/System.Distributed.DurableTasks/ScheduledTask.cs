@@ -101,6 +101,44 @@ internal sealed class ScheduledDurableTask<TResult> : ScheduledTask<TResult>
     }
 }
 
+internal sealed class CompletedScheduledDurableTask<TResult> : ScheduledTask<TResult>
+{
+    private readonly DurableTaskResponse _response;
+
+    internal CompletedScheduledDurableTask(TaskId taskId, DurableTaskResponse response)
+    {
+        Id = taskId;
+        _response = response;
+    }
+
+    public override TaskId Id { get; }
+
+    public override ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+    protected override ValueTask<DurableTaskResponse> PollAsyncCore(CancellationToken cancellationToken) => new(_response);
+
+    protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => new(_response);
+}
+
+internal sealed class CompletedScheduledDurableTask : ScheduledTask
+{
+    private readonly DurableTaskResponse _response;
+
+    internal CompletedScheduledDurableTask(TaskId taskId, DurableTaskResponse response)
+    {
+        Id = taskId;
+        _response = response;
+    }
+
+    public override TaskId Id { get; }
+
+    public override ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
+    protected override ValueTask<DurableTaskResponse> PollAsyncCore(CancellationToken cancellationToken) => new(_response);
+
+    protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => new(_response);
+}
+
 internal sealed class ScheduledDurableTask : ScheduledTask
 {
     private readonly IScheduledTaskHandle _handle;
