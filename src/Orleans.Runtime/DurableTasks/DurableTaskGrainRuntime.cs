@@ -452,6 +452,10 @@ internal sealed class DurableTaskGrainRuntime(
 // - Emit diagnostic logs indicating that the task is waiting for its children to complete.
 // Only signal clients once the task itself has transitioned.
 
+// NOTE: For Structured Concurrency to work here, we need to track all child tasks.
+// That likely requires having a hook so that we can write state before any ScheduleAsync call is issued by one of our tasks.
+// So ScheduleAsync needs to call back into the parent context to launch (which it might already do...), giving us a way to write state before calling.
+
             DurableTaskRuntimeHelper.SetResult(executionContext, response);
         }
 

@@ -18,9 +18,50 @@ public abstract class ScheduledTask
     /// <returns>An awaiter instance.</returns>
     public ScheduledTaskAwaiter GetAwaiter() => new(this);
 
-    protected internal abstract Task WaitAsync();
+    /// <summary>
+    /// Gets the status of the task.
+    /// </summary>
+    /// <returns>The task status.</returns>
+    public virtual async Task<bool> IsCompletedAsync(CancellationToken cancellationToken)
+    {
+        var result = await PollAsyncCore(cancellationToken);
+        return result.Status.IsCompleted();
+    }
 
+    /// <summary>
+    /// Gets the status of the task.
+    /// </summary>
+    /// <returns>The task status.</returns>
+    public virtual async Task<DurableTaskStatus> GetStatusAsync(CancellationToken cancellationToken)
+    {
+        var result = await PollAsyncCore(cancellationToken);
+        return result.Status;
+    }
+
+    /// <summary>
+    /// Gets a task representing the completion of the operation.
+    /// </summary>
+    /// <returns>A task representing the completion of the operation.</returns>
+    public virtual Task WaitAsync(CancellationToken cancellationToken) => WaitAsyncCore(cancellationToken);
+
+    /// <summary>
+    /// Attempts to cancel the operation.
+    /// </summary>
+    /// <param name="cancellationToken">A cancellation token used to signal when the attempt to request cancellation should be abandoned.</param>
+    /// <returns>A task representing the completion of the operation.</returns>
     public abstract ValueTask CancelAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets a task representing the completion of the operation.
+    /// </summary>
+    /// <returns>A task representing the completion of the operation.</returns>
+    protected abstract Task<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets the current status of the task without waiting for the task to complete.
+    /// </summary>
+    /// <returns>A task representing the completion of the operation.</returns>
+    protected abstract Task<DurableTaskResponse> PollAsyncCore(CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -28,12 +69,6 @@ public abstract class ScheduledTask
 /// </summary>
 public abstract class ScheduledTask<TResult> : ScheduledTask
 {
-    /// <summary>
-    /// Gets a task representing the completion of the operation.
-    /// </summary>
-    /// <returns>A task representing the completion of the operation.</returns>
-    internal abstract Task<DurableTaskResponse> GetResponseAsync();
-
     /// <summary>Gets an awaiter used to await this <see cref="ScheduledTask{TResult}"/>.</summary>
     /// <returns>An awaiter instance.</returns>
     public new ScheduledTaskAwaiter<TResult> GetAwaiter() => new(this);
@@ -50,13 +85,22 @@ internal sealed class ScheduledDurableTask<TResult> : ScheduledTask<TResult>
 
     public override TaskId Id => _executionContext.Id;
 
-    public override ValueTask CancelAsync(CancellationToken cancellationToken)
+    public override async ValueTask CancelAsync(CancellationToken cancellationToken)
     {
-        return _executionContext.SignalCancellationAsync(cancellationToken);
+        await _executionContext.SignalCancellationAsync(cancellationToken);
     }
 
-    protected internal override Task WaitAsync() => _executionContext.GetResponseAsync();
-    internal override Task<DurableTaskResponse> GetResponseAsync() => _executionContext.GetResponseAsync();
+    public override Task<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken) => _executionContext.GetResponseAsync();
+
+    protected override Task<DurableTaskResponse> PollAsyncCore(CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+
+    protected override Task<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
 }
 
 internal sealed class ScheduledDurableTask : ScheduledTask
@@ -70,12 +114,17 @@ internal sealed class ScheduledDurableTask : ScheduledTask
 
     public override TaskId Id => _executionContext.Id;
 
-    public override ValueTask CancelAsync(CancellationToken cancellationToken)
+    public override async ValueTask CancelAsync(CancellationToken cancellationToken)
     {
-        return _executionContext.SignalCancellationAsync(cancellationToken);
+        await _executionContext.SignalCancellationAsync(cancellationToken);
     }
 
-    protected internal override Task WaitAsync() => _executionContext.GetResponseAsync();
+    public override Task<DurableTaskStatus> GetStatusAsync(CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override Task<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken) => _executionContext.GetResponseAsync();
 }
 
 /// <summary>
@@ -83,13 +132,10 @@ internal sealed class ScheduledDurableTask : ScheduledTask
 /// </summary>
 public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 {
-    private readonly TaskAwaiter _awaiter;
+    private readonly TaskAwaiter<DurableTaskResponse> _awaiter;
 
     internal ScheduledTaskAwaiter(ScheduledTask durableTaskInvocation) =>
-#pragma warning disable CA2012 // Use ValueTasks correctly
-        _awaiter = durableTaskInvocation.WaitAsync().GetAwaiter();
-#pragma warning restore CA2012 // Use ValueTasks correctly
-
+        _awaiter = durableTaskInvocation.WaitAsync(CancellationToken.None).GetAwaiter();
 
     /// <summary>
     /// Gets the result of the task.
@@ -117,10 +163,7 @@ public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
     private readonly TaskAwaiter<DurableTaskResponse> _awaiter;
 
     internal ScheduledTaskAwaiter(ScheduledTask<TResult> durableTaskInvocation) =>
-#pragma warning disable CA2012 // Use ValueTasks correctly
-        _awaiter = durableTaskInvocation.GetResponseAsync().GetAwaiter();
-#pragma warning restore CA2012 // Use ValueTasks correctly
-
+        _awaiter = durableTaskInvocation.WaitAsync(CancellationToken.None).GetAwaiter();
 
     /// <summary>
     /// Gets the result of the task.

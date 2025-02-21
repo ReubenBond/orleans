@@ -243,7 +243,7 @@ internal sealed class ExceptionDurableTaskResponseCodec : IFieldCodec<ExceptionD
             exception = default;
         }
 
-        var result = DurableTaskResponse.FromException(exception!);
+        var result = new ExceptionDurableTaskResponse(exception!);
         reader.ReadFieldHeader(ref field);
         reader.ConsumeEndBaseOrEndObject(ref field);
 
@@ -264,7 +264,7 @@ internal sealed class ExceptionDurableTaskResponseCopier : IDeepCopier<Exception
         if (input is null)
             return null!;
 
-        return DurableTaskResponse.FromException(_copier.DeepCopy(input.Exception, context));
+        return new ExceptionDurableTaskResponse(_copier.DeepCopy(input.Exception, context));
     }
 }
 

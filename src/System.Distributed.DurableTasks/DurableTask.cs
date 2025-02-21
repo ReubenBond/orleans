@@ -84,7 +84,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
             static async ValueTask<DurableTaskResponse> ScheduleAndWaitAsync(TaskId taskId, ISchedulableTask schedulableTask, CancellationToken cancellationToken)
             {
                 var context = await schedulableTask.ScheduleAsync(taskId, cancellationToken);
-                return await context.GetResponseAsync().WaitAsync(cancellationToken);
+                return await context.WaitAsync(cancellationToken);
             }
         }
         else
@@ -440,18 +440,28 @@ internal sealed class DelegateDurableTaskWithState<TState>(Action<TState, Cancel
     }
 }
 
-public enum DurableTaskResponseStatus
+public enum DurableTaskStatus
+{
+    None,
+    Pending,
+    CompletedSuccessfully,
+    Canceled,
+    Failed,
+}
+
+public enum DurableTaskResponseKind
 {
     None,
     Pending,
     Subscribed,
-    Success,
-    Error,
+    CompletedSuccessfully,
+    Failed,
 }
 
-internal static class ResponseKindExtensions
+internal static class DurableTaskResponseExtensions
 {
-    public static bool IsCompleted(this DurableTaskResponseStatus value) => value is DurableTaskResponseStatus.Success or DurableTaskResponseStatus.Error;
+    public static bool IsCompleted(this DurableTaskStatus value) => value is DurableTaskStatus.CompletedSuccessfully or DurableTaskStatus.Canceled or DurableTaskStatus.Failed;
+    public static bool IsCompleted(this DurableTaskResponseKind value) => value is DurableTaskResponseKind.CompletedSuccessfully or DurableTaskResponseKind.Failed;
 }
 
 /// <summary>
@@ -469,7 +479,7 @@ public abstract class DurableTaskResponse
     /// </summary>
     /// <param name="exception">The exception.</param>
     /// <returns>A new response.</returns>
-    public static ExceptionDurableTaskResponse FromException(Exception exception) => new(exception);
+    public static DurableTaskResponse FromException(Exception exception) => new ExceptionDurableTaskResponse(exception);
 
     /// <summary>
     /// Creates a new response object which has been fulfilled with the provided value.
@@ -482,27 +492,43 @@ public abstract class DurableTaskResponse
     /// <summary>
     /// Gets a completed response with no value.
     /// </summary>
-    public static SuccessDurableTaskResponse Completed => SuccessDurableTaskResponse.Instance;
+    public static DurableTaskResponse Completed => SuccessDurableTaskResponse.Instance;
 
     /// <summary>
     /// Gets a pending response.
     /// </summary>
-    public static PendingDurableTaskResponse Pending => PendingDurableTaskResponse.Instance;
+    public static DurableTaskResponse Pending => PendingDurableTaskResponse.Instance;
 
     /// <summary>
     /// Gets a subscribed response.
     /// </summary>
-    public static SubscribedDurableTaskResponse Subscribed => SubscribedDurableTaskResponse.Instance;
+    public static DurableTaskResponse Subscribed => SubscribedDurableTaskResponse.Instance;
 
     /// <summary>
     /// Gets a value indicating whether the response represents a completed task.
     /// </summary>
-    public bool IsCompleted => Status.IsCompleted();
+    /// <remarks>
+    /// A task is considered completed if it has either succeeded, failed, or was canceled.
+    /// </remarks>
+    public bool IsCompleted => ResponseKind.IsCompleted();
+
+    /// <summary>
+    /// Gets the response kind.
+    /// </summary>
+    public abstract DurableTaskResponseKind ResponseKind { get; }
 
     /// <summary>
     /// Gets the response status.
     /// </summary>
-    public abstract DurableTaskResponseStatus Status { get; }
+    public DurableTaskStatus Status => ResponseKind switch
+    {
+        DurableTaskResponseKind.CompletedSuccessfully => DurableTaskStatus.CompletedSuccessfully,
+        DurableTaskResponseKind.Subscribed => DurableTaskStatus.Pending,
+        DurableTaskResponseKind.Pending => DurableTaskStatus.Pending,
+        DurableTaskResponseKind.Failed when Exception is OperationCanceledException => DurableTaskStatus.Canceled,
+        DurableTaskResponseKind.Failed => DurableTaskStatus.Failed,
+        _ => throw new NotSupportedException($"Unknown response kind '{ResponseKind}'."),
+    };
 
     /// <summary>
     /// Gets the result value.
@@ -547,7 +573,7 @@ public sealed class SuccessDurableTaskResponse : DurableTaskResponse
     /// <inheritdoc/>
     public override Exception? Exception => null;
 
-    public override DurableTaskResponseStatus Status => DurableTaskResponseStatus.Success;
+    public override DurableTaskResponseKind ResponseKind => DurableTaskResponseKind.CompletedSuccessfully;
 
     /// <inheritdoc/>
     public override T GetResult<T>() => default!;
@@ -581,7 +607,7 @@ public sealed class ExceptionDurableTaskResponse : DurableTaskResponse
     public override Exception Exception { get; }
 
     /// <inheritdoc/>
-    public override DurableTaskResponseStatus Status => DurableTaskResponseStatus.Error;
+    public override DurableTaskResponseKind ResponseKind => DurableTaskResponseKind.Failed;
 
     /// <inheritdoc/>
     public override T GetResult<T>()
@@ -606,7 +632,7 @@ public sealed class DurableTaskResponse<TResult>(TResult result) : DurableTaskRe
 
     public override object? Result => result;
 
-    public override DurableTaskResponseStatus Status => DurableTaskResponseStatus.Success;
+    public override DurableTaskResponseKind ResponseKind => DurableTaskResponseKind.CompletedSuccessfully;
 
     public override Type ResultType => typeof(TResult);
 
@@ -638,7 +664,7 @@ public sealed class PendingDurableTaskResponse : DurableTaskResponse
     public override Exception? Exception => null;
 
     /// <inheritdoc/>
-    public override DurableTaskResponseStatus Status => DurableTaskResponseStatus.Pending;
+    public override DurableTaskResponseKind ResponseKind => DurableTaskResponseKind.Pending;
 
     /// <inheritdoc/>
     public override T GetResult<T>() => default!;
@@ -664,7 +690,7 @@ public sealed class SubscribedDurableTaskResponse : DurableTaskResponse
     public override Exception? Exception => null;
 
     /// <inheritdoc/>
-    public override DurableTaskResponseStatus Status => DurableTaskResponseStatus.Subscribed;
+    public override DurableTaskResponseKind ResponseKind => DurableTaskResponseKind.Subscribed;
 
     /// <inheritdoc/>
     public override T GetResult<T>() => default!;

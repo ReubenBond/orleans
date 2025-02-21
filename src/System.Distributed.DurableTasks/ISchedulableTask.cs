@@ -10,7 +10,26 @@ public interface ISchedulableTask
     /// </summary>
     /// <param name="taskId">The task identifier.</param>
     /// <returns>A context representing the scheduled task.</returns>
-    ValueTask<DurableTaskContext> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default);
+    ValueTask<IScheduledTaskHandle> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default);
 }
 
+public interface IScheduledTaskHandle
+{
+    /// <summary>
+    /// Waits until the task has completed, returning the response.
+    /// </summary>
+    /// <returns>The task result.</returns>
+    ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Polls the task to determine whether it has completed, returning the result if it has completed, or a non-final result (<see cref="DurableTaskResponse.IsCompleted"/> returns <see langword="false"/>) if it has not.
+    /// </summary>
+    /// <returns>The current task result.</returns>
+    ValueTask<DurableTaskResponse> PollAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Cancels a task.
+    /// </summary>
+    /// <returns>A task which completes when cancellation has been acknowledged.</returns>
+    ValueTask CancelAsync(CancellationToken cancellationToken);
+}
