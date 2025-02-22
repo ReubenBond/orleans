@@ -335,17 +335,16 @@ internal sealed class DurableTaskGrainRuntime(
                     _ = Task.Run(async () =>
                     {
                         var handle = (durableTask as ISchedulableTask)?.GetHandle(taskId);
+                        var pollingOptions = new PollingOptions { PollTimeout = TimeSpan.FromSeconds(10) };
                         while (true)
                         {
-                            // TODO: make this configurable, possibly centralize polling, add a way to break out.
-                            await Task.Delay(1_000);
                             try
                             {
                                 DurableTaskResponse response;
                                 if (handle is not null)
                                 {
                                     // Poll the task, which is cheaper than sending the initial request again.
-                                    response = await handle.PollAsync(cancellationToken);
+                                    response = await handle.PollAsync(pollingOptions, cancellationToken);
                                 }
                                 else
                                 {
@@ -647,12 +646,12 @@ internal sealed class DurableTaskGrainRuntime(
             return DurableTaskResponse.FromException(new KeyNotFoundException($"A task with the identifier '{taskId}' was not found."));
         }
 
-        if (options.MaxPollingWait > TimeSpan.Zero)
+        if (options.PollTimeout > TimeSpan.Zero)
         {
             // Wait for the task to complete for up to the specified time.
             var task = DurableTaskRuntimeHelper.GetCompletionTask(executionContext);
             await ((Task)task)
-                .WaitAsync(options.MaxPollingWait)
+                .WaitAsync(options.PollTimeout)
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
             if (task.IsCompletedSuccessfully)
             {
@@ -785,10 +784,10 @@ internal sealed class DurableTaskGrainRuntime(
             return runtime.SignalCancellationAsync(TaskId, cancellationToken);
         }
 
-        public ValueTask<DurableTaskResponse> PollAsync(CancellationToken cancellationToken)
+        public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
         {
-            var options = new SubscribeOrPollOptions { MaxPollingWait = TimeSpan.FromSeconds(5) };
-            return runtime.SubscribeOrPollAsync(TaskId, options);
+            var pollOptions = new SubscribeOrPollOptions { PollTimeout = options.PollTimeout };
+            return runtime.SubscribeOrPollAsync(TaskId, pollOptions);
         }
 
         public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)

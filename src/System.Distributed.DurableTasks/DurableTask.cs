@@ -168,14 +168,14 @@ public struct ConfiguredDurableTask(DurableTask task, TaskId taskId)
     }
 
     // Polls a task, returning the status of the task.
-    public readonly async ValueTask<DurableTaskStatus> PollAsync(CancellationToken cancellationToken)
+    public readonly async ValueTask<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken)
     {
         if (Task is not ISchedulableTask schedulableTask)
         {
             throw GetNonSchedulableTaskException();
         }
 
-        var response = await schedulableTask.GetHandle(Id).PollAsync(cancellationToken);
+        var response = await schedulableTask.GetHandle(Id).PollAsync(pollingOptions, cancellationToken);
         return response.Status;
     }
 
@@ -226,14 +226,14 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task, TaskId t
     }
 
     // Polls a task, returning the status of the task.
-    public readonly async ValueTask<DurableTaskStatus> PollAsync(CancellationToken cancellationToken)
+    public readonly async ValueTask<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken)
     {
         if (Task is not ISchedulableTask schedulableTask)
         {
             throw ConfiguredDurableTask.GetNonSchedulableTaskException();
         }
 
-        var response = await schedulableTask.GetHandle(Id).PollAsync(cancellationToken);
+        var response = await schedulableTask.GetHandle(Id).PollAsync(pollingOptions, cancellationToken);
         return response.Status;
     }
 

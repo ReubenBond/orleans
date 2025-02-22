@@ -359,7 +359,7 @@ internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskReques
         await grain.CancelAsync(TaskId).AsTask().WaitAsync(cancellationToken);
     }
 
-    public async ValueTask<DurableTaskResponse> PollAsync(CancellationToken cancellationToken)
+    public async ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
     {
         if (LastResponse is { IsCompleted: true } response)
         {
@@ -367,8 +367,8 @@ internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskReques
         }
 
         // TODO: Add resilience via Polly
-        var options = new SubscribeOrPollOptions { MaxPollingWait = TimeSpan.FromSeconds(5) };
-        return LastResponse = await grain.SubscribeOrPollAsync(TaskId, options).AsTask().WaitAsync(cancellationToken);
+        var pollOptions = new SubscribeOrPollOptions { PollTimeout = options.PollTimeout };
+        return LastResponse = await grain.SubscribeOrPollAsync(TaskId, pollOptions).AsTask().WaitAsync(cancellationToken);
     }
 
     public async ValueTask<DurableTaskResponse> ScheduleAsync(CancellationToken cancellationToken)
@@ -388,7 +388,7 @@ internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskReques
             cancellationToken.ThrowIfCancellationRequested();
             // TODO: Add resilience via Polly
 
-            var options = new SubscribeOrPollOptions { MaxPollingWait = TimeSpan.FromSeconds(5) };
+            var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
             response = LastResponse = await grain.SubscribeOrPollAsync(TaskId, options).AsTask().WaitAsync(cancellationToken);
             if (response.IsCompleted)
             {

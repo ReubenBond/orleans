@@ -24,7 +24,8 @@ public abstract class ScheduledTask
     /// <returns>The task status.</returns>
     public virtual async Task<bool> IsCompletedAsync(CancellationToken cancellationToken = default)
     {
-        var result = await PollAsyncCore(cancellationToken);
+        var options = new PollingOptions { PollTimeout = TimeSpan.Zero };
+        var result = await PollAsyncCore(options, cancellationToken);
         return result.Status.IsCompleted();
     }
 
@@ -34,7 +35,8 @@ public abstract class ScheduledTask
     /// <returns>The task status.</returns>
     public virtual async Task<DurableTaskStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
-        var result = await PollAsyncCore(cancellationToken);
+        var options = new PollingOptions { PollTimeout = TimeSpan.Zero };
+        var result = await PollAsyncCore(options, cancellationToken);
         return result.Status;
     }
 
@@ -70,7 +72,7 @@ public abstract class ScheduledTask
     /// Gets the current status of the task without waiting for the task to complete.
     /// </summary>
     /// <returns>A task representing the completion of the operation.</returns>
-    protected abstract ValueTask<DurableTaskResponse> PollAsyncCore(CancellationToken cancellationToken);
+    protected abstract ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions pollingOptions, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -105,9 +107,9 @@ internal sealed class ScheduledDurableTask<TResult> : ScheduledTask<TResult>
         await _handle.CancelAsync(cancellationToken);
     }
 
-    protected override async ValueTask<DurableTaskResponse> PollAsyncCore(CancellationToken cancellationToken)
+    protected override async ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions pollingOptions, CancellationToken cancellationToken)
     {
-        return await _handle.PollAsync(cancellationToken);
+        return await _handle.PollAsync(pollingOptions, cancellationToken);
     }
 
     protected internal override async ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken)
@@ -130,7 +132,7 @@ internal sealed class CompletedScheduledDurableTask<TResult> : ScheduledTask<TRe
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
-    protected override ValueTask<DurableTaskResponse> PollAsyncCore(CancellationToken cancellationToken) => new(_response);
+    protected override ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions pollingOptions, CancellationToken cancellationToken) => new(_response);
 
     protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => new(_response);
 }
@@ -149,7 +151,7 @@ internal sealed class CompletedScheduledDurableTask : ScheduledTask
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
-    protected override ValueTask<DurableTaskResponse> PollAsyncCore(CancellationToken cancellationToken) => new(_response);
+    protected override ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions pollingOptions, CancellationToken cancellationToken) => new(_response);
 
     protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => new(_response);
 }
@@ -170,9 +172,9 @@ internal sealed class ScheduledDurableTask : ScheduledTask
         await _handle.CancelAsync(cancellationToken);
     }
 
-    protected override async ValueTask<DurableTaskResponse> PollAsyncCore(CancellationToken cancellationToken)
+    protected override async ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions pollingOptions, CancellationToken cancellationToken)
     {
-        return await _handle.PollAsync(cancellationToken);
+        return await _handle.PollAsync(pollingOptions, cancellationToken);
     }
 
     protected internal override async ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken)

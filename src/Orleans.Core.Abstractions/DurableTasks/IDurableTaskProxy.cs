@@ -77,7 +77,7 @@ public interface IDurableTaskServer : IGrainExtension
 public readonly struct SubscribeOrPollOptions
 {
     [Id(0)]
-    public TimeSpan MaxPollingWait { get; init; }
+    public TimeSpan PollTimeout { get; init; }
 
     [Id(1)]
     public IDurableTaskObserver? Observer { get; init; }

@@ -36,11 +36,16 @@ public interface IScheduledTaskHandle
     /// Polls the task to determine whether it has completed, returning the result if it has completed, or a non-final result (<see cref="DurableTaskResponse.IsCompleted"/> returns <see langword="false"/>) if it has not.
     /// </summary>
     /// <returns>The current task result.</returns>
-    ValueTask<DurableTaskResponse> PollAsync(CancellationToken cancellationToken);
+    ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken);
 
     /// <summary>
     /// Cancels a task.
     /// </summary>
     /// <returns>A task which completes when cancellation has been acknowledged.</returns>
     ValueTask CancelAsync(CancellationToken cancellationToken);
+}
+
+public readonly struct PollingOptions()
+{
+    public TimeSpan PollTimeout { get; init; } = TimeSpan.FromSeconds(5);
 }
