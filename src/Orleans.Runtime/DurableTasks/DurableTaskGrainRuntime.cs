@@ -635,7 +635,7 @@ internal sealed class DurableTaskGrainRuntime(
     }
 
     /// <inheritdoc/>
-    public ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver? client)
+    public async ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, SubscribeOrPollOptions options)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
@@ -644,34 +644,36 @@ internal sealed class DurableTaskGrainRuntime(
 
         if (!TryGetExecutionContext(taskId, out var executionContext))
         {
-            return new(DurableTaskResponse.FromException(new KeyNotFoundException($"A task with the identifier '{taskId}' was not found.")));
+            return DurableTaskResponse.FromException(new KeyNotFoundException($"A task with the identifier '{taskId}' was not found."));
+        }
+
+        if (options.MaxPollingWait > TimeSpan.Zero)
+        {
+            // Wait for the task to complete for up to the specified time.
+            var task = DurableTaskRuntimeHelper.GetCompletionTask(executionContext);
+            await ((Task)task)
+                .WaitAsync(options.MaxPollingWait)
+                .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+            if (task.IsCompletedSuccessfully)
+            {
+                return await task;
+            }
         }
 
         var response = executionContext.State.Result;
         if (response is not null)
         {
-            return new(response);
+            return response;
         }
 
+        var client = options.Observer;
         if (client is null)
         {
-            return new(PendingDurableTaskResponse.Instance);
+            return DurableTaskResponse.Pending;
         }
 
-        var subscribeTask = SubscribeClientAsync(taskId, executionContext, client, _deactivationCts.Token);
-        if (!subscribeTask.IsCompleted)
-        {
-            // Subscribe the client and return
-            return AwaitSubscribeClientAsync(subscribeTask);
-        }
-
-        return new(PendingDurableTaskResponse.Instance);
-
-        static async ValueTask<DurableTaskResponse> AwaitSubscribeClientAsync(ValueTask subscribeTask)
-        {
-            await subscribeTask;
-            return SubscribedDurableTaskResponse.Instance;
-        }
+        await SubscribeClientAsync(taskId, executionContext, client, _deactivationCts.Token);
+        return DurableTaskResponse.Subscribed;
     }
 
     async IAsyncEnumerable<(TaskId TaskId, DurableTaskDiagnosticState State)> IDurableTaskGrainExtension.GetTasksAsync()
@@ -692,7 +694,7 @@ internal sealed class DurableTaskGrainRuntime(
                 CompletedAt = taskState.CompletedAt,
                 CreatedAt = taskState.CreatedAt,
                 Response = taskState.Result?.ToString(),
-                Request = taskState.Request?.ToMethodCallString(),
+                Request = taskState.Request?.ToString(),
                 Status = taskState.Result switch
                 {
                     { } response when response.Exception is null => "Completed",
@@ -785,7 +787,8 @@ internal sealed class DurableTaskGrainRuntime(
 
         public ValueTask<DurableTaskResponse> PollAsync(CancellationToken cancellationToken)
         {
-            return runtime.SubscribeOrPollAsync(TaskId, runtime);
+            var options = new SubscribeOrPollOptions { MaxPollingWait = TimeSpan.FromSeconds(5) };
+            return runtime.SubscribeOrPollAsync(TaskId, options);
         }
 
         public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)

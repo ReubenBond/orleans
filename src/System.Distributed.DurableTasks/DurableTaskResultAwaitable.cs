@@ -6,7 +6,7 @@ public readonly struct DurableTaskResultAwaitable<TResult>(DurableTaskContext ex
 {
     private readonly DurableTaskContext _executionContext = executionContext;
 
-    public DurableTaskResultAwaiter<TResult> GetAwaiter() => new(_executionContext.GetResponseAsync());
+    public DurableTaskResultAwaiter<TResult> GetAwaiter() => new(_executionContext.ResponseTask);
 }
 
 public readonly struct DurableTaskResultAwaiter<TResult> : INotifyCompletion, ICriticalNotifyCompletion

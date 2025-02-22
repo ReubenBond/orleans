@@ -61,15 +61,26 @@ public interface IDurableTaskObserver : IGrainExtension
 public interface IDurableTaskServer : IGrainExtension
 {
     // Called by DurableTaskRequest.Invoke to ensure that a task is scheduled
-    [Alias("ScheduleAsync")]
+    [Alias("ScheduleAsync"), AlwaysInterleave]
     ValueTask<DurableTaskResponse> ScheduleAsync(IDurableTaskRequest request);
 
     // API used by ScheduledTask/<T> to check for a result for a task.
     // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
-    [Alias("SubscribeOrPollAsync")]
-    ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, IDurableTaskObserver? client);
+    [Alias("SubscribeOrPollAsync"), AlwaysInterleave]
+    ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, SubscribeOrPollOptions options);
 
+    [AlwaysInterleave]
     ValueTask CancelAsync(TaskId taskId);
+}
+
+[GenerateSerializer, Immutable, Alias(nameof(SubscribeOrPollOptions))]
+public readonly struct SubscribeOrPollOptions
+{
+    [Id(0)]
+    public TimeSpan MaxPollingWait { get; init; }
+
+    [Id(1)]
+    public IDurableTaskObserver? Observer { get; init; }
 }
 
 [Alias("IDurableTaskGrainExtension")]

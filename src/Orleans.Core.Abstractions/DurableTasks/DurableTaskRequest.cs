@@ -13,23 +13,6 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.DurableTasks;
 
-// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
-// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
-// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
-// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
-// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
-// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
-// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
-// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
-// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
-// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
-// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
-// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
-// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
-// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
-// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
-// TODO: Remove IRequest base from DurableTaskRequest??? Is it necessary? InvokeAsync is never called.
-
 /// <summary>
 /// Represents a durable task request.
 /// </summary>
@@ -149,7 +132,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         Debug.Assert(Context is not null);
         Context.TaskId = taskId;
 
-        if (TryGetProxy(_shared.GrainContextAccessor.GrainContext, out var proxy))
+        if (TryGetProxy(out var proxy))
         {
             return await proxy.ScheduleAsync(taskId, this, cancellationToken);
         }
@@ -171,7 +154,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
         Debug.Assert(Context is not null);
         Context.TaskId = executionContext.Id;
-        var currentContext = _shared.GrainContextAccessor.GrainContext;
+        var currentContext = RuntimeContext.Current;
         if (currentContext is not null)
         {
             Context.CallerId = currentContext.GrainId;
@@ -192,9 +175,9 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     // Generated
     protected abstract DurableTask InvokeInner();
 
-    internal static bool TryGetProxy(IGrainContext? callerContext, [NotNullWhen(true)] out IDurableTaskProxy? proxy)
+    internal static bool TryGetProxy([NotNullWhen(true)] out IDurableTaskProxy? proxy)
     {
-        if (callerContext?.GetComponent<IDurableTaskProxy>() is not { } localProxy)
+        if (RuntimeContext.Current?.GetComponent<IDurableTaskProxy>() is not { } localProxy)
         {
             proxy = null;
             return false;
@@ -211,7 +194,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     {
         Debug.Assert(Context is not null);
         Context.TaskId = taskId;
-        if (TryGetProxy(_shared.GrainContextAccessor.GrainContext, out var proxy))
+        if (TryGetProxy(out var proxy))
         {
             return proxy.GetScheduledTaskHandle(taskId);
         }
@@ -307,7 +290,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         Debug.Assert(Context is not null);
         Context.TaskId = taskId;
 
-        if (DurableTaskRequest.TryGetProxy(_shared.GrainContextAccessor.GrainContext, out var proxy))
+        if (DurableTaskRequest.TryGetProxy(out var proxy))
         {
             return await proxy.ScheduleAsync(taskId, this, cancellationToken);
         }
@@ -330,7 +313,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
         Debug.Assert(Context is not null);
         Context.TaskId = executionContext.Id;
-        var callerContext = _shared.GrainContextAccessor.GrainContext;
+        var callerContext = RuntimeContext.Current;
         if (callerContext is not null)
         {
             Context.CallerId = callerContext.GrainId;
@@ -356,7 +339,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     {
         Debug.Assert(Context is not null);
         Context.TaskId = taskId;
-        if (DurableTaskRequest.TryGetProxy(_shared.GrainContextAccessor.GrainContext, out var proxy))
+        if (DurableTaskRequest.TryGetProxy(out var proxy))
         {
             return proxy.GetScheduledTaskHandle(taskId);
         }
@@ -384,7 +367,8 @@ internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskReques
         }
 
         // TODO: Add resilience via Polly
-        return LastResponse = await grain.SubscribeOrPollAsync(TaskId, client: null).AsTask().WaitAsync(cancellationToken);
+        var options = new SubscribeOrPollOptions { MaxPollingWait = TimeSpan.FromSeconds(5) };
+        return LastResponse = await grain.SubscribeOrPollAsync(TaskId, options).AsTask().WaitAsync(cancellationToken);
     }
 
     public async ValueTask<DurableTaskResponse> ScheduleAsync(CancellationToken cancellationToken)
@@ -404,14 +388,14 @@ internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskReques
             cancellationToken.ThrowIfCancellationRequested();
             // TODO: Add resilience via Polly
 
-            response = LastResponse = await grain.SubscribeOrPollAsync(TaskId, client: null).AsTask().WaitAsync(cancellationToken);
+            var options = new SubscribeOrPollOptions { MaxPollingWait = TimeSpan.FromSeconds(5) };
+            response = LastResponse = await grain.SubscribeOrPollAsync(TaskId, options).AsTask().WaitAsync(cancellationToken);
             if (response.IsCompleted)
             {
                 return response;
             }
 
-            // TODO: Add exponential backoff via Polly/etc
-            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+            // TODO: Add exponential backoff via Polly/etc?
         }
     }
 }

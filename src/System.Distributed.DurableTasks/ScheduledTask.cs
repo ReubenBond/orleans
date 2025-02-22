@@ -16,13 +16,13 @@ public abstract class ScheduledTask
 
     /// <summary>Gets an awaiter used to await this <see cref="ScheduledTask"/>.</summary>
     /// <returns>An awaiter instance.</returns>
-    public ScheduledTaskAwaiter GetAwaiter() => new(this);
+    public ScheduledTaskAwaiter GetAwaiter() => new(this, cancellationToken: default);
 
     /// <summary>
     /// Gets the status of the task.
     /// </summary>
     /// <returns>The task status.</returns>
-    public virtual async Task<bool> IsCompletedAsync(CancellationToken cancellationToken)
+    public virtual async Task<bool> IsCompletedAsync(CancellationToken cancellationToken = default)
     {
         var result = await PollAsyncCore(cancellationToken);
         return result.Status.IsCompleted();
@@ -32,24 +32,33 @@ public abstract class ScheduledTask
     /// Gets the status of the task.
     /// </summary>
     /// <returns>The task status.</returns>
-    public virtual async Task<DurableTaskStatus> GetStatusAsync(CancellationToken cancellationToken)
+    public virtual async Task<DurableTaskStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
         var result = await PollAsyncCore(cancellationToken);
         return result.Status;
     }
 
     /// <summary>
-    /// Gets a task representing the completion of the operation.
+    /// Waits for completion of this task and returns an object representing the result.
+    /// </summary>
+    /// <returns>The task status.</returns>
+    public virtual async Task<DurableTaskResponse> GetResponseAsync(CancellationToken cancellationToken = default)
+    {
+        return await WaitAsyncCore(cancellationToken);
+    }
+
+    /// <summary>
+    /// Waits for the completion of this task.
     /// </summary>
     /// <returns>A task representing the completion of the operation.</returns>
-    public virtual async ValueTask WaitAsync(CancellationToken cancellationToken) => await WaitAsyncCore(cancellationToken);
+    public virtual async ValueTask WaitAsync(CancellationToken cancellationToken = default) => await WaitAsyncCore(cancellationToken);
 
     /// <summary>
     /// Attempts to cancel the operation.
     /// </summary>
     /// <param name="cancellationToken">A cancellation token used to signal when the attempt to request cancellation should be abandoned.</param>
     /// <returns>A task representing the completion of the operation.</returns>
-    public abstract ValueTask CancelAsync(CancellationToken cancellationToken);
+    public abstract ValueTask CancelAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets a task representing the completion of the operation.
@@ -71,7 +80,13 @@ public abstract class ScheduledTask<TResult> : ScheduledTask
 {
     /// <summary>Gets an awaiter used to await this <see cref="ScheduledTask{TResult}"/>.</summary>
     /// <returns>An awaiter instance.</returns>
-    public new ScheduledTaskAwaiter<TResult> GetAwaiter() => new(this);
+    public new ScheduledTaskAwaiter<TResult> GetAwaiter() => new(this, cancellationToken: default);
+
+    /// <summary>
+    /// Waits for the completion of this task.
+    /// </summary>
+    /// <returns>A task representing the completion of the operation.</returns>
+    public new virtual ConfiguredScheduledTaskAwaitable<TResult> WaitAsync(CancellationToken cancellationToken = default) => new(this, cancellationToken);
 }
 
 internal sealed class ScheduledDurableTask<TResult> : ScheduledTask<TResult>
@@ -173,8 +188,8 @@ public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 {
     private readonly ValueTaskAwaiter _awaiter;
 
-    internal ScheduledTaskAwaiter(ScheduledTask durableTaskInvocation) =>
-        _awaiter = durableTaskInvocation.WaitAsync(CancellationToken.None).GetAwaiter();
+    internal ScheduledTaskAwaiter(ScheduledTask durableTaskInvocation, CancellationToken cancellationToken) =>
+        _awaiter = durableTaskInvocation.WaitAsync(cancellationToken).GetAwaiter();
 
     /// <summary>
     /// Gets the result of the task.
@@ -201,8 +216,8 @@ public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
 {
     private readonly ValueTaskAwaiter<DurableTaskResponse> _awaiter;
 
-    internal ScheduledTaskAwaiter(ScheduledTask<TResult> durableTaskInvocation) =>
-        _awaiter = durableTaskInvocation.WaitAsyncCore(CancellationToken.None).GetAwaiter();
+    internal ScheduledTaskAwaiter(ScheduledTask<TResult> durableTaskInvocation, CancellationToken cancellationToken) =>
+        _awaiter = durableTaskInvocation.WaitAsyncCore(cancellationToken).GetAwaiter();
 
     /// <summary>
     /// Gets the result of the task.
@@ -219,4 +234,25 @@ public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
 
     /// <inheritdoc />
     public void UnsafeOnCompleted(Action continuation) => _awaiter.UnsafeOnCompleted(continuation);
+}
+
+/// <summary>
+/// An awaitable for <see cref="ScheduledTask{TResult}"/> which carries additional properties.
+/// </summary>
+/// <typeparam name="TResult">The underlying result type.</typeparam>
+public readonly struct ConfiguredScheduledTaskAwaitable<TResult>
+{
+    private readonly ScheduledTask<TResult> scheduledTask;
+    private readonly CancellationToken cancellationToken;
+
+    internal ConfiguredScheduledTaskAwaitable(ScheduledTask<TResult> scheduledTask, CancellationToken cancellationToken)
+    {
+        this.scheduledTask = scheduledTask;
+        this.cancellationToken = cancellationToken;
+    }
+
+    /// <summary>Gets an awaiter used to await this <see cref="ScheduledTask{TResult}"/>.</summary>
+    /// <returns>An awaiter instance.</returns>
+    public new ScheduledTaskAwaiter<TResult> GetAwaiter() => new(scheduledTask, cancellationToken: default);
+
 }

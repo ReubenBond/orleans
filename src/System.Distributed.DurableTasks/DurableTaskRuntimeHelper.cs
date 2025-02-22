@@ -22,7 +22,7 @@ public static class DurableTaskRuntimeHelper
 
     public static DurableTaskResponse Poll(DurableTaskContext context)
     {
-        var task = context.GetResponseAsync();
+        var task = context.ResponseTask;
         return task.Status switch
         {
             TaskStatus.RanToCompletion => task.Result,
@@ -32,6 +32,8 @@ public static class DurableTaskRuntimeHelper
 
     public static async ValueTask<DurableTaskResponse> WaitAsync(DurableTaskContext context, CancellationToken cancellationToken)
     {
-        return await context.GetResponseAsync().WaitAsync(cancellationToken);
+        return await context.ResponseTask.WaitAsync(cancellationToken);
     }
+
+    public static Task<DurableTaskResponse> GetCompletionTask(DurableTaskContext context) => context.ResponseTask;
 }

@@ -12,6 +12,7 @@ using Newtonsoft.Json;
 using System.Distributed.DurableTasks;
 using Orleans.DurableTasks;
 using Orleans.Runtime.DurableTasks;
+using WorkflowsApp.Service.Samples.HelloWorld;
 
 namespace WorkflowsApp.Service;
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
@@ -200,6 +201,8 @@ public class Program
         hostBuilder.Logging.SetMinimumLevel(LogLevel.Warning);
         using var host = hostBuilder.Build();
         await host.StartAsync();
+
+        await HelloWorld.RunAsync(host.Services);
 
         var client = host.Services.GetRequiredService<IClusterClient>();
 
