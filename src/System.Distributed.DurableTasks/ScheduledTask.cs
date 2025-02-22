@@ -22,9 +22,8 @@ public abstract class ScheduledTask
     /// Gets the status of the task.
     /// </summary>
     /// <returns>The task status.</returns>
-    public virtual async Task<bool> IsCompletedAsync(CancellationToken cancellationToken = default)
+    public virtual async Task<bool> IsCompletedAsync(PollingOptions options, CancellationToken cancellationToken = default)
     {
-        var options = new PollingOptions { PollTimeout = TimeSpan.Zero };
         var result = await PollAsyncCore(options, cancellationToken);
         return result.Status.IsCompleted();
     }
@@ -33,12 +32,23 @@ public abstract class ScheduledTask
     /// Gets the status of the task.
     /// </summary>
     /// <returns>The task status.</returns>
-    public virtual async Task<DurableTaskStatus> GetStatusAsync(CancellationToken cancellationToken = default)
+    public virtual async Task<DurableTaskStatus> GetStatusAsync(PollingOptions options, CancellationToken cancellationToken = default)
     {
-        var options = new PollingOptions { PollTimeout = TimeSpan.Zero };
         var result = await PollAsyncCore(options, cancellationToken);
         return result.Status;
     }
+
+    /// <summary>
+    /// Gets the status of the task.
+    /// </summary>
+    /// <returns>The task status.</returns>
+    public Task<bool> IsCompletedAsync(CancellationToken cancellationToken = default) => IsCompletedAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, cancellationToken);
+
+    /// <summary>
+    /// Gets the status of the task.
+    /// </summary>
+    /// <returns>The task status.</returns>
+    public Task<DurableTaskStatus> GetStatusAsync(CancellationToken cancellationToken = default) => GetStatusAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, cancellationToken);
 
     /// <summary>
     /// Waits for completion of this task and returns an object representing the result.
