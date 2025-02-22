@@ -27,11 +27,11 @@ public abstract partial class DurableTaskContext(TaskId id)
 
     // Note that blocking on cancellation of a task from within that task would result in a deadlock
     // Cancels the task if it is scheduled or running. If the task is not scheduled or running, this method does nothing.
-    protected internal async ValueTask SignalCancellationAsync(CancellationToken cancellationToken)
+    internal async Task CancelAsync()
     {
-        await SignalCancellationAsyncCore(cancellationToken);
+        //await SignalCancellationAsyncCore(cancellationToken);
         await _cancellationTokenSource.CancelAsync();
     }
 
-    protected abstract ValueTask SignalCancellationAsyncCore(CancellationToken cancellationToken);
+    //protected abstract ValueTask SignalCancellationAsyncCore(CancellationToken cancellationToken);
 }

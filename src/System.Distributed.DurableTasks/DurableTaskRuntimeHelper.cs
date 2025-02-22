@@ -1,4 +1,5 @@
-﻿namespace System.Distributed.DurableTasks;
+﻿
+namespace System.Distributed.DurableTasks;
 
 public static class DurableTaskRuntimeHelper
 {
@@ -36,4 +37,9 @@ public static class DurableTaskRuntimeHelper
     }
 
     public static Task<DurableTaskResponse> GetCompletionTask(DurableTaskContext context) => context.ResponseTask;
+
+    public static Task CancelAsync(DurableTaskContext context)
+    {
+        return context.CancelAsync();
+    }
 }

@@ -36,8 +36,10 @@ internal sealed class JobDurableTaskExecutionContext(TaskId taskId, JobScheduler
         }
     }
 
+    /*
     protected override async ValueTask SignalCancellationAsyncCore(CancellationToken cancellationToken)
     {
         await jobScheduler.SignalCancellationAsync(Id, State);
     }
+    */
 }

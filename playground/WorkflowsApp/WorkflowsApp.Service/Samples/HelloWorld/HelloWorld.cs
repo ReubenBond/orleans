@@ -11,11 +11,11 @@ internal static class HelloWorld
         var orchestrationGrain = grainFactory.GetGrain<IHelloWorkflowGrain>("default");
 
         var instance = await orchestrationGrain.RunSample().ScheduleAsync();
-        Console.WriteLine($"Started orchestration with ID = '{instance.Id}' successfully!");
+        Console.WriteLine($"Started workflow '{instance.Id}'.");
 
         // Block until the orchestration completes
         var result = await instance.WaitAsync();
-        Console.WriteLine($"Orchestration completed with status: {await instance.GetStatusAsync()} and output:\n\t{string.Join("\n\t", result)}");
+        Console.WriteLine($"Workflow completed:\n\t{string.Join("\n\t", result)}");
     }
 
     public interface IHelloGrain : IGrainWithStringKey

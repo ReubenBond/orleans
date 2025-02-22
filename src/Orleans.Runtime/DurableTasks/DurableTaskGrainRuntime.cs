@@ -727,7 +727,8 @@ internal sealed class DurableTaskGrainRuntime(
             return;
         }
 
-        if (!RequestCancellationCore(taskId, taskState))
+        List<GrainDurableTaskContext> canceledContexts = [];
+        if (!RequestCancellationCore(taskId, taskState, canceledContexts))
         {
             // No need to write state.
             return;
@@ -737,8 +738,15 @@ internal sealed class DurableTaskGrainRuntime(
         await _storage.WriteAsync(cancellationToken);
 
         // If any task is waiting on this, notify them now.
+        var tasks = new List<Task>(canceledContexts.Count);
+        foreach (var context in canceledContexts)
+        {
+            tasks.Add(DurableTaskRuntimeHelper.CancelAsync(context));
+        }
 
-        bool RequestCancellationCore(TaskId taskId, IDurableTaskState taskState)
+        await Task.WhenAll(tasks);
+
+        bool RequestCancellationCore(TaskId taskId, IDurableTaskState taskState, List<GrainDurableTaskContext> canceledContexts)
         {
             if (taskState.CompletedAt.HasValue)
             {
@@ -757,10 +765,15 @@ internal sealed class DurableTaskGrainRuntime(
             foreach (var (childTaskId, childTaskState) in _storage.GetChildren(taskId))
             {
                 Debug.Assert(taskId.IsParentOf(childTaskId));
-                _ = RequestCancellationCore(childTaskId, childTaskState);
+                _ = RequestCancellationCore(childTaskId, childTaskState, canceledContexts);
             }
 
             _storage.RequestCancellation(taskId, taskState);
+            if (TryGetExecutionContext(taskId, out var context))
+            {
+                canceledContexts.Add(context);
+            }
+
             return true;
         }
     }

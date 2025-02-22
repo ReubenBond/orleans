@@ -13,6 +13,7 @@ using System.Distributed.DurableTasks;
 using Orleans.DurableTasks;
 using Orleans.Runtime.DurableTasks;
 using WorkflowsApp.Service.Samples.HelloWorld;
+using WorkflowsApp.Service.Samples.CancelWorld;
 
 namespace WorkflowsApp.Service;
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
@@ -203,10 +204,14 @@ public class Program
         await host.StartAsync();
 
         await HelloWorld.RunAsync(host.Services);
-
-        var client = host.Services.GetRequiredService<IClusterClient>();
+        //await CancelWorld.RunAsync(host.Services);
 
         /*
+        var client = host.Services.GetRequiredService<IClusterClient>();
+
+        var dict = client.GetGrain<IDictionaryGrain<string, int>>("foo");
+
+        await dict.TryAddAsync("one", 1);
         var dict = client.GetGrain<IDictionaryGrain<string, int>>("foo");
 
         await dict.TryAddAsync("one", 1);
@@ -246,13 +251,12 @@ public class Program
         Console.WriteLine("Business balance: " + await business.GetBalance());
         */
 
+        var client = host.Services.GetRequiredService<IClusterClient>();
         var clientGrain = client.GetGrain<IClientGrain>("client");
-        Console.WriteLine("Now to do the same thing via a regular grain call");
         await clientGrain.Run();
-        /*
+
         Console.WriteLine("Now to do a similar thing via a grain workflow call");
         await await clientGrain.RunWorkflow().ScheduleAsync("my-client-wf");
-        */
 
         Console.WriteLine("Done!");
 

@@ -63,6 +63,7 @@ internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskProxy r
     //public bool TryGetTaskResponse(TaskId taskId, [NotNullWhen(true)] out DurableTaskResponse? response) => Runtime.GetResponseOrCreateChildTask(taskId, out response);
     //public void SetTaskResponse(TaskId taskId, DurableTaskResponse response) => Runtime.SetChildTaskResponse(taskId, response);
 
+    /*
     protected override ValueTask SignalCancellationAsyncCore(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -83,4 +84,5 @@ internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskProxy r
         // Return
         return default;
     }
+    */
 }

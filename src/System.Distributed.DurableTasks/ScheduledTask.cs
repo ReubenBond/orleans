@@ -54,6 +54,15 @@ public abstract class ScheduledTask
     /// Waits for completion of this task and returns an object representing the result.
     /// </summary>
     /// <returns>The task status.</returns>
+    public virtual async Task<DurableTaskResponse> GetResponseAsync(PollingOptions pollingOptions, CancellationToken cancellationToken = default)
+    {
+        return await PollAsyncCore(pollingOptions, cancellationToken);
+    }
+
+    /// <summary>
+    /// Waits for completion of this task and returns an object representing the result.
+    /// </summary>
+    /// <returns>The task status.</returns>
     public virtual async Task<DurableTaskResponse> GetResponseAsync(CancellationToken cancellationToken = default)
     {
         return await WaitAsyncCore(cancellationToken);

@@ -39,47 +39,40 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
 {
     internal readonly TDurableTask Task;
     internal readonly DurableTaskContext? ParentContext = DurableTaskContext.CurrentContext;
-    internal TaskId Id;
+    private TaskId _taskId;
 
-    public ConfiguredDurableTaskCore(TDurableTask task, TaskId taskId)
+    public ConfiguredDurableTaskCore(TDurableTask task)
     {
         ArgumentNullException.ThrowIfNull(task);
-        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         Task = task;
-        Id = taskId;
+    }
+
+    public readonly TaskId TaskId => _taskId;
+
+    public void SetTaskId(string? taskId)
+    {
+        if (!TrySetTaskId(taskId))
+        {
+            throw new InvalidOperationException($"This task's {nameof(DurableTasks.TaskId)} has already been specified.");
+        }
     }
 
     // TODO: move id logic to ctor or a Create method
     internal ValueTask<DurableTaskResponse> RunAsync(CancellationToken cancellationToken)
     {
+        // Ensure the task id is set.
+        _ = TrySetTaskId(null);
+
         if (ParentContext is { } parentContext)
         {
-            if (Id.IsDefault)
-            {
-                // Allocate a child identifier for the task.
-                Id = parentContext.CreateChildTaskId(null);
-            }
-            else if (!Id.IsChildOf(parentContext.Id))
-            {
-                // Make the id a child id, since it's running in the context of a parent task.
-                Id = parentContext.CreateChildTaskId(Id.ToString());
-            }
-
             // Evaluates the task: if it is a local method, it will be executed immediately.
             // This will return once the task has completed.
-            return parentContext.RunChildTaskAsync(Id, Task, cancellationToken);
+            return parentContext.RunChildTaskAsync(_taskId, Task, cancellationToken);
         }
         else if (Task is ISchedulableTask schedulableTask)
         {
-            if (Id.IsDefault)
-            {
-                // Select a random identifier for the task.
-                // The caller will need to query for the task to find its identifier.
-                Id = TaskId.CreateRandom();
-            }
-
             // Schedules the task and await completion.
-            return ScheduleAndWaitAsync(Id, schedulableTask, cancellationToken);
+            return ScheduleAndWaitAsync(_taskId, schedulableTask, cancellationToken);
 
             static async ValueTask<DurableTaskResponse> ScheduleAndWaitAsync(TaskId taskId, ISchedulableTask schedulableTask, CancellationToken cancellationToken)
             {
@@ -95,151 +88,156 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
         }
         else
         {
-            throw GetNonSchedulableTaskException();
+            throw ConfiguredDurableTask.GetNonSchedulableTaskException();
         }
     }
 
-    internal void SetTaskIdCore(string name)
+    internal bool TrySetTaskId(string? name)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        if (!Id.IsDefault)
+        if (!_taskId.IsDefault)
         {
-            throw new InvalidOperationException($"This task's {nameof(TaskId)} has already been specified.");
+            return false;
         }
 
         if (ParentContext is { } parentContext)
         {
             // Create an identifier relative to the parent context's identifier.
-            Id = parentContext.CreateChildTaskId(name);
+            _taskId = parentContext.CreateChildTaskId(name);
+        }
+        else if (string.IsNullOrWhiteSpace(name))
+        {
+            _taskId = TaskId.CreateRandom();
         }
         else
         {
-            Id = TaskId.Create(name);
+            _taskId = TaskId.Create(name);
         }
+
+        return true;
     }
-
-    private static InvalidOperationException GetNonSchedulableTaskException() => new(
-        $"The provided task does not support scheduling and was not executed in the context of an existing {nameof(DurableTask)}. This may be because it is a local method or another non-serializable task type.");
-}
-
-public struct ConfiguredDurableTask(DurableTask task, TaskId taskId)
-{
-    private ConfiguredDurableTaskCore<DurableTask> _core = new(task, taskId);
-
-    public DurableTaskAwaiter GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
-
-    internal readonly DurableTask Task => _core.Task;
-    internal TaskId Id { set => _core.Id = value; readonly get => _core.Id; }
-    internal ConfiguredDurableTask WithId(string id)
-    {
-        ArgumentNullException.ThrowIfNull(id);
-        _core.SetTaskIdCore(id);
-        return this;
-    }
-
+    
     // Schedules a durable task without waiting for the task to complete
-    public readonly async ValueTask<ScheduledTask> ScheduleAsync(CancellationToken cancellationToken = default)
+    public async ValueTask<ScheduledTask> ScheduleAsync(CancellationToken cancellationToken = default)
     {
+        // Ensure the task id is set.
+        _ = TrySetTaskId(null);
+
         if (Task is not ISchedulableTask schedulableTask)
         {
-            throw GetNonSchedulableTaskException();
+            throw ConfiguredDurableTask.GetNonSchedulableTaskException();
         }
 
-        var response = await schedulableTask.ScheduleAsync(Id, cancellationToken);
+        var response = await schedulableTask.ScheduleAsync(TaskId, cancellationToken);
         if (response.IsCompleted)
         {
-            return new CompletedScheduledDurableTask(Id, response);
+            return new CompletedScheduledDurableTask(TaskId, response);
         }
 
-        var handle = schedulableTask.GetHandle(Id);
+        var handle = schedulableTask.GetHandle(TaskId);
         return new ScheduledDurableTask(handle);
     }
 
     // Cancels a durable task without waiting for the task to complete
-    public readonly async ValueTask<bool> CancelAsync(CancellationToken cancellationToken)
+    public async ValueTask<bool> CancelAsync(CancellationToken cancellationToken)
     {
+        // Ensure the task id is set.
+        _ = TrySetTaskId(null);
+
         if (Task is not ISchedulableTask schedulableTask)
         {
-            throw GetNonSchedulableTaskException();
+            throw ConfiguredDurableTask.GetNonSchedulableTaskException();
         }
 
-        await schedulableTask.GetHandle(Id).CancelAsync(cancellationToken);
+        await schedulableTask.GetHandle(TaskId).CancelAsync(cancellationToken);
         return true;
     }
 
     // Polls a task, returning the status of the task.
-    public readonly async ValueTask<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken)
+    public async ValueTask<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken)
     {
+        // Ensure the task id is set.
+        _ = TrySetTaskId(null);
+
         if (Task is not ISchedulableTask schedulableTask)
         {
-            throw GetNonSchedulableTaskException();
+            throw ConfiguredDurableTask.GetNonSchedulableTaskException();
         }
 
-        var response = await schedulableTask.GetHandle(Id).PollAsync(pollingOptions, cancellationToken);
+        var response = await schedulableTask.GetHandle(TaskId).PollAsync(pollingOptions, cancellationToken);
         return response.Status;
     }
+}
+
+public struct ConfiguredDurableTask(DurableTask task)
+{
+    private ConfiguredDurableTaskCore<DurableTask> _core = new(task);
+
+    public DurableTaskAwaiter GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
+
+    internal readonly DurableTask Task => _core.Task;
+    internal readonly TaskId TaskId => _core.TaskId;
+
+    internal ConfiguredDurableTask WithId(string taskId)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(taskId);
+        _core.TrySetTaskId(taskId);
+        return this;
+    }
+
+    // Schedules a durable task without waiting for the task to complete
+    public ValueTask<ScheduledTask> ScheduleAsync(CancellationToken cancellationToken = default) => _core.ScheduleAsync(cancellationToken);
+
+    // Cancels a durable task without waiting for the task to complete
+    public ValueTask<bool> CancelAsync(CancellationToken cancellationToken) => _core.CancelAsync(cancellationToken);
+
+    // Polls a task, returning the status of the task.
+    public ValueTask<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken) => _core.PollAsync(pollingOptions, cancellationToken);
 
     internal static InvalidOperationException GetNonSchedulableTaskException() => new("The provided task does not support scheduling. This may be because it is a local method or another non-serializable task type.");
 }
 
-public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task, TaskId taskId)
+public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
 {
-    private ConfiguredDurableTaskCore<DurableTask<TResult>> _core = new(task, taskId);
+    private ConfiguredDurableTaskCore<DurableTask<TResult>> _core = new(task);
 
     internal readonly DurableTask<TResult> Task => _core.Task;
-    internal TaskId Id { set => _core.Id = value; readonly get => _core.Id; }
-    internal ConfiguredDurableTask<TResult> WithId(string id)
+    internal TaskId TaskId => _core.TaskId;
+
+    public DurableTaskAwaiter<TResult> GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
+
+    public ConfiguredDurableTask<TResult> WithId(string taskId)
     {
-        ArgumentNullException.ThrowIfNull(id);
-        _core.SetTaskIdCore(id);
+        ArgumentNullException.ThrowIfNullOrEmpty(taskId);
+        _core.TrySetTaskId(taskId);
         return this;
     }
 
-    public readonly async ValueTask<ScheduledTask<TResult>> ScheduleAsync(CancellationToken cancellationToken = default)
+    // Schedules a durable task without waiting for the task to complete
+    public async ValueTask<ScheduledTask<TResult>> ScheduleAsync(CancellationToken cancellationToken = default)
     {
+        // Ensure the task id is set.
+        _core.TrySetTaskId(null);
+
         if (Task is not ISchedulableTask schedulableTask)
         {
             throw ConfiguredDurableTask.GetNonSchedulableTaskException();
         }
 
-
-        var response = await schedulableTask.ScheduleAsync(Id, cancellationToken);
+        var response = await schedulableTask.ScheduleAsync(TaskId, cancellationToken);
         if (response.IsCompleted)
         {
-            return new CompletedScheduledDurableTask<TResult>(Id, response);
+            return new CompletedScheduledDurableTask<TResult>(TaskId, response);
         }
 
-        var handle = schedulableTask.GetHandle(Id);
+        var handle = schedulableTask.GetHandle(TaskId);
         return new ScheduledDurableTask<TResult>(handle);
     }
-    
-    // Cancels a durable task without waiting for the task to complete
-    public readonly async ValueTask<bool> CancelAsync(CancellationToken cancellationToken)
-    {
-        if (Task is not ISchedulableTask schedulableTask)
-        {
-            throw ConfiguredDurableTask.GetNonSchedulableTaskException();
-        }
 
-        await schedulableTask.GetHandle(Id).CancelAsync(cancellationToken);
-        return true;
-    }
+    // Cancels a durable task without waiting for the task to complete
+    public ValueTask<bool> CancelAsync(CancellationToken cancellationToken) => _core.CancelAsync(cancellationToken);
 
     // Polls a task, returning the status of the task.
-    public readonly async ValueTask<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken)
-    {
-        if (Task is not ISchedulableTask schedulableTask)
-        {
-            throw ConfiguredDurableTask.GetNonSchedulableTaskException();
-        }
-
-        var response = await schedulableTask.GetHandle(Id).PollAsync(pollingOptions, cancellationToken);
-        return response.Status;
-    }
-
-
-
-    public DurableTaskAwaiter<TResult> GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
+    public ValueTask<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken) => _core.PollAsync(pollingOptions, cancellationToken);
 }
 
 /// <summary>
