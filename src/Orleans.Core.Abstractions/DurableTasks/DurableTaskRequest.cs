@@ -27,7 +27,7 @@ public interface IDurableTaskRequest : IRequest
     /// Invoke the method on the target.
     /// </summary>
     /// <returns>The result of invocation.</returns>
-    ValueTask<DurableTaskResponse> InvokeImplementation(DurableTaskContext executionContext);
+    ValueTask<DurableTaskResponse> InvokeImplementation(DurableExecutionContext executionContext);
 
     /// <summary>
     /// Returns a string representation of the request.
@@ -108,12 +108,6 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     /// <inheritdoc/>
     public override string ToString() => IRequest.ToString(this);
 
-    /// <summary>
-    /// Returns a string representation of the request.
-    /// </summary>
-    /// <returns>A string representation of the request.</returns>
-    public string ToMethodCallString() => IRequest.ToMethodCallString(this);
-
     // Called upon creation in generated code by the creating grain reference by virtue of the [SelfInvokingReturnType(nameof(InitializeRequest))] attribute on this class.
     public DurableTask InitializeRequest(GrainReference targetGrainReference)
     {
@@ -142,7 +136,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     }
 
     /// <inheritdoc/>
-    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
+    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
@@ -170,7 +164,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
-    ValueTask<DurableTaskResponse> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
+    ValueTask<DurableTaskResponse> IDurableTaskRequest.InvokeImplementation(DurableExecutionContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
 
     // Generated
     protected abstract DurableTask InvokeInner();
@@ -194,10 +188,12 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     {
         Debug.Assert(Context is not null);
         Context.TaskId = taskId;
+        /*
         if (TryGetProxy(out var proxy))
         {
             return proxy.GetScheduledTaskHandle(taskId);
         }
+        */
 
         return new GrainScheduledTaskHandle(taskId, this, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: null);
     }
@@ -301,7 +297,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     }
 
     /// <inheritdoc/>
-    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
+    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
@@ -327,7 +323,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     ValueTask<Response> IInvokable.Invoke() => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
-    ValueTask<DurableTaskResponse> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
+    ValueTask<DurableTaskResponse> IDurableTaskRequest.InvokeImplementation(DurableExecutionContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
 
     // Generated
     protected abstract DurableTask<TResult> InvokeInner();
@@ -339,10 +335,12 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     {
         Debug.Assert(Context is not null);
         Context.TaskId = taskId;
+        /*
         if (DurableTaskRequest.TryGetProxy(out var proxy))
         {
             return proxy.GetScheduledTaskHandle(taskId);
         }
+        */
 
         return new GrainScheduledTaskHandle(taskId, this, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: null);
     }

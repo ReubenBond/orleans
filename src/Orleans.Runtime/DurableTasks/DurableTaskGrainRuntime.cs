@@ -33,7 +33,7 @@ internal sealed class DurableTaskGrainRuntime(
     IDurableTaskGrainStorage storage,
     DurableTaskGrainRuntimeShared shared) : IDurableTaskProxy, IDurableTaskGrainExtension
 {
-    private readonly Dictionary<TaskId, GrainDurableTaskContext> _pendingTasks = [];
+    private readonly Dictionary<TaskId, GrainDurableExecutionContext> _pendingTasks = [];
     private readonly Dictionary<TaskId, Task> _runningTasks = [];
     private readonly DurableTaskGrainRuntimeShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
@@ -50,7 +50,7 @@ internal sealed class DurableTaskGrainRuntime(
     /// <param name="taskId">The task id.</param>
     /// <param name="state">The task state.</param>
     /// <returns>The new execution context.</returns>
-    private GrainDurableTaskContext CreateExecutionContext(TaskId taskId, IDurableTaskState state) => _pendingTasks[taskId] = new(taskId, this, state);
+    private GrainDurableExecutionContext CreateExecutionContext(TaskId taskId, IDurableTaskState state) => _pendingTasks[taskId] = new(taskId, this, state);
 
     /// <summary>
     /// Gets the execution context corresponding to the provided task, if it exists, and returns it.
@@ -58,7 +58,7 @@ internal sealed class DurableTaskGrainRuntime(
     /// <param name="taskId">The task to get an execution context from.</param>
     /// <param name="executionContext">The execution context.</param>
     /// <returns><see langword="true"/> if the execution context was found, <see langword="false"/> otherwise.</returns>
-    private bool TryGetExecutionContext(TaskId taskId, [NotNullWhen(true)] out GrainDurableTaskContext? executionContext)
+    private bool TryGetExecutionContext(TaskId taskId, [NotNullWhen(true)] out GrainDurableExecutionContext? executionContext)
     {
         // Is an active method already waiting for this?
         if (_pendingTasks.TryGetValue(taskId, out executionContext))
@@ -69,7 +69,10 @@ internal sealed class DurableTaskGrainRuntime(
         if (_storage.TryGetTask(taskId, out var state))
         {
             // Rehydrate the execution context from its persisted state.
-            executionContext = new(taskId, this, state);
+            executionContext = new(taskId, this, state)
+            {
+                Task = state.Request as DurableTask // Not all tasks can be rehydrated, since some might be local method invocations, which are not serializable.
+            };
 
             // If the task has completed, set the result now.
             if (state.Result is { } response)
@@ -275,7 +278,7 @@ internal sealed class DurableTaskGrainRuntime(
         };
     }
 
-    private async ValueTask SubscribeClientAsync(TaskId taskId, GrainDurableTaskContext executionContext, IDurableTaskObserver client, CancellationToken cancellationToken)
+    private async ValueTask SubscribeClientAsync(TaskId taskId, GrainDurableExecutionContext executionContext, IDurableTaskObserver client, CancellationToken cancellationToken)
     {
         if (client is not null)
         {
@@ -309,9 +312,15 @@ internal sealed class DurableTaskGrainRuntime(
             _shared.Logger.LogTrace("{Id} evaluating task {TaskId}", GrainId, taskId);
         }
 
+
+        // If durableTask is ISchedulableTask, schedule it and store a handle to it in-memory
+        // Else, it must be a local method call, in which case we create an execution context for it and execute it.
+
+
+
         if (!TryGetExecutionContext(taskId, out var executionContext))
         {
-            executionContext = await CreateExecutionContextAsync(taskId, cancellationToken);
+            executionContext = await CreateExecutionContextAsync(taskId, durableTask, cancellationToken);
         }
 
         var storedResponse = DurableTaskRuntimeHelper.Poll(executionContext);
@@ -389,20 +398,22 @@ internal sealed class DurableTaskGrainRuntime(
         return DurableTaskRuntimeHelper.Poll(executionContext);
     }
 
-    private async Task<GrainDurableTaskContext> CreateExecutionContextAsync(TaskId taskId, CancellationToken cancellationToken)
+    private async Task<GrainDurableExecutionContext> CreateExecutionContextAsync(TaskId taskId, DurableTask task, CancellationToken cancellationToken)
     {
         var newTaskState = _storage.GetOrCreateTask(taskId, null);
         await _storage.WriteAsync(cancellationToken);
 
-        return CreateExecutionContext(taskId, newTaskState);
+        var executionContext = CreateExecutionContext(taskId, newTaskState);
+        executionContext.Task = task;
+        return executionContext;
     }
 
-    private void InvokeRequestMethod(TaskId taskId, IDurableTaskRequest request, GrainDurableTaskContext context)
+    private void InvokeRequestMethod(TaskId taskId, IDurableTaskRequest request, GrainDurableExecutionContext context)
     {
         _runningTasks.Add(taskId, InvokeRequestMethodCore(taskId, request, context));
     }
 
-    private async Task InvokeRequestMethodCore(TaskId taskId, IDurableTaskRequest request, GrainDurableTaskContext context)
+    private async Task InvokeRequestMethodCore(TaskId taskId, IDurableTaskRequest request, GrainDurableExecutionContext context)
     {
         await Task.Yield();
 
@@ -422,7 +433,7 @@ internal sealed class DurableTaskGrainRuntime(
     private async Task CompleteRequestWithResponse(
         TaskId taskId,
         DurableTaskResponse response,
-       GrainDurableTaskContext executionContext,
+       GrainDurableExecutionContext executionContext,
        CancellationToken cancellationToken)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
@@ -467,7 +478,7 @@ internal sealed class DurableTaskGrainRuntime(
     /// <param name="taskId">The task which has completed.</param>
     /// <param name="executionContext">The task execution context, containing the result.</param>
     /// <returns>A <see cref="Task"/> representing the work performed.</returns>
-    private async Task NotifyClientsAndCleanupTask(TaskId taskId, GrainDurableTaskContext executionContext, CancellationToken cancellationToken)
+    private async Task NotifyClientsAndCleanupTask(TaskId taskId, GrainDurableExecutionContext executionContext, CancellationToken cancellationToken)
     {
         Debug.Assert(executionContext.State.Result is not null);
         while (!cancellationToken.IsCancellationRequested)
@@ -693,7 +704,7 @@ internal sealed class DurableTaskGrainRuntime(
                 CompletedAt = taskState.CompletedAt,
                 CreatedAt = taskState.CreatedAt,
                 Response = taskState.Result?.ToString(),
-                Request = taskState.Request?.ToString(),
+                Request = taskState.Request?.ToMethodCallString(),
                 Status = taskState.Result switch
                 {
                     { } response when response.Exception is null => "Completed",
@@ -727,7 +738,7 @@ internal sealed class DurableTaskGrainRuntime(
             return;
         }
 
-        List<GrainDurableTaskContext> canceledContexts = [];
+        List<GrainDurableExecutionContext> canceledContexts = [];
         if (!RequestCancellationCore(taskId, taskState, canceledContexts))
         {
             // No need to write state.
@@ -741,12 +752,12 @@ internal sealed class DurableTaskGrainRuntime(
         var tasks = new List<Task>(canceledContexts.Count);
         foreach (var context in canceledContexts)
         {
-            tasks.Add(DurableTaskRuntimeHelper.CancelAsync(context));
+            tasks.Add(DurableTaskRuntimeHelper.CancelAsync(context, cancellationToken));
         }
 
         await Task.WhenAll(tasks);
 
-        bool RequestCancellationCore(TaskId taskId, IDurableTaskState taskState, List<GrainDurableTaskContext> canceledContexts)
+        bool RequestCancellationCore(TaskId taskId, IDurableTaskState taskState, List<GrainDurableExecutionContext> canceledContexts)
         {
             if (taskState.CompletedAt.HasValue)
             {

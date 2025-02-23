@@ -9,19 +9,19 @@ public static class DurableTaskRuntimeHelper
     /// <param name="task">The task.</param>
     /// <param name="context">The task context.</param>
     /// <returns>The result of invocation.</returns>
-    public static ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableTaskContext context) => task.RunAsync(context);
+    public static ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableExecutionContext context) => task.RunAsync(context);
 
     /// <summary>
     /// Sets the result of a durable task context.
     /// </summary>
     /// <param name="context">The task context.</param>
     /// <param name="result">The result.</param>
-    public static void SetResult(DurableTaskContext context, DurableTaskResponse result) => context.SetResult(result);
+    public static void SetResult(DurableExecutionContext context, DurableTaskResponse result) => context.SetResult(result);
 
-    public static void SetCurrentContext(DurableTaskContext? context) => DurableTaskContext.SetCurrentContext(context);
-    public static void SetCurrentContext(DurableTaskContext? context, out DurableTaskContext? previous) => DurableTaskContext.SetCurrentContext(context, out previous);
+    public static void SetCurrentContext(DurableExecutionContext? context) => DurableExecutionContext.SetCurrentContext(context);
+    public static void SetCurrentContext(DurableExecutionContext? context, out DurableExecutionContext? previous) => DurableExecutionContext.SetCurrentContext(context, out previous);
 
-    public static DurableTaskResponse Poll(DurableTaskContext context)
+    public static DurableTaskResponse Poll(DurableExecutionContext context)
     {
         var task = context.ResponseTask;
         return task.Status switch
@@ -31,15 +31,15 @@ public static class DurableTaskRuntimeHelper
         };  
     }
 
-    public static async ValueTask<DurableTaskResponse> WaitAsync(DurableTaskContext context, CancellationToken cancellationToken)
+    public static async ValueTask<DurableTaskResponse> WaitAsync(DurableExecutionContext context, CancellationToken cancellationToken)
     {
         return await context.ResponseTask.WaitAsync(cancellationToken);
     }
 
-    public static Task<DurableTaskResponse> GetCompletionTask(DurableTaskContext context) => context.ResponseTask;
+    public static Task<DurableTaskResponse> GetCompletionTask(DurableExecutionContext context) => context.ResponseTask;
 
-    public static Task CancelAsync(DurableTaskContext context)
+    public static Task CancelAsync(DurableExecutionContext context, CancellationToken cancellationToken)
     {
-        return context.CancelAsync();
+        return context.CancelAsync(cancellationToken);
     }
 }

@@ -2,7 +2,7 @@
 
 namespace System.Distributed.DurableTasks;
 
-public abstract partial class DurableTaskContext
+public abstract partial class DurableExecutionContext
 {
     private readonly TaskCompletionSource<DurableTaskResponse> _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously); 
 

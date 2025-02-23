@@ -23,7 +23,7 @@ internal sealed class UntypedDurableTaskMethodInvocation<TStateMachine> : Untype
     where TStateMachine : IAsyncStateMachine
 {
     private ManualResetValueTaskSourceCore<DurableTaskResponse> _completion = new();
-    private DurableTaskContext? _executionContext;
+    private DurableExecutionContext? _executionContext;
 
 #pragma warning disable IDE0044 // Add readonly modifier
     private TStateMachine _stateMachine;
@@ -45,20 +45,20 @@ internal sealed class UntypedDurableTaskMethodInvocation<TStateMachine> : Untype
     void IAsyncStateMachine.MoveNext()
     {
         // TODO: is this the best & most efficient way to propagate the context? It seems like it would be costly to do this for every await point.
-        DurableTaskContext.SetCurrentContext(_executionContext, out var previousContext);
+        DurableExecutionContext.SetCurrentContext(_executionContext, out var previousContext);
         try
         {
             _stateMachine.MoveNext();
         }
         finally
         {
-            DurableTaskContext.SetCurrentContext(previousContext);
+            DurableExecutionContext.SetCurrentContext(previousContext);
         }
     }
 
     void IAsyncStateMachine.SetStateMachine(IAsyncStateMachine stateMachine) => _stateMachine.SetStateMachine(stateMachine);
 
-    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
     {
         _executionContext = executionContext;
         StartInvocation();
@@ -88,7 +88,7 @@ internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : Dura
     where TStateMachine : IAsyncStateMachine
 {
     private ManualResetValueTaskSourceCore<DurableTaskResponse> _completion = new();
-    private DurableTaskContext? _executionContext;
+    private DurableExecutionContext? _executionContext;
 
 #pragma warning disable IDE0044 // Add readonly modifier
     private TStateMachine _stateMachine;
@@ -111,20 +111,20 @@ internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : Dura
     {
         // TODO: is this the best & most efficient way to propagate the context? It seems like it would be costly to do this for every await point.
         // Maybe a cheaper alternative would be to use a thread-local in addition to the async-local? Possibly ask Toub about ExecutionContext APIs, etc...
-        DurableTaskContext.SetCurrentContext(_executionContext, out var previousContext);
+        DurableExecutionContext.SetCurrentContext(_executionContext, out var previousContext);
         try
         {
             _stateMachine.MoveNext();
         }
         finally
         {
-            DurableTaskContext.SetCurrentContext(previousContext);
+            DurableExecutionContext.SetCurrentContext(previousContext);
         }
     }
 
     void IAsyncStateMachine.SetStateMachine(IAsyncStateMachine stateMachine) => _stateMachine.SetStateMachine(stateMachine);
 
-    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
     {
         _executionContext = executionContext;
         StartInvocation();

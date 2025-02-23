@@ -26,7 +26,7 @@ public class JobDescription
 public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
 {
     private readonly Dictionary<string, object> _handlers = [];
-    private readonly Dictionary<TaskId, JobDurableTaskExecutionContext> _tasks = [];
+    private readonly Dictionary<TaskId, JobDurableExecutionContext> _tasks = [];
     private readonly Dictionary<TaskId, Task> _runningTasks = [];
     private readonly IJobStorage _storage = storage;
     private readonly ILogger<JobScheduler> _logger = logger;
@@ -57,7 +57,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
     /// <param name="taskId">The task id.</param>
     /// <param name="state">The task state.</param>
     /// <returns>The new execution context.</returns>
-    private JobDurableTaskExecutionContext CreateExecutionContext(TaskId taskId, JobTaskState state) => _tasks[taskId] = new JobDurableTaskExecutionContext(taskId, this, state);
+    private JobDurableExecutionContext CreateExecutionContext(TaskId taskId, JobTaskState state) => _tasks[taskId] = new JobDurableExecutionContext(taskId, this, state);
 
     /// <summary>
     /// Gets the execution context corresponding to the provided task, if it exists, and returns it.
@@ -65,7 +65,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
     /// <param name="taskId">The task to get an execution context from.</param>
     /// <param name="executionContext">The execution context.</param>
     /// <returns><see langword="true"/> if the execution context was found, <see langword="false"/> otherwise.</returns>
-    private bool TryGetExecutionContext(TaskId taskId, [NotNullWhen(true)] out JobDurableTaskExecutionContext? executionContext)
+    private bool TryGetExecutionContext(TaskId taskId, [NotNullWhen(true)] out JobDurableExecutionContext? executionContext)
     {
         // Is an active method already waiting for this?
         if (_tasks.TryGetValue(taskId, out executionContext))
@@ -82,10 +82,10 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         return false;
     }
 
-    private JobDurableTaskExecutionContext RehydrateTaskFromStorage(TaskId taskId, JobTaskState state)
+    private JobDurableExecutionContext RehydrateTaskFromStorage(TaskId taskId, JobTaskState state)
     {
         // Rehydrate the execution context from its persisted state.
-        var executionContext = new JobDurableTaskExecutionContext(taskId, this, state);
+        var executionContext = new JobDurableExecutionContext(taskId, this, state);
 
         // If the task has completed, set the result now.
         if (state.Result is { } response)
@@ -98,7 +98,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         return executionContext;
     }
 
-    private async Task<JobDurableTaskExecutionContext> CreateExecutionContextAsync(TaskId taskId, string? type, string[]? arguments, CancellationToken cancellationToken)
+    private async Task<JobDurableExecutionContext> CreateExecutionContextAsync(TaskId taskId, string? type, string[]? arguments, CancellationToken cancellationToken)
     {
         var newTaskState = new JobTaskState
         {
@@ -190,7 +190,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         return await DurableTaskRuntimeHelper.WaitAsync(ctx, cancellationToken);
     }
 
-    private async ValueTask<DurableTaskContext> EvaluateStepAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+    private async ValueTask<DurableExecutionContext> EvaluateStepAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
     {
         try
         {
@@ -219,12 +219,12 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         }
     }
 
-    private void InvokeRequestMethod(JobTask job, TaskId taskId, JobDurableTaskExecutionContext executionContext, CancellationToken cancellationToken)
+    private void InvokeRequestMethod(JobTask job, TaskId taskId, JobDurableExecutionContext executionContext, CancellationToken cancellationToken)
     {
         _runningTasks.Add(taskId, InvokeRequestMethodCore(taskId, job, executionContext, cancellationToken));
     }
 
-    private async Task InvokeRequestMethodCore(TaskId taskId, JobTask job, JobDurableTaskExecutionContext executionContext, CancellationToken cancellationToken)
+    private async Task InvokeRequestMethodCore(TaskId taskId, JobTask job, JobDurableExecutionContext executionContext, CancellationToken cancellationToken)
     {
         await Task.Yield();
 
@@ -243,7 +243,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         }
     }
 
-    private async Task CompleteRequestWithResponse(TaskId taskId, DurableTaskResponse response, JobDurableTaskExecutionContext executionContext, CancellationToken cancellationToken)
+    private async Task CompleteRequestWithResponse(TaskId taskId, DurableTaskResponse response, JobDurableExecutionContext executionContext, CancellationToken cancellationToken)
     {
         if (_logger.IsEnabled(LogLevel.Trace))
         {
@@ -367,6 +367,11 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         //_storage.
     }
 
+    internal IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId)
+    {
+        throw new NotImplementedException();
+    }
+
     internal class JobTask(string type, string[]? args, JobScheduler jobScheduler) : DurableTask<string>, ISchedulableTask
     {
         private readonly JobScheduler _jobScheduler = jobScheduler;
@@ -383,7 +388,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
             return _jobScheduler.ScheduleAsync(this, taskId, cancellationToken);
         }
 
-        protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
+        protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
         {
             var handler = _jobScheduler._handlers[Type];
             DurableTaskResponse response;

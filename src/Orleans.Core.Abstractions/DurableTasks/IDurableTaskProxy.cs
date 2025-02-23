@@ -70,6 +70,7 @@ public interface IDurableTaskServer : IGrainExtension
     ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, SubscribeOrPollOptions options);
 
     [AlwaysInterleave]
+    [Alias("CancelAsync")]
     ValueTask CancelAsync(TaskId taskId);
 }
 
@@ -128,4 +129,5 @@ internal interface IDurableTaskProxy
 {
     ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
     IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId);
+    //IScheduledTaskHandle OnCreateScheduledTaskHandle(IScheduledTaskHandle handle);
 }

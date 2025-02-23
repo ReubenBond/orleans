@@ -2,9 +2,9 @@
 
 namespace System.Distributed.DurableTasks;
 
-public readonly struct DurableTaskResultAwaitable<TResult>(DurableTaskContext executionContext)
+public readonly struct DurableTaskResultAwaitable<TResult>(DurableExecutionContext executionContext)
 {
-    private readonly DurableTaskContext _executionContext = executionContext;
+    private readonly DurableExecutionContext _executionContext = executionContext;
 
     public DurableTaskResultAwaiter<TResult> GetAwaiter() => new(_executionContext.ResponseTask);
 }

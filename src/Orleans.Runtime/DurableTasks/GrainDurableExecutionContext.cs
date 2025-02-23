@@ -10,7 +10,7 @@ using Orleans.DurableTasks;
 
 namespace Orleans.Runtime.DurableTasks;
 
-internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskProxy runtime, IDurableTaskState state) : DurableTaskContext(taskId)
+internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskProxy runtime, IDurableTaskState state) : DurableExecutionContext(taskId)
 {
     // The sequence number for named children.
     private Dictionary<string, int>? _nextChildIds;
@@ -21,8 +21,9 @@ internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskProxy r
     internal IDurableTaskProxy Runtime { get; } = runtime;
 
     internal IDurableTaskState State { get; } = state;
+    public DurableTask? Task { get; internal set; }
 
-    protected override async ValueTask<DurableTaskResponse> RunChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+    protected override ValueTask<DurableTaskResponse> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         if (!Id.IsParentOf(taskId))
@@ -30,15 +31,10 @@ internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskProxy r
             throw new InvalidOperationException($"The provided task ID '{taskId}' is not a child of this task '{Id}'.");
         }
 
-        var response = await Runtime.ScheduleAsync(taskId, taskDefinition, cancellationToken);
-        if (response.IsCompleted)
-        {
-            return response;
-        }
-
-        var handle = Runtime.GetScheduledTaskHandle(taskId);
-        return await handle.WaitAsync(cancellationToken);
+        return Runtime.ScheduleAsync(taskId, taskDefinition, cancellationToken);
     }
+
+    protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId) => Runtime.GetScheduledTaskHandle(taskId);
 
     protected override TaskId CreateChildTaskId(string? name)
     {
@@ -57,6 +53,14 @@ internal sealed class GrainDurableTaskContext(TaskId taskId, IDurableTaskProxy r
             }
 
             return Id.Child(name);
+        }
+    }
+
+    protected override async Task CancelAsyncCore(CancellationToken cancellationToken)
+    {
+        if (Task is ISchedulableTask schedulableTask)
+        {
+            await schedulableTask.GetHandle(Id).CancelAsync(cancellationToken);
         }
     }
 

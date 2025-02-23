@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 namespace PaymentWorkflowApp.Runtime;
 
-internal sealed class JobDurableTaskExecutionContext(TaskId taskId, JobScheduler jobScheduler, JobTaskState state) : DurableTaskContext(taskId)
+internal sealed class JobDurableExecutionContext(TaskId taskId, JobScheduler jobScheduler, JobTaskState state) : DurableExecutionContext(taskId)
 {
     // The sequence number for named children.
     private Dictionary<string, int>? _nextChildIds;
@@ -12,9 +12,6 @@ internal sealed class JobDurableTaskExecutionContext(TaskId taskId, JobScheduler
     private int _nextSequenceNumber = 0;
 
     public JobTaskState State { get; } = state;
-
-    protected override ValueTask<DurableTaskResponse> RunChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
-        => jobScheduler.InvokeAsync(taskId, taskDefinition, cancellationToken);
 
     protected override TaskId CreateChildTaskId(string? name)
     {
@@ -34,6 +31,16 @@ internal sealed class JobDurableTaskExecutionContext(TaskId taskId, JobScheduler
 
             return Id.Child(name);
         }
+    }
+
+    protected override async ValueTask<DurableTaskResponse> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+    {
+        return await jobScheduler.InvokeAsync(taskId, taskDefinition, cancellationToken);
+    }
+
+    protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId)
+    {
+        return jobScheduler.GetScheduledTaskHandle(taskId);
     }
 
     /*
