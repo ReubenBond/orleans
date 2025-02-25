@@ -33,7 +33,7 @@ internal sealed class JobDurableExecutionContext(TaskId taskId, JobScheduler job
         }
     }
 
-    protected override async ValueTask<DurableTaskResponse> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+    protected override async ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
     {
         return await jobScheduler.InvokeAsync(taskId, taskDefinition, cancellationToken);
     }

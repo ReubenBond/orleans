@@ -90,7 +90,8 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         // If the task has completed, set the result now.
         if (state.Result is { } response)
         {
-            DurableTaskRuntimeHelper.SetResult(executionContext, response);
+            //DurableTaskRuntimeHelper.SetResult(executionContext, response);
+            throw new NotImplementedException();
         }
 
         // Move the task into the list of active tasks.
@@ -168,7 +169,8 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
                 }
 
                 // and similarly for the job arguments...
-                return DurableTaskRuntimeHelper.Poll(executionContext);
+                //return DurableTaskRuntimeHelper.Poll(executionContext);
+                throw new NotImplementedException();
             }
 
             executionContext = await CreateExecutionContextAsync(taskId, job.Type, job.Arguments, cancellationToken);
@@ -176,7 +178,8 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
             // Start invoking the newly defined task.
             InvokeRequestMethod(job, taskId, executionContext, cancellationToken);
 
-            return DurableTaskRuntimeHelper.Poll(executionContext);
+            //return DurableTaskRuntimeHelper.Poll(executionContext);
+            throw new NotImplementedException();
         }
         finally
         {
@@ -184,10 +187,12 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
         }
     }
 
-    public async ValueTask<DurableTaskResponse> InvokeAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+    public async ValueTask<IScheduledTaskHandle> InvokeAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
     {
         var ctx = await EvaluateStepAsync(taskId, taskDefinition, cancellationToken);
-        return await DurableTaskRuntimeHelper.WaitAsync(ctx, cancellationToken);
+
+        //return await DurableTaskRuntimeHelper.WaitAsync(ctx, cancellationToken);
+        throw new NotImplementedException();
     }
 
     private async ValueTask<DurableExecutionContext> EvaluateStepAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
@@ -268,7 +273,8 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
             await _storage.WriteAsync(cancellationToken);
 
             // TODO: visibility of results must only happen once all child tasks have completed.
-            DurableTaskRuntimeHelper.SetResult(executionContext, response);
+            //DurableTaskRuntimeHelper.SetResult(executionContext, response);
+            throw new NotImplementedException();
         }
     }
 

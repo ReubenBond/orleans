@@ -57,11 +57,6 @@ public class VolatileDurableTaskGrainStorage(
             throw new InvalidOperationException("The request context must not be null");
         }
 
-        if (request.Context.TaskId.IsDefault)
-        {
-            request.Context.TaskId = taskId;
-        }
-
         if (!TryGetTask(taskId, out var result))
         {
             result = new DurableTaskState

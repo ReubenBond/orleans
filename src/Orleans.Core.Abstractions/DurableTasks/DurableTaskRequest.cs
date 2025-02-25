@@ -127,7 +127,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
 
         if (TryGetRuntime(out var runtime))
         {
-            var handle = await runtime.ScheduleAsync(taskId, this, cancellationToken);
+            var handle = await runtime.ScheduleChildAsync(taskId, this, cancellationToken);
             return await handle.PollAsync(default, cancellationToken);
         }
 
@@ -285,7 +285,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
 
         if (DurableTaskRequest.TryGetRuntime(out var runtime))
         {
-            var handle = await runtime.ScheduleAsync(taskId, this, cancellationToken);
+            var handle = await runtime.ScheduleChildAsync(taskId, this, cancellationToken);
             return await handle.PollAsync(default, cancellationToken);
         }
 

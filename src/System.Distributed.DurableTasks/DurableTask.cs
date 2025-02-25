@@ -57,22 +57,15 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
         }
     }
 
-    // TODO: move id logic to ctor or a Create method
     internal async ValueTask<DurableTaskResponse> RunAsync(CancellationToken cancellationToken)
     {
         // Ensure the task id is set.
         _ = TrySetTaskId(null);
 
+        IScheduledTaskHandle handle;
         if (ParentContext is { } parentContext)
         {
-            var response = await parentContext.ScheduleChildTaskAsync(_taskId, Task, cancellationToken);
-            if (response.IsCompleted)
-            {
-                return response;
-            }
-
-            var handle = parentContext.GetChildTaskHandle(_taskId);
-            return await handle.WaitAsync(cancellationToken);
+            handle = await parentContext.ScheduleChildTaskAsync(_taskId, Task, cancellationToken);
         }
         else if (Task is ISchedulableTask schedulableTask)
         {
@@ -82,13 +75,14 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
                 return response;
             }
 
-            var handle = schedulableTask.GetHandle(_taskId);
-            return await handle.WaitAsync(cancellationToken);
+            handle = schedulableTask.GetHandle(_taskId);
         }
         else
         {
             throw ConfiguredDurableTask.GetNonSchedulableTaskException();
         }
+
+        return await handle.WaitAsync(cancellationToken);
     }
 
     internal bool TrySetTaskId(string? name)

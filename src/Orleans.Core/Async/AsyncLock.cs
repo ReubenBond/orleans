@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -47,15 +47,7 @@ namespace Orleans
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1001:TypesThatOwnDisposableFieldsShouldBeDisposable")]
     internal class AsyncLock
     {
-        private readonly SemaphoreSlim semaphore;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="AsyncLock"/> class.
-        /// </summary>
-        public AsyncLock()
-        {
-            semaphore = new SemaphoreSlim(1);
-        }
+        private readonly SemaphoreSlim _semaphore = new (1);
 
         /// <summary>
         /// Acquires the lock asynchronously.
@@ -63,7 +55,7 @@ namespace Orleans
         /// <returns>An <see cref="IDisposable"/> which must be used to release the lock.</returns>
         public ValueTask<IDisposable> LockAsync()
         {
-            Task wait = semaphore.WaitAsync();
+            Task wait = _semaphore.WaitAsync();
             if (wait.IsCompletedSuccessfully)
             {
                 return new(new LockReleaser(this));
@@ -82,26 +74,31 @@ namespace Orleans
 
         private class LockReleaser : IDisposable
         {
-            private AsyncLock target;
+            private AsyncLock _target;
 
             internal LockReleaser(AsyncLock target)
             {
-                this.target = target;
+                _target = target;
             }
 
             public void Dispose()
             {
-                if (target == null)
+                if (_target == null)
+                {
                     return;
+                }
 
-                // first null it, next Release, so even if Release throws, we don't hold the reference any more.
-                AsyncLock tmp = target;
-                target = null;
+                // First null it, next Release, so even if Release throws, we don't hold the reference any more.
+                AsyncLock tmp = _target;
+                _target = null;
                 try
                 {
-                    tmp.semaphore.Release();
+                    tmp._semaphore.Release();
                 }
-                catch (Exception) { } // just ignore the Exception
+                catch (Exception)
+                {
+                    // just ignore the Exception
+                }
             }
         }
     }

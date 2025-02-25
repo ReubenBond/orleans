@@ -20,4 +20,8 @@
     <PackageReference Include="Aspire.Azure.Data.Tables" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Samples\Saga\" />
+  </ItemGroup>
+
 </Project>

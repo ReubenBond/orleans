@@ -127,7 +127,7 @@ public struct DurableTaskDiagnosticState
 // 2. Client proxy: does not store results locally, does not support subscribing. Available outside the context of a grain.
 internal interface IDurableTaskGrainRuntime
 {
-    ValueTask<IScheduledTaskHandle> ScheduleAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
+    ValueTask<IScheduledTaskHandle> ScheduleChildAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
     IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId);
     //IScheduledTaskHandle OnCreateScheduledTaskHandle(IScheduledTaskHandle handle);
 }
