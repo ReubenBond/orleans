@@ -65,9 +65,9 @@ public class Program
         using var host = hostBuilder.Build();
         await host.StartAsync();
 
-        //await Bank.RunAsync(host.Services);
+        await Bank.RunAsync(host.Services);
         await HelloWorld.RunAsync(host.Services);
-        //await CancelWorld.RunAsync(host.Services);
+        await CancelWorld.RunAsync(host.Services);
 
         /*
         var client = host.Services.GetRequiredService<IClusterClient>();

@@ -194,7 +194,7 @@ internal sealed class DurableTaskGrainRuntime(
             _runningRequests.Add(taskId, InvokeRequest(taskId, request, executionContext));
 
             // Otherwise, schedule and run the task.
-            handle = new LocalScheduledTaskHandle(taskId, this) { IsRunning = true };
+            handle = new ScheduledTaskHandle(taskId, this) { IsRunning = true };
             _taskHandles.Add(taskId, handle);
 
             return subscribed ? DurableTaskResponse.Subscribed : DurableTaskResponse.Pending;
@@ -209,7 +209,7 @@ internal sealed class DurableTaskGrainRuntime(
         }
 
         // If the task is currently running, return the existing handle.
-        if (TryGetScheduledTaskHandle(taskId, out var handle) && (handle is not LocalScheduledTaskHandle localHandle || localHandle.IsRunning))
+        if (TryGetScheduledTaskHandle(taskId, out var handle) && (handle is not ScheduledTaskHandle localHandle || localHandle.IsRunning))
         {
             return handle;
         }
@@ -229,16 +229,17 @@ internal sealed class DurableTaskGrainRuntime(
             }
             
             // Schedule the task and store a handle to it in-memory.
-            var taskHandle = schedulableTask.GetHandle(taskId);
-            _taskHandles[taskId] = taskHandle;
+            handle = schedulableTask.GetHandle(taskId);
+            _taskHandles.Add(taskId, handle);
             await _storage.WriteAsync(cancellationToken);
-            return taskHandle;
+            return handle;
         }
 
         // Otherwise, the task must be a local method invocation, so create an execution context for it and execute it.
         var state = _storage.GetOrCreateTask(taskId, null);
         var executionContext = CreateExecutionContext(taskId, state);
-        handle = new LocalScheduledTaskHandle(taskId, this) { IsRunning = true };
+        handle =  new ScheduledTaskHandle(taskId, this) { IsRunning = true };
+        _taskHandles.Add(taskId, handle);
         _runningRequests.Add(taskId, InvokeChildTask(taskId, durableTask, executionContext));
         return handle;
     }
@@ -323,14 +324,9 @@ internal sealed class DurableTaskGrainRuntime(
 
         if (_taskHandles.TryGetValue(taskId, out var handle))
         {
-            if (handle is LocalScheduledTaskHandle localHandle)
+            if (handle is ScheduledTaskHandle localHandle)
             {
                 localHandle.TrySetResponse(response);
-            }
-
-            if (handle is RemoteScheduledTaskHandle remoteHandle)
-            {
-                remoteHandle.TrySetResponse(response);
             }
         }
 
@@ -586,7 +582,8 @@ internal sealed class DurableTaskGrainRuntime(
         }
 
         List<GrainDurableExecutionContext> canceledContexts = [];
-        if (!RequestCancellationCore(taskId, taskState, canceledContexts))
+        List<IScheduledTaskHandle> canceledHandles = [];
+        if (!RequestCancellationCore(taskId, taskState, canceledContexts, canceledHandles))
         {
             // No need to write state.
             return;
@@ -601,10 +598,14 @@ internal sealed class DurableTaskGrainRuntime(
         {
             tasks.Add(DurableTaskRuntimeHelper.CancelAsync(context, cancellationToken));
         }
+        foreach (var handle in canceledHandles)
+        {
+            tasks.Add(handle.CancelAsync(cancellationToken).AsTask());
+        }
 
         await Task.WhenAll(tasks);
 
-        bool RequestCancellationCore(TaskId taskId, IDurableTaskState taskState, List<GrainDurableExecutionContext> canceledContexts)
+        bool RequestCancellationCore(TaskId taskId, IDurableTaskState taskState, List<GrainDurableExecutionContext> canceledContexts, List<IScheduledTaskHandle> canceledHandles)
         {
             if (taskState.CompletedAt.HasValue)
             {
@@ -623,13 +624,17 @@ internal sealed class DurableTaskGrainRuntime(
             foreach (var (childTaskId, childTaskState) in _storage.GetChildren(taskId))
             {
                 Debug.Assert(taskId.IsParentOf(childTaskId));
-                _ = RequestCancellationCore(childTaskId, childTaskState, canceledContexts);
+                _ = RequestCancellationCore(childTaskId, childTaskState, canceledContexts, canceledHandles);
             }
 
             _storage.RequestCancellation(taskId, taskState);
             if (TryGetExecutionContext(taskId, out var context))
             {
                 canceledContexts.Add(context);
+            }
+            else if (TryGetScheduledTaskHandle(taskId, out var handle))
+            {
+                canceledHandles.Add(handle);
             }
 
             return true;
@@ -660,7 +665,7 @@ internal sealed class DurableTaskGrainRuntime(
             else
             {
                 // Create a new handle for the task.
-                handle = new LocalScheduledTaskHandle(taskId, this);
+                handle = new ScheduledTaskHandle(taskId, this);
                 _taskHandles.Add(taskId, handle);
                 return true;
             }
@@ -679,7 +684,7 @@ internal sealed class DurableTaskGrainRuntime(
         return handle;
     }
 
-    private class LocalScheduledTaskHandle(TaskId taskId, DurableTaskGrainRuntime runtime) : IScheduledTaskHandle
+    private class ScheduledTaskHandle(TaskId taskId, DurableTaskGrainRuntime runtime) : IScheduledTaskHandle
     {
         private readonly TaskCompletionSource<DurableTaskResponse> _responseTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -698,12 +703,12 @@ internal sealed class DurableTaskGrainRuntime(
         {
             if (options.PollTimeout > TimeSpan.Zero)
             {
-                await ((Task)_responseTcs.Task).WaitAsync(options.PollTimeout, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+                await ((Task)ResponseTask).WaitAsync(options.PollTimeout, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
             }
 
-            if (_responseTcs.Task.IsCompleted)
+            if (ResponseTask.IsCompleted)
             {
-                return await _responseTcs.Task;
+                return await ResponseTask;
             }
 
             return DurableTaskResponse.Pending;
@@ -711,47 +716,7 @@ internal sealed class DurableTaskGrainRuntime(
 
         public async ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
         {
-            return await _responseTcs.Task.WaitAsync(cancellationToken);
-        }
-
-        public bool TrySetResponse(DurableTaskResponse response) => _responseTcs.TrySetResult(response);
-    }
-
-    private sealed class RemoteScheduledTaskHandle(TaskId taskId, IScheduledTaskHandle handle, DurableTaskGrainRuntime runtime) : IScheduledTaskHandle
-    {
-        private readonly TaskCompletionSource<DurableTaskResponse> _responseTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public TaskId TaskId { get; } = taskId;
-
-        public async ValueTask CancelAsync(CancellationToken cancellationToken)
-        {
-            await runtime.SignalCancellationAsync(TaskId, cancellationToken);
-            await handle.CancelAsync(cancellationToken);
-        }
-
-        public async ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
-        {
-            var pollOptions = new SubscribeOrPollOptions { PollTimeout = options.PollTimeout };
-            var response = await runtime.SubscribeOrPollAsync(TaskId, pollOptions);
-            if (response.IsCompleted)
-            {
-                await runtime.SetResponseAsync(TaskId, response, cancellationToken);
-            }
-
-            return response;
-        }
-
-        public async ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
-        {
-            if (!runtime.TryGetExecutionContext(TaskId, out var context))
-            {
-                throw new KeyNotFoundException($"A task with the identifier '{TaskId}' was not found.");
-            }
-
-            var response = await handle.WaitAsync(cancellationToken);
-            await runtime.SetResponseAsync(TaskId, response, cancellationToken);
-            TrySetResponse(response);
-            return response;
+            return await ResponseTask.WaitAsync(cancellationToken);
         }
 
         public bool TrySetResponse(DurableTaskResponse response) => _responseTcs.TrySetResult(response);

@@ -125,14 +125,6 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         Debug.Assert(Context is not null);
 
-        /*
-        if (TryGetRuntime(out var runtime))
-        {
-            var handle = await runtime.ScheduleChildAsync(taskId, this, cancellationToken);
-            return await handle.PollAsync(default, cancellationToken);
-        }
-        */
-
         var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         return await targetGrain.ScheduleAsync(taskId, this);
     }
@@ -284,14 +276,6 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     public async ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default)
     {
         Debug.Assert(Context is not null);
-
-        /*
-        if (DurableTaskRequest.TryGetRuntime(out var runtime))
-        {
-            var handle = await runtime.ScheduleChildAsync(taskId, this, cancellationToken);
-            return await handle.PollAsync(default, cancellationToken);
-        }
-        */
 
         // Schedule the request directly on the target grain.
         var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
