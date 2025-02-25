@@ -4,6 +4,7 @@ namespace System.Distributed.DurableTasks;
 
 public abstract partial class DurableExecutionContext
 {
+    /*
     private readonly TaskCompletionSource<DurableTaskResponse> _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously); 
 
     internal Task<DurableTaskResponse> ResponseTask => _tcs.Task;
@@ -14,4 +15,5 @@ public abstract partial class DurableExecutionContext
         Debug.Assert(response.IsCompleted, "DurableTask completed with an invalid, non-terminal response.");
         _tcs.SetResult(response);
     }
+    */
 }

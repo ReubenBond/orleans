@@ -12,16 +12,13 @@ namespace Orleans.DurableTasks;
 public class DurableTaskRequestContext
 {
     [Id(0)]
-    public TaskId TaskId { get; set; }
-
-    [Id(1)]
     public GrainId CallerId { get; set; }
 
-    [Id(2)]
+    [Id(1)]
     public GrainId TargetId { get; set; }
 
     // TODO: Use a specialized collection type which allows for late materialization when deserialized.
-    [Id(3)]
+    [Id(2)]
     public Dictionary<string, byte[]>? Values { get; set; }
 }
 

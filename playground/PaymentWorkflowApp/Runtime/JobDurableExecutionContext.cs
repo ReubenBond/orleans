@@ -18,7 +18,7 @@ internal sealed class JobDurableExecutionContext(TaskId taskId, JobScheduler job
         if (string.IsNullOrWhiteSpace(name))
         {
             var sequenceNumber = _nextSequenceNumber++;
-            return Id.Child(sequenceNumber.ToString(CultureInfo.InvariantCulture));
+            return TaskId.Child(sequenceNumber.ToString(CultureInfo.InvariantCulture));
         }
         else
         {
@@ -26,10 +26,10 @@ internal sealed class JobDurableExecutionContext(TaskId taskId, JobScheduler job
             var sequenceNumber = nextSequenceNumber++;
             if (sequenceNumber > 0)
             {
-                return Id.Child($"{name}.{sequenceNumber.ToString(CultureInfo.InvariantCulture)}");
+                return TaskId.Child($"{name}.{sequenceNumber.ToString(CultureInfo.InvariantCulture)}");
             }
 
-            return Id.Child(name);
+            return TaskId.Child(name);
         }
     }
 

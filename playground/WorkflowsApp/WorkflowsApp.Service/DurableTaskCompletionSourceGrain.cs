@@ -43,7 +43,7 @@ public class DurableTaskCompletionSourceGrain<T>([FromKeyedServices("state")] ID
     {
         // Wait for the result to complete, without throwing.
         var nonGenericTask = (Task)state.Task;
-        await nonGenericTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        await nonGenericTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
 
         return state.State;
     }

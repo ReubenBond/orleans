@@ -11,16 +11,19 @@ public static class DurableTaskRuntimeHelper
     /// <returns>The result of invocation.</returns>
     public static ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableExecutionContext context) => task.RunAsync(context);
 
+    /*
     /// <summary>
     /// Sets the result of a durable task context.
     /// </summary>
     /// <param name="context">The task context.</param>
     /// <param name="result">The result.</param>
     public static void SetResult(DurableExecutionContext context, DurableTaskResponse result) => context.SetResult(result);
+    */
 
     public static void SetCurrentContext(DurableExecutionContext? context) => DurableExecutionContext.SetCurrentContext(context);
     public static void SetCurrentContext(DurableExecutionContext? context, out DurableExecutionContext? previous) => DurableExecutionContext.SetCurrentContext(context, out previous);
 
+    /*
     public static DurableTaskResponse Poll(DurableExecutionContext context)
     {
         var task = context.ResponseTask;
@@ -37,6 +40,7 @@ public static class DurableTaskRuntimeHelper
     }
 
     public static Task<DurableTaskResponse> GetCompletionTask(DurableExecutionContext context) => context.ResponseTask;
+    */
 
     public static Task CancelAsync(DurableExecutionContext context, CancellationToken cancellationToken)
     {

@@ -2,6 +2,7 @@
 
 namespace System.Distributed.DurableTasks;
 
+/*
 public readonly struct DurableTaskResultAwaitable<TResult>(DurableExecutionContext executionContext)
 {
     private readonly DurableExecutionContext _executionContext = executionContext;
@@ -23,3 +24,4 @@ public readonly struct DurableTaskResultAwaiter<TResult> : INotifyCompletion, IC
     public void OnCompleted(Action continuation) => _awaiter.OnCompleted(continuation);
     public void UnsafeOnCompleted(Action continuation) => _awaiter.UnsafeOnCompleted(continuation);
 }
+*/

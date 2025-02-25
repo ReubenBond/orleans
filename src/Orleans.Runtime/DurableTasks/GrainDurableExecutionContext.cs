@@ -10,7 +10,7 @@ using Orleans.DurableTasks;
 
 namespace Orleans.Runtime.DurableTasks;
 
-internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskProxy runtime, IDurableTaskState state) : DurableExecutionContext(taskId)
+internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskGrainRuntime runtime, IDurableTaskState state) : DurableExecutionContext(taskId)
 {
     // The sequence number for named children.
     private Dictionary<string, int>? _nextChildIds;
@@ -18,17 +18,17 @@ internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskPr
     // The sequence number for unnamed children.
     private int _nextSequenceNumber = 0;
 
-    internal IDurableTaskProxy Runtime { get; } = runtime;
+    internal IDurableTaskGrainRuntime Runtime { get; } = runtime;
 
     internal IDurableTaskState State { get; } = state;
     public DurableTask? Task { get; internal set; }
 
-    protected override ValueTask<DurableTaskResponse> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+    protected override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
-        if (!Id.IsParentOf(taskId))
+        if (!TaskId.IsParentOf(taskId))
         {
-            throw new InvalidOperationException($"The provided task ID '{taskId}' is not a child of this task '{Id}'.");
+            throw new InvalidOperationException($"The provided task ID '{taskId}' is not a child of this task '{TaskId}'.");
         }
 
         return Runtime.ScheduleAsync(taskId, taskDefinition, cancellationToken);
@@ -41,7 +41,7 @@ internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskPr
         if (string.IsNullOrWhiteSpace(name))
         {
             var sequenceNumber = _nextSequenceNumber++;
-            return Id.Child(sequenceNumber.ToString(CultureInfo.InvariantCulture));
+            return TaskId.Child(sequenceNumber.ToString(CultureInfo.InvariantCulture));
         }
         else
         {
@@ -49,10 +49,10 @@ internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskPr
             var sequenceNumber = nextSequenceNumber++;
             if (sequenceNumber > 0)
             {
-                return Id.Child($"{name}.{sequenceNumber.ToString(CultureInfo.InvariantCulture)}");
+                return TaskId.Child($"{name}.{sequenceNumber.ToString(CultureInfo.InvariantCulture)}");
             }
 
-            return Id.Child(name);
+            return TaskId.Child(name);
         }
     }
 
@@ -60,7 +60,7 @@ internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskPr
     {
         if (Task is ISchedulableTask schedulableTask)
         {
-            await schedulableTask.GetHandle(Id).CancelAsync(cancellationToken);
+            await schedulableTask.GetHandle(TaskId).CancelAsync(cancellationToken);
         }
     }
 

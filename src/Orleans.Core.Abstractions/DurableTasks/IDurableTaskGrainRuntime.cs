@@ -62,7 +62,7 @@ public interface IDurableTaskServer : IGrainExtension
 {
     // Called by DurableTaskRequest.Invoke to ensure that a task is scheduled
     [Alias("ScheduleAsync"), AlwaysInterleave]
-    ValueTask<DurableTaskResponse> ScheduleAsync(IDurableTaskRequest request);
+    ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, IDurableTaskRequest request);
 
     // API used by ScheduledTask/<T> to check for a result for a task.
     // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
@@ -125,9 +125,9 @@ public struct DurableTaskDiagnosticState
 // There are two implementations:
 // 1. Grain proxy: stores results locally, supports subscribing. Only available in the context of a grain.
 // 2. Client proxy: does not store results locally, does not support subscribing. Available outside the context of a grain.
-internal interface IDurableTaskProxy
+internal interface IDurableTaskGrainRuntime
 {
-    ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
+    ValueTask<IScheduledTaskHandle> ScheduleAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
     IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId);
     //IScheduledTaskHandle OnCreateScheduledTaskHandle(IScheduledTaskHandle handle);
 }

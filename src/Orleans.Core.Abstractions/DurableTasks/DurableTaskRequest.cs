@@ -124,15 +124,15 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         Debug.Assert(Context is not null);
-        Context.TaskId = taskId;
 
-        if (TryGetProxy(out var proxy))
+        if (TryGetRuntime(out var runtime))
         {
-            return await proxy.ScheduleAsync(taskId, this, cancellationToken);
+            var handle = await runtime.ScheduleAsync(taskId, this, cancellationToken);
+            return await handle.PollAsync(default, cancellationToken);
         }
 
         var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
-        return await targetGrain.ScheduleAsync(this);
+        return await targetGrain.ScheduleAsync(taskId, this);
     }
 
     /// <inheritdoc/>
@@ -147,15 +147,21 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         // For the first point (identical implementation and arguments), we could store the task locally and verify it against its already-stored copy.
         // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
         Debug.Assert(Context is not null);
-        Context.TaskId = executionContext.Id;
-        var currentContext = RuntimeContext.Current;
-        if (currentContext is not null)
+        var callerContext = RuntimeContext.Current;
+        if (callerContext is not null)
         {
-            Context.CallerId = currentContext.GrainId;
+            Context.CallerId = callerContext.GrainId;
         }
 
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
-        return await remote.ScheduleAsync(this);
+        var response = await remote.ScheduleAsync(executionContext.TaskId, this);
+        var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
+        while (!response.IsCompleted)
+        {
+            await remote.SubscribeOrPollAsync(executionContext.TaskId, options);
+        }
+
+        return response;
     }
 
     /// <inheritdoc/>
@@ -169,15 +175,15 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     // Generated
     protected abstract DurableTask InvokeInner();
 
-    internal static bool TryGetProxy([NotNullWhen(true)] out IDurableTaskProxy? proxy)
+    internal static bool TryGetRuntime([NotNullWhen(true)] out IDurableTaskGrainRuntime? runtime)
     {
-        if (RuntimeContext.Current?.GetComponent<IDurableTaskProxy>() is not { } localProxy)
+        if (RuntimeContext.Current?.GetComponent<IDurableTaskGrainRuntime>() is not { } localProxy)
         {
-            proxy = null;
+            runtime = null;
             return false;
         }
 
-        proxy = localProxy;
+        runtime = localProxy;
         return true;
     }
 
@@ -187,14 +193,6 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     public IScheduledTaskHandle GetHandle(TaskId taskId)
     {
         Debug.Assert(Context is not null);
-        Context.TaskId = taskId;
-        /*
-        if (TryGetProxy(out var proxy))
-        {
-            return proxy.GetScheduledTaskHandle(taskId);
-        }
-        */
-
         return new GrainScheduledTaskHandle(taskId, this, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: null);
     }
 }
@@ -284,16 +282,16 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     public async ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default)
     {
         Debug.Assert(Context is not null);
-        Context.TaskId = taskId;
 
-        if (DurableTaskRequest.TryGetProxy(out var proxy))
+        if (DurableTaskRequest.TryGetRuntime(out var runtime))
         {
-            return await proxy.ScheduleAsync(taskId, this, cancellationToken);
+            var handle = await runtime.ScheduleAsync(taskId, this, cancellationToken);
+            return await handle.PollAsync(default, cancellationToken);
         }
 
         // Schedule the request directly on the target grain.
         var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
-        return await targetGrain.ScheduleAsync(this);
+        return await targetGrain.ScheduleAsync(taskId, this);
     }
 
     /// <inheritdoc/>
@@ -308,7 +306,6 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         // For the first point (identical implementation and arguments), we could store the task locally and verify it against its already-stored copy.
         // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
         Debug.Assert(Context is not null);
-        Context.TaskId = executionContext.Id;
         var callerContext = RuntimeContext.Current;
         if (callerContext is not null)
         {
@@ -316,7 +313,14 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         }
 
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
-        return await remote.ScheduleAsync(this);
+        var response = await remote.ScheduleAsync(executionContext.TaskId, this);
+        var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
+        while (!response.IsCompleted)
+        {
+            await remote.SubscribeOrPollAsync(executionContext.TaskId, options);
+        }
+
+        return response;
     }
 
     /// <inheritdoc/>
@@ -334,14 +338,6 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     public IScheduledTaskHandle GetHandle(TaskId taskId)
     {
         Debug.Assert(Context is not null);
-        Context.TaskId = taskId;
-        /*
-        if (DurableTaskRequest.TryGetProxy(out var proxy))
-        {
-            return proxy.GetScheduledTaskHandle(taskId);
-        }
-        */
-
         return new GrainScheduledTaskHandle(taskId, this, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: null);
     }
 }
@@ -371,7 +367,7 @@ internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskReques
 
     public async ValueTask<DurableTaskResponse> ScheduleAsync(CancellationToken cancellationToken)
     {
-        return await grain.ScheduleAsync(request).AsTask().WaitAsync(cancellationToken);
+        return await grain.ScheduleAsync(TaskId, request).AsTask().WaitAsync(cancellationToken);
     }
 
     public async ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
