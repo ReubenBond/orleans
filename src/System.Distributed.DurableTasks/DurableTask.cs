@@ -115,18 +115,26 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
         // Ensure the task id is set.
         _ = TrySetTaskId(null);
 
-        if (Task is not ISchedulableTask schedulableTask)
+        IScheduledTaskHandle handle;
+        if (ParentContext is { } parentContext)
+        {
+            handle = await parentContext.ScheduleChildTaskAsync(_taskId, Task, cancellationToken);
+        }
+        else if (Task is ISchedulableTask schedulableTask)
+        {
+            var response = await schedulableTask.ScheduleAsync(TaskId, cancellationToken);
+            if (response.IsCompleted)
+            {
+                return new CompletedScheduledDurableTask(TaskId, response);
+            }
+
+            handle = schedulableTask.GetHandle(TaskId);
+        }
+        else
         {
             throw ConfiguredDurableTask.GetNonSchedulableTaskException();
         }
 
-        var response = await schedulableTask.ScheduleAsync(TaskId, cancellationToken);
-        if (response.IsCompleted)
-        {
-            return new CompletedScheduledDurableTask(TaskId, response);
-        }
-
-        var handle = schedulableTask.GetHandle(TaskId);
         return new ScheduledDurableTask(handle);
     }
 
@@ -136,12 +144,8 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
         // Ensure the task id is set.
         _ = TrySetTaskId(null);
 
-        if (Task is not ISchedulableTask schedulableTask)
-        {
-            throw ConfiguredDurableTask.GetNonSchedulableTaskException();
-        }
-
-        await schedulableTask.GetHandle(TaskId).CancelAsync(cancellationToken);
+        var handle = GetHandleOrThrow();
+        await handle.CancelAsync(cancellationToken);
         return true;
     }
 
@@ -151,13 +155,28 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
         // Ensure the task id is set.
         _ = TrySetTaskId(null);
 
-        if (Task is not ISchedulableTask schedulableTask)
+        var handle = GetHandleOrThrow();
+        var response = await handle.PollAsync(pollingOptions, cancellationToken);
+        return response.Status;
+    }
+
+    private readonly IScheduledTaskHandle GetHandleOrThrow()
+    {
+        IScheduledTaskHandle handle;
+        if (ParentContext is { } parentContext)
+        {
+            handle = parentContext.GetChildTaskHandle(TaskId);
+        }
+        else if (Task is ISchedulableTask schedulableTask)
+        {
+            handle = schedulableTask.GetHandle(TaskId);
+        }
+        else
         {
             throw ConfiguredDurableTask.GetNonSchedulableTaskException();
         }
 
-        var response = await schedulableTask.GetHandle(TaskId).PollAsync(pollingOptions, cancellationToken);
-        return response.Status;
+        return handle;
     }
 }
 
@@ -194,7 +213,7 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
     private ConfiguredDurableTaskCore<DurableTask<TResult>> _core = new(task);
 
     internal readonly DurableTask<TResult> Task => _core.Task;
-    internal TaskId TaskId => _core.TaskId;
+    internal readonly TaskId TaskId => _core.TaskId;
 
     public DurableTaskAwaiter<TResult> GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
 
@@ -211,18 +230,26 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
         // Ensure the task id is set.
         _core.TrySetTaskId(null);
 
-        if (Task is not ISchedulableTask schedulableTask)
+        IScheduledTaskHandle handle;
+        if (_core.ParentContext is { } parentContext)
+        {
+            handle = await parentContext.ScheduleChildTaskAsync(TaskId, Task, cancellationToken);
+        }
+        else if (Task is ISchedulableTask schedulableTask)
+        {
+            var response = await schedulableTask.ScheduleAsync(TaskId, cancellationToken);
+            if (response.IsCompleted)
+            {
+                return new CompletedScheduledDurableTask<TResult>(TaskId, response);
+            }
+
+            handle = schedulableTask.GetHandle(TaskId);
+        }
+        else
         {
             throw ConfiguredDurableTask.GetNonSchedulableTaskException();
         }
 
-        var response = await schedulableTask.ScheduleAsync(TaskId, cancellationToken);
-        if (response.IsCompleted)
-        {
-            return new CompletedScheduledDurableTask<TResult>(TaskId, response);
-        }
-
-        var handle = schedulableTask.GetHandle(TaskId);
         return new ScheduledDurableTask<TResult>(handle);
     }
 
