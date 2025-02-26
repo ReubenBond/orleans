@@ -4,6 +4,8 @@ public abstract partial class DurableExecutionContext(TaskId id)
 {
     private static readonly AsyncLocal<DurableExecutionContext?> Current = new();
     private readonly object _lockObj = new();
+    protected object SyncRoot => _lockObj;
+
     private List<CancellationCallbackRegistrationBase>? _cancellationCallbacks;
 
     public static DurableExecutionContext? CurrentContext => Current.Value;

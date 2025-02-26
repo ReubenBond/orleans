@@ -22,7 +22,6 @@ internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskGr
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         ThrowIfNotChildTaskId(taskId);
-
         return runtime.ScheduleChildAsync(taskId, task, cancellationToken);
     }
 
@@ -34,21 +33,24 @@ internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskGr
 
     protected override TaskId CreateChildTaskId(string? name)
     {
-        if (string.IsNullOrWhiteSpace(name))
+        lock (SyncRoot)
         {
-            var sequenceNumber = _nextSequenceNumber++;
-            return TaskId.Child(sequenceNumber.ToString(CultureInfo.InvariantCulture));
-        }
-        else
-        {
-            ref var nextSequenceNumber = ref CollectionsMarshal.GetValueRefOrAddDefault(_nextChildIds ??= [], name, out _);
-            var sequenceNumber = nextSequenceNumber++;
-            if (sequenceNumber > 0)
+            if (string.IsNullOrWhiteSpace(name))
             {
-                return TaskId.Child($"{name}.{sequenceNumber.ToString(CultureInfo.InvariantCulture)}");
+                var sequenceNumber = _nextSequenceNumber++;
+                return TaskId.Child(sequenceNumber.ToString(CultureInfo.InvariantCulture));
             }
+            else
+            {
+                ref var nextSequenceNumber = ref CollectionsMarshal.GetValueRefOrAddDefault(_nextChildIds ??= [], name, out _);
+                var sequenceNumber = nextSequenceNumber++;
+                if (sequenceNumber > 0)
+                {
+                    return TaskId.Child($"{name}.{sequenceNumber.ToString(CultureInfo.InvariantCulture)}");
+                }
 
-            return TaskId.Child(name);
+                return TaskId.Child(name);
+            }
         }
     }
 

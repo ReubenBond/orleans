@@ -9,7 +9,7 @@ internal static class DurableTaskMethodInvocation
     public static DurableTaskMethodInvocation<TResult, TStateMachine> Create<TResult, TStateMachine>(scoped ref TStateMachine stateMachine) where TStateMachine : IAsyncStateMachine => DurableTaskMethodInvocation<TResult, TStateMachine>.Create(ref stateMachine);
 }
 
-internal abstract class UntypedDurableTaskMethodInvocation : DurableTask, IDurableTaskMethodInvocation
+internal abstract class UntypedDurableTaskMethodInvocation : DurableTask
 {
     public abstract void SetResult();
 
@@ -75,7 +75,7 @@ internal sealed class UntypedDurableTaskMethodInvocation<TStateMachine> : Untype
 /// <summary>
 /// Represents a locally-executing <see cref="DurableTask{TResult}"/> method.
 /// </summary>
-internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResult>, IDurableTaskMethodInvocation
+internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResult>
 {
     public abstract void SetResult(TResult result);
     public abstract void SetException(Exception exception);
@@ -137,11 +137,4 @@ internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : Dura
     public DurableTaskResponse GetResult(short token) => _completion.GetResult(token);
     public ValueTaskSourceStatus GetStatus(short token) => _completion.GetStatus(token);
     public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) => _completion.OnCompleted(continuation, state, token, flags);
-}
-
-/// <summary>
-/// Support for converting awaiting the completion of a <see cref="DurableTaskMethodInvocation{TResult}"/> instance which has been cast to an untyped <see cref="DurableTask"/> instance.
-/// </summary>
-internal interface IDurableTaskMethodInvocation
-{
 }

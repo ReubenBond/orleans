@@ -367,9 +367,9 @@ internal sealed class DelegateDurableTask<TResult>(Func<CancellationToken, TResu
     /// <inheritdoc/>
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
     {
+        DurableExecutionContext.SetCurrentContext(context, out var previousContext);
         try
         {
-            DurableExecutionContext.SetCurrentContext(context);
             using var cts = new CancellationTokenSource();
             using var registration = context.RegisterCancellationCallback(static (cts, ct) => cts!.CancelAsync(), cts);
             return new(DurableTaskResponse.FromResult(func(cts.Token)));
@@ -377,6 +377,10 @@ internal sealed class DelegateDurableTask<TResult>(Func<CancellationToken, TResu
         catch (Exception exception)
         {
             return new(DurableTaskResponse.FromException(exception));
+        }
+        finally
+        {
+            DurableExecutionContext.SetCurrentContext(previousContext);
         }
     }
 }
@@ -389,9 +393,9 @@ internal sealed class DelegateDurableTask(Action<CancellationToken> func) : Dura
     /// <inheritdoc/>
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
     {
+        DurableExecutionContext.SetCurrentContext(context, out var previousContext);
         try
         {
-            DurableExecutionContext.SetCurrentContext(context);
             using var cts = new CancellationTokenSource();
             using var registration = context.RegisterCancellationCallback(static (cts, ct) => cts!.CancelAsync(), cts);
             func(cts.Token);
@@ -400,6 +404,10 @@ internal sealed class DelegateDurableTask(Action<CancellationToken> func) : Dura
         catch (Exception exception)
         {
             return new(DurableTaskResponse.FromException(exception));
+        }
+        finally
+        {
+            DurableExecutionContext.SetCurrentContext(previousContext);
         }
     }
 }
@@ -502,6 +510,7 @@ internal sealed class DelegateDurableTaskWithState<TState, TResult>(Func<TState,
     /// <inheritdoc/>
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
     {
+        DurableExecutionContext.SetCurrentContext(context, out var previousContext);
         try
         {
             DurableExecutionContext.SetCurrentContext(context);
@@ -512,6 +521,10 @@ internal sealed class DelegateDurableTaskWithState<TState, TResult>(Func<TState,
         catch (Exception exception)
         {
             return new(DurableTaskResponse.FromException(exception));
+        }
+        finally
+        {
+            DurableExecutionContext.SetCurrentContext(previousContext);
         }
     }
 }
@@ -524,6 +537,7 @@ internal sealed class DelegateDurableTaskWithState<TState>(Action<TState, Cancel
     /// <inheritdoc/>
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
     {
+        DurableExecutionContext.SetCurrentContext(context, out var previousContext);
         try
         {
             DurableExecutionContext.SetCurrentContext(context);
@@ -535,6 +549,10 @@ internal sealed class DelegateDurableTaskWithState<TState>(Action<TState, Cancel
         catch (Exception exception)
         {
             return new(DurableTaskResponse.FromException(exception));
+        }
+        finally
+        {
+            DurableExecutionContext.SetCurrentContext(previousContext);
         }
     }
 }

@@ -10,26 +10,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.DurableTasks;
-using Orleans.Runtime.Placement;
 
 namespace Orleans.Runtime.DurableTasks;
 
-internal sealed class DurableTaskGrainRuntimeShared(
-    IGrainContextAccessor grainContextAccessor,
-    TimeProvider timeProvider,
-    PlacementStrategyResolver placementStrategyResolver,
-    IGrainFactory grainFactory,
-    ILogger<DurableTaskGrainRuntime> logger)
-{
-    public IGrainContextAccessor GrainContextAccessor { get; } = grainContextAccessor;
-    public TimeProvider TimeProvider { get; } = timeProvider;
-    public ILogger<DurableTaskGrainRuntime> Logger { get; } = logger;
-    public PlacementStrategyResolver PlacementStrategyResolver { get; } = placementStrategyResolver;
-    public IGrainFactory GrainFactory { get; } = grainFactory;
-    public CleanupPolicy DefaultCleanupPolicy { get; } = new() { CleanupAge = TimeSpan.FromDays(1) };
-}
-
-internal sealed class DurableTaskGrainRuntime(
+internal sealed partial class DurableTaskGrainRuntime(
     IDurableTaskGrainStorage storage,
     DurableTaskGrainRuntimeShared shared) : IDurableTaskGrainRuntime, IDurableTaskGrainExtension
 {
@@ -38,7 +22,6 @@ internal sealed class DurableTaskGrainRuntime(
     private readonly Dictionary<TaskId, IScheduledTaskHandle> _taskHandles = [];
     private readonly DurableTaskGrainRuntimeShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
-    //private readonly AsyncLock _scheduleLock = new();
 
     // TODO: Cancel during deactivation.
     // Then drain all tasks.
@@ -108,30 +91,6 @@ internal sealed class DurableTaskGrainRuntime(
     /// <returns>A <see cref="ValueTask"/> representing the work performed.</returns>
     ValueTask IDurableTaskObserver.OnResponseAsync(TaskId taskId, DurableTaskResponse response)
     {
-        /*
-        /*
-        if (!TryGetExecutionContext(taskId, out var executionContext))
-        {
-            // No such task. This may be because this client has already received a response for this task and removed its entry for it.
-            // TODO: Perhaps this should log at a lower level since it is likely not the symptom of a bug or exceptional condition.
-            _shared.Logger.LogWarning("Received response for unknown task '{TaskId}': '{Response}'", taskId, response);
-            return;
-        }
-        if (!_storage.TryGetTask(taskId, out var state))
-        {
-            _shared.Logger.LogDebug("Received response for unknown task '{TaskId}': '{Response}'", taskId, response);
-        }
-
-
-        // Persist the response before responding to the caller.
-        // TODO: If this write (or just about any state write) fails, then we need to undo the update to the task state.
-        // The most straightforward way to do that might be to take a copy before mutating it.
-        _storage.SetResponse(taskId, state, response);
-        await _storage.WriteAsync(_deactivationCts.Token);
-
-        // Propagate the response to the application.
-        //DurableTaskRuntimeHelper.SetResult(executionContext, response);
-        */
         throw new NotImplementedException("TODO");
     }
 
@@ -242,27 +201,6 @@ internal sealed class DurableTaskGrainRuntime(
         _runningRequests.Add(taskId, invocationTask);
         return handle;
     }
-
-    /*
-    private async Task InvokeRequest(TaskId taskId, IDurableTaskRequest request, GrainDurableExecutionContext context)
-    {
-        try
-        {
-            DurableTaskRuntimeHelper.SetCurrentContext(context);
-            var response = await request.InvokeImplementation(context);
-            await SetResponseAsync(taskId, response, _deactivationCts.Token);
-        }
-        catch (Exception exception)
-        {
-            _shared.Logger.LogError(exception, "{Id} error invoking durable task request '{Request}'.", GrainId, request);
-            await SetResponseAsync(taskId, DurableTaskResponse.FromException(exception), _deactivationCts.Token);
-        }
-        finally
-        {
-            _runningRequests.Remove(taskId);
-        }
-    }
-    */
 
     private async Task Invoke<TState>(Func<TState, DurableTask> createTask, TState state, GrainDurableExecutionContext context)
     {
@@ -443,6 +381,7 @@ internal sealed class DurableTaskGrainRuntime(
 
                         _storage.RemoveTask(childTaskId);
                         _executionContexts.Remove(childTaskId);
+                        _taskHandles.Remove(childTaskId);
                     }
                 }
 
@@ -454,6 +393,7 @@ internal sealed class DurableTaskGrainRuntime(
 
                 _storage.RemoveTask(taskId);
                 _executionContexts.Remove(taskId);
+                _taskHandles.Remove(taskId);
             }
         }
 
@@ -636,56 +576,5 @@ internal sealed class DurableTaskGrainRuntime(
         }
 
         return handle;
-    }
-
-    private class TaskHandle(TaskId taskId, DurableTaskGrainRuntime runtime) : IScheduledTaskHandle
-    {
-        private readonly TaskCompletionSource<DurableTaskResponse> _responseTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public Task<DurableTaskResponse> ResponseTask => _responseTcs.Task;
-
-        public TaskId TaskId { get; } = taskId;
-
-        public bool IsRunning { get; set; }
-
-        public async ValueTask CancelAsync(CancellationToken cancellationToken)
-        {
-            await runtime.SignalCancellationAsync(TaskId, cancellationToken);
-        }
-
-        public async ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
-        {
-            if (options.PollTimeout > TimeSpan.Zero)
-            {
-                await ((Task)ResponseTask).WaitAsync(options.PollTimeout, runtime._shared.TimeProvider, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
-            }
-
-            if (ResponseTask.IsCompleted)
-            {
-                return await ResponseTask;
-            }
-
-            return DurableTaskResponse.Pending;
-        }
-
-        public async ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken)
-        {
-            return await ResponseTask.WaitAsync(cancellationToken);
-        }
-
-        public bool TrySetResponse(DurableTaskResponse response) => _responseTcs.TrySetResult(response);
-    }
-
-    private sealed class CompletedTaskHandle(TaskId taskId, DurableTaskResponse response) : IScheduledTaskHandle
-    {
-        public TaskId TaskId => taskId;
-
-        public DurableTaskResponse Response => response;
-
-        public ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
-
-        public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken) => new(response);
-
-        public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken) => new(response);
     }
 }
