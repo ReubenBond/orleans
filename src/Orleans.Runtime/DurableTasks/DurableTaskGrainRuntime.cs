@@ -192,7 +192,9 @@ internal sealed class DurableTaskGrainRuntime(
             var executionContext = CreateExecutionContext(taskId);
             handle = new TaskHandle(taskId, this) { IsRunning = true };
             _taskHandles.Add(taskId, handle);
-            _runningRequests.Add(taskId, InvokeRequest(taskId, request, executionContext));
+            request.SetTarget(_shared.GrainContextAccessor.GrainContext);
+            var invocationTask = Invoke(static request => request.CreateTask(), request, executionContext);
+            _runningRequests.Add(taskId, invocationTask);
 
             return subscribed ? DurableTaskResponse.Subscribed : DurableTaskResponse.Pending;
         }
@@ -236,17 +238,18 @@ internal sealed class DurableTaskGrainRuntime(
         var executionContext = CreateExecutionContext(taskId);
         handle =  new TaskHandle(taskId, this) { IsRunning = true };
         _taskHandles.Add(taskId, handle);
-        _runningRequests.Add(taskId, InvokeChildTask(taskId, durableTask, executionContext));
+        var invocationTask = Invoke(static task => task, durableTask, executionContext);
+        _runningRequests.Add(taskId, invocationTask);
         return handle;
     }
 
-    private async Task InvokeRequest(TaskId taskId, IDurableTaskRequest request, GrainDurableExecutionContext context, CancellationToken cancellationToken)
+    /*
+    private async Task InvokeRequest(TaskId taskId, IDurableTaskRequest request, GrainDurableExecutionContext context)
     {
         try
         {
             DurableTaskRuntimeHelper.SetCurrentContext(context);
-            request.SetTarget(_shared.GrainContextAccessor.GrainContext);
-            var response = await request.InvokeImplementation(context, cancellationToken);
+            var response = await request.InvokeImplementation(context);
             await SetResponseAsync(taskId, response, _deactivationCts.Token);
         }
         catch (Exception exception)
@@ -259,23 +262,24 @@ internal sealed class DurableTaskGrainRuntime(
             _runningRequests.Remove(taskId);
         }
     }
+    */
 
-    private async Task InvokeChildTask(TaskId taskId, DurableTask durableTask, GrainDurableExecutionContext context, CancellationToken cancellationToken)
+    private async Task Invoke<TState>(Func<TState, DurableTask> createTask, TState state, GrainDurableExecutionContext context)
     {
         try
         {
             DurableTaskRuntimeHelper.SetCurrentContext(context);
-            var response = await DurableTaskRuntimeHelper.RunAsync(durableTask, context, cancellationToken);
-            await SetResponseAsync(taskId, response, _deactivationCts.Token);
+            var response = await DurableTaskRuntimeHelper.RunAsync(createTask(state), context);
+            await SetResponseAsync(context.TaskId, response, _deactivationCts.Token);
         }
         catch (Exception exception)
         {
-            _shared.Logger.LogError(exception, "{Id} error invoking durable task '{DurableTask}'.", GrainId, durableTask);
-            await SetResponseAsync(taskId, DurableTaskResponse.FromException(exception), _deactivationCts.Token);
+            _shared.Logger.LogError(exception, "{Id} error invoking durable task '{DurableTask}'.", GrainId, createTask);
+            await SetResponseAsync(context.TaskId, DurableTaskResponse.FromException(exception), _deactivationCts.Token);
         }
         finally
         {
-            _runningRequests.Remove(taskId);
+            _runningRequests.Remove(context.TaskId);
         }
     }
 
