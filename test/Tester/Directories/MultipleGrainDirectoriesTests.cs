@@ -1,4 +1,5 @@
 using Orleans.Internal;
+using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces.Directories;
@@ -27,8 +28,6 @@ namespace Tester.Directories
             Assert.Equal(++primaryCounter, await grainOnSecondary.ProxyPing(grainOnPrimary));
             Assert.Equal(++secondaryCounter, await grainOnPrimary.ProxyPing(grainOnSecondary));
 
-            await Task.Delay(5000);
-
             // Shutdown the secondary silo
             await this.HostedCluster.StopSecondarySilosAsync();
 
@@ -38,26 +37,22 @@ namespace Tester.Directories
             Assert.Equal(1, await grainOnSecondary.Ping());
         }
 
-        private async Task<ICustomDirectoryGrain> GetGrainOnPrimary()
+        private Task<ICustomDirectoryGrain> GetGrainOnPrimary() => GetGrainOnSilo(HostedCluster.Silos[0].SiloAddress);
+
+
+        private Task<ICustomDirectoryGrain> GetGrainOnSecondary() => GetGrainOnSilo(HostedCluster.Silos[1].SiloAddress);
+
+        private async Task<ICustomDirectoryGrain> GetGrainOnSilo(SiloAddress siloAddress)
         {
             while (true)
             {
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, siloAddress);
                 var grain = this.GrainFactory.GetGrain<ICustomDirectoryGrain>(Guid.NewGuid());
                 var instanceId = await grain.GetRuntimeInstanceId();
-                if (instanceId.Contains(HostedCluster.Primary.SiloAddress.Endpoint.ToString()))
+                if (instanceId.Contains(siloAddress.Endpoint.ToString()))
                     return grain;
             }
         }
 
-        private async Task<ICustomDirectoryGrain> GetGrainOnSecondary()
-        {
-            while (true)
-            {
-                var grain = this.GrainFactory.GetGrain<ICustomDirectoryGrain>(Guid.NewGuid());
-                var instanceId = await grain.GetRuntimeInstanceId();
-                if (instanceId.Contains(HostedCluster.SecondarySilos[0].SiloAddress.Endpoint.ToString()))
-                    return grain;
-            }
-        }
     }
 }

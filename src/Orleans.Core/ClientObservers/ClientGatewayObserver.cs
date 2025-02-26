@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using Orleans.Messaging;
 using Orleans.Runtime;
 
@@ -12,7 +13,7 @@ namespace Orleans.ClientObservers
         /// Signals a client that it should stop sending messages to the specified gateway.
         /// </summary>
         /// <param name="gateway">The gateway</param>
-        void StopSendingToGateway(SiloAddress gateway);
+        Task StopSendingToGateway(SiloAddress gateway);
     }
 
     /// <summary>
@@ -36,7 +37,11 @@ namespace Orleans.ClientObservers
         }
 
         /// <inheritdoc />
-        public void StopSendingToGateway(SiloAddress gateway) => this.gatewayManager.MarkAsUnavailableForSend(gateway);
+        public Task StopSendingToGateway(SiloAddress gateway)
+        {
+            this.gatewayManager.MarkAsUnavailableForSend(gateway);
+            return Task.CompletedTask;
+        }
 
         internal override ObserverGrainId GetObserverGrainId(ClientGrainId clientId) => ObserverGrainId.Create(clientId, ScopedId);
 

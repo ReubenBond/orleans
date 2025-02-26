@@ -84,21 +84,24 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal async Task SendStopSendMessages(IInternalGrainFactory grainFactory)
+        internal async Task SendStopSendMessages(IInternalGrainFactory grainFactory, CancellationToken cancellationToken)
         {
+            List<Task> tasks;
             lock (clients)
             {
+                tasks = new List<Task>(clients.Count);
                 foreach (var client in clients)
                 {
                     if (client.Value.IsConnected)
                     {
                         var observer = ClientGatewayObserver.GetObserver(grainFactory, client.Key);
-                        observer.StopSendingToGateway(this.gatewayAddress);
+                        tasks.Add(observer.StopSendingToGateway(this.gatewayAddress));
                     }
                 }
             }
 
-            await Task.Delay(this.messagingOptions.ClientGatewayShutdownNotificationTimeout);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            await Task.WhenAny(Task.Delay(this.messagingOptions.ClientGatewayShutdownNotificationTimeout, cts.Token), Task.WhenAll(tasks)).WaitAsync(cts.Token).ConfigureAwait(false);
         }
 
         internal async Task StopAsync()

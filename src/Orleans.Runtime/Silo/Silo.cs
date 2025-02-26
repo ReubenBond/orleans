@@ -514,7 +514,7 @@ namespace Orleans.Runtime
                 try
                 {
                     await lifecycleSchedulingSystemTarget
-                        .QueueTask(() => this.messageCenter.Gateway.SendStopSendMessages(this.grainFactory)).WaitAsync(ct);
+                        .QueueTask(() => this.messageCenter.Gateway.SendStopSendMessages(this.grainFactory, ct)).WaitAsync(ct);
                 }
                 catch (Exception exception)
                 {

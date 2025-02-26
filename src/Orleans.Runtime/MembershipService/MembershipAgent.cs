@@ -15,14 +15,14 @@ namespace Orleans.Runtime.MembershipService
     /// </summary>
     internal class MembershipAgent : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, IDisposable, MembershipAgent.ITestAccessor
     {
-        private readonly CancellationTokenSource cancellation = new CancellationTokenSource();
+        private readonly CancellationTokenSource _shutdownCts = new CancellationTokenSource();
         private readonly MembershipTableManager tableManager;
         private readonly ILocalSiloDetails localSilo;
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly ClusterMembershipOptions clusterMembershipOptions;
         private readonly ILogger<MembershipAgent> log;
         private readonly IRemoteSiloProber siloProber;
-        private readonly IAsyncTimer iAmAliveTimer;
+        private readonly IAsyncTimer _iAmAliveTimer;
         private Func<DateTime> getUtcDateTime = () => DateTime.UtcNow;
 
         public MembershipAgent(
@@ -40,7 +40,7 @@ namespace Orleans.Runtime.MembershipService
             this.clusterMembershipOptions = options.Value;
             this.log = log;
             this.siloProber = siloProber;
-            this.iAmAliveTimer = timerFactory.Create(
+            this._iAmAliveTimer = timerFactory.Create(
                 this.clusterMembershipOptions.IAmAliveTablePublishTimeout,
                 nameof(UpdateIAmAlive));
         }
@@ -60,7 +60,7 @@ namespace Orleans.Runtime.MembershipService
             try
             {
                 TimeSpan? onceOffDelay = default;
-                while (await this.iAmAliveTimer.NextTick(onceOffDelay) && !this.tableManager.CurrentStatus.IsTerminating())
+                while (await this._iAmAliveTimer.NextTick(onceOffDelay).WaitAsync(_shutdownCts.Token))
                 {
                     onceOffDelay = default;
 
@@ -68,7 +68,7 @@ namespace Orleans.Runtime.MembershipService
                     {
                         var stopwatch = ValueStopwatch.StartNew();
                         ((ITestAccessor)this).OnUpdateIAmAlive?.Invoke();
-                        await this.tableManager.UpdateIAmAlive();
+                        await this.tableManager.UpdateIAmAlive().WaitAsync(_shutdownCts.Token);
                         if (this.log.IsEnabled(LogLevel.Trace)) this.log.LogTrace("Updating IAmAlive took {Elapsed}", stopwatch.Elapsed);
                     }
                     catch (Exception exception)
@@ -82,6 +82,10 @@ namespace Orleans.Runtime.MembershipService
                         onceOffDelay = TimeSpan.FromMilliseconds(200);
                     }
                 }
+            }
+            catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+            {
+                // Ignore and continue shutting down.
             }
             catch (Exception exception) when (this.fatalErrorHandler.IsUnexpected(exception))
             {
@@ -330,11 +334,7 @@ namespace Orleans.Runtime.MembershipService
 
                 async Task OnRuntimeInitializeStop(CancellationToken ct)
                 {
-                    this.iAmAliveTimer.Dispose();
-                    this.cancellation.Cancel();
-                    await Task.WhenAny(
-                        Task.Run(() => this.BecomeDead()),
-                        Task.Delay(TimeSpan.FromMinutes(1)));
+                    await Task.Run(() => this.BecomeDead());
                 }
 
                 lifecycle.Subscribe(
@@ -347,7 +347,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 async Task AfterRuntimeGrainServicesStart(CancellationToken ct)
                 {
-                    await Task.Run(() => this.BecomeJoining());
+                    await Task.Run(() => this.BecomeJoining()).WaitAsync(ct);
                 }
 
                 Task AfterRuntimeGrainServicesStop(CancellationToken ct) => Task.CompletedTask;
@@ -360,18 +360,18 @@ namespace Orleans.Runtime.MembershipService
             }
 
             {
-                var tasks = new List<Task>();
+                Task updateIAmAliveLoop = null;
 
                 async Task OnBecomeActiveStart(CancellationToken ct)
                 {
-                    await Task.Run(() => this.BecomeActive());
-                    tasks.Add(Task.Run(() => this.UpdateIAmAlive()));
+                    await Task.Run(() => this.BecomeActive()).WaitAsync(ct);
+                    updateIAmAliveLoop = Task.Run(() => this.UpdateIAmAlive());
                 }
 
                 async Task OnBecomeActiveStop(CancellationToken ct)
                 {
-                    this.iAmAliveTimer.Dispose();
-                    this.cancellation.Cancel(throwOnFirstException: false);
+                    this._iAmAliveTimer.Dispose();
+                    this._shutdownCts.Cancel(throwOnFirstException: false);
                     var cancellationTask = ct.WhenCancelled();
 
                     if (ct.IsCancellationRequested)
@@ -380,17 +380,10 @@ namespace Orleans.Runtime.MembershipService
                     }
                     else
                     {
-                        // Allow some minimum time for graceful shutdown.
-                        var gracePeriod = Task.WhenAll(Task.Delay(ClusterMembershipOptions.ClusteringShutdownGracePeriod), cancellationTask);
-                        var task = await Task.WhenAny(gracePeriod, this.BecomeShuttingDown());
-                        if (ReferenceEquals(task, gracePeriod))
+                        await this.BecomeShuttingDown().WaitAsync(ct);
+                        if (updateIAmAliveLoop is not null)
                         {
-                            this.log.LogWarning("Graceful shutdown aborted: starting ungraceful shutdown");
-                            await Task.Run(() => this.BecomeStopping());
-                        }
-                        else
-                        {
-                            await Task.WhenAny(gracePeriod, Task.WhenAll(tasks));
+                            await updateIAmAliveLoop.WaitAsync(ct);
                         }
                     }
                 }
@@ -405,9 +398,9 @@ namespace Orleans.Runtime.MembershipService
 
         public void Dispose()
         {
-            this.iAmAliveTimer.Dispose();
+            this._iAmAliveTimer.Dispose();
         }
 
-        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, out string reason) => this.iAmAliveTimer.CheckHealth(lastCheckTime, out reason);
+        bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, out string reason) => this._iAmAliveTimer.CheckHealth(lastCheckTime, out reason);
     }
 }
