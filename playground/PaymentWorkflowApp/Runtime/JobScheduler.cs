@@ -394,7 +394,7 @@ public class JobScheduler(IJobStorage storage, ILogger<JobScheduler> logger)
             return _jobScheduler.ScheduleAsync(this, taskId, cancellationToken);
         }
 
-        protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext, CancellationToken cancellationToken)
+        protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
         {
             var handler = _jobScheduler._handlers[Type];
             DurableTaskResponse response;

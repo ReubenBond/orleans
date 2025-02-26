@@ -27,7 +27,7 @@ public interface IDurableTaskRequest : IRequest
     /// Invoke the method on the target.
     /// </summary>
     /// <returns>The result of invocation.</returns>
-    ValueTask<DurableTaskResponse> InvokeImplementation(DurableExecutionContext executionContext, CancellationToken cancellationToken);
+    ValueTask<DurableTaskResponse> InvokeImplementation(DurableExecutionContext executionContext);
 
     /// <summary>
     /// Returns a string representation of the request.
@@ -161,7 +161,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     }
 
     /// <inheritdoc/>
-    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext, CancellationToken cancellationToken)
+    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
@@ -195,7 +195,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
-    ValueTask<DurableTaskResponse> IDurableTaskRequest.InvokeImplementation(DurableExecutionContext executionContext, CancellationToken cancellationToken) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext, cancellationToken);
+    ValueTask<DurableTaskResponse> IDurableTaskRequest.InvokeImplementation(DurableExecutionContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
 
     // Generated. This invokes the target method directly.
     protected abstract DurableTask InvokeInner();
@@ -314,7 +314,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     }
 
     /// <inheritdoc/>
-    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext, CancellationToken cancellationToken)
+    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:

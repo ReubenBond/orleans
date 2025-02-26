@@ -14,7 +14,7 @@ public abstract partial class DurableExecutionContext(TaskId id)
 
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     public TaskId TaskId { get; } = id;
-    private CancellationToken CancellationToken => _cancellationTokenSource.Token;
+    internal CancellationToken CancellationToken => _cancellationTokenSource.Token;
     protected internal abstract ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
     protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
     protected internal abstract TaskId CreateChildTaskId(string? name);
