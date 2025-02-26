@@ -50,9 +50,8 @@ internal sealed class DurableTaskGrainRuntime(
     /// Creates a new execution context, registering it in the local collection of execution contexts.
     /// </summary>
     /// <param name="taskId">The task id.</param>
-    /// <param name="state">The task state.</param>
     /// <returns>The new execution context.</returns>
-    private GrainDurableExecutionContext CreateExecutionContext(TaskId taskId, IDurableTaskState state) => _executionContexts[taskId] = new(taskId, this, state);
+    private GrainDurableExecutionContext CreateExecutionContext(TaskId taskId) => _executionContexts[taskId] = new(taskId, this);
 
     /// <summary>
     /// Gets the execution context corresponding to the provided task, if it exists, and returns it.
@@ -190,12 +189,10 @@ internal sealed class DurableTaskGrainRuntime(
             await _storage.WriteAsync(_deactivationCts.Token);
 
             // Schedule the task with the runtime.
-            var executionContext = CreateExecutionContext(taskId, state);
-            _runningRequests.Add(taskId, InvokeRequest(taskId, request, executionContext));
-
-            // Otherwise, schedule and run the task.
-            handle = new ScheduledTaskHandle(taskId, this) { IsRunning = true };
+            var executionContext = CreateExecutionContext(taskId);
+            handle = new TaskHandle(taskId, this) { IsRunning = true };
             _taskHandles.Add(taskId, handle);
+            _runningRequests.Add(taskId, InvokeRequest(taskId, request, executionContext));
 
             return subscribed ? DurableTaskResponse.Subscribed : DurableTaskResponse.Pending;
         }
@@ -209,12 +206,12 @@ internal sealed class DurableTaskGrainRuntime(
         }
 
         // If the task is currently running, return the existing handle.
-        if (TryGetScheduledTaskHandle(taskId, out var handle) && (handle is not ScheduledTaskHandle localHandle || localHandle.IsRunning))
+        if (TryGetScheduledTaskHandle(taskId, out var handle) && (handle is not TaskHandle localHandle || localHandle.IsRunning))
         {
             return handle;
         }
 
-        var storedTask = _storage.GetOrCreateTask(taskId, null);
+        var state = _storage.GetOrCreateTask(taskId, null);
 
         // If the task is schedulable, schedule it.
         if (durableTask is ISchedulableTask schedulableTask)
@@ -222,10 +219,10 @@ internal sealed class DurableTaskGrainRuntime(
             var schedulingResponse = await schedulableTask.ScheduleAsync(taskId, cancellationToken);
             if (schedulingResponse.IsCompleted)
             {
-                _storage.SetResponse(taskId, storedTask, schedulingResponse);
+                _storage.SetResponse(taskId, state, schedulingResponse);
                 await _storage.WriteAsync(cancellationToken);
 
-                return new CompletedScheduledTaskHandle(taskId, schedulingResponse);
+                return new CompletedTaskHandle(taskId, schedulingResponse);
             }
             
             // Schedule the task and store a handle to it in-memory.
@@ -236,20 +233,20 @@ internal sealed class DurableTaskGrainRuntime(
         }
 
         // Otherwise, the task must be a local method invocation, so create an execution context for it and execute it.
-        var state = _storage.GetOrCreateTask(taskId, null);
-        var executionContext = CreateExecutionContext(taskId, state);
-        handle =  new ScheduledTaskHandle(taskId, this) { IsRunning = true };
+        var executionContext = CreateExecutionContext(taskId);
+        handle =  new TaskHandle(taskId, this) { IsRunning = true };
         _taskHandles.Add(taskId, handle);
         _runningRequests.Add(taskId, InvokeChildTask(taskId, durableTask, executionContext));
         return handle;
     }
 
-    private async Task InvokeRequest(TaskId taskId, IDurableTaskRequest request, GrainDurableExecutionContext context)
+    private async Task InvokeRequest(TaskId taskId, IDurableTaskRequest request, GrainDurableExecutionContext context, CancellationToken cancellationToken)
     {
         try
         {
+            DurableTaskRuntimeHelper.SetCurrentContext(context);
             request.SetTarget(_shared.GrainContextAccessor.GrainContext);
-            var response = await request.InvokeImplementation(context);
+            var response = await request.InvokeImplementation(context, cancellationToken);
             await SetResponseAsync(taskId, response, _deactivationCts.Token);
         }
         catch (Exception exception)
@@ -263,12 +260,12 @@ internal sealed class DurableTaskGrainRuntime(
         }
     }
 
-    private async Task InvokeChildTask(TaskId taskId, DurableTask durableTask, GrainDurableExecutionContext context)
+    private async Task InvokeChildTask(TaskId taskId, DurableTask durableTask, GrainDurableExecutionContext context, CancellationToken cancellationToken)
     {
         try
         {
             DurableTaskRuntimeHelper.SetCurrentContext(context);
-            var response = await DurableTaskRuntimeHelper.RunAsync(durableTask, context);
+            var response = await DurableTaskRuntimeHelper.RunAsync(durableTask, context, cancellationToken);
             await SetResponseAsync(taskId, response, _deactivationCts.Token);
         }
         catch (Exception exception)
@@ -310,21 +307,11 @@ internal sealed class DurableTaskGrainRuntime(
             // That is ok: we want to ensure that every client always sees the same result for a task, so it is important to persist the task before notifying the first client.
             _storage.SetResponse(taskId, state, response);
             await _storage.WriteAsync(cancellationToken);
-
-// TODO: 'Structured concurrency':
-// - Cancel all dangling child tasks now.
-// - Wait for all child tasks to complete before propagating the result to the caller.
-// - Emit diagnostic logs indicating that the task is waiting for its children to complete.
-// Only signal clients once the task itself has transitioned.
-
-// NOTE: For Structured Concurrency to work here, we need to track all child tasks.
-// That likely requires having a hook so that we can write state before any ScheduleAsync call is issued by one of our tasks.
-// So ScheduleAsync needs to call back into the parent context to launch (which it might already do...), giving us a way to write state before calling.
         }
 
         if (_taskHandles.TryGetValue(taskId, out var handle))
         {
-            if (handle is ScheduledTaskHandle localHandle)
+            if (handle is TaskHandle localHandle)
             {
                 localHandle.TrySetResponse(response);
             }
@@ -387,7 +374,7 @@ internal sealed class DurableTaskGrainRuntime(
             }
 
             // TODO: Make this configurable and probably use exponential back-off, potentially with some coordination with other tasks.
-            await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
+            await Task.Delay(TimeSpan.FromSeconds(10), _shared.TimeProvider, cancellationToken);
         }
     }
 
@@ -469,41 +456,6 @@ internal sealed class DurableTaskGrainRuntime(
         return completedTaskIds is not null;
     }
 
-    private static bool AreRequestsEquivalent(IDurableTaskRequest left, IDurableTaskRequest right)
-    {
-        if (!string.Equals(left.GetInterfaceName(), right.GetInterfaceName(), StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        if (!string.Equals(left.GetMethodName(), right.GetMethodName(), StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        if (left.GetArgumentCount() != right.GetArgumentCount())
-        {
-            return false;
-        }
-
-        for (var arg = 0; arg < left.GetArgumentCount(); arg++)
-        {
-            var leftValue = left.GetArgument(arg);
-            var rightValue = right.GetArgument(arg);
-            if (leftValue is null ^ rightValue is null)
-            {
-                return false;
-            }
-
-            if (!Equals(left, right))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     /// <inheritdoc/>
     public async ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, SubscribeOrPollOptions options)
     {
@@ -583,21 +535,19 @@ internal sealed class DurableTaskGrainRuntime(
 
         List<GrainDurableExecutionContext> canceledContexts = [];
         List<IScheduledTaskHandle> canceledHandles = [];
-        if (!RequestCancellationCore(taskId, taskState, canceledContexts, canceledHandles))
+        if (RequestCancellationCore(taskId, taskState, canceledContexts, canceledHandles))
         {
-            // No need to write state.
-            return;
+            // Something changed, write state.
+            await _storage.WriteAsync(cancellationToken);
         }
 
-        // Write state.
-        await _storage.WriteAsync(cancellationToken);
-
-        // If any task is waiting on this, notify them now.
+        // Cancel all tasks that we found.
         var tasks = new List<Task>(canceledContexts.Count);
         foreach (var context in canceledContexts)
         {
             tasks.Add(DurableTaskRuntimeHelper.CancelAsync(context, cancellationToken));
         }
+
         foreach (var handle in canceledHandles)
         {
             tasks.Add(handle.CancelAsync(cancellationToken).AsTask());
@@ -659,13 +609,13 @@ internal sealed class DurableTaskGrainRuntime(
             if (taskState.Result is { } response)
             {
                 Debug.Assert(response.IsCompleted);
-                handle = new CompletedScheduledTaskHandle(taskId, response);
+                handle = new CompletedTaskHandle(taskId, response);
                 return true;
             }
             else
             {
                 // Create a new handle for the task.
-                handle = new ScheduledTaskHandle(taskId, this);
+                handle = new TaskHandle(taskId, this);
                 _taskHandles.Add(taskId, handle);
                 return true;
             }
@@ -684,7 +634,7 @@ internal sealed class DurableTaskGrainRuntime(
         return handle;
     }
 
-    private class ScheduledTaskHandle(TaskId taskId, DurableTaskGrainRuntime runtime) : IScheduledTaskHandle
+    private class TaskHandle(TaskId taskId, DurableTaskGrainRuntime runtime) : IScheduledTaskHandle
     {
         private readonly TaskCompletionSource<DurableTaskResponse> _responseTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -703,7 +653,7 @@ internal sealed class DurableTaskGrainRuntime(
         {
             if (options.PollTimeout > TimeSpan.Zero)
             {
-                await ((Task)ResponseTask).WaitAsync(options.PollTimeout, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+                await ((Task)ResponseTask).WaitAsync(options.PollTimeout, runtime._shared.TimeProvider, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
             }
 
             if (ResponseTask.IsCompleted)
@@ -722,7 +672,7 @@ internal sealed class DurableTaskGrainRuntime(
         public bool TrySetResponse(DurableTaskResponse response) => _responseTcs.TrySetResult(response);
     }
 
-    private sealed class CompletedScheduledTaskHandle(TaskId taskId, DurableTaskResponse response) : IScheduledTaskHandle
+    private sealed class CompletedTaskHandle(TaskId taskId, DurableTaskResponse response) : IScheduledTaskHandle
     {
         public TaskId TaskId => taskId;
 

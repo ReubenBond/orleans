@@ -10,7 +10,7 @@ using Orleans.DurableTasks;
 
 namespace Orleans.Runtime.DurableTasks;
 
-internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskGrainRuntime runtime, IDurableTaskState state) : DurableExecutionContext(taskId)
+internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskGrainRuntime runtime) : DurableExecutionContext(taskId)
 {
     // The sequence number for named children.
     private Dictionary<string, int>? _nextChildIds;
@@ -18,23 +18,19 @@ internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskGr
     // The sequence number for unnamed children.
     private int _nextSequenceNumber = 0;
 
-    internal IDurableTaskGrainRuntime Runtime { get; } = runtime;
-
-    internal IDurableTaskState State { get; } = state;
-    public DurableTask? Task { get; internal set; }
-
-    protected override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+    protected override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask task, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
-        if (!TaskId.IsParentOf(taskId))
-        {
-            throw new InvalidOperationException($"The provided task ID '{taskId}' is not a child of this task '{TaskId}'.");
-        }
+        ThrowIfNotChildTaskId(taskId);
 
-        return Runtime.ScheduleChildAsync(taskId, taskDefinition, cancellationToken);
+        return runtime.ScheduleChildAsync(taskId, task, cancellationToken);
     }
 
-    protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId) => Runtime.GetScheduledTaskHandle(taskId);
+    protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId)
+    {
+        ThrowIfNotChildTaskId(taskId);
+        return runtime.GetScheduledTaskHandle(taskId);
+    }
 
     protected override TaskId CreateChildTaskId(string? name)
     {
@@ -56,37 +52,11 @@ internal sealed class GrainDurableExecutionContext(TaskId taskId, IDurableTaskGr
         }
     }
 
-    protected override async Task CancelAsyncCore(CancellationToken cancellationToken)
+    private void ThrowIfNotChildTaskId(TaskId taskId)
     {
-        if (Task is ISchedulableTask schedulableTask)
+        if (!TaskId.IsParentOf(taskId))
         {
-            await schedulableTask.GetHandle(TaskId).CancelAsync(cancellationToken);
+            throw new InvalidOperationException($"The provided task ID '{taskId}' is not a child of this task '{TaskId}'.");
         }
     }
-
-    //public bool TryGetTaskResponse(TaskId taskId, [NotNullWhen(true)] out DurableTaskResponse? response) => Runtime.GetResponseOrCreateChildTask(taskId, out response);
-    //public void SetTaskResponse(TaskId taskId, DurableTaskResponse response) => Runtime.SetChildTaskResponse(taskId, response);
-
-    /*
-    protected override ValueTask SignalCancellationAsyncCore(CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // If already cancelling or terminated, return.
-        // Update state to signal cancellation if not already.
-        // Persist state.
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // Cancel the CTS passed to child tasks.
-        // Wait for children to terminate.
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // Set response to canceled (TaskCanceledException).
-        // (optional) write state.
-        // Return
-        return default;
-    }
-    */
 }

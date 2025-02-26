@@ -9,7 +9,7 @@ public static class DurableTaskRuntimeHelper
     /// <param name="task">The task.</param>
     /// <param name="context">The task context.</param>
     /// <returns>The result of invocation.</returns>
-    public static ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableExecutionContext context) => task.RunAsync(context);
+    public static ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableExecutionContext context, CancellationToken cancellationToken) => task.RunAsync(context, cancellationToken);
 
     /*
     /// <summary>

@@ -27,13 +27,44 @@ public interface IDurableTaskRequest : IRequest
     /// Invoke the method on the target.
     /// </summary>
     /// <returns>The result of invocation.</returns>
-    ValueTask<DurableTaskResponse> InvokeImplementation(DurableExecutionContext executionContext);
+    ValueTask<DurableTaskResponse> InvokeImplementation(DurableExecutionContext executionContext, CancellationToken cancellationToken);
 
     /// <summary>
     /// Returns a string representation of the request.
     /// </summary>
     /// <returns>A string representation of the request.</returns>
     public string ToMethodCallString() => ToMethodCallString(this);
+
+    internal static bool AreRequestsEquivalent(IDurableTaskRequest left, IDurableTaskRequest right)
+    {
+        if (!string.Equals(left.GetInterfaceName(), right.GetInterfaceName(), StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (!string.Equals(left.GetMethodName(), right.GetMethodName(), StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (left.GetArgumentCount() != right.GetArgumentCount())
+        {
+            return false;
+        }
+
+        for (var arg = 0; arg < left.GetArgumentCount(); arg++)
+        {
+            var leftValue = left.GetArgument(arg);
+            var rightValue = right.GetArgument(arg);
+            if (!Equals(leftValue, rightValue))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
 }
 
 public sealed class DurableTaskRequestShared(IGrainContextAccessor grainContextAccessor, IGrainFactory grainFactory)
@@ -130,7 +161,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     }
 
     /// <inheritdoc/>
-    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
+    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext, CancellationToken cancellationToken)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
@@ -148,11 +179,11 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         }
 
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
-        var response = await remote.ScheduleAsync(executionContext.TaskId, this);
+        var response = await remote.ScheduleAsync(executionContext.TaskId, this).AsTask().WaitAsync(cancellationToken);
         var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
-        while (!response.IsCompleted)
+        while (!response.IsCompleted && !cancellationToken.IsCancellationRequested)
         {
-            await remote.SubscribeOrPollAsync(executionContext.TaskId, options);
+            await remote.SubscribeOrPollAsync(executionContext.TaskId, options).AsTask().WaitAsync(cancellationToken);
         }
 
         return response;
@@ -164,7 +195,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
-    ValueTask<DurableTaskResponse> IDurableTaskRequest.InvokeImplementation(DurableExecutionContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
+    ValueTask<DurableTaskResponse> IDurableTaskRequest.InvokeImplementation(DurableExecutionContext executionContext, CancellationToken cancellationToken) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext, cancellationToken);
 
     // Generated. This invokes the target method directly.
     protected abstract DurableTask InvokeInner();
@@ -283,7 +314,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     }
 
     /// <inheritdoc/>
-    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
+    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext, CancellationToken cancellationToken)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
@@ -301,11 +332,11 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         }
 
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
-        var response = await remote.ScheduleAsync(executionContext.TaskId, this);
+        var response = await remote.ScheduleAsync(executionContext.TaskId, this).AsTask().WaitAsync(cancellationToken);
         var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
         while (!response.IsCompleted)
         {
-            await remote.SubscribeOrPollAsync(executionContext.TaskId, options);
+            await remote.SubscribeOrPollAsync(executionContext.TaskId, options).AsTask().WaitAsync(cancellationToken);
         }
 
         return response;
