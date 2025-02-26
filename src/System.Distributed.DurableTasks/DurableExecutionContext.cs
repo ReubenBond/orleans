@@ -3,6 +3,8 @@
 public abstract partial class DurableExecutionContext(TaskId id)
 {
     private static readonly AsyncLocal<DurableExecutionContext?> Current = new();
+    private readonly CancellationTokenSource _cancellationTokenSource = new();
+
     public static DurableExecutionContext? CurrentContext => Current.Value;
 
     internal static void SetCurrentContext(DurableExecutionContext? context) => Current.Value = context;
@@ -12,9 +14,10 @@ public abstract partial class DurableExecutionContext(TaskId id)
         Current.Value = context;
     }
 
-    private readonly CancellationTokenSource _cancellationTokenSource = new();
     public TaskId TaskId { get; } = id;
-    internal CancellationToken CancellationToken => _cancellationTokenSource.Token;
+
+    protected internal CancellationToken CancellationToken => _cancellationTokenSource.Token;
+
     protected internal abstract ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
     protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
     protected internal abstract TaskId CreateChildTaskId(string? name);

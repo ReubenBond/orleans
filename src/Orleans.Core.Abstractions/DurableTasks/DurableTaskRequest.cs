@@ -178,6 +178,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
             Context.CallerId = callerContext.GrainId;
         }
 
+        var cancellationToken = DurableTaskRuntimeHelper.GetCancellationToken(executionContext);
         var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         var response = await remote.ScheduleAsync(executionContext.TaskId, this).AsTask().WaitAsync(cancellationToken);
         var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };

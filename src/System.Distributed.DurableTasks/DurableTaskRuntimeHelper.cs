@@ -11,6 +11,8 @@ public static class DurableTaskRuntimeHelper
     /// <returns>The result of invocation.</returns>
     public static ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableExecutionContext context) => task.RunAsync(context);
 
+    public static CancellationToken GetCancellationToken(DurableExecutionContext context) => context.CancellationToken;
+
     /*
     /// <summary>
     /// Sets the result of a durable task context.
