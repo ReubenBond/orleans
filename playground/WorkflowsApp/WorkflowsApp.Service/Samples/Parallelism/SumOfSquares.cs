@@ -40,7 +40,7 @@ internal static class SumOfSquares
             List<ScheduledTask<int>> tasks = [];
             for (var i = 1; i <= input; i++)
             {
-                tasks.Add(await GrainFactory.GetGrain<ISquareGrain>(i).Square(i).ScheduleAsync());
+                tasks.Add(await GrainFactory.GetGrain<ISquareGrain>(i).Square(i).WithId($"{i}").ScheduleAsync());
             }
 
             var sum = 0;

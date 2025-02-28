@@ -276,6 +276,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WorkflowsApp.Service", "pla
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "System.Distributed.DurableTasks", "src\System.Distributed.DurableTasks\System.Distributed.DurableTasks.csproj", "{AFAB4DBB-6062-4F09-AF56-B972EDE4E80A}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Agents", "Agents", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -850,6 +852,7 @@ Global
 		{A906A008-16C4-4B7C-AC2D-74A270C77A18} = {719D6F4D-9794-4D00-B4F1-378B8074BA30}
 		{086E27CD-3F87-447A-820F-2F913F3D2C36} = {719D6F4D-9794-4D00-B4F1-378B8074BA30}
 		{AFAB4DBB-6062-4F09-AF56-B972EDE4E80A} = {4CD3AA9E-D937-48CA-BB6C-158E12257D23}
+		{02EA681E-C7D8-13C7-8484-4AC65E1B71E8} = {A41DE3D1-F8AA-4234-BE6F-3C9646A1507A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}

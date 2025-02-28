@@ -16,6 +16,7 @@ using WorkflowsApp.Service.Samples.HelloWorld;
 using WorkflowsApp.Service.Samples.CancelWorld;
 using WorkflowsApp.Service.Samples.Bank;
 using WorkflowsApp.Service.Samples.Parallelism;
+using WorkflowsApp.Service.Samples.HumanInTheLoop;
 
 namespace WorkflowsApp.Service;
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
@@ -43,10 +44,10 @@ public class Program
 
     public static async Task Main(string[] args)
     {
-        var hostBuilder = Host.CreateApplicationBuilder(args);
-        hostBuilder.AddKeyedAzureBlobClient("state");
-        hostBuilder.AddKeyedAzureTableClient("clustering");
-        hostBuilder.UseOrleans(siloBuilder =>
+        var builder = WebApplication.CreateBuilder(args);
+        builder.AddKeyedAzureBlobClient("state");
+        builder.AddKeyedAzureTableClient("clustering");
+        builder.UseOrleans(siloBuilder =>
             {
                 //siloBuilder.UseLocalhostClustering();
                 siloBuilder.AddDurableTasks();
@@ -62,15 +63,18 @@ public class Program
             });
 
         //logging.AddFilter((category, level) => category is not null && category.StartsWith("Orleans.DurableTasks"));
-        hostBuilder.Logging.SetMinimumLevel(LogLevel.Warning);
-        using var host = hostBuilder.Build();
-        await host.StartAsync();
+        builder.Logging.SetMinimumLevel(LogLevel.Warning);
+        using var app = builder.Build();
 
-        await SumOfSquares.RunAsync(host.Services);
+        HumanInTheLoop.ConfigureApp(app);
 
-        await Bank.RunAsync(host.Services);
-        await HelloWorld.RunAsync(host.Services);
-        await CancelWorld.RunAsync(host.Services);
+        await app.StartAsync();
+
+        await HumanInTheLoop.RunAsync(app.Services);
+        //await SumOfSquares.RunAsync(app.Services);
+        //await Bank.RunAsync(app.Services);
+        //await HelloWorld.RunAsync(app.Services);
+        //await CancelWorld.RunAsync(app.Services);
 
         /*
         var client = host.Services.GetRequiredService<IClusterClient>();
@@ -101,7 +105,7 @@ public class Program
 
         Console.WriteLine("Done!");
 
-        await host.WaitForShutdownAsync();
+        await app.WaitForShutdownAsync();
     }
 
 #if false

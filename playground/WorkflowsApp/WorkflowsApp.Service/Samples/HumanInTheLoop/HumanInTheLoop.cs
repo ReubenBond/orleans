@@ -1,8 +1,7 @@
 ﻿using System.Distributed.DurableTasks;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 
-namespace WorkflowsApp.Service.Samples.Parallelism;
+namespace WorkflowsApp.Service.Samples.HumanInTheLoop;
 
 internal static class HumanInTheLoop
 {
@@ -13,21 +12,7 @@ internal static class HumanInTheLoop
 
         var instance = await orchestrationGrain.GetGreetingAsync().ScheduleAsync();
         Console.WriteLine($"Started greeter workflow '{instance.Id}'.");
-        string? input;
-        do
-        {
-            Console.WriteLine($"Enter a greeting or 'cancel' to cancel the workflow:");
-            input = Console.ReadLine();
-        } while (input is null);
-
-        if (input == "cancel")
-        {
-            await orchestrationGrain.CancelAsync();
-        }
-        else
-        {
-            await orchestrationGrain.SetGreetingAsync(input);
-        }
+        Console.WriteLine($"Navigate to /greet/<greeting> to set a greeting or 'cancel' to cancel the workflow.");
 
         try
         {
@@ -40,6 +25,22 @@ internal static class HumanInTheLoop
         }
     }
 
+    internal static void ConfigureApp(WebApplication app)
+    {
+        app.MapGet("/greet/{greeting}", async (IGrainFactory grainFactory, string greeting) =>
+        {
+            var greeter = grainFactory.GetGrain<IGreeterGrain>("default");
+            if (greeting == "cancel")
+            {
+                await greeter.CancelAsync();
+            }
+            else
+            {
+                await greeter.SetGreetingAsync(greeting);
+            }
+        });
+    }
+
     public interface IGreeterGrain : IGrainWithStringKey
     {
         ValueTask SetGreetingAsync(string greeting);
@@ -49,25 +50,18 @@ internal static class HumanInTheLoop
 
     internal class GreeterGrain([FromKeyedServices("state")] IDurableTaskCompletionSource<string> state) : DurableGrain, IGreeterGrain
     {
-        public DurableTask<string> GetGreetingAsync() => DurableTask.Run(async cancellationToken =>
-        {
-            return await state.Task;
-        });
+        public DurableTask<string> GetGreetingAsync() => DurableTask.Run(state.Task.WaitAsync);
 
         public async ValueTask SetGreetingAsync(string greeting)
         {
-            if (state.TrySetResult(greeting))
-            {
-                await WriteStateAsync();
-            }
+            state.TrySetResult(greeting);
+            await WriteStateAsync();
         }
 
         public async ValueTask CancelAsync()
         {
-            if (state.TrySetCanceled())
-            {
-                await WriteStateAsync();
-            }
+            state.TrySetCanceled();
+            await WriteStateAsync();
         }
     }
 }
