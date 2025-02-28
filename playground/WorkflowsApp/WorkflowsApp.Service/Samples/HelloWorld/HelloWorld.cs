@@ -38,14 +38,12 @@ internal static class HelloWorld
         public async DurableTask<string[]> RunSample()
         {
             var helloGrain = GrainFactory.GetGrain<IHelloGrain>("default");
-            var result1 = await helloGrain.SayHelloAsync("Tokyo");
-            var result2 = await helloGrain.SayHelloAsync("Hyderabad");
-            var result3 = await helloGrain.SayHelloAsync("London");
-            var result4 = await helloGrain.SayHelloAsync("São Paulo");
-            var result5 = await helloGrain.SayHelloAsync("Seattle");
+            var result1 = await helloGrain.SayHelloAsync("Melbourne");
+            var result2 = await helloGrain.SayHelloAsync("Seattle");
+            var result3 = await helloGrain.SayHelloAsync("Shanghai");
 
             // Return greetings as an array
-            return [result1, result2, result3, result4, result5];
+            return [result1, result2, result3];
         }
     }
 }

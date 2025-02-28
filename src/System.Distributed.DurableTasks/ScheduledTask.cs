@@ -207,10 +207,10 @@ internal sealed class ScheduledDurableTask : ScheduledTask
 /// </summary>
 public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 {
-    private readonly ValueTaskAwaiter _awaiter;
+    private readonly TaskAwaiter _awaiter;
 
     internal ScheduledTaskAwaiter(ScheduledTask durableTaskInvocation, CancellationToken cancellationToken) =>
-        _awaiter = durableTaskInvocation.WaitAsync(cancellationToken).GetAwaiter();
+        _awaiter = durableTaskInvocation.WaitAsync(cancellationToken).AsTask().GetAwaiter();
 
     /// <summary>
     /// Gets the result of the task.
@@ -235,10 +235,10 @@ public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 /// <typeparam name="TResult">The underlying result type.</typeparam>
 public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
 {
-    private readonly ValueTaskAwaiter<DurableTaskResponse> _awaiter;
+    private readonly TaskAwaiter<DurableTaskResponse> _awaiter;
 
     internal ScheduledTaskAwaiter(ScheduledTask<TResult> durableTaskInvocation, CancellationToken cancellationToken) =>
-        _awaiter = durableTaskInvocation.WaitAsyncCore(cancellationToken).GetAwaiter();
+        _awaiter = durableTaskInvocation.WaitAsyncCore(cancellationToken).AsTask().GetAwaiter();
 
     /// <summary>
     /// Gets the result of the task.
@@ -274,6 +274,6 @@ public readonly struct ConfiguredScheduledTaskAwaitable<TResult>
 
     /// <summary>Gets an awaiter used to await this <see cref="ScheduledTask{TResult}"/>.</summary>
     /// <returns>An awaiter instance.</returns>
-    public new ScheduledTaskAwaiter<TResult> GetAwaiter() => new(scheduledTask, cancellationToken: default);
+    public new ScheduledTaskAwaiter<TResult> GetAwaiter() => new(scheduledTask, cancellationToken: cancellationToken);
 
 }

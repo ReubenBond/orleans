@@ -7,9 +7,9 @@ namespace System.Distributed.DurableTasks;
 /// </summary>
 public readonly struct DurableTaskAwaiter : INotifyCompletion, ICriticalNotifyCompletion
 {
-    private readonly ValueTaskAwaiter<DurableTaskResponse> _awaiter;
+    private readonly TaskAwaiter<DurableTaskResponse> _awaiter;
 
-    internal DurableTaskAwaiter(ValueTask<DurableTaskResponse> invokedTask)
+    internal DurableTaskAwaiter(Task<DurableTaskResponse> invokedTask)
     {
         _awaiter = invokedTask.GetAwaiter();
     }
@@ -25,9 +25,9 @@ public readonly struct DurableTaskAwaiter : INotifyCompletion, ICriticalNotifyCo
 /// </summary>
 public readonly struct DurableTaskAwaiter<TResult> : INotifyCompletion, ICriticalNotifyCompletion
 {
-    private readonly ValueTaskAwaiter<DurableTaskResponse> _awaiter;
+    private readonly TaskAwaiter<DurableTaskResponse> _awaiter;
 
-    internal DurableTaskAwaiter(ValueTask<DurableTaskResponse> invokedTask)
+    internal DurableTaskAwaiter(Task<DurableTaskResponse> invokedTask)
     {
         _awaiter = invokedTask.GetAwaiter();
     }

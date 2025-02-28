@@ -15,6 +15,7 @@ using Orleans.Runtime.DurableTasks;
 using WorkflowsApp.Service.Samples.HelloWorld;
 using WorkflowsApp.Service.Samples.CancelWorld;
 using WorkflowsApp.Service.Samples.Bank;
+using WorkflowsApp.Service.Samples.Parallelism;
 
 namespace WorkflowsApp.Service;
 #pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
@@ -64,6 +65,8 @@ public class Program
         hostBuilder.Logging.SetMinimumLevel(LogLevel.Warning);
         using var host = hostBuilder.Build();
         await host.StartAsync();
+
+        await SumOfSquares.RunAsync(host.Services);
 
         await Bank.RunAsync(host.Services);
         await HelloWorld.RunAsync(host.Services);

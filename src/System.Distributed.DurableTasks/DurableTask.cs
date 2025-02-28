@@ -10,17 +10,106 @@ public abstract class DurableTask
 
     public static DurableTask Run(Action<CancellationToken> func) => new DelegateDurableTask(func);
     public static DurableTask<TResult> Run<TResult>(Func<CancellationToken, TResult> func) => new DelegateDurableTask<TResult>(func);
-    public static DurableTask Run(Func<CancellationToken, ValueTask> func) => new AsyncDelegateDurableTask(func);
-    public static DurableTask<TResult> Run<TResult>(Func<CancellationToken, ValueTask<TResult>> func) => new AsyncDelegateDurableTask<TResult>(func);
     public static DurableTask Run(Func<CancellationToken, Task> func) => new AsyncTaskDelegateDurableTask(func);
     public static DurableTask<TResult> Run<TResult>(Func<CancellationToken, Task<TResult>> func) => new AsyncTaskDelegateDurableTask<TResult>(func);
 
     public static DurableTask Run<TState>(Action<TState, CancellationToken> func, TState state) => new DelegateDurableTaskWithState<TState>(func, state);
     public static DurableTask<TResult> Run<TState, TResult>(Func<TState, CancellationToken, TResult> func, TState state) => new DelegateDurableTaskWithState<TState, TResult>(func, state);
-    public static DurableTask Run<TState>(Func<TState, CancellationToken, ValueTask> func, TState state) => new AsyncDelegateDurableTaskWithState<TState>(func, state);
-    public static DurableTask<TResult> Run<TState, TResult>(Func<TState, CancellationToken, ValueTask<TResult>> func, TState state) => new AsyncDelegateDurableTaskWithState<TState, TResult>(func, state);
     public static DurableTask Run<TState>(Func<TState, CancellationToken, Task> func, TState state) => new AsyncTaskDelegateDurableTaskWithState<TState>(func, state);
     public static DurableTask<TResult> Run<TState, TResult>(Func<TState, CancellationToken, Task<TResult>> func, TState state) => new AsyncTaskDelegateDurableTaskWithState<TState, TResult>(func, state);
+
+    public static async DurableTask<List<ScheduledTask>> WhenAll(List<DurableTask> tasks)
+    {
+        if (DurableExecutionContext.CurrentContext is null)
+        {
+            throw new InvalidOperationException($"{nameof(DurableTask)}.{nameof(WhenAll)} can only be used within a durable task context.");
+        }
+
+        var result = new List<ScheduledTask>();
+        for (var i = 0; i < tasks.Count; i++)
+        {
+            await tasks[i].ScheduleAsync($"{i}");
+        }
+
+        foreach (var task in result)
+        {
+            await task.GetResponseAsync();
+        }
+
+        return result;
+    }
+
+    public static async DurableTask<List<ScheduledTask<TResult>>> WhenAll<TResult>(List<DurableTask<TResult>> tasks)
+    {
+        if (DurableExecutionContext.CurrentContext is null)
+        {
+            throw new InvalidOperationException($"{nameof(DurableTask)}.{nameof(WhenAll)} can only be used within a durable task context.");
+        }
+
+        var result = new List<ScheduledTask<TResult>>();
+        for (var i = 0; i < tasks.Count; i++)
+        {
+            await tasks[i].ScheduleAsync($"{i}");
+        }
+
+
+        foreach (var task in result)
+        {
+            await task.GetResponseAsync();
+        }
+
+        return result;
+    }
+
+    public static DurableTask<ScheduledTask> WhenAny(List<DurableTask> tasks)
+    => Run(async (tasks, cancellationToken) =>
+    {
+        if (DurableExecutionContext.CurrentContext is null)
+        {
+            throw new InvalidOperationException($"{nameof(DurableTask)}.{nameof(WhenAny)} can only be used within a durable task context.");
+        }
+
+        var result = new List<ScheduledTask>();
+        for (var i = 0; i < tasks.Count; i++)
+        {
+            await tasks[i].ScheduleAsync($"{i}", cancellationToken);
+        }
+
+        var completions = new List<Task>(result.Count);
+        foreach (var task in result)
+        {
+            completions.Add(task.GetResponseAsync(cancellationToken));
+        }
+
+        var completed = await Task.WhenAny(completions);
+
+        return result[completions.IndexOf(completed)];
+    }, tasks);
+
+    public static DurableTask<ScheduledTask<TResult>> WhenAny<TResult>(List<DurableTask<TResult>> tasks)
+    => Run(async (tasks, cancellationToken) =>
+    {
+        if (DurableExecutionContext.CurrentContext is null)
+        {
+            throw new InvalidOperationException($"{nameof(DurableTask)}.{nameof(WhenAny)} can only be used within a durable task context.");
+        }
+
+        var result = new List<ScheduledTask<TResult>>();
+        for (var i = 0; i < tasks.Count; i++)
+        {
+            await tasks[i].ScheduleAsync($"{i}", cancellationToken);
+        }
+
+        var completions = new List<Task>(result.Count);
+        foreach (var task in result)
+        {
+            completions.Add(task.GetResponseAsync(cancellationToken));
+        }
+
+        var completed = await Task.WhenAny(completions);
+
+        return result[completions.IndexOf(completed)];
+    }, tasks);
 
     /// <summary>
     /// Invokes the task with the provided context.
@@ -57,7 +146,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
         }
     }
 
-    internal async ValueTask<DurableTaskResponse> RunAsync(CancellationToken cancellationToken)
+    internal async Task<DurableTaskResponse> RunAsync(CancellationToken cancellationToken)
     {
         // Ensure the task id is set.
         _ = TrySetTaskId(null);
@@ -110,7 +199,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
     }
     
     // Schedules a durable task without waiting for the task to complete
-    public async ValueTask<ScheduledTask> ScheduleAsync(CancellationToken cancellationToken = default)
+    public async Task<ScheduledTask> ScheduleAsync(CancellationToken cancellationToken = default)
     {
         // Ensure the task id is set.
         _ = TrySetTaskId(null);
@@ -139,7 +228,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
     }
 
     // Cancels a durable task without waiting for the task to complete
-    public async ValueTask<bool> CancelAsync(CancellationToken cancellationToken)
+    public async Task<bool> CancelAsync(CancellationToken cancellationToken)
     {
         // Ensure the task id is set.
         _ = TrySetTaskId(null);
@@ -150,7 +239,7 @@ internal struct ConfiguredDurableTaskCore<TDurableTask> where TDurableTask : Dur
     }
 
     // Polls a task, returning the status of the task.
-    public async ValueTask<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken)
+    public async Task<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken)
     {
         // Ensure the task id is set.
         _ = TrySetTaskId(null);
@@ -197,13 +286,13 @@ public struct ConfiguredDurableTask(DurableTask task)
     }
 
     // Schedules a durable task without waiting for the task to complete
-    public ValueTask<ScheduledTask> ScheduleAsync(CancellationToken cancellationToken = default) => _core.ScheduleAsync(cancellationToken);
+    public Task<ScheduledTask> ScheduleAsync(CancellationToken cancellationToken = default) => _core.ScheduleAsync(cancellationToken);
 
     // Cancels a durable task without waiting for the task to complete
-    public ValueTask<bool> CancelAsync(CancellationToken cancellationToken) => _core.CancelAsync(cancellationToken);
+    public Task<bool> CancelAsync(CancellationToken cancellationToken) => _core.CancelAsync(cancellationToken);
 
     // Polls a task, returning the status of the task.
-    public ValueTask<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken) => _core.PollAsync(pollingOptions, cancellationToken);
+    public Task<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken) => _core.PollAsync(pollingOptions, cancellationToken);
 
     internal static InvalidOperationException GetNonSchedulableTaskException() => new("The provided task does not support scheduling. This may be because it is a local method or another non-serializable task type.");
 }
@@ -225,7 +314,7 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
     }
 
     // Schedules a durable task without waiting for the task to complete
-    public async ValueTask<ScheduledTask<TResult>> ScheduleAsync(CancellationToken cancellationToken = default)
+    public async Task<ScheduledTask<TResult>> ScheduleAsync(CancellationToken cancellationToken = default)
     {
         // Ensure the task id is set.
         _core.TrySetTaskId(null);
@@ -254,10 +343,10 @@ public struct ConfiguredDurableTask<TResult>(DurableTask<TResult> task)
     }
 
     // Cancels a durable task without waiting for the task to complete
-    public ValueTask<bool> CancelAsync(CancellationToken cancellationToken) => _core.CancelAsync(cancellationToken);
+    public Task<bool> CancelAsync(CancellationToken cancellationToken) => _core.CancelAsync(cancellationToken);
 
     // Polls a task, returning the status of the task.
-    public ValueTask<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken) => _core.PollAsync(pollingOptions, cancellationToken);
+    public Task<DurableTaskStatus> PollAsync(PollingOptions pollingOptions, CancellationToken cancellationToken) => _core.PollAsync(pollingOptions, cancellationToken);
 }
 
 /// <summary>
@@ -295,51 +384,6 @@ internal sealed class AsyncTaskDelegateDurableTask<TResult>(Func<CancellationTok
 /// Represents a <see cref="DurableTask"/> instance which invokes a delegate.
 /// </summary>
 internal sealed class AsyncTaskDelegateDurableTask(Func<CancellationToken, Task> func) : DurableTask
-{
-    /// <inheritdoc/>
-    protected internal override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
-    {
-        try
-        {
-            DurableExecutionContext.SetCurrentContext(context);
-            using var cts = new CancellationTokenSource();
-            using var registration = context.RegisterCancellationCallback(static (cts, ct) => cts!.CancelAsync(), cts);
-            await func(cts.Token);
-            return DurableTaskResponse.Completed;
-        }
-        catch (Exception exception)
-        {
-            return DurableTaskResponse.FromException(exception);
-        }
-    }
-}
-
-/// <summary>
-/// Represents a <see cref="DurableTask{TResult}"/> instance which invokes a delegate.
-/// </summary>
-internal sealed class AsyncDelegateDurableTask<TResult>(Func<CancellationToken, ValueTask<TResult>> func) : DurableTask<TResult>
-{
-    /// <inheritdoc/>
-    protected internal override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
-    {
-        try
-        {
-            DurableExecutionContext.SetCurrentContext(context);
-            using var cts = new CancellationTokenSource();
-            using var registration = context.RegisterCancellationCallback(static (cts, ct) => cts!.CancelAsync(), cts);
-            return DurableTaskResponse.FromResult(await func(cts.Token));
-        }
-        catch (Exception exception)
-        {
-            return DurableTaskResponse.FromException(exception);
-        }
-    }
-}
-
-/// <summary>
-/// Represents a <see cref="DurableTask"/> instance which invokes a delegate.
-/// </summary>
-internal sealed class AsyncDelegateDurableTask(Func<CancellationToken, ValueTask> func) : DurableTask
 {
     /// <inheritdoc/>
     protected internal override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)

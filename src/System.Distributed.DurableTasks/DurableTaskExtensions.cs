@@ -55,7 +55,7 @@ public static class DurableTaskExtensions
     /// <typeparam name="TResult">The task result type.</typeparam>
     /// <param name="task">The task.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task, CancellationToken cancellationToken = default) => new ConfiguredDurableTask<TResult>(task).ScheduleAsync(cancellationToken);
+    public static Task<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task, CancellationToken cancellationToken = default) => new ConfiguredDurableTask<TResult>(task).ScheduleAsync(cancellationToken);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask{TResult}"/> as a workflow using the provided identifier.
@@ -64,14 +64,14 @@ public static class DurableTaskExtensions
     /// <param name="task">The task.</param>
     /// <param name="taskId">The task identifier.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task, string taskId, CancellationToken cancellationToken = default) => new ConfiguredDurableTask<TResult>(task).WithId(taskId).ScheduleAsync(cancellationToken);
+    public static Task<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task, string taskId, CancellationToken cancellationToken = default) => new ConfiguredDurableTask<TResult>(task).WithId(taskId).ScheduleAsync(cancellationToken);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask"/> as a workflow using the provided identifier.
     /// </summary>
     /// <param name="task">The task.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask task, CancellationToken cancellationToken = default) => new ConfiguredDurableTask(task).ScheduleAsync(cancellationToken);
+    public static Task<ScheduledTask> ScheduleAsync(this DurableTask task, CancellationToken cancellationToken = default) => new ConfiguredDurableTask(task).ScheduleAsync(cancellationToken);
 
     /// <summary>
     /// Schedules the provided <see cref="DurableTask"/> as a workflow using the provided identifier.
@@ -79,5 +79,5 @@ public static class DurableTaskExtensions
     /// <param name="task">The task.</param>
     /// <param name="taskId">The task identifier.</param>
     /// <returns>A handle for the scheduled task.</returns>
-    public static ValueTask<ScheduledTask> ScheduleAsync(this DurableTask task, string taskId, CancellationToken cancellationToken = default) => new ConfiguredDurableTask(task).WithId(taskId).ScheduleAsync(cancellationToken);
+    public static Task<ScheduledTask> ScheduleAsync(this DurableTask task, string taskId, CancellationToken cancellationToken = default) => new ConfiguredDurableTask(task).WithId(taskId).ScheduleAsync(cancellationToken);
 }
