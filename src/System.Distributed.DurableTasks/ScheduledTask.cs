@@ -92,6 +92,54 @@ public abstract class ScheduledTask
     /// </summary>
     /// <returns>A task representing the completion of the operation.</returns>
     protected abstract ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions pollingOptions, CancellationToken cancellationToken);
+
+    public static async Task WhenAll(List<ScheduledTask> tasks, CancellationToken cancellationToken = default)
+    {
+        var innerTasks = new List<Task>(tasks.Count);
+        foreach (var task in tasks)
+        {
+            innerTasks.Add(task.GetResponseAsync(cancellationToken));
+        }
+
+        await Task.WhenAll(innerTasks);
+    }
+
+    public static async Task WhenAll<TResult>(List<ScheduledTask<TResult>> tasks, CancellationToken cancellationToken = default)
+    {
+        var innerTasks = new List<Task>(tasks.Count);
+        foreach (var task in tasks)
+        {
+            innerTasks.Add(task.GetResponseAsync(cancellationToken));
+        }
+
+        await Task.WhenAll(innerTasks);
+    }
+
+    public static async Task<ScheduledTask> WhenAny(List<ScheduledTask> tasks, CancellationToken cancellationToken = default)
+    {
+        var completions = new List<Task>(tasks.Count);
+        foreach (var task in tasks)
+        {
+            completions.Add(task.GetResponseAsync(cancellationToken));
+        }
+
+        var completed = await Task.WhenAny(completions);
+
+        return tasks[completions.IndexOf(completed)];
+    }
+
+    public static async Task<ScheduledTask<TResult>> WhenAny<TResult>(List<ScheduledTask<TResult>> tasks, CancellationToken cancellationToken = default)
+    {
+        var completions = new List<Task>(tasks.Count);
+        foreach (var task in tasks)
+        {
+            completions.Add(task.GetResponseAsync(cancellationToken));
+        }
+
+        var completed = await Task.WhenAny(completions);
+
+        return tasks[completions.IndexOf(completed)];
+    }
 }
 
 /// <summary>

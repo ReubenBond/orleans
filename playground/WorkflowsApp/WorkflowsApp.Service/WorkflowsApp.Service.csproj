@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Samples\WaitForEvent\" />
     <Folder Include="Samples\Saga\" />
   </ItemGroup>
 
