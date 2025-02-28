@@ -13,8 +13,8 @@ namespace Tester.StreamingTests
         private static readonly Func<Task<int>> DefaultDeliveryFailureCount = () => Task.FromResult(0); 
         private static readonly TimeSpan _timeout = TimeSpan.FromMinutes(3);
 
-        private readonly TestCluster testHost;
-        public ClientStreamTestRunner(TestCluster testHost)
+        private readonly InProcessTestCluster testHost;
+        public ClientStreamTestRunner(InProcessTestCluster testHost)
         {
             this.testHost = testHost;
         }

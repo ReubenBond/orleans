@@ -30,7 +30,7 @@ namespace UnitTests.StorageTests
         public class Fixture : BaseTestClusterFixture
         {
 
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 1;
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
@@ -60,7 +60,7 @@ namespace UnitTests.StorageTests
         private const string ErrorInjectorProviderName = "ErrorInjector";
         private readonly ITestOutputHelper output;
 
-        protected TestCluster HostedCluster { get; }
+        protected InProcessTestCluster HostedCluster { get; }
 
         public PersistenceGrainTests_Local(ITestOutputHelper output, Fixture fixture)
         {
@@ -86,7 +86,7 @@ namespace UnitTests.StorageTests
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Silo_StorageProvider_Name_Missing()
         {
-            List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
+            List<InProcessSiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             var silo = silos.First();
             const string providerName = "NotPresent";
             Assert.False(await this.HostedCluster.Client.GetTestHooks(silo).HasStorageProvider(providerName),

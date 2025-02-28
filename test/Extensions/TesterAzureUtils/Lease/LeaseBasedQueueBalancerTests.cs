@@ -11,7 +11,7 @@ using Xunit;
 namespace Tester.AzureUtils.Lease
 {
     [TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Lease")]
-    public class LeaseBasedQueueBalancerTests : TestClusterPerTest
+    public class LeaseBasedQueueBalancerTests : InProcessTestClusterPerTest
     {
         private const string StreamProviderName = "MemoryStreamProvider";
         private static readonly int totalQueueCount = 6;
@@ -20,7 +20,7 @@ namespace Tester.AzureUtils.Lease
         //since lease length is 1 min, so set time out to be two minutes to fulfill some test scenario
         public static readonly TimeSpan TimeOut = TimeSpan.FromMinutes(2);
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
             builder.Options.InitialSilosCount = siloCount;
@@ -66,7 +66,7 @@ namespace Tester.AzureUtils.Lease
             await this.HostedCluster.StopSiloAsync(this.HostedCluster.SecondarySilos[0]);
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(3, 3, mgmtGrain, lastTry), TimeOut);
             //start one silo, 6 queues, 3 silo, then each agent manager should own 2 queues
-            this.HostedCluster.StartAdditionalSilo(true);
+            this.HostedCluster.StartAdditionalSilo();
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, 2, mgmtGrain, lastTry), TimeOut);
         }
 
@@ -83,7 +83,7 @@ namespace Tester.AzureUtils.Lease
             await this.HostedCluster.KillSiloAsync(this.HostedCluster.SecondarySilos[0]);
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(3, 3, mgmtGrain, lastTry), TimeOut);
             //start one silo, 6 queues, 3 silo, then each agent manager should own 2 queues
-            this.HostedCluster.StartAdditionalSilo(true);
+            this.HostedCluster.StartAdditionalSilo();
             await TestingUtils.WaitUntilAsync(lastTry => AgentManagerOwnCorrectAmountOfAgents(2, 2, mgmtGrain, lastTry), TimeOut);
         }
 

@@ -17,8 +17,14 @@ namespace Tests.GeoClusterTests
         private readonly Fixture fixture;
         private readonly Random random;
 
-        public class Fixture : BaseAzureTestClusterFixture
+        public class Fixture : BaseClassicTestClusterFixture
         {
+            protected override void CheckPreconditionsOrThrow()
+            {
+                base.CheckPreconditionsOrThrow();
+                TestUtils.CheckForAzureStorage();
+            }
+
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
                 builder.Options.ConnectionTransport = ConnectionTransportType.TcpSocket;

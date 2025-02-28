@@ -11,27 +11,21 @@ using OrleansAWSUtils.Streams;
 namespace AWSUtils.Tests.Streaming
 {
     [TestCategory("AWS"), TestCategory("SQS")]
-    public class SQSStreamTests : TestClusterPerTest
+    public class SQSStreamTests : InProcessTestClusterPerTest
     {
         public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSProvider";
 
         private SingleStreamTestRunner runner;
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             if (!AWSTestConstants.IsSqsAvailable)
             {
                 throw new SkipException("Empty connection string");
             }
-            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
-        }
-
-        private class MySiloBuilderConfigurator : ISiloConfigurator
-        {
-            public void Configure(ISiloBuilder hostBuilder)
+            builder.ConfigureSilo((options, siloBuilder) =>
             {
-                hostBuilder
+                siloBuilder
                     .AddSqsStreams("SQSProvider", options =>
                     {
                         options.ConnectionString = AWSTestConstants.SqsConnectionString;
@@ -54,19 +48,13 @@ namespace AWSUtils.Tests.Streaming
                         options.AccessKey = AWSTestConstants.DynamoDbAccessKey;
                     })
                     .AddMemoryGrainStorage("MemoryStore", op=>op.NumStorageGrains = 1);
-            }
-        }
-
-        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
-        {
-            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-            {
+            });
+            builder.ConfigureClient(clientBuilder => 
                 clientBuilder
                     .AddSqsStreams("SQSProvider", (System.Action<Orleans.Configuration.SqsOptions>)(options =>
                     {
                         options.ConnectionString = AWSTestConstants.SqsConnectionString;
-                    }));
-            }
+                    })));
         }
         
         public override async Task InitializeAsync()

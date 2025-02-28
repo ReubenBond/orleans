@@ -16,7 +16,7 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 1;
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
@@ -39,7 +39,7 @@ namespace UnitTests.General
             HostedCluster = fixture.HostedCluster;
         }
 
-        public TestCluster HostedCluster { get; }
+        public InProcessTestCluster HostedCluster { get; }
 
         [Fact, TestCategory("Functional"), TestCategory("LoadShedding")]
         public async Task LoadSheddingBasic()

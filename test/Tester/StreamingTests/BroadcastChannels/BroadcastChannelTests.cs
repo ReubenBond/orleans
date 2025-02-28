@@ -24,7 +24,7 @@ namespace Tester.StreamingTests.BroadcastChannel
                 base.CheckPreconditionsOrThrow();
             }
 
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.AddClientBuilderConfigurator<ClientConfigurator>();
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();

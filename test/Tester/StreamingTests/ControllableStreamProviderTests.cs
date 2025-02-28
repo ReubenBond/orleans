@@ -16,7 +16,7 @@ namespace UnitTests.StreamingTests
             public const string StreamProviderName = "ControllableTestStreamProvider";
             public readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
 
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             }

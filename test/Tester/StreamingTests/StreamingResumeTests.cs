@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Tester.StreamingTests
 {
-    public abstract class StreamingResumeTests : TestClusterPerTest
+    public abstract class StreamingResumeTests : InProcessTestClusterPerTest
     {
         protected static readonly TimeSpan StreamInactivityPeriod = TimeSpan.FromSeconds(5);
         protected static readonly TimeSpan MetadataMinTimeInCache = StreamInactivityPeriod * 100;

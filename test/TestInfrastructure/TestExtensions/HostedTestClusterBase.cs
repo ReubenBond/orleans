@@ -13,9 +13,9 @@ namespace TestExtensions
     public abstract class HostedTestClusterEnsureDefaultStarted : OrleansTestingBase
     {
         protected DefaultClusterFixture Fixture { get; private set; }
-        protected TestCluster HostedCluster => this.Fixture.HostedCluster;
+        protected InProcessTestCluster HostedCluster => this.Fixture.HostedCluster;
 
-        protected IGrainFactory GrainFactory => this.HostedCluster.GrainFactory;
+        protected IGrainFactory GrainFactory => this.HostedCluster.Client;
 
         protected IClusterClient Client => this.HostedCluster.Client;
         protected ILogger Logger => this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
@@ -43,6 +43,23 @@ namespace TestExtensions
         public static Serializer GetSerializer(this TestCluster cluster)
         {
             return cluster.ServiceProvider.GetRequiredService<Serializer>();
+        }
+
+        public static T RoundTripSerializationForTesting<T>(this InProcessTestCluster cluster, T value)
+        {
+            var serializer = cluster.Client.ServiceProvider.GetRequiredService<Serializer>();
+            return serializer.Deserialize<T>(serializer.SerializeToArray(value));
+        }
+
+        public static T DeepCopy<T>(this InProcessTestCluster cluster, T value)
+        {
+            var copier = cluster.Client.ServiceProvider.GetRequiredService<DeepCopier>();
+            return copier.Copy(value);
+        }
+
+        public static Serializer GetSerializer(this InProcessTestCluster cluster)
+        {
+            return cluster.Client.ServiceProvider.GetRequiredService<Serializer>();
         }
     }
 }

@@ -17,7 +17,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         public class Fixture : BaseEventHubTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.AddSiloBuilderConfigurator<TestClusterConfigurator>();
                 builder.AddClientBuilderConfigurator<TestClusterConfigurator>();

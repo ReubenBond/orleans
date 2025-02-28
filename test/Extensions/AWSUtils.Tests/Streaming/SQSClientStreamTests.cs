@@ -12,7 +12,7 @@ using Orleans.Configuration;
 
 namespace AWSUtils.Tests.Streaming
 {
-    public class SQSClientStreamTests : TestClusterPerTest
+    public class SQSClientStreamTests : InProcessTestClusterPerTest
     {
         private const string SQSStreamProviderName = "SQSProvider";
         private const string StreamNamespace = "SQSSubscriptionMultiplicityTestsNamespace";
@@ -32,7 +32,7 @@ namespace AWSUtils.Tests.Streaming
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             if (!AWSTestConstants.IsSqsAvailable)
             {

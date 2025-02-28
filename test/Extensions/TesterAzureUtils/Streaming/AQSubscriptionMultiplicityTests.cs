@@ -13,13 +13,13 @@ using Xunit;
 namespace Tester.AzureUtils.Streaming
 {
     [TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Streaming")]
-    public class AQSubscriptionMultiplicityTests : TestClusterPerTest
+    public class AQSubscriptionMultiplicityTests : InProcessTestClusterPerTest
     {
         private const string AQStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
         private SubscriptionMultiplicityTestRunner runner;
         private const int queueCount = 8;
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();

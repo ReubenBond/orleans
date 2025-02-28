@@ -12,9 +12,9 @@ namespace TestExtensions
             TestDefaultConfiguration.InitializeDefaults();
         }
 
-        public TestCluster HostedCluster { get; private set; }
+        public InProcessTestCluster HostedCluster { get; private set; }
 
-        public IGrainFactory GrainFactory => this.HostedCluster?.GrainFactory;
+        public IGrainFactory GrainFactory => this.HostedCluster?.Client;
 
         public IClusterClient Client => this.HostedCluster?.Client;
 
@@ -22,18 +22,27 @@ namespace TestExtensions
 
         public virtual async Task InitializeAsync()
         {
-            var builder = new TestClusterBuilder();
+            var builder = new InProcessTestClusterBuilder();
             TestDefaultConfiguration.ConfigureTestCluster(builder);
-            builder.AddSiloBuilderConfigurator<SiloHostConfigurator>();
-
-            var testCluster = builder.Build();
-            if (testCluster.Primary == null)
+            builder.ConfigureSilo((options, siloBuilder) =>
             {
-                await testCluster.DeployAsync().ConfigureAwait(false);
-            }
+                siloBuilder
+                    .Configure<SiloMessagingOptions>(o => o.ClientGatewayShutdownNotificationTimeout = default)
+                    .UseInMemoryReminderService()
+                    .AddMemoryGrainStorageAsDefault()
+                    .AddMemoryGrainStorage("MemoryStore");
+            });
+
+            ConfigureCluster(builder);
+            var testCluster = builder.Build();
+            await testCluster.DeployAsync().ConfigureAwait(false);
 
             this.HostedCluster = testCluster;
             this.Logger = this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
+        }
+
+        public virtual void ConfigureCluster(InProcessTestClusterBuilder builder)
+        {
         }
 
         public virtual async Task DisposeAsync()
@@ -48,18 +57,6 @@ namespace TestExtensions
             finally
             {
                 await cluster.DisposeAsync().ConfigureAwait(false);
-            }
-        }
-
-        public class SiloHostConfigurator : ISiloConfigurator
-        {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder
-                    .Configure<SiloMessagingOptions>(o => o.ClientGatewayShutdownNotificationTimeout = default)
-                    .UseInMemoryReminderService()
-                    .AddMemoryGrainStorageAsDefault()
-                    .AddMemoryGrainStorage("MemoryStore");
             }
         }
     }

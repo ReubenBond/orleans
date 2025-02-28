@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Linq;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
@@ -31,6 +32,7 @@ public sealed class InProcessTestClusterBuilder
             ClusterId = CreateClusterId(),
             ServiceId = Guid.NewGuid().ToString("N"),
             UseTestClusterMembership = true,
+            UseTestClusterGrainDirectory = true,
             InitializeClientOnDeploy = true,
             ConfigureFileLogging = true,
             AssumeHomogenousSilosForTesting = true
@@ -95,6 +97,69 @@ public sealed class InProcessTestClusterBuilder
     public InProcessTestClusterBuilder ConfigureClientHost(Action<IHostApplicationBuilder> configureHostDelegate)
     {
         Options.ClientHostConfigurationDelegates.Add(hostBuilder => configureHostDelegate(hostBuilder));
+        return this;
+    }
+
+    /// <summary>
+    /// Set up the configuration for the builder itself. This will be used as a base to initialize each silo host
+    /// for use later in the build process. This can be called multiple times and the results will be additive.
+    /// </summary>
+    /// <param name="configureDelegate">The delegate for configuring the <see cref="IConfigurationBuilder"/> that will be used
+    /// to construct the <see cref="IConfiguration"/> for the host.</param>
+    /// <returns>The same instance of the host builder for chaining.</returns>
+    public InProcessTestClusterBuilder ConfigureHostConfiguration(Action<IConfigurationBuilder> configureDelegate)
+    {
+        ArgumentNullException.ThrowIfNull(configureDelegate);
+        Options.ClientHostConfigurationDelegates.Add(host => configureDelegate(host.Configuration));
+        Options.SiloHostConfigurationDelegates.Add((_, host) => configureDelegate(host.Configuration));
+        return this;
+    }
+
+    /// <summary>
+    /// Adds an implementation of <see cref="ISiloConfigurator"/> or <see cref="IHostConfigurator"/> to configure silos created by the test cluster.
+    /// </summary>
+    /// <typeparam name="T">The configurator type.</typeparam>
+    /// <returns>The builder.</returns>
+    public InProcessTestClusterBuilder AddSiloBuilderConfigurator<T>() where T : ISiloConfigurator, new()
+    {
+        if (typeof(IHostConfigurator).IsAssignableFrom(typeof(T)))
+        {
+            throw new ArgumentException($"{nameof(InProcessTestClusterBuilder)}.{nameof(AddSiloBuilderConfigurator)} does not support {nameof(IHostConfigurator)}.");
+        }
+
+        this.Options.SiloHostConfigurationDelegates.Add((options, host) =>
+        {
+            var instance = new T();
+            if (instance is ISiloConfigurator siloConfigurator)
+            {
+                host.UseOrleans(siloBuilder => siloConfigurator.Configure(siloBuilder));
+            }
+        });
+
+        return this;
+    }
+
+    /// <summary>
+    /// Adds an implementation of <see cref="IClientBuilderConfigurator"/> or <see cref="IHostConfigurator"/> to configure the client created for the test cluster
+    /// </summary>
+    /// <typeparam name="T">The client builder type</typeparam>
+    /// <returns>The builder.</returns>
+    public InProcessTestClusterBuilder AddClientBuilderConfigurator<T>() where T : new()
+    {
+        if (typeof(IHostConfigurator).IsAssignableFrom(typeof(T)))
+        {
+            throw new ArgumentException($"{nameof(InProcessTestClusterBuilder)}.{nameof(AddClientBuilderConfigurator)} does not support {nameof(IHostConfigurator)}.");
+        }
+
+        this.Options.ClientHostConfigurationDelegates.Add(host =>
+        {
+            var instance = new T();
+            if (instance is IClientBuilderConfigurator clientConfigurator)
+            {
+                host.UseOrleansClient(clientBuilder => clientConfigurator.Configure(host.Configuration, clientBuilder));
+            }
+        });
+
         return this;
     }
 

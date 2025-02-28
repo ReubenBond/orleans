@@ -26,7 +26,7 @@ public class PostgreSqlAdoNetSubscriptionMultiplicityTests() : AdoNetSubscriptio
 }
 
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-public abstract class AdoNetSubscriptionMultiplicityTests : TestClusterPerTest
+public abstract class AdoNetSubscriptionMultiplicityTests : InProcessTestClusterPerTest
 {
     private const string TestDatabaseName = "OrleansStreamTest";
     private const string AdoNetStreamProviderName = "AdoNet";
@@ -56,7 +56,7 @@ public abstract class AdoNetSubscriptionMultiplicityTests : TestClusterPerTest
         _runner = new SubscriptionMultiplicityTestRunner(AdoNetStreamProviderName, HostedCluster);
     }
 
-    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
     {
         builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
         builder.AddClientBuilderConfigurator<TestClientBuilderConfigurator>();

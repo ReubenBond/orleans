@@ -25,7 +25,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         public class Fixture : BaseEventHubTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 // poor fault injection requires grain instances stay on same host, so only single host for this test
                 builder.Options.InitialSilosCount = 1;
@@ -96,7 +96,7 @@ namespace ServiceBus.Tests.StreamingTests
 
         private async Task GenerateEvents(string streamNamespace, int streamCount, int eventsInStream)
         {
-            IStreamProvider streamProvider = this.fixture.HostedCluster.ServiceProvider.GetKeyedService<IStreamProvider>(StreamProviderName);
+            IStreamProvider streamProvider = this.fixture.HostedCluster.ClientHost.Services.GetKeyedService<IStreamProvider>(StreamProviderName);
             IAsyncStream<GeneratedEvent>[] producers =
                 Enumerable.Range(0, streamCount)
                     .Select(i => streamProvider.GetStream<GeneratedEvent>(streamNamespace, Guid.NewGuid()))

@@ -11,7 +11,7 @@ public class UnixSocketTransportTests : TransportTestsBase, IClassFixture<UnixSo
     {
     }
 
-    public class Fixture : BaseTestClusterFixture
+    public class Fixture : BaseClassicTestClusterFixture
     {
         protected override void CheckPreconditionsOrThrow()
         {

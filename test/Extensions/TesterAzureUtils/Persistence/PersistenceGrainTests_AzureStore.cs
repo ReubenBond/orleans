@@ -24,7 +24,7 @@ namespace Tester.AzureUtils.Persistence
     public abstract class Base_PersistenceGrainTests_AzureStore : OrleansTestingBase
     {
         private readonly ITestOutputHelper output;
-        protected TestCluster HostedCluster { get; private set; }
+        protected InProcessTestCluster HostedCluster { get; private set; }
         private readonly double timingFactor;
         protected readonly ILogger logger;
         private const int LoopIterations_Grain = 1000;
@@ -160,7 +160,7 @@ namespace Tester.AzureUtils.Persistence
        
         protected async Task Persistence_Silo_StorageProvider_Azure(string providerName)
         {
-            List<SiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
+            List<InProcessSiloHandle> silos = this.HostedCluster.GetActiveSilos().ToList();
             foreach (var silo in silos)
             {
                 var isPresent = await this.HostedCluster.Client.GetTestHooks(silo).HasStorageProvider(providerName);

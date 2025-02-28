@@ -8,7 +8,7 @@ using Xunit.Abstractions;
 
 namespace Tester.StreamingTests
 {
-    public abstract class StreamingCacheMissTests : TestClusterPerTest
+    public abstract class StreamingCacheMissTests : InProcessTestClusterPerTest
     {
         protected static readonly TimeSpan DataMaxAgeInCache = TimeSpan.FromSeconds(5);
         protected static readonly TimeSpan DataMinTimeInCache = TimeSpan.FromSeconds(0);

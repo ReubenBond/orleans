@@ -20,7 +20,7 @@ namespace Tester.Directories
 
         protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForAzureStorage();
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             EnsurePreconditionsMet();
 

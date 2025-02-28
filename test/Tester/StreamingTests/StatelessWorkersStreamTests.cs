@@ -17,7 +17,7 @@ namespace UnitTests.StreamingTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
                 builder.AddClientBuilderConfigurator<ClientConfiguretor>();
@@ -64,9 +64,9 @@ namespace UnitTests.StreamingTests
 
         private readonly string streamProvider;
         private readonly ILogger logger;
-        private readonly TestCluster cluster;
+        private readonly InProcessTestCluster cluster;
 
-        public StatelessWorkersStreamTestsRunner(string streamProvider, ILogger logger, TestCluster cluster)
+        public StatelessWorkersStreamTestsRunner(string streamProvider, ILogger logger, InProcessTestCluster cluster)
         {
             this.streamProvider = streamProvider;
             this.logger = logger;

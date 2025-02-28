@@ -18,7 +18,7 @@ namespace AWSUtils.Tests.StorageTests
     {
         public class Fixture : TestExtensions.BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 if (AWSTestConstants.IsDynamoDbAvailable)
                 {

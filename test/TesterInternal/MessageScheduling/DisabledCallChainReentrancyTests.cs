@@ -10,7 +10,7 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.AddSiloBuilderConfigurator<ReentrancyTestsSiloBuilderConfigurator>();
             }

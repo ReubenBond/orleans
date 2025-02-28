@@ -20,7 +20,7 @@ namespace UnitTests.Streaming
         {
             public string ServiceId { get; set; }
 
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 this.ServiceId = builder.Options.ServiceId;
                 builder.Options.InitialSilosCount = 4;
@@ -46,7 +46,7 @@ namespace UnitTests.Streaming
         public static readonly string STREAM_PROVIDER_NAME = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
         private readonly ITestOutputHelper output;
         private readonly Fixture fixture;
-        protected TestCluster HostedCluster => this.fixture.HostedCluster;
+        protected InProcessTestCluster HostedCluster => this.fixture.HostedCluster;
 
         public StreamProvidersTests_ProviderConfigNotLoaded(ITestOutputHelper output, Fixture fixture)
         {

@@ -18,7 +18,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
             TestUtils.CheckForAzureStorage();
         }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
@@ -56,7 +56,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
             TestUtils.CheckForAzureStorage();
         }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
@@ -83,7 +83,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
 
     public class SkewedClockTestFixture : TestFixture
     {
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<SkewedClockConfigurator>();
             base.ConfigureTestCluster(builder);
@@ -93,7 +93,7 @@ namespace Orleans.Transactions.AzureStorage.Tests
 
     public class RandomFaultInjectedTestFixture : TestFixture
     {
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<TxSiloBuilderConfigurator>();
             base.ConfigureTestCluster(builder);

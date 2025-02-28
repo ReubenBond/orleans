@@ -7,9 +7,9 @@ using Xunit;
 
 namespace Tester.Directories
 {
-    public abstract class MultipleGrainDirectoriesTests : TestClusterPerTest
+    public abstract class MultipleGrainDirectoriesTests : InProcessTestClusterPerTest
     {
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.Options.InitialSilosCount = 2;
         }
@@ -29,7 +29,7 @@ namespace Tester.Directories
             Assert.Equal(++secondaryCounter, await grainOnPrimary.ProxyPing(grainOnSecondary));
 
             // Shutdown the secondary silo
-            await this.HostedCluster.StopSecondarySilosAsync();
+            await this.HostedCluster.StopSiloAsync(HostedCluster.Silos[1]);
 
             // Activation on the primary silo should still be there, another activation should be
             // created for the other one

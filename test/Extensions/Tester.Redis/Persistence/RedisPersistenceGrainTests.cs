@@ -21,10 +21,9 @@ namespace Tester.Redis.Persistence
         public const string ConnectionStringKey = "ConnectionString";
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 4;
-                builder.Options.UseTestClusterMembership = true;
                 builder.ConfigureHostConfiguration(configBuilder => configBuilder.AddInMemoryCollection(
                     new Dictionary<string, string>
                     {
@@ -35,21 +34,18 @@ namespace Tester.Redis.Persistence
                 builder.AddClientBuilderConfigurator<GatewayConnectionTests.ClientBuilderConfigurator>();
             }
 
-            private class MySiloBuilderConfigurator : IHostConfigurator
+            private class MySiloBuilderConfigurator : ISiloConfigurator
             {
-                public void Configure(IHostBuilder hostBuilder)
+                public void Configure(ISiloBuilder siloBuilder)
                 {
-                    var connectionString = hostBuilder.GetConfiguration()[ConnectionStringKey];
-                    hostBuilder.UseOrleans((ctx, siloBuilder) =>
-                    {
-                        siloBuilder
-                            .AddRedisGrainStorage("GrainStorageForTest", options =>
-                            {
-                                options.ConfigurationOptions = ConfigurationOptions.Parse(connectionString);
-                                options.EntryExpiry = TimeSpan.FromHours(1);
-                            })
-                            .AddMemoryGrainStorage("MemoryStore");
-                    });
+                    var connectionString = siloBuilder.Configuration[ConnectionStringKey];
+                    siloBuilder
+                        .AddRedisGrainStorage("GrainStorageForTest", options =>
+                        {
+                            options.ConfigurationOptions = ConfigurationOptions.Parse(connectionString);
+                            options.EntryExpiry = TimeSpan.FromHours(1);
+                        })
+                        .AddMemoryGrainStorage("MemoryStore");
                 }
             }
 

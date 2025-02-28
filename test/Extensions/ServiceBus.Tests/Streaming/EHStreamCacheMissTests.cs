@@ -20,7 +20,7 @@ namespace ServiceBus.Tests.StreamingTests
         {
         }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             TestUtils.CheckForEventHub();
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();

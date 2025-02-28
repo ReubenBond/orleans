@@ -16,7 +16,7 @@ namespace Tester.AzureUtils.TimerTests
     {
         public class Fixture : BaseAzureTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
             }
@@ -145,7 +145,7 @@ namespace Tester.AzureUtils.TimerTests
             // start two extra silos ... although it will take it a while before they stabilize
             log.LogInformation("Starting 2 extra silos");
 
-            await this.HostedCluster.StartAdditionalSilosAsync(2, true);
+            await this.HostedCluster.StartSilosAsync(2);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             //Block until all tasks complete.
@@ -194,7 +194,7 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_2F_MultiGrain()
         {
-            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(2,true);
+            var silos = await this.HostedCluster.StartSilosAsync(2);
 
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -228,7 +228,7 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_1F1J_MultiGrain()
         {
-            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(1);
+            var silos = await this.HostedCluster.StartSilosAsync(1);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -254,10 +254,7 @@ namespace Tester.AzureUtils.TimerTests
             // stop a silo and join a new one in parallel
             log.LogInformation("Stopping a silo and joining a silo");
             Task t1 = Task.Factory.StartNew(async () => await this.HostedCluster.StopSiloAsync(siloToKill));
-            Task t2 = this.HostedCluster.StartAdditionalSilosAsync(1, true).ContinueWith(t =>
-            {
-                t.GetAwaiter().GetResult();
-            });
+            Task t2 = this.HostedCluster.StartSilosAsync(1);
             await Task.WhenAll(new[] { t1, t2 }).WaitAsync(ENDWAIT);
 
             await Task.WhenAll(tasks).WaitAsync(ENDWAIT); // Block until all tasks complete.
@@ -304,7 +301,7 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
         public async Task Rem_Azure_GT_1F1J_MultiGrain()
         {
-            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(1);
+            var silos = await this.HostedCluster.StartSilosAsync(1);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());

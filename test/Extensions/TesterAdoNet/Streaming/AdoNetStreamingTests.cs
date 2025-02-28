@@ -39,7 +39,7 @@ public class PostgreSqlAdoNetStreamingTests() : AdoNetStreamingTests(AdoNetInvar
 /// Cluster streaming tests for ADO.NET Streaming.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-public abstract class AdoNetStreamingTests : TestClusterPerTest
+public abstract class AdoNetStreamingTests : InProcessTestClusterPerTest
 {
     private const string TestDatabaseName = "OrleansStreamTest";
     private const string AdoNetStreamProviderName = "AdoNet";
@@ -68,16 +68,9 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
         _runner = new SingleStreamTestRunner(InternalClient, AdoNetStreamProviderName);
     }
 
-    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
     {
-        builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
-        builder.AddClientBuilderConfigurator<TestClientBuilderConfigurator>();
-    }
-
-    private class TestSiloBuilderConfigurator : ISiloConfigurator
-    {
-        public void Configure(ISiloBuilder siloBuilder)
-        {
+        builder.ConfigureSilo((options, siloBuilder) => 
             siloBuilder
                 .AddAdoNetStreams(AdoNetStreamProviderName, options =>
                 {
@@ -85,20 +78,13 @@ public abstract class AdoNetStreamingTests : TestClusterPerTest
                     options.ConnectionString = _testing.CurrentConnectionString;
                 })
                 .AddMemoryGrainStorage("MemoryStore")
-                .AddMemoryGrainStorage("PubSubStore");
-        }
-    }
-
-    private class TestClientBuilderConfigurator : IClientBuilderConfigurator
-    {
-        public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-        {
+                .AddMemoryGrainStorage("PubSubStore"));
+        builder.ConfigureClient(clientBuilder =>
             clientBuilder.AddAdoNetStreams(AdoNetStreamProviderName, options =>
             {
                 options.Invariant = _invariant;
                 options.ConnectionString = _testing.CurrentConnectionString;
-            });
-        }
+            }));
     }
 
     //------------------------ One to One -----------------------------------------------------//

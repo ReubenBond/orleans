@@ -33,7 +33,7 @@ namespace Tester.Redis.GrainDirectory
 
         protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForRedis();
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             base.ConfigureTestCluster(builder);
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();

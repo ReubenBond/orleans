@@ -18,14 +18,14 @@ using Tester.AzureUtils;
 namespace ServiceBus.Tests.StreamingTests
 {
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
-    public class EHStreamProviderCheckpointTests : TestClusterPerTest
+    public class EHStreamProviderCheckpointTests : InProcessTestClusterPerTest
     {
         private static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
         private const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
         private const string EHPath = "ehorleanstest6";
         private const string EHConsumerGroup = "orleansnightly";
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             TestUtils.CheckForEventHub();
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
@@ -121,7 +121,7 @@ namespace ServiceBus.Tests.StreamingTests
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);
                 await TestingUtils.WaitUntilAsync(assertIsTrue => CheckCounters(streamNamespace, streamCount, eventsInStream, assertIsTrue), TimeSpan.FromSeconds(60));
 
-                await HostedCluster.RestartSiloAsync(HostedCluster.SecondarySilos[0]);
+                await HostedCluster.RestartSiloAsync(HostedCluster.Silos[1]);
                 await HostedCluster.WaitForLivenessToStabilizeAsync();
 
                 await GenerateEvents(streamNamespace, streamGuids, eventsInStream, 0);

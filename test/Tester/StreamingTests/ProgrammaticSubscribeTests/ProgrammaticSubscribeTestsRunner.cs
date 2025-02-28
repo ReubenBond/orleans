@@ -295,10 +295,10 @@ namespace Tester.StreamingTests
         private readonly IGrainFactory grainFactory;
         private readonly IServiceProvider serviceProvider;
         private readonly IStreamSubscriptionManager subManager;
-        public SubscriptionManager(TestCluster cluster)
+        public SubscriptionManager(InProcessTestCluster cluster)
         {
             this.grainFactory = cluster.GrainFactory;
-            this.serviceProvider = cluster.ServiceProvider;
+            this.serviceProvider = cluster.ClientHost.Services;
             var admin = serviceProvider.GetRequiredService<IStreamSubscriptionManagerAdmin>();
             this.subManager = admin.GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
         }

@@ -27,7 +27,7 @@ namespace UnitTests.Management
 
         private TestCluster HostedCluster => this.fixture.HostedCluster;
 
-        public class Fixture : BaseTestClusterFixture
+        public class Fixture : BaseClassicTestClusterFixture
         {
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {

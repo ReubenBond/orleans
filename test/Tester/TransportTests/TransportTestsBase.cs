@@ -6,9 +6,9 @@ namespace Tester.TransportTests;
 
 public abstract class TransportTestsBase
 {
-    private readonly BaseTestClusterFixture _fixture;
+    private readonly BaseClassicTestClusterFixture _fixture;
 
-    protected TransportTestsBase(BaseTestClusterFixture fixture)
+    protected TransportTestsBase(BaseClassicTestClusterFixture fixture)
     {
         _fixture = fixture;
         Assert.True(fixture.HostedCluster.Silos.Count >= 2);

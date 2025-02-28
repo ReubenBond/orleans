@@ -17,7 +17,7 @@ namespace UnitTests.TimerTests
 {
     public class ReminderTests_Base : OrleansTestingBase, IDisposable
     {
-        protected TestCluster HostedCluster { get; private set; }
+        protected InProcessTestCluster HostedCluster { get; private set; }
         internal static readonly TimeSpan LEEWAY = TimeSpan.FromMilliseconds(500); // the experiment shouldnt be that long that the sums of leeways exceeds a period
         internal static readonly TimeSpan ENDWAIT = TimeSpan.FromMinutes(5);
 
@@ -151,7 +151,7 @@ namespace UnitTests.TimerTests
 
             // start another silo ... although it will take it a while before it stabilizes
             log.LogInformation("Starting another silo");
-            await this.HostedCluster.StartAdditionalSilosAsync(1, true);
+            await this.HostedCluster.StartAdditionalSiloAsync();
 
             //Block until all tasks complete.
             await Task.WhenAll(tasks).WaitAsync(ENDWAIT);

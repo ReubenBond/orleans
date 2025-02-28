@@ -22,7 +22,7 @@ namespace Tester.AzureUtils.Streaming
 
         public class Fixture : BaseAzureTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 TestUtils.CheckForAzureStorage();
                 builder.AddClientBuilderConfigurator<ClientConfigurator>();

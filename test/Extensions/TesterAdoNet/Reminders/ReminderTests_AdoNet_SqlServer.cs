@@ -25,7 +25,7 @@ namespace Tester.AdoNet.Reminders
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 string connectionString = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName)
                     .Result.CurrentConnectionString;
@@ -37,17 +37,14 @@ namespace Tester.AdoNet.Reminders
             }
         }
 
-        public class SiloConfigurator : IHostConfigurator
+        public class SiloConfigurator : ISiloConfigurator
         {
-            public void Configure(IHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder siloBuilder)
             {
-                hostBuilder.UseOrleans((ctx, siloBuilder) =>
+                siloBuilder.UseAdoNetReminderService(options =>
                 {
-                    siloBuilder.UseAdoNetReminderService(options =>
-                    {
-                        options.ConnectionString = hostBuilder.GetConfigurationValue(ConnectionStringKey);
-                        options.Invariant = AdoInvariant;
-                    });
+                    options.ConnectionString = siloBuilder.Configuration[ConnectionStringKey];
+                    options.Invariant = AdoInvariant;
                 });
             }
         }

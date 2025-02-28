@@ -19,7 +19,7 @@ namespace Tester.StreamingTests
         {
             public const string StreamProviderName = "MemoryStreamProvider";
             private const int partitionCount = 8;
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.Options.GatewayPerSilo = false;
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();

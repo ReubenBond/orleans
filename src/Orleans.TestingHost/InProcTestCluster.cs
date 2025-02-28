@@ -43,6 +43,34 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// Collection of all known silos.
     /// </summary>
+    internal InProcessSiloHandle Primary
+    {
+        get
+        {
+            lock (_silos)
+            {
+                return _silos.FirstOrDefault();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Collection of all known silos.
+    /// </summary>
+    internal ReadOnlyCollection<InProcessSiloHandle> SecondarySilos
+    {
+        get
+        {
+            lock (_silos)
+            {
+                return new List<InProcessSiloHandle>(_silos.Skip(1)).AsReadOnly();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Collection of all known silos.
+    /// </summary>
     public ReadOnlyCollection<InProcessSiloHandle> Silos
     {
         get
@@ -63,9 +91,19 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     public InProcessTestClusterOptions Options { get; }
 
     /// <summary>
-    /// The internal client interface.
+    /// Gets the grain reference factory.
     /// </summary>
-    internal IHost ClientHost { get; private set; }
+    internal IServiceProvider ServiceProvider => ClientHost?.Services;
+
+    /// <summary>
+    /// Gets the grain reference factory.
+    /// </summary>
+    public IGrainFactory GrainFactory => Client;
+
+    /// <summary>
+    /// The client host.
+    /// </summary>
+    public IHost ClientHost { get; private set; }
 
     /// <summary>
     /// The internal client interface.
@@ -288,6 +326,15 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// Start an additional silo, so that it joins the existing cluster.
     /// </summary>
     /// <returns>SiloHandle for the newly started silo.</returns>
+    public async Task<List<InProcessSiloHandle>> StartAdditionalSilosAsync(int numSilos)
+    {
+        return await StartSilosAsync(numSilos);
+    }
+
+    /// <summary>
+    /// Start an additional silo, so that it joins the existing cluster.
+    /// </summary>
+    /// <returns>SiloHandle for the newly started silo.</returns>
     public async Task<InProcessSiloHandle> StartAdditionalSiloAsync()
     {
         return (await StartSilosAsync(1)).Single();
@@ -307,6 +354,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// Start an additional silo, so that it joins the existing cluster.
     /// </summary>
     /// <returns>SiloHandle for the newly started silo.</returns>
+    [Obsolete("Use overload which does not have a 'startAdditionalSiloOnNewPort' parameter.")]
     public async Task<InProcessSiloHandle> StartAdditionalSiloAsync(bool startAdditionalSiloOnNewPort)
     {
         return (await StartSilosAsync(1)).Single();
@@ -618,13 +666,27 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                     o.GatewayPort = siloOptions.GatewayPort;
                 });
 
+                siloBuilder.Configure<SiloMessagingOptions>(o =>
+                {
+                    o.WaitForMessageToBeQueuedForOutboundTime = TimeSpan.Zero;
+                });
+
                 siloBuilder.Services
                     .Configure<HostOptions>(options => options.ShutdownTimeout = TimeSpan.FromSeconds(30));
 
                 if (Options.UseTestClusterMembership)
                 {
                     services.AddSingleton<IMembershipTable>(_membershipTable);
-                    siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (_, _) => _grainDirectory);
+                    if (Options.UseTestClusterGrainDirectory)
+                    {
+                        siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (_, _) => _grainDirectory);
+                    }
+                    else
+                    {
+#pragma warning disable ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+                        siloBuilder.AddDistributedGrainDirectory();
+#pragma warning restore ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+                    }
                 }
 
                 siloBuilder.UseInMemoryConnectionTransport(_transportHub);

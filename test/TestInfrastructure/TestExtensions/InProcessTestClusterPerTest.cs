@@ -1,22 +1,30 @@
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Orleans.TestingHost;
 
 namespace TestExtensions
 {
-    public abstract class BaseTestClusterFixture : Xunit.IAsyncLifetime
+    public abstract class InProcessTestClusterPerTest : OrleansTestingBase, Xunit.IAsyncLifetime
     {
         private readonly ExceptionDispatchInfo preconditionsException;
-
-        static BaseTestClusterFixture()
+        static InProcessTestClusterPerTest()
         {
             TestDefaultConfiguration.InitializeDefaults();
         }
 
-        protected BaseTestClusterFixture()
+        protected InProcessTestCluster HostedCluster { get; private set; }
+
+        internal IInternalClusterClient InternalClient => (IInternalClusterClient)this.Client;
+
+        public IClusterClient Client => this.HostedCluster.Client;
+
+        protected IGrainFactory GrainFactory => this.Client;
+
+        protected ILogger Logger => this.logger;
+        protected ILogger logger;
+
+        protected InProcessTestClusterPerTest()
         {
             try
             {
@@ -40,19 +48,8 @@ namespace TestExtensions
         {
         }
 
-        public InProcessTestCluster HostedCluster { get; private set; }
-
-        public IGrainFactory GrainFactory => this.HostedCluster?.GrainFactory;
-
-        public IClusterClient Client => this.HostedCluster?.Client;
-
-        public ILogger Logger { get; private set; }
-        
-        public string GetClientServiceId() => Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
-
         public virtual async Task InitializeAsync()
         {
-            this.EnsurePreconditionsMet();
             var builder = new InProcessTestClusterBuilder();
             TestDefaultConfiguration.ConfigureTestCluster(builder);
             this.ConfigureTestCluster(builder);
@@ -61,7 +58,7 @@ namespace TestExtensions
             await testCluster.DeployAsync().ConfigureAwait(false);
 
             this.HostedCluster = testCluster;
-            this.Logger = this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
+            this.logger = this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
         }
 
         public virtual async Task DisposeAsync()
@@ -80,16 +77,26 @@ namespace TestExtensions
         }
     }
 
-    public abstract class BaseClassicTestClusterFixture : Xunit.IAsyncLifetime
+    public abstract class TestClusterPerTest : OrleansTestingBase, Xunit.IAsyncLifetime
     {
         private readonly ExceptionDispatchInfo preconditionsException;
-
-        static BaseClassicTestClusterFixture()
+        static TestClusterPerTest()
         {
             TestDefaultConfiguration.InitializeDefaults();
         }
 
-        protected BaseClassicTestClusterFixture()
+        protected TestCluster HostedCluster { get; private set; }
+
+        internal IInternalClusterClient InternalClient => (IInternalClusterClient)this.Client;
+
+        public IClusterClient Client => this.HostedCluster.Client;
+
+        protected IGrainFactory GrainFactory => this.Client;
+
+        protected ILogger Logger => this.logger;
+        protected ILogger logger;
+
+        protected TestClusterPerTest()
         {
             try
             {
@@ -113,19 +120,8 @@ namespace TestExtensions
         {
         }
 
-        public TestCluster HostedCluster { get; private set; }
-
-        public IGrainFactory GrainFactory => this.HostedCluster?.GrainFactory;
-
-        public IClusterClient Client => this.HostedCluster?.Client;
-
-        public ILogger Logger { get; private set; }
-        
-        public string GetClientServiceId() => Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
-
         public virtual async Task InitializeAsync()
         {
-            this.EnsurePreconditionsMet();
             var builder = new TestClusterBuilder();
             TestDefaultConfiguration.ConfigureTestCluster(builder);
             this.ConfigureTestCluster(builder);
@@ -134,7 +130,7 @@ namespace TestExtensions
             await testCluster.DeployAsync().ConfigureAwait(false);
 
             this.HostedCluster = testCluster;
-            this.Logger = this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
+            this.logger = this.Client.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Application");
         }
 
         public virtual async Task DisposeAsync()

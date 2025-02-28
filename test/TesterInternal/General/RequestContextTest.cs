@@ -12,13 +12,11 @@ namespace UnitTests.General
 {
     public class RequestContextTests_Silo : OrleansTestingBase, IClassFixture<RequestContextTests_Silo.Fixture>, IDisposable
     {
-        private readonly ITestOutputHelper output;
         private readonly Fixture fixture;
-        private readonly OutsideRuntimeClient runtimeClient;
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 1;
             }
@@ -26,9 +24,7 @@ namespace UnitTests.General
 
         public RequestContextTests_Silo(ITestOutputHelper output, Fixture fixture)
         {
-            this.output = output;
             this.fixture = fixture;
-            this.runtimeClient = this.fixture.Client.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
 
             RequestContextTestUtils.ClearActivityId();
             RequestContext.Clear();

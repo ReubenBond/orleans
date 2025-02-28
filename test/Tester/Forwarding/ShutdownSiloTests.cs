@@ -6,7 +6,6 @@ using Orleans.Configuration;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Azure.Data.Tables;
-using Azure.Identity;
 
 namespace Tester.Forwarding
 {

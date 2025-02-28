@@ -162,5 +162,11 @@ namespace TestExtensions
         {
             builder.ConfigureHostConfiguration(ConfigureHostConfiguration);
         }
+
+        public static void ConfigureTestCluster(InProcessTestClusterBuilder builder)
+        {
+            builder.ConfigureClientHost(hostBuilder => ConfigureHostConfiguration(hostBuilder.Configuration));
+            builder.ConfigureSiloHost((siloOptions, hostBuilder) => ConfigureHostConfiguration(hostBuilder.Configuration));
+        }
     }
 }

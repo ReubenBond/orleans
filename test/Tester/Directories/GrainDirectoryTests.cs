@@ -1,4 +1,5 @@
 #nullable enable
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using TestExtensions;
@@ -20,6 +21,7 @@ public abstract class GrainDirectoryTests<TGrainDirectory> where TGrainDirectory
     }
 
     protected TGrainDirectory GrainDirectory => _directory ??= CreateGrainDirectory();
+    protected virtual SiloAddress GetValidSilo(int siloNum) => SiloAddress.FromParsableString($"10.0.23.12:1{siloNum}@5678");
 
     protected abstract TGrainDirectory CreateGrainDirectory();
 
@@ -30,7 +32,7 @@ public abstract class GrainDirectoryTests<TGrainDirectory> where TGrainDirectory
         {
             ActivationId = ActivationId.NewId(),
             GrainId = GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N")),
-            SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
+            SiloAddress = GetValidSilo(0),
             MembershipVersion = new MembershipVersion(51)
         };
 
@@ -50,7 +52,7 @@ public abstract class GrainDirectoryTests<TGrainDirectory> where TGrainDirectory
         {
             ActivationId = ActivationId.NewId(),
             GrainId = GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N")),
-            SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
+            SiloAddress = GetValidSilo(0),
             MembershipVersion = new MembershipVersion(51)
         };
 
@@ -58,7 +60,7 @@ public abstract class GrainDirectoryTests<TGrainDirectory> where TGrainDirectory
         {
             ActivationId = ActivationId.NewId(),
             GrainId = expected.GrainId,
-            SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
+            SiloAddress = GetValidSilo(0),
             MembershipVersion = new MembershipVersion(51)
         };
 
@@ -66,7 +68,7 @@ public abstract class GrainDirectoryTests<TGrainDirectory> where TGrainDirectory
         {
             ActivationId = expected.ActivationId,
             GrainId = expected.GrainId,
-            SiloAddress = SiloAddress.FromParsableString("10.0.23.14:1000@4583"),
+            SiloAddress = GetValidSilo(1),
             MembershipVersion = new MembershipVersion(51)
         };
 
@@ -87,7 +89,7 @@ public abstract class GrainDirectoryTests<TGrainDirectory> where TGrainDirectory
         {
             ActivationId = ActivationId.NewId(),
             GrainId = GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N")),
-            SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
+            SiloAddress = GetValidSilo(0),
             MembershipVersion = new MembershipVersion(51)
         };
 
@@ -103,7 +105,7 @@ public abstract class GrainDirectoryTests<TGrainDirectory> where TGrainDirectory
         {
             ActivationId = initial.ActivationId,
             GrainId = initial.GrainId,
-            SiloAddress = SiloAddress.FromParsableString("10.0.23.14:1000@4583"),
+            SiloAddress = GetValidSilo(1),
             MembershipVersion = initial.MembershipVersion
         };
 
@@ -126,7 +128,7 @@ public abstract class GrainDirectoryTests<TGrainDirectory> where TGrainDirectory
         {
             ActivationId = ActivationId.NewId(),
             GrainId = GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N")),
-            SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
+            SiloAddress = GetValidSilo(0),
             MembershipVersion = new MembershipVersion(51)
         };
 
@@ -134,7 +136,7 @@ public abstract class GrainDirectoryTests<TGrainDirectory> where TGrainDirectory
         {
             ActivationId = ActivationId.NewId(),
             GrainId = expected.GrainId,
-            SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
+            SiloAddress = GetValidSilo(0),
             MembershipVersion = new MembershipVersion(51)
         };
 

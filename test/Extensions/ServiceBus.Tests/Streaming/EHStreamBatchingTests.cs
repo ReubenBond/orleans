@@ -17,7 +17,7 @@ namespace ServiceBus.Tests.Streaming
             private const string EHPath = "ehorleanstest7";
             private const string EHConsumerGroup = "orleansnightly";
 
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();

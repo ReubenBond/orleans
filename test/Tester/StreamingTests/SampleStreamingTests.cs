@@ -13,9 +13,9 @@ namespace UnitTests.StreamingTests
 
         private readonly string streamProvider;
         private readonly ILogger logger;
-        private readonly TestCluster cluster;
+        private readonly InProcessTestCluster cluster;
 
-        public SampleStreamingTests(string streamProvider, ILogger logger, TestCluster cluster)
+        public SampleStreamingTests(string streamProvider, ILogger logger, InProcessTestCluster cluster)
         {
             this.streamProvider = streamProvider;
             this.logger = logger;

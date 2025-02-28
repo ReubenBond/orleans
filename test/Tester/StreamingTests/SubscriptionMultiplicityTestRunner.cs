@@ -16,9 +16,9 @@ namespace UnitTests.StreamingTests
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
         private readonly string streamProviderName;
         private readonly ILogger logger;
-        private readonly TestCluster testCluster;
+        private readonly InProcessTestCluster testCluster;
 
-        public SubscriptionMultiplicityTestRunner(string streamProviderName, TestCluster testCluster)
+        public SubscriptionMultiplicityTestRunner(string streamProviderName, InProcessTestCluster testCluster)
         {
             if (string.IsNullOrWhiteSpace(streamProviderName))
             {

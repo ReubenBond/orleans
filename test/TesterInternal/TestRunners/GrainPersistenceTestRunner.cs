@@ -13,7 +13,7 @@ namespace TestExtensions.Runners
         private readonly string grainNamespace;
         private readonly BaseTestClusterFixture fixture;
         protected readonly ILogger logger;
-        protected TestCluster HostedCluster { get; private set; }
+        protected InProcessTestCluster HostedCluster { get; private set; }
 
         public GrainPersistenceTestsRunner(ITestOutputHelper output, BaseTestClusterFixture fixture, string grainNamespace = "UnitTests.Grains")
         {

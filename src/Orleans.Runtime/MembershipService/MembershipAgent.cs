@@ -269,7 +269,7 @@ namespace Orleans.Runtime.MembershipService
             {
                 this.log.LogDebug((int)ErrorCode.MembershipShutDown, "-Shutdown");
             }
-            
+
             try
             {
                 await this.UpdateStatus(SiloStatus.ShuttingDown);

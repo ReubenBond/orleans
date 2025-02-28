@@ -16,7 +16,7 @@ namespace UnitTests.StreamingTests
     {
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 4;
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
@@ -53,7 +53,7 @@ namespace UnitTests.StreamingTests
         protected Guid StreamId;
         protected string StreamProviderName;
         protected string StreamNamespace;
-        protected TestCluster HostedCluster;
+        protected InProcessTestCluster HostedCluster;
         private readonly Fixture _fixture;
 
         public StreamPubSubReliabilityTests(Fixture fixture)

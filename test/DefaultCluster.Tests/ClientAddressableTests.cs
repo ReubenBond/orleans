@@ -67,7 +67,7 @@ namespace DefaultCluster.Tests
 
         public ClientAddressableTests(DefaultClusterFixture fixture) : base(fixture)
         {
-            this.runtimeClient = this.HostedCluster.ServiceProvider.GetRequiredService<IRuntimeClient>();
+            this.runtimeClient = this.HostedCluster.ClientHost.Services.GetRequiredService<IRuntimeClient>();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("ClientAddressable")]

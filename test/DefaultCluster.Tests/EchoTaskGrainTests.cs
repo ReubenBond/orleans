@@ -19,7 +19,7 @@ namespace DefaultCluster.Tests.General
         public EchoTaskGrainTests(DefaultClusterFixture fixture)
             : base(fixture)
         {
-            if (HostedCluster.SecondarySilos.Count == 0)
+            if (HostedCluster.Silos.Count == 1)
             {
                 HostedCluster.StartAdditionalSilo();
                 HostedCluster.WaitForLivenessToStabilizeAsync().Wait();
@@ -228,8 +228,8 @@ namespace DefaultCluster.Tests.General
             var grain = this.GrainFactory.GetGrain<IEchoTaskGrain>(Guid.NewGuid());
             this.Logger.LogInformation("{What} took {Elapsed}", what, clock.Elapsed);
 
-            SiloAddress silo1 = HostedCluster.Primary.SiloAddress;
-            SiloAddress silo2 = HostedCluster.SecondarySilos[0].SiloAddress;
+            SiloAddress silo1 = HostedCluster.Silos[0].SiloAddress;
+            SiloAddress silo2 = HostedCluster.Silos[1].SiloAddress;
 
             what = "EchoGrain.PingRemoteSilo[1]";
             clock.Restart();

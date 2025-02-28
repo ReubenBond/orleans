@@ -18,7 +18,7 @@ namespace Tester.AzureUtils.Streaming
         private const int queueCount = 8;
         public class Fixture : BaseAzureTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.AddSiloBuilderConfigurator<TestClusterConfigurator>();
                 builder.AddClientBuilderConfigurator<TestClusterConfigurator>();

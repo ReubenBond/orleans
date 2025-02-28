@@ -18,7 +18,7 @@ namespace UnitTests.General
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = 3;
                 builder.AddSiloBuilderConfigurator<SiloConfiguration>();
@@ -51,14 +51,14 @@ namespace UnitTests.General
         [Fact]
         public async Task OneWay_Deactivation_CacheInvalidated()
         {
-            var directoryCache = ((InProcessSiloHandle)_fixture.HostedCluster.Primary).SiloHost.Services.GetRequiredService<TestDirectoryCache>();
+            var directoryCache = _fixture.HostedCluster.Silos[0].ServiceProvider.GetRequiredService<TestDirectoryCache>();
             IOneWayGrain grainToCallFrom;
             while (true)
             {
-                RequestContext.Set(IPlacementDirector.PlacementHintKey, _fixture.HostedCluster.Primary.SiloAddress);
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, _fixture.HostedCluster.Silos[0].SiloAddress);
                 grainToCallFrom = _fixture.Client.GetGrain<IOneWayGrain>(Guid.NewGuid());
                 var grainHost = await grainToCallFrom.GetSiloAddress();
-                if (grainHost.Equals(_fixture.HostedCluster.Primary.SiloAddress))
+                if (grainHost.Equals(_fixture.HostedCluster.Silos[0].SiloAddress))
                 {
                     break;
                 }

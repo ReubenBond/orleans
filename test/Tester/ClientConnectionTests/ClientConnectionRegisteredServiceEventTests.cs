@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Tester
 {
-    public class ClientConnectionRegisteredServiceEventTests : TestClusterPerTest
+    public class ClientConnectionRegisteredServiceEventTests : InProcessTestClusterPerTest
     {
         private EventNotifier<EventArgs> clusterConnectionLostNotifier;
 
@@ -18,11 +18,11 @@ namespace Tester
         public override async Task InitializeAsync()
         {
             await base.InitializeAsync();
-            this.clusterConnectionLostNotifier = this.HostedCluster.ServiceProvider.GetRequiredService<EventNotifier<EventArgs>>();
-            this.gatewayCountChangedNotifier = this.HostedCluster.ServiceProvider.GetRequiredService<EventNotifier<GatewayCountChangedEventArgs>>();
+            this.clusterConnectionLostNotifier = this.HostedCluster.ClientHost.Services.GetRequiredService<EventNotifier<EventArgs>>();
+            this.gatewayCountChangedNotifier = this.HostedCluster.ClientHost.Services.GetRequiredService<EventNotifier<GatewayCountChangedEventArgs>>();
         }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.AddClientBuilderConfigurator<Configurator>();
         }
@@ -63,7 +63,7 @@ namespace Tester
         [Fact, TestCategory("SlowBVT")]
         public async Task EventSendWhenDisconnectedFromCluster()
         {
-            var runtime = this.HostedCluster.ServiceProvider.GetRequiredService<OutsideRuntimeClient>();
+            var runtime = this.HostedCluster.ClientHost.Services.GetRequiredService<OutsideRuntimeClient>();
 
             var semaphore = new SemaphoreSlim(0, 1);
             void ReleaseSemaphoreAction(EventArgs args) => semaphore.Release();
@@ -111,7 +111,7 @@ namespace Tester
 
             try
             {
-                var silo = this.HostedCluster.SecondarySilos[0];
+                var silo = this.HostedCluster.Silos[1];
                 await silo.StopSiloAsync(true);
 
                 Assert.True(await lostGatewaySemaphore.WaitAsync(TimeSpan.FromSeconds(20)));

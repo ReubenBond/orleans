@@ -15,7 +15,7 @@ using Xunit.Abstractions;
 namespace ServiceBus.Tests.StreamingTests
 {
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
-    public class EHClientStreamTests : TestClusterPerTest
+    public class EHClientStreamTests : InProcessTestClusterPerTest
     {
         private const string StreamProviderName = "EventHubStreamProvider";
         private const string StreamNamespace = "StreamNamespace";
@@ -35,7 +35,7 @@ namespace ServiceBus.Tests.StreamingTests
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             TestUtils.CheckForEventHub();
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();

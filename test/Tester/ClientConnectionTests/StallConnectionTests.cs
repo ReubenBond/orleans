@@ -43,7 +43,7 @@ namespace Tester.ClientConnectionTests
         public async Task ConnectToGwAfterStallConnectionOpened()
         {
             Socket stalledSocket;
-            var gwEndpoint = this.HostedCluster.Primary.GatewayAddress.Endpoint;
+            var gwEndpoint = this.HostedCluster.Silos[0].GatewayAddress.Endpoint;
 
             // Close current client connection
             await this.Client.ServiceProvider.GetRequiredService<IHost>().StopAsync();

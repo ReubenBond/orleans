@@ -26,7 +26,7 @@ namespace UnitTests.HaloTests.Streaming
             public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
             public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
 
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             }
@@ -82,7 +82,7 @@ namespace UnitTests.HaloTests.Streaming
             }
         }
 
-        protected TestCluster HostedCluster { get; }
+        protected InProcessTestCluster HostedCluster { get; }
 
         private const string SmsStreamProviderName = Fixture.SmsStreamProviderName;
         private const string AzureQueueStreamProviderName = Fixture.AzureQueueStreamProviderName;

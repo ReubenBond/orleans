@@ -8,7 +8,7 @@ namespace Orleans.Transactions.Tests
 {
     public class MemoryTransactionsFixture : BaseTestClusterFixture
     {
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
@@ -27,7 +27,7 @@ namespace Orleans.Transactions.Tests
 
     public class SkewedClockMemoryTransactionsFixture : MemoryTransactionsFixture
     {
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<SkewedClockConfigurator>();
             base.ConfigureTestCluster(builder);

@@ -10,14 +10,14 @@ using UnitTests.StreamingTests;
 
 namespace AWSUtils.Tests.Streaming
 {
-    public class SQSSubscriptionMultiplicityTests : TestClusterPerTest
+    public class SQSSubscriptionMultiplicityTests : InProcessTestClusterPerTest
     {
         private const string SQSStreamProviderName = "SQSProvider";
         private const string StreamNamespace = "SQSSubscriptionMultiplicityTestsNamespace";
         private readonly string StreamConnectionString = AWSTestConstants.SqsConnectionString;
         private SubscriptionMultiplicityTestRunner runner;
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             if (!AWSTestConstants.IsSqsAvailable)
             {

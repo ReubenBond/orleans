@@ -44,6 +44,15 @@ public sealed class InProcessTestClusterOptions
     internal bool UseTestClusterMembership { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether to use a test grain directory.
+    /// </summary>
+    /// <value><see langword="true" /> if the test grain directory should be used; otherwise, <see langword="false" />.</value>
+    /// <remarks>
+    /// Only applicable if <see cref="UseTestClusterMembership"/> is true.
+    /// </remarks>
+    internal bool UseTestClusterGrainDirectory { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether to use the real environment statistics.
     /// </summary>
     public bool UseRealEnvironmentStatistics { get; set; }

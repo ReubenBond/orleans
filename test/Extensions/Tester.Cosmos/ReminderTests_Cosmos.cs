@@ -15,7 +15,7 @@ public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTe
     {
         protected override void CheckPreconditionsOrThrow() => CosmosTestUtils.CheckCosmosStorage();
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
@@ -144,7 +144,7 @@ public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTe
         // start two extra silos ... although it will take it a while before they stabilize
         log.LogInformation("Starting 2 extra silos");
 
-        await HostedCluster.StartAdditionalSilosAsync(2, true);
+        await HostedCluster.StartAdditionalSilosAsync(2);
         await HostedCluster.WaitForLivenessToStabilizeAsync();
 
         //Block until all tasks complete.
@@ -185,7 +185,7 @@ public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTe
         Thread.Sleep(period.Multiply(failAfter));
         // stop the secondary silo
         log.LogInformation("Stopping secondary silo");
-        await HostedCluster.StopSiloAsync(HostedCluster.SecondarySilos.First());
+        await HostedCluster.StopSiloAsync(HostedCluster.Silos[1]);
 
         await test; // Block until test completes.
     }
@@ -193,7 +193,7 @@ public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTe
     [SkippableFact, TestCategory("Functional")]
     public async Task Rem_Azure_2F_MultiGrain()
     {
-        List<SiloHandle> silos = await HostedCluster.StartAdditionalSilosAsync(2, true);
+        var silos = await HostedCluster.StartAdditionalSilosAsync(2);
 
         IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         IReminderTestGrain2 g2 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -227,7 +227,7 @@ public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTe
     [SkippableFact, TestCategory("Functional")]
     public async Task Rem_Azure_1F1J_MultiGrain()
     {
-        List<SiloHandle> silos = await HostedCluster.StartAdditionalSilosAsync(1);
+        var silos = await HostedCluster.StartAdditionalSilosAsync(1);
         await HostedCluster.WaitForLivenessToStabilizeAsync();
 
         IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -253,10 +253,7 @@ public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTe
         // stop a silo and join a new one in parallel
         log.LogInformation("Stopping a silo and joining a silo");
         Task t1 = Task.Factory.StartNew(async () => await HostedCluster.StopSiloAsync(siloToKill));
-        Task t2 = HostedCluster.StartAdditionalSilosAsync(1, true).ContinueWith(t =>
-        {
-            t.GetAwaiter().GetResult();
-        });
+        Task t2 = HostedCluster.StartAdditionalSilosAsync(1);
         await Task.WhenAll(new[] { t1, t2 }).WaitAsync(ENDWAIT);
 
         await Task.WhenAll(tasks).WaitAsync(ENDWAIT); // Block until all tasks complete.
@@ -303,7 +300,7 @@ public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTe
     [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
     public async Task Rem_Azure_GT_1F1J_MultiGrain()
     {
-        List<SiloHandle> silos = await HostedCluster.StartAdditionalSilosAsync(1);
+        var silos = await HostedCluster.StartAdditionalSilosAsync(1);
         await HostedCluster.WaitForLivenessToStabilizeAsync();
 
         IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());

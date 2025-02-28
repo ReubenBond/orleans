@@ -12,11 +12,11 @@ using Xunit;
 namespace Tester.AzureUtils.Streaming
 {
     [TestCategory("Streaming")]
-    public class SampleAzureQueueStreamingTests : TestClusterPerTest
+    public class SampleAzureQueueStreamingTests : InProcessTestClusterPerTest
     {
         private const string StreamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private const int queueCount = 8;
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();

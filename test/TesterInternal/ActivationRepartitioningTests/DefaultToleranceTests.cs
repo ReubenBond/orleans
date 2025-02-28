@@ -528,7 +528,7 @@ public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : Repa
         public const string StreamProviderName = "arsp";
         public const string StreamNamespaceName = "arns";
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.Options.InitialSilosCount = 2;
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();

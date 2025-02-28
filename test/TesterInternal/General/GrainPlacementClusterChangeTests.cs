@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -7,7 +7,7 @@ using Xunit.Abstractions;
 
 namespace UnitTests.General
 {
-    public sealed class GrainPlacementClusterChangeTests(ITestOutputHelper output) : TestClusterPerTest
+    public sealed class GrainPlacementClusterChangeTests(ITestOutputHelper output) : InProcessTestClusterPerTest
     {
         [Theory]
         [InlineData("Primary")]
@@ -50,7 +50,7 @@ namespace UnitTests.General
             output.WriteLine("PreferLocalPlacement grain was originally located on silo {0}", actual);
             Assert.Equal(expected, actual);  // "PreferLocalPlacement strategy should create activations on the local silo."
 
-            SiloHandle siloToKill = HostedCluster.GetActiveSilos().First(s => s.SiloAddress.Endpoint.Equals(expected));
+            var siloToKill = HostedCluster.GetActiveSilos().First(s => s.SiloAddress.Endpoint.Equals(expected));
             output.WriteLine("Killing silo {0} hosting locally placed grain", siloToKill);
             await HostedCluster.StopSiloAsync(siloToKill);
 

@@ -68,7 +68,7 @@ namespace Tester.StreamingTests.Filtering
     {
         protected readonly BaseTestClusterFixture fixture;
         private IClusterClient clusterClient => this.fixture.Client;
-        private CustomStreamFilter streamFilter => this.fixture.HostedCluster.ServiceProvider.GetKeyedService<IStreamFilter>(ProviderName) as CustomStreamFilter;
+        private CustomStreamFilter streamFilter => this.fixture.HostedCluster.ClientHost.Services.GetKeyedService<IStreamFilter>(ProviderName) as CustomStreamFilter;
 
         protected ILogger logger => fixture.Logger;
 

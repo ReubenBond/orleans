@@ -28,7 +28,7 @@ public class PostgreSqlAdoNetClientStreamTests(ITestOutputHelper output) : AdoNe
 }
 
 [TestCategory("AdoNet"), TestCategory("Streaming")]
-public abstract class AdoNetClientStreamTests : TestClusterPerTest
+public abstract class AdoNetClientStreamTests : InProcessTestClusterPerTest
 {
     protected AdoNetClientStreamTests(string invariant, ITestOutputHelper output)
     {
@@ -58,7 +58,7 @@ public abstract class AdoNetClientStreamTests : TestClusterPerTest
         _runner = new ClientStreamTestRunner(HostedCluster);
     }
 
-    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
     {
         builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
         builder.AddClientBuilderConfigurator<TestClientBuilderConfigurator>();

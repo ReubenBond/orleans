@@ -61,7 +61,7 @@ public abstract class AdoNetStreamFilteringTests : StreamFilteringTestsBase, IAs
             await base.InitializeAsync();
         }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.AddClientBuilderConfigurator<TestClientConfigurator>();
             builder.AddSiloBuilderConfigurator<TestSiloConfigurator>();

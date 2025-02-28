@@ -11,13 +11,13 @@ using Xunit;
 namespace UnitTests.General
 {
     [TestCategory("Elasticity"), TestCategory("Placement")]
-    public class ElasticPlacementTests : TestClusterPerTest
+    public class ElasticPlacementTests : InProcessTestClusterPerTest
     {
         private readonly List<IActivationCountBasedPlacementTestGrain> grains = new List<IActivationCountBasedPlacementTestGrain>();
         private const int leavy = 300;
         private const int perSilo = 1000;
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
@@ -50,7 +50,7 @@ namespace UnitTests.General
             AssertIsInRange(activationCounts[this.HostedCluster.Primary], perSilo, leavy);
             AssertIsInRange(activationCounts[this.HostedCluster.SecondarySilos.First()], perSilo, leavy);
 
-            SiloHandle silo3 = this.HostedCluster.StartAdditionalSilo();
+            var silo3 = this.HostedCluster.StartAdditionalSilo();
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
 
             logger.LogInformation("\n\n\n----- Phase 2 -----\n\n");
@@ -93,7 +93,7 @@ namespace UnitTests.General
         [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4008"), TestCategory("Functional")]
         public async Task ElasticityTest_StoppingSilos()
         {
-            List<SiloHandle> runtimes = await this.HostedCluster.StartAdditionalSilosAsync(2);
+            List<InProcessSiloHandle> runtimes = await this.HostedCluster.StartSilosAsync(2);
             await this.HostedCluster.WaitForLivenessToStabilizeAsync();
             int stopLeavy = leavy;
 
@@ -281,7 +281,7 @@ namespace UnitTests.General
             return Task.WhenAll(promises);
         }
 
-        private async Task<Dictionary<SiloHandle, int>> GetPerSiloActivationCounts()
+        private async Task<Dictionary<InProcessSiloHandle, int>> GetPerSiloActivationCounts()
         {
             string fullTypeName = "UnitTests.Grains.ActivationCountBasedPlacementTestGrain";
 
@@ -296,7 +296,7 @@ namespace UnitTests.General
                         .Select(stat => stat.ActivationCount).SingleOrDefault());
         }
 
-        private void LogCounts(Dictionary<SiloHandle, int> activationCounts)
+        private void LogCounts(Dictionary<InProcessSiloHandle, int> activationCounts)
         {
             var sb = new StringBuilder();
             foreach (var silo in this.HostedCluster.GetActiveSilos())

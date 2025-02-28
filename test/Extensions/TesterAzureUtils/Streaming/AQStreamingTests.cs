@@ -244,7 +244,7 @@ namespace Tester.AzureUtils.Streaming
         {
             var multiRunner = new MultipleStreamsTestRunner(fixture.Cluster.InternalClient, SingleStreamTestRunner.AQ_STREAM_PROVIDER_NAME, 17, false);
             await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
-                fixture.Cluster.StartAdditionalSilo);
+                () => fixture.Cluster.StartAdditionalSilo());
         }
 
         //[SkippableFact, TestCategory("BVT")]

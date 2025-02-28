@@ -1,4 +1,4 @@
-﻿namespace TestFSharpSerialization
+namespace TestFSharpSerialization
 
 open TestExtensions
 open UnitTests.FSharpTypes
@@ -15,7 +15,7 @@ type FSharpSerializationTests(fixture: DefaultClusterFixture) =
     [<Fact; TestCategory("BVT"); TestCategory("Serialization")>]
     let Serialization_Roundtrip_FSharp_Unit () =
         let roundtripped = cluster.RoundTripSerializationForTesting ()
-        let copy = cluster.DeepCopy ()
+        let copy = cluster.DeepCopy()
         Assert.Equal((), roundtripped)
         Assert.Equal((), copy)
 

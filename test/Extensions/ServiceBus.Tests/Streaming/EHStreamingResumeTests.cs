@@ -64,7 +64,7 @@ namespace ServiceBus.Tests.Streaming
 
         protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForEventHub();
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             TestUtils.CheckForEventHub();
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();

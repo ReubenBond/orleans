@@ -9,7 +9,7 @@ using Xunit;
 
 namespace UnitTests.MembershipTests
 {
-    public class SilosStopTests : TestClusterPerTest
+    public class SilosStopTests : InProcessTestClusterPerTest
     {
         private class BuilderConfigurator : ISiloConfigurator, IClientBuilderConfigurator
         {
@@ -32,7 +32,7 @@ namespace UnitTests.MembershipTests
             }
         }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             builder.AddClientBuilderConfigurator<BuilderConfigurator>();
             builder.AddSiloBuilderConfigurator<BuilderConfigurator>();
@@ -41,15 +41,15 @@ namespace UnitTests.MembershipTests
         [Fact, TestCategory("Functional"), TestCategory("Liveness")]
         public async Task SiloUngracefulShutdown_OutstandingRequestsBreak()
         {
-            var grain = await GetGrainOnTargetSilo(HostedCluster.Primary);
+            var grain = await GetGrainOnTargetSilo(HostedCluster.Silos[0]);
             Assert.NotNull(grain);
-            var target = await GetGrainOnTargetSilo(HostedCluster.SecondarySilos[0]);
+            var target = await GetGrainOnTargetSilo(HostedCluster.Silos[1]);
             Assert.NotNull(target);
 
             var promise = grain.CallOtherLongRunningTask(target, true, TimeSpan.FromSeconds(7));
 
             await Task.Delay(500);
-            await HostedCluster.KillSiloAsync(HostedCluster.SecondarySilos[0]);
+            await HostedCluster.KillSiloAsync(HostedCluster.Silos[1]);
 
             await Assert.ThrowsAsync<SiloUnavailableException>(() => promise);
         }

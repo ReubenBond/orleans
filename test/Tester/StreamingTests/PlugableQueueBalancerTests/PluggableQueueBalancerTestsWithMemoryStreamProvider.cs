@@ -17,7 +17,7 @@ namespace Tester.StreamingTests.PlugableQueueBalancerTests
 
         public class Fixture : BaseTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
                 builder.Options.InitialSilosCount = siloCount;
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();

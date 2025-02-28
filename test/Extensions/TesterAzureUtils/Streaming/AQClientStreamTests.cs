@@ -13,7 +13,7 @@ using Xunit.Abstractions;
 
 namespace Tester.AzureUtils.Streaming
 {
-    public class AQClientStreamTests : TestClusterPerTest
+    public class AQClientStreamTests : InProcessTestClusterPerTest
     {
         private const string AQStreamProviderName = "AzureQueueProvider";
         private const string StreamNamespace = "AQSubscriptionMultiplicityTestsNamespace";
@@ -32,7 +32,7 @@ namespace Tester.AzureUtils.Streaming
             runner = new ClientStreamTestRunner(this.HostedCluster);
         }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
             TestUtils.CheckForAzureStorage();
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
