@@ -1,4 +1,4 @@
-using System.Buffers;
+﻿using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -199,15 +199,6 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
             writer.Commit();
         }, this);
-    }
-
-    [DoesNotReturn]
-    private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");
-
-    private IStateMachineLogWriter GetStorage()
-    {
-        Debug.Assert(_storage is not null);
-        return _storage;
     }
 
     public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
