@@ -1,4 +1,4 @@
-using System.Buffers;
+﻿using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -14,6 +14,8 @@ public interface IDurableDictionary<K, V> : IDictionary<K, V> where K : notnull
 {
 }
 
+[DebuggerTypeProxy(typeof(IDurableDictionaryDebugView<,>))]
+[DebuggerDisplay("Count = {Count}")]
 internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableStateMachine where K : notnull
 {
     private readonly SerializerSessionPool _serializerSessionPool;
@@ -253,5 +255,54 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
         Remove = 1,
         Clear = 2,
         Snapshot = 3 
+    }
+}
+
+[DebuggerDisplay("{Value}", Name = "[{Key}]")]
+internal readonly struct DebugViewDictionaryItem<TKey, TValue>
+{
+    public DebugViewDictionaryItem(TKey key, TValue value)
+    {
+        Key = key;
+        Value = value;
+    }
+
+    public DebugViewDictionaryItem(KeyValuePair<TKey, TValue> keyValue)
+    {
+        Key = keyValue.Key;
+        Value = keyValue.Value;
+    }
+
+    [DebuggerBrowsable(DebuggerBrowsableState.Collapsed)]
+    public TKey Key { get; }
+
+    [DebuggerBrowsable(DebuggerBrowsableState.Collapsed)]
+    public TValue Value { get; }
+}
+
+internal sealed class IDurableDictionaryDebugView<TKey, TValue> where TKey : notnull
+{
+    private readonly IDurableDictionary<TKey, TValue> _dict;
+
+    public IDurableDictionaryDebugView(IDurableDictionary<TKey, TValue> dictionary)
+    {
+        ArgumentNullException.ThrowIfNull(dictionary);
+        _dict = dictionary;
+    }
+
+    [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
+    public DebugViewDictionaryItem<TKey, TValue>[] Items
+    {
+        get
+        {
+            var keyValuePairs = new KeyValuePair<TKey, TValue>[_dict.Count];
+            _dict.CopyTo(keyValuePairs, 0);
+            var items = new DebugViewDictionaryItem<TKey, TValue>[keyValuePairs.Length];
+            for (int i = 0; i < items.Length; i++)
+            {
+                items[i] = new DebugViewDictionaryItem<TKey, TValue>(keyValuePairs[i]);
+            }
+            return items;
+        }
     }
 }

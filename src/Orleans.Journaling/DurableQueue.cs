@@ -1,4 +1,4 @@
-using System.Buffers;
+﻿using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -22,6 +22,8 @@ public interface IDurableQueue<T> : IEnumerable<T>, IReadOnlyCollection<T>
     bool TryPeek([MaybeNullWhen(false)] out T item);
 }
 
+[DebuggerTypeProxy(typeof(DurableQueueDebugView<>))]
+[DebuggerDisplay("Count = {Count}")]
 internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
 {
     private readonly SerializerSessionPool _serializerSessionPool;
@@ -210,5 +212,26 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
         Dequeue = 1,
         Clear = 2,
         Snapshot = 3,
+    }
+}
+
+internal sealed class DurableQueueDebugView<T>
+{
+    private readonly DurableQueue<T> _queue;
+
+    public DurableQueueDebugView(DurableQueue<T> queue)
+    {
+        ArgumentNullException.ThrowIfNull(queue);
+
+        _queue = queue;
+    }
+
+    [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
+    public T[] Items
+    {
+        get
+        {
+            return _queue.ToArray();
+        }
     }
 }

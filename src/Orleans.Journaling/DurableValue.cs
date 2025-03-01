@@ -1,4 +1,4 @@
-using System.Buffers;
+﻿using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -15,6 +15,7 @@ public interface IDurableValue<T>
     T? Value { get; set; }
 }
 
+[DebuggerDisplay("{Value}")]
 internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine
 {
     private const byte VersionByte = 0;

@@ -1,4 +1,4 @@
-using System.Buffers;
+﻿using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -14,6 +14,8 @@ public interface IDurableList<T> : IList<T>
 {
 }
 
+[DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
+[DebuggerDisplay("Count = {Count}")]
 internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
 {
     private readonly SerializerSessionPool _serializerSessionPool;
@@ -250,5 +252,35 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
         Remove = 3,
         Clear = 4,
         Snapshot = 5
+    }
+}
+
+internal sealed class IDurableCollectionDebugView<T>
+{
+    private readonly ICollection<T> _collection;
+
+    public IDurableCollectionDebugView(ICollection<T> collection)
+    {
+#if NET
+        ArgumentNullException.ThrowIfNull(collection);
+#else
+            if (collection is null)
+            {
+                throw new ArgumentNullException(nameof(collection));
+            }
+#endif
+
+        _collection = collection;
+    }
+
+    [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
+    public T[] Items
+    {
+        get
+        {
+            T[] items = new T[_collection.Count];
+            _collection.CopyTo(items, 0);
+            return items;
+        }
     }
 }

@@ -1,4 +1,4 @@
-using System.Buffers;
+﻿using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -12,8 +12,11 @@ namespace Orleans.Journaling;
 
 public interface IDurableSet<T> : ICollection<T>, ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<T>
 {
+    new int Count { get; }
 }
 
+[DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
+[DebuggerDisplay("Count = {Count}")]
 internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine
 {
     private readonly SerializerSessionPool _serializerSessionPool;
