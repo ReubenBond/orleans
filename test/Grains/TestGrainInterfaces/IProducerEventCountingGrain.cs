@@ -1,4 +1,7 @@
-﻿namespace UnitTests.GrainInterfaces
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+
+namespace UnitTests.GrainInterfaces
 {
     /// <summary>
     /// Stream producer grain that sends a single event at a time (when told, see SendEvent) and tracks the number of events sent

@@ -1,3 +1,6 @@
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+
 namespace UnitTests.GrainInterfaces
 {
     // Note: Self-managed can only implement one grain interface, so have to use copy-paste rather than subclassing 

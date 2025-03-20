@@ -1,4 +1,7 @@
-﻿namespace Tester.StorageFacet.Abstractions
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+
+namespace Tester.StorageFacet.Abstractions
 {
     /// <summary>
     /// Primary storage feature interface.

@@ -1,4 +1,7 @@
-﻿namespace Orleans.Storage
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+
+namespace Orleans.Storage
 {
     /// <summary>
     /// An interface for all the hashing operations currently in Orleans Storage operations.
