@@ -1,36 +1,35 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Serialization.Configuration
+namespace Orleans.Serialization.Configuration;
+
+/// <summary>
+/// Defines a metadata provider for this assembly.
+/// </summary>
+[AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
+public sealed class TypeManifestProviderAttribute : Attribute
 {
     /// <summary>
-    /// Defines a metadata provider for this assembly.
+    /// Initializes a new instance of the <see cref="TypeManifestProviderAttribute"/> class.
     /// </summary>
-    [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
-    public sealed class TypeManifestProviderAttribute : Attribute
+    /// <param name="providerType">The metadata provider type.</param>
+    public TypeManifestProviderAttribute(Type providerType)
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="TypeManifestProviderAttribute"/> class.
-        /// </summary>
-        /// <param name="providerType">The metadata provider type.</param>
-        public TypeManifestProviderAttribute(Type providerType)
+        if (providerType is null)
         {
-            if (providerType is null)
-            {
-                throw new ArgumentNullException(nameof(providerType));
-            }
-
-            if (!typeof(ITypeManifestProvider).IsAssignableFrom(providerType))
-            {
-                throw new ArgumentException($"Provided type {providerType} must implement {typeof(ITypeManifestProvider)}", nameof(providerType));
-            }
-
-            ProviderType = providerType;
+            throw new ArgumentNullException(nameof(providerType));
         }
 
-        /// <summary>
-        /// Gets the manifest provider type.
-        /// </summary>
-        public Type ProviderType { get; }
+        if (!typeof(ITypeManifestProvider).IsAssignableFrom(providerType))
+        {
+            throw new ArgumentException($"Provided type {providerType} must implement {typeof(ITypeManifestProvider)}", nameof(providerType));
+        }
+
+        ProviderType = providerType;
     }
+
+    /// <summary>
+    /// Gets the manifest provider type.
+    /// </summary>
+    public Type ProviderType { get; }
 }

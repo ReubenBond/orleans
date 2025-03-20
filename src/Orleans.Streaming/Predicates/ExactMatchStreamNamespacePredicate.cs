@@ -1,35 +1,34 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Streams
+namespace Orleans.Streams;
+
+/// <summary>
+/// Stream namespace predicate which matches exactly one, specified
+/// </summary>
+[Serializable, GenerateSerializer, Immutable]
+internal sealed class ExactMatchStreamNamespacePredicate : IStreamNamespacePredicate
 {
+    internal const string Prefix = "namespace:";
+
+    [Id(0)]
+    private readonly string targetStreamNamespace;
+
     /// <summary>
-    /// Stream namespace predicate which matches exactly one, specified
+    /// Initializes a new instance of the <see cref="ExactMatchStreamNamespacePredicate"/> class.
     /// </summary>
-    [Serializable, GenerateSerializer, Immutable]
-    internal sealed class ExactMatchStreamNamespacePredicate : IStreamNamespacePredicate
+    /// <param name="targetStreamNamespace">The target stream namespace.</param>
+    public ExactMatchStreamNamespacePredicate(string targetStreamNamespace)
     {
-        internal const string Prefix = "namespace:";
+        this.targetStreamNamespace = targetStreamNamespace;
+    }
 
-        [Id(0)]
-        private readonly string targetStreamNamespace;
+    /// <inheritdoc/>
+    public string PredicatePattern => $"{Prefix}{this.targetStreamNamespace}";
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ExactMatchStreamNamespacePredicate"/> class.
-        /// </summary>
-        /// <param name="targetStreamNamespace">The target stream namespace.</param>
-        public ExactMatchStreamNamespacePredicate(string targetStreamNamespace)
-        {
-            this.targetStreamNamespace = targetStreamNamespace;
-        }
-
-        /// <inheritdoc/>
-        public string PredicatePattern => $"{Prefix}{this.targetStreamNamespace}";
-
-        /// <inheritdoc/>
-        public bool IsMatch(string streamNamespace)
-        {
-            return string.Equals(targetStreamNamespace, streamNamespace?.Trim());
-        }
+    /// <inheritdoc/>
+    public bool IsMatch(string streamNamespace)
+    {
+        return string.Equals(targetStreamNamespace, streamNamespace?.Trim());
     }
 }

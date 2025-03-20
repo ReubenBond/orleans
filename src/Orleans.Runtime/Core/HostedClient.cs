@@ -13,389 +13,388 @@ using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
-namespace Orleans.Runtime
+namespace Orleans.Runtime;
+
+/// <summary>
+/// A client which is hosted within a silo.
+/// </summary>
+internal sealed class HostedClient : IGrainContext, IGrainExtensionBinder, IDisposable, ILifecycleParticipant<ISiloLifecycle>
 {
-    /// <summary>
-    /// A client which is hosted within a silo.
-    /// </summary>
-    internal sealed class HostedClient : IGrainContext, IGrainExtensionBinder, IDisposable, ILifecycleParticipant<ISiloLifecycle>
+    private readonly object lockObj = new object();
+    private readonly Channel<Message> incomingMessages;
+    private readonly IGrainReferenceRuntime grainReferenceRuntime;
+    private readonly InvokableObjectManager invokableObjects;
+    private readonly InsideRuntimeClient runtimeClient;
+    private readonly ILogger logger;
+    private readonly IInternalGrainFactory grainFactory;
+    private readonly MessageCenter siloMessageCenter;
+    private readonly MessagingTrace messagingTrace;
+    private readonly ConcurrentDictionary<Type, (object Implementation, IAddressable Reference)> _extensions = new ConcurrentDictionary<Type, (object, IAddressable)>();
+    private readonly ConcurrentDictionary<Type, object> _components = new();
+    private readonly IServiceScope _serviceProviderScope;
+    private bool disposing;
+    private Task? messagePump;
+
+    public HostedClient(
+        InsideRuntimeClient runtimeClient,
+        ILocalSiloDetails siloDetails,
+        ILogger<HostedClient> logger,
+        IGrainReferenceRuntime grainReferenceRuntime,
+        IInternalGrainFactory grainFactory,
+        MessageCenter messageCenter,
+        MessagingTrace messagingTrace,
+        DeepCopier deepCopier,
+        GrainReferenceActivator referenceActivator,
+        InterfaceToImplementationMappingCache interfaceToImplementationMappingCache)
     {
-        private readonly object lockObj = new object();
-        private readonly Channel<Message> incomingMessages;
-        private readonly IGrainReferenceRuntime grainReferenceRuntime;
-        private readonly InvokableObjectManager invokableObjects;
-        private readonly InsideRuntimeClient runtimeClient;
-        private readonly ILogger logger;
-        private readonly IInternalGrainFactory grainFactory;
-        private readonly MessageCenter siloMessageCenter;
-        private readonly MessagingTrace messagingTrace;
-        private readonly ConcurrentDictionary<Type, (object Implementation, IAddressable Reference)> _extensions = new ConcurrentDictionary<Type, (object, IAddressable)>();
-        private readonly ConcurrentDictionary<Type, object> _components = new();
-        private readonly IServiceScope _serviceProviderScope;
-        private bool disposing;
-        private Task? messagePump;
-
-        public HostedClient(
-            InsideRuntimeClient runtimeClient,
-            ILocalSiloDetails siloDetails,
-            ILogger<HostedClient> logger,
-            IGrainReferenceRuntime grainReferenceRuntime,
-            IInternalGrainFactory grainFactory,
-            MessageCenter messageCenter,
-            MessagingTrace messagingTrace,
-            DeepCopier deepCopier,
-            GrainReferenceActivator referenceActivator,
-            InterfaceToImplementationMappingCache interfaceToImplementationMappingCache)
+        this.incomingMessages = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
         {
-            this.incomingMessages = Channel.CreateUnbounded<Message>(new UnboundedChannelOptions
-            {
-                SingleReader = true,
-                SingleWriter = false,
-                AllowSynchronousContinuations = false,
-            });
+            SingleReader = true,
+            SingleWriter = false,
+            AllowSynchronousContinuations = false,
+        });
 
-            this.runtimeClient = runtimeClient;
-            this.grainReferenceRuntime = grainReferenceRuntime;
-            this.grainFactory = grainFactory;
-            this.invokableObjects = new InvokableObjectManager(
-                this,
-                runtimeClient,
-                deepCopier,
-                messagingTrace,
-                runtimeClient.ServiceProvider.GetRequiredService<DeepCopier<Response>>(),
-                interfaceToImplementationMappingCache,
-                logger);
-            this.siloMessageCenter = messageCenter;
-            this.messagingTrace = messagingTrace;
-            this.logger = logger;
+        this.runtimeClient = runtimeClient;
+        this.grainReferenceRuntime = grainReferenceRuntime;
+        this.grainFactory = grainFactory;
+        this.invokableObjects = new InvokableObjectManager(
+            this,
+            runtimeClient,
+            deepCopier,
+            messagingTrace,
+            runtimeClient.ServiceProvider.GetRequiredService<DeepCopier<Response>>(),
+            interfaceToImplementationMappingCache,
+            logger);
+        this.siloMessageCenter = messageCenter;
+        this.messagingTrace = messagingTrace;
+        this.logger = logger;
 
-            this.ClientId = CreateHostedClientGrainId(siloDetails.SiloAddress);
-            this.Address = Gateway.GetClientActivationAddress(this.ClientId.GrainId, siloDetails.SiloAddress);
-            this.GrainReference = referenceActivator.CreateReference(this.ClientId.GrainId, default);
-            _serviceProviderScope = runtimeClient.ServiceProvider.CreateScope();
+        this.ClientId = CreateHostedClientGrainId(siloDetails.SiloAddress);
+        this.Address = Gateway.GetClientActivationAddress(this.ClientId.GrainId, siloDetails.SiloAddress);
+        this.GrainReference = referenceActivator.CreateReference(this.ClientId.GrainId, default);
+        _serviceProviderScope = runtimeClient.ServiceProvider.CreateScope();
+    }
+
+    public static ClientGrainId CreateHostedClientGrainId(SiloAddress siloAddress) => ClientGrainId.Create($"hosted-{siloAddress.ToParsableString()}");
+
+    /// <inheritdoc />
+    public ClientGrainId ClientId { get; }
+
+    public GrainReference GrainReference { get; }
+
+    public GrainId GrainId => this.ClientId.GrainId;
+
+    public object? GrainInstance => null;
+
+    public ActivationId ActivationId => this.Address.ActivationId;
+
+    public GrainAddress Address { get; }
+
+    public IServiceProvider ActivationServices => _serviceProviderScope.ServiceProvider;
+
+    public IGrainLifecycle ObservableLifecycle => throw new NotImplementedException();
+
+    public IWorkItemScheduler Scheduler => throw new NotImplementedException();
+
+    public bool IsExemptFromCollection => true;
+
+    /// <inheritdoc />
+    public override string ToString() => $"{nameof(HostedClient)}_{this.Address}";
+
+    /// <inheritdoc />
+    public IAddressable CreateObjectReference(IAddressable obj)
+    {
+        if (obj is GrainReference) throw new ArgumentException("Argument obj is already a grain reference.");
+
+        var observerId = ObserverGrainId.Create(this.ClientId);
+        var grainReference = this.grainFactory.GetGrain(observerId.GrainId);
+        if (!this.invokableObjects.TryRegister(obj, observerId))
+        {
+            throw new ArgumentException(
+                string.Format("Failed to add new observer {0} to localObjects collection.", grainReference),
+                nameof(grainReference));
         }
 
-        public static ClientGrainId CreateHostedClientGrainId(SiloAddress siloAddress) => ClientGrainId.Create($"hosted-{siloAddress.ToParsableString()}");
+        return grainReference;
+    }
 
-        /// <inheritdoc />
-        public ClientGrainId ClientId { get; }
-
-        public GrainReference GrainReference { get; }
-
-        public GrainId GrainId => this.ClientId.GrainId;
-
-        public object? GrainInstance => null;
-
-        public ActivationId ActivationId => this.Address.ActivationId;
-
-        public GrainAddress Address { get; }
-
-        public IServiceProvider ActivationServices => _serviceProviderScope.ServiceProvider;
-
-        public IGrainLifecycle ObservableLifecycle => throw new NotImplementedException();
-
-        public IWorkItemScheduler Scheduler => throw new NotImplementedException();
-
-        public bool IsExemptFromCollection => true;
-
-        /// <inheritdoc />
-        public override string ToString() => $"{nameof(HostedClient)}_{this.Address}";
-
-        /// <inheritdoc />
-        public IAddressable CreateObjectReference(IAddressable obj)
+    /// <inheritdoc />
+    public void DeleteObjectReference(IAddressable obj)
+    {
+        if (obj is not GrainReference reference)
         {
-            if (obj is GrainReference) throw new ArgumentException("Argument obj is already a grain reference.");
-
-            var observerId = ObserverGrainId.Create(this.ClientId);
-            var grainReference = this.grainFactory.GetGrain(observerId.GrainId);
-            if (!this.invokableObjects.TryRegister(obj, observerId))
-            {
-                throw new ArgumentException(
-                    string.Format("Failed to add new observer {0} to localObjects collection.", grainReference),
-                    nameof(grainReference));
-            }
-
-            return grainReference;
+            throw new ArgumentException("Argument reference is not a grain reference.");
         }
 
-        /// <inheritdoc />
-        public void DeleteObjectReference(IAddressable obj)
+        if (!ObserverGrainId.TryParse(reference.GrainId, out var observerId))
         {
-            if (obj is not GrainReference reference)
-            {
-                throw new ArgumentException("Argument reference is not a grain reference.");
-            }
+            throw new ArgumentException($"Reference {reference.GrainId} is not an observer reference");
+        }
 
-            if (!ObserverGrainId.TryParse(reference.GrainId, out var observerId))
-            {
-                throw new ArgumentException($"Reference {reference.GrainId} is not an observer reference");
-            }
+        if (!invokableObjects.TryDeregister(observerId))
+        {
+            throw new ArgumentException("Reference is not associated with a local object.", "reference");
+        }
+    }
 
-            if (!invokableObjects.TryDeregister(observerId))
+    public TComponent? GetComponent<TComponent>() where TComponent : class
+    {
+        if (this is TComponent component) return component;
+        if (_components.TryGetValue(typeof(TComponent), out var result))
+        {
+            return (TComponent)result;
+        }
+        else if (typeof(TComponent) == typeof(PlacementStrategy))
+        {
+            return (TComponent)(object)ClientObserversPlacement.Instance;
+        }
+
+        lock (lockObj)
+        {
+            if (ActivationServices.GetService<TComponent>() is { } activatedComponent)
             {
-                throw new ArgumentException("Reference is not associated with a local object.", "reference");
+                return (TComponent)_components.GetOrAdd(typeof(TComponent), activatedComponent);
             }
         }
 
-        public TComponent? GetComponent<TComponent>() where TComponent : class
+        return default;
+    }
+
+    public void SetComponent<TComponent>(TComponent? instance) where TComponent : class
+    {
+        if (this is TComponent)
         {
-            if (this is TComponent component) return component;
-            if (_components.TryGetValue(typeof(TComponent), out var result))
-            {
-                return (TComponent)result;
-            }
-            else if (typeof(TComponent) == typeof(PlacementStrategy))
-            {
-                return (TComponent)(object)ClientObserversPlacement.Instance;
-            }
-
-            lock (lockObj)
-            {
-                if (ActivationServices.GetService<TComponent>() is { } activatedComponent)
-                {
-                    return (TComponent)_components.GetOrAdd(typeof(TComponent), activatedComponent);
-                }
-            }
-
-            return default;
+            throw new ArgumentException("Cannot override a component which is implemented by the client context");
         }
 
-        public void SetComponent<TComponent>(TComponent? instance) where TComponent : class
+        lock (lockObj)
         {
-            if (this is TComponent)
+            if (instance == null)
             {
-                throw new ArgumentException("Cannot override a component which is implemented by the client context");
+                _components.Remove(typeof(TComponent), out _);
+                return;
             }
 
-            lock (lockObj)
-            {
-                if (instance == null)
-                {
-                    _components.Remove(typeof(TComponent), out _);
-                    return;
-                }
+            _components[typeof(TComponent)] = instance;
+        }
+    }
 
-                _components[typeof(TComponent)] = instance;
-            }
+    /// <inheritdoc />
+    public bool TryDispatchToClient(Message message)
+    {
+        if (!ClientGrainId.TryParse(message.TargetGrain, out var targetClient) || !this.ClientId.Equals(targetClient))
+        {
+            return false;
         }
 
-        /// <inheritdoc />
-        public bool TryDispatchToClient(Message message)
+        if (message.IsExpired)
         {
-            if (!ClientGrainId.TryParse(message.TargetGrain, out var targetClient) || !this.ClientId.Equals(targetClient))
-            {
-                return false;
-            }
-
-            if (message.IsExpired)
-            {
-                this.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Receive);
-                return true;
-            }
-
-            this.ReceiveMessage(message);
+            this.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Receive);
             return true;
         }
 
-        public void ReceiveMessage(object message)
-        {
-            var msg = (Message)message;
+        this.ReceiveMessage(message);
+        return true;
+    }
 
-            if (msg.Direction == Message.Directions.Response)
-            {
-                // Requests are made through the runtime client, so deliver responses to the rutnime client so that the request callback can be executed.
-                this.runtimeClient.ReceiveResponse(msg);
-            }
-            else
-            {
-                // Requests against client objects are scheduled for execution on the client.
-                this.incomingMessages.Writer.TryWrite(msg);
-            }
+    public void ReceiveMessage(object message)
+    {
+        var msg = (Message)message;
+
+        if (msg.Direction == Message.Directions.Response)
+        {
+            // Requests are made through the runtime client, so deliver responses to the rutnime client so that the request callback can be executed.
+            this.runtimeClient.ReceiveResponse(msg);
         }
-
-        /// <inheritdoc />
-        void IDisposable.Dispose()
+        else
         {
-            if (this.disposing) return;
-            this.disposing = true;
-            _serviceProviderScope.Dispose();
-            Utils.SafeExecute(() => this.siloMessageCenter.SetHostedClient(null));
-            Utils.SafeExecute(() => this.incomingMessages.Writer.TryComplete());
-            Utils.SafeExecute(() => this.messagePump?.GetAwaiter().GetResult());
+            // Requests against client objects are scheduled for execution on the client.
+            this.incomingMessages.Writer.TryWrite(msg);
         }
+    }
 
-        private void Start()
-        {
-            this.messagePump = Task.Run(this.RunClientMessagePump);
-        }
+    /// <inheritdoc />
+    void IDisposable.Dispose()
+    {
+        if (this.disposing) return;
+        this.disposing = true;
+        _serviceProviderScope.Dispose();
+        Utils.SafeExecute(() => this.siloMessageCenter.SetHostedClient(null));
+        Utils.SafeExecute(() => this.incomingMessages.Writer.TryComplete());
+        Utils.SafeExecute(() => this.messagePump?.GetAwaiter().GetResult());
+    }
 
-        private async Task RunClientMessagePump()
+    private void Start()
+    {
+        this.messagePump = Task.Run(this.RunClientMessagePump);
+    }
+
+    private async Task RunClientMessagePump()
+    {
+        var reader = this.incomingMessages.Reader;
+        while (true)
         {
-            var reader = this.incomingMessages.Reader;
-            while (true)
+            try
             {
-                try
+                var more = await reader.WaitToReadAsync();
+                if (!more)
                 {
-                    var more = await reader.WaitToReadAsync();
-                    if (!more)
+                    if (this.logger.IsEnabled(LogLevel.Debug))
                     {
-                        if (this.logger.IsEnabled(LogLevel.Debug))
-                        {
-                            this.logger.LogDebug($"{nameof(Runtime.HostedClient)} completed processing all messages. Shutting down.");
-                        }
-                        break;
+                        this.logger.LogDebug($"{nameof(Runtime.HostedClient)} completed processing all messages. Shutting down.");
                     }
+                    break;
+                }
 
-                    while (reader.TryRead(out var message))
+                while (reader.TryRead(out var message))
+                {
+                    if (message == null) continue;
+                    switch (message.Direction)
                     {
-                        if (message == null) continue;
-                        switch (message.Direction)
-                        {
-                            case Message.Directions.OneWay:
-                            case Message.Directions.Request:
-                                this.invokableObjects.Dispatch(message);
-                                break;
-                            default:
-                                this.logger.LogError((int)ErrorCode.Runtime_Error_100327, "Message not supported: {Message}", message);
-                                break;
-                        }
+                        case Message.Directions.OneWay:
+                        case Message.Directions.Request:
+                            this.invokableObjects.Dispatch(message);
+                            break;
+                        default:
+                            this.logger.LogError((int)ErrorCode.Runtime_Error_100327, "Message not supported: {Message}", message);
+                            break;
                     }
                 }
-                catch (Exception exception)
-                {
-                    this.logger.LogError((int)ErrorCode.Runtime_Error_100326, exception, "RunClientMessagePump has thrown an exception. Continuing.");
-                }
+            }
+            catch (Exception exception)
+            {
+                this.logger.LogError((int)ErrorCode.Runtime_Error_100326, exception, "RunClientMessagePump has thrown an exception. Continuing.");
             }
         }
+    }
 
-        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+    void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+    {
+        lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
+
+        Task OnStart(CancellationToken cancellation)
         {
-            lifecycle.Subscribe("HostedClient", ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
+            if (cancellation.IsCancellationRequested) return Task.CompletedTask;
 
-            Task OnStart(CancellationToken cancellation)
-            {
-                if (cancellation.IsCancellationRequested) return Task.CompletedTask;
+            // Register with the message center so that we can receive messages.
+            this.siloMessageCenter.SetHostedClient(this);
 
-                // Register with the message center so that we can receive messages.
-                this.siloMessageCenter.SetHostedClient(this);
-
-                // Start pumping messages.
-                this.Start();
-                return Task.CompletedTask;
-            }
-
-            async Task OnStop(CancellationToken cancellation)
-            {
-                this.incomingMessages.Writer.TryComplete();
-
-                if (this.messagePump != null)
-                {
-                    await messagePump.WaitAsync(cancellation).SuppressThrowing();
-                }
-            }
+            // Start pumping messages.
+            this.Start();
+            return Task.CompletedTask;
         }
 
-        public bool Equals(IGrainContext? other) => ReferenceEquals(this, other);
-
-        public (TExtension, TExtensionInterface) GetOrSetExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
-            where TExtension : class, TExtensionInterface
-            where TExtensionInterface : class, IGrainExtension
+        async Task OnStop(CancellationToken cancellation)
         {
-            (TExtension, TExtensionInterface) result;
+            this.incomingMessages.Writer.TryComplete();
+
+            if (this.messagePump != null)
+            {
+                await messagePump.WaitAsync(cancellation).SuppressThrowing();
+            }
+        }
+    }
+
+    public bool Equals(IGrainContext? other) => ReferenceEquals(this, other);
+
+    public (TExtension, TExtensionInterface) GetOrSetExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
+        where TExtension : class, TExtensionInterface
+        where TExtensionInterface : class, IGrainExtension
+    {
+        (TExtension, TExtensionInterface) result;
+        if (this.TryGetExtension(out result))
+        {
+            return result;
+        }
+
+        lock (this.lockObj)
+        {
             if (this.TryGetExtension(out result))
             {
                 return result;
             }
 
-            lock (this.lockObj)
-            {
-                if (this.TryGetExtension(out result))
-                {
-                    return result;
-                }
-
-                var implementation = newExtensionFunc();
-                var reference = this.grainFactory.CreateObjectReference<TExtensionInterface>(implementation);
-                _extensions[typeof(TExtensionInterface)] = (implementation, reference);
-                result = (implementation, reference);
-                return result;
-            }
+            var implementation = newExtensionFunc();
+            var reference = this.grainFactory.CreateObjectReference<TExtensionInterface>(implementation);
+            _extensions[typeof(TExtensionInterface)] = (implementation, reference);
+            result = (implementation, reference);
+            return result;
         }
+    }
 
-        private bool TryGetExtension<TExtension, TExtensionInterface>(out (TExtension, TExtensionInterface) result)
-            where TExtension : class, TExtensionInterface
-            where TExtensionInterface : class, IGrainExtension
+    private bool TryGetExtension<TExtension, TExtensionInterface>(out (TExtension, TExtensionInterface) result)
+        where TExtension : class, TExtensionInterface
+        where TExtensionInterface : class, IGrainExtension
+    {
+        if (_extensions.TryGetValue(typeof(TExtensionInterface), out var existing))
         {
-            if (_extensions.TryGetValue(typeof(TExtensionInterface), out var existing))
+            if (existing.Implementation is TExtension typedResult)
             {
-                if (existing.Implementation is TExtension typedResult)
-                {
-                    result = (typedResult, existing.Reference.AsReference<TExtensionInterface>());
-                    return true;
-                }
-
-                throw new InvalidCastException($"Cannot cast existing extension of type {existing.Implementation} to target type {typeof(TExtension)}");
-            }
-
-            result = default;
-            return false;
-        }
-
-        private bool TryGetExtension<TExtensionInterface>([NotNullWhen(true)] out TExtensionInterface? result)
-            where TExtensionInterface : IGrainExtension
-        {
-            if (_extensions.TryGetValue(typeof(TExtensionInterface), out var existing))
-            {
-                result = (TExtensionInterface)existing.Implementation;
+                result = (typedResult, existing.Reference.AsReference<TExtensionInterface>());
                 return true;
             }
 
-            result = default;
-            return false;
+            throw new InvalidCastException($"Cannot cast existing extension of type {existing.Implementation} to target type {typeof(TExtension)}");
         }
 
-        public TExtensionInterface GetExtension<TExtensionInterface>()
-            where TExtensionInterface : class, IGrainExtension
+        result = default;
+        return false;
+    }
+
+    private bool TryGetExtension<TExtensionInterface>([NotNullWhen(true)] out TExtensionInterface? result)
+        where TExtensionInterface : IGrainExtension
+    {
+        if (_extensions.TryGetValue(typeof(TExtensionInterface), out var existing))
         {
-            if (this.TryGetExtension<TExtensionInterface>(out var result))
+            result = (TExtensionInterface)existing.Implementation;
+            return true;
+        }
+
+        result = default;
+        return false;
+    }
+
+    public TExtensionInterface GetExtension<TExtensionInterface>()
+        where TExtensionInterface : class, IGrainExtension
+    {
+        if (this.TryGetExtension<TExtensionInterface>(out var result))
+        {
+            return result;
+        }
+
+        lock (this.lockObj)
+        {
+            if (this.TryGetExtension(out result))
             {
                 return result;
             }
 
-            lock (this.lockObj)
+            var implementation = this.ActivationServices.GetKeyedService<IGrainExtension>(typeof(TExtensionInterface));
+            if (implementation is null)
             {
-                if (this.TryGetExtension(out result))
-                {
-                    return result;
-                }
-
-                var implementation = this.ActivationServices.GetKeyedService<IGrainExtension>(typeof(TExtensionInterface));
-                if (implementation is null)
-                {
-                    throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TExtensionInterface)} is installed on this instance and no implementations are registered for automated install");
-                }
-
-                var reference = this.GrainReference.Cast<TExtensionInterface>();
-                _extensions[typeof(TExtensionInterface)] = (implementation, reference);
-                result = (TExtensionInterface)implementation;
-                return result;
+                throw new GrainExtensionNotInstalledException($"No extension of type {typeof(TExtensionInterface)} is installed on this instance and no implementations are registered for automated install");
             }
-        }
 
-        public TTarget GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
-        public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) { }
-        public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) { }
-        public Task Deactivated => Task.CompletedTask;
-
-        public void Rehydrate(IRehydrationContext context)
-        {
-            // Migration is not supported, but we need to dispose of the context if it's provided
-            (context as IDisposable)?.Dispose();
+            var reference = this.GrainReference.Cast<TExtensionInterface>();
+            _extensions[typeof(TExtensionInterface)] = (implementation, reference);
+            result = (TExtensionInterface)implementation;
+            return result;
         }
+    }
 
-        public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
-        {
-            // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
-        }
+    public TTarget GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
+    public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) { }
+    public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) { }
+    public Task Deactivated => Task.CompletedTask;
+
+    public void Rehydrate(IRehydrationContext context)
+    {
+        // Migration is not supported, but we need to dispose of the context if it's provided
+        (context as IDisposable)?.Dispose();
+    }
+
+    public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken)
+    {
+        // Migration is not supported. Do nothing: the contract is that this method attempts migration, but does not guarantee it will occur.
     }
 }

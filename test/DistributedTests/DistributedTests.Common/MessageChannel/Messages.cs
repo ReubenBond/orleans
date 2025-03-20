@@ -1,36 +1,35 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace DistributedTests.Common.MessageChannel
+namespace DistributedTests.Common.MessageChannel;
+
+public class ServerMessage
 {
-    public class ServerMessage
+    public Guid MessageId { get; }
+
+    public bool IsGraceful { get; }
+
+    public bool Restart { get; }
+
+    public ServerMessage(bool isGraceful, bool restart)
     {
-        public Guid MessageId { get; }
+        MessageId = Guid.NewGuid();
+        IsGraceful = isGraceful;
+        Restart = restart;
+    }
+}
 
-        public bool IsGraceful { get; }
+public class AckMessage
+{
+    public Guid MessageId { get; }
 
-        public bool Restart { get; }
+    public string ServerName { get; set; }
 
-        public ServerMessage(bool isGraceful, bool restart)
-        {
-            MessageId = Guid.NewGuid();
-            IsGraceful = isGraceful;
-            Restart = restart;
-        }
+    public AckMessage(Guid messageId, string serverName)
+    {
+        MessageId = messageId;
+        ServerName = serverName;
     }
 
-    public class AckMessage
-    {
-        public Guid MessageId { get; }
-
-        public string ServerName { get; set; }
-
-        public AckMessage(Guid messageId, string serverName)
-        {
-            MessageId = messageId;
-            ServerName = serverName;
-        }
-
-        public static AckMessage CreateAckMessage(ServerMessage msg, string serverName) => new(msg.MessageId, serverName);
-    }
+    public static AckMessage CreateAckMessage(ServerMessage msg, string serverName) => new(msg.MessageId, serverName);
 }

@@ -4,37 +4,36 @@
 using Orleans.GrainDirectory;
 using UnitTests.GrainInterfaces.Directories;
 
-namespace UnitTests.Grains.Directories
+namespace UnitTests.Grains.Directories;
+
+[GrainDirectory(GrainDirectoryName = DIRECTORY), GrainType(DIRECTORY)]
+public class CustomDirectoryGrain : ICustomDirectoryGrain
 {
-    [GrainDirectory(GrainDirectoryName = DIRECTORY), GrainType(DIRECTORY)]
-    public class CustomDirectoryGrain : ICustomDirectoryGrain
+    private int counter = 0;
+    private readonly SiloAddress _siloAddress;
+
+    public const string DIRECTORY = "CustomGrainDirectory";
+
+    public CustomDirectoryGrain(ILocalSiloDetails siloDetails)
     {
-        private int counter = 0;
-        private readonly SiloAddress _siloAddress;
+        _siloAddress = siloDetails.SiloAddress;
+    }
 
-        public const string DIRECTORY = "CustomGrainDirectory";
+    public Task<int> Ping() => Task.FromResult(++this.counter);
 
-        public CustomDirectoryGrain(ILocalSiloDetails siloDetails)
-        {
-            _siloAddress = siloDetails.SiloAddress;
-        }
+    public Task Reset()
+    {
+        counter = 0;
+        return Task.CompletedTask;
+    }
 
-        public Task<int> Ping() => Task.FromResult(++this.counter);
+    public Task<string> GetRuntimeInstanceId()
+    {
+        return Task.FromResult(_siloAddress.ToString());
+    }
 
-        public Task Reset()
-        {
-            counter = 0;
-            return Task.CompletedTask;
-        }
-
-        public Task<string> GetRuntimeInstanceId()
-        {
-            return Task.FromResult(_siloAddress.ToString());
-        }
-
-        public Task<int> ProxyPing(ICommonDirectoryGrain grain)
-        {
-            return grain.Ping();
-        }
+    public Task<int> ProxyPing(ICommonDirectoryGrain grain)
+    {
+        return grain.Ping();
     }
 }

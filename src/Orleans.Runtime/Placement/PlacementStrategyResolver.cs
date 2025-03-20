@@ -5,80 +5,79 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Metadata;
 using System.Collections.Concurrent;
 
-namespace Orleans.Runtime.Placement
+namespace Orleans.Runtime.Placement;
+
+/// <summary>
+/// Responsible for resolving an <see cref="PlacementStrategy"/> for a <see cref="GrainType"/>.
+/// </summary>
+public sealed class PlacementStrategyResolver
 {
+    private readonly ConcurrentDictionary<GrainType, PlacementStrategy> _resolvedStrategies = new();
+    private readonly Func<GrainType, PlacementStrategy> _getStrategyInternal;
+    private readonly IPlacementStrategyResolver[] _resolvers;
+    private readonly GrainPropertiesResolver _grainPropertiesResolver;
+    private readonly PlacementStrategy _defaultPlacementStrategy;
+    private readonly IServiceProvider _services;
+
     /// <summary>
-    /// Responsible for resolving an <see cref="PlacementStrategy"/> for a <see cref="GrainType"/>.
+    /// Create a <see cref="PlacementStrategyResolver"/> instance.
     /// </summary>
-    public sealed class PlacementStrategyResolver
+    public PlacementStrategyResolver(
+        IServiceProvider services,
+        IEnumerable<IPlacementStrategyResolver> resolvers,
+        GrainPropertiesResolver grainPropertiesResolver)
     {
-        private readonly ConcurrentDictionary<GrainType, PlacementStrategy> _resolvedStrategies = new();
-        private readonly Func<GrainType, PlacementStrategy> _getStrategyInternal;
-        private readonly IPlacementStrategyResolver[] _resolvers;
-        private readonly GrainPropertiesResolver _grainPropertiesResolver;
-        private readonly PlacementStrategy _defaultPlacementStrategy;
-        private readonly IServiceProvider _services;
+        _services = services;
+        _getStrategyInternal = GetPlacementStrategyInternal;
+        _resolvers = resolvers.ToArray();
+        _grainPropertiesResolver = grainPropertiesResolver;
+        _defaultPlacementStrategy = services.GetService<PlacementStrategy>();
+    }
 
-        /// <summary>
-        /// Create a <see cref="PlacementStrategyResolver"/> instance.
-        /// </summary>
-        public PlacementStrategyResolver(
-            IServiceProvider services,
-            IEnumerable<IPlacementStrategyResolver> resolvers,
-            GrainPropertiesResolver grainPropertiesResolver)
+    /// <summary>
+    /// Gets the placement strategy associated with the provided grain type.
+    /// </summary>
+    public PlacementStrategy GetPlacementStrategy(GrainType grainType) => _resolvedStrategies.GetOrAdd(grainType, _getStrategyInternal);
+
+    private bool TryGetNonDefaultPlacementStrategy(GrainType grainType, out PlacementStrategy strategy)
+    {
+        _grainPropertiesResolver.TryGetGrainProperties(grainType, out var properties);
+
+        foreach (var resolver in _resolvers)
         {
-            _services = services;
-            _getStrategyInternal = GetPlacementStrategyInternal;
-            _resolvers = resolvers.ToArray();
-            _grainPropertiesResolver = grainPropertiesResolver;
-            _defaultPlacementStrategy = services.GetService<PlacementStrategy>();
+            if (resolver.TryResolvePlacementStrategy(grainType, properties, out strategy))
+            {
+                return true;
+            }
         }
 
-        /// <summary>
-        /// Gets the placement strategy associated with the provided grain type.
-        /// </summary>
-        public PlacementStrategy GetPlacementStrategy(GrainType grainType) => _resolvedStrategies.GetOrAdd(grainType, _getStrategyInternal);
-
-        private bool TryGetNonDefaultPlacementStrategy(GrainType grainType, out PlacementStrategy strategy)
+        if (properties is not null
+            && properties.Properties.TryGetValue(WellKnownGrainTypeProperties.PlacementStrategy, out var placementStrategyId)
+            && !string.IsNullOrWhiteSpace(placementStrategyId))
         {
-            _grainPropertiesResolver.TryGetGrainProperties(grainType, out var properties);
-
-            foreach (var resolver in _resolvers)
+            strategy = _services.GetKeyedService<PlacementStrategy>(placementStrategyId);
+            if (strategy is not null)
             {
-                if (resolver.TryResolvePlacementStrategy(grainType, properties, out strategy))
-                {
-                    return true;
-                }
+                strategy.Initialize(properties);
+                return true;
             }
-
-            if (properties is not null
-                && properties.Properties.TryGetValue(WellKnownGrainTypeProperties.PlacementStrategy, out var placementStrategyId)
-                && !string.IsNullOrWhiteSpace(placementStrategyId))
+            else
             {
-                strategy = _services.GetKeyedService<PlacementStrategy>(placementStrategyId);
-                if (strategy is not null)
-                {
-                    strategy.Initialize(properties);
-                    return true;
-                }
-                else
-                {
-                    throw new KeyNotFoundException($"Could not resolve placement strategy {placementStrategyId} for grain type {grainType}.");
-                }
+                throw new KeyNotFoundException($"Could not resolve placement strategy {placementStrategyId} for grain type {grainType}.");
             }
-
-            strategy = default;
-            return false;
         }
 
-        private PlacementStrategy GetPlacementStrategyInternal(GrainType grainType)
-        {
-            if (TryGetNonDefaultPlacementStrategy(grainType, out var result))
-            {
-                return result;
-            }
+        strategy = default;
+        return false;
+    }
 
-            return _defaultPlacementStrategy;
+    private PlacementStrategy GetPlacementStrategyInternal(GrainType grainType)
+    {
+        if (TryGetNonDefaultPlacementStrategy(grainType, out var result))
+        {
+            return result;
         }
+
+        return _defaultPlacementStrategy;
     }
 }

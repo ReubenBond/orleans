@@ -3,10 +3,9 @@
 
 using Orleans.Metadata;
 
-namespace Orleans.Runtime
+namespace Orleans.Runtime;
+
+internal interface ISiloManifestSystemTarget : ISystemTarget
 {
-    internal interface ISiloManifestSystemTarget : ISystemTarget
-    {
-        ValueTask<GrainManifest> GetSiloManifest();
-    }
+    ValueTask<GrainManifest> GetSiloManifest();
 }

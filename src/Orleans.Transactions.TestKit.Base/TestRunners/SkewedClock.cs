@@ -1,26 +1,25 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Transactions.TestKit
+namespace Orleans.Transactions.TestKit;
+
+public class SkewedClock : IClock
 {
-    public class SkewedClock : IClock
+    private readonly TimeSpan minSkew;
+    private readonly int skewRangeTicks;
+
+    public SkewedClock(TimeSpan minSkew, TimeSpan maxSkew)
     {
-        private readonly TimeSpan minSkew;
-        private readonly int skewRangeTicks;
+        this.minSkew = minSkew;
+        this.skewRangeTicks = (int)(maxSkew.Ticks - minSkew.Ticks);
+    }
 
-        public SkewedClock(TimeSpan minSkew, TimeSpan maxSkew)
-        {
-            this.minSkew = minSkew;
-            this.skewRangeTicks = (int)(maxSkew.Ticks - minSkew.Ticks);
-        }
-
-        public DateTime UtcNow()
-        {
-            TimeSpan skew = TimeSpan.FromTicks(minSkew.Ticks + Random.Shared.Next(skewRangeTicks));
-            // skew forward in time or backward in time
-            return ((Random.Shared.Next() & 1) != 0)
-                ? DateTime.UtcNow + skew
-                : DateTime.UtcNow - skew;
-        }
+    public DateTime UtcNow()
+    {
+        TimeSpan skew = TimeSpan.FromTicks(minSkew.Ticks + Random.Shared.Next(skewRangeTicks));
+        // skew forward in time or backward in time
+        return ((Random.Shared.Next() & 1) != 0)
+            ? DateTime.UtcNow + skew
+            : DateTime.UtcNow - skew;
     }
 }

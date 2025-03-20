@@ -1,17 +1,16 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Streams
+namespace Orleans.Streams;
+
+/// <summary>
+/// Interface for accessing the deployment configuration.
+/// </summary>
+public interface IDeploymentConfiguration
 {
     /// <summary>
-    /// Interface for accessing the deployment configuration.
+    /// Get the silo instance names for all configured silos.
     /// </summary>
-    public interface IDeploymentConfiguration
-    {
-        /// <summary>
-        /// Get the silo instance names for all configured silos.
-        /// </summary>
-        /// <returns>The list of silo names.</returns>
-        IList<string> GetAllSiloNames();
-    }
+    /// <returns>The list of silo names.</returns>
+    IList<string> GetAllSiloNames();
 }

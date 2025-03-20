@@ -13,80 +13,79 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 
-namespace AWSUtils.Tests.Streaming
+namespace AWSUtils.Tests.Streaming;
+
+public class SQSClientStreamTests : TestClusterPerTest
 {
-    public class SQSClientStreamTests : TestClusterPerTest
+    private const string SQSStreamProviderName = "SQSProvider";
+    private const string StreamNamespace = "SQSSubscriptionMultiplicityTestsNamespace";
+    private readonly string StorageConnectionString = AWSTestConstants.SqsConnectionString;
+
+    private readonly ITestOutputHelper output;
+    private ClientStreamTestRunner runner;
+
+    public SQSClientStreamTests(ITestOutputHelper output)
     {
-        private const string SQSStreamProviderName = "SQSProvider";
-        private const string StreamNamespace = "SQSSubscriptionMultiplicityTestsNamespace";
-        private readonly string StorageConnectionString = AWSTestConstants.SqsConnectionString;
+        this.output = output;
+    }
 
-        private readonly ITestOutputHelper output;
-        private ClientStreamTestRunner runner;
+    public override async Task InitializeAsync()
+    {
+        await base.InitializeAsync();
+        runner = new ClientStreamTestRunner(this.HostedCluster);
+    }
 
-        public SQSClientStreamTests(ITestOutputHelper output)
+    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    {
+        if (!AWSTestConstants.IsSqsAvailable)
         {
-            this.output = output;
+            throw new SkipException("Empty connection string");
         }
 
-        public override async Task InitializeAsync()
-        {
-            await base.InitializeAsync();
-            runner = new ClientStreamTestRunner(this.HostedCluster);
-        }
+        builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+        builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
+    }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    private class MySiloBuilderConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder hostBuilder)
         {
-            if (!AWSTestConstants.IsSqsAvailable)
-            {
-                throw new SkipException("Empty connection string");
-            }
-
-            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
+            hostBuilder
+                .AddSqsStreams(SQSStreamProviderName, options => 
+                {
+                    options.ConnectionString = AWSTestConstants.SqsConnectionString;
+                })
+                .AddMemoryGrainStorage("PubSubStore")
+                .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
         }
+    }
 
-        private class MySiloBuilderConfigurator : ISiloConfigurator
+    private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+    {
+        public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
         {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder
-                    .AddSqsStreams(SQSStreamProviderName, options => 
-                    {
-                        options.ConnectionString = AWSTestConstants.SqsConnectionString;
-                    })
-                    .AddMemoryGrainStorage("PubSubStore")
-                    .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
-            }
+            clientBuilder
+                .AddSqsStreams(SQSStreamProviderName, (Action<SqsOptions>)(options =>
+                {
+                    options.ConnectionString = AWSTestConstants.SqsConnectionString;
+                }));
         }
+    }
 
-        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+    public override async Task DisposeAsync()
+    {
+        var clusterId = HostedCluster.Options.ClusterId;
+        await base.DisposeAsync();
+        if (!string.IsNullOrWhiteSpace(StorageConnectionString))
         {
-            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-            {
-                clientBuilder
-                    .AddSqsStreams(SQSStreamProviderName, (Action<SqsOptions>)(options =>
-                    {
-                        options.ConnectionString = AWSTestConstants.SqsConnectionString;
-                    }));
-            }
+            await SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, clusterId, StorageConnectionString, NullLoggerFactory.Instance);
         }
+    }
 
-        public override async Task DisposeAsync()
-        {
-            var clusterId = HostedCluster.Options.ClusterId;
-            await base.DisposeAsync();
-            if (!string.IsNullOrWhiteSpace(StorageConnectionString))
-            {
-                await SQSStreamProviderUtils.DeleteAllUsedQueues(SQSStreamProviderName, clusterId, StorageConnectionString, NullLoggerFactory.Instance);
-            }
-        }
-
-        [SkippableFact, TestCategory("AWS")]
-        public async Task SQSStreamProducerOnDroppedClientTest()
-        {
-            logger.LogInformation("************************ AQStreamProducerOnDroppedClientTest *********************************");
-            await runner.StreamProducerOnDroppedClientTest(SQSStreamProviderName, StreamNamespace);
-        }
+    [SkippableFact, TestCategory("AWS")]
+    public async Task SQSStreamProducerOnDroppedClientTest()
+    {
+        logger.LogInformation("************************ AQStreamProducerOnDroppedClientTest *********************************");
+        await runner.StreamProducerOnDroppedClientTest(SQSStreamProviderName, StreamNamespace);
     }
 }

@@ -1,28 +1,27 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace UnitTests.GrainInterfaces
+namespace UnitTests.GrainInterfaces;
+
+public interface IConcurrentGrain : IGrainWithIntegerKey
 {
-    public interface IConcurrentGrain : IGrainWithIntegerKey
-    {
-        Task Initialize(int index);
+    Task Initialize(int index);
 
-        //[ReadOnly]
-        Task<int> A();
-        //[ReadOnly]
-        Task<int> B(int time);
+    //[ReadOnly]
+    Task<int> A();
+    //[ReadOnly]
+    Task<int> B(int time);
 
-        Task<List<int>> ModifyReturnList_Test();
+    Task<List<int>> ModifyReturnList_Test();
 
-        Task Initialize_2(int index);
-        Task<int> TailCall_Caller(IConcurrentReentrantGrain another, bool doCW);
-        Task<int> TailCall_Resolver(IConcurrentReentrantGrain another);
-    }
+    Task Initialize_2(int index);
+    Task<int> TailCall_Caller(IConcurrentReentrantGrain another, bool doCW);
+    Task<int> TailCall_Resolver(IConcurrentReentrantGrain another);
+}
 
-    public interface IConcurrentReentrantGrain : IGrainWithIntegerKey
-    {
-        Task Initialize_2(int index);
-        Task<int> TailCall_Called();
-        Task<int> TailCall_Resolve();
-    }
+public interface IConcurrentReentrantGrain : IGrainWithIntegerKey
+{
+    Task Initialize_2(int index);
+    Task<int> TailCall_Called();
+    Task<int> TailCall_Resolve();
 }

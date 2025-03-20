@@ -12,219 +12,218 @@ using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Security;
 
-namespace Orleans.Serialization
+namespace Orleans.Serialization;
+
+/// <summary>
+/// Serializer for types which implement the <see cref="ISerializable"/> pattern.
+/// </summary>
+[Alias("ISerializable")]
+public class DotNetSerializableCodec : IGeneralizedCodec
 {
+    public static readonly Type CodecType = typeof(DotNetSerializableCodec);
+    private static readonly Type SerializableType = typeof(ISerializable);
+    private readonly SerializationCallbacksFactory _serializationCallbacks;
+    private readonly Func<Type, Action<object, SerializationInfo, StreamingContext>> _createConstructorDelegate;
+    private readonly ConcurrentDictionary<Type, Action<object, SerializationInfo, StreamingContext>> _constructors = new();
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
+    private readonly IFormatterConverter _formatterConverter;
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
+    private readonly StreamingContext _streamingContext;
+    private readonly SerializationEntryCodec _entrySerializer;
+    private readonly TypeConverter _typeConverter;
+    private readonly ValueTypeSerializerFactory _valueTypeSerializerFactory;
+
     /// <summary>
-    /// Serializer for types which implement the <see cref="ISerializable"/> pattern.
+    /// Initializes a new instance of the <see cref="DotNetSerializableCodec"/> class.
     /// </summary>
-    [Alias("ISerializable")]
-    public class DotNetSerializableCodec : IGeneralizedCodec
+    /// <param name="typeResolver">The type resolver.</param>
+    public DotNetSerializableCodec(TypeConverter typeResolver)
     {
-        public static readonly Type CodecType = typeof(DotNetSerializableCodec);
-        private static readonly Type SerializableType = typeof(ISerializable);
-        private readonly SerializationCallbacksFactory _serializationCallbacks;
-        private readonly Func<Type, Action<object, SerializationInfo, StreamingContext>> _createConstructorDelegate;
-        private readonly ConcurrentDictionary<Type, Action<object, SerializationInfo, StreamingContext>> _constructors = new();
 #pragma warning disable SYSLIB0050 // Type or member is obsolete
-        private readonly IFormatterConverter _formatterConverter;
+        _streamingContext = new StreamingContext(StreamingContextStates.All);
 #pragma warning restore SYSLIB0050 // Type or member is obsolete
-        private readonly StreamingContext _streamingContext;
-        private readonly SerializationEntryCodec _entrySerializer;
-        private readonly TypeConverter _typeConverter;
-        private readonly ValueTypeSerializerFactory _valueTypeSerializerFactory;
+        _typeConverter = typeResolver;
+        _entrySerializer = new SerializationEntryCodec();
+        _serializationCallbacks = new SerializationCallbacksFactory();
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
+        _formatterConverter = new FormatterConverter();
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
+        var constructorFactory = new SerializationConstructorFactory();
+        _createConstructorDelegate = constructorFactory.GetSerializationConstructorDelegate;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="DotNetSerializableCodec"/> class.
-        /// </summary>
-        /// <param name="typeResolver">The type resolver.</param>
-        public DotNetSerializableCodec(TypeConverter typeResolver)
+        _valueTypeSerializerFactory = new ValueTypeSerializerFactory(
+            _entrySerializer,
+            constructorFactory,
+            _serializationCallbacks,
+            _formatterConverter,
+            _streamingContext);
+    }
+
+    /// <inheritdoc />
+    [SecurityCritical]
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
+    {
+        if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
         {
-#pragma warning disable SYSLIB0050 // Type or member is obsolete
-            _streamingContext = new StreamingContext(StreamingContextStates.All);
-#pragma warning restore SYSLIB0050 // Type or member is obsolete
-            _typeConverter = typeResolver;
-            _entrySerializer = new SerializationEntryCodec();
-            _serializationCallbacks = new SerializationCallbacksFactory();
-#pragma warning disable SYSLIB0050 // Type or member is obsolete
-            _formatterConverter = new FormatterConverter();
-#pragma warning restore SYSLIB0050 // Type or member is obsolete
-            var constructorFactory = new SerializationConstructorFactory();
-            _createConstructorDelegate = constructorFactory.GetSerializationConstructorDelegate;
-
-            _valueTypeSerializerFactory = new ValueTypeSerializerFactory(
-                _entrySerializer,
-                constructorFactory,
-                _serializationCallbacks,
-                _formatterConverter,
-                _streamingContext);
+            return;
         }
 
-        /// <inheritdoc />
-        [SecurityCritical]
-        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
+        var type = value.GetType();
+        writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecType, WireType.TagDelimited);
+        if (type.IsValueType)
         {
-            if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, value))
-            {
-                return;
-            }
+            var serializer = _valueTypeSerializerFactory.GetSerializer(type);
+            serializer.WriteValue(ref writer, value);
+        }
+        else
+        {
+            WriteObject(ref writer, type, value);
+        }
 
-            var type = value.GetType();
-            writer.WriteFieldHeader(fieldIdDelta, expectedType, CodecType, WireType.TagDelimited);
+        writer.WriteEndObject();
+    }
+
+    /// <inheritdoc />
+    [SecurityCritical]
+    public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+    {
+        if (field.IsReference)
+        {
+            return ReferenceCodec.ReadReference(ref reader, field.FieldType);
+        }
+
+        field.EnsureWireTypeTagDelimited();
+
+        var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
+        Type type;
+        var header = reader.ReadFieldHeader();
+        if (header.FieldIdDelta == 1)
+        {
+            // This is an exception type, so deserialize it as an exception.
+            var typeName = StringCodec.ReadValue(ref reader, header);
+            if (!_typeConverter.TryParse(typeName, out type))
+            {
+                return ReadFallbackException(ref reader, typeName, placeholderReferenceId);
+            }
+        }
+        else
+        {
+            type = TypeSerializerCodec.ReadValue(ref reader, header);
+
             if (type.IsValueType)
             {
                 var serializer = _valueTypeSerializerFactory.GetSerializer(type);
-                serializer.WriteValue(ref writer, value);
+                return serializer.ReadValue(ref reader, type);
             }
-            else
-            {
-                WriteObject(ref writer, type, value);
-            }
-
-            writer.WriteEndObject();
         }
 
-        /// <inheritdoc />
-        [SecurityCritical]
-        public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
-        {
-            if (field.IsReference)
-            {
-                return ReferenceCodec.ReadReference(ref reader, field.FieldType);
-            }
+        return ReadObject(ref reader, type, placeholderReferenceId);
+    }
 
-            field.EnsureWireTypeTagDelimited();
+    private object ReadFallbackException<TInput>(ref Reader<TInput> reader, string typeName, uint placeholderReferenceId)
+    {
+        // Deserialize into a fallback type for unknown exceptions. This means that missing fields will not be represented.
+        var result = (UnavailableExceptionFallbackException)ReadObject(ref reader, typeof(UnavailableExceptionFallbackException), placeholderReferenceId);
+        result.ExceptionType = typeName;
+        return result;
+    }
 
-            var placeholderReferenceId = ReferenceCodec.CreateRecordPlaceholder(reader.Session);
-            Type type;
-            var header = reader.ReadFieldHeader();
-            if (header.FieldIdDelta == 1)
-            {
-                // This is an exception type, so deserialize it as an exception.
-                var typeName = StringCodec.ReadValue(ref reader, header);
-                if (!_typeConverter.TryParse(typeName, out type))
-                {
-                    return ReadFallbackException(ref reader, typeName, placeholderReferenceId);
-                }
-            }
-            else
-            {
-                type = TypeSerializerCodec.ReadValue(ref reader, header);
-
-                if (type.IsValueType)
-                {
-                    var serializer = _valueTypeSerializerFactory.GetSerializer(type);
-                    return serializer.ReadValue(ref reader, type);
-                }
-            }
-
-            return ReadObject(ref reader, type, placeholderReferenceId);
-        }
-
-        private object ReadFallbackException<TInput>(ref Reader<TInput> reader, string typeName, uint placeholderReferenceId)
-        {
-            // Deserialize into a fallback type for unknown exceptions. This means that missing fields will not be represented.
-            var result = (UnavailableExceptionFallbackException)ReadObject(ref reader, typeof(UnavailableExceptionFallbackException), placeholderReferenceId);
-            result.ExceptionType = typeName;
-            return result;
-        }
-
-        private object ReadObject<TInput>(ref Reader<TInput> reader, Type type, uint placeholderReferenceId)
-        {
-            var callbacks = _serializationCallbacks.GetReferenceTypeCallbacks(type);
+    private object ReadObject<TInput>(ref Reader<TInput> reader, Type type, uint placeholderReferenceId)
+    {
+        var callbacks = _serializationCallbacks.GetReferenceTypeCallbacks(type);
 
 #pragma warning disable SYSLIB0050 // Type or member is obsolete
-            var info = new SerializationInfo(type, _formatterConverter);
+        var info = new SerializationInfo(type, _formatterConverter);
 #pragma warning restore SYSLIB0050 // Type or member is obsolete
-            var result = RuntimeHelpers.GetUninitializedObject(type);
-            ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
-            callbacks.OnDeserializing?.Invoke(result, _streamingContext);
+        var result = RuntimeHelpers.GetUninitializedObject(type);
+        ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
+        callbacks.OnDeserializing?.Invoke(result, _streamingContext);
 
-            uint fieldId = 0;
-            while (true)
+        uint fieldId = 0;
+        while (true)
+        {
+            var header = reader.ReadFieldHeader();
+            if (header.IsEndBaseOrEndObject)
             {
-                var header = reader.ReadFieldHeader();
-                if (header.IsEndBaseOrEndObject)
-                {
-                    break;
-                }
+                break;
+            }
 
-                fieldId += header.FieldIdDelta;
-                if (fieldId == 1)
+            fieldId += header.FieldIdDelta;
+            if (fieldId == 1)
+            {
+                var entry = _entrySerializer.ReadValue(ref reader, header);
+                if (entry.ObjectType is { } entryType)
                 {
-                    var entry = _entrySerializer.ReadValue(ref reader, header);
-                    if (entry.ObjectType is { } entryType)
-                    {
-                        info.AddValue(entry.Name, entry.Value, entryType);
-                    }
-                    else
-                    {
-                        info.AddValue(entry.Name, entry.Value);
-                    }
+                    info.AddValue(entry.Name, entry.Value, entryType);
                 }
                 else
                 {
-                    reader.ConsumeUnknownField(header);
+                    info.AddValue(entry.Name, entry.Value);
                 }
-            }
-
-            var constructor = _constructors.GetOrAdd(info.ObjectType, _createConstructorDelegate);
-            constructor(result, info, _streamingContext);
-            callbacks.OnDeserialized?.Invoke(result, _streamingContext);
-            if (result is IDeserializationCallback callback)
-            {
-                callback.OnDeserialization(_streamingContext.Context);
-            }
-
-            return result;
-        }
-
-        private void WriteObject<TBufferWriter>(ref Writer<TBufferWriter> writer, Type type, object value) where TBufferWriter : IBufferWriter<byte>
-        {
-            var callbacks = _serializationCallbacks.GetReferenceTypeCallbacks(type);
-#pragma warning disable SYSLIB0050 // Type or member is obsolete
-            var info = new SerializationInfo(type, _formatterConverter);
-#pragma warning restore SYSLIB0050 // Type or member is obsolete
-
-            // Serialize the type name according to the value populated in the SerializationInfo.
-            if (value is Exception)
-            {
-                // For exceptions, the type is serialized as a string to facilitate safe deserialization.
-                var typeName = _typeConverter.Format(info.ObjectType);
-                StringCodec.WriteField(ref writer, 1, typeName);
             }
             else
             {
-                TypeSerializerCodec.WriteField(ref writer, 0, info.ObjectType);
+                reader.ConsumeUnknownField(header);
             }
-
-            callbacks.OnSerializing?.Invoke(value, _streamingContext);
-#pragma warning disable SYSLIB0050 // Type or member is obsolete
-            ((ISerializable)value).GetObjectData(info, _streamingContext);
-#pragma warning restore SYSLIB0050 // Type or member is obsolete
-
-            var first = true;
-            foreach (var field in info)
-            {
-                var surrogate = new SerializationEntrySurrogate
-                {
-                    Name = field.Name,
-                    Value = field.Value,
-                    ObjectType = field.ObjectType
-                };
-
-                _entrySerializer.WriteField(ref writer, first ? 1 : (uint)0, typeof(SerializationEntrySurrogate), surrogate);
-                if (first)
-                {
-                    first = false;
-                }
-            }
-
-            callbacks.OnSerialized?.Invoke(value, _streamingContext);
         }
 
-        /// <inheritdoc />
-        [SecurityCritical]
-        public bool IsSupportedType(Type type) =>
-            type == CodecType || typeof(Exception).IsAssignableFrom(type) || SerializableType.IsAssignableFrom(type) && SerializationConstructorFactory.HasSerializationConstructor(type);
+        var constructor = _constructors.GetOrAdd(info.ObjectType, _createConstructorDelegate);
+        constructor(result, info, _streamingContext);
+        callbacks.OnDeserialized?.Invoke(result, _streamingContext);
+        if (result is IDeserializationCallback callback)
+        {
+            callback.OnDeserialization(_streamingContext.Context);
+        }
+
+        return result;
     }
+
+    private void WriteObject<TBufferWriter>(ref Writer<TBufferWriter> writer, Type type, object value) where TBufferWriter : IBufferWriter<byte>
+    {
+        var callbacks = _serializationCallbacks.GetReferenceTypeCallbacks(type);
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
+        var info = new SerializationInfo(type, _formatterConverter);
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
+
+        // Serialize the type name according to the value populated in the SerializationInfo.
+        if (value is Exception)
+        {
+            // For exceptions, the type is serialized as a string to facilitate safe deserialization.
+            var typeName = _typeConverter.Format(info.ObjectType);
+            StringCodec.WriteField(ref writer, 1, typeName);
+        }
+        else
+        {
+            TypeSerializerCodec.WriteField(ref writer, 0, info.ObjectType);
+        }
+
+        callbacks.OnSerializing?.Invoke(value, _streamingContext);
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
+        ((ISerializable)value).GetObjectData(info, _streamingContext);
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
+
+        var first = true;
+        foreach (var field in info)
+        {
+            var surrogate = new SerializationEntrySurrogate
+            {
+                Name = field.Name,
+                Value = field.Value,
+                ObjectType = field.ObjectType
+            };
+
+            _entrySerializer.WriteField(ref writer, first ? 1 : (uint)0, typeof(SerializationEntrySurrogate), surrogate);
+            if (first)
+            {
+                first = false;
+            }
+        }
+
+        callbacks.OnSerialized?.Invoke(value, _streamingContext);
+    }
+
+    /// <inheritdoc />
+    [SecurityCritical]
+    public bool IsSupportedType(Type type) =>
+        type == CodecType || typeof(Exception).IsAssignableFrom(type) || SerializableType.IsAssignableFrom(type) && SerializationConstructorFactory.HasSerializationConstructor(type);
 }

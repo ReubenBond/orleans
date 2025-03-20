@@ -3,32 +3,31 @@
 
 using BenchmarkGrainInterfaces.Ping;
 
-namespace BenchmarkGrains.Ping
+namespace BenchmarkGrains.Ping;
+
+public class PingGrain : IGrainBase, IPingGrain
 {
-    public class PingGrain : IGrainBase, IPingGrain
+    private IPingGrain _self;
+
+    public PingGrain(IGrainContext context)
     {
-        private IPingGrain _self;
+        GrainContext = context;
+    }
 
-        public PingGrain(IGrainContext context)
-        {
-            GrainContext = context;
-        }
+    public IGrainContext GrainContext { get; set; }
 
-        public IGrainContext GrainContext { get; set; }
+    public Task OnActivateAsync(CancellationToken cancellationToken)
 
-        public Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        _self = this.AsReference<IPingGrain>();
+        return Task.CompletedTask;
+    }
 
-        {
-            _self = this.AsReference<IPingGrain>();
-            return Task.CompletedTask;
-        }
+    public ValueTask Run() => default;
 
-        public ValueTask Run() => default;
-
-        public ValueTask PingPongInterleave(IPingGrain other, int count)
-        {
-            if (count == 0) return default;
-            return other.PingPongInterleave(_self, count - 1);
-        }
+    public ValueTask PingPongInterleave(IPingGrain other, int count)
+    {
+        if (count == 0) return default;
+        return other.PingPongInterleave(_self, count - 1);
     }
 }

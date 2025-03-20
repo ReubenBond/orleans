@@ -3,11 +3,10 @@
 
 using Orleans.Concurrency;
 
-namespace Orleans.Runtime
+namespace Orleans.Runtime;
+
+internal interface IDeploymentLoadPublisher : ISystemTarget
 {
-    internal interface IDeploymentLoadPublisher : ISystemTarget
-    {
-        [OneWay]
-        Task UpdateRuntimeStatistics(SiloAddress siloAddress, SiloRuntimeStatistics siloStats);
-    }
+    [OneWay]
+    Task UpdateRuntimeStatistics(SiloAddress siloAddress, SiloRuntimeStatistics siloStats);
 }

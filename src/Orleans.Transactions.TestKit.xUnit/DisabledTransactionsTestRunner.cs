@@ -4,25 +4,24 @@
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Orleans.Transactions.TestKit.xUnit
+namespace Orleans.Transactions.TestKit.xUnit;
+
+public class DisabledTransactionsTestRunnerxUnit : DisabledTransactionsTestRunner
 {
-    public class DisabledTransactionsTestRunnerxUnit : DisabledTransactionsTestRunner
+    protected DisabledTransactionsTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
+    : base(grainFactory, output.WriteLine) { }
+
+    [SkippableTheory]
+    [InlineData(TransactionTestConstants.NoStateTransactionalGrain)]
+    public override void TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
     {
-        protected DisabledTransactionsTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
-        : base(grainFactory, output.WriteLine) { }
+         base.TransactionGrainsThrowWhenTransactions(transactionTestGrainClassName);
+    }
 
-        [SkippableTheory]
-        [InlineData(TransactionTestConstants.NoStateTransactionalGrain)]
-        public override void TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
-        {
-             base.TransactionGrainsThrowWhenTransactions(transactionTestGrainClassName);
-        }
-
-        [SkippableTheory]
-        [InlineData(TransactionTestConstants.NoStateTransactionalGrain)]
-        public override void MultiTransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
-        {
-            base.MultiTransactionGrainsThrowWhenTransactions(transactionTestGrainClassName);
-        }
+    [SkippableTheory]
+    [InlineData(TransactionTestConstants.NoStateTransactionalGrain)]
+    public override void MultiTransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
+    {
+        base.MultiTransactionGrainsThrowWhenTransactions(transactionTestGrainClassName);
     }
 }

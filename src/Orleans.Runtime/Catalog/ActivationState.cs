@@ -1,33 +1,32 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Runtime
+namespace Orleans.Runtime;
+
+internal enum ActivationState
 {
-    internal enum ActivationState
-    {
-        /// <summary>
-        /// Activation is being created
-        /// </summary>
-        Creating,
-        
-        /// <summary>
-        /// Activation is in the middle of activation process.
-        /// </summary>
-        Activating,
-        
-        /// <summary>
-        /// Activation was successfully activated and ready to process requests.
-        /// </summary>
-        Valid,
-        
-        /// <summary>
-        /// Activation is in the middle of deactivation process.
-        /// </summary>
-        Deactivating,
-        
-        /// <summary>
-        /// Tombstone for an activation which has terminated.
-        /// </summary>
-        Invalid
-    }
+    /// <summary>
+    /// Activation is being created
+    /// </summary>
+    Creating,
+    
+    /// <summary>
+    /// Activation is in the middle of activation process.
+    /// </summary>
+    Activating,
+    
+    /// <summary>
+    /// Activation was successfully activated and ready to process requests.
+    /// </summary>
+    Valid,
+    
+    /// <summary>
+    /// Activation is in the middle of deactivation process.
+    /// </summary>
+    Deactivating,
+    
+    /// <summary>
+    /// Tombstone for an activation which has terminated.
+    /// </summary>
+    Invalid
 }

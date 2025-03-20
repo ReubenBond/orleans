@@ -4,35 +4,34 @@
 using System.Runtime.Serialization;
 using System.Security;
 
-namespace Orleans.Serialization
+namespace Orleans.Serialization;
+
+/// <summary>
+/// Thrown when a type has no serialization constructor.
+/// </summary>
+[Serializable]
+public class SerializationConstructorNotFoundException : Exception
 {
     /// <summary>
-    /// Thrown when a type has no serialization constructor.
+    /// Initializes a new instance of the <see cref="SerializationConstructorNotFoundException"/> class.
     /// </summary>
-    [Serializable]
-    public class SerializationConstructorNotFoundException : Exception
+    /// <param name="type">The type.</param>
+    [SecurityCritical]
+    public SerializationConstructorNotFoundException(Type type) : base(
+        (string)$"Could not find a suitable serialization constructor on type {type.FullName}")
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="SerializationConstructorNotFoundException"/> class.
-        /// </summary>
-        /// <param name="type">The type.</param>
-        [SecurityCritical]
-        public SerializationConstructorNotFoundException(Type type) : base(
-            (string)$"Could not find a suitable serialization constructor on type {type.FullName}")
-        {
-        }
+    }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="SerializationConstructorNotFoundException" /> class.
-        /// </summary>
-        /// <param name="info">The serialization information.</param>
-        /// <param name="context">The context.</param>
-        [SecurityCritical]
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SerializationConstructorNotFoundException" /> class.
+    /// </summary>
+    /// <param name="info">The serialization information.</param>
+    /// <param name="context">The context.</param>
+    [SecurityCritical]
 #if NET8_0_OR_GREATER
-        [Obsolete]
+    [Obsolete]
 #endif
-        protected SerializationConstructorNotFoundException(SerializationInfo info, StreamingContext context) : base(info, context)
-        {
-        }
+    protected SerializationConstructorNotFoundException(SerializationInfo info, StreamingContext context) : base(info, context)
+    {
     }
 }

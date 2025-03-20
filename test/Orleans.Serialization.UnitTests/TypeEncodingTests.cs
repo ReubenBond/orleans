@@ -14,136 +14,135 @@ using Orleans.Serialization.Session;
 using Orleans.Serialization.Utilities;
 using Xunit;
 
-namespace Orleans.Serialization.UnitTests
+namespace Orleans.Serialization.UnitTests;
+
+public class TypeEncodingTests
 {
-    public class TypeEncodingTests
+    private readonly IServiceProvider _serviceProvider;
+    private readonly SerializerSessionPool _sessionPool;
+    private readonly Serializer _serializer;
+
+    public TypeEncodingTests()
     {
-        private readonly IServiceProvider _serviceProvider;
-        private readonly SerializerSessionPool _sessionPool;
-        private readonly Serializer _serializer;
+        var services = new ServiceCollection();
+        _ = services.AddSerializer();
+        _serviceProvider = services.BuildServiceProvider();
+        _sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
+        _serializer = _serviceProvider.GetRequiredService<Serializer>();
+    }
 
-        public TypeEncodingTests()
+    [Fact]
+    public void CompoundTypeAliasesAreEncodedAsExpected()
+    {
+        var original = new MyCompoundTypeAliasClass
         {
-            var services = new ServiceCollection();
-            _ = services.AddSerializer();
-            _serviceProvider = services.BuildServiceProvider();
-            _sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
-            _serializer = _serviceProvider.GetRequiredService<Serializer>();
-        }
+            Name = "TwinkleToes",
+            Value = 112
+        };
+        var expectedString = "(\"xx_test_xx\",[_custom_type_alias_],[int],\"1\")";
+        var expectedEncoding = Encoding.UTF8.GetBytes(expectedString).AsSpan();
+        var (payload, bitStream) = SerializePayload(original);
+        Assert.True(payload.AsSpan().IndexOf(expectedEncoding) >= 0, $"Expected to find string \"{expectedString}\" in bitstream (formatted: {bitStream})");
+    }
 
-        [Fact]
-        public void CompoundTypeAliasesAreEncodedAsExpected()
+    [Fact]
+    public void GeneratedProxyClassesHaveExpectedCompoundTypeNames()
+    {
+        var configuration = _serviceProvider.GetRequiredService<IOptions<TypeManifestOptions>>().Value;
+        var generatedProxy = configuration.InterfaceProxies.Single(proxy => typeof(IProxyAliasTestGrain).IsAssignableFrom(proxy));
+        var instance = ActivatorUtilities.CreateInstance(_serviceProvider, generatedProxy);
+        var instanceAsBase = Assert.IsAssignableFrom<MyInvokableProxyBase>(instance);
+        var instanceAsInterface = Assert.IsAssignableFrom<IProxyAliasTestGrain>(instance);
+
+        var calls = new Queue<IInvokable>();
+        instanceAsBase.OnInvoke = body => calls.Enqueue(body);
+
         {
-            var original = new MyCompoundTypeAliasClass
-            {
-                Name = "TwinkleToes",
-                Value = 112
-            };
-            var expectedString = "(\"xx_test_xx\",[_custom_type_alias_],[int],\"1\")";
-            var expectedEncoding = Encoding.UTF8.GetBytes(expectedString).AsSpan();
-            var (payload, bitStream) = SerializePayload(original);
-            Assert.True(payload.AsSpan().IndexOf(expectedEncoding) >= 0, $"Expected to find string \"{expectedString}\" in bitstream (formatted: {bitStream})");
-        }
-
-        [Fact]
-        public void GeneratedProxyClassesHaveExpectedCompoundTypeNames()
-        {
-            var configuration = _serviceProvider.GetRequiredService<IOptions<TypeManifestOptions>>().Value;
-            var generatedProxy = configuration.InterfaceProxies.Single(proxy => typeof(IProxyAliasTestGrain).IsAssignableFrom(proxy));
-            var instance = ActivatorUtilities.CreateInstance(_serviceProvider, generatedProxy);
-            var instanceAsBase = Assert.IsAssignableFrom<MyInvokableProxyBase>(instance);
-            var instanceAsInterface = Assert.IsAssignableFrom<IProxyAliasTestGrain>(instance);
-
-            var calls = new Queue<IInvokable>();
-            instanceAsBase.OnInvoke = body => calls.Enqueue(body);
-
-            {
-                var res = instanceAsInterface.Method();
-                Assert.True(res.IsCompletedSuccessfully);
-                var method = calls.Dequeue();
-                var (payload, bitStream) = SerializePayload(method);
-                var expectedString = "(\"inv\",[_my_proxy_base_],[_proxy_alias_test_],\"125\")";
-                var expectedEncoding = Encoding.UTF8.GetBytes(expectedString).AsSpan();
-                Assert.True(payload.AsSpan().IndexOf(expectedEncoding) >= 0, $"Expected to find string \"{expectedString}\" in bitstream (formatted: {bitStream})");
-            }
-
-            {
-                var res = instanceAsInterface.OtherMethod();
-                Assert.True(res.IsCompletedSuccessfully);
-                var method = calls.Dequeue();
-                var (payload, bitStream) = SerializePayload(method);
-                var expectedString = "(\"inv\",[_my_proxy_base_],[_proxy_alias_test_],\"MyOtherMethod\")";
-                var expectedEncoding = Encoding.UTF8.GetBytes(expectedString).AsSpan();
-                Assert.True(payload.AsSpan().IndexOf(expectedEncoding) >= 0, $"Expected to find string \"{expectedString}\" in bitstream (formatted: {bitStream})");
-            }
-        }
-
-        [Fact]
-        public void GeneratedProxyClassesHaveExpectedCompoundTypeNames_Generic()
-        {
-            var configuration = _serviceProvider.GetRequiredService<IOptions<TypeManifestOptions>>().Value;
-            var generatedProxy = configuration.InterfaceProxies.Single(proxy => proxy.GetInterfaces().Any(iface => iface.IsGenericType && typeof(IGenericProxyAliasTestGrain<,,>).IsAssignableFrom(iface.GetGenericTypeDefinition())));
-            var instance = ActivatorUtilities.CreateInstance(_serviceProvider, generatedProxy.MakeGenericType(typeof(int), typeof(string), typeof(double)));
-            var instanceAsBase = Assert.IsAssignableFrom<MyInvokableProxyBase>(instance);
-            var instanceAsInterface = Assert.IsAssignableFrom<IGenericProxyAliasTestGrain<int, string, double>>(instance);
-
-            var calls = new Queue<IInvokable>();
-            instanceAsBase.OnInvoke = body => calls.Enqueue(body);
-
-            var res = instanceAsInterface.Method<int, MyTypeAliasClass, int>();
+            var res = instanceAsInterface.Method();
             Assert.True(res.IsCompletedSuccessfully);
             var method = calls.Dequeue();
             var (payload, bitStream) = SerializePayload(method);
-            var expectedString = "(\"inv\",[_my_proxy_base_],[test.IGenericProxyAliasTestGrain`3],\"777\")`6[[int],[string],[double],[int],[_custom_type_alias_],[int]]";
+            var expectedString = "(\"inv\",[_my_proxy_base_],[_proxy_alias_test_],\"125\")";
             var expectedEncoding = Encoding.UTF8.GetBytes(expectedString).AsSpan();
             Assert.True(payload.AsSpan().IndexOf(expectedEncoding) >= 0, $"Expected to find string \"{expectedString}\" in bitstream (formatted: {bitStream})");
         }
 
-        private (byte[] Serialized, string FormattedBitStream) SerializePayload(object original)
         {
-            var payload = _serializer.SerializeToArray<object>(original);
-            using var session = _sessionPool.GetSession();
-            var bitStream = BitStreamFormatter.Format(payload, session);
-            return (payload, bitStream);
-        }
-
-        [Fact]
-        public void AliasAttributeIsApplied()
-        {
-            var original = new Person(2, "harry");
-
-            var bytes = _serializer.SerializeToArray(original.GetType());
-            var resultType = _serializer.Deserialize<Type>(bytes);
-
-            var alias = original.GetType().GetCustomAttributes(false).OfType<AliasAttribute>().SingleOrDefault();
-            Assert.NotNull(alias);
-            Assert.NotNull(alias.Alias);
-            Assert.Equal(typeof(Person), resultType);
-            var expectedBytes = Encoding.UTF8.GetBytes(alias.Alias);
-            Assert.True(bytes.AsSpan().IndexOf(expectedBytes) >= 0);
+            var res = instanceAsInterface.OtherMethod();
+            Assert.True(res.IsCompletedSuccessfully);
+            var method = calls.Dequeue();
+            var (payload, bitStream) = SerializePayload(method);
+            var expectedString = "(\"inv\",[_my_proxy_base_],[_proxy_alias_test_],\"MyOtherMethod\")";
+            var expectedEncoding = Encoding.UTF8.GetBytes(expectedString).AsSpan();
+            Assert.True(payload.AsSpan().IndexOf(expectedEncoding) >= 0, $"Expected to find string \"{expectedString}\" in bitstream (formatted: {bitStream})");
         }
     }
 
-    [Alias("_custom_type_alias_")]
-    public class MyTypeAliasClass
+    [Fact]
+    public void GeneratedProxyClassesHaveExpectedCompoundTypeNames_Generic()
     {
+        var configuration = _serviceProvider.GetRequiredService<IOptions<TypeManifestOptions>>().Value;
+        var generatedProxy = configuration.InterfaceProxies.Single(proxy => proxy.GetInterfaces().Any(iface => iface.IsGenericType && typeof(IGenericProxyAliasTestGrain<,,>).IsAssignableFrom(iface.GetGenericTypeDefinition())));
+        var instance = ActivatorUtilities.CreateInstance(_serviceProvider, generatedProxy.MakeGenericType(typeof(int), typeof(string), typeof(double)));
+        var instanceAsBase = Assert.IsAssignableFrom<MyInvokableProxyBase>(instance);
+        var instanceAsInterface = Assert.IsAssignableFrom<IGenericProxyAliasTestGrain<int, string, double>>(instance);
+
+        var calls = new Queue<IInvokable>();
+        instanceAsBase.OnInvoke = body => calls.Enqueue(body);
+
+        var res = instanceAsInterface.Method<int, MyTypeAliasClass, int>();
+        Assert.True(res.IsCompletedSuccessfully);
+        var method = calls.Dequeue();
+        var (payload, bitStream) = SerializePayload(method);
+        var expectedString = "(\"inv\",[_my_proxy_base_],[test.IGenericProxyAliasTestGrain`3],\"777\")`6[[int],[string],[double],[int],[_custom_type_alias_],[int]]";
+        var expectedEncoding = Encoding.UTF8.GetBytes(expectedString).AsSpan();
+        Assert.True(payload.AsSpan().IndexOf(expectedEncoding) >= 0, $"Expected to find string \"{expectedString}\" in bitstream (formatted: {bitStream})");
     }
 
-    [GenerateSerializer]
-    public class MyCompoundTypeAliasBaseClass
+    private (byte[] Serialized, string FormattedBitStream) SerializePayload(object original)
     {
-        [Id(0)]
-        public int BaseValue { get; set; }
+        var payload = _serializer.SerializeToArray<object>(original);
+        using var session = _sessionPool.GetSession();
+        var bitStream = BitStreamFormatter.Format(payload, session);
+        return (payload, bitStream);
     }
 
-    [GenerateSerializer]
-    [CompoundTypeAlias("xx_test_xx", typeof(MyTypeAliasClass), typeof(int), "1")]
-    public class MyCompoundTypeAliasClass : MyCompoundTypeAliasBaseClass
+    [Fact]
+    public void AliasAttributeIsApplied()
     {
-        [Id(0)]
-        public string? Name { get; set; }
+        var original = new Person(2, "harry");
 
-        [Id(1)]
-        public int Value { get; set; }
+        var bytes = _serializer.SerializeToArray(original.GetType());
+        var resultType = _serializer.Deserialize<Type>(bytes);
+
+        var alias = original.GetType().GetCustomAttributes(false).OfType<AliasAttribute>().SingleOrDefault();
+        Assert.NotNull(alias);
+        Assert.NotNull(alias.Alias);
+        Assert.Equal(typeof(Person), resultType);
+        var expectedBytes = Encoding.UTF8.GetBytes(alias.Alias);
+        Assert.True(bytes.AsSpan().IndexOf(expectedBytes) >= 0);
     }
+}
+
+[Alias("_custom_type_alias_")]
+public class MyTypeAliasClass
+{
+}
+
+[GenerateSerializer]
+public class MyCompoundTypeAliasBaseClass
+{
+    [Id(0)]
+    public int BaseValue { get; set; }
+}
+
+[GenerateSerializer]
+[CompoundTypeAlias("xx_test_xx", typeof(MyTypeAliasClass), typeof(int), "1")]
+public class MyCompoundTypeAliasClass : MyCompoundTypeAliasBaseClass
+{
+    [Id(0)]
+    public string? Name { get; set; }
+
+    [Id(1)]
+    public int Value { get; set; }
 }

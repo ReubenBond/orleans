@@ -1,40 +1,39 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace UnitTests.TestHelper
+namespace UnitTests.TestHelper;
+
+[Serializable]
+[Orleans.GenerateSerializer]
+public sealed class InterlockedFlag
 {
-    [Serializable]
-    [Orleans.GenerateSerializer]
-    public sealed class InterlockedFlag
+    [Orleans.Id(0)]
+    private int _value;
+
+    public InterlockedFlag()
     {
-        [Orleans.Id(0)]
-        private int _value;
+        _value = 0;
+    }
 
-        public InterlockedFlag()
-        {
-            _value = 0;
-        }
+    public bool IsSet { get { return _value != 0; } }
 
-        public bool IsSet { get { return _value != 0; } }
+    public bool TrySet()
+    {
+        // attempt to set _value; if we're the first to attempt to do it, return true;
+        return 0 == Interlocked.CompareExchange(ref _value, 1, 0);
+    }
 
-        public bool TrySet()
-        {
-            // attempt to set _value; if we're the first to attempt to do it, return true;
-            return 0 == Interlocked.CompareExchange(ref _value, 1, 0);
-        }
+    public void ThrowNotInitializedIfSet()
+    {
+        if (IsSet)
+            throw new InvalidOperationException("Attempt to access object that isn't initialized (or has been marked as dead).");
+    }
 
-        public void ThrowNotInitializedIfSet()
-        {
-            if (IsSet)
-                throw new InvalidOperationException("Attempt to access object that isn't initialized (or has been marked as dead).");
-        }
-
-        public void ThrowDisposedIfSet(Type type)
-        {
-            if (type == null)
-                throw new ArgumentNullException(nameof(type));
-            if (IsSet)
-                throw new ObjectDisposedException(type.Name);
-        }
+    public void ThrowDisposedIfSet(Type type)
+    {
+        if (type == null)
+            throw new ArgumentNullException(nameof(type));
+        if (IsSet)
+            throw new ObjectDisposedException(type.Name);
     }
 }

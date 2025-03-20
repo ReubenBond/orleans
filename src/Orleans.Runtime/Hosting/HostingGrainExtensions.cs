@@ -3,23 +3,22 @@
 
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Orleans.Hosting
+namespace Orleans.Hosting;
+
+/// <summary>
+/// Methods for configuring <see cref="IGrainExtension"/>s on a silo.
+/// </summary>
+public static class HostingGrainExtensions
 {
     /// <summary>
-    /// Methods for configuring <see cref="IGrainExtension"/>s on a silo.
+    /// Registers a grain extension implementation for the specified interface.
     /// </summary>
-    public static class HostingGrainExtensions
+    /// <typeparam name="TExtensionInterface">The <see cref="IGrainExtension"/> interface being registered.</typeparam>
+    /// <typeparam name="TExtension">The implementation of <typeparamref name="TExtensionInterface"/>.</typeparam>
+    public static ISiloBuilder AddGrainExtension<TExtensionInterface, TExtension>(this ISiloBuilder builder)
+        where TExtensionInterface : class, IGrainExtension
+        where TExtension : class, TExtensionInterface
     {
-        /// <summary>
-        /// Registers a grain extension implementation for the specified interface.
-        /// </summary>
-        /// <typeparam name="TExtensionInterface">The <see cref="IGrainExtension"/> interface being registered.</typeparam>
-        /// <typeparam name="TExtension">The implementation of <typeparamref name="TExtensionInterface"/>.</typeparam>
-        public static ISiloBuilder AddGrainExtension<TExtensionInterface, TExtension>(this ISiloBuilder builder)
-            where TExtensionInterface : class, IGrainExtension
-            where TExtension : class, TExtensionInterface
-        {
-            return builder.ConfigureServices(services => services.AddKeyedTransient<IGrainExtension, TExtension>(typeof(TExtensionInterface)));
-        }
+        return builder.ConfigureServices(services => services.AddKeyedTransient<IGrainExtension, TExtension>(typeof(TExtensionInterface)));
     }
 }

@@ -5,121 +5,120 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
-namespace Orleans.Runtime.Placement
+namespace Orleans.Runtime.Placement;
+
+
+internal class ActivationCountPlacementDirector : RandomPlacementDirector, ISiloStatisticsChangeListener, IPlacementDirector
 {
-
-    internal class ActivationCountPlacementDirector : RandomPlacementDirector, ISiloStatisticsChangeListener, IPlacementDirector
+    private class CachedLocalStat
     {
-        private class CachedLocalStat
+        private int _activationCount;
+
+        internal CachedLocalStat(SiloRuntimeStatistics siloStats) => SiloStats = siloStats;
+
+        public SiloRuntimeStatistics SiloStats { get; }
+        public int ActivationCount => _activationCount;
+        public void IncrementActivationCount(int delta) => Interlocked.Add(ref _activationCount, delta);
+    }
+    
+    // Track created activations on this silo between statistic intervals.
+    private readonly ConcurrentDictionary<SiloAddress, CachedLocalStat> _localCache = new();
+    private readonly SiloAddress _localAddress;
+    private readonly int _chooseHowMany;
+
+    public ActivationCountPlacementDirector(
+        ILocalSiloDetails localSiloDetails,
+        DeploymentLoadPublisher deploymentLoadPublisher, 
+        IOptions<ActivationCountBasedPlacementOptions> options)
+    {
+        _localAddress = localSiloDetails.SiloAddress;
+        _chooseHowMany = options.Value.ChooseOutOf;
+        if (_chooseHowMany <= 0) throw new ArgumentException($"{nameof(ActivationCountBasedPlacementOptions)}.{nameof(ActivationCountBasedPlacementOptions.ChooseOutOf)} is {_chooseHowMany}. It must be greater than zero.");
+        deploymentLoadPublisher?.SubscribeToStatisticsChangeEvents(this);
+    }
+
+    private SiloAddress SelectSiloPowerOfK(SiloAddress[] silos)
+    {
+        var compatibleSilos = silos.ToSet();
+
+        // Exclude overloaded and non-compatible silos
+        var relevantSilos = new List<KeyValuePair<SiloAddress, CachedLocalStat>>();
+        var totalSilos = 0;
+        foreach (var kv in _localCache)
         {
-            private int _activationCount;
+            totalSilos++;
+            if (kv.Value.SiloStats.IsOverloaded) continue;
+            if (!compatibleSilos.Contains(kv.Key)) continue;
 
-            internal CachedLocalStat(SiloRuntimeStatistics siloStats) => SiloStats = siloStats;
-
-            public SiloRuntimeStatistics SiloStats { get; }
-            public int ActivationCount => _activationCount;
-            public void IncrementActivationCount(int delta) => Interlocked.Add(ref _activationCount, delta);
+            relevantSilos.Add(kv);
         }
-        
-        // Track created activations on this silo between statistic intervals.
-        private readonly ConcurrentDictionary<SiloAddress, CachedLocalStat> _localCache = new();
-        private readonly SiloAddress _localAddress;
-        private readonly int _chooseHowMany;
 
-        public ActivationCountPlacementDirector(
-            ILocalSiloDetails localSiloDetails,
-            DeploymentLoadPublisher deploymentLoadPublisher, 
-            IOptions<ActivationCountBasedPlacementOptions> options)
+        if (relevantSilos.Count > 0)
         {
-            _localAddress = localSiloDetails.SiloAddress;
-            _chooseHowMany = options.Value.ChooseOutOf;
-            if (_chooseHowMany <= 0) throw new ArgumentException($"{nameof(ActivationCountBasedPlacementOptions)}.{nameof(ActivationCountBasedPlacementOptions.ChooseOutOf)} is {_chooseHowMany}. It must be greater than zero.");
-            deploymentLoadPublisher?.SubscribeToStatisticsChangeEvents(this);
-        }
-
-        private SiloAddress SelectSiloPowerOfK(SiloAddress[] silos)
-        {
-            var compatibleSilos = silos.ToSet();
-
-            // Exclude overloaded and non-compatible silos
-            var relevantSilos = new List<KeyValuePair<SiloAddress, CachedLocalStat>>();
-            var totalSilos = 0;
-            foreach (var kv in _localCache)
+            int chooseFrom = Math.Min(relevantSilos.Count, _chooseHowMany);
+            var chooseFromThoseSilos = new List<KeyValuePair<SiloAddress, CachedLocalStat>>(chooseFrom);
+            while (chooseFromThoseSilos.Count < chooseFrom)
             {
-                totalSilos++;
-                if (kv.Value.SiloStats.IsOverloaded) continue;
-                if (!compatibleSilos.Contains(kv.Key)) continue;
-
-                relevantSilos.Add(kv);
+                int index = Random.Shared.Next(relevantSilos.Count);
+                var pickedSilo = relevantSilos[index];
+                relevantSilos.RemoveAt(index);
+                chooseFromThoseSilos.Add(pickedSilo);
             }
 
-            if (relevantSilos.Count > 0)
+            KeyValuePair<SiloAddress, CachedLocalStat> minLoadedSilo = default;
+            var minLoad = int.MaxValue;
+            foreach (var s in chooseFromThoseSilos)
             {
-                int chooseFrom = Math.Min(relevantSilos.Count, _chooseHowMany);
-                var chooseFromThoseSilos = new List<KeyValuePair<SiloAddress, CachedLocalStat>>(chooseFrom);
-                while (chooseFromThoseSilos.Count < chooseFrom)
+                var load = s.Value.ActivationCount + s.Value.SiloStats.RecentlyUsedActivationCount;
+                if (load < minLoad)
                 {
-                    int index = Random.Shared.Next(relevantSilos.Count);
-                    var pickedSilo = relevantSilos[index];
-                    relevantSilos.RemoveAt(index);
-                    chooseFromThoseSilos.Add(pickedSilo);
+                    minLoadedSilo = s;
+                    minLoad = load;
                 }
-
-                KeyValuePair<SiloAddress, CachedLocalStat> minLoadedSilo = default;
-                var minLoad = int.MaxValue;
-                foreach (var s in chooseFromThoseSilos)
-                {
-                    var load = s.Value.ActivationCount + s.Value.SiloStats.RecentlyUsedActivationCount;
-                    if (load < minLoad)
-                    {
-                        minLoadedSilo = s;
-                        minLoad = load;
-                    }
-                }
-
-                // Increment placement by number of silos instead of by one.
-                // This is our trick to get more balanced placement, accounting to the probable
-                // case when multiple silos place on the same silo at the same time, before stats are refreshed.
-                minLoadedSilo.Value.IncrementActivationCount(totalSilos);
-
-                return minLoadedSilo.Key;
             }
 
-            // There are no compatible, non-overloaded silos.
-            var all = _localCache.ToList();
-            throw new SiloUnavailableException($"Unable to select a candidate from {all.Count} silos: {Utils.EnumerableToString(all, kvp => $"SiloAddress = {kvp.Key} -> {kvp.Value}")}");
+            // Increment placement by number of silos instead of by one.
+            // This is our trick to get more balanced placement, accounting to the probable
+            // case when multiple silos place on the same silo at the same time, before stats are refreshed.
+            minLoadedSilo.Value.IncrementActivationCount(totalSilos);
+
+            return minLoadedSilo.Key;
         }
 
-        public override Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context) => Task.FromResult(OnAddActivationInternal(target, context));
+        // There are no compatible, non-overloaded silos.
+        var all = _localCache.ToList();
+        throw new SiloUnavailableException($"Unable to select a candidate from {all.Count} silos: {Utils.EnumerableToString(all, kvp => $"SiloAddress = {kvp.Key} -> {kvp.Value}")}");
+    }
 
-        private SiloAddress OnAddActivationInternal(PlacementTarget target, IPlacementContext context)
+    public override Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context) => Task.FromResult(OnAddActivationInternal(target, context));
+
+    private SiloAddress OnAddActivationInternal(PlacementTarget target, IPlacementContext context)
+    {
+        var compatibleSilos = context.GetCompatibleSilos(target);
+
+        // If a valid placement hint was specified, use it.
+        if (IPlacementDirector.GetPlacementHint(target.RequestContextData, compatibleSilos) is { } placementHint)
         {
-            var compatibleSilos = context.GetCompatibleSilos(target);
-
-            // If a valid placement hint was specified, use it.
-            if (IPlacementDirector.GetPlacementHint(target.RequestContextData, compatibleSilos) is { } placementHint)
-            {
-                return placementHint;
-            }
-
-            // If the cache was not populated, just place locally
-            if (_localCache.IsEmpty)
-            {
-                return _localAddress;
-            }
-
-            return SelectSiloPowerOfK(compatibleSilos);
+            return placementHint;
         }
 
-        public void SiloStatisticsChangeNotification(SiloAddress updatedSilo, SiloRuntimeStatistics newSiloStats)
+        // If the cache was not populated, just place locally
+        if (_localCache.IsEmpty)
         {
-            // just create a new empty CachedLocalStat and throw the old one.
-            _localCache[updatedSilo] = new(newSiloStats);
+            return _localAddress;
         }
 
-        public void RemoveSilo(SiloAddress removedSilo)
-        {
-            _localCache.TryRemove(removedSilo, out _);
-        }
+        return SelectSiloPowerOfK(compatibleSilos);
+    }
+
+    public void SiloStatisticsChangeNotification(SiloAddress updatedSilo, SiloRuntimeStatistics newSiloStats)
+    {
+        // just create a new empty CachedLocalStat and throw the old one.
+        _localCache[updatedSilo] = new(newSiloStats);
+    }
+
+    public void RemoveSilo(SiloAddress removedSilo)
+    {
+        _localCache.TryRemove(removedSilo, out _);
     }
 }

@@ -8,64 +8,63 @@ using Orleans.Providers;
 using Orleans.Runtime.Hosting;
 using Orleans.Storage;
 
-namespace Orleans.Hosting
+namespace Orleans.Hosting;
+
+/// <summary>
+/// Silo host builder extensions
+/// </summary>
+public static class MemoryGrainStorageSiloBuilderExtensions
 {
     /// <summary>
-    /// Silo host builder extensions
+    /// Configure silo to use memory grain storage as the default grain storage.
     /// </summary>
-    public static class MemoryGrainStorageSiloBuilderExtensions
+    /// <param name="builder">The builder.</param>
+    /// <param name="configureOptions">The configuration delegate.</param>
+    /// <returns>The silo builder.</returns>
+    public static ISiloBuilder AddMemoryGrainStorageAsDefault(this ISiloBuilder builder, Action<MemoryGrainStorageOptions> configureOptions)
     {
-        /// <summary>
-        /// Configure silo to use memory grain storage as the default grain storage.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="configureOptions">The configuration delegate.</param>
-        /// <returns>The silo builder.</returns>
-        public static ISiloBuilder AddMemoryGrainStorageAsDefault(this ISiloBuilder builder, Action<MemoryGrainStorageOptions> configureOptions)
-        {
-            return builder.AddMemoryGrainStorageAsDefault(ob => ob.Configure(configureOptions));
-        }
+        return builder.AddMemoryGrainStorageAsDefault(ob => ob.Configure(configureOptions));
+    }
 
-        /// <summary>
-        /// Configure silo to use memory grain storage.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="name">The name of the storage provider. This must match with the <c>StorageName</c> property specified when injecting state into a grain.</param>
-        /// <param name="configureOptions">The configuration delegate.</param>
-        /// <returns>The silo builder.</returns>
-        public static ISiloBuilder AddMemoryGrainStorage(this ISiloBuilder builder, string name, Action<MemoryGrainStorageOptions> configureOptions)
-        {
-            return builder.AddMemoryGrainStorage(name, ob => ob.Configure(configureOptions));
-        }
+    /// <summary>
+    /// Configure silo to use memory grain storage.
+    /// </summary>
+    /// <param name="builder">The builder.</param>
+    /// <param name="name">The name of the storage provider. This must match with the <c>StorageName</c> property specified when injecting state into a grain.</param>
+    /// <param name="configureOptions">The configuration delegate.</param>
+    /// <returns>The silo builder.</returns>
+    public static ISiloBuilder AddMemoryGrainStorage(this ISiloBuilder builder, string name, Action<MemoryGrainStorageOptions> configureOptions)
+    {
+        return builder.AddMemoryGrainStorage(name, ob => ob.Configure(configureOptions));
+    }
 
-        /// <summary>
-        /// Configure silo to use memory grain storage as the default grain storage.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="configureOptions">The configuration delegate.</param>
-        /// <returns>The silo builder.</returns>
-        public static ISiloBuilder AddMemoryGrainStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null)
-        {
-            return builder.AddMemoryGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
-        }
+    /// <summary>
+    /// Configure silo to use memory grain storage as the default grain storage.
+    /// </summary>
+    /// <param name="builder">The builder.</param>
+    /// <param name="configureOptions">The configuration delegate.</param>
+    /// <returns>The silo builder.</returns>
+    public static ISiloBuilder AddMemoryGrainStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null)
+    {
+        return builder.AddMemoryGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
+    }
 
-        /// <summary>
-        /// Configure silo to use memory grain storage.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="name">The name of the storage provider. This must match with the <c>StorageName</c> property specified when injecting state into a grain.</param>
-        /// <param name="configureOptions">The configuration delegate.</param>
-        /// <returns>The silo builder.</returns>
-        public static ISiloBuilder AddMemoryGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null)
-        {
-            return builder
-                .ConfigureServices(services =>
-                {
-                    configureOptions?.Invoke(services.AddOptions<MemoryGrainStorageOptions>(name));
-                    services.AddTransient<IPostConfigureOptions<MemoryGrainStorageOptions>, DefaultStorageProviderSerializerOptionsConfigurator<MemoryGrainStorageOptions>>();
-                    services.ConfigureNamedOptionForLogging<MemoryGrainStorageOptions>(name);
-                    services.AddGrainStorage(name, MemoryGrainStorageFactory.Create);
-                });
-        }
+    /// <summary>
+    /// Configure silo to use memory grain storage.
+    /// </summary>
+    /// <param name="builder">The builder.</param>
+    /// <param name="name">The name of the storage provider. This must match with the <c>StorageName</c> property specified when injecting state into a grain.</param>
+    /// <param name="configureOptions">The configuration delegate.</param>
+    /// <returns>The silo builder.</returns>
+    public static ISiloBuilder AddMemoryGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null)
+    {
+        return builder
+            .ConfigureServices(services =>
+            {
+                configureOptions?.Invoke(services.AddOptions<MemoryGrainStorageOptions>(name));
+                services.AddTransient<IPostConfigureOptions<MemoryGrainStorageOptions>, DefaultStorageProviderSerializerOptionsConfigurator<MemoryGrainStorageOptions>>();
+                services.ConfigureNamedOptionForLogging<MemoryGrainStorageOptions>(name);
+                services.AddGrainStorage(name, MemoryGrainStorageFactory.Create);
+            });
     }
 }

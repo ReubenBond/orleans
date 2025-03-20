@@ -9,103 +9,102 @@ using Orleans.Messaging;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace UnitTests.MessageCenterTests
+namespace UnitTests.MessageCenterTests;
+
+public class GatewaySelectionTest
 {
-    public class GatewaySelectionTest
+    protected readonly ITestOutputHelper output;
+
+    protected static readonly List<Uri> gatewayAddressUris = new[]
     {
-        protected readonly ITestOutputHelper output;
+        new Uri("gwy.tcp://127.0.0.1:1/0"),
+        new Uri("gwy.tcp://127.0.0.1:2/0"),
+        new Uri("gwy.tcp://127.0.0.1:3/0"),
+        new Uri("gwy.tcp://127.0.0.1:4/0")
+    }.ToList();
+    
+    public GatewaySelectionTest(ITestOutputHelper output)
+    {
+        this.output = output;
+    }
 
-        protected static readonly List<Uri> gatewayAddressUris = new[]
+    [Fact, TestCategory("BVT"), TestCategory("Gateway")]
+    public async Task GatewaySelection()
+    {
+        var listProvider = new TestListProvider(gatewayAddressUris);
+        await Test_GatewaySelection(listProvider);
+    }
+
+    protected async Task Test_GatewaySelection(IGatewayListProvider listProvider)
+    {
+        IList<Uri> gatewayUris = await listProvider.GetGateways();
+        Assert.True(gatewayUris.Count > 0, $"Found some gateways. Data = {Utils.EnumerableToString(gatewayUris)}");
+
+        var gatewayEndpoints = gatewayUris.Select(uri =>
         {
-            new Uri("gwy.tcp://127.0.0.1:1/0"),
-            new Uri("gwy.tcp://127.0.0.1:2/0"),
-            new Uri("gwy.tcp://127.0.0.1:3/0"),
-            new Uri("gwy.tcp://127.0.0.1:4/0")
-        }.ToList();
-        
-        public GatewaySelectionTest(ITestOutputHelper output)
+            return new IPEndPoint(IPAddress.Parse(uri.Host), uri.Port);
+        }).ToList();
+
+        var gatewayManager = new GatewayManager(Options.Create(new GatewayOptions()), listProvider, NullLoggerFactory.Instance, null, TimeProvider.System);
+        await gatewayManager.StartAsync(CancellationToken.None);
+
+        var counts = new int[4];
+
+        for (int i = 0; i < 2300; i++)
         {
-            this.output = output;
+            var ip = gatewayManager.GetLiveGateway();
+            Assert.NotNull(ip);
+            var addr = ip.Endpoint.Address;
+            Assert.Equal(IPAddress.Loopback, addr);  // "Incorrect IP address returned for gateway"
+            Assert.True((0 < ip.Endpoint.Port) && (ip.Endpoint.Port < 5), "Incorrect IP port returned for gateway");
+            counts[ip.Endpoint.Port - 1]++;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Gateway")]
-        public async Task GatewaySelection()
+        // The following needed to be changed as the gateway manager now round-robins through the available gateways, rather than
+        // selecting randomly based on load numbers.
+        //Assert.True((500 < counts[0]) && (counts[0] < 1500), "Gateway selection is incorrectly skewed");
+        //Assert.True((500 < counts[1]) && (counts[1] < 1500), "Gateway selection is incorrectly skewed");
+        //Assert.True((125 < counts[2]) && (counts[2] < 375), "Gateway selection is incorrectly skewed");
+        //Assert.True((25 < counts[3]) && (counts[3] < 75), "Gateway selection is incorrectly skewed");
+        //Assert.True((287 < counts[0]) && (counts[0] < 1150), "Gateway selection is incorrectly skewed");
+        //Assert.True((287 < counts[1]) && (counts[1] < 1150), "Gateway selection is incorrectly skewed");
+        //Assert.True((287 < counts[2]) && (counts[2] < 1150), "Gateway selection is incorrectly skewed");
+        //Assert.True((287 < counts[3]) && (counts[3] < 1150), "Gateway selection is incorrectly skewed");
+
+        int low = 2300 / 4;
+        int up = 2300 / 4;
+        Assert.True((low <= counts[0]) && (counts[0] <= up), "Gateway selection is incorrectly skewed. " + counts[0]);
+        Assert.True((low <= counts[1]) && (counts[1] <= up), "Gateway selection is incorrectly skewed. " + counts[1]);
+        Assert.True((low <= counts[2]) && (counts[2] <= up), "Gateway selection is incorrectly skewed. " + counts[2]);
+        Assert.True((low <= counts[3]) && (counts[3] <= up), "Gateway selection is incorrectly skewed. " + counts[3]);
+    }
+
+    private class TestListProvider : IGatewayListProvider
+    {
+        private readonly IList<Uri> list;
+
+        public TestListProvider(List<Uri> gatewayUris)
         {
-            var listProvider = new TestListProvider(gatewayAddressUris);
-            await Test_GatewaySelection(listProvider);
+            list = gatewayUris;
         }
 
-        protected async Task Test_GatewaySelection(IGatewayListProvider listProvider)
+        public Task<IList<Uri>> GetGateways()
         {
-            IList<Uri> gatewayUris = await listProvider.GetGateways();
-            Assert.True(gatewayUris.Count > 0, $"Found some gateways. Data = {Utils.EnumerableToString(gatewayUris)}");
-
-            var gatewayEndpoints = gatewayUris.Select(uri =>
-            {
-                return new IPEndPoint(IPAddress.Parse(uri.Host), uri.Port);
-            }).ToList();
-
-            var gatewayManager = new GatewayManager(Options.Create(new GatewayOptions()), listProvider, NullLoggerFactory.Instance, null, TimeProvider.System);
-            await gatewayManager.StartAsync(CancellationToken.None);
-
-            var counts = new int[4];
-
-            for (int i = 0; i < 2300; i++)
-            {
-                var ip = gatewayManager.GetLiveGateway();
-                Assert.NotNull(ip);
-                var addr = ip.Endpoint.Address;
-                Assert.Equal(IPAddress.Loopback, addr);  // "Incorrect IP address returned for gateway"
-                Assert.True((0 < ip.Endpoint.Port) && (ip.Endpoint.Port < 5), "Incorrect IP port returned for gateway");
-                counts[ip.Endpoint.Port - 1]++;
-            }
-
-            // The following needed to be changed as the gateway manager now round-robins through the available gateways, rather than
-            // selecting randomly based on load numbers.
-            //Assert.True((500 < counts[0]) && (counts[0] < 1500), "Gateway selection is incorrectly skewed");
-            //Assert.True((500 < counts[1]) && (counts[1] < 1500), "Gateway selection is incorrectly skewed");
-            //Assert.True((125 < counts[2]) && (counts[2] < 375), "Gateway selection is incorrectly skewed");
-            //Assert.True((25 < counts[3]) && (counts[3] < 75), "Gateway selection is incorrectly skewed");
-            //Assert.True((287 < counts[0]) && (counts[0] < 1150), "Gateway selection is incorrectly skewed");
-            //Assert.True((287 < counts[1]) && (counts[1] < 1150), "Gateway selection is incorrectly skewed");
-            //Assert.True((287 < counts[2]) && (counts[2] < 1150), "Gateway selection is incorrectly skewed");
-            //Assert.True((287 < counts[3]) && (counts[3] < 1150), "Gateway selection is incorrectly skewed");
-
-            int low = 2300 / 4;
-            int up = 2300 / 4;
-            Assert.True((low <= counts[0]) && (counts[0] <= up), "Gateway selection is incorrectly skewed. " + counts[0]);
-            Assert.True((low <= counts[1]) && (counts[1] <= up), "Gateway selection is incorrectly skewed. " + counts[1]);
-            Assert.True((low <= counts[2]) && (counts[2] <= up), "Gateway selection is incorrectly skewed. " + counts[2]);
-            Assert.True((low <= counts[3]) && (counts[3] <= up), "Gateway selection is incorrectly skewed. " + counts[3]);
+            return Task.FromResult(list);
         }
 
-        private class TestListProvider : IGatewayListProvider
+        public TimeSpan MaxStaleness
         {
-            private readonly IList<Uri> list;
+            get { return TimeSpan.FromMinutes(1); }
+        }
 
-            public TestListProvider(List<Uri> gatewayUris)
-            {
-                list = gatewayUris;
-            }
-
-            public Task<IList<Uri>> GetGateways()
-            {
-                return Task.FromResult(list);
-            }
-
-            public TimeSpan MaxStaleness
-            {
-                get { return TimeSpan.FromMinutes(1); }
-            }
-
-            public bool IsUpdatable
-            {
-                get { return false; }
-            }
-            public Task InitializeGatewayListProvider()
-            {
-                return Task.CompletedTask;
-            }
+        public bool IsUpdatable
+        {
+            get { return false; }
+        }
+        public Task InitializeGatewayListProvider()
+        {
+            return Task.CompletedTask;
         }
     }
 }

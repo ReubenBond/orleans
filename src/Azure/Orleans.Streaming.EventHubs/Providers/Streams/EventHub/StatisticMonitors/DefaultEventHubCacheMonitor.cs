@@ -3,20 +3,19 @@
 
 using Orleans.Providers.Streams.Common;
 
-namespace Orleans.Streaming.EventHubs.StatisticMonitors
+namespace Orleans.Streaming.EventHubs.StatisticMonitors;
+
+/// <summary>
+/// Default cache monitor for eventhub streaming provider ecosystem
+/// </summary>
+public class DefaultEventHubCacheMonitor : DefaultCacheMonitor
 {
     /// <summary>
-    /// Default cache monitor for eventhub streaming provider ecosystem
+    /// Constructor
     /// </summary>
-    public class DefaultEventHubCacheMonitor : DefaultCacheMonitor
+    /// <param name="dimensions"></param>
+    public DefaultEventHubCacheMonitor(EventHubCacheMonitorDimensions dimensions)
+        : base(new KeyValuePair<string, object>[] { new("Path", dimensions.EventHubPath), new("Partition", dimensions.EventHubPartition) })
     {
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="dimensions"></param>
-        public DefaultEventHubCacheMonitor(EventHubCacheMonitorDimensions dimensions)
-            : base(new KeyValuePair<string, object>[] { new("Path", dimensions.EventHubPath), new("Partition", dimensions.EventHubPartition) })
-        {
-        }
     }
 }

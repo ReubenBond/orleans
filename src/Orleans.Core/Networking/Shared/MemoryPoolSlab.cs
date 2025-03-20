@@ -3,78 +3,77 @@
 
 using System.Runtime.InteropServices;
 
-namespace Orleans.Networking.Shared
+namespace Orleans.Networking.Shared;
+
+/// <summary>
+/// Slab tracking object used by the byte buffer memory pool. A slab is a large allocation which is divided into smaller blocks. The
+/// individual blocks are then treated as independent array segments.
+/// </summary>
+internal class MemoryPoolSlab : IDisposable
 {
     /// <summary>
-    /// Slab tracking object used by the byte buffer memory pool. A slab is a large allocation which is divided into smaller blocks. The
-    /// individual blocks are then treated as independent array segments.
+    /// This handle pins the managed array in memory until the slab is disposed. This prevents it from being
+    /// relocated and enables any subsections of the array to be used as native memory pointers to P/Invoked API calls.
     /// </summary>
-    internal class MemoryPoolSlab : IDisposable
+    private GCHandle _gcHandle;
+    private bool _isDisposed;
+
+    public MemoryPoolSlab(byte[] data)
     {
-        /// <summary>
-        /// This handle pins the managed array in memory until the slab is disposed. This prevents it from being
-        /// relocated and enables any subsections of the array to be used as native memory pointers to P/Invoked API calls.
-        /// </summary>
-        private GCHandle _gcHandle;
-        private bool _isDisposed;
+        Array = data;
+        _gcHandle = GCHandle.Alloc(data, GCHandleType.Pinned);
+        NativePointer = _gcHandle.AddrOfPinnedObject();
+    }
 
-        public MemoryPoolSlab(byte[] data)
+    /// <summary>
+    /// True as long as the blocks from this slab are to be considered returnable to the pool. In order to shrink the
+    /// memory pool size an entire slab must be removed. That is done by (1) setting IsActive to false and removing the
+    /// slab from the pool's _slabs collection, (2) as each block currently in use is Return()ed to the pool it will
+    /// be allowed to be garbage collected rather than re-pooled, and (3) when all block tracking objects are garbage
+    /// collected and the slab is no longer references the slab will be garbage collected and the memory unpinned will
+    /// be unpinned by the slab's Dispose.
+    /// </summary>
+    public bool IsActive => !_isDisposed;
+
+    public IntPtr NativePointer { get; private set; }
+
+    public byte[] Array { get; private set; }
+
+    public static MemoryPoolSlab Create(int length)
+    {
+        // allocate and pin requested memory length
+        var array = new byte[length];
+
+        // allocate and return slab tracking object
+        return new MemoryPoolSlab(array);
+    }
+
+    protected void Dispose(bool disposing)
+    {
+        if (_isDisposed)
         {
-            Array = data;
-            _gcHandle = GCHandle.Alloc(data, GCHandleType.Pinned);
-            NativePointer = _gcHandle.AddrOfPinnedObject();
+            return;
         }
 
-        /// <summary>
-        /// True as long as the blocks from this slab are to be considered returnable to the pool. In order to shrink the
-        /// memory pool size an entire slab must be removed. That is done by (1) setting IsActive to false and removing the
-        /// slab from the pool's _slabs collection, (2) as each block currently in use is Return()ed to the pool it will
-        /// be allowed to be garbage collected rather than re-pooled, and (3) when all block tracking objects are garbage
-        /// collected and the slab is no longer references the slab will be garbage collected and the memory unpinned will
-        /// be unpinned by the slab's Dispose.
-        /// </summary>
-        public bool IsActive => !_isDisposed;
+        _isDisposed = true;
 
-        public IntPtr NativePointer { get; private set; }
+        Array = null;
+        NativePointer = IntPtr.Zero;
 
-        public byte[] Array { get; private set; }
-
-        public static MemoryPoolSlab Create(int length)
+        if (_gcHandle.IsAllocated)
         {
-            // allocate and pin requested memory length
-            var array = new byte[length];
-
-            // allocate and return slab tracking object
-            return new MemoryPoolSlab(array);
+            _gcHandle.Free();
         }
+    }
 
-        protected void Dispose(bool disposing)
-        {
-            if (_isDisposed)
-            {
-                return;
-            }
+    ~MemoryPoolSlab()
+    {
+        Dispose(false);
+    }
 
-            _isDisposed = true;
-
-            Array = null;
-            NativePointer = IntPtr.Zero;
-
-            if (_gcHandle.IsAllocated)
-            {
-                _gcHandle.Free();
-            }
-        }
-
-        ~MemoryPoolSlab()
-        {
-            Dispose(false);
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
 }

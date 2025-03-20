@@ -1,27 +1,26 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Transactions.TestKit.Correctnesss
-{
-    public interface ITransactionalBitArrayGrain : IGrainWithGuidKey
-    {
-        /// <summary>
-        /// Ping 
-        /// </summary>
-        /// <returns></returns>
-        Task Ping();
-        /// <summary>
-        /// apply set operation to every transaction state
-        /// </summary>
-        /// <param name="newValue"></param>
-        /// <returns></returns>
-        [Transaction(TransactionOption.CreateOrJoin)]
-        Task SetBit(int newValue);
+namespace Orleans.Transactions.TestKit.Correctnesss;
 
-        /// <summary>
-        /// Performs a read transaction on each state, returning the results in order.
-        /// </summary>
-        [Transaction(TransactionOption.CreateOrJoin)]
-        Task<List<BitArrayState>> Get();
-    }
+public interface ITransactionalBitArrayGrain : IGrainWithGuidKey
+{
+    /// <summary>
+    /// Ping 
+    /// </summary>
+    /// <returns></returns>
+    Task Ping();
+    /// <summary>
+    /// apply set operation to every transaction state
+    /// </summary>
+    /// <param name="newValue"></param>
+    /// <returns></returns>
+    [Transaction(TransactionOption.CreateOrJoin)]
+    Task SetBit(int newValue);
+
+    /// <summary>
+    /// Performs a read transaction on each state, returning the results in order.
+    /// </summary>
+    [Transaction(TransactionOption.CreateOrJoin)]
+    Task<List<BitArrayState>> Get();
 }

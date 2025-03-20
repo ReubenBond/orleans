@@ -1,49 +1,48 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Storage
+namespace Orleans.Storage;
+
+/// <summary>
+/// Provides functionality for serializing and deserializing grain state, delegating to a prefered and fallback implementation of <see cref="IGrainStorageSerializer"/>.
+/// </summary>
+public class GrainStorageSerializer : IGrainStorageSerializer
 {
+    private readonly IGrainStorageSerializer _serializer;
+    private readonly IGrainStorageSerializer _fallbackDeserializer;
+
     /// <summary>
-    /// Provides functionality for serializing and deserializing grain state, delegating to a prefered and fallback implementation of <see cref="IGrainStorageSerializer"/>.
+    /// Initializes a new instance of the <see cref="GrainStorageSerializer"/> class.
     /// </summary>
-    public class GrainStorageSerializer : IGrainStorageSerializer
+    /// <param name="serializer">The grain storage serializer.</param>
+    /// <param name="fallbackDeserializer">The fallback grain storage serializer.</param>
+    public GrainStorageSerializer(IGrainStorageSerializer serializer, IGrainStorageSerializer fallbackDeserializer)
     {
-        private readonly IGrainStorageSerializer _serializer;
-        private readonly IGrainStorageSerializer _fallbackDeserializer;
+        _serializer = serializer;
+        _fallbackDeserializer = fallbackDeserializer;
+    }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="GrainStorageSerializer"/> class.
-        /// </summary>
-        /// <param name="serializer">The grain storage serializer.</param>
-        /// <param name="fallbackDeserializer">The fallback grain storage serializer.</param>
-        public GrainStorageSerializer(IGrainStorageSerializer serializer, IGrainStorageSerializer fallbackDeserializer)
+    /// <inheritdoc/>
+    public BinaryData Serialize<T>(T input) => _serializer.Serialize(input);
+
+    /// <inheritdoc/>
+    public T Deserialize<T>(BinaryData input)
+    {
+        try
         {
-            _serializer = serializer;
-            _fallbackDeserializer = fallbackDeserializer;
+            return _serializer.Deserialize<T>(input);
         }
-
-        /// <inheritdoc/>
-        public BinaryData Serialize<T>(T input) => _serializer.Serialize(input);
-
-        /// <inheritdoc/>
-        public T Deserialize<T>(BinaryData input)
+        catch (Exception ex1)
         {
             try
             {
-                return _serializer.Deserialize<T>(input);
+                return _fallbackDeserializer.Deserialize<T>(input);
             }
-            catch (Exception ex1)
+            catch (Exception ex2)
             {
-                try
-                {
-                    return _fallbackDeserializer.Deserialize<T>(input);
-                }
-                catch (Exception ex2)
-                {
-                    throw new AggregateException("Failed to deserialize input", ex1, ex2);
-                }
+                throw new AggregateException("Failed to deserialize input", ex1, ex2);
             }
         }
-
     }
+
 }

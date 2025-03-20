@@ -4,12 +4,11 @@
 using TestExtensions;
 using Xunit;
 
-namespace NonSilo.Tests
-{
-    // Assembly collections must be defined once in each assembly
-    [CollectionDefinition("DefaultCluster")]
-    public class DefaultClusterTestCollection : ICollectionFixture<DefaultClusterFixture> { }
+namespace NonSilo.Tests;
 
-    [CollectionDefinition(TestEnvironmentFixture.DefaultCollection)]
-    public class TestEnvironmentFixtureCollection : ICollectionFixture<TestEnvironmentFixture> { }
-}
+// Assembly collections must be defined once in each assembly
+[CollectionDefinition("DefaultCluster")]
+public class DefaultClusterTestCollection : ICollectionFixture<DefaultClusterFixture> { }
+
+[CollectionDefinition(TestEnvironmentFixture.DefaultCollection)]
+public class TestEnvironmentFixtureCollection : ICollectionFixture<TestEnvironmentFixture> { }

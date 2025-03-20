@@ -3,13 +3,12 @@
 
 using Orleans.Concurrency;
 
-namespace BenchmarkGrainInterfaces.Ping
-{
-    public interface IPingGrain : IGrainWithIntegerKey
-    {
-        ValueTask Run();
+namespace BenchmarkGrainInterfaces.Ping;
 
-        [AlwaysInterleave]
-        ValueTask PingPongInterleave(IPingGrain other, int count);
-    }
+public interface IPingGrain : IGrainWithIntegerKey
+{
+    ValueTask Run();
+
+    [AlwaysInterleave]
+    ValueTask PingPongInterleave(IPingGrain other, int count);
 }

@@ -3,16 +3,15 @@
 
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Orleans.Serialization
+namespace Orleans.Serialization;
+
+/// <summary>
+/// Builder interface for configuring serialization.
+/// </summary>
+public interface ISerializerBuilder
 {
     /// <summary>
-    /// Builder interface for configuring serialization.
+    /// Gets the service collection.
     /// </summary>
-    public interface ISerializerBuilder
-    {
-        /// <summary>
-        /// Gets the service collection.
-        /// </summary>
-        IServiceCollection Services { get; }
-    }
+    IServiceCollection Services { get; }
 }

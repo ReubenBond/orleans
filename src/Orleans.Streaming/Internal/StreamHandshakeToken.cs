@@ -1,51 +1,50 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Streams
+namespace Orleans.Streams;
+
+[Serializable]
+[GenerateSerializer]
+internal abstract class StreamHandshakeToken : IEquatable<StreamHandshakeToken>
 {
-    [Serializable]
-    [GenerateSerializer]
-    internal abstract class StreamHandshakeToken : IEquatable<StreamHandshakeToken>
+    [Id(0)]
+    public StreamSequenceToken Token { get; private set; }
+    
+    public static StreamHandshakeToken CreateStartToken(StreamSequenceToken token)
     {
-        [Id(0)]
-        public StreamSequenceToken Token { get; private set; }
-        
-        public static StreamHandshakeToken CreateStartToken(StreamSequenceToken token)
-        {
-            if (token == null) return default;
-            return new StartToken {Token = token};
-        }
-
-        public static StreamHandshakeToken CreateDeliveyToken(StreamSequenceToken token)
-        {
-            if (token == null) return default;
-            return new DeliveryToken {Token = token};
-        }
-
-        public bool Equals(StreamHandshakeToken other)
-        {
-            if (ReferenceEquals(null, other)) return false;
-            if (ReferenceEquals(this, other)) return true;
-            if (other.GetType() != GetType()) return false;
-            return Equals(Token, other.Token);
-        }
-
-        public override bool Equals(object obj)
-        {
-            if (ReferenceEquals(null, obj)) return false;
-            if (ReferenceEquals(this, obj)) return true;
-            if (obj.GetType() != GetType()) return false;
-            return Equals((StreamHandshakeToken)obj);
-        }
-
-        public override int GetHashCode() => HashCode.Combine(GetType(), Token);
+        if (token == null) return default;
+        return new StartToken {Token = token};
     }
 
-    [Serializable]
-    [GenerateSerializer]
-    internal sealed class StartToken : StreamHandshakeToken { }
-    
-    [Serializable]
-    [GenerateSerializer]
-    internal sealed class DeliveryToken : StreamHandshakeToken { }
+    public static StreamHandshakeToken CreateDeliveyToken(StreamSequenceToken token)
+    {
+        if (token == null) return default;
+        return new DeliveryToken {Token = token};
+    }
+
+    public bool Equals(StreamHandshakeToken other)
+    {
+        if (ReferenceEquals(null, other)) return false;
+        if (ReferenceEquals(this, other)) return true;
+        if (other.GetType() != GetType()) return false;
+        return Equals(Token, other.Token);
+    }
+
+    public override bool Equals(object obj)
+    {
+        if (ReferenceEquals(null, obj)) return false;
+        if (ReferenceEquals(this, obj)) return true;
+        if (obj.GetType() != GetType()) return false;
+        return Equals((StreamHandshakeToken)obj);
+    }
+
+    public override int GetHashCode() => HashCode.Combine(GetType(), Token);
 }
+
+[Serializable]
+[GenerateSerializer]
+internal sealed class StartToken : StreamHandshakeToken { }
+
+[Serializable]
+[GenerateSerializer]
+internal sealed class DeliveryToken : StreamHandshakeToken { }

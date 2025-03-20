@@ -1,79 +1,78 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Hosting
+namespace Orleans.Hosting;
+
+/// <summary>
+/// Extension methods for configuring <see cref="IIncomingGrainCallFilter"/> and <see cref="IOutgoingGrainCallFilter"/> implementations.
+/// </summary>
+public static class GrainCallFilterSiloBuilderExtensions
 {
     /// <summary>
-    /// Extension methods for configuring <see cref="IIncomingGrainCallFilter"/> and <see cref="IOutgoingGrainCallFilter"/> implementations.
+    /// Adds an <see cref="IIncomingGrainCallFilter"/> to the filter pipeline.
     /// </summary>
-    public static class GrainCallFilterSiloBuilderExtensions
+    /// <param name="builder">The builder.</param>
+    /// <param name="filter">The filter.</param>
+    /// <returns>The builder.</returns>
+    public static ISiloBuilder AddIncomingGrainCallFilter(this ISiloBuilder builder, IIncomingGrainCallFilter filter)
     {
-        /// <summary>
-        /// Adds an <see cref="IIncomingGrainCallFilter"/> to the filter pipeline.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="filter">The filter.</param>
-        /// <returns>The builder.</returns>
-        public static ISiloBuilder AddIncomingGrainCallFilter(this ISiloBuilder builder, IIncomingGrainCallFilter filter)
-        {
-            return builder.ConfigureServices(services => services.AddIncomingGrainCallFilter(filter));
-        }
+        return builder.ConfigureServices(services => services.AddIncomingGrainCallFilter(filter));
+    }
 
-        /// <summary>
-        /// Adds an <see cref="IIncomingGrainCallFilter"/> to the filter pipeline.
-        /// </summary>
-        /// <typeparam name="TImplementation">The filter implementation type.</typeparam>
-        /// <param name="builder">The builder.</param>
-        /// <returns>The builder.</returns>
-        public static ISiloBuilder AddIncomingGrainCallFilter<TImplementation>(this ISiloBuilder builder)
-            where TImplementation : class, IIncomingGrainCallFilter
-        {
-            return builder.ConfigureServices(services => services.AddIncomingGrainCallFilter<TImplementation>());
-        }
+    /// <summary>
+    /// Adds an <see cref="IIncomingGrainCallFilter"/> to the filter pipeline.
+    /// </summary>
+    /// <typeparam name="TImplementation">The filter implementation type.</typeparam>
+    /// <param name="builder">The builder.</param>
+    /// <returns>The builder.</returns>
+    public static ISiloBuilder AddIncomingGrainCallFilter<TImplementation>(this ISiloBuilder builder)
+        where TImplementation : class, IIncomingGrainCallFilter
+    {
+        return builder.ConfigureServices(services => services.AddIncomingGrainCallFilter<TImplementation>());
+    }
 
-        /// <summary>
-        /// Adds an <see cref="IIncomingGrainCallFilter"/> to the filter pipeline via a delegate.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="filter">The filter.</param>
-        /// <returns>The builder.</returns>
-        public static ISiloBuilder AddIncomingGrainCallFilter(this ISiloBuilder builder, IncomingGrainCallFilterDelegate filter)
-        {
-            return builder.ConfigureServices(services => services.AddIncomingGrainCallFilter(filter));
-        }
+    /// <summary>
+    /// Adds an <see cref="IIncomingGrainCallFilter"/> to the filter pipeline via a delegate.
+    /// </summary>
+    /// <param name="builder">The builder.</param>
+    /// <param name="filter">The filter.</param>
+    /// <returns>The builder.</returns>
+    public static ISiloBuilder AddIncomingGrainCallFilter(this ISiloBuilder builder, IncomingGrainCallFilterDelegate filter)
+    {
+        return builder.ConfigureServices(services => services.AddIncomingGrainCallFilter(filter));
+    }
 
-        /// <summary>
-        /// Adds an <see cref="IOutgoingGrainCallFilter"/> to the filter pipeline.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="filter">The filter.</param>
-        /// <returns>The builder.</returns>
-        public static ISiloBuilder AddOutgoingGrainCallFilter(this ISiloBuilder builder, IOutgoingGrainCallFilter filter)
-        {
-            return builder.ConfigureServices(services => services.AddOutgoingGrainCallFilter(filter));
-        }
+    /// <summary>
+    /// Adds an <see cref="IOutgoingGrainCallFilter"/> to the filter pipeline.
+    /// </summary>
+    /// <param name="builder">The builder.</param>
+    /// <param name="filter">The filter.</param>
+    /// <returns>The builder.</returns>
+    public static ISiloBuilder AddOutgoingGrainCallFilter(this ISiloBuilder builder, IOutgoingGrainCallFilter filter)
+    {
+        return builder.ConfigureServices(services => services.AddOutgoingGrainCallFilter(filter));
+    }
 
-        /// <summary>
-        /// Adds an <see cref="IOutgoingGrainCallFilter"/> to the filter pipeline.
-        /// </summary>
-        /// <typeparam name="TImplementation">The filter implementation type.</typeparam>
-        /// <param name="builder">The builder.</param>
-        /// <returns>The builder.</returns>
-        public static ISiloBuilder AddOutgoingGrainCallFilter<TImplementation>(this ISiloBuilder builder)
-            where TImplementation : class, IOutgoingGrainCallFilter
-        {
-            return builder.ConfigureServices(services => services.AddOutgoingGrainCallFilter<TImplementation>());
-        }
+    /// <summary>
+    /// Adds an <see cref="IOutgoingGrainCallFilter"/> to the filter pipeline.
+    /// </summary>
+    /// <typeparam name="TImplementation">The filter implementation type.</typeparam>
+    /// <param name="builder">The builder.</param>
+    /// <returns>The builder.</returns>
+    public static ISiloBuilder AddOutgoingGrainCallFilter<TImplementation>(this ISiloBuilder builder)
+        where TImplementation : class, IOutgoingGrainCallFilter
+    {
+        return builder.ConfigureServices(services => services.AddOutgoingGrainCallFilter<TImplementation>());
+    }
 
-        /// <summary>
-        /// Adds an <see cref="IOutgoingGrainCallFilter"/> to the filter pipeline via a delegate.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="filter">The filter.</param>
-        /// <returns>The builder.</returns>
-        public static ISiloBuilder AddOutgoingGrainCallFilter(this ISiloBuilder builder, OutgoingGrainCallFilterDelegate filter)
-        {
-            return builder.ConfigureServices(services => services.AddOutgoingGrainCallFilter(filter));
-        }
+    /// <summary>
+    /// Adds an <see cref="IOutgoingGrainCallFilter"/> to the filter pipeline via a delegate.
+    /// </summary>
+    /// <param name="builder">The builder.</param>
+    /// <param name="filter">The filter.</param>
+    /// <returns>The builder.</returns>
+    public static ISiloBuilder AddOutgoingGrainCallFilter(this ISiloBuilder builder, OutgoingGrainCallFilterDelegate filter)
+    {
+        return builder.ConfigureServices(services => services.AddOutgoingGrainCallFilter(filter));
     }
 }

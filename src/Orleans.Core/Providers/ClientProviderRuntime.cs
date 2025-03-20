@@ -1,45 +1,44 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Providers
+namespace Orleans.Providers;
+
+/// <summary>
+/// <see cref="IProviderRuntime"/> for clients.
+/// </summary>
+/// <seealso cref="Orleans.Providers.IProviderRuntime" />
+internal class ClientProviderRuntime : IProviderRuntime
 {
+    private readonly IInternalGrainFactory grainFactory;
+    private readonly ClientGrainContext clientContext;
+
     /// <summary>
-    /// <see cref="IProviderRuntime"/> for clients.
+    /// Initializes a new instance of the <see cref="ClientProviderRuntime"/> class.
     /// </summary>
-    /// <seealso cref="Orleans.Providers.IProviderRuntime" />
-    internal class ClientProviderRuntime : IProviderRuntime
+    /// <param name="grainFactory">The grain factory.</param>
+    /// <param name="serviceProvider">The service provider.</param>
+    /// <param name="clientContext">The client context.</param>
+    public ClientProviderRuntime(
+        IInternalGrainFactory grainFactory,
+        IServiceProvider serviceProvider,
+        ClientGrainContext clientContext)
     {
-        private readonly IInternalGrainFactory grainFactory;
-        private readonly ClientGrainContext clientContext;
+        this.grainFactory = grainFactory;
+        this.ServiceProvider = serviceProvider;
+        this.clientContext = clientContext;
+    }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ClientProviderRuntime"/> class.
-        /// </summary>
-        /// <param name="grainFactory">The grain factory.</param>
-        /// <param name="serviceProvider">The service provider.</param>
-        /// <param name="clientContext">The client context.</param>
-        public ClientProviderRuntime(
-            IInternalGrainFactory grainFactory,
-            IServiceProvider serviceProvider,
-            ClientGrainContext clientContext)
-        {
-            this.grainFactory = grainFactory;
-            this.ServiceProvider = serviceProvider;
-            this.clientContext = clientContext;
-        }
+    /// <inheritdoc/>
+    public IGrainFactory GrainFactory => this.grainFactory;
 
-        /// <inheritdoc/>
-        public IGrainFactory GrainFactory => this.grainFactory;
+    /// <inheritdoc/>
+    public IServiceProvider ServiceProvider { get; }
 
-        /// <inheritdoc/>
-        public IServiceProvider ServiceProvider { get; }
-
-        /// <inheritdoc/>
-        public (TExtension Extension, TExtensionInterface ExtensionReference) BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
-            where TExtension : class, TExtensionInterface
-            where TExtensionInterface : class, IGrainExtension
-        {
-            return this.clientContext.GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
-        }
+    /// <inheritdoc/>
+    public (TExtension Extension, TExtensionInterface ExtensionReference) BindExtension<TExtension, TExtensionInterface>(Func<TExtension> newExtensionFunc)
+        where TExtension : class, TExtensionInterface
+        where TExtensionInterface : class, IGrainExtension
+    {
+        return this.clientContext.GetOrSetExtension<TExtension, TExtensionInterface>(newExtensionFunc);
     }
 }

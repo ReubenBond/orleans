@@ -10,62 +10,61 @@ using TestExtensions.Runners;
 using UnitTests.General;
 using Xunit.Abstractions;
 
-namespace Tester.AdoNet.Persistence
+namespace Tester.AdoNet.Persistence;
+
+[TestCategory("Persistence"), TestCategory("SqlServer")]
+public class PersistenceGrainTests_SqlServer : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_SqlServer.Fixture>
 {
-    [TestCategory("Persistence"), TestCategory("SqlServer")]
-    public class PersistenceGrainTests_SqlServer : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_SqlServer.Fixture>
+    public const string TestDatabaseName = "OrleansTest_SqlServer_Storage";
+    public static string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
+    public static Guid ServiceId = Guid.NewGuid();
+    public static string ConnectionStringKey = "AdoNetConnectionString";
+    public class Fixture : BaseTestClusterFixture
     {
-        public const string TestDatabaseName = "OrleansTest_SqlServer_Storage";
-        public static string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
-        public static Guid ServiceId = Guid.NewGuid();
-        public static string ConnectionStringKey = "AdoNetConnectionString";
-        public class Fixture : BaseTestClusterFixture
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.Options.InitialSilosCount = 4;
-                builder.Options.UseTestClusterMembership = false;
-                var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName).Result;
-                builder.ConfigureHostConfiguration(configBuilder => configBuilder.AddInMemoryCollection(
-                    new Dictionary<string, string>
-                    {
-                        {ConnectionStringKey, relationalStorage.CurrentConnectionString}
-                    }));
-                builder.Options.ServiceId = ServiceId.ToString();
-                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-                builder.AddClientBuilderConfigurator<GatewayConnectionTests.ClientBuilderConfigurator>();
-            }
-
-            private class MySiloBuilderConfigurator : IHostConfigurator
-            {
-                public void Configure(IHostBuilder hostBuilder)
+            builder.Options.InitialSilosCount = 4;
+            builder.Options.UseTestClusterMembership = false;
+            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName).Result;
+            builder.ConfigureHostConfiguration(configBuilder => configBuilder.AddInMemoryCollection(
+                new Dictionary<string, string>
                 {
-                    var connectionString = hostBuilder.GetConfiguration()[ConnectionStringKey];
-                    hostBuilder.UseOrleans((ctx, siloBuilder) =>
-                    {
-                        siloBuilder
-                            .UseAdoNetClustering(options =>
-                            {
-                                options.ConnectionString = connectionString;
-                                options.Invariant = AdoInvariant;
-                            })
-                            .AddAdoNetGrainStorage("GrainStorageForTest", options =>
-                            {
-                                options.ConnectionString = (string)connectionString;
-                                options.Invariant = AdoInvariant;
-                            })
-                            .AddMemoryGrainStorage("MemoryStore");
-                    });
-                }
+                    {ConnectionStringKey, relationalStorage.CurrentConnectionString}
+                }));
+            builder.Options.ServiceId = ServiceId.ToString();
+            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<GatewayConnectionTests.ClientBuilderConfigurator>();
+        }
+
+        private class MySiloBuilderConfigurator : IHostConfigurator
+        {
+            public void Configure(IHostBuilder hostBuilder)
+            {
+                var connectionString = hostBuilder.GetConfiguration()[ConnectionStringKey];
+                hostBuilder.UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder
+                        .UseAdoNetClustering(options =>
+                        {
+                            options.ConnectionString = connectionString;
+                            options.Invariant = AdoInvariant;
+                        })
+                        .AddAdoNetGrainStorage("GrainStorageForTest", options =>
+                        {
+                            options.ConnectionString = (string)connectionString;
+                            options.Invariant = AdoInvariant;
+                        })
+                        .AddMemoryGrainStorage("MemoryStore");
+                });
             }
         }
+    }
 
-        private readonly Fixture fixture;
+    private readonly Fixture fixture;
 
-        public PersistenceGrainTests_SqlServer(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
-        {
-            this.fixture = fixture;
-            this.fixture.EnsurePreconditionsMet();
-        }
+    public PersistenceGrainTests_SqlServer(ITestOutputHelper output, Fixture fixture) : base(output, fixture)
+    {
+        this.fixture = fixture;
+        this.fixture.EnsurePreconditionsMet();
     }
 }

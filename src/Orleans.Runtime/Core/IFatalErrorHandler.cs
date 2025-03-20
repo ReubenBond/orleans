@@ -1,26 +1,25 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Runtime
+namespace Orleans.Runtime;
+
+/// <summary>
+/// Interface for controlling how fatal errors (such as a silo being declared defunct) are handled.
+/// </summary>
+public interface IFatalErrorHandler
 {
     /// <summary>
-    /// Interface for controlling how fatal errors (such as a silo being declared defunct) are handled.
+    /// Determines whether the specified exception is unexpected.
     /// </summary>
-    public interface IFatalErrorHandler
-    {
-        /// <summary>
-        /// Determines whether the specified exception is unexpected.
-        /// </summary>
-        /// <param name="exception">The exception.</param>
-        /// <returns><see langword="true"/> if the specified exception is unexpected; otherwise, <see langword="false"/>.</returns>
-        bool IsUnexpected(Exception exception);
+    /// <param name="exception">The exception.</param>
+    /// <returns><see langword="true"/> if the specified exception is unexpected; otherwise, <see langword="false"/>.</returns>
+    bool IsUnexpected(Exception exception);
 
-        /// <summary>
-        /// Called when a fatal exception occurs.
-        /// </summary>
-        /// <param name="sender">The sender.</param>
-        /// <param name="context">The context.</param>
-        /// <param name="exception">The exception.</param>
-        void OnFatalException(object sender = null, string context = null, Exception exception = null);
-    }
+    /// <summary>
+    /// Called when a fatal exception occurs.
+    /// </summary>
+    /// <param name="sender">The sender.</param>
+    /// <param name="context">The context.</param>
+    /// <param name="exception">The exception.</param>
+    void OnFatalException(object sender = null, string context = null, Exception exception = null);
 }

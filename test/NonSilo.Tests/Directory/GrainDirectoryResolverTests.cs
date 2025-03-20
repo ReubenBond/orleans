@@ -14,56 +14,55 @@ using UnitTests.Grains.Directories;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace NonSilo.Tests.Directory
+namespace NonSilo.Tests.Directory;
+
+[TestCategory("BVT"), TestCategory("Directory")]
+public class GrainDirectoryResolverTests
 {
-    [TestCategory("BVT"), TestCategory("Directory")]
-    public class GrainDirectoryResolverTests
+    private readonly IGrainDirectory azureDirectory = Substitute.For<IGrainDirectory>();
+    private readonly IGrainDirectory otherDirectory = Substitute.For<IGrainDirectory>();
+    private readonly IGrainDirectory againAnotherDirectory = Substitute.For<IGrainDirectory>();
+    private readonly IHost host;
+    private readonly GrainDirectoryResolver target;
+
+    public GrainDirectoryResolverTests(ITestOutputHelper output)
     {
-        private readonly IGrainDirectory azureDirectory = Substitute.For<IGrainDirectory>();
-        private readonly IGrainDirectory otherDirectory = Substitute.For<IGrainDirectory>();
-        private readonly IGrainDirectory againAnotherDirectory = Substitute.For<IGrainDirectory>();
-        private readonly IHost host;
-        private readonly GrainDirectoryResolver target;
+        this.azureDirectory = Substitute.For<IGrainDirectory>();
 
-        public GrainDirectoryResolverTests(ITestOutputHelper output)
+        var hostBuilder = new HostBuilder();
+        hostBuilder.UseOrleans((ctx, siloBuilder) =>
         {
-            this.azureDirectory = Substitute.For<IGrainDirectory>();
+            siloBuilder
+                .AddGrainDirectory(CustomDirectoryGrain.DIRECTORY, (sp, nameof) => this.azureDirectory)
+                .AddGrainDirectory("OtherDirectory", (sp, nameof) => this.otherDirectory)
+                .AddGrainDirectory("AgainAnotherDirectory", (sp, nameof) => this.againAnotherDirectory)
+                .ConfigureLogging(builder => builder.AddProvider(new XunitLoggerProvider(output)))
+                .UseLocalhostClustering();
+        });
 
-            var hostBuilder = new HostBuilder();
-            hostBuilder.UseOrleans((ctx, siloBuilder) =>
-            {
-                siloBuilder
-                    .AddGrainDirectory(CustomDirectoryGrain.DIRECTORY, (sp, nameof) => this.azureDirectory)
-                    .AddGrainDirectory("OtherDirectory", (sp, nameof) => this.otherDirectory)
-                    .AddGrainDirectory("AgainAnotherDirectory", (sp, nameof) => this.againAnotherDirectory)
-                    .ConfigureLogging(builder => builder.AddProvider(new XunitLoggerProvider(output)))
-                    .UseLocalhostClustering();
-            });
+        this.host = hostBuilder.Build();
 
-            this.host = hostBuilder.Build();
+        this.target = host.Services.GetRequiredService<GrainDirectoryResolver>();
+    }
 
-            this.target = host.Services.GetRequiredService<GrainDirectoryResolver>();
-        }
+    [Fact]
+    public void UserProvidedDirectory()
+    {
+        var grainId = host.Services.GetRequiredService<IGrainFactory>().GetGrain<ICustomDirectoryGrain>(Guid.NewGuid()).GetGrainId();
+        Assert.Same(this.azureDirectory, this.target.Resolve(grainId.Type));
+    }
 
-        [Fact]
-        public void UserProvidedDirectory()
-        {
-            var grainId = host.Services.GetRequiredService<IGrainFactory>().GetGrain<ICustomDirectoryGrain>(Guid.NewGuid()).GetGrainId();
-            Assert.Same(this.azureDirectory, this.target.Resolve(grainId.Type));
-        }
+    [Fact]
+    public void DefaultDhtDirectory()
+    {
+        Assert.Null(this.target.Resolve(GrainType.Create(DefaultDirectoryGrain.DIRECTORY)));
+    }
 
-        [Fact]
-        public void DefaultDhtDirectory()
-        {
-            Assert.Null(this.target.Resolve(GrainType.Create(DefaultDirectoryGrain.DIRECTORY)));
-        }
-
-        [Fact]
-        public void ListAllDirectories()
-        {
-            
-            var expected = new[] { this.azureDirectory, this.otherDirectory, this.againAnotherDirectory };
-            Assert.Equal(expected, this.target.Directories.ToArray());
-        }
+    [Fact]
+    public void ListAllDirectories()
+    {
+        
+        var expected = new[] { this.azureDirectory, this.otherDirectory, this.againAnotherDirectory };
+        Assert.Equal(expected, this.target.Directories.ToArray());
     }
 }

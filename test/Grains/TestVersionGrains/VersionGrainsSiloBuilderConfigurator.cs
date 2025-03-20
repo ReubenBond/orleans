@@ -8,31 +8,30 @@ using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 
-namespace TestVersionGrains
+namespace TestVersionGrains;
+
+public class VersionGrainsSiloBuilderConfigurator : IHostConfigurator
 {
-    public class VersionGrainsSiloBuilderConfigurator : IHostConfigurator
+    public void Configure(IHostBuilder hostBuilder)
     {
-        public void Configure(IHostBuilder hostBuilder)
+        var cfg = hostBuilder.GetConfiguration();
+        var siloCount = int.Parse(cfg["SiloCount"]);
+        hostBuilder.UseOrleans((ctx, siloBuilder) =>
         {
-            var cfg = hostBuilder.GetConfiguration();
-            var siloCount = int.Parse(cfg["SiloCount"]);
-            hostBuilder.UseOrleans((ctx, siloBuilder) =>
+            siloBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
+            siloBuilder.Configure<GrainVersioningOptions>(options =>
             {
-                siloBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = false);
-                siloBuilder.Configure<GrainVersioningOptions>(options =>
-                {
-                    options.DefaultCompatibilityStrategy = cfg["CompatibilityStrategy"];
-                    options.DefaultVersionSelectorStrategy = cfg["VersionSelectorStrategy"];
-                });
-
-                siloBuilder.ConfigureServices(ConfigureServices)
-                    .AddMemoryGrainStorageAsDefault();
+                options.DefaultCompatibilityStrategy = cfg["CompatibilityStrategy"];
+                options.DefaultVersionSelectorStrategy = cfg["VersionSelectorStrategy"];
             });
-        }
 
-        private void ConfigureServices(IServiceCollection services)
-        {
-            services.AddPlacementDirector<VersionAwarePlacementStrategy, VersionAwarePlacementDirector>();
-        }
+            siloBuilder.ConfigureServices(ConfigureServices)
+                .AddMemoryGrainStorageAsDefault();
+        });
+    }
+
+    private void ConfigureServices(IServiceCollection services)
+    {
+        services.AddPlacementDirector<VersionAwarePlacementStrategy, VersionAwarePlacementDirector>();
     }
 }

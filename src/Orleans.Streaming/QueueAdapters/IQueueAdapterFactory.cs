@@ -1,36 +1,35 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Streams
+namespace Orleans.Streams;
+
+/// <summary>
+/// Adapter factory. This should create an adapter from the stream provider configuration
+/// </summary>
+public interface IQueueAdapterFactory
 {
     /// <summary>
-    /// Adapter factory. This should create an adapter from the stream provider configuration
+    /// Creates a queue adapter.
     /// </summary>
-    public interface IQueueAdapterFactory
-    {
-        /// <summary>
-        /// Creates a queue adapter.
-        /// </summary>
-        /// <returns>The queue adapter</returns>
-        Task<IQueueAdapter> CreateAdapter();
+    /// <returns>The queue adapter</returns>
+    Task<IQueueAdapter> CreateAdapter();
 
-        /// <summary>
-        /// Creates queue message cache adapter.
-        /// </summary>
-        /// <returns>The queue adapter cache.</returns>
-        IQueueAdapterCache GetQueueAdapterCache();
+    /// <summary>
+    /// Creates queue message cache adapter.
+    /// </summary>
+    /// <returns>The queue adapter cache.</returns>
+    IQueueAdapterCache GetQueueAdapterCache();
 
-        /// <summary>
-        /// Creates a queue mapper.
-        /// </summary>
-        /// <returns>The queue mapper.</returns>
-        IStreamQueueMapper GetStreamQueueMapper();
+    /// <summary>
+    /// Creates a queue mapper.
+    /// </summary>
+    /// <returns>The queue mapper.</returns>
+    IStreamQueueMapper GetStreamQueueMapper();
 
-        /// <summary>
-        /// Acquire delivery failure handler for a queue
-        /// </summary>
-        /// <param name="queueId">The queue identifier.</param>
-        /// <returns>The stream failure handler.</returns>
-        Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId);
-    }
+    /// <summary>
+    /// Acquire delivery failure handler for a queue
+    /// </summary>
+    /// <param name="queueId">The queue identifier.</param>
+    /// <returns>The stream failure handler.</returns>
+    Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId);
 }

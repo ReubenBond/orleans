@@ -1,11 +1,10 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Transactions.TestKit
+namespace Orleans.Transactions.TestKit;
+
+public interface ITransactionFaultInjector
 {
-    public interface ITransactionFaultInjector
-    {
-        void BeforeStore();
-        void AfterStore();
-    }
+    void BeforeStore();
+    void AfterStore();
 }

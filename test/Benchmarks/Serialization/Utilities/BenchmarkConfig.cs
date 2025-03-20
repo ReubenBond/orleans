@@ -5,16 +5,15 @@ using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Exporters;
 
-namespace Benchmarks.Utilities
+namespace Benchmarks.Utilities;
+
+internal class BenchmarkConfig : ManualConfig
 {
-    internal class BenchmarkConfig : ManualConfig
+    public BenchmarkConfig()
     {
-        public BenchmarkConfig()
-        {
-            ArtifactsPath = ".\\BenchmarkDotNet.Aritfacts." + DateTime.Now.ToString("u").Replace(' ', '_').Replace(':', '-');
-            AddExporter(MarkdownExporter.GitHub);
-            AddDiagnoser(MemoryDiagnoser.Default);
-            Options |= ConfigOptions.KeepBenchmarkFiles;
-        }
+        ArtifactsPath = ".\\BenchmarkDotNet.Aritfacts." + DateTime.Now.ToString("u").Replace(' ', '_').Replace(':', '-');
+        AddExporter(MarkdownExporter.GitHub);
+        AddDiagnoser(MemoryDiagnoser.Default);
+        Options |= ConfigOptions.KeepBenchmarkFiles;
     }
 }

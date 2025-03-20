@@ -1,80 +1,79 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Runtime.ReminderService
+namespace Orleans.Runtime.ReminderService;
+
+internal sealed class InMemoryReminderTable : IReminderTable, ILifecycleParticipant<ISiloLifecycle>
 {
-    internal sealed class InMemoryReminderTable : IReminderTable, ILifecycleParticipant<ISiloLifecycle>
+    internal const long ReminderTableGrainId = 12345;
+    private readonly IReminderTableGrain reminderTableGrain;
+    private bool isAvailable;
+
+    public InMemoryReminderTable(IGrainFactory grainFactory)
     {
-        internal const long ReminderTableGrainId = 12345;
-        private readonly IReminderTableGrain reminderTableGrain;
-        private bool isAvailable;
+        this.reminderTableGrain = grainFactory.GetGrain<IReminderTableGrain>(ReminderTableGrainId);
+    }
 
-        public InMemoryReminderTable(IGrainFactory grainFactory)
+    public Task Init() => Task.CompletedTask;
+
+    public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+    {
+        this.ThrowIfNotAvailable();
+        return this.reminderTableGrain.ReadRow(grainId, reminderName);
+    }
+
+    public Task<ReminderTableData> ReadRows(GrainId grainId)
+    {
+        this.ThrowIfNotAvailable();
+        return this.reminderTableGrain.ReadRows(grainId);
+    }
+
+    public Task<ReminderTableData> ReadRows(uint begin, uint end)
+    {
+        return this.isAvailable ? this.reminderTableGrain.ReadRows(begin, end) : Task.FromResult(new ReminderTableData());
+    }
+
+    public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+    {
+        this.ThrowIfNotAvailable();
+        return this.reminderTableGrain.RemoveRow(grainId, reminderName, eTag);
+    }
+
+    public Task TestOnlyClearTable()
+    {
+        this.ThrowIfNotAvailable();
+        return this.reminderTableGrain.TestOnlyClearTable();
+    }
+
+    public Task<string> UpsertRow(ReminderEntry entry)
+    {
+        this.ThrowIfNotAvailable();
+        return this.reminderTableGrain.UpsertRow(entry);
+    }
+
+    private void ThrowIfNotAvailable()
+    {
+        if (!this.isAvailable) throw new InvalidOperationException("The reminder service is not currently available.");
+    }
+
+    void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+    {
+        Task OnApplicationServicesStart(CancellationToken ct)
         {
-            this.reminderTableGrain = grainFactory.GetGrain<IReminderTableGrain>(ReminderTableGrainId);
+            this.isAvailable = true;
+            return Task.CompletedTask;
         }
 
-        public Task Init() => Task.CompletedTask;
-
-        public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
+        Task OnApplicationServicesStop(CancellationToken ct)
         {
-            this.ThrowIfNotAvailable();
-            return this.reminderTableGrain.ReadRow(grainId, reminderName);
+            this.isAvailable = false;
+            return Task.CompletedTask;
         }
 
-        public Task<ReminderTableData> ReadRows(GrainId grainId)
-        {
-            this.ThrowIfNotAvailable();
-            return this.reminderTableGrain.ReadRows(grainId);
-        }
-
-        public Task<ReminderTableData> ReadRows(uint begin, uint end)
-        {
-            return this.isAvailable ? this.reminderTableGrain.ReadRows(begin, end) : Task.FromResult(new ReminderTableData());
-        }
-
-        public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
-        {
-            this.ThrowIfNotAvailable();
-            return this.reminderTableGrain.RemoveRow(grainId, reminderName, eTag);
-        }
-
-        public Task TestOnlyClearTable()
-        {
-            this.ThrowIfNotAvailable();
-            return this.reminderTableGrain.TestOnlyClearTable();
-        }
-
-        public Task<string> UpsertRow(ReminderEntry entry)
-        {
-            this.ThrowIfNotAvailable();
-            return this.reminderTableGrain.UpsertRow(entry);
-        }
-
-        private void ThrowIfNotAvailable()
-        {
-            if (!this.isAvailable) throw new InvalidOperationException("The reminder service is not currently available.");
-        }
-
-        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
-        {
-            Task OnApplicationServicesStart(CancellationToken ct)
-            {
-                this.isAvailable = true;
-                return Task.CompletedTask;
-            }
-
-            Task OnApplicationServicesStop(CancellationToken ct)
-            {
-                this.isAvailable = false;
-                return Task.CompletedTask;
-            }
-
-            lifecycle.Subscribe(
-                nameof(InMemoryReminderTable),
-                ServiceLifecycleStage.ApplicationServices,
-                OnApplicationServicesStart,
-                OnApplicationServicesStop);
-        }
+        lifecycle.Subscribe(
+            nameof(InMemoryReminderTable),
+            ServiceLifecycleStage.ApplicationServices,
+            OnApplicationServicesStart,
+            OnApplicationServicesStop);
     }
 }

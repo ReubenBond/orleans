@@ -7,143 +7,142 @@ using Azure.Storage;
 using Azure.Storage.Queues;
 using Orleans.AzureUtils;
 
-namespace Orleans.Configuration
+namespace Orleans.Configuration;
+
+/// <summary>
+/// Azure queue stream provider options.
+/// </summary>
+public class AzureQueueOptions
 {
+    private QueueServiceClient _queueServiceClient;
+
     /// <summary>
-    /// Azure queue stream provider options.
+    /// Options to be used when configuring the queue storage client, or <see langword="null"/> to use the default options.
     /// </summary>
-    public class AzureQueueOptions
+    [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
+    public QueueClientOptions ClientOptions { get; set; } = new QueueClientOptions
     {
-        private QueueServiceClient _queueServiceClient;
-
-        /// <summary>
-        /// Options to be used when configuring the queue storage client, or <see langword="null"/> to use the default options.
-        /// </summary>
-        [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
-        public QueueClientOptions ClientOptions { get; set; } = new QueueClientOptions
+        Retry =
         {
-            Retry =
-            {
-                Mode = RetryMode.Fixed,
-                Delay = AzureQueueDefaultPolicies.PauseBetweenQueueOperationRetries,
-                MaxRetries = AzureQueueDefaultPolicies.MaxQueueOperationRetries,
-                NetworkTimeout = AzureQueueDefaultPolicies.QueueOperationTimeout,
-            }
-        };
-
-        /// <summary>
-        /// The optional delegate used to create a <see cref="QueueServiceClient"/> instance.
-        /// </summary>
-        internal Func<Task<QueueServiceClient>> CreateClient { get; private set; }
-
-        public TimeSpan? MessageVisibilityTimeout { get; set; }
-
-        public List<string> QueueNames { get; set; }
-
-        /// <summary>
-        /// Gets or sets the <see cref="QueueServiceClient"/> used to access the Azure Queue Service.
-        /// </summary>
-        public QueueServiceClient QueueServiceClient
-        {
-            get => _queueServiceClient;
-
-            set
-            {
-                _queueServiceClient = value;
-                CreateClient = () => Task.FromResult(value);
-            }
+            Mode = RetryMode.Fixed,
+            Delay = AzureQueueDefaultPolicies.PauseBetweenQueueOperationRetries,
+            MaxRetries = AzureQueueDefaultPolicies.MaxQueueOperationRetries,
+            NetworkTimeout = AzureQueueDefaultPolicies.QueueOperationTimeout,
         }
+    };
 
-        /// <summary>
-        /// Configures the <see cref="QueueServiceClient"/> using a connection string.
-        /// </summary>
-        [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
-        public void ConfigureQueueServiceClient(string connectionString)
-        {
-            if (string.IsNullOrWhiteSpace(connectionString)) throw new ArgumentNullException(nameof(connectionString));
-            CreateClient = () => Task.FromResult(new QueueServiceClient(connectionString, ClientOptions));
-        }
+    /// <summary>
+    /// The optional delegate used to create a <see cref="QueueServiceClient"/> instance.
+    /// </summary>
+    internal Func<Task<QueueServiceClient>> CreateClient { get; private set; }
 
-        /// <summary>
-        /// Configures the <see cref="QueueServiceClient"/> using an authenticated service URI.
-        /// </summary>
-        [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
-        public void ConfigureQueueServiceClient(Uri serviceUri)
-        {
-            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
-            CreateClient = () => Task.FromResult(new QueueServiceClient(serviceUri, ClientOptions));
-        }
+    public TimeSpan? MessageVisibilityTimeout { get; set; }
 
-        /// <summary>
-        /// Configures the <see cref="QueueServiceClient"/> using the provided callback.
-        /// </summary>
-        [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
-        public void ConfigureQueueServiceClient(Func<Task<QueueServiceClient>> createClientCallback)
-        {
-            CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
-        }
+    public List<string> QueueNames { get; set; }
 
-        /// <summary>
-        /// Configures the <see cref="QueueServiceClient"/> using an authenticated service URI and a <see cref="Azure.Core.TokenCredential"/>.
-        /// </summary>
-        [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
-        public void ConfigureQueueServiceClient(Uri serviceUri, TokenCredential tokenCredential)
-        {
-            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
-            if (tokenCredential is null) throw new ArgumentNullException(nameof(tokenCredential));
-            CreateClient = () => Task.FromResult(new QueueServiceClient(serviceUri, tokenCredential, ClientOptions));
-        }
+    /// <summary>
+    /// Gets or sets the <see cref="QueueServiceClient"/> used to access the Azure Queue Service.
+    /// </summary>
+    public QueueServiceClient QueueServiceClient
+    {
+        get => _queueServiceClient;
 
-        /// <summary>
-        /// Configures the <see cref="QueueServiceClient"/> using an authenticated service URI and a <see cref="Azure.AzureSasCredential"/>.
-        /// </summary>
-        [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
-        public void ConfigureQueueServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)
+        set
         {
-            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
-            if (azureSasCredential is null) throw new ArgumentNullException(nameof(azureSasCredential));
-            CreateClient = () => Task.FromResult(new QueueServiceClient(serviceUri, azureSasCredential, ClientOptions));
-        }
-
-        /// <summary>
-        /// Configures the <see cref="QueueServiceClient"/> using an authenticated service URI and a <see cref="StorageSharedKeyCredential"/>.
-        /// </summary>
-        [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
-        public void ConfigureQueueServiceClient(Uri serviceUri, StorageSharedKeyCredential sharedKeyCredential)
-        {
-            if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
-            if (sharedKeyCredential is null) throw new ArgumentNullException(nameof(sharedKeyCredential));
-            CreateClient = () => Task.FromResult(new QueueServiceClient(serviceUri, sharedKeyCredential, ClientOptions));
+            _queueServiceClient = value;
+            CreateClient = () => Task.FromResult(value);
         }
     }
 
-    public class AzureQueueOptionsValidator : IConfigurationValidator
+    /// <summary>
+    /// Configures the <see cref="QueueServiceClient"/> using a connection string.
+    /// </summary>
+    [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
+    public void ConfigureQueueServiceClient(string connectionString)
     {
-        private readonly AzureQueueOptions options;
-        private readonly string name;
+        if (string.IsNullOrWhiteSpace(connectionString)) throw new ArgumentNullException(nameof(connectionString));
+        CreateClient = () => Task.FromResult(new QueueServiceClient(connectionString, ClientOptions));
+    }
 
-        private AzureQueueOptionsValidator(AzureQueueOptions options, string name)
+    /// <summary>
+    /// Configures the <see cref="QueueServiceClient"/> using an authenticated service URI.
+    /// </summary>
+    [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
+    public void ConfigureQueueServiceClient(Uri serviceUri)
+    {
+        if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+        CreateClient = () => Task.FromResult(new QueueServiceClient(serviceUri, ClientOptions));
+    }
+
+    /// <summary>
+    /// Configures the <see cref="QueueServiceClient"/> using the provided callback.
+    /// </summary>
+    [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
+    public void ConfigureQueueServiceClient(Func<Task<QueueServiceClient>> createClientCallback)
+    {
+        CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
+    }
+
+    /// <summary>
+    /// Configures the <see cref="QueueServiceClient"/> using an authenticated service URI and a <see cref="Azure.Core.TokenCredential"/>.
+    /// </summary>
+    [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
+    public void ConfigureQueueServiceClient(Uri serviceUri, TokenCredential tokenCredential)
+    {
+        if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+        if (tokenCredential is null) throw new ArgumentNullException(nameof(tokenCredential));
+        CreateClient = () => Task.FromResult(new QueueServiceClient(serviceUri, tokenCredential, ClientOptions));
+    }
+
+    /// <summary>
+    /// Configures the <see cref="QueueServiceClient"/> using an authenticated service URI and a <see cref="Azure.AzureSasCredential"/>.
+    /// </summary>
+    [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
+    public void ConfigureQueueServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)
+    {
+        if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+        if (azureSasCredential is null) throw new ArgumentNullException(nameof(azureSasCredential));
+        CreateClient = () => Task.FromResult(new QueueServiceClient(serviceUri, azureSasCredential, ClientOptions));
+    }
+
+    /// <summary>
+    /// Configures the <see cref="QueueServiceClient"/> using an authenticated service URI and a <see cref="StorageSharedKeyCredential"/>.
+    /// </summary>
+    [Obsolete($"Set the {nameof(QueueServiceClient)} property directly.")]
+    public void ConfigureQueueServiceClient(Uri serviceUri, StorageSharedKeyCredential sharedKeyCredential)
+    {
+        if (serviceUri is null) throw new ArgumentNullException(nameof(serviceUri));
+        if (sharedKeyCredential is null) throw new ArgumentNullException(nameof(sharedKeyCredential));
+        CreateClient = () => Task.FromResult(new QueueServiceClient(serviceUri, sharedKeyCredential, ClientOptions));
+    }
+}
+
+public class AzureQueueOptionsValidator : IConfigurationValidator
+{
+    private readonly AzureQueueOptions options;
+    private readonly string name;
+
+    private AzureQueueOptionsValidator(AzureQueueOptions options, string name)
+    {
+        this.options = options;
+        this.name = name;
+    }
+
+    public void ValidateConfiguration()
+    {
+        if (this.options.CreateClient is null)
         {
-            this.options = options;
-            this.name = name;
+            throw new OrleansConfigurationException($"No credentials specified. Use the {options.GetType().Name}.{nameof(AzureQueueOptions.ConfigureQueueServiceClient)} method to configure the Azure Queue Service client.");
         }
 
-        public void ValidateConfiguration()
-        {
-            if (this.options.CreateClient is null)
-            {
-                throw new OrleansConfigurationException($"No credentials specified. Use the {options.GetType().Name}.{nameof(AzureQueueOptions.ConfigureQueueServiceClient)} method to configure the Azure Queue Service client.");
-            }
+        if (options.QueueNames == null || options.QueueNames.Count == 0)
+            throw new OrleansConfigurationException(
+                $"{nameof(AzureQueueOptions)} on stream provider {this.name} is invalid. {nameof(AzureQueueOptions.QueueNames)} is invalid");
+    }
 
-            if (options.QueueNames == null || options.QueueNames.Count == 0)
-                throw new OrleansConfigurationException(
-                    $"{nameof(AzureQueueOptions)} on stream provider {this.name} is invalid. {nameof(AzureQueueOptions.QueueNames)} is invalid");
-        }
-
-        public static IConfigurationValidator Create(IServiceProvider services, string name)
-        {
-            AzureQueueOptions aqOptions = services.GetOptionsByName<AzureQueueOptions>(name);
-            return new AzureQueueOptionsValidator(aqOptions, name);
-        }
+    public static IConfigurationValidator Create(IServiceProvider services, string name)
+    {
+        AzureQueueOptions aqOptions = services.GetOptionsByName<AzureQueueOptions>(name);
+        return new AzureQueueOptionsValidator(aqOptions, name);
     }
 }

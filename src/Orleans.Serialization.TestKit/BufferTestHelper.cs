@@ -7,121 +7,120 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 
-namespace Orleans.Serialization.TestKit
+namespace Orleans.Serialization.TestKit;
+
+/// <summary>
+/// Helper for testing buffer types.
+/// </summary>
+[ExcludeFromCodeCoverage]
+internal static class BufferTestHelper<TValue>
 {
-    /// <summary>
-    /// Helper for testing buffer types.
-    /// </summary>
-    [ExcludeFromCodeCoverage]
-    internal static class BufferTestHelper<TValue>
+    public static IBufferTestSerializer[] GetTestSerializers(IServiceProvider serviceProvider, int[] maxSizes)
     {
-        public static IBufferTestSerializer[] GetTestSerializers(IServiceProvider serviceProvider, int[] maxSizes)
+        var result = new List<IBufferTestSerializer>();
+        foreach (var size in maxSizes)
         {
-            var result = new List<IBufferTestSerializer>();
-            foreach (var size in maxSizes)
-            {
-                result.Add(ActivatorUtilities.CreateInstance<MultiSegmentBufferWriterTester>(serviceProvider, new MultiSegmentBufferWriterTester.Options { MaxAllocationSize = size }));
-            }
-
-            result.Add(ActivatorUtilities.CreateInstance<StructBufferWriterTester>(serviceProvider));
-            result.Add(ActivatorUtilities.CreateInstance<PooledBufferWriterTester>(serviceProvider));
-            return result.ToArray();
+            result.Add(ActivatorUtilities.CreateInstance<MultiSegmentBufferWriterTester>(serviceProvider, new MultiSegmentBufferWriterTester.Options { MaxAllocationSize = size }));
         }
 
-        public interface IBufferTestSerializer
+        result.Add(ActivatorUtilities.CreateInstance<StructBufferWriterTester>(serviceProvider));
+        result.Add(ActivatorUtilities.CreateInstance<PooledBufferWriterTester>(serviceProvider));
+        return result.ToArray();
+    }
+
+    public interface IBufferTestSerializer
+    {
+        IOutputBuffer Serialize(TValue input);
+        void Deserialize(ReadOnlySequence<byte> buffer, out TValue output);
+    }
+
+    [ExcludeFromCodeCoverage]
+    private abstract class BufferTester<TBufferWriter> : IBufferTestSerializer where TBufferWriter : IBufferWriter<byte>, IOutputBuffer
+    {
+        private readonly SerializerSessionPool _sessionPool;
+        private readonly Serializer<TValue> _serializer;
+
+        protected BufferTester(IServiceProvider serviceProvider)
         {
-            IOutputBuffer Serialize(TValue input);
-            void Deserialize(ReadOnlySequence<byte> buffer, out TValue output);
+            _sessionPool = serviceProvider.GetRequiredService<SerializerSessionPool>();
+            _serializer = serviceProvider.GetRequiredService<Serializer<TValue>>();
         }
 
-        [ExcludeFromCodeCoverage]
-        private abstract class BufferTester<TBufferWriter> : IBufferTestSerializer where TBufferWriter : IBufferWriter<byte>, IOutputBuffer
+        protected abstract TBufferWriter CreateBufferWriter();
+
+        public IOutputBuffer Serialize(TValue input)
         {
-            private readonly SerializerSessionPool _sessionPool;
-            private readonly Serializer<TValue> _serializer;
-
-            protected BufferTester(IServiceProvider serviceProvider)
-            {
-                _sessionPool = serviceProvider.GetRequiredService<SerializerSessionPool>();
-                _serializer = serviceProvider.GetRequiredService<Serializer<TValue>>();
-            }
-
-            protected abstract TBufferWriter CreateBufferWriter();
-
-            public IOutputBuffer Serialize(TValue input)
-            {
-                using var session = _sessionPool.GetSession();
-                var writer = Writer.Create(CreateBufferWriter(), session);
-                _serializer.Serialize(input, ref writer);
-                return writer.Output;
-            }
-
-            public void Deserialize(ReadOnlySequence<byte> buffer, out TValue output)
-            {
-                using var session = _sessionPool.GetSession();
-                var reader = Reader.Create(buffer, session);
-                output = _serializer.Deserialize(ref reader);
-            }
+            using var session = _sessionPool.GetSession();
+            var writer = Writer.Create(CreateBufferWriter(), session);
+            _serializer.Serialize(input, ref writer);
+            return writer.Output;
         }
 
-        [ExcludeFromCodeCoverage]
-        private class MultiSegmentBufferWriterTester : BufferTester<TestMultiSegmentBufferWriter>
+        public void Deserialize(ReadOnlySequence<byte> buffer, out TValue output)
         {
-            private readonly Options _options;
+            using var session = _sessionPool.GetSession();
+            var reader = Reader.Create(buffer, session);
+            output = _serializer.Deserialize(ref reader);
+        }
+    }
 
-            public MultiSegmentBufferWriterTester(IServiceProvider serviceProvider, Options options) : base(serviceProvider)
-            {
-                _options = options;
-            }
+    [ExcludeFromCodeCoverage]
+    private class MultiSegmentBufferWriterTester : BufferTester<TestMultiSegmentBufferWriter>
+    {
+        private readonly Options _options;
 
-            public class Options
-            {
-                public int MaxAllocationSize { get; set; }
-            }
-
-            protected override TestMultiSegmentBufferWriter CreateBufferWriter() => new(_options.MaxAllocationSize);
-
-            public override string ToString() => $"{nameof(TestMultiSegmentBufferWriter)} {nameof(_options.MaxAllocationSize)}: {_options.MaxAllocationSize}";
+        public MultiSegmentBufferWriterTester(IServiceProvider serviceProvider, Options options) : base(serviceProvider)
+        {
+            _options = options;
         }
 
-        [ExcludeFromCodeCoverage]
-        private class StructBufferWriterTester : BufferTester<TestBufferWriterStruct>
+        public class Options
         {
-            protected override TestBufferWriterStruct CreateBufferWriter() => new(new byte[102400]);
-
-            public StructBufferWriterTester(IServiceProvider serviceProvider) : base(serviceProvider)
-            {
-            }
-
-            public override string ToString() => $"{nameof(TestBufferWriterStruct)}";
+            public int MaxAllocationSize { get; set; }
         }
 
-        private struct PooledOutputBuffer : IBufferWriter<byte>, IOutputBuffer, IDisposable
+        protected override TestMultiSegmentBufferWriter CreateBufferWriter() => new(_options.MaxAllocationSize);
+
+        public override string ToString() => $"{nameof(TestMultiSegmentBufferWriter)} {nameof(_options.MaxAllocationSize)}: {_options.MaxAllocationSize}";
+    }
+
+    [ExcludeFromCodeCoverage]
+    private class StructBufferWriterTester : BufferTester<TestBufferWriterStruct>
+    {
+        protected override TestBufferWriterStruct CreateBufferWriter() => new(new byte[102400]);
+
+        public StructBufferWriterTester(IServiceProvider serviceProvider) : base(serviceProvider)
         {
-            private PooledBuffer _buffer;
-
-            public PooledOutputBuffer()
-            {
-                _buffer = new();
-            }
-
-            public void Advance(int count) => _buffer.Advance(count);
-            public void Dispose() => _buffer.Dispose();
-            public Memory<byte> GetMemory(int sizeHint = 0) => _buffer.GetMemory(sizeHint);
-            public ReadOnlySequence<byte> GetReadOnlySequence(int maxSegmentSize) => _buffer.AsReadOnlySequence();
-            public Span<byte> GetSpan(int sizeHint = 0) => _buffer.GetSpan(sizeHint);
         }
 
-        [ExcludeFromCodeCoverage]
-        private class PooledBufferWriterTester : BufferTester<PooledOutputBuffer>
+        public override string ToString() => $"{nameof(TestBufferWriterStruct)}";
+    }
+
+    private struct PooledOutputBuffer : IBufferWriter<byte>, IOutputBuffer, IDisposable
+    {
+        private PooledBuffer _buffer;
+
+        public PooledOutputBuffer()
         {
-            public PooledBufferWriterTester(IServiceProvider serviceProvider) : base(serviceProvider)
-            {
-            }
-
-            protected override PooledOutputBuffer CreateBufferWriter() => new();
-
-            public override string ToString() => $"{nameof(PooledBufferWriterTester)}";
+            _buffer = new();
         }
+
+        public void Advance(int count) => _buffer.Advance(count);
+        public void Dispose() => _buffer.Dispose();
+        public Memory<byte> GetMemory(int sizeHint = 0) => _buffer.GetMemory(sizeHint);
+        public ReadOnlySequence<byte> GetReadOnlySequence(int maxSegmentSize) => _buffer.AsReadOnlySequence();
+        public Span<byte> GetSpan(int sizeHint = 0) => _buffer.GetSpan(sizeHint);
+    }
+
+    [ExcludeFromCodeCoverage]
+    private class PooledBufferWriterTester : BufferTester<PooledOutputBuffer>
+    {
+        public PooledBufferWriterTester(IServiceProvider serviceProvider) : base(serviceProvider)
+        {
+        }
+
+        protected override PooledOutputBuffer CreateBufferWriter() => new();
+
+        public override string ToString() => $"{nameof(PooledBufferWriterTester)}";
     }
 }

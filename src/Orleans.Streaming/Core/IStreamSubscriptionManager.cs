@@ -1,37 +1,36 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Streams.Core
+namespace Orleans.Streams.Core;
+
+/// <summary>
+/// Functionality for managing stream subscriptions.
+/// </summary>
+public interface IStreamSubscriptionManager
 {
     /// <summary>
-    /// Functionality for managing stream subscriptions.
+    /// Subscribes the specified grain to a stream.
     /// </summary>
-    public interface IStreamSubscriptionManager
-    {
-        /// <summary>
-        /// Subscribes the specified grain to a stream.
-        /// </summary>
-        /// <param name="streamProviderName">Name of the stream provider.</param>
-        /// <param name="streamId">The stream identifier.</param>
-        /// <param name="grainRef">The grain reference.</param>
-        /// <returns>The stream subscription.</returns>
-        Task<StreamSubscription> AddSubscription(string streamProviderName, StreamId streamId, GrainReference grainRef);
+    /// <param name="streamProviderName">Name of the stream provider.</param>
+    /// <param name="streamId">The stream identifier.</param>
+    /// <param name="grainRef">The grain reference.</param>
+    /// <returns>The stream subscription.</returns>
+    Task<StreamSubscription> AddSubscription(string streamProviderName, StreamId streamId, GrainReference grainRef);
 
-        /// <summary>
-        /// Unsubscribes a grain from a stream.
-        /// </summary>
-        /// <param name="streamProviderName">Name of the stream provider.</param>
-        /// <param name="streamId">The stream identifier.</param>
-        /// <param name="subscriptionId">The subscription identifier.</param>
-        /// <returns>A <see cref="Task"/> representing the operation.</returns>
-        Task RemoveSubscription(string streamProviderName, StreamId streamId, Guid subscriptionId);
+    /// <summary>
+    /// Unsubscribes a grain from a stream.
+    /// </summary>
+    /// <param name="streamProviderName">Name of the stream provider.</param>
+    /// <param name="streamId">The stream identifier.</param>
+    /// <param name="subscriptionId">The subscription identifier.</param>
+    /// <returns>A <see cref="Task"/> representing the operation.</returns>
+    Task RemoveSubscription(string streamProviderName, StreamId streamId, Guid subscriptionId);
 
-        /// <summary>
-        /// Gets the subscriptions for a stream.
-        /// </summary>
-        /// <param name="streamProviderName">Name of the stream provider.</param>
-        /// <param name="streamId">The stream identifier.</param>
-        /// <returns>The subscriptions.</returns>
-        Task<IEnumerable<StreamSubscription>> GetSubscriptions(string streamProviderName, StreamId streamId);
-    }
+    /// <summary>
+    /// Gets the subscriptions for a stream.
+    /// </summary>
+    /// <param name="streamProviderName">Name of the stream provider.</param>
+    /// <param name="streamId">The stream identifier.</param>
+    /// <returns>The subscriptions.</returns>
+    Task<IEnumerable<StreamSubscription>> GetSubscriptions(string streamProviderName, StreamId streamId);
 }

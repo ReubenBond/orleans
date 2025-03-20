@@ -1,72 +1,71 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Providers.Streams.Common
+namespace Orleans.Providers.Streams.Common;
+
+/// <summary>
+/// Simple object pool Interface.
+/// Objects allocated should be returned to the pool when disposed.
+/// </summary>
+/// <typeparam name="T"></typeparam>
+public interface IObjectPool<T>
+    where T : IDisposable
 {
     /// <summary>
-    /// Simple object pool Interface.
-    /// Objects allocated should be returned to the pool when disposed.
+    /// Allocates a pooled resource
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    public interface IObjectPool<T>
-        where T : IDisposable
-    {
-        /// <summary>
-        /// Allocates a pooled resource
-        /// </summary>
-        /// <returns></returns>
-        T Allocate();
+    /// <returns></returns>
+    T Allocate();
 
-        /// <summary>
-        /// Returns a resource to the pool
-        /// </summary>
-        /// <param name="resource"></param>
-        void Free(T resource);
+    /// <summary>
+    /// Returns a resource to the pool
+    /// </summary>
+    /// <param name="resource"></param>
+    void Free(T resource);
+}
+
+/// <summary>
+/// Utility class to support pooled objects by allowing them to track the pool they came from and return to it when disposed
+/// </summary>
+/// <typeparam name="T"></typeparam>
+public abstract class PooledResource<T> : IDisposable
+    where T : PooledResource<T>, IDisposable
+{
+    private IObjectPool<T> pool;
+
+    /// <summary>
+    /// Gets the pool to return this resource to upon disposal.
+    /// A pool must set this property upon resource allocation.
+    /// </summary>
+    public IObjectPool<T> Pool { set { pool = value; } }
+
+    /// <summary>
+    /// If this object is to be used in a fixed size object pool, this call should be
+    ///   overridden with the purge implementation that returns the object to the pool.
+    /// </summary>
+    public virtual void SignalPurge()
+    {
+        Dispose();
     }
 
     /// <summary>
-    /// Utility class to support pooled objects by allowing them to track the pool they came from and return to it when disposed
+    /// Returns item to pool.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    public abstract class PooledResource<T> : IDisposable
-        where T : PooledResource<T>, IDisposable
+    public void Dispose()
     {
-        private IObjectPool<T> pool;
-
-        /// <summary>
-        /// Gets the pool to return this resource to upon disposal.
-        /// A pool must set this property upon resource allocation.
-        /// </summary>
-        public IObjectPool<T> Pool { set { pool = value; } }
-
-        /// <summary>
-        /// If this object is to be used in a fixed size object pool, this call should be
-        ///   overridden with the purge implementation that returns the object to the pool.
-        /// </summary>
-        public virtual void SignalPurge()
+        IObjectPool<T> localPool = Interlocked.Exchange(ref pool, null);
+        if (localPool != null)
         {
-            Dispose();
+            OnResetState();
+            localPool.Free((T)this);
         }
+    }
 
-        /// <summary>
-        /// Returns item to pool.
-        /// </summary>
-        public void Dispose()
-        {
-            IObjectPool<T> localPool = Interlocked.Exchange(ref pool, null);
-            if (localPool != null)
-            {
-                OnResetState();
-                localPool.Free((T)this);
-            }
-        }
-
-        /// <summary>
-        /// Notifies the object that it has been purged, so it can reset itself to
-        ///   the state of a newly allocated object.
-        /// </summary>
-        public virtual void OnResetState()
-        {
-        }
+    /// <summary>
+    /// Notifies the object that it has been purged, so it can reset itself to
+    ///   the state of a newly allocated object.
+    /// </summary>
+    public virtual void OnResetState()
+    {
     }
 }

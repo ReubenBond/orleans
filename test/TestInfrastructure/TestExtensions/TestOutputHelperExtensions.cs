@@ -1,13 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Xunit.Abstractions
+namespace Xunit.Abstractions;
+
+public static class TestOutputHelperExtensions
 {
-    public static class TestOutputHelperExtensions
+    public static void WriteLine(this ITestOutputHelper output, object value)
     {
-        public static void WriteLine(this ITestOutputHelper output, object value)
-        {
-            output.WriteLine(value.ToString());
-        }
+        output.WriteLine(value.ToString());
     }
 }

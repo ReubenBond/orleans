@@ -1,57 +1,56 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.TestingHost.Tests.Grains
+namespace Orleans.TestingHost.Tests.Grains;
+
+public interface ISimpleGrain : IGrainWithIntegerKey
 {
-    public interface ISimpleGrain : IGrainWithIntegerKey
+    Task SetA(int a);
+    Task SetB(int b);
+    Task IncrementA();
+    Task<int> GetAxB();
+    Task<int> GetAxB(int a, int b);
+    Task<int> GetA();
+}
+
+/// <summary>
+/// A simple grain that allows to set two arguments and then multiply them.
+/// </summary>
+public class SimpleGrain : Grain, ISimpleGrain
+{
+    protected int A { get; set; }
+    protected int B { get; set; }
+
+    public Task SetA(int a)
     {
-        Task SetA(int a);
-        Task SetB(int b);
-        Task IncrementA();
-        Task<int> GetAxB();
-        Task<int> GetAxB(int a, int b);
-        Task<int> GetA();
+        A = a;
+        return Task.CompletedTask;
     }
 
-    /// <summary>
-    /// A simple grain that allows to set two arguments and then multiply them.
-    /// </summary>
-    public class SimpleGrain : Grain, ISimpleGrain
+    public Task SetB(int b)
     {
-        protected int A { get; set; }
-        protected int B { get; set; }
+        this.B = b;
+        return Task.CompletedTask;
+    }
 
-        public Task SetA(int a)
-        {
-            A = a;
-            return Task.CompletedTask;
-        }
+    public Task IncrementA()
+    {
+        A = A + 1;
+        return Task.CompletedTask;
+    }
 
-        public Task SetB(int b)
-        {
-            this.B = b;
-            return Task.CompletedTask;
-        }
+    public Task<int> GetAxB()
+    {
+        return Task.FromResult(A * B);
+    }
 
-        public Task IncrementA()
-        {
-            A = A + 1;
-            return Task.CompletedTask;
-        }
+    public Task<int> GetAxB(int a, int b)
+    {
+        return Task.FromResult(a * b);
+    }
 
-        public Task<int> GetAxB()
-        {
-            return Task.FromResult(A * B);
-        }
-
-        public Task<int> GetAxB(int a, int b)
-        {
-            return Task.FromResult(a * b);
-        }
-
-        public Task<int> GetA()
-        {
-            return Task.FromResult(A);
-        }
+    public Task<int> GetA()
+    {
+        return Task.FromResult(A);
     }
 }

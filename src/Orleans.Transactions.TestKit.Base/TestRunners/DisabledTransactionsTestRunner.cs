@@ -3,34 +3,33 @@
 
 using FluentAssertions;
 
-namespace Orleans.Transactions.TestKit
+namespace Orleans.Transactions.TestKit;
+
+public abstract class DisabledTransactionsTestRunner : TransactionTestRunnerBase
 {
-    public abstract class DisabledTransactionsTestRunner : TransactionTestRunnerBase
+    protected DisabledTransactionsTestRunner(IGrainFactory grainFactory, Action<string> output)
+    : base(grainFactory, output) { }
+
+    public virtual void TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
     {
-        protected DisabledTransactionsTestRunner(IGrainFactory grainFactory, Action<string> output)
-        : base(grainFactory, output) { }
+        const int delta = 5;
+        ITransactionTestGrain grain = RandomTestGrain(transactionTestGrainClassName);
+        Func<Task> task = ()=>grain.Set(delta);
+        var response = task.Should().ThrowAsync<OrleansTransactionsDisabledException>();
+    }
 
-        public virtual void TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
-        {
-            const int delta = 5;
-            ITransactionTestGrain grain = RandomTestGrain(transactionTestGrainClassName);
-            Func<Task> task = ()=>grain.Set(delta);
-            var response = task.Should().ThrowAsync<OrleansTransactionsDisabledException>();
-        }
+    public virtual void MultiTransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
+    {
+        const int delta = 5;
+        const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions;
 
-        public virtual void MultiTransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName)
-        {
-            const int delta = 5;
-            const int grainCount = TransactionTestConstants.MaxCoordinatedTransactions;
+        List<ITransactionTestGrain> grains =
+            Enumerable.Range(0, grainCount)
+                .Select(i => RandomTestGrain(transactionTestGrainClassName))
+                .ToList();
+        ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
-            List<ITransactionTestGrain> grains =
-                Enumerable.Range(0, grainCount)
-                    .Select(i => RandomTestGrain(transactionTestGrainClassName))
-                    .ToList();
-            ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
-
-            Func<Task> task = () => coordinator.MultiGrainSet(grains, delta);
-            var response = task.Should().ThrowAsync<OrleansTransactionsDisabledException>();
-        }
+        Func<Task> task = () => coordinator.MultiGrainSet(grains, delta);
+        var response = task.Should().ThrowAsync<OrleansTransactionsDisabledException>();
     }
 }

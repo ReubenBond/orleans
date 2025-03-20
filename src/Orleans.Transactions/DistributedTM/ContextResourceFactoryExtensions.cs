@@ -1,28 +1,27 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Transactions
+namespace Orleans.Transactions;
+
+internal class ResourceFactoryRegistry<T> : Dictionary<string, Func<T>> { };
+
+internal static class ContextResourceFactoryExtensions
 {
-    internal class ResourceFactoryRegistry<T> : Dictionary<string, Func<T>> { };
-
-    internal static class ContextResourceFactoryExtensions
+    public static void RegisterResourceFactory<T>(this IGrainContext context, string name, Func<T> factory)
     {
-        public static void RegisterResourceFactory<T>(this IGrainContext context, string name, Func<T> factory)
+        ResourceFactoryRegistry<T> registry = context.GetResourceFactoryRegistry<T>(true);
+        registry[name] = factory;
+    }
+
+    public static ResourceFactoryRegistry<T> GetResourceFactoryRegistry<T>(this IGrainContext context, bool createIfNotExists = false)
+    {
+        ResourceFactoryRegistry<T> result = context.GetComponent<ResourceFactoryRegistry<T>>();
+        if (createIfNotExists && result == null)
         {
-            ResourceFactoryRegistry<T> registry = context.GetResourceFactoryRegistry<T>(true);
-            registry[name] = factory;
+            result = new ResourceFactoryRegistry<T>();
+            context.SetComponent(result);
         }
 
-        public static ResourceFactoryRegistry<T> GetResourceFactoryRegistry<T>(this IGrainContext context, bool createIfNotExists = false)
-        {
-            ResourceFactoryRegistry<T> result = context.GetComponent<ResourceFactoryRegistry<T>>();
-            if (createIfNotExists && result == null)
-            {
-                result = new ResourceFactoryRegistry<T>();
-                context.SetComponent(result);
-            }
-
-            return result;
-        }
+        return result;
     }
 }

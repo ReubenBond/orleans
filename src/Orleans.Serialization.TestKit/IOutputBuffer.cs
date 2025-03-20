@@ -3,10 +3,9 @@
 
 using System.Buffers;
 
-namespace Orleans.Serialization.TestKit
+namespace Orleans.Serialization.TestKit;
+
+public interface IOutputBuffer
 {
-    public interface IOutputBuffer
-    {
-        ReadOnlySequence<byte> GetReadOnlySequence(int maxSegmentSize);
-    }
+    ReadOnlySequence<byte> GetReadOnlySequence(int maxSegmentSize);
 }

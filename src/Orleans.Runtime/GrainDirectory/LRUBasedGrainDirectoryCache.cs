@@ -1,49 +1,48 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Runtime.GrainDirectory
+namespace Orleans.Runtime.GrainDirectory;
+
+internal class LRUBasedGrainDirectoryCache : IGrainDirectoryCache
 {
-    internal class LRUBasedGrainDirectoryCache : IGrainDirectoryCache
+    private static readonly Func<GrainAddress, (GrainAddress Address, int Version), bool> ActivationAddressesMatch = (a, b) => GrainAddress.MatchesGrainIdAndSilo(a, b.Address);
+    private readonly LRU<GrainId, (GrainAddress ActivationAddress, int Version)> cache;
+
+    public LRUBasedGrainDirectoryCache(int maxCacheSize, TimeSpan maxEntryAge) => cache = new(maxCacheSize, maxEntryAge);
+
+    public void AddOrUpdate(GrainAddress activationAddress, int version)
     {
-        private static readonly Func<GrainAddress, (GrainAddress Address, int Version), bool> ActivationAddressesMatch = (a, b) => GrainAddress.MatchesGrainIdAndSilo(a, b.Address);
-        private readonly LRU<GrainId, (GrainAddress ActivationAddress, int Version)> cache;
+        // ignore the version number
+        cache.AddOrUpdate(activationAddress.GrainId, (activationAddress, version));
+    }
 
-        public LRUBasedGrainDirectoryCache(int maxCacheSize, TimeSpan maxEntryAge) => cache = new(maxCacheSize, maxEntryAge);
+    public bool Remove(GrainId key) => cache.RemoveKey(key);
 
-        public void AddOrUpdate(GrainAddress activationAddress, int version)
+    public bool Remove(GrainAddress grainAddress) => cache.TryRemove(grainAddress.GrainId, ActivationAddressesMatch, grainAddress);
+
+    public void Clear() => cache.Clear();
+
+    public bool LookUp(GrainId key, out GrainAddress result, out int version)
+    {
+        if (cache.TryGetValue(key, out var entry))
         {
-            // ignore the version number
-            cache.AddOrUpdate(activationAddress.GrainId, (activationAddress, version));
+            version = entry.Version;
+            result = entry.ActivationAddress;
+            return true;
         }
 
-        public bool Remove(GrainId key) => cache.RemoveKey(key);
+        version = default;
+        result = default;
+        return false;
+    }
 
-        public bool Remove(GrainAddress grainAddress) => cache.TryRemove(grainAddress.GrainId, ActivationAddressesMatch, grainAddress);
-
-        public void Clear() => cache.Clear();
-
-        public bool LookUp(GrainId key, out GrainAddress result, out int version)
+    public IEnumerable<(GrainAddress ActivationAddress, int Version)> KeyValues
+    {
+        get
         {
-            if (cache.TryGetValue(key, out var entry))
+            foreach (var entry in cache)
             {
-                version = entry.Version;
-                result = entry.ActivationAddress;
-                return true;
-            }
-
-            version = default;
-            result = default;
-            return false;
-        }
-
-        public IEnumerable<(GrainAddress ActivationAddress, int Version)> KeyValues
-        {
-            get
-            {
-                foreach (var entry in cache)
-                {
-                    yield return (entry.Value.ActivationAddress, entry.Value.Version);
-                }
+                yield return (entry.Value.ActivationAddress, entry.Value.Version);
             }
         }
     }

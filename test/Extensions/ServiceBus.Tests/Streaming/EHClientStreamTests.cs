@@ -15,88 +15,87 @@ using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace ServiceBus.Tests.StreamingTests
+namespace ServiceBus.Tests.StreamingTests;
+
+[TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
+public class EHClientStreamTests : TestClusterPerTest
 {
-    [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
-    public class EHClientStreamTests : TestClusterPerTest
+    private const string StreamProviderName = "EventHubStreamProvider";
+    private const string StreamNamespace = "StreamNamespace";
+    private const string EHPath = "ehorleanstest";
+    private const string EHConsumerGroup = "orleansnightly";
+
+    private readonly ITestOutputHelper output;
+    private ClientStreamTestRunner runner;
+    public EHClientStreamTests(ITestOutputHelper output)
     {
-        private const string StreamProviderName = "EventHubStreamProvider";
-        private const string StreamNamespace = "StreamNamespace";
-        private const string EHPath = "ehorleanstest";
-        private const string EHConsumerGroup = "orleansnightly";
+        this.output = output;
+    }
 
-        private readonly ITestOutputHelper output;
-        private ClientStreamTestRunner runner;
-        public EHClientStreamTests(ITestOutputHelper output)
-        {
-            this.output = output;
-        }
+    public override async Task InitializeAsync()
+    {
+        await base.InitializeAsync();
+        runner = new ClientStreamTestRunner(this.HostedCluster);
+    }
 
-        public override async Task InitializeAsync()
-        {
-            await base.InitializeAsync();
-            runner = new ClientStreamTestRunner(this.HostedCluster);
-        }
+    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    {
+        TestUtils.CheckForEventHub();
+        builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+        builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
+    }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    private class MySiloBuilderConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder hostBuilder)
         {
-            TestUtils.CheckForEventHub();
-            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
-        }
-
-        private class MySiloBuilderConfigurator : ISiloConfigurator
-        {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder
-                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>
+            hostBuilder
+                .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>
+                {
+                    b.Configure<SiloMessagingOptions>(ob => ob.Configure(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5)));
+                    b.Configure<EventHubOptions>(ob => ob.Configure(options =>
                     {
-                        b.Configure<SiloMessagingOptions>(ob => ob.Configure(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5)));
-                        b.Configure<EventHubOptions>(ob => ob.Configure(options =>
+                        options.ConfigureTestDefaults(EHPath, EHConsumerGroup);
+                    }));
+                    b.ConfigureComponent<AzureTableStreamCheckpointerOptions, IStreamQueueCheckpointerFactory>(
+                        EventHubCheckpointerFactory.CreateFactory,
+                        ob => ob.Configure(options =>
                         {
-                            options.ConfigureTestDefaults(EHPath, EHConsumerGroup);
+                            options.ConfigureTestDefaults();
+                            options.PersistInterval = TimeSpan.FromSeconds(10);
                         }));
-                        b.ConfigureComponent<AzureTableStreamCheckpointerOptions, IStreamQueueCheckpointerFactory>(
-                            EventHubCheckpointerFactory.CreateFactory,
-                            ob => ob.Configure(options =>
-                            {
-                                options.ConfigureTestDefaults();
-                                options.PersistInterval = TimeSpan.FromSeconds(10);
-                            }));
-                    })
-                    .AddMemoryGrainStorage("PubSubStore")
-                    .ConfigureServices(services => services.TryAddSingleton<IEventHubDataAdapter, EventHubDataAdapter>());
-            }
+                })
+                .AddMemoryGrainStorage("PubSubStore")
+                .ConfigureServices(services => services.TryAddSingleton<IEventHubDataAdapter, EventHubDataAdapter>());
         }
+    }
 
-        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+    private class MyClientBuilderConfigurator : IClientBuilderConfigurator
+    {
+        public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
         {
-            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-            {
-                clientBuilder
-                    .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>b
-                        .Configure<EventHubOptions>(ob=>ob.Configure(options =>
-                        {
-                            options.ConfigureTestDefaults(EHPath, EHConsumerGroup);
-                        })))
-                    .ConfigureServices(services => services.TryAddSingleton<IEventHubDataAdapter, EventHubDataAdapter>());
-            }
+            clientBuilder
+                .AddPersistentStreams(StreamProviderName, TestEventHubStreamAdapterFactory.Create, b=>b
+                    .Configure<EventHubOptions>(ob=>ob.Configure(options =>
+                    {
+                        options.ConfigureTestDefaults(EHPath, EHConsumerGroup);
+                    })))
+                .ConfigureServices(services => services.TryAddSingleton<IEventHubDataAdapter, EventHubDataAdapter>());
         }
+    }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5657")]
-        public async Task EHStreamProducerOnDroppedClientTest()
-        {
-            logger.LogInformation("************************ EHStreamProducerOnDroppedClientTest *********************************");
-            await runner.StreamProducerOnDroppedClientTest(StreamProviderName, StreamNamespace);
-        }
+    [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5657")]
+    public async Task EHStreamProducerOnDroppedClientTest()
+    {
+        logger.LogInformation("************************ EHStreamProducerOnDroppedClientTest *********************************");
+        await runner.StreamProducerOnDroppedClientTest(StreamProviderName, StreamNamespace);
+    }
 
-        [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5634")]
-        public async Task EHStreamConsumerOnDroppedClientTest()
-        {
-            logger.LogInformation("************************ EHStreamConsumerOnDroppedClientTest *********************************");
-            await runner.StreamConsumerOnDroppedClientTest(StreamProviderName, StreamNamespace, output,
-                    () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(StreamProviderName), true);
-        }
+    [SkippableFact(Skip="https://github.com/dotnet/orleans/issues/5634")]
+    public async Task EHStreamConsumerOnDroppedClientTest()
+    {
+        logger.LogInformation("************************ EHStreamConsumerOnDroppedClientTest *********************************");
+        await runner.StreamConsumerOnDroppedClientTest(StreamProviderName, StreamNamespace, output,
+                () => TestAzureTableStorageStreamFailureHandler.GetDeliveryFailureCount(StreamProviderName), true);
     }
 }

@@ -11,70 +11,68 @@ using Tester.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Tester.AzureUtils.Streaming
+namespace Tester.AzureUtils.Streaming;
+
+[TestCategory("BVT"), TestCategory("Streaming"), TestCategory("AQStreaming")]
+public class AQProgrammaticSubscribeTest : ProgrammaticSubscribeTestsRunner, IClassFixture<AQProgrammaticSubscribeTest.Fixture>
 {
-    [TestCategory("BVT"), TestCategory("Streaming"), TestCategory("AQStreaming")]
-    public class AQProgrammaticSubscribeTest : ProgrammaticSubscribeTestsRunner, IClassFixture<AQProgrammaticSubscribeTest.Fixture>
+    private const int queueCount = 8;
+    public class Fixture : BaseAzureTestClusterFixture
     {
-        private const int queueCount = 8;
-        public class Fixture : BaseAzureTestClusterFixture
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<TestClusterConfigurator>();
-                builder.AddClientBuilderConfigurator<TestClusterConfigurator>();
-            }
-
-            private class TestClusterConfigurator : ISiloConfigurator, IClientBuilderConfigurator
-            {
-                public void Configure(ISiloBuilder hostBuilder)
-                {
-                    hostBuilder
-                        .AddAzureQueueStreams(StreamProviderName2, ob=>ob.Configure<IOptions<ClusterOptions>>(
-                            (options, dep) =>
-                            {
-                                options.ConfigureTestDefaults();
-                                options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}2", queueCount);
-                        }))
-                        .AddAzureQueueStreams(StreamProviderName, ob => ob.Configure<IOptions<ClusterOptions>>(
-                            (options, dep) =>
-                            {
-                                options.ConfigureTestDefaults();
-                                options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
-                        }));
-                    hostBuilder
-                        .AddMemoryGrainStorageAsDefault()
-                        .AddMemoryGrainStorage("PubSubStore");
-                }
-
-                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.AddStreaming();
-            }
-
-            public override async Task DisposeAsync()
-            {
-                await base.DisposeAsync();
-
-                // Only perform cleanup if this suite was not skipped.
-                try
-                {
-                    TestUtils.CheckForAzureStorage();
-                    await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                        AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), new AzureQueueOptions().ConfigureTestDefaults());
-                    await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                        AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount), new AzureQueueOptions().ConfigureTestDefaults());
-                }
-                catch (SkipException)
-                {
-                    // ignore
-                }
-            }
+            builder.AddSiloBuilderConfigurator<TestClusterConfigurator>();
+            builder.AddClientBuilderConfigurator<TestClusterConfigurator>();
         }
 
-        public AQProgrammaticSubscribeTest(ITestOutputHelper output, Fixture fixture)
-            : base(fixture)
+        private class TestClusterConfigurator : ISiloConfigurator, IClientBuilderConfigurator
         {
-            fixture.EnsurePreconditionsMet();
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder
+                    .AddAzureQueueStreams(StreamProviderName2, ob=>ob.Configure<IOptions<ClusterOptions>>(
+                        (options, dep) =>
+                        {
+                            options.ConfigureTestDefaults();
+                            options.QueueNames = AzureQueueUtilities.GenerateQueueNames($"{dep.Value.ClusterId}2", queueCount);
+                    }))
+                    .AddAzureQueueStreams(StreamProviderName, ob => ob.Configure<IOptions<ClusterOptions>>(
+                        (options, dep) =>
+                        {
+                            options.ConfigureTestDefaults();
+                            options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
+                    }));
+                hostBuilder
+                    .AddMemoryGrainStorageAsDefault()
+                    .AddMemoryGrainStorage("PubSubStore");
+            }
+
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.AddStreaming();
+        }
+
+        public override async Task DisposeAsync()
+        {
+            await base.DisposeAsync();
+
+            // Only perform cleanup if this suite was not skipped.
+            try
+            {
+                TestUtils.CheckForAzureStorage();
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                    AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount), new AzureQueueOptions().ConfigureTestDefaults());
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                    AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount), new AzureQueueOptions().ConfigureTestDefaults());
+            }
+            catch (SkipException)
+            {
+                // ignore
+            }
         }
     }
 
+    public AQProgrammaticSubscribeTest(ITestOutputHelper output, Fixture fixture)
+        : base(fixture)
+    {
+        fixture.EnsurePreconditionsMet();
+    }
 }

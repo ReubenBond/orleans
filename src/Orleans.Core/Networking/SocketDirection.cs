@@ -1,12 +1,11 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Messaging
+namespace Orleans.Messaging;
+
+internal enum ConnectionDirection : byte
 {
-    internal enum ConnectionDirection : byte
-    {
-        SiloToSilo,
-        ClientToGateway,
-        GatewayToClient
-    }
+    SiloToSilo,
+    ClientToGateway,
+    GatewayToClient
 }

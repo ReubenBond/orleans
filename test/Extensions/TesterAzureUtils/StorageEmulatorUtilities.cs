@@ -4,18 +4,17 @@
 using TestExtensions;
 using Xunit;
 
-namespace Tester.AzureUtils
+namespace Tester.AzureUtils;
+
+public static class StorageEmulatorUtilities
 {
-    public static class StorageEmulatorUtilities
+    public static void EnsureEmulatorIsNotUsed()
     {
-        public static void EnsureEmulatorIsNotUsed()
+        if (TestDefaultConfiguration.DataConnectionString is { Length: > 0 } connectionString
+            && (connectionString.Contains("UseDevelopmentStorage", StringComparison.OrdinalIgnoreCase)
+            || connectionString.Contains("devstoreaccount", StringComparison.OrdinalIgnoreCase)))
         {
-            if (TestDefaultConfiguration.DataConnectionString is { Length: > 0 } connectionString
-                && (connectionString.Contains("UseDevelopmentStorage", StringComparison.OrdinalIgnoreCase)
-                || connectionString.Contains("devstoreaccount", StringComparison.OrdinalIgnoreCase)))
-            {
-                throw new SkipException("This test does not support the storage emulator.");
-            }
+            throw new SkipException("This test does not support the storage emulator.");
         }
     }
 }

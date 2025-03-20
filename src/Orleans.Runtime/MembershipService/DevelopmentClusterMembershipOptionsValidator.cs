@@ -5,25 +5,24 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.MembershipService;
 
-namespace Orleans.Configuration
+namespace Orleans.Configuration;
+
+internal class DevelopmentClusterMembershipOptionsValidator : IConfigurationValidator
 {
-    internal class DevelopmentClusterMembershipOptionsValidator : IConfigurationValidator
+    private readonly DevelopmentClusterMembershipOptions options;
+    private readonly IMembershipTable membershipTable;
+
+    public DevelopmentClusterMembershipOptionsValidator(IOptions<DevelopmentClusterMembershipOptions> options, IServiceProvider serviceProvider)
     {
-        private readonly DevelopmentClusterMembershipOptions options;
-        private readonly IMembershipTable membershipTable;
+        this.options = options.Value;
+        this.membershipTable = serviceProvider.GetService<IMembershipTable>();
+    }
 
-        public DevelopmentClusterMembershipOptionsValidator(IOptions<DevelopmentClusterMembershipOptions> options, IServiceProvider serviceProvider)
+    public void ValidateConfiguration()
+    {
+        if (this.membershipTable is SystemTargetBasedMembershipTable && this.options.PrimarySiloEndpoint is null)
         {
-            this.options = options.Value;
-            this.membershipTable = serviceProvider.GetService<IMembershipTable>();
-        }
-
-        public void ValidateConfiguration()
-        {
-            if (this.membershipTable is SystemTargetBasedMembershipTable && this.options.PrimarySiloEndpoint is null)
-            {
-                throw new OrleansConfigurationException("Development clustering is enabled but no value is specified ");
-            }
+            throw new OrleansConfigurationException("Development clustering is enabled but no value is specified ");
         }
     }
 }

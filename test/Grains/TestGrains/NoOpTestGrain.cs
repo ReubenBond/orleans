@@ -3,9 +3,8 @@
 
 using UnitTests.GrainInterfaces;
 
-namespace UnitTests.Grains
+namespace UnitTests.Grains;
+
+public class NoOpTestGrain : Grain, INoOpTestGrain
 {
-    public class NoOpTestGrain : Grain, INoOpTestGrain
-    {
-    }
 }

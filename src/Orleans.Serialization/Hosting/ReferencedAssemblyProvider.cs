@@ -9,222 +9,221 @@ using System.Reflection;
 using System.Runtime.Loader;
 #endif
 
-namespace Orleans.Serialization.Internal
+namespace Orleans.Serialization.Internal;
+
+public static class ReferencedAssemblyProvider
 {
-    public static class ReferencedAssemblyProvider
+    public static IEnumerable<Assembly> GetRelevantAssemblies()
     {
-        public static IEnumerable<Assembly> GetRelevantAssemblies()
-        {
-            var parts = new HashSet<Assembly>();
+        var parts = new HashSet<Assembly>();
 
-            AddFromDependencyContext(parts);
+        AddFromDependencyContext(parts);
 
 #if NETCOREAPP3_1_OR_GREATER
-            AddFromAssemblyLoadContext(parts);
+        AddFromAssemblyLoadContext(parts);
 #endif
 
-            foreach (var loadedAsm in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                AddAssembly(parts, loadedAsm);
-            }
-
-            return parts;
+        foreach (var loadedAsm in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            AddAssembly(parts, loadedAsm);
         }
 
-        public static void AddAssembly(HashSet<Assembly> parts, Assembly assembly)
+        return parts;
+    }
+
+    public static void AddAssembly(HashSet<Assembly> parts, Assembly assembly)
+    {
+        if (assembly == null)
         {
-            if (assembly == null)
+            throw new ArgumentNullException(nameof(assembly));
+        }
+
+        if (!assembly.IsDefined(typeof(ApplicationPartAttribute)))
+        {
+            return;
+        }
+
+        if (!parts.Add(assembly))
+        {
+            return;
+        }
+
+        AddAssembly(parts, assembly);
+
+        // Add all referenced application parts.
+        foreach (var referencedAsm in GetApplicationPartAssemblies(assembly))
+        {
+            AddAssembly(parts, referencedAsm);
+        }
+    }
+
+#if NETCOREAPP3_1_OR_GREATER
+    public static void AddFromAssemblyLoadContext(HashSet<Assembly> parts, AssemblyLoadContext context)
+    {
+        if (context is null)
+        {
+            throw new ArgumentNullException(nameof(context));
+        }
+
+        foreach (var asm in context.Assemblies)
+        {
+            AddAssembly(parts, asm);
+        }
+    }
+
+    public static void AddFromAssemblyLoadContext(HashSet<Assembly> parts, Assembly assembly = null)
+    {
+        assembly ??= typeof(ReferencedAssemblyProvider).Assembly;
+        var assemblies = new HashSet<Assembly>();
+        var context = AssemblyLoadContext.GetLoadContext(assembly);
+        foreach (var asm in context.Assemblies)
+        {
+            // Skip assemblies which have not had code generation executed against them and already-seen assemblies.
+            if (!asm.IsDefined(typeof(ApplicationPartAttribute)) || !assemblies.Add(asm))
             {
-                throw new ArgumentNullException(nameof(assembly));
+                continue;
             }
 
-            if (!assembly.IsDefined(typeof(ApplicationPartAttribute)))
-            {
-                return;
-            }
+            AddAssembly(parts, asm);
+        }
+    }
+#endif
 
-            if (!parts.Add(assembly))
-            {
-                return;
-            }
+    public static void AddFromDependencyContext(HashSet<Assembly> parts, Assembly assembly = null)
+    {
+        assembly ??= Assembly.GetEntryAssembly();
+        DependencyContext dependencyContext;
+        if (assembly is null || assembly.IsDynamic)
+        {
+            dependencyContext = DependencyContext.Default;
+        }
+        else
+        {
+            dependencyContext = DependencyContext.Load(assembly);
+        }
 
+        var assemblies = new HashSet<Assembly>();
+        if (assembly != null && assembly.IsDefined(typeof(ApplicationPartAttribute)))
+        {
             AddAssembly(parts, assembly);
+            assemblies.Add(assembly);
+        }
 
-            // Add all referenced application parts.
-            foreach (var referencedAsm in GetApplicationPartAssemblies(assembly))
-            {
-                AddAssembly(parts, referencedAsm);
-            }
+        if (dependencyContext == null)
+        {
+            return;
         }
 
 #if NETCOREAPP3_1_OR_GREATER
-        public static void AddFromAssemblyLoadContext(HashSet<Assembly> parts, AssemblyLoadContext context)
-        {
-            if (context is null)
-            {
-                throw new ArgumentNullException(nameof(context));
-            }
-
-            foreach (var asm in context.Assemblies)
-            {
-                AddAssembly(parts, asm);
-            }
-        }
-
-        public static void AddFromAssemblyLoadContext(HashSet<Assembly> parts, Assembly assembly = null)
-        {
-            assembly ??= typeof(ReferencedAssemblyProvider).Assembly;
-            var assemblies = new HashSet<Assembly>();
-            var context = AssemblyLoadContext.GetLoadContext(assembly);
-            foreach (var asm in context.Assemblies)
-            {
-                // Skip assemblies which have not had code generation executed against them and already-seen assemblies.
-                if (!asm.IsDefined(typeof(ApplicationPartAttribute)) || !assemblies.Add(asm))
-                {
-                    continue;
-                }
-
-                AddAssembly(parts, asm);
-            }
-        }
+        var assemblyContext = assembly is not null
+            ? AssemblyLoadContext.GetLoadContext(assembly) ?? AssemblyLoadContext.Default
+            : AssemblyLoadContext.Default;
 #endif
 
-        public static void AddFromDependencyContext(HashSet<Assembly> parts, Assembly assembly = null)
+        foreach (var lib in dependencyContext.RuntimeLibraries)
         {
-            assembly ??= Assembly.GetEntryAssembly();
-            DependencyContext dependencyContext;
-            if (assembly is null || assembly.IsDynamic)
+            if (!lib.Name.Contains("Orleans.Serialization", StringComparison.Ordinal) && !lib.Dependencies.Any(dep => dep.Name.Contains("Orleans.Serialization", StringComparison.Ordinal)))
             {
-                dependencyContext = DependencyContext.Default;
-            }
-            else
-            {
-                dependencyContext = DependencyContext.Load(assembly);
+                continue;
             }
 
-            var assemblies = new HashSet<Assembly>();
-            if (assembly != null && assembly.IsDefined(typeof(ApplicationPartAttribute)))
+            try
             {
-                AddAssembly(parts, assembly);
-                assemblies.Add(assembly);
-            }
-
-            if (dependencyContext == null)
-            {
-                return;
-            }
-
-#if NETCOREAPP3_1_OR_GREATER
-            var assemblyContext = assembly is not null
-                ? AssemblyLoadContext.GetLoadContext(assembly) ?? AssemblyLoadContext.Default
-                : AssemblyLoadContext.Default;
-#endif
-
-            foreach (var lib in dependencyContext.RuntimeLibraries)
-            {
-                if (!lib.Name.Contains("Orleans.Serialization", StringComparison.Ordinal) && !lib.Dependencies.Any(dep => dep.Name.Contains("Orleans.Serialization", StringComparison.Ordinal)))
-                {
-                    continue;
-                }
-
-                try
-                {
 #if NET5_0_OR_GREATER
-                    var name = lib.GetRuntimeAssemblyNames(dependencyContext, System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier).FirstOrDefault();
-                    if (name is null)
-                    {
-                        continue;
-                    }
+                var name = lib.GetRuntimeAssemblyNames(dependencyContext, System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier).FirstOrDefault();
+                if (name is null)
+                {
+                    continue;
+                }
 
-                    var asm = assemblyContext.LoadFromAssemblyName(name);
+                var asm = assemblyContext.LoadFromAssemblyName(name);
 #else
-                    var name = lib.GetRuntimeAssemblyNames(dependencyContext, Microsoft.DotNet.PlatformAbstractions.RuntimeEnvironment.GetRuntimeIdentifier()).FirstOrDefault();
-                    if (name is null)
-                    {
-                        continue;
-                    }
+                var name = lib.GetRuntimeAssemblyNames(dependencyContext, Microsoft.DotNet.PlatformAbstractions.RuntimeEnvironment.GetRuntimeIdentifier()).FirstOrDefault();
+                if (name is null)
+                {
+                    continue;
+                }
 
 #if NETCOREAPP3_1_OR_GREATER
-                    var asm = assemblyContext.LoadFromAssemblyName(name);
+                var asm = assemblyContext.LoadFromAssemblyName(name);
 #else
-                    var asm = Assembly.Load(name);
+                var asm = Assembly.Load(name);
 #endif
 #endif
-                    if (asm.IsDefined(typeof(ApplicationPartAttribute)) && assemblies.Add(asm))
-                    {
-                        AddAssembly(parts, asm);
-                    }
-                }
-                catch
+                if (asm.IsDefined(typeof(ApplicationPartAttribute)) && assemblies.Add(asm))
                 {
-                    // Ignore any exceptions thrown during non-explicit assembly loading.
+                    AddAssembly(parts, asm);
                 }
+            }
+            catch
+            {
+                // Ignore any exceptions thrown during non-explicit assembly loading.
             }
         }
+    }
 
-        private static IEnumerable<Assembly> GetApplicationPartAssemblies(Assembly assembly)
+    private static IEnumerable<Assembly> GetApplicationPartAssemblies(Assembly assembly)
+    {
+        if (!assembly.IsDefined(typeof(ApplicationPartAttribute)))
         {
-            if (!assembly.IsDefined(typeof(ApplicationPartAttribute)))
+            return Array.Empty<Assembly>();
+        }
+
+#if NETCOREAPP3_1_OR_GREATER
+        var assemblyContext = AssemblyLoadContext.GetLoadContext(assembly) ?? AssemblyLoadContext.Default; 
+#endif
+
+        return ExpandApplicationParts(
+            new[] { assembly }.Concat(assembly.GetCustomAttributes<ApplicationPartAttribute>()
+                .Select(name =>
+#if NETCOREAPP3_1_OR_GREATER
+                    assemblyContext.LoadFromAssemblyName(new AssemblyName(name.AssemblyName))
+#else
+                    Assembly.Load(new AssemblyName(name.AssemblyName))
+#endif
+                )));
+
+        static IEnumerable<Assembly> ExpandApplicationParts(IEnumerable<Assembly> assemblies)
+        {
+            if (assemblies == null)
             {
-                return Array.Empty<Assembly>();
+                throw new ArgumentNullException(nameof(assemblies));
             }
 
-#if NETCOREAPP3_1_OR_GREATER
-            var assemblyContext = AssemblyLoadContext.GetLoadContext(assembly) ?? AssemblyLoadContext.Default; 
-#endif
-
-            return ExpandApplicationParts(
-                new[] { assembly }.Concat(assembly.GetCustomAttributes<ApplicationPartAttribute>()
-                    .Select(name =>
-#if NETCOREAPP3_1_OR_GREATER
-                        assemblyContext.LoadFromAssemblyName(new AssemblyName(name.AssemblyName))
-#else
-                        Assembly.Load(new AssemblyName(name.AssemblyName))
-#endif
-                    )));
-
-            static IEnumerable<Assembly> ExpandApplicationParts(IEnumerable<Assembly> assemblies)
+            var relatedAssemblies = new HashSet<Assembly>();
+            foreach (var assembly in assemblies)
             {
-                if (assemblies == null)
+                if (relatedAssemblies.Add(assembly))
                 {
-                    throw new ArgumentNullException(nameof(assemblies));
+                    ExpandAssembly(relatedAssemblies, assembly);
                 }
+            }
 
-                var relatedAssemblies = new HashSet<Assembly>();
-                foreach (var assembly in assemblies)
+            return relatedAssemblies.OrderBy(assembly => assembly.FullName, StringComparer.Ordinal);
+
+            static void ExpandAssembly(HashSet<Assembly> assemblies, Assembly assembly)
+            {
+                var attributes = assembly.GetCustomAttributes<ApplicationPartAttribute>().ToArray();
+                if (attributes.Length == 0)
                 {
-                    if (relatedAssemblies.Add(assembly))
-                    {
-                        ExpandAssembly(relatedAssemblies, assembly);
-                    }
+                    return;
                 }
-
-                return relatedAssemblies.OrderBy(assembly => assembly.FullName, StringComparer.Ordinal);
-
-                static void ExpandAssembly(HashSet<Assembly> assemblies, Assembly assembly)
-                {
-                    var attributes = assembly.GetCustomAttributes<ApplicationPartAttribute>().ToArray();
-                    if (attributes.Length == 0)
-                    {
-                        return;
-                    }
 
 #if NETCOREAPP3_1_OR_GREATER
-                    var assemblyContext = AssemblyLoadContext.GetLoadContext(assembly) ?? AssemblyLoadContext.Default; 
+                var assemblyContext = AssemblyLoadContext.GetLoadContext(assembly) ?? AssemblyLoadContext.Default; 
 #endif
 
-                    foreach (var attribute in attributes)
-                    {
-                        var assemblyName = new AssemblyName(attribute.AssemblyName);
+                foreach (var attribute in attributes)
+                {
+                    var assemblyName = new AssemblyName(attribute.AssemblyName);
 #if NETCOREAPP3_1_OR_GREATER
-                        var referenced = assemblyContext.LoadFromAssemblyName(assemblyName);
+                    var referenced = assemblyContext.LoadFromAssemblyName(assemblyName);
 #else
-                        var referenced = Assembly.Load(assemblyName);
+                    var referenced = Assembly.Load(assemblyName);
 #endif
-                        if (assemblies.Add(referenced))
-                        {
-                            ExpandAssembly(assemblies, referenced);
-                        }
+                    if (assemblies.Add(referenced))
+                    {
+                        ExpandAssembly(assemblies, referenced);
                     }
                 }
             }

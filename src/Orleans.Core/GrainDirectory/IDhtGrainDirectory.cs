@@ -2,118 +2,117 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 #nullable enable
-namespace Orleans.GrainDirectory
+namespace Orleans.GrainDirectory;
+
+/// <summary>
+/// Recursive distributed operations on grain directories.
+/// Each operation may forward the request to a remote owner, increasing the hopCount.
+/// 
+/// The methods here can be called remotely (where extended by IRemoteGrainDirectory) or
+/// locally (where extended by ILocalGrainDirectory)
+/// </summary>
+internal interface IDhtGrainDirectory
 {
     /// <summary>
-    /// Recursive distributed operations on grain directories.
-    /// Each operation may forward the request to a remote owner, increasing the hopCount.
-    /// 
-    /// The methods here can be called remotely (where extended by IRemoteGrainDirectory) or
-    /// locally (where extended by ILocalGrainDirectory)
+    /// Record a new grain activation by adding it to the directory.
+    /// <para>This method must be called from a scheduler thread.</para>
     /// </summary>
-    internal interface IDhtGrainDirectory
-    {
-        /// <summary>
-        /// Record a new grain activation by adding it to the directory.
-        /// <para>This method must be called from a scheduler thread.</para>
-        /// </summary>
-        /// <param name="address">The address of the new activation.</param>
-        /// <param name="hopCount">Counts recursion depth across silos</param>
-        /// <returns>The registered address and the version associated with this directory mapping.</returns>
-        Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount = 0);
-
-        /// <summary>
-        /// Record a new grain activation by adding it to the directory.
-        /// <para>This method must be called from a scheduler thread.</para>
-        /// </summary>
-        /// <param name="address">The address of the new activation.</param>
-        /// <param name="currentRegistration">The existing registration, which may be null.</param>
-        /// <param name="hopCount">Counts recursion depth across silos</param>
-        /// <returns>The registered address and the version associated with this directory mapping.</returns>
-        Task<AddressAndTag> RegisterAsync(GrainAddress address, GrainAddress? currentRegistration, int hopCount = 0);
-
-        /// <summary>
-        /// Removes the record for an existing activation from the directory service.
-        /// This is used when an activation is being deleted.
-        /// <para>This method must be called from a scheduler thread.</para>
-        /// </summary>
-        /// <param name="address">The address of the activation to remove.</param>
-        /// <param name="hopCount">Counts recursion depth across silos.</param>
-        /// <param name="cause">The reason for deregistration.</param>
-        /// <returns>An acknowledgement that the deregistration has completed.</returns>
-        Task UnregisterAsync(GrainAddress address, UnregistrationCause cause, int hopCount = 0);
-
-        /// <summary>
-        /// Unregister a batch of addresses at once
-        /// <para>This method must be called from a scheduler thread.</para>
-        /// </summary>
-        /// <param name="addresses">The addresses to deregister.</param>
-        /// <param name="hopCount">Counts recursion depth across silos.</param>
-        /// <param name="cause">The reason for deregistration.</param>
-        /// <returns>An acknowledgement that the unregistration has completed.</returns>
-        Task UnregisterManyAsync(List<GrainAddress> addresses, UnregistrationCause cause, int hopCount = 0);
-
-        /// <summary>
-        /// Removes all directory information about a grain.
-        /// <para>This method must be called from a scheduler thread.</para>
-        /// </summary>
-        /// <param name="grainId">The ID of the grain.</param>
-        /// <param name="hopCount">Counts recursion depth across silos.</param>
-        /// <returns>
-        /// An acknowledgement that the deletion has completed.
-        /// </returns>
-        Task DeleteGrainAsync(GrainId grainId, int hopCount = 0);
-
-        /// <summary>
-        /// Fetches complete directory information for a grain.
-        /// If there is no local information, then this method will query the appropriate remote directory node.
-        /// <para>This method must be called from a scheduler thread.</para>
-        /// </summary>
-        /// <param name="grainId">The ID of the grain to look up.</param>
-        /// <param name="hopCount">Counts recursion depth across silos.</param>
-        /// <returns>A list of all known activations of the grain, and the e-tag.</returns>
-        Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount = 0);
-    }
+    /// <param name="address">The address of the new activation.</param>
+    /// <param name="hopCount">Counts recursion depth across silos</param>
+    /// <returns>The registered address and the version associated with this directory mapping.</returns>
+    Task<AddressAndTag> RegisterAsync(GrainAddress address, int hopCount = 0);
 
     /// <summary>
-    /// Represents the address of a grain as well as a version tag.
+    /// Record a new grain activation by adding it to the directory.
+    /// <para>This method must be called from a scheduler thread.</para>
     /// </summary>
-    [Serializable, GenerateSerializer, Immutable]
-    internal readonly struct AddressAndTag
-    {
-        /// <summary>
-        /// The address.
-        /// </summary>
-        [Id(0)]
-        public readonly GrainAddress? Address;
-       
-        /// <summary>
-        /// The version of this entry.
-        /// </summary>
-        [Id(1)]
-        public readonly int VersionTag;
-
-        public AddressAndTag(GrainAddress? address, int versionTag)
-        {
-            Address = address;
-            VersionTag = versionTag;
-        }
-    }
+    /// <param name="address">The address of the new activation.</param>
+    /// <param name="currentRegistration">The existing registration, which may be null.</param>
+    /// <param name="hopCount">Counts recursion depth across silos</param>
+    /// <returns>The registered address and the version associated with this directory mapping.</returns>
+    Task<AddressAndTag> RegisterAsync(GrainAddress address, GrainAddress? currentRegistration, int hopCount = 0);
 
     /// <summary>
-    /// Indicates the reason for removing activations from the directory.
-    /// This influences the conditions that are applied when determining whether or not to remove an entry.
+    /// Removes the record for an existing activation from the directory service.
+    /// This is used when an activation is being deleted.
+    /// <para>This method must be called from a scheduler thread.</para>
     /// </summary>
-    public enum UnregistrationCause : byte
-    {
-        /// <summary>
-        /// Remove the directory entry forcefully, without any conditions
-        /// </summary>
-        Force = 0,
+    /// <param name="address">The address of the activation to remove.</param>
+    /// <param name="hopCount">Counts recursion depth across silos.</param>
+    /// <param name="cause">The reason for deregistration.</param>
+    /// <returns>An acknowledgement that the deregistration has completed.</returns>
+    Task UnregisterAsync(GrainAddress address, UnregistrationCause cause, int hopCount = 0);
 
-        /// <summary>
-        /// Remove the directory entry only if it is not too fresh (to avoid races on new registrations)
-        /// </summary>
-        NonexistentActivation = 1,
+    /// <summary>
+    /// Unregister a batch of addresses at once
+    /// <para>This method must be called from a scheduler thread.</para>
+    /// </summary>
+    /// <param name="addresses">The addresses to deregister.</param>
+    /// <param name="hopCount">Counts recursion depth across silos.</param>
+    /// <param name="cause">The reason for deregistration.</param>
+    /// <returns>An acknowledgement that the unregistration has completed.</returns>
+    Task UnregisterManyAsync(List<GrainAddress> addresses, UnregistrationCause cause, int hopCount = 0);
+
+    /// <summary>
+    /// Removes all directory information about a grain.
+    /// <para>This method must be called from a scheduler thread.</para>
+    /// </summary>
+    /// <param name="grainId">The ID of the grain.</param>
+    /// <param name="hopCount">Counts recursion depth across silos.</param>
+    /// <returns>
+    /// An acknowledgement that the deletion has completed.
+    /// </returns>
+    Task DeleteGrainAsync(GrainId grainId, int hopCount = 0);
+
+    /// <summary>
+    /// Fetches complete directory information for a grain.
+    /// If there is no local information, then this method will query the appropriate remote directory node.
+    /// <para>This method must be called from a scheduler thread.</para>
+    /// </summary>
+    /// <param name="grainId">The ID of the grain to look up.</param>
+    /// <param name="hopCount">Counts recursion depth across silos.</param>
+    /// <returns>A list of all known activations of the grain, and the e-tag.</returns>
+    Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount = 0);
+}
+
+/// <summary>
+/// Represents the address of a grain as well as a version tag.
+/// </summary>
+[Serializable, GenerateSerializer, Immutable]
+internal readonly struct AddressAndTag
+{
+    /// <summary>
+    /// The address.
+    /// </summary>
+    [Id(0)]
+    public readonly GrainAddress? Address;
+   
+    /// <summary>
+    /// The version of this entry.
+    /// </summary>
+    [Id(1)]
+    public readonly int VersionTag;
+
+    public AddressAndTag(GrainAddress? address, int versionTag)
+    {
+        Address = address;
+        VersionTag = versionTag;
     }
+}
+
+/// <summary>
+/// Indicates the reason for removing activations from the directory.
+/// This influences the conditions that are applied when determining whether or not to remove an entry.
+/// </summary>
+public enum UnregistrationCause : byte
+{
+    /// <summary>
+    /// Remove the directory entry forcefully, without any conditions
+    /// </summary>
+    Force = 0,
+
+    /// <summary>
+    /// Remove the directory entry only if it is not too fresh (to avoid races on new registrations)
+    /// </summary>
+    NonexistentActivation = 1,
 }

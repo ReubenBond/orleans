@@ -8,140 +8,139 @@ using UnitTests.GrainInterfaces;
 using Xunit;
 using Orleans.Configuration;
 
-namespace Tester.CustomPlacementTests
+namespace Tester.CustomPlacementTests;
+
+[TestCategory("Functional"), TestCategory("Placement")]
+public class CustomPlacementTests : OrleansTestingBase, IClassFixture<CustomPlacementTests.Fixture>
 {
-    [TestCategory("Functional"), TestCategory("Placement")]
-    public class CustomPlacementTests : OrleansTestingBase, IClassFixture<CustomPlacementTests.Fixture>
+    private const short nSilos = 3;
+    private readonly Fixture fixture;
+    private readonly string[] silos;
+    private readonly SiloAddress[] siloAddresses;
+
+    public class Fixture : BaseTestClusterFixture
     {
-        private const short nSilos = 3;
-        private readonly Fixture fixture;
-        private readonly string[] silos;
-        private readonly SiloAddress[] siloAddresses;
-
-        public class Fixture : BaseTestClusterFixture
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.Options.InitialSilosCount = nSilos;
-                builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
-            }
+            builder.Options.InitialSilosCount = nSilos;
+            builder.AddSiloBuilderConfigurator<TestSiloBuilderConfigurator>();
+        }
 
-            private class TestSiloBuilderConfigurator : ISiloConfigurator
+        private class TestSiloBuilderConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
             {
-                public void Configure(ISiloBuilder hostBuilder)
-                {
-                    hostBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = true);
-                    hostBuilder.ConfigureServices(ConfigureServices);
-                }
-            }
-
-            private static void ConfigureServices(IServiceCollection services)
-            {
-                services.AddPlacementDirector<TestCustomPlacementStrategy, TestPlacementStrategyFixedSiloDirector>();
+                hostBuilder.Configure<SiloMessagingOptions>(options => options.AssumeHomogenousSilosForTesting = true);
+                hostBuilder.ConfigureServices(ConfigureServices);
             }
         }
 
-        public CustomPlacementTests(Fixture fixture)
+        private static void ConfigureServices(IServiceCollection services)
         {
-            this.fixture = fixture;
+            services.AddPlacementDirector<TestCustomPlacementStrategy, TestPlacementStrategyFixedSiloDirector>();
+        }
+    }
 
-            // sort silo IDs into an array
-            this.silos = fixture.HostedCluster.GetActiveSilos().OrderBy(s => s.SiloAddress).Select(h => h.SiloAddress.ToString()).ToArray();
-            this.siloAddresses = fixture.HostedCluster.GetActiveSilos().Select(h => h.SiloAddress).OrderBy(s => s).ToArray();
+    public CustomPlacementTests(Fixture fixture)
+    {
+        this.fixture = fixture;
+
+        // sort silo IDs into an array
+        this.silos = fixture.HostedCluster.GetActiveSilos().OrderBy(s => s.SiloAddress).Select(h => h.SiloAddress.ToString()).ToArray();
+        this.siloAddresses = fixture.HostedCluster.GetActiveSilos().Select(h => h.SiloAddress).OrderBy(s => s).ToArray();
+    }
+
+    [Fact]
+    public async Task CustomPlacement_FixedSilo()
+    {
+        const int nGrains = 100;
+
+        Task<string>[] tasks = new Task<string>[nGrains];
+        for (int i = 0; i < nGrains; i++)
+        {
+            var g = this.fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
+                "UnitTests.Grains.CustomPlacement_FixedSiloGrain");
+            tasks[i] = g.GetRuntimeInstanceId();
         }
 
-        [Fact]
-        public async Task CustomPlacement_FixedSilo()
+        await Task.WhenAll(tasks);
+
+        var silo = await tasks[0];
+        Assert.Equal(silos[silos.Length-2], silo);
+
+        for (int i = 1; i < nGrains; i++)
         {
-            const int nGrains = 100;
+            Assert.Equal(silo, await tasks[i]);
+        }
+    }
 
-            Task<string>[] tasks = new Task<string>[nGrains];
-            for (int i = 0; i < nGrains; i++)
-            {
-                var g = this.fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
-                    "UnitTests.Grains.CustomPlacement_FixedSiloGrain");
-                tasks[i] = g.GetRuntimeInstanceId();
-            }
+    [Fact]
+    public async Task CustomPlacement_ExcludeOne()
+    {
+        const int nGrains = 100;
 
-            await Task.WhenAll(tasks);
-
-            var silo = await tasks[0];
-            Assert.Equal(silos[silos.Length-2], silo);
-
-            for (int i = 1; i < nGrains; i++)
-            {
-                Assert.Equal(silo, await tasks[i]);
-            }
+        Task<string>[] tasks = new Task<string>[nGrains];
+        for (int i = 0; i < nGrains; i++)
+        {
+            var g = this.fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
+                "UnitTests.Grains.CustomPlacement_ExcludeOneGrain");
+            tasks[i] = g.GetRuntimeInstanceId();
         }
 
-        [Fact]
-        public async Task CustomPlacement_ExcludeOne()
+        await Task.WhenAll(tasks);
+        var excludedSilo = silos[1];
+
+        for (int i = 1; i < nGrains; i++)
         {
-            const int nGrains = 100;
+            Assert.NotEqual(excludedSilo, await tasks[i]);
+        }
+    }
 
-            Task<string>[] tasks = new Task<string>[nGrains];
-            for (int i = 0; i < nGrains; i++)
-            {
-                var g = this.fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
-                    "UnitTests.Grains.CustomPlacement_ExcludeOneGrain");
-                tasks[i] = g.GetRuntimeInstanceId();
-            }
+    [Fact]
+    public async Task CustomPlacement_RequestContextBased()
+    {
+        const int nGrains = 100;
+        var targetSilo = silos.Length - 1; // Always target the last one
 
-            await Task.WhenAll(tasks);
-            var excludedSilo = silos[1];
-
-            for (int i = 1; i < nGrains; i++)
-            {
-                Assert.NotEqual(excludedSilo, await tasks[i]);
-            }
+        Task<string>[] tasks = new Task<string>[nGrains];
+        for (int i = 0; i < nGrains; i++)
+        {
+            RequestContext.Set(TestPlacementStrategyFixedSiloDirector.TARGET_SILO_INDEX, targetSilo);
+            var g = this.fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
+                "UnitTests.Grains.CustomPlacement_RequestContextBased");
+            tasks[i] = g.GetRuntimeInstanceId();
+            RequestContext.Clear();
         }
 
-        [Fact]
-        public async Task CustomPlacement_RequestContextBased()
+        await Task.WhenAll(tasks);
+
+        for (int i = 1; i < nGrains; i++)
         {
-            const int nGrains = 100;
-            var targetSilo = silos.Length - 1; // Always target the last one
+            Assert.Equal(silos[targetSilo], await tasks[i]);
+        }
+    }
 
-            Task<string>[] tasks = new Task<string>[nGrains];
-            for (int i = 0; i < nGrains; i++)
-            {
-                RequestContext.Set(TestPlacementStrategyFixedSiloDirector.TARGET_SILO_INDEX, targetSilo);
-                var g = this.fixture.GrainFactory.GetGrain<ICustomPlacementTestGrain>(Guid.NewGuid(),
-                    "UnitTests.Grains.CustomPlacement_RequestContextBased");
-                tasks[i] = g.GetRuntimeInstanceId();
-                RequestContext.Clear();
-            }
+    [Fact]
+    public async Task HashBasedPlacement()
+    {
+        const int nGrains = 100;
 
-            await Task.WhenAll(tasks);
-
-            for (int i = 1; i < nGrains; i++)
-            {
-                Assert.Equal(silos[targetSilo], await tasks[i]);
-            }
+        Task<SiloAddress>[] tasks = new Task<SiloAddress>[nGrains];
+        List<GrainId> grains = new List<GrainId>();
+        for (int i = 0; i < nGrains; i++)
+        {
+            var g = this.fixture.GrainFactory.GetGrain<IHashBasedPlacementGrain>(Guid.NewGuid(),
+                "UnitTests.Grains.HashBasedBasedPlacementGrain");
+            grains.Add(g.GetGrainId());
+            tasks[i] = g.GetSiloAddress();
         }
 
-        [Fact]
-        public async Task HashBasedPlacement()
+        await Task.WhenAll(tasks);
+
+        for (int i = 0; i < nGrains; i++)
         {
-            const int nGrains = 100;
-
-            Task<SiloAddress>[] tasks = new Task<SiloAddress>[nGrains];
-            List<GrainId> grains = new List<GrainId>();
-            for (int i = 0; i < nGrains; i++)
-            {
-                var g = this.fixture.GrainFactory.GetGrain<IHashBasedPlacementGrain>(Guid.NewGuid(),
-                    "UnitTests.Grains.HashBasedBasedPlacementGrain");
-                grains.Add(g.GetGrainId());
-                tasks[i] = g.GetSiloAddress();
-            }
-
-            await Task.WhenAll(tasks);
-
-            for (int i = 0; i < nGrains; i++)
-            {
-                var hash = (int) (grains[i].GetUniformHashCode() & 0x7fffffff);
-                Assert.Equal(siloAddresses[hash % silos.Length], await tasks[i]);
-            }
+            var hash = (int) (grains[i].GetUniformHashCode() & 0x7fffffff);
+            Assert.Equal(siloAddresses[hash % silos.Length], await tasks[i]);
         }
     }
 }

@@ -1,28 +1,27 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Transactions.TestKit
+namespace Orleans.Transactions.TestKit;
+
+public interface IFaultInjectionTransactionCoordinatorGrain : IGrainWithGuidKey
 {
-    public interface IFaultInjectionTransactionCoordinatorGrain : IGrainWithGuidKey
-    {
-        [Transaction(TransactionOption.Create)]
-        Task MultiGrainSet(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd);
+    [Transaction(TransactionOption.Create)]
+    Task MultiGrainSet(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd);
 
-        [Transaction(TransactionOption.Create)]
-        Task MultiGrainAddAndFaultInjection(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd, 
-            FaultInjectionControl faultInjection = null);
+    [Transaction(TransactionOption.Create)]
+    Task MultiGrainAddAndFaultInjection(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd, 
+        FaultInjectionControl faultInjection = null);
+}
+public class FaultInjectionTransactionCoordinatorGrain : Grain, IFaultInjectionTransactionCoordinatorGrain
+{
+    public Task MultiGrainSet(List<IFaultInjectionTransactionTestGrain> grains, int newValue)
+    {
+        return Task.WhenAll(grains.Select(g => g.Set(newValue)));
     }
-    public class FaultInjectionTransactionCoordinatorGrain : Grain, IFaultInjectionTransactionCoordinatorGrain
-    {
-        public Task MultiGrainSet(List<IFaultInjectionTransactionTestGrain> grains, int newValue)
-        {
-            return Task.WhenAll(grains.Select(g => g.Set(newValue)));
-        }
 
-        public Task MultiGrainAddAndFaultInjection(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd,
-            FaultInjectionControl faultInjection = null)
-        {
-            return Task.WhenAll(grains.Select(g => g.Add(numberToAdd, faultInjection)));
-        }
+    public Task MultiGrainAddAndFaultInjection(List<IFaultInjectionTransactionTestGrain> grains, int numberToAdd,
+        FaultInjectionControl faultInjection = null)
+    {
+        return Task.WhenAll(grains.Select(g => g.Add(numberToAdd, faultInjection)));
     }
 }

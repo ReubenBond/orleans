@@ -3,36 +3,35 @@
 
 using Orleans.Streams.Core;
 
-namespace Orleans.Streams
+namespace Orleans.Streams;
+
+/// <summary>
+/// Installs an <see cref="IStreamConsumerExtension"/> extension on a <see cref="IGrainContext"/> for grains which implement <see cref="IStreamSubscriptionObserver"/>.
+/// </summary>
+internal class StreamConsumerGrainContextAction : IConfigureGrainContext
 {
+    private readonly IStreamProviderRuntime _streamProviderRuntime;
+
     /// <summary>
-    /// Installs an <see cref="IStreamConsumerExtension"/> extension on a <see cref="IGrainContext"/> for grains which implement <see cref="IStreamSubscriptionObserver"/>.
+    /// Initializes a new instance of the <see cref="StreamConsumerGrainContextAction"/> class.
     /// </summary>
-    internal class StreamConsumerGrainContextAction : IConfigureGrainContext
+    /// <param name="streamProviderRuntime">The stream provider runtime.</param>
+    public StreamConsumerGrainContextAction(IStreamProviderRuntime streamProviderRuntime)
     {
-        private readonly IStreamProviderRuntime _streamProviderRuntime;
+        _streamProviderRuntime = streamProviderRuntime;
+    }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="StreamConsumerGrainContextAction"/> class.
-        /// </summary>
-        /// <param name="streamProviderRuntime">The stream provider runtime.</param>
-        public StreamConsumerGrainContextAction(IStreamProviderRuntime streamProviderRuntime)
+    /// <inheritdoc/>
+    public void Configure(IGrainContext context)
+    {
+        if (context.GrainInstance is IStreamSubscriptionObserver observer)
         {
-            _streamProviderRuntime = streamProviderRuntime;
+            InstallStreamConsumerExtension(context, observer as IStreamSubscriptionObserver);
         }
+    }
 
-        /// <inheritdoc/>
-        public void Configure(IGrainContext context)
-        {
-            if (context.GrainInstance is IStreamSubscriptionObserver observer)
-            {
-                InstallStreamConsumerExtension(context, observer as IStreamSubscriptionObserver);
-            }
-        }
-
-        private void InstallStreamConsumerExtension(IGrainContext context, IStreamSubscriptionObserver observer)
-        {
-            _streamProviderRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(() => new StreamConsumerExtension(_streamProviderRuntime, observer));
-        }
+    private void InstallStreamConsumerExtension(IGrainContext context, IStreamSubscriptionObserver observer)
+    {
+        _streamProviderRuntime.BindExtension<StreamConsumerExtension, IStreamConsumerExtension>(() => new StreamConsumerExtension(_streamProviderRuntime, observer));
     }
 }

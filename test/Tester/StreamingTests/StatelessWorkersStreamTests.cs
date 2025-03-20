@@ -9,83 +9,82 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
-namespace UnitTests.StreamingTests
+namespace UnitTests.StreamingTests;
+
+[TestCategory("Streaming")]
+public class StatelessWorkersStreamTests : OrleansTestingBase, IClassFixture<StatelessWorkersStreamTests.Fixture>
 {
-    [TestCategory("Streaming")]
-    public class StatelessWorkersStreamTests : OrleansTestingBase, IClassFixture<StatelessWorkersStreamTests.Fixture>
+    private readonly Fixture fixture;
+
+    private readonly ILogger logger;
+
+    public class Fixture : BaseTestClusterFixture
     {
-        private readonly Fixture fixture;
-
-        private readonly ILogger logger;
-
-        public class Fixture : BaseTestClusterFixture
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-                builder.AddClientBuilderConfigurator<ClientConfiguretor>();
-            }
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+            builder.AddClientBuilderConfigurator<ClientConfiguretor>();
+        }
 
-            public class SiloConfigurator : ISiloConfigurator
+        public class SiloConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
             {
-                public void Configure(ISiloBuilder hostBuilder)
-                {
-                    hostBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProvider)
-                         .AddMemoryGrainStorage("PubSubStore");
-                }
-            }
-
-            public class ClientConfiguretor : IClientBuilderConfigurator
-            {
-                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-                {
-                    clientBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProvider);
-                }
+                hostBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProvider)
+                     .AddMemoryGrainStorage("PubSubStore");
             }
         }
 
-        private const string StreamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
-
-        public StatelessWorkersStreamTests(Fixture fixture)
+        public class ClientConfiguretor : IClientBuilderConfigurator
         {
-            this.fixture = fixture;
-            logger = this.fixture.Logger;
-        }
-
-        [Fact, TestCategory("Functional")]
-        public async Task SubscribeToStream_FromStatelessWorker_Fail()
-        {
-            this.logger.LogInformation($"************************ { nameof(SubscribeToStream_FromStatelessWorker_Fail) } *********************************");
-            var runner = new StatelessWorkersStreamTestsRunner(StreamProvider, this.logger, this.fixture.HostedCluster);
-            await Assert.ThrowsAsync<InvalidOperationException>( () => runner.BecomeConsumer(Guid.NewGuid()));
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamProvider);
+            }
         }
     }
 
-    public class StatelessWorkersStreamTestsRunner
+    private const string StreamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
+
+    public StatelessWorkersStreamTests(Fixture fixture)
     {
-        private const string StreamNamespace = "SampleStreamNamespace";
+        this.fixture = fixture;
+        logger = this.fixture.Logger;
+    }
 
-        private readonly string streamProvider;
-        private readonly ILogger logger;
-        private readonly TestCluster cluster;
+    [Fact, TestCategory("Functional")]
+    public async Task SubscribeToStream_FromStatelessWorker_Fail()
+    {
+        this.logger.LogInformation($"************************ { nameof(SubscribeToStream_FromStatelessWorker_Fail) } *********************************");
+        var runner = new StatelessWorkersStreamTestsRunner(StreamProvider, this.logger, this.fixture.HostedCluster);
+        await Assert.ThrowsAsync<InvalidOperationException>( () => runner.BecomeConsumer(Guid.NewGuid()));
+    }
+}
 
-        public StatelessWorkersStreamTestsRunner(string streamProvider, ILogger logger, TestCluster cluster)
-        {
-            this.streamProvider = streamProvider;
-            this.logger = logger;
-            this.cluster = cluster;
-        }
+public class StatelessWorkersStreamTestsRunner
+{
+    private const string StreamNamespace = "SampleStreamNamespace";
 
-        public async Task BecomeConsumer(Guid streamId)
-        {
-            var consumer = this.cluster.GrainFactory.GetGrain<IStatelessWorkerStreamConsumerGrain>(0);
-            await consumer.BecomeConsumer(streamId, streamProvider);
-        }
+    private readonly string streamProvider;
+    private readonly ILogger logger;
+    private readonly TestCluster cluster;
 
-        public async Task ProduceMessage(Guid streamId)
-        {
-            var producer = this.cluster.GrainFactory.GetGrain<IStatelessWorkerStreamProducerGrain>(0);
-            await producer.Produce(streamId, streamProvider, string.Empty);
-        }
+    public StatelessWorkersStreamTestsRunner(string streamProvider, ILogger logger, TestCluster cluster)
+    {
+        this.streamProvider = streamProvider;
+        this.logger = logger;
+        this.cluster = cluster;
+    }
+
+    public async Task BecomeConsumer(Guid streamId)
+    {
+        var consumer = this.cluster.GrainFactory.GetGrain<IStatelessWorkerStreamConsumerGrain>(0);
+        await consumer.BecomeConsumer(streamId, streamProvider);
+    }
+
+    public async Task ProduceMessage(Guid streamId)
+    {
+        var producer = this.cluster.GrainFactory.GetGrain<IStatelessWorkerStreamProducerGrain>(0);
+        await producer.Produce(streamId, streamProvider, string.Empty);
     }
 }

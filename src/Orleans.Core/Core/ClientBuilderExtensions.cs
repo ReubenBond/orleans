@@ -10,304 +10,303 @@ using Orleans.Configuration;
 using Orleans.Messaging;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace Orleans.Hosting
+namespace Orleans.Hosting;
+
+/// <summary>
+/// Extension methods for <see cref="IClientBuilder"/>.
+/// </summary>
+public static class ClientBuilderExtensions
 {
     /// <summary>
-    /// Extension methods for <see cref="IClientBuilder"/>.
+    /// Configures the provided delegate as a connection retry filter, used to determine whether initial connection to the Orleans cluster should be retried after a failure.
     /// </summary>
-    public static class ClientBuilderExtensions
+    /// <param name="builder">The host builder.</param>
+    /// <param name="connectionRetryFilter">The connection retry filter.</param>
+    /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
+    public static IClientBuilder UseConnectionRetryFilter(this IClientBuilder builder, Func<Exception, CancellationToken, Task<bool>> connectionRetryFilter)
     {
-        /// <summary>
-        /// Configures the provided delegate as a connection retry filter, used to determine whether initial connection to the Orleans cluster should be retried after a failure.
-        /// </summary>
-        /// <param name="builder">The host builder.</param>
-        /// <param name="connectionRetryFilter">The connection retry filter.</param>
-        /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
-        public static IClientBuilder UseConnectionRetryFilter(this IClientBuilder builder, Func<Exception, CancellationToken, Task<bool>> connectionRetryFilter)
-        {
-            return builder.ConfigureServices(collection => collection.AddSingleton<IClientConnectionRetryFilter>(new DelegateConnectionRetryFilter(connectionRetryFilter)));
-        }
+        return builder.ConfigureServices(collection => collection.AddSingleton<IClientConnectionRetryFilter>(new DelegateConnectionRetryFilter(connectionRetryFilter)));
+    }
 
-        /// <summary>
-        /// Configures the provided delegate as a connection retry filter, used to determine whether initial connection to the Orleans cluster should be retried after a failure.
-        /// </summary>
-        /// <param name="builder">The host builder.</param>
-        /// <param name="connectionRetryFilter">The connection retry filter.</param>
-        /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
-        public static IClientBuilder UseConnectionRetryFilter(this IClientBuilder builder, IClientConnectionRetryFilter connectionRetryFilter)
-        {
-            return builder.ConfigureServices(collection => collection.AddSingleton<IClientConnectionRetryFilter>(connectionRetryFilter));
-        }
+    /// <summary>
+    /// Configures the provided delegate as a connection retry filter, used to determine whether initial connection to the Orleans cluster should be retried after a failure.
+    /// </summary>
+    /// <param name="builder">The host builder.</param>
+    /// <param name="connectionRetryFilter">The connection retry filter.</param>
+    /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
+    public static IClientBuilder UseConnectionRetryFilter(this IClientBuilder builder, IClientConnectionRetryFilter connectionRetryFilter)
+    {
+        return builder.ConfigureServices(collection => collection.AddSingleton<IClientConnectionRetryFilter>(connectionRetryFilter));
+    }
 
-        /// <summary>
-        /// Configures the provided <typeparamref name="TConnectionRetryFilter"/> type as a connection retry filter, used to determine whether initial connection to the Orleans cluster should be retried after a failure.
-        /// </summary>
-        /// <param name="builder">The host builder.</param>
-        /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
-        public static IClientBuilder UseConnectionRetryFilter<TConnectionRetryFilter>(this IClientBuilder builder) where TConnectionRetryFilter : class, IClientConnectionRetryFilter
-        {
-            return builder.ConfigureServices(collection => collection.AddSingleton<IClientConnectionRetryFilter, TConnectionRetryFilter>());
-        }
+    /// <summary>
+    /// Configures the provided <typeparamref name="TConnectionRetryFilter"/> type as a connection retry filter, used to determine whether initial connection to the Orleans cluster should be retried after a failure.
+    /// </summary>
+    /// <param name="builder">The host builder.</param>
+    /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
+    public static IClientBuilder UseConnectionRetryFilter<TConnectionRetryFilter>(this IClientBuilder builder) where TConnectionRetryFilter : class, IClientConnectionRetryFilter
+    {
+        return builder.ConfigureServices(collection => collection.AddSingleton<IClientConnectionRetryFilter, TConnectionRetryFilter>());
+    }
 
-        private sealed class DelegateConnectionRetryFilter : IClientConnectionRetryFilter
-        {
-            private readonly Func<Exception, CancellationToken, Task<bool>> _filter;
-            public DelegateConnectionRetryFilter(Func<Exception, CancellationToken, Task<bool>> connectionRetryFilter) => _filter = connectionRetryFilter ?? throw new ArgumentNullException(nameof(connectionRetryFilter));
-            public Task<bool> ShouldRetryConnectionAttempt(Exception exception, CancellationToken cancellationToken) => _filter(exception, cancellationToken);
-        }
+    private sealed class DelegateConnectionRetryFilter : IClientConnectionRetryFilter
+    {
+        private readonly Func<Exception, CancellationToken, Task<bool>> _filter;
+        public DelegateConnectionRetryFilter(Func<Exception, CancellationToken, Task<bool>> connectionRetryFilter) => _filter = connectionRetryFilter ?? throw new ArgumentNullException(nameof(connectionRetryFilter));
+        public Task<bool> ShouldRetryConnectionAttempt(Exception exception, CancellationToken cancellationToken) => _filter(exception, cancellationToken);
+    }
 
-        /// <summary>
-        /// Adds services to the container. This can be called multiple times and the results will be additive.
-        /// </summary>
-        /// <param name="builder">The host builder.</param>
-        /// <param name="configureDelegate"></param>
-        /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
-        public static IClientBuilder ConfigureServices(this IClientBuilder builder, Action<IServiceCollection> configureDelegate)
-        {
-            if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
-            configureDelegate(builder.Services);
-            return builder;
-        }
+    /// <summary>
+    /// Adds services to the container. This can be called multiple times and the results will be additive.
+    /// </summary>
+    /// <param name="builder">The host builder.</param>
+    /// <param name="configureDelegate"></param>
+    /// <returns>The same instance of the <see cref="IClientBuilder"/> for chaining.</returns>
+    public static IClientBuilder ConfigureServices(this IClientBuilder builder, Action<IServiceCollection> configureDelegate)
+    {
+        if (configureDelegate == null) throw new ArgumentNullException(nameof(configureDelegate));
+        configureDelegate(builder.Services);
+        return builder;
+    }
 
-        /// <summary>
-        /// Registers an action used to configure a particular type of options.
-        /// </summary>
-        /// <typeparam name="TOptions">The options type to be configured.</typeparam>
-        /// <param name="builder">The host builder.</param>
-        /// <param name="configureOptions">The action used to configure the options.</param>
-        /// <returns>The client builder.</returns>
-        public static IClientBuilder Configure<TOptions>(this IClientBuilder builder, Action<TOptions> configureOptions) where TOptions : class
-        {
-            return builder.ConfigureServices(services => services.Configure(configureOptions));
-        }
+    /// <summary>
+    /// Registers an action used to configure a particular type of options.
+    /// </summary>
+    /// <typeparam name="TOptions">The options type to be configured.</typeparam>
+    /// <param name="builder">The host builder.</param>
+    /// <param name="configureOptions">The action used to configure the options.</param>
+    /// <returns>The client builder.</returns>
+    public static IClientBuilder Configure<TOptions>(this IClientBuilder builder, Action<TOptions> configureOptions) where TOptions : class
+    {
+        return builder.ConfigureServices(services => services.Configure(configureOptions));
+    }
 
-        /// <summary>
-        /// Registers a configuration instance which <typeparamref name="TOptions"/> will bind against.
-        /// </summary>
-        /// <typeparam name="TOptions">The options type to be configured.</typeparam>
-        /// <param name="builder">The host builder.</param>
-        /// <param name="configuration">The configuration.</param>
-        /// <returns>The client builder.</returns>
-        public static IClientBuilder Configure<TOptions>(this IClientBuilder builder, IConfiguration configuration) where TOptions : class
-        {
-            return builder.ConfigureServices(services => services.AddOptions<TOptions>().Bind(configuration));
-        }
+    /// <summary>
+    /// Registers a configuration instance which <typeparamref name="TOptions"/> will bind against.
+    /// </summary>
+    /// <typeparam name="TOptions">The options type to be configured.</typeparam>
+    /// <param name="builder">The host builder.</param>
+    /// <param name="configuration">The configuration.</param>
+    /// <returns>The client builder.</returns>
+    public static IClientBuilder Configure<TOptions>(this IClientBuilder builder, IConfiguration configuration) where TOptions : class
+    {
+        return builder.ConfigureServices(services => services.AddOptions<TOptions>().Bind(configuration));
+    }
 
-        /// <summary>
-        /// Registers a <see cref="GatewayCountChangedHandler"/> event handler.
-        /// </summary>
-        public static IClientBuilder AddGatewayCountChangedHandler(this IClientBuilder builder, GatewayCountChangedHandler handler)
-        {
-            builder.ConfigureServices(services => services.AddSingleton(handler));
-            return builder;
-        }
+    /// <summary>
+    /// Registers a <see cref="GatewayCountChangedHandler"/> event handler.
+    /// </summary>
+    public static IClientBuilder AddGatewayCountChangedHandler(this IClientBuilder builder, GatewayCountChangedHandler handler)
+    {
+        builder.ConfigureServices(services => services.AddSingleton(handler));
+        return builder;
+    }
 
-        /// <summary>
-        /// Registers a <see cref="GatewayCountChangedHandler"/> event handler.
-        /// </summary>
-        public static IClientBuilder AddGatewayCountChangedHandler(this IClientBuilder builder, Func<IServiceProvider, GatewayCountChangedHandler> handlerFactory)
-        {
-            builder.ConfigureServices(services => services.AddSingleton(handlerFactory));
-            return builder;
-        }
+    /// <summary>
+    /// Registers a <see cref="GatewayCountChangedHandler"/> event handler.
+    /// </summary>
+    public static IClientBuilder AddGatewayCountChangedHandler(this IClientBuilder builder, Func<IServiceProvider, GatewayCountChangedHandler> handlerFactory)
+    {
+        builder.ConfigureServices(services => services.AddSingleton(handlerFactory));
+        return builder;
+    }
 
-        /// <summary>
-        /// Registers a cluster connection status observer.
-        /// </summary>
-        public static IClientBuilder AddClusterConnectionStatusObserver<TObserver>(this IClientBuilder builder, TObserver observer)
-            where TObserver : IClusterConnectionStatusObserver
-        {
-            builder.Services.AddSingleton<IClusterConnectionStatusObserver>(observer);
-            return builder;
-        }
+    /// <summary>
+    /// Registers a cluster connection status observer.
+    /// </summary>
+    public static IClientBuilder AddClusterConnectionStatusObserver<TObserver>(this IClientBuilder builder, TObserver observer)
+        where TObserver : IClusterConnectionStatusObserver
+    {
+        builder.Services.AddSingleton<IClusterConnectionStatusObserver>(observer);
+        return builder;
+    }
 
-        /// <summary>
-        /// Registers a cluster connection status observer.
-        /// </summary>
-        public static IClientBuilder AddClusterConnectionStatusObserver<TObserver>(this IClientBuilder builder)
-            where TObserver : class, IClusterConnectionStatusObserver
-        {
-            builder.Services.AddSingleton<IClusterConnectionStatusObserver, TObserver>();
-            return builder;
-        }
+    /// <summary>
+    /// Registers a cluster connection status observer.
+    /// </summary>
+    public static IClientBuilder AddClusterConnectionStatusObserver<TObserver>(this IClientBuilder builder)
+        where TObserver : class, IClusterConnectionStatusObserver
+    {
+        builder.Services.AddSingleton<IClusterConnectionStatusObserver, TObserver>();
+        return builder;
+    }
 
-        /// <summary>
-        /// Registers a <see cref="ConnectionToClusterLostHandler"/> event handler.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="handler">The handler.</param>
-        /// <returns>The builder.</returns>
-        public static IClientBuilder AddClusterConnectionLostHandler(this IClientBuilder builder, ConnectionToClusterLostHandler handler)
-        {
-            builder.ConfigureServices(services => services.AddSingleton(handler));
-            return builder;
-        }
+    /// <summary>
+    /// Registers a <see cref="ConnectionToClusterLostHandler"/> event handler.
+    /// </summary>
+    /// <param name="builder">The builder.</param>
+    /// <param name="handler">The handler.</param>
+    /// <returns>The builder.</returns>
+    public static IClientBuilder AddClusterConnectionLostHandler(this IClientBuilder builder, ConnectionToClusterLostHandler handler)
+    {
+        builder.ConfigureServices(services => services.AddSingleton(handler));
+        return builder;
+    }
 
-        /// <summary>
-        /// Registers a <see cref="ConnectionToClusterLostHandler"/> event handler.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="handlerFactory">The handler factory.</param>
-        /// <returns>The builder.</returns>
-        public static IClientBuilder AddClusterConnectionLostHandler(this IClientBuilder builder, Func<IServiceProvider, ConnectionToClusterLostHandler> handlerFactory)
-        {
-            builder.ConfigureServices(services => services.AddSingleton(handlerFactory));
-            return builder;
-        }
+    /// <summary>
+    /// Registers a <see cref="ConnectionToClusterLostHandler"/> event handler.
+    /// </summary>
+    /// <param name="builder">The builder.</param>
+    /// <param name="handlerFactory">The handler factory.</param>
+    /// <returns>The builder.</returns>
+    public static IClientBuilder AddClusterConnectionLostHandler(this IClientBuilder builder, Func<IServiceProvider, ConnectionToClusterLostHandler> handlerFactory)
+    {
+        builder.ConfigureServices(services => services.AddSingleton(handlerFactory));
+        return builder;
+    }
 
-        /// <summary>
-        /// Add <see cref="Activity.Current"/> propagation through grain calls.
-        /// Note: according to <see cref="ActivitySource.StartActivity(string, ActivityKind)"/> activity will be created only when any listener for activity exists <see cref="ActivitySource.HasListeners()"/> and <see cref="ActivityListener.Sample"/> returns <see cref="ActivitySamplingResult.PropagationData"/>.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <returns>The builder.</returns>
-        public static IClientBuilder AddActivityPropagation(this IClientBuilder builder)
-        {
-            builder.Services.TryAddSingleton(DistributedContextPropagator.Current);
+    /// <summary>
+    /// Add <see cref="Activity.Current"/> propagation through grain calls.
+    /// Note: according to <see cref="ActivitySource.StartActivity(string, ActivityKind)"/> activity will be created only when any listener for activity exists <see cref="ActivitySource.HasListeners()"/> and <see cref="ActivityListener.Sample"/> returns <see cref="ActivitySamplingResult.PropagationData"/>.
+    /// </summary>
+    /// <param name="builder">The builder.</param>
+    /// <returns>The builder.</returns>
+    public static IClientBuilder AddActivityPropagation(this IClientBuilder builder)
+    {
+        builder.Services.TryAddSingleton(DistributedContextPropagator.Current);
 
-            return builder
-                .AddOutgoingGrainCallFilter<ActivityPropagationOutgoingGrainCallFilter>()
-                .AddIncomingGrainCallFilter<ActivityPropagationIncomingGrainCallFilter>();
-        }
+        return builder
+            .AddOutgoingGrainCallFilter<ActivityPropagationOutgoingGrainCallFilter>()
+            .AddIncomingGrainCallFilter<ActivityPropagationIncomingGrainCallFilter>();
+    }
 
-        /// <summary>
-        /// Configures the client to connect to a silo on the localhost.
-        /// </summary>
-        /// <param name="builder">
-        /// The client builder.
-        /// </param>
-        /// <param name="gatewayPort">
-        /// The local silo's gateway port.
-        /// </param>
-        /// <param name="serviceId">
-        /// The service id.
-        /// </param>
-        /// <param name="clusterId">
-        /// The cluster id.
-        /// </param>
-        /// <returns>
-        /// The <see cref="IClientBuilder"/>.
-        /// </returns>
-        public static IClientBuilder UseLocalhostClustering(
-            this IClientBuilder builder,
-            int gatewayPort = 30000,
-            string serviceId = ClusterOptions.DevelopmentServiceId,
-            string clusterId = ClusterOptions.DevelopmentClusterId)
-        {
-            return builder.UseLocalhostClustering(new [] {gatewayPort}, serviceId, clusterId);
-        }
+    /// <summary>
+    /// Configures the client to connect to a silo on the localhost.
+    /// </summary>
+    /// <param name="builder">
+    /// The client builder.
+    /// </param>
+    /// <param name="gatewayPort">
+    /// The local silo's gateway port.
+    /// </param>
+    /// <param name="serviceId">
+    /// The service id.
+    /// </param>
+    /// <param name="clusterId">
+    /// The cluster id.
+    /// </param>
+    /// <returns>
+    /// The <see cref="IClientBuilder"/>.
+    /// </returns>
+    public static IClientBuilder UseLocalhostClustering(
+        this IClientBuilder builder,
+        int gatewayPort = 30000,
+        string serviceId = ClusterOptions.DevelopmentServiceId,
+        string clusterId = ClusterOptions.DevelopmentClusterId)
+    {
+        return builder.UseLocalhostClustering(new [] {gatewayPort}, serviceId, clusterId);
+    }
 
-        /// <summary>
-        /// Configures the client to connect to a silo on the localhost.
-        /// </summary>
-        /// <param name="builder">
-        /// The client builder.
-        /// </param>
-        /// <param name="gatewayPorts">
-        /// The local silo gateway ports.
-        /// </param>
-        /// <param name="serviceId">
-        /// The service id.
-        /// </param>
-        /// <param name="clusterId">
-        /// The cluster id.
-        /// </param>
-        /// <returns>
-        /// The <see cref="IClientBuilder"/>.
-        /// </returns>
-        public static IClientBuilder UseLocalhostClustering(this IClientBuilder builder,
-            int[] gatewayPorts,
-            string serviceId = ClusterOptions.DevelopmentServiceId,
-            string clusterId = ClusterOptions.DevelopmentClusterId)
-        {
-            return builder.UseStaticClustering(gatewayPorts.Select(p => new IPEndPoint(IPAddress.Loopback, p)).ToArray())
-                .ConfigureServices(services =>
+    /// <summary>
+    /// Configures the client to connect to a silo on the localhost.
+    /// </summary>
+    /// <param name="builder">
+    /// The client builder.
+    /// </param>
+    /// <param name="gatewayPorts">
+    /// The local silo gateway ports.
+    /// </param>
+    /// <param name="serviceId">
+    /// The service id.
+    /// </param>
+    /// <param name="clusterId">
+    /// The cluster id.
+    /// </param>
+    /// <returns>
+    /// The <see cref="IClientBuilder"/>.
+    /// </returns>
+    public static IClientBuilder UseLocalhostClustering(this IClientBuilder builder,
+        int[] gatewayPorts,
+        string serviceId = ClusterOptions.DevelopmentServiceId,
+        string clusterId = ClusterOptions.DevelopmentClusterId)
+    {
+        return builder.UseStaticClustering(gatewayPorts.Select(p => new IPEndPoint(IPAddress.Loopback, p)).ToArray())
+            .ConfigureServices(services =>
+            {
+                // If the caller did not override service id or cluster id, configure default values as a fallback.
+                if (string.Equals(serviceId, ClusterOptions.DevelopmentServiceId) && string.Equals(clusterId, ClusterOptions.DevelopmentClusterId))
                 {
-                    // If the caller did not override service id or cluster id, configure default values as a fallback.
-                    if (string.Equals(serviceId, ClusterOptions.DevelopmentServiceId) && string.Equals(clusterId, ClusterOptions.DevelopmentClusterId))
+                    services.PostConfigure<ClusterOptions>(options =>
                     {
-                        services.PostConfigure<ClusterOptions>(options =>
-                        {
-                            if (string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = ClusterOptions.DevelopmentClusterId;
-                            if (string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = ClusterOptions.DevelopmentServiceId;
-                        });
-                    }
-                    else
-                    {
-                        services.Configure<ClusterOptions>(options =>
-                        {
-                            options.ServiceId = serviceId;
-                            options.ClusterId = clusterId;
-                        });
-                    }
-                });
-        }
-
-        /// <summary>
-        /// Configures the client to use static clustering.
-        /// </summary>
-        /// <param name="builder">
-        /// The client builder.
-        /// </param>
-        /// <param name="endpoints">
-        /// The gateway endpoints.
-        /// </param>
-        /// <returns>
-        /// The <see cref="IClientBuilder"/>.
-        /// </returns>
-        public static IClientBuilder UseStaticClustering(this IClientBuilder builder, params IPEndPoint[] endpoints)
-        {
-            return builder.UseStaticClustering(options => options.Gateways = endpoints.Select(ep => ep.ToGatewayUri()).ToList());
-        }
-
-        /// <summary>
-        /// Configures the client to use static clustering.
-        /// </summary>
-        /// <param name="builder">
-        /// The client builder.
-        /// </param>
-        /// <param name="configureOptions">
-        /// The configure Options.
-        /// </param>
-        /// <returns>
-        /// The <see cref="IClientBuilder"/>.
-        /// </returns>
-        public static IClientBuilder UseStaticClustering(this IClientBuilder builder, Action<StaticGatewayListProviderOptions> configureOptions)
-        {
-            return builder.ConfigureServices(
-                collection =>
+                        if (string.IsNullOrWhiteSpace(options.ClusterId)) options.ClusterId = ClusterOptions.DevelopmentClusterId;
+                        if (string.IsNullOrWhiteSpace(options.ServiceId)) options.ServiceId = ClusterOptions.DevelopmentServiceId;
+                    });
+                }
+                else
                 {
-                    if (configureOptions != null)
+                    services.Configure<ClusterOptions>(options =>
                     {
-                        collection.Configure(configureOptions);
-                    }
+                        options.ServiceId = serviceId;
+                        options.ClusterId = clusterId;
+                    });
+                }
+            });
+    }
 
-                    collection.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
-                        .ConfigureFormatter<StaticGatewayListProviderOptions>();
-                });
-        }
+    /// <summary>
+    /// Configures the client to use static clustering.
+    /// </summary>
+    /// <param name="builder">
+    /// The client builder.
+    /// </param>
+    /// <param name="endpoints">
+    /// The gateway endpoints.
+    /// </param>
+    /// <returns>
+    /// The <see cref="IClientBuilder"/>.
+    /// </returns>
+    public static IClientBuilder UseStaticClustering(this IClientBuilder builder, params IPEndPoint[] endpoints)
+    {
+        return builder.UseStaticClustering(options => options.Gateways = endpoints.Select(ep => ep.ToGatewayUri()).ToList());
+    }
 
-        /// <summary>
-        /// Configures the client to use static clustering.
-        /// </summary>
-        /// <param name="builder">
-        /// The client builder.
-        /// </param>
-        /// <param name="configureOptions">
-        /// The configure Options.
-        /// </param>
-        /// <returns>
-        /// The <see cref="IClientBuilder"/>.
-        /// </returns>
-        public static IClientBuilder UseStaticClustering(this IClientBuilder builder, Action<OptionsBuilder<StaticGatewayListProviderOptions>> configureOptions)
-        {
-            return builder.ConfigureServices(
-                collection =>
+    /// <summary>
+    /// Configures the client to use static clustering.
+    /// </summary>
+    /// <param name="builder">
+    /// The client builder.
+    /// </param>
+    /// <param name="configureOptions">
+    /// The configure Options.
+    /// </param>
+    /// <returns>
+    /// The <see cref="IClientBuilder"/>.
+    /// </returns>
+    public static IClientBuilder UseStaticClustering(this IClientBuilder builder, Action<StaticGatewayListProviderOptions> configureOptions)
+    {
+        return builder.ConfigureServices(
+            collection =>
+            {
+                if (configureOptions != null)
                 {
-                    configureOptions?.Invoke(collection.AddOptions<StaticGatewayListProviderOptions>());
-                    collection.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
-                        .ConfigureFormatter<StaticGatewayListProviderOptions>();
-                });
-        }
+                    collection.Configure(configureOptions);
+                }
+
+                collection.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
+                    .ConfigureFormatter<StaticGatewayListProviderOptions>();
+            });
+    }
+
+    /// <summary>
+    /// Configures the client to use static clustering.
+    /// </summary>
+    /// <param name="builder">
+    /// The client builder.
+    /// </param>
+    /// <param name="configureOptions">
+    /// The configure Options.
+    /// </param>
+    /// <returns>
+    /// The <see cref="IClientBuilder"/>.
+    /// </returns>
+    public static IClientBuilder UseStaticClustering(this IClientBuilder builder, Action<OptionsBuilder<StaticGatewayListProviderOptions>> configureOptions)
+    {
+        return builder.ConfigureServices(
+            collection =>
+            {
+                configureOptions?.Invoke(collection.AddOptions<StaticGatewayListProviderOptions>());
+                collection.AddSingleton<IGatewayListProvider, StaticGatewayListProvider>()
+                    .ConfigureFormatter<StaticGatewayListProviderOptions>();
+            });
     }
 }

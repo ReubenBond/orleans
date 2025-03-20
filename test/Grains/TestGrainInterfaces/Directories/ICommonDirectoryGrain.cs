@@ -1,16 +1,15 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace UnitTests.GrainInterfaces.Directories
+namespace UnitTests.GrainInterfaces.Directories;
+
+public interface ICommonDirectoryGrain : IGrainWithGuidKey
 {
-    public interface ICommonDirectoryGrain : IGrainWithGuidKey
-    {
-        Task<int> Ping();
+    Task<int> Ping();
 
-        Task Reset();
+    Task Reset();
 
-        Task<string> GetRuntimeInstanceId();
+    Task<string> GetRuntimeInstanceId();
 
-        Task<int> ProxyPing(ICommonDirectoryGrain grain);
-    }
+    Task<int> ProxyPing(ICommonDirectoryGrain grain);
 }

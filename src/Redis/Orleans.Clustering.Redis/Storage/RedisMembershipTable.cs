@@ -10,246 +10,245 @@ using System.Globalization;
 using System.Text;
 using System.Diagnostics.CodeAnalysis;
 
-namespace Orleans.Clustering.Redis
+namespace Orleans.Clustering.Redis;
+
+internal class RedisMembershipTable : IMembershipTable, IDisposable
 {
-    internal class RedisMembershipTable : IMembershipTable, IDisposable
+    private const string TableVersionKey = "Version";
+    private static readonly TableVersion DefaultTableVersion = new TableVersion(0, "0");
+    private readonly RedisClusteringOptions _redisOptions;
+    private readonly ClusterOptions _clusterOptions;
+    private readonly JsonSerializerSettings _jsonSerializerSettings;
+    private readonly RedisKey _clusterKey;
+    private IConnectionMultiplexer _muxer = null!;
+    private IDatabase _db = null!;
+
+    public RedisMembershipTable(IOptions<RedisClusteringOptions> redisOptions, IOptions<ClusterOptions> clusterOptions)
     {
-        private const string TableVersionKey = "Version";
-        private static readonly TableVersion DefaultTableVersion = new TableVersion(0, "0");
-        private readonly RedisClusteringOptions _redisOptions;
-        private readonly ClusterOptions _clusterOptions;
-        private readonly JsonSerializerSettings _jsonSerializerSettings;
-        private readonly RedisKey _clusterKey;
-        private IConnectionMultiplexer _muxer = null!;
-        private IDatabase _db = null!;
+        _redisOptions = redisOptions.Value;
+        _clusterOptions = clusterOptions.Value;
+        _clusterKey = Encoding.UTF8.GetBytes($"{_clusterOptions.ServiceId}/members/{_clusterOptions.ClusterId}");
+        _jsonSerializerSettings = JsonSettings.JsonSerializerSettings;
+    }
 
-        public RedisMembershipTable(IOptions<RedisClusteringOptions> redisOptions, IOptions<ClusterOptions> clusterOptions)
+    public bool IsInitialized { get; private set; }
+
+    public async Task DeleteMembershipTableEntries(string clusterId)
+    {
+        await _db.KeyDeleteAsync(_clusterKey);
+    }
+
+    public async Task InitializeMembershipTable(bool tryInitTableVersion)
+    {
+        _muxer = await _redisOptions.CreateMultiplexer(_redisOptions);
+        _db = _muxer.GetDatabase();
+
+        if (tryInitTableVersion)
         {
-            _redisOptions = redisOptions.Value;
-            _clusterOptions = clusterOptions.Value;
-            _clusterKey = Encoding.UTF8.GetBytes($"{_clusterOptions.ServiceId}/members/{_clusterOptions.ClusterId}");
-            _jsonSerializerSettings = JsonSettings.JsonSerializerSettings;
+            await _db.HashSetAsync(_clusterKey, TableVersionKey, SerializeVersion(DefaultTableVersion), When.NotExists);
+
+            if (_redisOptions.EntryExpiry is { } expiry)
+            {
+                await _db.KeyExpireAsync(_clusterKey, expiry);
+            }
         }
 
-        public bool IsInitialized { get; private set; }
+        this.IsInitialized = true;
+    }
 
-        public async Task DeleteMembershipTableEntries(string clusterId)
+    public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
+    {
+        return await UpsertRowInternal(entry, tableVersion, updateTableVersion: true, allowInsertOnly: true) == UpsertResult.Success;
+    }
+
+    private async Task<UpsertResult> UpsertRowInternal(MembershipEntry entry, TableVersion tableVersion, bool updateTableVersion, bool allowInsertOnly)
+    {
+        var tx = _db.CreateTransaction();
+        var rowKey = entry.SiloAddress.ToString();
+
+        if (updateTableVersion)
         {
-            await _db.KeyDeleteAsync(_clusterKey);
+            tx.HashSetAsync(_clusterKey, TableVersionKey, SerializeVersion(tableVersion)).Ignore();
         }
 
-        public async Task InitializeMembershipTable(bool tryInitTableVersion)
+        var versionCondition = tx.AddCondition(Condition.HashEqual(_clusterKey, TableVersionKey, SerializeVersion(Predeccessor(tableVersion))));
+
+        ConditionResult? insertCondition;
+        if (allowInsertOnly)
         {
-            _muxer = await _redisOptions.CreateMultiplexer(_redisOptions);
-            _db = _muxer.GetDatabase();
-
-            if (tryInitTableVersion)
-            {
-                await _db.HashSetAsync(_clusterKey, TableVersionKey, SerializeVersion(DefaultTableVersion), When.NotExists);
-
-                if (_redisOptions.EntryExpiry is { } expiry)
-                {
-                    await _db.KeyExpireAsync(_clusterKey, expiry);
-                }
-            }
-
-            this.IsInitialized = true;
+            insertCondition = tx.AddCondition(Condition.HashNotExists(_clusterKey, rowKey));
+        }
+        else
+        {
+            insertCondition = null;
         }
 
-        public async Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion)
+        tx.HashSetAsync(_clusterKey, rowKey, Serialize(entry)).Ignore();
+
+        var success = await tx.ExecuteAsync();
+
+        if (success)
         {
-            return await UpsertRowInternal(entry, tableVersion, updateTableVersion: true, allowInsertOnly: true) == UpsertResult.Success;
+            return UpsertResult.Success;
         }
 
-        private async Task<UpsertResult> UpsertRowInternal(MembershipEntry entry, TableVersion tableVersion, bool updateTableVersion, bool allowInsertOnly)
+        if (!versionCondition.WasSatisfied)
         {
-            var tx = _db.CreateTransaction();
-            var rowKey = entry.SiloAddress.ToString();
-
-            if (updateTableVersion)
-            {
-                tx.HashSetAsync(_clusterKey, TableVersionKey, SerializeVersion(tableVersion)).Ignore();
-            }
-
-            var versionCondition = tx.AddCondition(Condition.HashEqual(_clusterKey, TableVersionKey, SerializeVersion(Predeccessor(tableVersion))));
-
-            ConditionResult? insertCondition;
-            if (allowInsertOnly)
-            {
-                insertCondition = tx.AddCondition(Condition.HashNotExists(_clusterKey, rowKey));
-            }
-            else
-            {
-                insertCondition = null;
-            }
-
-            tx.HashSetAsync(_clusterKey, rowKey, Serialize(entry)).Ignore();
-
-            var success = await tx.ExecuteAsync();
-
-            if (success)
-            {
-                return UpsertResult.Success;
-            }
-
-            if (!versionCondition.WasSatisfied)
-            {
-                return UpsertResult.Conflict;
-            }
-
-            if (insertCondition is not null && !insertCondition.WasSatisfied)
-            {
-                return UpsertResult.Conflict;
-            }
-
-            return UpsertResult.Failure;
+            return UpsertResult.Conflict;
         }
 
-        public async Task<MembershipTableData> ReadAll()
+        if (insertCondition is not null && !insertCondition.WasSatisfied)
         {
-            var all = await _db.HashGetAllAsync(_clusterKey);
-            var tableVersionRow = all.SingleOrDefault(h => TableVersionKey.Equals(h.Name, StringComparison.Ordinal));
-            TableVersion tableVersion = GetTableVersionFromRow(tableVersionRow.Value);
-
-            var data = all.Where(x => !TableVersionKey.Equals(x.Name, StringComparison.Ordinal) && x.Value.HasValue)
-                .Select(x => Tuple.Create(Deserialize(x.Value!), tableVersion.VersionEtag))
-                .ToList();
-            return new MembershipTableData(data, tableVersion);
+            return UpsertResult.Conflict;
         }
 
-        private static TableVersion GetTableVersionFromRow(RedisValue tableVersionRow)
-        {
-            if (TryGetValueString(tableVersionRow, out var value))
-            {
-                return DeserializeVersion(value);
-            }
+        return UpsertResult.Failure;
+    }
 
+    public async Task<MembershipTableData> ReadAll()
+    {
+        var all = await _db.HashGetAllAsync(_clusterKey);
+        var tableVersionRow = all.SingleOrDefault(h => TableVersionKey.Equals(h.Name, StringComparison.Ordinal));
+        TableVersion tableVersion = GetTableVersionFromRow(tableVersionRow.Value);
+
+        var data = all.Where(x => !TableVersionKey.Equals(x.Name, StringComparison.Ordinal) && x.Value.HasValue)
+            .Select(x => Tuple.Create(Deserialize(x.Value!), tableVersion.VersionEtag))
+            .ToList();
+        return new MembershipTableData(data, tableVersion);
+    }
+
+    private static TableVersion GetTableVersionFromRow(RedisValue tableVersionRow)
+    {
+        if (TryGetValueString(tableVersionRow, out var value))
+        {
+            return DeserializeVersion(value);
+        }
+
+        return DefaultTableVersion;
+    }
+
+    private static bool TryGetValueString(RedisValue key, [NotNullWhen(true)] out string? value)
+    {
+        if (key.HasValue)
+        {
+            value = key.ToString();
+            return true;
+        }
+
+        value = null;
+        return false;
+    }
+
+    public async Task<MembershipTableData> ReadRow(SiloAddress key)
+    {
+        var tx = _db.CreateTransaction();
+        var tableVersionRowTask = tx.HashGetAsync(_clusterKey, TableVersionKey);
+        var entryRowTask = tx.HashGetAsync(_clusterKey, key.ToString());
+        if (!await tx.ExecuteAsync())
+        {
+            throw new RedisClusteringException($"Unexpected transaction failure while reading key {key}");
+        }
+
+        TableVersion tableVersion = GetTableVersionFromRow(await tableVersionRowTask);
+        var entryRow = await entryRowTask;
+        if (TryGetValueString(entryRow, out var entryValueString))
+        {
+            var entry = Deserialize(entryValueString);
+            return new MembershipTableData(Tuple.Create(entry, tableVersion.VersionEtag), tableVersion);
+        }
+        else
+        {
+            return new MembershipTableData(tableVersion);
+        }
+    }
+
+    public async Task UpdateIAmAlive(MembershipEntry entry)
+    {
+        var key = entry.SiloAddress.ToString();
+        var tx = _db.CreateTransaction();
+        var tableVersionRowTask = tx.HashGetAsync(_clusterKey, TableVersionKey);
+        var entryRowTask = tx.HashGetAsync(_clusterKey, key);
+        if (!await tx.ExecuteAsync())
+        {
+            throw new RedisClusteringException($"Unexpected transaction failure while reading key {key}");
+        }
+
+        var entryRow = await entryRowTask;
+        if (!TryGetValueString(entryRow, out var entryRowValue))
+        {
+            throw new RedisClusteringException($"Could not find a value for the key {key}");
+        }
+
+        TableVersion tableVersion = GetTableVersionFromRow(await tableVersionRowTask).Next();
+        var existingEntry = Deserialize(entryRowValue);
+
+        // Update only the IAmAliveTime property.
+        existingEntry.IAmAliveTime = entry.IAmAliveTime;
+
+        var result = await UpsertRowInternal(existingEntry, tableVersion, updateTableVersion: false, allowInsertOnly: false);
+        if (result == UpsertResult.Conflict)
+        {
+            throw new RedisClusteringException($"Failed to update IAmAlive value for key {key} due to conflict");
+        }
+        else if (result != UpsertResult.Success)
+        {
+            throw new RedisClusteringException($"Failed to update IAmAlive value for key {key} for an unknown reason");
+        }
+    }
+
+    public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
+    {
+        return await UpsertRowInternal(entry, tableVersion, updateTableVersion: true, allowInsertOnly: false) == UpsertResult.Success;
+    }
+
+    public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
+    {
+        var entries = await this.ReadAll();
+        foreach (var (entry, _) in entries.Members)
+        {
+            if (entry.Status != SiloStatus.Active
+                && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
+            {
+                await _db.HashDeleteAsync(_clusterKey, entry.SiloAddress.ToString());
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        _muxer?.Dispose();
+    }
+
+    private enum UpsertResult
+    {
+        Success = 1,
+        Failure = 2,
+        Conflict = 3,
+    }
+
+    private static string SerializeVersion(TableVersion tableVersion) => tableVersion.Version.ToString(CultureInfo.InvariantCulture);
+
+    private static TableVersion DeserializeVersion(string versionString)
+    {
+        if (string.IsNullOrWhiteSpace(versionString))
+        {
             return DefaultTableVersion;
         }
 
-        private static bool TryGetValueString(RedisValue key, [NotNullWhen(true)] out string? value)
-        {
-            if (key.HasValue)
-            {
-                value = key.ToString();
-                return true;
-            }
+        var version = int.Parse(versionString);
+        return new TableVersion(version, versionString);
+    }
 
-            value = null;
-            return false;
-        }
-
-        public async Task<MembershipTableData> ReadRow(SiloAddress key)
-        {
-            var tx = _db.CreateTransaction();
-            var tableVersionRowTask = tx.HashGetAsync(_clusterKey, TableVersionKey);
-            var entryRowTask = tx.HashGetAsync(_clusterKey, key.ToString());
-            if (!await tx.ExecuteAsync())
-            {
-                throw new RedisClusteringException($"Unexpected transaction failure while reading key {key}");
-            }
-
-            TableVersion tableVersion = GetTableVersionFromRow(await tableVersionRowTask);
-            var entryRow = await entryRowTask;
-            if (TryGetValueString(entryRow, out var entryValueString))
-            {
-                var entry = Deserialize(entryValueString);
-                return new MembershipTableData(Tuple.Create(entry, tableVersion.VersionEtag), tableVersion);
-            }
-            else
-            {
-                return new MembershipTableData(tableVersion);
-            }
-        }
-
-        public async Task UpdateIAmAlive(MembershipEntry entry)
-        {
-            var key = entry.SiloAddress.ToString();
-            var tx = _db.CreateTransaction();
-            var tableVersionRowTask = tx.HashGetAsync(_clusterKey, TableVersionKey);
-            var entryRowTask = tx.HashGetAsync(_clusterKey, key);
-            if (!await tx.ExecuteAsync())
-            {
-                throw new RedisClusteringException($"Unexpected transaction failure while reading key {key}");
-            }
-
-            var entryRow = await entryRowTask;
-            if (!TryGetValueString(entryRow, out var entryRowValue))
-            {
-                throw new RedisClusteringException($"Could not find a value for the key {key}");
-            }
-
-            TableVersion tableVersion = GetTableVersionFromRow(await tableVersionRowTask).Next();
-            var existingEntry = Deserialize(entryRowValue);
-
-            // Update only the IAmAliveTime property.
-            existingEntry.IAmAliveTime = entry.IAmAliveTime;
-
-            var result = await UpsertRowInternal(existingEntry, tableVersion, updateTableVersion: false, allowInsertOnly: false);
-            if (result == UpsertResult.Conflict)
-            {
-                throw new RedisClusteringException($"Failed to update IAmAlive value for key {key} due to conflict");
-            }
-            else if (result != UpsertResult.Success)
-            {
-                throw new RedisClusteringException($"Failed to update IAmAlive value for key {key} for an unknown reason");
-            }
-        }
-
-        public async Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion)
-        {
-            return await UpsertRowInternal(entry, tableVersion, updateTableVersion: true, allowInsertOnly: false) == UpsertResult.Success;
-        }
-
-        public async Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
-        {
-            var entries = await this.ReadAll();
-            foreach (var (entry, _) in entries.Members)
-            {
-                if (entry.Status != SiloStatus.Active
-                    && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
-                {
-                    await _db.HashDeleteAsync(_clusterKey, entry.SiloAddress.ToString());
-                }
-            }
-        }
-
-        public void Dispose()
-        {
-            _muxer?.Dispose();
-        }
-
-        private enum UpsertResult
-        {
-            Success = 1,
-            Failure = 2,
-            Conflict = 3,
-        }
-
-        private static string SerializeVersion(TableVersion tableVersion) => tableVersion.Version.ToString(CultureInfo.InvariantCulture);
-
-        private static TableVersion DeserializeVersion(string versionString)
-        {
-            if (string.IsNullOrWhiteSpace(versionString))
-            {
-                return DefaultTableVersion;
-            }
-
-            var version = int.Parse(versionString);
-            return new TableVersion(version, versionString);
-        }
-
-        private static TableVersion Predeccessor(TableVersion tableVersion) => new TableVersion(tableVersion.Version - 1, (tableVersion.Version - 1).ToString(CultureInfo.InvariantCulture));
+    private static TableVersion Predeccessor(TableVersion tableVersion) => new TableVersion(tableVersion.Version - 1, (tableVersion.Version - 1).ToString(CultureInfo.InvariantCulture));
 
 
-        private string Serialize(MembershipEntry value)
-        {
-            return JsonConvert.SerializeObject(value, _jsonSerializerSettings);
-        }
+    private string Serialize(MembershipEntry value)
+    {
+        return JsonConvert.SerializeObject(value, _jsonSerializerSettings);
+    }
 
-        private MembershipEntry Deserialize(string json)
-        {
-            return JsonConvert.DeserializeObject<MembershipEntry>(json, _jsonSerializerSettings)!;
-        }
+    private MembershipEntry Deserialize(string json)
+    {
+        return JsonConvert.DeserializeObject<MembershipEntry>(json, _jsonSerializerSettings)!;
     }
 }

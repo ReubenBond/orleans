@@ -1,42 +1,41 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Providers.Streams.Common
+namespace Orleans.Providers.Streams.Common;
+
+/// <summary>
+/// Pool of tightly packed cached messages that are kept in large blocks to reduce GC pressure.
+/// </summary>
+internal class CachedMessagePool
 {
+    private readonly IObjectPool<CachedMessageBlock> messagePool;
+    private CachedMessageBlock currentMessageBlock;
+
     /// <summary>
-    /// Pool of tightly packed cached messages that are kept in large blocks to reduce GC pressure.
+    /// Allocates a pool of cached message blocks.
     /// </summary>
-    internal class CachedMessagePool
+    /// <param name="cacheDataAdapter">The cache data adapter.</param>
+    public CachedMessagePool(ICacheDataAdapter cacheDataAdapter)
     {
-        private readonly IObjectPool<CachedMessageBlock> messagePool;
-        private CachedMessageBlock currentMessageBlock;
+        messagePool = new ObjectPool<CachedMessageBlock>(
+            () => new CachedMessageBlock());
+    }
 
-        /// <summary>
-        /// Allocates a pool of cached message blocks.
-        /// </summary>
-        /// <param name="cacheDataAdapter">The cache data adapter.</param>
-        public CachedMessagePool(ICacheDataAdapter cacheDataAdapter)
+    /// <summary>
+    /// Allocates a message in a block and returns the block the message is in.
+    /// </summary>
+    /// <returns>The cached message block which the message was allocated in.</returns>
+    public CachedMessageBlock AllocateMessage(CachedMessage message)
+    {
+        CachedMessageBlock returnBlock = currentMessageBlock ?? (currentMessageBlock = messagePool.Allocate());
+        returnBlock.Add(message);
+
+        // blocks at capacity are eligable for purge, so we don't want to be holding on to them.
+        if (!currentMessageBlock.HasCapacity)
         {
-            messagePool = new ObjectPool<CachedMessageBlock>(
-                () => new CachedMessageBlock());
+            currentMessageBlock = messagePool.Allocate();
         }
 
-        /// <summary>
-        /// Allocates a message in a block and returns the block the message is in.
-        /// </summary>
-        /// <returns>The cached message block which the message was allocated in.</returns>
-        public CachedMessageBlock AllocateMessage(CachedMessage message)
-        {
-            CachedMessageBlock returnBlock = currentMessageBlock ?? (currentMessageBlock = messagePool.Allocate());
-            returnBlock.Add(message);
-
-            // blocks at capacity are eligable for purge, so we don't want to be holding on to them.
-            if (!currentMessageBlock.HasCapacity)
-            {
-                currentMessageBlock = messagePool.Allocate();
-            }
-
-            return returnBlock;
-        }
+        return returnBlock;
     }
 }

@@ -6,67 +6,66 @@ using k8s.Autorest;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 
-namespace Orleans.Hosting.Kubernetes
+namespace Orleans.Hosting.Kubernetes;
+
+internal static class KubernetesClientExtensions
 {
-    internal static class KubernetesClientExtensions
+    public static async IAsyncEnumerable<(WatchEventType EventType, TValue Value)> WatchAsync<TList, TValue>(this HttpOperationResponse<TList> watchList, [EnumeratorCancellation] CancellationToken cancellation)
     {
-        public static async IAsyncEnumerable<(WatchEventType EventType, TValue Value)> WatchAsync<TList, TValue>(this HttpOperationResponse<TList> watchList, [EnumeratorCancellation] CancellationToken cancellation)
+        Channel<(WatchEventType, TValue)> channel = Channel.CreateUnbounded<(WatchEventType, TValue)>(
+            new UnboundedChannelOptions
+            {
+                AllowSynchronousContinuations = false,
+                SingleReader = true,
+                SingleWriter = true
+            });
+
+        var reader = channel.Reader;
+        Watcher<TValue>[] watcher = new Watcher<TValue>[] { default };
+        var cancellationRegistration = cancellation.Register(() =>
         {
-            Channel<(WatchEventType, TValue)> channel = Channel.CreateUnbounded<(WatchEventType, TValue)>(
-                new UnboundedChannelOptions
-                {
-                    AllowSynchronousContinuations = false,
-                    SingleReader = true,
-                    SingleWriter = true
-                });
+            _ = channel.Writer.TryComplete();
+            watcher[0]?.Dispose();
+        });
 
-            var reader = channel.Reader;
-            Watcher<TValue>[] watcher = new Watcher<TValue>[] { default };
-            var cancellationRegistration = cancellation.Register(() =>
-            {
-                _ = channel.Writer.TryComplete();
-                watcher[0]?.Dispose();
-            });
+        watcher[0] = watchList.Watch<TValue, TList>((eventType, value) =>
+        {
+            _ = channel.Writer.TryWrite((eventType, value));
+        },
+        exception =>
+        {
+            _ = channel.Writer.TryComplete(exception);
+            cancellationRegistration.Dispose();
+        },
+        () =>
+        {
+            _ = channel.Writer.TryComplete();
+            cancellationRegistration.Dispose();
+        });
 
-            watcher[0] = watchList.Watch<TValue, TList>((eventType, value) =>
+        _ = Task.Run(async () =>
+        {
+            try
             {
-                _ = channel.Writer.TryWrite((eventType, value));
-            },
-            exception =>
+                await channel.Reader.Completion.ConfigureAwait(false);
+            }
+            catch (Exception)
             {
-                _ = channel.Writer.TryComplete(exception);
+                // suppress exception set by channel writer and re-thrown by Completion task
+            }
+            finally
+            {
+                watcher[0].Dispose();
                 cancellationRegistration.Dispose();
-            },
-            () =>
-            {
-                _ = channel.Writer.TryComplete();
-                cancellationRegistration.Dispose();
-            });
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await channel.Reader.Completion.ConfigureAwait(false);
-                }
-                catch (Exception)
-                {
-                    // suppress exception set by channel writer and re-thrown by Completion task
-                }
-                finally
-                {
-                    watcher[0].Dispose();
-                    cancellationRegistration.Dispose();
-                }
-            });
+            }
+        });
 
 
-            while (await channel.Reader.WaitToReadAsync(cancellation))
+        while (await channel.Reader.WaitToReadAsync(cancellation))
+        {
+            while (reader.TryRead(out var item))
             {
-                while (reader.TryRead(out var item))
-                {
-                    yield return item;
-                }
+                yield return item;
             }
         }
     }

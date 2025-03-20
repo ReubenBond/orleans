@@ -3,38 +3,37 @@
 
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Serialization.Configuration
+namespace Orleans.Serialization.Configuration;
+
+/// <summary>
+/// Provides type manifest information.
+/// </summary>
+public interface ITypeManifestProvider : IConfigureOptions<TypeManifestOptions>
 {
-    /// <summary>
-    /// Provides type manifest information.
-    /// </summary>
-    public interface ITypeManifestProvider : IConfigureOptions<TypeManifestOptions>
-    {
-    }
+}
 
-    /// <summary>
-    /// Base class for generated type manifest providers.
-    /// </summary>
-    public abstract class TypeManifestProviderBase : ITypeManifestProvider
+/// <summary>
+/// Base class for generated type manifest providers.
+/// </summary>
+public abstract class TypeManifestProviderBase : ITypeManifestProvider
+{
+    /// <inheritdoc/>
+    void IConfigureOptions<TypeManifestOptions>.Configure(TypeManifestOptions options)
     {
-        /// <inheritdoc/>
-        void IConfigureOptions<TypeManifestOptions>.Configure(TypeManifestOptions options)
+        if (options.TypeManifestProviders.Add(Key))
         {
-            if (options.TypeManifestProviders.Add(Key))
-            {
-                ConfigureInner(options);
-            }
+            ConfigureInner(options);
         }
-
-        /// <summary>
-        /// Gets the unique identifier for this type manifest provider.
-        /// </summary>
-        public virtual object Key => GetType();
-
-        /// <summary>
-        /// Configures the provided type manifest options.
-        /// </summary>
-        /// <param name="options">The type manifest options.</param>
-        protected abstract void ConfigureInner(TypeManifestOptions options);
     }
+
+    /// <summary>
+    /// Gets the unique identifier for this type manifest provider.
+    /// </summary>
+    public virtual object Key => GetType();
+
+    /// <summary>
+    /// Configures the provided type manifest options.
+    /// </summary>
+    /// <param name="options">The type manifest options.</param>
+    protected abstract void ConfigureInner(TypeManifestOptions options);
 }

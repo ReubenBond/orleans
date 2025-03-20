@@ -7,77 +7,76 @@ using System.IO.Pipelines;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 
-namespace Orleans.Networking.Shared
+namespace Orleans.Networking.Shared;
+
+internal sealed class SocketSender : SocketSenderReceiverBase
 {
-    internal sealed class SocketSender : SocketSenderReceiverBase
+    private List<ArraySegment<byte>> _bufferList;
+
+    public SocketSender(Socket socket, PipeScheduler scheduler) : base(socket, scheduler)
     {
-        private List<ArraySegment<byte>> _bufferList;
+    }
 
-        public SocketSender(Socket socket, PipeScheduler scheduler) : base(socket, scheduler)
+    public SocketAwaitableEventArgs SendAsync(in ReadOnlySequence<byte> buffers)
+    {
+        if (buffers.IsSingleSegment)
         {
+            return SendAsync(buffers.First);
         }
 
-        public SocketAwaitableEventArgs SendAsync(in ReadOnlySequence<byte> buffers)
+        if (!_awaitableEventArgs.Equals(Memory<byte>.Empty))
         {
-            if (buffers.IsSingleSegment)
-            {
-                return SendAsync(buffers.First);
-            }
-
-            if (!_awaitableEventArgs.Equals(Memory<byte>.Empty))
-            {
-                _awaitableEventArgs.SetBuffer(null, 0, 0);
-            }
-
-            _awaitableEventArgs.BufferList = GetBufferList(buffers);
-
-            if (!_socket.SendAsync(_awaitableEventArgs))
-            {
-                _awaitableEventArgs.Complete();
-            }
-
-            return _awaitableEventArgs;
+            _awaitableEventArgs.SetBuffer(null, 0, 0);
         }
 
-        private SocketAwaitableEventArgs SendAsync(ReadOnlyMemory<byte> memory)
+        _awaitableEventArgs.BufferList = GetBufferList(buffers);
+
+        if (!_socket.SendAsync(_awaitableEventArgs))
         {
-            // The BufferList getter is much less expensive then the setter.
-            if (_awaitableEventArgs.BufferList != null)
-            {
-                _awaitableEventArgs.BufferList = null;
-            }
-
-            _awaitableEventArgs.SetBuffer(MemoryMarshal.AsMemory(memory));
-
-            if (!_socket.SendAsync(_awaitableEventArgs))
-            {
-                _awaitableEventArgs.Complete();
-            }
-
-            return _awaitableEventArgs;
+            _awaitableEventArgs.Complete();
         }
 
-        private List<ArraySegment<byte>> GetBufferList(in ReadOnlySequence<byte> buffer)
+        return _awaitableEventArgs;
+    }
+
+    private SocketAwaitableEventArgs SendAsync(ReadOnlyMemory<byte> memory)
+    {
+        // The BufferList getter is much less expensive then the setter.
+        if (_awaitableEventArgs.BufferList != null)
         {
-            Debug.Assert(!buffer.IsEmpty);
-            Debug.Assert(!buffer.IsSingleSegment);
-
-            if (_bufferList == null)
-            {
-                _bufferList = new List<ArraySegment<byte>>();
-            }
-            else
-            {
-                // Buffers are pooled, so it's OK to root them until the next multi-buffer write.
-                _bufferList.Clear();
-            }
-
-            foreach (var b in buffer)
-            {
-                _bufferList.Add(b.GetArray());
-            }
-
-            return _bufferList;
+            _awaitableEventArgs.BufferList = null;
         }
+
+        _awaitableEventArgs.SetBuffer(MemoryMarshal.AsMemory(memory));
+
+        if (!_socket.SendAsync(_awaitableEventArgs))
+        {
+            _awaitableEventArgs.Complete();
+        }
+
+        return _awaitableEventArgs;
+    }
+
+    private List<ArraySegment<byte>> GetBufferList(in ReadOnlySequence<byte> buffer)
+    {
+        Debug.Assert(!buffer.IsEmpty);
+        Debug.Assert(!buffer.IsSingleSegment);
+
+        if (_bufferList == null)
+        {
+            _bufferList = new List<ArraySegment<byte>>();
+        }
+        else
+        {
+            // Buffers are pooled, so it's OK to root them until the next multi-buffer write.
+            _bufferList.Clear();
+        }
+
+        foreach (var b in buffer)
+        {
+            _bufferList.Add(b.GetArray());
+        }
+
+        return _bufferList;
     }
 }

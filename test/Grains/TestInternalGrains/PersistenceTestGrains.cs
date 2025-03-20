@@ -15,33 +15,558 @@ using Orleans.Storage;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
-namespace UnitTests.Grains
+namespace UnitTests.Grains;
+
+internal static class TestRuntimeEnvironmentUtility
 {
-    internal static class TestRuntimeEnvironmentUtility
+    public static string CaptureRuntimeEnvironment()
     {
-        public static string CaptureRuntimeEnvironment()
+        var callStack = Utils.GetStackTrace(1); // Don't include this method in stack trace
+        return
+            $"""
+            TaskScheduler={TaskScheduler.Current}
+            RuntimeContext={RuntimeContext.Current}
+            WorkerPoolThread={Thread.CurrentThread.Name}
+            Thread.CurrentThread.ManagedThreadId={Thread.CurrentThread.ManagedThreadId}
+            StackTrace={callStack}
+            """;
+    }
+}
+
+[Serializable]
+[GenerateSerializer]
+public class PersistenceTestGrainState
+{
+    public PersistenceTestGrainState()
+    {
+        SortedDict = new SortedDictionary<int, int>();
+    }
+
+    [Id(0)]
+    public int Field1 { get; set; }
+    [Id(1)]
+    public string Field2 { get; set; }
+    [Id(2)]
+    public SortedDictionary<int, int> SortedDict { get; set; }
+}
+
+[Serializable]
+[GenerateSerializer]
+public class PersistenceGenericGrainState<T>
+{
+    [Id(0)]
+    public T Field1 { get; set; }
+    [Id(1)]
+    public string Field2 { get; set; }
+    [Id(2)]
+    public SortedDictionary<T, T> SortedDict { get; set; }
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "test1")]
+public class PersistenceTestGrain : Grain<PersistenceTestGrainState>, IPersistenceTestGrain
+{
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> CheckStateInit()
+    {
+        Assert.NotNull(State);
+        Assert.Equal(0, State.Field1);
+        Assert.Null(State.Field2);
+        //Assert.NotNull(State.Field3, "Null Field3");
+        //Assert.AreEqual(0, State.Field3.Count, "Field3 = {0}", String.Join("'", State.Field3));
+        Assert.NotNull(State.SortedDict);
+        return Task.FromResult(true);
+    }
+
+    public Task<string> CheckProviderType()
+    {
+        IGrainStorage grainStorage = GrainStorageHelpers.GetGrainStorage(GetType(), this.ServiceProvider);
+        Assert.NotNull(grainStorage);
+        return Task.FromResult(grainStorage.GetType().FullName);
+    }
+
+    public Task DoSomething()
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task DoWrite(int val)
+    {
+        State.Field1 = val;
+        State.SortedDict[val] = val;
+        return WriteStateAsync();
+    }
+
+    public async Task<int> DoRead()
+    {
+        await ReadStateAsync();
+        return State.Field1;
+    }
+
+    public Task<int> GetValue()
+    {
+        return Task.FromResult(State.Field1);
+    }
+
+    public async Task DoDelete()
+    {
+        await ClearStateAsync();
+    }
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "test1")]
+public class PersistenceTestGenericGrain<T> : PersistenceTestGrain, IPersistenceTestGenericGrain<T>
+{
+    //...
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "ErrorInjector")]
+public class PersistenceProviderErrorGrain : Grain<PersistenceTestGrainState>, IPersistenceProviderErrorGrain
+{
+    private readonly string _id = Guid.NewGuid().ToString();
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<int> GetValue()
+    {
+        return Task.FromResult(State.Field1);
+    }
+
+    public Task DoWrite(int val)
+    {
+        State.Field1 = val;
+        return WriteStateAsync();
+    }
+
+    public async Task<int> DoRead()
+    {
+        await ReadStateAsync();
+        return State.Field1;
+    }
+
+    public Task<string> GetActivationId() => Task.FromResult(_id);
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "ErrorInjector")]
+public class PersistenceUserHandledErrorGrain : Grain<PersistenceTestGrainState>, IPersistenceUserHandledErrorGrain
+{
+    private readonly ILogger logger;
+    private readonly DeepCopier<PersistenceTestGrainState> copier;
+
+    public PersistenceUserHandledErrorGrain(ILoggerFactory loggerFactory, DeepCopier<PersistenceTestGrainState> copier)
+    {
+        this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+        this.copier = copier;
+    }
+
+    public Task<int> GetValue()
+    {
+        return Task.FromResult(State.Field1);
+    }
+
+    public async Task DoWrite(int val, bool recover)
+    {
+        var original = this.copier.Copy(State);
+        try
         {
-            var callStack = Utils.GetStackTrace(1); // Don't include this method in stack trace
-            return
-                $"""
-                TaskScheduler={TaskScheduler.Current}
-                RuntimeContext={RuntimeContext.Current}
-                WorkerPoolThread={Thread.CurrentThread.Name}
-                Thread.CurrentThread.ManagedThreadId={Thread.CurrentThread.ManagedThreadId}
-                StackTrace={callStack}
-                """;
+            State.Field1 = val;
+            await WriteStateAsync();
         }
+        catch (Exception exc)
+        {
+            if (!recover) throw;
+
+            this.logger.LogWarning(exc, "Grain is handling error in DoWrite - Resetting value to {Original}", original);
+            State = (PersistenceTestGrainState)original;
+        }
+    }
+
+    public async Task<int> DoRead(bool recover)
+    {
+        var original = this.copier.Copy(State);
+        try
+        {
+            await ReadStateAsync();
+        }
+        catch (Exception exc)
+        {
+            if (!recover) throw;
+
+            this.logger.LogWarning(exc, "Grain is handling error in DoRead - Resetting value to {Original}", original);
+            State = (PersistenceTestGrainState)original;
+        }
+        return State.Field1;
+    }
+}
+
+public class PersistenceProviderErrorProxyGrain : Grain, IPersistenceProviderErrorProxyGrain
+{
+    private readonly string _id = Guid.NewGuid().ToString();
+
+    public Task<int> GetValue(IPersistenceProviderErrorGrain other) => other.GetValue();
+
+    public Task DoWrite(int val, IPersistenceProviderErrorGrain other) => other.DoWrite(val);
+
+    public Task<int> DoRead(IPersistenceProviderErrorGrain other) => other.DoRead();
+
+    public Task<string> GetActivationId() => Task.FromResult(_id);
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "test1")]
+public class PersistenceErrorGrain : Grain<PersistenceTestGrainState>, IPersistenceErrorGrain
+{
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<int> GetValue()
+    {
+        return Task.FromResult(State.Field1);
+    }
+
+    public Task DoWrite(int val)
+    {
+        State.Field1 = val;
+        return WriteStateAsync();
+    }
+
+    public async Task DoWriteError(int val, bool errorBeforeUpdate)
+    {
+        if (errorBeforeUpdate) throw new ApplicationException("Before Update");
+        State.Field1 = val;
+        await WriteStateAsync();
+        throw new ApplicationException("After Update");
+    }
+
+    public async Task<int> DoRead()
+    {
+        await ReadStateAsync(); // Re-read state from store
+        return State.Field1;
+    }
+
+    public async Task<int> DoReadError(bool errorBeforeRead)
+    {
+        if (errorBeforeRead) throw new ApplicationException("Before Read");
+        await ReadStateAsync(); // Attempt to re-read state from store
+        throw new ApplicationException("After Read");
+    }
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "MissingProvider")]
+public class BadProviderTestGrain : Grain<PersistenceTestGrainState>, IBadProviderTestGrain
+{
+    private readonly ILogger logger;
+
+    public BadProviderTestGrain(ILoggerFactory loggerFactory)
+    {
+        this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+    }
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        this.logger.LogWarning("OnActivateAsync");
+        return Task.CompletedTask;
+    }
+
+    public Task DoSomething()
+    {
+        this.logger.LogWarning("DoSomething");
+        throw new ApplicationException(
+            "BadProviderTestGrain.DoSomething should never get called when provider is missing");
+    }
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "test1")]
+public class PersistenceNoStateTestGrain : Grain, IPersistenceNoStateTestGrain
+{
+    private readonly ILogger logger;
+
+    public PersistenceNoStateTestGrain(ILoggerFactory loggerFactory)
+    {
+        this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+    }
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        this.logger.LogInformation("OnActivateAsync");
+        return Task.CompletedTask;
+    }
+
+    public Task DoSomething()
+    {
+        this.logger.LogInformation("DoSomething");
+        return Task.CompletedTask;
+    }
+}
+
+public class ServiceIdGrain : Grain, IServiceIdGrain
+{
+    private readonly IOptions<ClusterOptions> clusterOptions;
+
+    public ServiceIdGrain(IOptions<ClusterOptions> clusterOptions)
+    {
+        this.clusterOptions = clusterOptions;
+    }
+
+    public Task<string> GetServiceId()
+    {
+        return Task.FromResult(clusterOptions.Value.ServiceId);
+    }
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
+public class GrainStorageTestGrain : Grain<PersistenceTestGrainState>,
+    IGrainStorageTestGrain, IGrainStorageTestGrain_LongKey
+{
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<int> GetValue()
+    {
+        return Task.FromResult(State.Field1);
+    }
+
+    public Task DoWrite(int val)
+    {
+        State.Field1 = val;
+        return WriteStateAsync();
+    }
+
+    public async Task<int> DoRead()
+    {
+        await ReadStateAsync(); // Re-read state from store
+        return State.Field1;
+    }
+
+    public Task DoDelete()
+    {
+        return ClearStateAsync();
+    }
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
+public class GrainStorageGenericGrain<T> : Grain<PersistenceGenericGrainState<T>>,
+    IGrainStorageGenericGrain<T>
+{
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<T> GetValue()
+    {
+        return Task.FromResult(State.Field1);
+    }
+
+    public Task DoWrite(T val)
+    {
+        State.Field1 = val;
+        return WriteStateAsync();
+    }
+
+    public async Task<T> DoRead()
+    {
+        await ReadStateAsync(); // Re-read state from store
+        return State.Field1;
+    }
+
+    public Task DoDelete()
+    {
+        return ClearStateAsync();
+    }
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
+public class GrainStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
+    IGrainStorageTestGrain_GuidExtendedKey, IGrainStorageTestGrain_LongExtendedKey
+{
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<int> GetValue()
+    {
+        return Task.FromResult(State.Field1);
+    }
+
+    public Task<string> GetExtendedKeyValue()
+    {
+        string extKey;
+        _ = this.GetPrimaryKey(out extKey);
+        return Task.FromResult(extKey);
+    }
+
+    public Task DoWrite(int val)
+    {
+        State.Field1 = val;
+        return WriteStateAsync();
+    }
+
+    public async Task<int> DoRead()
+    {
+        await ReadStateAsync(); // Re-read state from store
+        return State.Field1;
+    }
+
+    public Task DoDelete()
+    {
+        return ClearStateAsync();
+    }
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
+public class AWSStorageTestGrain : Grain<PersistenceTestGrainState>,
+    IAWSStorageTestGrain, IAWSStorageTestGrain_LongKey
+{
+    private readonly string _id = Guid.NewGuid().ToString();
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<int> GetValue()
+    {
+        return Task.FromResult(State.Field1);
+    }
+
+    public Task DoWrite(int val)
+    {
+        State.Field1 = val;
+        return WriteStateAsync();
+    }
+
+    public async Task<int> DoRead()
+    {
+        await ReadStateAsync(); // Re-read state from store
+        return State.Field1;
+    }
+
+    public Task<string> GetActivationId() => Task.FromResult(_id);
+
+    public Task DoDelete()
+    {
+        return ClearStateAsync();
+    }
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
+public class AWSStorageGenericGrain<T> : Grain<PersistenceGenericGrainState<T>>,
+    IAWSStorageGenericGrain<T>
+{
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<T> GetValue()
+    {
+        return Task.FromResult(State.Field1);
+    }
+
+    public Task DoWrite(T val)
+    {
+        State.Field1 = val;
+        return WriteStateAsync();
+    }
+
+    public async Task<T> DoRead()
+    {
+        await ReadStateAsync(); // Re-read state from store
+        return State.Field1;
+    }
+
+    public Task DoDelete()
+    {
+        return ClearStateAsync();
+    }
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
+public class AWSStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
+    IAWSStorageTestGrain_GuidExtendedKey, IAWSStorageTestGrain_LongExtendedKey
+{
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<int> GetValue()
+    {
+        return Task.FromResult(State.Field1);
+    }
+
+    public Task<string> GetExtendedKeyValue()
+    {
+        string extKey;
+        _ = this.GetPrimaryKey(out extKey);
+        return Task.FromResult(extKey);
+    }
+
+    public Task DoWrite(int val)
+    {
+        State.Field1 = val;
+        return WriteStateAsync();
+    }
+
+    public async Task<int> DoRead()
+    {
+        await ReadStateAsync(); // Re-read state from store
+        return State.Field1;
+    }
+
+    public Task DoDelete()
+    {
+        return ClearStateAsync();
+    }
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
+//[Orleans.Providers.StorageProvider(ProviderName = "AzureStorageEmulator")]
+public class MemoryStorageTestGrain : Grain<MemoryStorageTestGrain.NestedPersistenceTestGrainState>,
+    IMemoryStorageTestGrain
+{
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<int> GetValue()
+    {
+        return Task.FromResult(State.Field1);
+    }
+
+    public Task DoWrite(int val)
+    {
+        State.Field1 = val;
+        return WriteStateAsync();
+    }
+
+    public async Task<int> DoRead()
+    {
+        await ReadStateAsync(); // Re-read state from store
+        return State.Field1;
+    }
+
+    public Task DoDelete()
+    {
+        return ClearStateAsync();
     }
 
     [Serializable]
     [GenerateSerializer]
-    public class PersistenceTestGrainState
+    public class NestedPersistenceTestGrainState
     {
-        public PersistenceTestGrainState()
-        {
-            SortedDict = new SortedDictionary<int, int>();
-        }
-
         [Id(0)]
         public int Field1 { get; set; }
         [Id(1)]
@@ -49,1183 +574,657 @@ namespace UnitTests.Grains
         [Id(2)]
         public SortedDictionary<int, int> SortedDict { get; set; }
     }
+}
 
-    [Serializable]
-    [GenerateSerializer]
-    public class PersistenceGenericGrainState<T>
+[Serializable]
+[GenerateSerializer]
+public class UserState
+{
+    public UserState()
     {
-        [Id(0)]
-        public T Field1 { get; set; }
-        [Id(1)]
-        public string Field2 { get; set; }
-        [Id(2)]
-        public SortedDictionary<T, T> SortedDict { get; set; }
+        Friends = new List<IUser>();
     }
 
-    [Orleans.Providers.StorageProvider(ProviderName = "test1")]
-    public class PersistenceTestGrain : Grain<PersistenceTestGrainState>, IPersistenceTestGrain
+    [Id(0)]
+    public string Name { get; set; }
+    [Id(1)]
+    public string Status { get; set; }
+    [Id(2)]
+    public List<IUser> Friends { get; set; }
+}
+
+[Serializable]
+[GenerateSerializer]
+public class DerivedUserState : UserState
+{
+    [Id(0)]
+    public int Field1 { get; set; }
+    [Id(1)]
+    public int Field2 { get; set; }
+}
+
+/// <summary>
+/// Orleans grain implementation class.
+/// </summary>
+[Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
+//[Orleans.Providers.StorageProvider(ProviderName = "AzureStore")]
+//[Orleans.Providers.StorageProvider(ProviderName = "AzureStorageEmulator")]
+public class UserGrain : Grain<DerivedUserState>, IUser
+{
+    public Task SetName(string name)
     {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task<bool> CheckStateInit()
-        {
-            Assert.NotNull(State);
-            Assert.Equal(0, State.Field1);
-            Assert.Null(State.Field2);
-            //Assert.NotNull(State.Field3, "Null Field3");
-            //Assert.AreEqual(0, State.Field3.Count, "Field3 = {0}", String.Join("'", State.Field3));
-            Assert.NotNull(State.SortedDict);
-            return Task.FromResult(true);
-        }
-
-        public Task<string> CheckProviderType()
-        {
-            IGrainStorage grainStorage = GrainStorageHelpers.GetGrainStorage(GetType(), this.ServiceProvider);
-            Assert.NotNull(grainStorage);
-            return Task.FromResult(grainStorage.GetType().FullName);
-        }
-
-        public Task DoSomething()
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task DoWrite(int val)
-        {
-            State.Field1 = val;
-            State.SortedDict[val] = val;
-            return WriteStateAsync();
-        }
-
-        public async Task<int> DoRead()
-        {
-            await ReadStateAsync();
-            return State.Field1;
-        }
-
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
-
-        public async Task DoDelete()
-        {
-            await ClearStateAsync();
-        }
+        State.Name = name;
+        return WriteStateAsync();
     }
 
-    [Orleans.Providers.StorageProvider(ProviderName = "test1")]
-    public class PersistenceTestGenericGrain<T> : PersistenceTestGrain, IPersistenceTestGenericGrain<T>
+    public Task<string> GetStatus()
     {
-        //...
+        return Task.FromResult($"{State.Name} : {State.Status}");
     }
 
-    [Orleans.Providers.StorageProvider(ProviderName = "ErrorInjector")]
-    public class PersistenceProviderErrorGrain : Grain<PersistenceTestGrainState>, IPersistenceProviderErrorGrain
+    public Task<string> GetName()
     {
-        private readonly string _id = Guid.NewGuid().ToString();
-
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
-
-        public Task DoWrite(int val)
-        {
-            State.Field1 = val;
-            return WriteStateAsync();
-        }
-
-        public async Task<int> DoRead()
-        {
-            await ReadStateAsync();
-            return State.Field1;
-        }
-
-        public Task<string> GetActivationId() => Task.FromResult(_id);
+        return Task.FromResult(State.Name);
     }
 
-    [Orleans.Providers.StorageProvider(ProviderName = "ErrorInjector")]
-    public class PersistenceUserHandledErrorGrain : Grain<PersistenceTestGrainState>, IPersistenceUserHandledErrorGrain
+    public Task UpdateStatus(string status)
     {
-        private readonly ILogger logger;
-        private readonly DeepCopier<PersistenceTestGrainState> copier;
-
-        public PersistenceUserHandledErrorGrain(ILoggerFactory loggerFactory, DeepCopier<PersistenceTestGrainState> copier)
-        {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
-            this.copier = copier;
-        }
-
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
-
-        public async Task DoWrite(int val, bool recover)
-        {
-            var original = this.copier.Copy(State);
-            try
-            {
-                State.Field1 = val;
-                await WriteStateAsync();
-            }
-            catch (Exception exc)
-            {
-                if (!recover) throw;
-
-                this.logger.LogWarning(exc, "Grain is handling error in DoWrite - Resetting value to {Original}", original);
-                State = (PersistenceTestGrainState)original;
-            }
-        }
-
-        public async Task<int> DoRead(bool recover)
-        {
-            var original = this.copier.Copy(State);
-            try
-            {
-                await ReadStateAsync();
-            }
-            catch (Exception exc)
-            {
-                if (!recover) throw;
-
-                this.logger.LogWarning(exc, "Grain is handling error in DoRead - Resetting value to {Original}", original);
-                State = (PersistenceTestGrainState)original;
-            }
-            return State.Field1;
-        }
+        State.Status = status;
+        return WriteStateAsync();
     }
 
-    public class PersistenceProviderErrorProxyGrain : Grain, IPersistenceProviderErrorProxyGrain
+    public Task AddFriend(IUser friend)
     {
-        private readonly string _id = Guid.NewGuid().ToString();
+        if (!State.Friends.Contains(friend))
+            State.Friends.Add(friend);
+        else
+            throw new Exception("Already a friend.");
 
-        public Task<int> GetValue(IPersistenceProviderErrorGrain other) => other.GetValue();
-
-        public Task DoWrite(int val, IPersistenceProviderErrorGrain other) => other.DoWrite(val);
-
-        public Task<int> DoRead(IPersistenceProviderErrorGrain other) => other.DoRead();
-
-        public Task<string> GetActivationId() => Task.FromResult(_id);
+        return Task.CompletedTask;
     }
 
-    [Orleans.Providers.StorageProvider(ProviderName = "test1")]
-    public class PersistenceErrorGrain : Grain<PersistenceTestGrainState>, IPersistenceErrorGrain
+    public Task<List<IUser>> GetFriends()
     {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
+        return Task.FromResult(State.Friends);
+    }
+
+    public async Task<string> GetFriendsStatuses()
+    {
+        var sb = new StringBuilder();
+        var promises = new List<Task<string>>();
+
+        foreach (var friend in State.Friends)
+            promises.Add(friend.GetStatus());
+
+        var friends = await Task.WhenAll(promises);
+
+        foreach (var f in friends)
         {
-            return Task.CompletedTask;
+            sb.AppendLine(f);
         }
 
-        public Task<int> GetValue()
+        return sb.ToString();
+    }
+}
+
+[Serializable]
+[GenerateSerializer]
+public class StateForIReentrentGrain
+{
+    public StateForIReentrentGrain()
+    {
+        DictOne = new Dictionary<string, int>();
+        DictTwo = new Dictionary<string, int>();
+    }
+
+    [Id(0)]
+    public int One { get; set; }
+    [Id(1)]
+    public int Two { get; set; }
+    [Id(2)]
+    public Dictionary<string, int> DictOne { get; set; }
+    [Id(3)]
+    public Dictionary<string, int> DictTwo { get; set; }
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
+[Reentrant]
+public class ReentrentGrainWithState : Grain<StateForIReentrentGrain>, IReentrentGrainWithState
+{
+    private const int Multiple = 100;
+
+    private IReentrentGrainWithState _other;
+    private IGrainContext _context;
+    private TaskScheduler _scheduler;
+    private readonly ILogger logger;
+    private bool executing;
+    private Task outstandingWriteStateOperation;
+
+    public ReentrentGrainWithState(ILoggerFactory loggerFactory)
+    {
+        this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+    }
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        _context = RuntimeContext.Current;
+        _scheduler = TaskScheduler.Current;
+        executing = false;
+        return base.OnActivateAsync(cancellationToken);
+    }
+
+    // When reentrant grain is doing WriteStateAsync, etag violations are posssible due to concurent writes.
+    // The solution is to serialize all writes, and make sure only a single write is outstanind at any moment in time.
+    // No deadlocks are posssible with that approach, since all WriteStateAsync go to the store, which does not issue call into grains,
+    // thus cycle of calls is not posssible.
+    // Implementaton: need to use While and not if, due to the same "early check becomes later invalid" standard problem, like in conditional variables.
+    private async Task PerformSerializedStateUpdate()
+    {
+        while (outstandingWriteStateOperation != null)
         {
-            return Task.FromResult(State.Field1);
+            await outstandingWriteStateOperation;
         }
 
-        public Task DoWrite(int val)
+        try
         {
-            State.Field1 = val;
-            return WriteStateAsync();
+            outstandingWriteStateOperation = WriteStateAsync();
+            await outstandingWriteStateOperation;
         }
-
-        public async Task DoWriteError(int val, bool errorBeforeUpdate)
+        finally
         {
-            if (errorBeforeUpdate) throw new ApplicationException("Before Update");
-            State.Field1 = val;
-            await WriteStateAsync();
-            throw new ApplicationException("After Update");
-        }
-
-        public async Task<int> DoRead()
-        {
-            await ReadStateAsync(); // Re-read state from store
-            return State.Field1;
-        }
-
-        public async Task<int> DoReadError(bool errorBeforeRead)
-        {
-            if (errorBeforeRead) throw new ApplicationException("Before Read");
-            await ReadStateAsync(); // Attempt to re-read state from store
-            throw new ApplicationException("After Read");
+            outstandingWriteStateOperation = null;
         }
     }
 
-    [Orleans.Providers.StorageProvider(ProviderName = "MissingProvider")]
-    public class BadProviderTestGrain : Grain<PersistenceTestGrainState>, IBadProviderTestGrain
+    public Task Setup(IReentrentGrainWithState other)
     {
-        private readonly ILogger logger;
-
-        public BadProviderTestGrain(ILoggerFactory loggerFactory)
-        {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
-        }
-
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            this.logger.LogWarning("OnActivateAsync");
-            return Task.CompletedTask;
-        }
-
-        public Task DoSomething()
-        {
-            this.logger.LogWarning("DoSomething");
-            throw new ApplicationException(
-                "BadProviderTestGrain.DoSomething should never get called when provider is missing");
-        }
+        logger.LogInformation("Setup");
+        _other = other;
+        return Task.CompletedTask;
     }
 
-    [Orleans.Providers.StorageProvider(ProviderName = "test1")]
-    public class PersistenceNoStateTestGrain : Grain, IPersistenceNoStateTestGrain
+    public async Task SetOne(int val)
     {
-        private readonly ILogger logger;
-
-        public PersistenceNoStateTestGrain(ILoggerFactory loggerFactory)
-        {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
-        }
-
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            this.logger.LogInformation("OnActivateAsync");
-            return Task.CompletedTask;
-        }
-
-        public Task DoSomething()
-        {
-            this.logger.LogInformation("DoSomething");
-            return Task.CompletedTask;
-        }
+        logger.LogInformation("SetOne Start");
+        CheckRuntimeEnvironment();
+        var iStr = val.ToString(CultureInfo.InvariantCulture);
+        State.One = val;
+        State.DictOne[iStr] = val;
+        State.DictTwo[iStr] = val;
+        CheckRuntimeEnvironment();
+        await PerformSerializedStateUpdate();
+        CheckRuntimeEnvironment();
     }
 
-    public class ServiceIdGrain : Grain, IServiceIdGrain
+    public async Task SetTwo(int val)
     {
-        private readonly IOptions<ClusterOptions> clusterOptions;
-
-        public ServiceIdGrain(IOptions<ClusterOptions> clusterOptions)
-        {
-            this.clusterOptions = clusterOptions;
-        }
-
-        public Task<string> GetServiceId()
-        {
-            return Task.FromResult(clusterOptions.Value.ServiceId);
-        }
+        logger.LogInformation("SetTwo Start");
+        CheckRuntimeEnvironment();
+        var iStr = val.ToString(CultureInfo.InvariantCulture);
+        State.Two = val;
+        State.DictTwo[iStr] = val;
+        State.DictOne[iStr] = val;
+        CheckRuntimeEnvironment();
+        await PerformSerializedStateUpdate();
+        CheckRuntimeEnvironment();
     }
 
-    [Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
-    public class GrainStorageTestGrain : Grain<PersistenceTestGrainState>,
-        IGrainStorageTestGrain, IGrainStorageTestGrain_LongKey
+    public async Task Test1()
     {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
+        logger.LogInformation(" ==================================== Test1 Started");
+        CheckRuntimeEnvironment();
+        for (var i = 1*Multiple; i < 2*Multiple; i++)
         {
-            return Task.CompletedTask;
-        }
-
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
-
-        public Task DoWrite(int val)
-        {
-            State.Field1 = val;
-            return WriteStateAsync();
-        }
-
-        public async Task<int> DoRead()
-        {
-            await ReadStateAsync(); // Re-read state from store
-            return State.Field1;
-        }
-
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
-    }
-
-    [Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
-    public class GrainStorageGenericGrain<T> : Grain<PersistenceGenericGrainState<T>>,
-        IGrainStorageGenericGrain<T>
-    {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task<T> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
-
-        public Task DoWrite(T val)
-        {
-            State.Field1 = val;
-            return WriteStateAsync();
-        }
-
-        public async Task<T> DoRead()
-        {
-            await ReadStateAsync(); // Re-read state from store
-            return State.Field1;
-        }
-
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
-    }
-
-    [Orleans.Providers.StorageProvider(ProviderName = "GrainStorageForTest")]
-    public class GrainStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
-        IGrainStorageTestGrain_GuidExtendedKey, IGrainStorageTestGrain_LongExtendedKey
-    {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
-
-        public Task<string> GetExtendedKeyValue()
-        {
-            string extKey;
-            _ = this.GetPrimaryKey(out extKey);
-            return Task.FromResult(extKey);
-        }
-
-        public Task DoWrite(int val)
-        {
-            State.Field1 = val;
-            return WriteStateAsync();
-        }
-
-        public async Task<int> DoRead()
-        {
-            await ReadStateAsync(); // Re-read state from store
-            return State.Field1;
-        }
-
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
-    }
-
-    [Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
-    public class AWSStorageTestGrain : Grain<PersistenceTestGrainState>,
-        IAWSStorageTestGrain, IAWSStorageTestGrain_LongKey
-    {
-        private readonly string _id = Guid.NewGuid().ToString();
-
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
-
-        public Task DoWrite(int val)
-        {
-            State.Field1 = val;
-            return WriteStateAsync();
-        }
-
-        public async Task<int> DoRead()
-        {
-            await ReadStateAsync(); // Re-read state from store
-            return State.Field1;
-        }
-
-        public Task<string> GetActivationId() => Task.FromResult(_id);
-
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
-    }
-
-    [Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
-    public class AWSStorageGenericGrain<T> : Grain<PersistenceGenericGrainState<T>>,
-        IAWSStorageGenericGrain<T>
-    {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task<T> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
-
-        public Task DoWrite(T val)
-        {
-            State.Field1 = val;
-            return WriteStateAsync();
-        }
-
-        public async Task<T> DoRead()
-        {
-            await ReadStateAsync(); // Re-read state from store
-            return State.Field1;
-        }
-
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
-    }
-
-    [Orleans.Providers.StorageProvider(ProviderName = "DDBStore")]
-    public class AWSStorageTestGrainExtendedKey : Grain<PersistenceTestGrainState>,
-        IAWSStorageTestGrain_GuidExtendedKey, IAWSStorageTestGrain_LongExtendedKey
-    {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
-
-        public Task<string> GetExtendedKeyValue()
-        {
-            string extKey;
-            _ = this.GetPrimaryKey(out extKey);
-            return Task.FromResult(extKey);
-        }
-
-        public Task DoWrite(int val)
-        {
-            State.Field1 = val;
-            return WriteStateAsync();
-        }
-
-        public async Task<int> DoRead()
-        {
-            await ReadStateAsync(); // Re-read state from store
-            return State.Field1;
-        }
-
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
-    }
-
-    [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
-    //[Orleans.Providers.StorageProvider(ProviderName = "AzureStorageEmulator")]
-    public class MemoryStorageTestGrain : Grain<MemoryStorageTestGrain.NestedPersistenceTestGrainState>,
-        IMemoryStorageTestGrain
-    {
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task<int> GetValue()
-        {
-            return Task.FromResult(State.Field1);
-        }
-
-        public Task DoWrite(int val)
-        {
-            State.Field1 = val;
-            return WriteStateAsync();
-        }
-
-        public async Task<int> DoRead()
-        {
-            await ReadStateAsync(); // Re-read state from store
-            return State.Field1;
-        }
-
-        public Task DoDelete()
-        {
-            return ClearStateAsync();
-        }
-
-        [Serializable]
-        [GenerateSerializer]
-        public class NestedPersistenceTestGrainState
-        {
-            [Id(0)]
-            public int Field1 { get; set; }
-            [Id(1)]
-            public string Field2 { get; set; }
-            [Id(2)]
-            public SortedDictionary<int, int> SortedDict { get; set; }
-        }
-    }
-
-    [Serializable]
-    [GenerateSerializer]
-    public class UserState
-    {
-        public UserState()
-        {
-            Friends = new List<IUser>();
-        }
-
-        [Id(0)]
-        public string Name { get; set; }
-        [Id(1)]
-        public string Status { get; set; }
-        [Id(2)]
-        public List<IUser> Friends { get; set; }
-    }
-
-    [Serializable]
-    [GenerateSerializer]
-    public class DerivedUserState : UserState
-    {
-        [Id(0)]
-        public int Field1 { get; set; }
-        [Id(1)]
-        public int Field2 { get; set; }
-    }
-
-    /// <summary>
-    /// Orleans grain implementation class.
-    /// </summary>
-    [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
-    //[Orleans.Providers.StorageProvider(ProviderName = "AzureStore")]
-    //[Orleans.Providers.StorageProvider(ProviderName = "AzureStorageEmulator")]
-    public class UserGrain : Grain<DerivedUserState>, IUser
-    {
-        public Task SetName(string name)
-        {
-            State.Name = name;
-            return WriteStateAsync();
-        }
-
-        public Task<string> GetStatus()
-        {
-            return Task.FromResult($"{State.Name} : {State.Status}");
-        }
-
-        public Task<string> GetName()
-        {
-            return Task.FromResult(State.Name);
-        }
-
-        public Task UpdateStatus(string status)
-        {
-            State.Status = status;
-            return WriteStateAsync();
-        }
-
-        public Task AddFriend(IUser friend)
-        {
-            if (!State.Friends.Contains(friend))
-                State.Friends.Add(friend);
-            else
-                throw new Exception("Already a friend.");
-
-            return Task.CompletedTask;
-        }
-
-        public Task<List<IUser>> GetFriends()
-        {
-            return Task.FromResult(State.Friends);
-        }
-
-        public async Task<string> GetFriendsStatuses()
-        {
-            var sb = new StringBuilder();
-            var promises = new List<Task<string>>();
-
-            foreach (var friend in State.Friends)
-                promises.Add(friend.GetStatus());
-
-            var friends = await Task.WhenAll(promises);
-
-            foreach (var f in friends)
-            {
-                sb.AppendLine(f);
-            }
-
-            return sb.ToString();
-        }
-    }
-
-    [Serializable]
-    [GenerateSerializer]
-    public class StateForIReentrentGrain
-    {
-        public StateForIReentrentGrain()
-        {
-            DictOne = new Dictionary<string, int>();
-            DictTwo = new Dictionary<string, int>();
-        }
-
-        [Id(0)]
-        public int One { get; set; }
-        [Id(1)]
-        public int Two { get; set; }
-        [Id(2)]
-        public Dictionary<string, int> DictOne { get; set; }
-        [Id(3)]
-        public Dictionary<string, int> DictTwo { get; set; }
-    }
-
-    [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
-    [Reentrant]
-    public class ReentrentGrainWithState : Grain<StateForIReentrentGrain>, IReentrentGrainWithState
-    {
-        private const int Multiple = 100;
-
-        private IReentrentGrainWithState _other;
-        private IGrainContext _context;
-        private TaskScheduler _scheduler;
-        private readonly ILogger logger;
-        private bool executing;
-        private Task outstandingWriteStateOperation;
-
-        public ReentrentGrainWithState(ILoggerFactory loggerFactory)
-        {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
-        }
-
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            _context = RuntimeContext.Current;
-            _scheduler = TaskScheduler.Current;
-            executing = false;
-            return base.OnActivateAsync(cancellationToken);
-        }
-
-        // When reentrant grain is doing WriteStateAsync, etag violations are posssible due to concurent writes.
-        // The solution is to serialize all writes, and make sure only a single write is outstanind at any moment in time.
-        // No deadlocks are posssible with that approach, since all WriteStateAsync go to the store, which does not issue call into grains,
-        // thus cycle of calls is not posssible.
-        // Implementaton: need to use While and not if, due to the same "early check becomes later invalid" standard problem, like in conditional variables.
-        private async Task PerformSerializedStateUpdate()
-        {
-            while (outstandingWriteStateOperation != null)
-            {
-                await outstandingWriteStateOperation;
-            }
-
-            try
-            {
-                outstandingWriteStateOperation = WriteStateAsync();
-                await outstandingWriteStateOperation;
-            }
-            finally
-            {
-                outstandingWriteStateOperation = null;
-            }
-        }
-
-        public Task Setup(IReentrentGrainWithState other)
-        {
-            logger.LogInformation("Setup");
-            _other = other;
-            return Task.CompletedTask;
-        }
-
-        public async Task SetOne(int val)
-        {
-            logger.LogInformation("SetOne Start");
+            var t1 = SetOne(i);
+            await t1;
             CheckRuntimeEnvironment();
-            var iStr = val.ToString(CultureInfo.InvariantCulture);
-            State.One = val;
-            State.DictOne[iStr] = val;
-            State.DictTwo[iStr] = val;
+
+            var t2 = PerformSerializedStateUpdate();
+            await t2;
             CheckRuntimeEnvironment();
-            await PerformSerializedStateUpdate();
+
+            var t3 = _other.SetTwo(i);
+            await t3;
+            CheckRuntimeEnvironment();
+
+            var t4 = PerformSerializedStateUpdate();
+            await t4;
             CheckRuntimeEnvironment();
         }
-
-        public async Task SetTwo(int val)
-        {
-            logger.LogInformation("SetTwo Start");
-            CheckRuntimeEnvironment();
-            var iStr = val.ToString(CultureInfo.InvariantCulture);
-            State.Two = val;
-            State.DictTwo[iStr] = val;
-            State.DictOne[iStr] = val;
-            CheckRuntimeEnvironment();
-            await PerformSerializedStateUpdate();
-            CheckRuntimeEnvironment();
-        }
-
-        public async Task Test1()
-        {
-            logger.LogInformation(" ==================================== Test1 Started");
-            CheckRuntimeEnvironment();
-            for (var i = 1*Multiple; i < 2*Multiple; i++)
-            {
-                var t1 = SetOne(i);
-                await t1;
-                CheckRuntimeEnvironment();
-
-                var t2 = PerformSerializedStateUpdate();
-                await t2;
-                CheckRuntimeEnvironment();
-
-                var t3 = _other.SetTwo(i);
-                await t3;
-                CheckRuntimeEnvironment();
-
-                var t4 = PerformSerializedStateUpdate();
-                await t4;
-                CheckRuntimeEnvironment();
-            }
-            CheckRuntimeEnvironment();
-            logger.LogInformation(" ==================================== Test1 Done");
-        }
-
-        public async Task Test2()
-        {
-            logger.LogInformation("==================================== Test2 Started");
-            CheckRuntimeEnvironment();
-            for (var i = 2*Multiple; i < 3*Multiple; i++)
-            {
-                var t1 = _other.SetOne(i);
-                await t1;
-                CheckRuntimeEnvironment();
-
-                var t2 = PerformSerializedStateUpdate();
-                await t2;
-                CheckRuntimeEnvironment();
-
-                var t3 = SetTwo(i);
-                await t3;
-                CheckRuntimeEnvironment();
-
-                var t4 = PerformSerializedStateUpdate();
-                await t4;
-                CheckRuntimeEnvironment();
-            }
-            CheckRuntimeEnvironment();
-            logger.LogInformation(" ==================================== Test2 Done");
-        }
-
-        public async Task Task_Delay(bool doStart)
-        {
-            var wrapper = new Task<Task>(async () =>
-            {
-                logger.LogInformation("Before Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
-                await DoDelay(1);
-                logger.LogInformation("After Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
-                await DoDelay(2);
-                logger.LogInformation("After Task.Delay #2 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
-            });
-
-            if (doStart)
-            {
-                wrapper.Start(); // THIS IS THE KEY STEP!
-            }
-
-            await wrapper.Unwrap();
-        }
-
-        private async Task DoDelay(int i)
-        {
-            logger.LogInformation("Before Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
-            await Task.Delay(1);
-            logger.LogInformation("After Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
-        }
-
-        private void CheckRuntimeEnvironment()
-        {
-            if (executing)
-            {
-                var errorMsg = "Found out that this grain is already in the middle of execution."
-                               + " Single threaded-ness violation!\n" +
-                               TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment();
-                this.logger.LogError(1, "{Message}", "\n\n\n\n" + errorMsg + "\n\n\n\n");
-                throw new Exception(errorMsg);
-                //Environment.Exit(1);
-            }
-
-            if (RuntimeContext.Current == null)
-            {
-                var errorMsg = "Found RuntimeContext.Current == null.\n" + TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment();
-                this.logger.LogError(1, "{Message}", "\n\n\n\n" + errorMsg + "\n\n\n\n");
-                throw new Exception(errorMsg);
-                //Environment.Exit(1);
-            }
-
-            var context = RuntimeContext.Current;
-            var scheduler = TaskScheduler.Current;
-
-            executing = true;
-            Assert.Equal(_scheduler, scheduler);
-            Assert.Equal(_context, context);
-            Assert.NotNull(context);
-            executing = false;
-        }
+        CheckRuntimeEnvironment();
+        logger.LogInformation(" ==================================== Test1 Done");
     }
 
-    internal class NonReentrantStressGrainWithoutState : Grain, INonReentrantStressGrainWithoutState
+    public async Task Test2()
     {
-        private const int Multiple = 100;
-        private ILogger logger;
-        private bool executing;
-        private const int LEVEL = 2; // level 2 is enough to repro the problem.
-
-        private static int _counter = 1;
-        private int _id;
-
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
+        logger.LogInformation("==================================== Test2 Started");
+        CheckRuntimeEnvironment();
+        for (var i = 2*Multiple; i < 3*Multiple; i++)
         {
-            _id = _counter++;
-            var loggerFactory = this.ServiceProvider?.GetService<ILoggerFactory>();
-            //if grain created outside a cluster
-            if (loggerFactory == null)
-                loggerFactory = NullLoggerFactory.Instance;
-            logger = loggerFactory.CreateLogger($"NonReentrantStressGrainWithoutState-{_id}");
+            var t1 = _other.SetOne(i);
+            await t1;
+            CheckRuntimeEnvironment();
 
-            executing = false;
-            logger.LogTrace("--> OnActivateAsync");
-            logger.LogTrace("<-- OnActivateAsync");
-            return base.OnActivateAsync(cancellationToken);
+            var t2 = PerformSerializedStateUpdate();
+            await t2;
+            CheckRuntimeEnvironment();
+
+            var t3 = SetTwo(i);
+            await t3;
+            CheckRuntimeEnvironment();
+
+            var t4 = PerformSerializedStateUpdate();
+            await t4;
+            CheckRuntimeEnvironment();
+        }
+        CheckRuntimeEnvironment();
+        logger.LogInformation(" ==================================== Test2 Done");
+    }
+
+    public async Task Task_Delay(bool doStart)
+    {
+        var wrapper = new Task<Task>(async () =>
+        {
+            logger.LogInformation("Before Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
+            await DoDelay(1);
+            logger.LogInformation("After Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
+            await DoDelay(2);
+            logger.LogInformation("After Task.Delay #2 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
+        });
+
+        if (doStart)
+        {
+            wrapper.Start(); // THIS IS THE KEY STEP!
         }
 
-        private async Task SetOne(int iter, int level)
+        await wrapper.Unwrap();
+    }
+
+    private async Task DoDelay(int i)
+    {
+        logger.LogInformation("Before Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
+        await Task.Delay(1);
+        logger.LogInformation("After Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
+    }
+
+    private void CheckRuntimeEnvironment()
+    {
+        if (executing)
+        {
+            var errorMsg = "Found out that this grain is already in the middle of execution."
+                           + " Single threaded-ness violation!\n" +
+                           TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment();
+            this.logger.LogError(1, "{Message}", "\n\n\n\n" + errorMsg + "\n\n\n\n");
+            throw new Exception(errorMsg);
+            //Environment.Exit(1);
+        }
+
+        if (RuntimeContext.Current == null)
+        {
+            var errorMsg = "Found RuntimeContext.Current == null.\n" + TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment();
+            this.logger.LogError(1, "{Message}", "\n\n\n\n" + errorMsg + "\n\n\n\n");
+            throw new Exception(errorMsg);
+            //Environment.Exit(1);
+        }
+
+        var context = RuntimeContext.Current;
+        var scheduler = TaskScheduler.Current;
+
+        executing = true;
+        Assert.Equal(_scheduler, scheduler);
+        Assert.Equal(_context, context);
+        Assert.NotNull(context);
+        executing = false;
+    }
+}
+
+internal class NonReentrantStressGrainWithoutState : Grain, INonReentrantStressGrainWithoutState
+{
+    private const int Multiple = 100;
+    private ILogger logger;
+    private bool executing;
+    private const int LEVEL = 2; // level 2 is enough to repro the problem.
+
+    private static int _counter = 1;
+    private int _id;
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        _id = _counter++;
+        var loggerFactory = this.ServiceProvider?.GetService<ILoggerFactory>();
+        //if grain created outside a cluster
+        if (loggerFactory == null)
+            loggerFactory = NullLoggerFactory.Instance;
+        logger = loggerFactory.CreateLogger($"NonReentrantStressGrainWithoutState-{_id}");
+
+        executing = false;
+        logger.LogTrace("--> OnActivateAsync");
+        logger.LogTrace("<-- OnActivateAsync");
+        return base.OnActivateAsync(cancellationToken);
+    }
+
+    private async Task SetOne(int iter, int level)
+    {
+        if (logger.IsEnabled(LogLevel.Trace))
+        {
+            logger.LogTrace("---> SetOne {Iteration}-{Level}_0", iter, level);
+        }
+
+        CheckRuntimeEnvironment();
+        if (level > 0)
         {
             if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.LogTrace("---> SetOne {Iteration}-{Level}_0", iter, level);
+                logger.LogTrace("SetOne {Iteration}-{Level}_1. Before await Task.CompletedTask.", iter, level);
             }
 
-            CheckRuntimeEnvironment();
-            if (level > 0)
-            {
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    logger.LogTrace("SetOne {Iteration}-{Level}_1. Before await Task.CompletedTask.", iter, level);
-                }
-
-                await Task.CompletedTask;
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    logger.LogTrace("SetOne {Iteration}-{Level}_2. After await Task.CompletedTask.", iter, level);
-                }
-
-                CheckRuntimeEnvironment();
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    logger.LogTrace("SetOne {Iteration}-{Level}_4. Before yield.", iter, level);
-                }
-
-                await Task.Yield();
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    logger.LogTrace("SetOne {Iteration}-{Level}_5. After yield.", iter, level);
-                }
-
-                CheckRuntimeEnvironment();
-                var nextLevel = level - 1;
-                await SetOne(iter, nextLevel);
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    logger.LogTrace(
-                        "SetOne {Iteration}-{Level}_7 => {NextLevel}. After await SetOne call.",
-                        iter,
-                        level,
-                        nextLevel);
-                }
-
-                CheckRuntimeEnvironment();
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    logger.LogTrace("SetOne {Iteration}-{Level}_9. Finished SetOne.", iter, level);
-                }
-            }
-
-            CheckRuntimeEnvironment();
-            logger.LogTrace("<--- SetOne {Iteration}-{Level}_11", iter, level);
-        }
-
-        public async Task Test1()
-        {
-            CheckRuntimeEnvironment();
+            await Task.CompletedTask;
             if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.LogTrace("Test1.Start");
-            }
-
-            var tasks = new List<Task>();
-            for (var i = 0; i < Multiple; i++)
-            {
-                CheckRuntimeEnvironment();
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    logger.LogTrace("Test1_ ------> {CallNum}", i);
-                }
-
-                var task = SetOne(i, LEVEL);
-                CheckRuntimeEnvironment();
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    logger.LogTrace("After SetOne call {CallNum}", i);
-                }
-
-                tasks.Add(task);
-                CheckRuntimeEnvironment();
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    logger.LogTrace("Test1_ <------ {CallNum}", i);
-                }
+                logger.LogTrace("SetOne {Iteration}-{Level}_2. After await Task.CompletedTask.", iter, level);
             }
 
             CheckRuntimeEnvironment();
             if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.LogTrace("Test1_About to WhenAll");
+                logger.LogTrace("SetOne {Iteration}-{Level}_4. Before yield.", iter, level);
             }
 
-            await Task.WhenAll(tasks);
+            await Task.Yield();
             if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.LogTrace("Test1.Finish");
+                logger.LogTrace("SetOne {Iteration}-{Level}_5. After yield.", iter, level);
             }
 
-           CheckRuntimeEnvironment();
+            CheckRuntimeEnvironment();
+            var nextLevel = level - 1;
+            await SetOne(iter, nextLevel);
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                logger.LogTrace(
+                    "SetOne {Iteration}-{Level}_7 => {NextLevel}. After await SetOne call.",
+                    iter,
+                    level,
+                    nextLevel);
+            }
+
+            CheckRuntimeEnvironment();
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                logger.LogTrace("SetOne {Iteration}-{Level}_9. Finished SetOne.", iter, level);
+            }
+        }
+
+        CheckRuntimeEnvironment();
+        logger.LogTrace("<--- SetOne {Iteration}-{Level}_11", iter, level);
+    }
+
+    public async Task Test1()
+    {
+        CheckRuntimeEnvironment();
+        if (logger.IsEnabled(LogLevel.Trace))
+        {
+            logger.LogTrace("Test1.Start");
+        }
+
+        var tasks = new List<Task>();
+        for (var i = 0; i < Multiple; i++)
+        {
+            CheckRuntimeEnvironment();
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                logger.LogTrace("Test1_ ------> {CallNum}", i);
+            }
+
+            var task = SetOne(i, LEVEL);
+            CheckRuntimeEnvironment();
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                logger.LogTrace("After SetOne call {CallNum}", i);
+            }
+
+            tasks.Add(task);
+            CheckRuntimeEnvironment();
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                logger.LogTrace("Test1_ <------ {CallNum}", i);
+            }
+        }
+
+        CheckRuntimeEnvironment();
+        if (logger.IsEnabled(LogLevel.Trace))
+        {
+            logger.LogTrace("Test1_About to WhenAll");
+        }
+
+        await Task.WhenAll(tasks);
+        if (logger.IsEnabled(LogLevel.Trace))
+        {
+            logger.LogTrace("Test1.Finish");
+        }
+
+       CheckRuntimeEnvironment();
 //#if DEBUG
 //            // HACK for testing
 //            Logger.SetTraceLevelOverrides(overridesOff.ToList());
 //#endif
-        }
-
-        public async Task Task_Delay(bool doStart)
-        {
-            var wrapper = new Task<Task>(async () =>
-            {
-                logger.LogTrace("Before Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
-                await DoDelay(1);
-                logger.LogTrace("After Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
-                await DoDelay(2);
-                logger.LogTrace("After Task.Delay #2 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
-            });
-
-            if (doStart)
-            {
-                wrapper.Start(); // THIS IS THE KEY STEP!
-            }
-
-            await wrapper.Unwrap();
-        }
-
-        private async Task DoDelay(int i)
-        {
-            logger.LogTrace("Before Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
-            await Task.Delay(1);
-            logger.LogTrace("After Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
-        }
-
-        private void CheckRuntimeEnvironment()
-        {
-            if (executing)
-            {
-                var callStack = new StackTrace();
-                var errorMsg = string.Format(
-                    "Found out that grain {0} is already in the middle of execution."
-                    + "\n Single threaded-ness violation!"
-                    + "\n {1} \n Call Stack={2}",
-                    this._id,
-                    TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment(),
-                    callStack);
-                this.logger.LogError(1, "{Message}", "\n\n\n\n" + errorMsg + "\n\n\n\n");
-                throw new InvalidOperationException(errorMsg);
-            }
-
-            executing = true;
-            var stopwatch = ValueStopwatch.StartNew();
-            SpinWait.SpinUntil(() => stopwatch.Elapsed > TimeSpan.FromMicroseconds(1));
-            executing = false;
-        }
     }
 
-    [Serializable]
-    [GenerateSerializer]
-    public class InternalGrainStateData
+    public async Task Task_Delay(bool doStart)
     {
-        [Id(0)]
-        public int One { get; set; }
+        var wrapper = new Task<Task>(async () =>
+        {
+            logger.LogTrace("Before Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
+            await DoDelay(1);
+            logger.LogTrace("After Task.Delay #1 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
+            await DoDelay(2);
+            logger.LogTrace("After Task.Delay #2 TaskScheduler.Current={TaskScheduler}", TaskScheduler.Current);
+        });
+
+        if (doStart)
+        {
+            wrapper.Start(); // THIS IS THE KEY STEP!
+        }
+
+        await wrapper.Unwrap();
     }
 
-    [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
-    internal class InternalGrainWithState : Grain<InternalGrainStateData>, IInternalGrainWithState
+    private async Task DoDelay(int i)
     {
-        private readonly ILogger logger;
-
-        public InternalGrainWithState(ILoggerFactory loggerFactory)
-        {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
-        }
-
-        public Task SetOne(int val)
-        {
-            logger.LogInformation("SetOne");
-            State.One = val;
-            return Task.CompletedTask;
-        }
+        logger.LogTrace("Before Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
+        await Task.Delay(1);
+        logger.LogTrace("After Task.Delay #{Num} TaskScheduler.Current={TaskScheduler}", i, TaskScheduler.Current);
     }
 
-    public interface IBaseStateData // Note: I am deliberately not using IGrainState here.
+    private void CheckRuntimeEnvironment()
     {
-        int Field1 { get; set; }
+        if (executing)
+        {
+            var callStack = new StackTrace();
+            var errorMsg = string.Format(
+                "Found out that grain {0} is already in the middle of execution."
+                + "\n Single threaded-ness violation!"
+                + "\n {1} \n Call Stack={2}",
+                this._id,
+                TestRuntimeEnvironmentUtility.CaptureRuntimeEnvironment(),
+                callStack);
+            this.logger.LogError(1, "{Message}", "\n\n\n\n" + errorMsg + "\n\n\n\n");
+            throw new InvalidOperationException(errorMsg);
+        }
+
+        executing = true;
+        var stopwatch = ValueStopwatch.StartNew();
+        SpinWait.SpinUntil(() => stopwatch.Elapsed > TimeSpan.FromMicroseconds(1));
+        executing = false;
     }
-
-    [Serializable]
-    [GenerateSerializer]
-    public class StateInheritanceTestGrainData : IBaseStateData
-    {
-        [Id(0)]
-        private int Field2 { get; set; }
-
-        [Id(1)]
-        public int Field1 { get; set; }
-    }
-
-    [Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
-    public class StateInheritanceTestGrain : Grain<StateInheritanceTestGrainData>, IStateInheritanceTestGrain
-    {
-        private readonly ILogger logger;
-
-        public StateInheritanceTestGrain(ILoggerFactory loggerFactory)
-        {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
-        }
-
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
-        {
-            logger.LogInformation("OnActivateAsync");
-            return base.OnActivateAsync(cancellationToken);
-        }
-
-        public Task<int> GetValue()
-        {
-            var val = State.Field1;
-            logger.LogInformation("GetValue {Value}", val);
-            return Task.FromResult(val);
-        }
-
-        public Task SetValue(int val)
-        {
-            State.Field1 = val;
-            logger.LogInformation("SetValue {Value}", val);
-            return WriteStateAsync();
-        }
-    }
-
-    public sealed class SurrogateStateForTypeWithoutPublicConstructorGrain : IGrainBase, ISurrogateStateForTypeWithoutPublicConstructorGrain<ExternalTypeWithoutPublicConstructor>
-    {
-        private readonly IPersistentState<ExternalTypeWithoutPublicConstructor> _persistence;
-
-        public IGrainContext GrainContext { get; }
-
-        public SurrogateStateForTypeWithoutPublicConstructorGrain(
-            IGrainContext grainContext,
-            [PersistentState("test_state", "OrleansSerializerMemoryStore")] IPersistentState<ExternalTypeWithoutPublicConstructor> persistence)
-        {
-            GrainContext = grainContext;
-            _persistence = persistence;
-        }
-
-        public async Task SetState(ExternalTypeWithoutPublicConstructor state)
-        {
-            _persistence.State = state;
-            await _persistence.WriteStateAsync();
-        }
-
-        public async Task<ExternalTypeWithoutPublicConstructor> GetState()
-        {
-            await _persistence.ReadStateAsync();
-            return _persistence.State;
-        }
-    }
-
-    public sealed class ExternalTypeWithoutPublicConstructor
-    {
-        public int Field1 { get; set; }
-        public int Field2 { get; set; }
-
-        public static ExternalTypeWithoutPublicConstructor Create(int field1, int field2)
-            => new(field1, field2);
-
-        private ExternalTypeWithoutPublicConstructor(int field1, int field2)
-        {
-            Field1 = field1;
-            Field2 = field2;
-        }
-    }
-
-    [GenerateSerializer]
-    public struct ExternalTypeWithoutPublicConstructorSurrogate
-    {
-        [Id(0)] public int Field1;
-        [Id(1)] public required int Field2;
-    }
-
-    [RegisterConverter]
-    public sealed class ExternalTypeWithoutPublicConstructorSurrogateConverter : IConverter<ExternalTypeWithoutPublicConstructor, ExternalTypeWithoutPublicConstructorSurrogate>
-    {
-        public ExternalTypeWithoutPublicConstructor ConvertFromSurrogate(in ExternalTypeWithoutPublicConstructorSurrogate surrogate)
-            => ExternalTypeWithoutPublicConstructor.Create(surrogate.Field1, surrogate.Field2);
-
-        public ExternalTypeWithoutPublicConstructorSurrogate ConvertToSurrogate(in ExternalTypeWithoutPublicConstructor value)
-            => new()
-            {
-                Field1 = value.Field1,
-                Field2 = value.Field2,
-            };
-    }
-    
-
-    public sealed class RecordTypeWithoutPublicParameterlessConstructorGrain : IGrainBase, IRecordTypeWithoutPublicParameterlessConstructorGrain<RecordTypeWithoutPublicParameterlessConstructor>
-    {
-        private readonly IPersistentState<RecordTypeWithoutPublicParameterlessConstructor> _persistence;
-
-        public IGrainContext GrainContext { get; }
-
-        public RecordTypeWithoutPublicParameterlessConstructorGrain(
-            IGrainContext grainContext,
-            [PersistentState("test_state", "OrleansSerializerMemoryStore")] IPersistentState<RecordTypeWithoutPublicParameterlessConstructor> persistence)
-        {
-            GrainContext = grainContext;
-            _persistence = persistence;
-        }
-
-        public async Task SetState(RecordTypeWithoutPublicParameterlessConstructor state)
-        {
-            _persistence.State = state;
-            await _persistence.WriteStateAsync();
-        }
-
-        public async Task<RecordTypeWithoutPublicParameterlessConstructor> GetState()
-        {
-            await _persistence.ReadStateAsync();
-            return _persistence.State;
-        }
-    }
-
-    [GenerateSerializer]
-    public record class RecordTypeWithoutPublicParameterlessConstructor
-    (
-        [property: Id(0)] int Field
-    );
 }
+
+[Serializable]
+[GenerateSerializer]
+public class InternalGrainStateData
+{
+    [Id(0)]
+    public int One { get; set; }
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
+internal class InternalGrainWithState : Grain<InternalGrainStateData>, IInternalGrainWithState
+{
+    private readonly ILogger logger;
+
+    public InternalGrainWithState(ILoggerFactory loggerFactory)
+    {
+        this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+    }
+
+    public Task SetOne(int val)
+    {
+        logger.LogInformation("SetOne");
+        State.One = val;
+        return Task.CompletedTask;
+    }
+}
+
+public interface IBaseStateData // Note: I am deliberately not using IGrainState here.
+{
+    int Field1 { get; set; }
+}
+
+[Serializable]
+[GenerateSerializer]
+public class StateInheritanceTestGrainData : IBaseStateData
+{
+    [Id(0)]
+    private int Field2 { get; set; }
+
+    [Id(1)]
+    public int Field1 { get; set; }
+}
+
+[Orleans.Providers.StorageProvider(ProviderName = "MemoryStore")]
+public class StateInheritanceTestGrain : Grain<StateInheritanceTestGrainData>, IStateInheritanceTestGrain
+{
+    private readonly ILogger logger;
+
+    public StateInheritanceTestGrain(ILoggerFactory loggerFactory)
+    {
+        this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+    }
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        logger.LogInformation("OnActivateAsync");
+        return base.OnActivateAsync(cancellationToken);
+    }
+
+    public Task<int> GetValue()
+    {
+        var val = State.Field1;
+        logger.LogInformation("GetValue {Value}", val);
+        return Task.FromResult(val);
+    }
+
+    public Task SetValue(int val)
+    {
+        State.Field1 = val;
+        logger.LogInformation("SetValue {Value}", val);
+        return WriteStateAsync();
+    }
+}
+
+public sealed class SurrogateStateForTypeWithoutPublicConstructorGrain : IGrainBase, ISurrogateStateForTypeWithoutPublicConstructorGrain<ExternalTypeWithoutPublicConstructor>
+{
+    private readonly IPersistentState<ExternalTypeWithoutPublicConstructor> _persistence;
+
+    public IGrainContext GrainContext { get; }
+
+    public SurrogateStateForTypeWithoutPublicConstructorGrain(
+        IGrainContext grainContext,
+        [PersistentState("test_state", "OrleansSerializerMemoryStore")] IPersistentState<ExternalTypeWithoutPublicConstructor> persistence)
+    {
+        GrainContext = grainContext;
+        _persistence = persistence;
+    }
+
+    public async Task SetState(ExternalTypeWithoutPublicConstructor state)
+    {
+        _persistence.State = state;
+        await _persistence.WriteStateAsync();
+    }
+
+    public async Task<ExternalTypeWithoutPublicConstructor> GetState()
+    {
+        await _persistence.ReadStateAsync();
+        return _persistence.State;
+    }
+}
+
+public sealed class ExternalTypeWithoutPublicConstructor
+{
+    public int Field1 { get; set; }
+    public int Field2 { get; set; }
+
+    public static ExternalTypeWithoutPublicConstructor Create(int field1, int field2)
+        => new(field1, field2);
+
+    private ExternalTypeWithoutPublicConstructor(int field1, int field2)
+    {
+        Field1 = field1;
+        Field2 = field2;
+    }
+}
+
+[GenerateSerializer]
+public struct ExternalTypeWithoutPublicConstructorSurrogate
+{
+    [Id(0)] public int Field1;
+    [Id(1)] public required int Field2;
+}
+
+[RegisterConverter]
+public sealed class ExternalTypeWithoutPublicConstructorSurrogateConverter : IConverter<ExternalTypeWithoutPublicConstructor, ExternalTypeWithoutPublicConstructorSurrogate>
+{
+    public ExternalTypeWithoutPublicConstructor ConvertFromSurrogate(in ExternalTypeWithoutPublicConstructorSurrogate surrogate)
+        => ExternalTypeWithoutPublicConstructor.Create(surrogate.Field1, surrogate.Field2);
+
+    public ExternalTypeWithoutPublicConstructorSurrogate ConvertToSurrogate(in ExternalTypeWithoutPublicConstructor value)
+        => new()
+        {
+            Field1 = value.Field1,
+            Field2 = value.Field2,
+        };
+}
+
+
+public sealed class RecordTypeWithoutPublicParameterlessConstructorGrain : IGrainBase, IRecordTypeWithoutPublicParameterlessConstructorGrain<RecordTypeWithoutPublicParameterlessConstructor>
+{
+    private readonly IPersistentState<RecordTypeWithoutPublicParameterlessConstructor> _persistence;
+
+    public IGrainContext GrainContext { get; }
+
+    public RecordTypeWithoutPublicParameterlessConstructorGrain(
+        IGrainContext grainContext,
+        [PersistentState("test_state", "OrleansSerializerMemoryStore")] IPersistentState<RecordTypeWithoutPublicParameterlessConstructor> persistence)
+    {
+        GrainContext = grainContext;
+        _persistence = persistence;
+    }
+
+    public async Task SetState(RecordTypeWithoutPublicParameterlessConstructor state)
+    {
+        _persistence.State = state;
+        await _persistence.WriteStateAsync();
+    }
+
+    public async Task<RecordTypeWithoutPublicParameterlessConstructor> GetState()
+    {
+        await _persistence.ReadStateAsync();
+        return _persistence.State;
+    }
+}
+
+[GenerateSerializer]
+public record class RecordTypeWithoutPublicParameterlessConstructor
+(
+    [property: Id(0)] int Field
+);

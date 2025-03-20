@@ -1,24 +1,23 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Runtime
+namespace Orleans.Runtime;
+
+/// <summary>
+/// Configuration for persistent state.
+/// </summary>
+/// <seealso cref="IPersistentState{TState}"/>
+public interface IPersistentStateConfiguration
 {
     /// <summary>
-    /// Configuration for persistent state.
+    /// Gets the name of the state.
     /// </summary>
-    /// <seealso cref="IPersistentState{TState}"/>
-    public interface IPersistentStateConfiguration
-    {
-        /// <summary>
-        /// Gets the name of the state.
-        /// </summary>
-        /// <value>The name of the state.</value>
-        string StateName { get; }
+    /// <value>The name of the state.</value>
+    string StateName { get; }
 
-        /// <summary>
-        /// Gets the name of the storage provider.
-        /// </summary>
-        /// <value>The name of the storage provider.</value>
-        string StorageName { get; }
-    }
+    /// <summary>
+    /// Gets the name of the storage provider.
+    /// </summary>
+    /// <value>The name of the storage provider.</value>
+    string StorageName { get; }
 }

@@ -4,67 +4,66 @@
 using Microsoft.Extensions.Logging;
 using TestGrainInterfaces;
 
-namespace TestGrains
+namespace TestGrains;
+
+internal class GeneratedEventReporterGrain : Grain, IGeneratedEventReporterGrain
 {
-    internal class GeneratedEventReporterGrain : Grain, IGeneratedEventReporterGrain
+    private readonly ILogger logger;
+
+    private Dictionary<Tuple<string, string>, Dictionary<Guid, int>> reports;
+
+    public GeneratedEventReporterGrain(ILoggerFactory loggerFactory)
     {
-        private readonly ILogger logger;
+        this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+    }
 
-        private Dictionary<Tuple<string, string>, Dictionary<Guid, int>> reports;
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        logger.LogInformation("OnActivateAsync");
 
-        public GeneratedEventReporterGrain(ILoggerFactory loggerFactory)
+        reports = new Dictionary<Tuple<string, string>, Dictionary<Guid, int>>();
+        return base.OnActivateAsync(cancellationToken);
+    }
+
+    public Task ReportResult(Guid streamGuid, string streamProvider, string streamNamespace, int count)
+    {
+        Dictionary<Guid, int> counts;
+        Tuple<string, string> key = Tuple.Create(streamProvider, streamNamespace);
+        if (!reports.TryGetValue(key, out counts))
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            counts = new Dictionary<Guid, int>();
+            reports[key] = counts;
         }
 
-        public override Task OnActivateAsync(CancellationToken cancellationToken)
+        logger.LogInformation(
+            "ReportResult. StreamProvider: {StreamProvider}, StreamNamespace: {StreamNamespace}, StreamGuid: {StreamGuid}, Count: {Count}",
+            streamProvider,
+            streamNamespace,
+            streamGuid,
+            count);
+        counts[streamGuid] = count;
+        return Task.CompletedTask;
+    }
+
+    public Task<IDictionary<Guid, int>> GetReport(string streamProvider, string streamNamespace)
+    {
+        Dictionary<Guid, int> counts;
+        Tuple<string, string> key = Tuple.Create(streamProvider, streamNamespace);
+        if (!reports.TryGetValue(key, out counts))
         {
-            logger.LogInformation("OnActivateAsync");
-
-            reports = new Dictionary<Tuple<string, string>, Dictionary<Guid, int>>();
-            return base.OnActivateAsync(cancellationToken);
+            return Task.FromResult<IDictionary<Guid, int>>(new Dictionary<Guid, int>());
         }
+        return Task.FromResult<IDictionary<Guid, int>>(counts);
+    }
 
-        public Task ReportResult(Guid streamGuid, string streamProvider, string streamNamespace, int count)
-        {
-            Dictionary<Guid, int> counts;
-            Tuple<string, string> key = Tuple.Create(streamProvider, streamNamespace);
-            if (!reports.TryGetValue(key, out counts))
-            {
-                counts = new Dictionary<Guid, int>();
-                reports[key] = counts;
-            }
+    public Task Reset()
+    {
+        reports = new Dictionary<Tuple<string, string>, Dictionary<Guid, int>>();
+        return Task.CompletedTask;
+    }
 
-            logger.LogInformation(
-                "ReportResult. StreamProvider: {StreamProvider}, StreamNamespace: {StreamNamespace}, StreamGuid: {StreamGuid}, Count: {Count}",
-                streamProvider,
-                streamNamespace,
-                streamGuid,
-                count);
-            counts[streamGuid] = count;
-            return Task.CompletedTask;
-        }
-
-        public Task<IDictionary<Guid, int>> GetReport(string streamProvider, string streamNamespace)
-        {
-            Dictionary<Guid, int> counts;
-            Tuple<string, string> key = Tuple.Create(streamProvider, streamNamespace);
-            if (!reports.TryGetValue(key, out counts))
-            {
-                return Task.FromResult<IDictionary<Guid, int>>(new Dictionary<Guid, int>());
-            }
-            return Task.FromResult<IDictionary<Guid, int>>(counts);
-        }
-
-        public Task Reset()
-        {
-            reports = new Dictionary<Tuple<string, string>, Dictionary<Guid, int>>();
-            return Task.CompletedTask;
-        }
-
-        public Task<bool> IsLocatedOnSilo(SiloAddress siloAddress)
-        {
-            return Task.FromResult(RuntimeIdentity == siloAddress.ToString());
-        }
+    public Task<bool> IsLocatedOnSilo(SiloAddress siloAddress)
+    {
+        return Task.FromResult(RuntimeIdentity == siloAddress.ToString());
     }
 }

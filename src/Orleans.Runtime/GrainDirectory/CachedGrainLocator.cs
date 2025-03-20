@@ -6,220 +6,219 @@ using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
 
-namespace Orleans.Runtime.GrainDirectory
+namespace Orleans.Runtime.GrainDirectory;
+
+/// <summary>
+/// Implementation of <see cref="IGrainLocator"/> that uses <see cref="IGrainDirectory"/> stores.
+/// </summary>
+internal class CachedGrainLocator : IGrainLocator, ILifecycleParticipant<ISiloLifecycle>, CachedGrainLocator.ITestAccessor
 {
-    /// <summary>
-    /// Implementation of <see cref="IGrainLocator"/> that uses <see cref="IGrainDirectory"/> stores.
-    /// </summary>
-    internal class CachedGrainLocator : IGrainLocator, ILifecycleParticipant<ISiloLifecycle>, CachedGrainLocator.ITestAccessor
+    private readonly GrainDirectoryResolver grainDirectoryResolver;
+    private readonly IGrainDirectoryCache cache;
+
+    private readonly CancellationTokenSource shutdownToken = new CancellationTokenSource();
+    private readonly IClusterMembershipService clusterMembershipService;
+
+    private Task listenToClusterChangeTask;
+
+    internal interface ITestAccessor
     {
-        private readonly GrainDirectoryResolver grainDirectoryResolver;
-        private readonly IGrainDirectoryCache cache;
+        MembershipVersion LastMembershipVersion { get; set; }
+    }
 
-        private readonly CancellationTokenSource shutdownToken = new CancellationTokenSource();
-        private readonly IClusterMembershipService clusterMembershipService;
+    MembershipVersion ITestAccessor.LastMembershipVersion { get; set; }
 
-        private Task listenToClusterChangeTask;
+    public CachedGrainLocator(
+        IServiceProvider serviceProvider,
+        GrainDirectoryResolver grainDirectoryResolver,
+        IClusterMembershipService clusterMembershipService,
+        IOptions<GrainDirectoryOptions> grainDirectoryOptions)
+    {
+        this.grainDirectoryResolver = grainDirectoryResolver;
+        this.clusterMembershipService = clusterMembershipService;
+        this.cache = GrainDirectoryCacheFactory.CreateCustomGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value);
+    }
 
-        internal interface ITestAccessor
+    public async ValueTask<GrainAddress> Lookup(GrainId grainId)
+    {
+        var grainType = grainId.Type;
+        if (grainType.IsClient() || grainType.IsSystemTarget())
         {
-            MembershipVersion LastMembershipVersion { get; set; }
+            ThrowUnsupportedGrainType(grainId);
         }
 
-        MembershipVersion ITestAccessor.LastMembershipVersion { get; set; }
-
-        public CachedGrainLocator(
-            IServiceProvider serviceProvider,
-            GrainDirectoryResolver grainDirectoryResolver,
-            IClusterMembershipService clusterMembershipService,
-            IOptions<GrainDirectoryOptions> grainDirectoryOptions)
+        // Check cache first
+        if (TryLookupInCache(grainId, out var cachedResult))
         {
-            this.grainDirectoryResolver = grainDirectoryResolver;
-            this.clusterMembershipService = clusterMembershipService;
-            this.cache = GrainDirectoryCacheFactory.CreateCustomGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value);
+            return cachedResult;
         }
 
-        public async ValueTask<GrainAddress> Lookup(GrainId grainId)
+        var entry = await GetGrainDirectory(grainId.Type).Lookup(grainId);
+
+        // Nothing found
+        if (entry is null)
         {
-            var grainType = grainId.Type;
-            if (grainType.IsClient() || grainType.IsSystemTarget())
+            return null;
+        }
+
+        // Check if the entry is pointing to a dead silo
+        if (IsKnownDeadSilo(entry))
+        {
+            // Remove it from the directory
+            await GetGrainDirectory(grainId.Type).Unregister(entry);
+            entry = null;
+        }
+        else
+        {
+            // Add to the local cache and return it
+            this.cache.AddOrUpdate(entry, 0);
+        }
+
+        return entry;
+    }
+
+    public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress)
+    {
+        var grainType = address.GrainId.Type;
+        if (grainType.IsClient() || grainType.IsSystemTarget())
+        {
+            ThrowUnsupportedGrainType(address.GrainId);
+        }
+
+        address = new()
+        {
+            GrainId = address.GrainId,
+            ActivationId = address.ActivationId,
+            SiloAddress = address.SiloAddress,
+            MembershipVersion = clusterMembershipService.CurrentSnapshot.Version
+        };
+
+        var result = await GetGrainDirectory(grainType).Register(address, previousAddress);
+
+        // Check if the entry point to a dead silo
+        if (IsKnownDeadSilo(result))
+        {
+            // Remove outdated entry and retry to register
+            await GetGrainDirectory(grainType).Unregister(result);
+            result = await GetGrainDirectory(grainType).Register(address, previousAddress);
+        }
+
+        // Cache update
+        this.cache.AddOrUpdate(result, (int)result.MembershipVersion.Value);
+
+        return result;
+    }
+
+    public async Task Unregister(GrainAddress address, UnregistrationCause cause)
+    {
+        // Remove from local cache first so we don't return it anymore
+        this.cache.Remove(address);
+
+        // Remove from grain directory which may take significantly longer
+        await GetGrainDirectory(address.GrainId.Type).Unregister(address);
+
+        // There is the potential for a lookup to race with the Unregister and add the bad entry back to the cache.
+        if (this.cache.LookUp(address.GrainId, out var entry, out _) && entry.Equals(address))
+        {
+            this.cache.Remove(address);
+        }
+    }
+
+    public void Participate(ISiloLifecycle lifecycle)
+    {
+        Task OnStart(CancellationToken ct)
+        {
+            this.listenToClusterChangeTask = ListenToClusterChange();
+            return Task.CompletedTask;
+        };
+        async Task OnStop(CancellationToken ct)
+        {
+            this.shutdownToken.Cancel();
+            if (listenToClusterChangeTask != default && !ct.IsCancellationRequested)
+                await listenToClusterChangeTask.WaitAsync(ct);
+        };
+        lifecycle.Subscribe(nameof(CachedGrainLocator), ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
+    }
+
+    private IGrainDirectory GetGrainDirectory(GrainType grainType) => this.grainDirectoryResolver.Resolve(grainType);
+
+    private async Task ListenToClusterChange()
+    {
+        var previousSnapshot = this.clusterMembershipService.CurrentSnapshot;
+
+        ((ITestAccessor)this).LastMembershipVersion = previousSnapshot.Version;
+
+        var updates = this.clusterMembershipService.MembershipUpdates.WithCancellation(this.shutdownToken.Token);
+        await foreach (var snapshot in updates)
+        {
+            // Active filtering: detect silos that went down and try to clean proactively the directory
+            var changes = snapshot.CreateUpdate(previousSnapshot).Changes;
+            var deadSilos = changes
+                .Where(member => member.Status.IsTerminating())
+                .Select(member => member.SiloAddress)
+                .ToList();
+
+            if (deadSilos.Count > 0)
             {
-                ThrowUnsupportedGrainType(grainId);
+                var tasks = new List<Task>();
+                foreach (var directory in this.grainDirectoryResolver.Directories)
+                {
+                    tasks.Add(directory.UnregisterSilos(deadSilos));
+                }
+                await Task.WhenAll(tasks).WaitAsync(this.shutdownToken.Token);
             }
 
-            // Check cache first
-            if (TryLookupInCache(grainId, out var cachedResult))
-            {
-                return cachedResult;
-            }
+            ((ITestAccessor)this).LastMembershipVersion = snapshot.Version;
+        }
+    }
 
-            var entry = await GetGrainDirectory(grainId.Type).Lookup(grainId);
+    private bool IsKnownDeadSilo(GrainAddress grainAddress)
+        => IsKnownDeadSilo(grainAddress.SiloAddress, grainAddress.MembershipVersion);
 
-            // Nothing found
-            if (entry is null)
-            {
-                return null;
-            }
+    private bool IsKnownDeadSilo(SiloAddress siloAddress, MembershipVersion membershipVersion)
+    {
+        var current = this.clusterMembershipService.CurrentSnapshot;
 
-            // Check if the entry is pointing to a dead silo
-            if (IsKnownDeadSilo(entry))
+        // Check if the target silo is in the cluster
+        if (current.Members.TryGetValue(siloAddress, out var value))
+        {
+            // It is, check if it's alive
+            return value.Status.IsTerminating();
+        }
+
+        // We didn't find it in the cluster. If the silo entry is too old, it has been cleaned in the membership table: the entry isn't valid anymore.
+        // Otherwise, maybe the membership service isn't up to date yet. The entry should be valid
+        return current.Version > membershipVersion;
+    }
+
+    private static void ThrowUnsupportedGrainType(GrainId grainId) => throw new InvalidOperationException($"Unsupported grain type for grain {grainId}");
+
+    public void UpdateCache(GrainId grainId, SiloAddress siloAddress) => cache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
+    public void InvalidateCache(GrainId grainId) => cache.Remove(grainId);
+    public void InvalidateCache(GrainAddress address) => cache.Remove(address);
+    public bool TryLookupInCache(GrainId grainId, out GrainAddress address)
+    {
+        var grainType = grainId.Type;
+        if (grainType.IsClient() || grainType.IsSystemTarget())
+        {
+            ThrowUnsupportedGrainType(grainId);
+        }
+
+        if (this.cache.LookUp(grainId, out address, out var version))
+        {
+            // If the silo is dead, remove the entry
+            if (IsKnownDeadSilo(address.SiloAddress, new MembershipVersion(version)))
             {
-                // Remove it from the directory
-                await GetGrainDirectory(grainId.Type).Unregister(entry);
-                entry = null;
+                address = default;
+                this.cache.Remove(grainId);
             }
             else
             {
-                // Add to the local cache and return it
-                this.cache.AddOrUpdate(entry, 0);
-            }
-
-            return entry;
-        }
-
-        public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress)
-        {
-            var grainType = address.GrainId.Type;
-            if (grainType.IsClient() || grainType.IsSystemTarget())
-            {
-                ThrowUnsupportedGrainType(address.GrainId);
-            }
-
-            address = new()
-            {
-                GrainId = address.GrainId,
-                ActivationId = address.ActivationId,
-                SiloAddress = address.SiloAddress,
-                MembershipVersion = clusterMembershipService.CurrentSnapshot.Version
-            };
-
-            var result = await GetGrainDirectory(grainType).Register(address, previousAddress);
-
-            // Check if the entry point to a dead silo
-            if (IsKnownDeadSilo(result))
-            {
-                // Remove outdated entry and retry to register
-                await GetGrainDirectory(grainType).Unregister(result);
-                result = await GetGrainDirectory(grainType).Register(address, previousAddress);
-            }
-
-            // Cache update
-            this.cache.AddOrUpdate(result, (int)result.MembershipVersion.Value);
-
-            return result;
-        }
-
-        public async Task Unregister(GrainAddress address, UnregistrationCause cause)
-        {
-            // Remove from local cache first so we don't return it anymore
-            this.cache.Remove(address);
-
-            // Remove from grain directory which may take significantly longer
-            await GetGrainDirectory(address.GrainId.Type).Unregister(address);
-
-            // There is the potential for a lookup to race with the Unregister and add the bad entry back to the cache.
-            if (this.cache.LookUp(address.GrainId, out var entry, out _) && entry.Equals(address))
-            {
-                this.cache.Remove(address);
+                // Entry found and valid -> return it
+                return true;
             }
         }
 
-        public void Participate(ISiloLifecycle lifecycle)
-        {
-            Task OnStart(CancellationToken ct)
-            {
-                this.listenToClusterChangeTask = ListenToClusterChange();
-                return Task.CompletedTask;
-            };
-            async Task OnStop(CancellationToken ct)
-            {
-                this.shutdownToken.Cancel();
-                if (listenToClusterChangeTask != default && !ct.IsCancellationRequested)
-                    await listenToClusterChangeTask.WaitAsync(ct);
-            };
-            lifecycle.Subscribe(nameof(CachedGrainLocator), ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
-        }
-
-        private IGrainDirectory GetGrainDirectory(GrainType grainType) => this.grainDirectoryResolver.Resolve(grainType);
-
-        private async Task ListenToClusterChange()
-        {
-            var previousSnapshot = this.clusterMembershipService.CurrentSnapshot;
-
-            ((ITestAccessor)this).LastMembershipVersion = previousSnapshot.Version;
-
-            var updates = this.clusterMembershipService.MembershipUpdates.WithCancellation(this.shutdownToken.Token);
-            await foreach (var snapshot in updates)
-            {
-                // Active filtering: detect silos that went down and try to clean proactively the directory
-                var changes = snapshot.CreateUpdate(previousSnapshot).Changes;
-                var deadSilos = changes
-                    .Where(member => member.Status.IsTerminating())
-                    .Select(member => member.SiloAddress)
-                    .ToList();
-
-                if (deadSilos.Count > 0)
-                {
-                    var tasks = new List<Task>();
-                    foreach (var directory in this.grainDirectoryResolver.Directories)
-                    {
-                        tasks.Add(directory.UnregisterSilos(deadSilos));
-                    }
-                    await Task.WhenAll(tasks).WaitAsync(this.shutdownToken.Token);
-                }
-
-                ((ITestAccessor)this).LastMembershipVersion = snapshot.Version;
-            }
-        }
-
-        private bool IsKnownDeadSilo(GrainAddress grainAddress)
-            => IsKnownDeadSilo(grainAddress.SiloAddress, grainAddress.MembershipVersion);
-
-        private bool IsKnownDeadSilo(SiloAddress siloAddress, MembershipVersion membershipVersion)
-        {
-            var current = this.clusterMembershipService.CurrentSnapshot;
-
-            // Check if the target silo is in the cluster
-            if (current.Members.TryGetValue(siloAddress, out var value))
-            {
-                // It is, check if it's alive
-                return value.Status.IsTerminating();
-            }
-
-            // We didn't find it in the cluster. If the silo entry is too old, it has been cleaned in the membership table: the entry isn't valid anymore.
-            // Otherwise, maybe the membership service isn't up to date yet. The entry should be valid
-            return current.Version > membershipVersion;
-        }
-
-        private static void ThrowUnsupportedGrainType(GrainId grainId) => throw new InvalidOperationException($"Unsupported grain type for grain {grainId}");
-
-        public void UpdateCache(GrainId grainId, SiloAddress siloAddress) => cache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
-        public void InvalidateCache(GrainId grainId) => cache.Remove(grainId);
-        public void InvalidateCache(GrainAddress address) => cache.Remove(address);
-        public bool TryLookupInCache(GrainId grainId, out GrainAddress address)
-        {
-            var grainType = grainId.Type;
-            if (grainType.IsClient() || grainType.IsSystemTarget())
-            {
-                ThrowUnsupportedGrainType(grainId);
-            }
-
-            if (this.cache.LookUp(grainId, out address, out var version))
-            {
-                // If the silo is dead, remove the entry
-                if (IsKnownDeadSilo(address.SiloAddress, new MembershipVersion(version)))
-                {
-                    address = default;
-                    this.cache.Remove(grainId);
-                }
-                else
-                {
-                    // Entry found and valid -> return it
-                    return true;
-                }
-            }
-
-            return false;
-        }
+        return false;
     }
 }

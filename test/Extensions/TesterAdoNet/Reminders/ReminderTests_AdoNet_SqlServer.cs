@@ -13,79 +13,78 @@ using Microsoft.Extensions.Hosting;
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
 
-namespace Tester.AdoNet.Reminders
+namespace Tester.AdoNet.Reminders;
+
+[TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("SqlServer")]
+public class ReminderTests_AdoNet_SqlServer : ReminderTests_Base, IClassFixture<ReminderTests_AdoNet_SqlServer.Fixture>
 {
-    [TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("SqlServer")]
-    public class ReminderTests_AdoNet_SqlServer : ReminderTests_Base, IClassFixture<ReminderTests_AdoNet_SqlServer.Fixture>
+    private const string TestDatabaseName = "OrleansTest_SqlServer_Reminders";
+    private static readonly string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
+    private const string ConnectionStringKey = "ReminderConnectionString";
+
+    public class Fixture : BaseTestClusterFixture
     {
-        private const string TestDatabaseName = "OrleansTest_SqlServer_Reminders";
-        private static readonly string AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
-        private const string ConnectionStringKey = "ReminderConnectionString";
-
-        public class Fixture : BaseTestClusterFixture
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+            string connectionString = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName)
+                .Result.CurrentConnectionString;
+            builder.ConfigureHostConfiguration(config => config.AddInMemoryCollection(new Dictionary<string, string>
             {
-                string connectionString = RelationalStorageForTesting.SetupInstance(AdoInvariant, TestDatabaseName)
-                    .Result.CurrentConnectionString;
-                builder.ConfigureHostConfiguration(config => config.AddInMemoryCollection(new Dictionary<string, string>
-                {
-                    [ConnectionStringKey] = connectionString
-                }));
-                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-            }
+                [ConnectionStringKey] = connectionString
+            }));
+            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
         }
+    }
 
-        public class SiloConfigurator : IHostConfigurator
+    public class SiloConfigurator : IHostConfigurator
+    {
+        public void Configure(IHostBuilder hostBuilder)
         {
-            public void Configure(IHostBuilder hostBuilder)
+            hostBuilder.UseOrleans((ctx, siloBuilder) =>
             {
-                hostBuilder.UseOrleans((ctx, siloBuilder) =>
+                siloBuilder.UseAdoNetReminderService(options =>
                 {
-                    siloBuilder.UseAdoNetReminderService(options =>
-                    {
-                        options.ConnectionString = hostBuilder.GetConfigurationValue(ConnectionStringKey);
-                        options.Invariant = AdoInvariant;
-                    });
+                    options.ConnectionString = hostBuilder.GetConfigurationValue(ConnectionStringKey);
+                    options.Invariant = AdoInvariant;
                 });
-            }
+            });
         }
+    }
 
-        public ReminderTests_AdoNet_SqlServer(Fixture fixture) : base(fixture)
-        {
-            // ReminderTable.Clear() cannot be called from a non-Orleans thread,
-            // so we must proxy the call through a grain.
-            var controlProxy = fixture.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout).Wait();
-        }
-        
-        // Basic tests
+    public ReminderTests_AdoNet_SqlServer(Fixture fixture) : base(fixture)
+    {
+        // ReminderTable.Clear() cannot be called from a non-Orleans thread,
+        // so we must proxy the call through a grain.
+        var controlProxy = fixture.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout).Wait();
+    }
+    
+    // Basic tests
 
-        [SkippableFact]
-        public async Task Rem_Sql_Basic_StopByRef()
-        {
-            await Test_Reminders_Basic_StopByRef();
-        }
+    [SkippableFact]
+    public async Task Rem_Sql_Basic_StopByRef()
+    {
+        await Test_Reminders_Basic_StopByRef();
+    }
 
-        [SkippableFact]
-        public async Task Rem_Sql_Basic_ListOps()
-        {
-            await Test_Reminders_Basic_ListOps();
-        }
+    [SkippableFact]
+    public async Task Rem_Sql_Basic_ListOps()
+    {
+        await Test_Reminders_Basic_ListOps();
+    }
 
-        // Single join tests ... multi grain, multi reminders
+    // Single join tests ... multi grain, multi reminders
 
-        [SkippableFact]
-        public async Task Rem_Sql_1J_MultiGrainMultiReminders()
-        {
-            await Test_Reminders_1J_MultiGrainMultiReminders();
-        }
+    [SkippableFact]
+    public async Task Rem_Sql_1J_MultiGrainMultiReminders()
+    {
+        await Test_Reminders_1J_MultiGrainMultiReminders();
+    }
 
-        [SkippableFact]
-        public async Task Rem_Sql_ReminderNotFound()
-        {
-            await Test_Reminders_ReminderNotFound();
-        }
+    [SkippableFact]
+    public async Task Rem_Sql_ReminderNotFound()
+    {
+        await Test_Reminders_ReminderNotFound();
     }
 }
 // ReSharper restore InconsistentNaming

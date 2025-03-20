@@ -1,17 +1,16 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Runtime
+namespace Orleans.Runtime;
+
+/// <summary>
+/// The silo role placement strategy specifies that a grain should be placed on a compatible silo which has the role specified by the strategy's placement attribute.
+/// </summary>
+[Serializable]
+public class SiloRoleBasedPlacement : PlacementStrategy
 {
     /// <summary>
-    /// The silo role placement strategy specifies that a grain should be placed on a compatible silo which has the role specified by the strategy's placement attribute.
+    /// Gets the singleton instance of this class.
     /// </summary>
-    [Serializable]
-    public class SiloRoleBasedPlacement : PlacementStrategy
-    {
-        /// <summary>
-        /// Gets the singleton instance of this class.
-        /// </summary>
-        internal static SiloRoleBasedPlacement Singleton { get; } = new SiloRoleBasedPlacement();
-    }
+    internal static SiloRoleBasedPlacement Singleton { get; } = new SiloRoleBasedPlacement();
 }

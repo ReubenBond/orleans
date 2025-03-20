@@ -3,10 +3,9 @@
 
 using System.Buffers;
 
-namespace Orleans.Networking.Shared
+namespace Orleans.Networking.Shared;
+
+internal sealed class SharedMemoryPool
 {
-    internal sealed class SharedMemoryPool
-    {
-        public MemoryPool<byte> Pool { get; } = KestrelMemoryPool.Create();
-    }
+    public MemoryPool<byte> Pool { get; } = KestrelMemoryPool.Create();
 }

@@ -4,83 +4,82 @@
 using Orleans.Providers;
 using Orleans.Streams.Core;
 
-namespace Orleans.Streams
+namespace Orleans.Streams;
+
+/// <summary>
+/// Provider-facing interface for manager of streaming providers
+/// </summary>
+internal interface IStreamProviderRuntime : IProviderRuntime
 {
     /// <summary>
-    /// Provider-facing interface for manager of streaming providers
+    /// Retrieves the opaque identity of currently executing grain or client object. 
     /// </summary>
-    internal interface IStreamProviderRuntime : IProviderRuntime
-    {
-        /// <summary>
-        /// Retrieves the opaque identity of currently executing grain or client object. 
-        /// </summary>
-        /// <remarks>Exposed for logging purposes.</remarks>
-        string ExecutingEntityIdentity();
-
-        /// <summary>
-        /// Returns the stream directory.
-        /// </summary>
-        /// <returns>The stream directory.</returns>
-        StreamDirectory GetStreamDirectory();
-
-        /// <summary>
-        /// A Pub Sub runtime interface.
-        /// </summary>
-        /// <returns></returns>
-        IStreamPubSub PubSub(StreamPubSubType pubSubType);
-    }
+    /// <remarks>Exposed for logging purposes.</remarks>
+    string ExecutingEntityIdentity();
 
     /// <summary>
-    /// Provider-facing interface for manager of streaming providers
+    /// Returns the stream directory.
     /// </summary>
-    internal interface ISiloSideStreamProviderRuntime : IStreamProviderRuntime
-    {
-        /// <summary>Start the pulling agents for a given persistent stream provider.</summary>
-        Task<IPersistentStreamPullingManager> InitializePullingAgents(
-            string streamProviderName,
-            IQueueAdapterFactory adapterFactory,
-            IQueueAdapter queueAdapter);
-    }
+    /// <returns>The stream directory.</returns>
+    StreamDirectory GetStreamDirectory();
 
     /// <summary>
-    /// Identifies the publish/subscribe system types which stream providers can use.
+    /// A Pub Sub runtime interface.
     /// </summary>
-    public enum StreamPubSubType
-    {        
-        /// <summary>
-        /// Explicit and implicit pub/sub.
-        /// </summary>
-        ExplicitGrainBasedAndImplicit,
+    /// <returns></returns>
+    IStreamPubSub PubSub(StreamPubSubType pubSubType);
+}
 
-        /// <summary>
-        /// Explicit pub/sub.
-        /// </summary>
-        ExplicitGrainBasedOnly,
+/// <summary>
+/// Provider-facing interface for manager of streaming providers
+/// </summary>
+internal interface ISiloSideStreamProviderRuntime : IStreamProviderRuntime
+{
+    /// <summary>Start the pulling agents for a given persistent stream provider.</summary>
+    Task<IPersistentStreamPullingManager> InitializePullingAgents(
+        string streamProviderName,
+        IQueueAdapterFactory adapterFactory,
+        IQueueAdapter queueAdapter);
+}
 
-        /// <summary>
-        /// Implicit pub/sub.
-        /// </summary>
-        ImplicitOnly,
-    }
+/// <summary>
+/// Identifies the publish/subscribe system types which stream providers can use.
+/// </summary>
+public enum StreamPubSubType
+{        
+    /// <summary>
+    /// Explicit and implicit pub/sub.
+    /// </summary>
+    ExplicitGrainBasedAndImplicit,
 
-    public interface IStreamPubSub // Compare with: IPubSubRendezvousGrain
-    {
-        Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
+    /// <summary>
+    /// Explicit pub/sub.
+    /// </summary>
+    ExplicitGrainBasedOnly,
 
-        Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
+    /// <summary>
+    /// Implicit pub/sub.
+    /// </summary>
+    ImplicitOnly,
+}
 
-        Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData);
+public interface IStreamPubSub // Compare with: IPubSubRendezvousGrain
+{
+    Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
 
-        Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId);
+    Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
 
-        Task<int> ProducerCount(QualifiedStreamId streamId);
+    Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData);
 
-        Task<int> ConsumerCount(QualifiedStreamId streamId);
+    Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId);
 
-        Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer = default);
+    Task<int> ProducerCount(QualifiedStreamId streamId);
 
-        GuidId CreateSubscriptionId(QualifiedStreamId streamId, GrainId streamConsumer);
+    Task<int> ConsumerCount(QualifiedStreamId streamId);
 
-        Task<bool> FaultSubscription(QualifiedStreamId streamId, GuidId subscriptionId);
-    }
+    Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer = default);
+
+    GuidId CreateSubscriptionId(QualifiedStreamId streamId, GrainId streamConsumer);
+
+    Task<bool> FaultSubscription(QualifiedStreamId streamId, GuidId subscriptionId);
 }

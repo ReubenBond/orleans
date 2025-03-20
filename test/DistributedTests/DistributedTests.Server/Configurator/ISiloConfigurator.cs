@@ -3,14 +3,13 @@
 
 using System.CommandLine;
 
-namespace DistributedTests.Server.Configurator
+namespace DistributedTests.Server.Configurator;
+
+public interface ISiloConfigurator<T>
 {
-    public interface ISiloConfigurator<T>
-    {
-        string Name { get; }
+    string Name { get; }
 
-        List<Option> Options { get; }
+    List<Option> Options { get; }
 
-        void Configure(ISiloBuilder siloBuilder, T parameters);
-    }
+    void Configure(ISiloBuilder siloBuilder, T parameters);
 }

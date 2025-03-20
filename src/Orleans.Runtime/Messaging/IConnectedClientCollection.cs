@@ -1,28 +1,27 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Runtime
+namespace Orleans.Runtime;
+
+/// <summary>
+/// Represents the collection of clients which are currently connected to this gateway.
+/// </summary>
+internal interface IConnectedClientCollection
 {
     /// <summary>
-    /// Represents the collection of clients which are currently connected to this gateway.
+    /// The monotonically increasing version of the collection, which can be used for change notification.
     /// </summary>
-    internal interface IConnectedClientCollection
-    {
-        /// <summary>
-        /// The monotonically increasing version of the collection, which can be used for change notification.
-        /// </summary>
-        long Version { get; }
+    long Version { get; }
 
-        /// <summary>
-        /// Gets the collection of ids for the connected clients.
-        /// </summary>
-        List<GrainId> GetConnectedClientIds();
-    }
+    /// <summary>
+    /// Gets the collection of ids for the connected clients.
+    /// </summary>
+    List<GrainId> GetConnectedClientIds();
+}
 
-    internal sealed class EmptyConnectedClientCollection : IConnectedClientCollection
-    {
-        public long Version => 0;
+internal sealed class EmptyConnectedClientCollection : IConnectedClientCollection
+{
+    public long Version => 0;
 
-        public List<GrainId> GetConnectedClientIds() => new List<GrainId>(0);
-    }
+    public List<GrainId> GetConnectedClientIds() => new List<GrainId>(0);
 }

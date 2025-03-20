@@ -3,13 +3,12 @@
 
 using UnitTests.GrainInterfaces;
 
-namespace UnitTests.Grains
+namespace UnitTests.Grains;
+
+public class GeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain : Grain, IGeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain
 {
-    public class GeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain : Grain, IGeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain
+    public Task<int> Echo(int x)
     {
-        public Task<int> Echo(int x)
-        {
-            return Task.FromResult(x);
-        }
+        return Task.FromResult(x);
     }
 }

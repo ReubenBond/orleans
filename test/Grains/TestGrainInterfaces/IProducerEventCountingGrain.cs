@@ -1,21 +1,20 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace UnitTests.GrainInterfaces
+namespace UnitTests.GrainInterfaces;
+
+/// <summary>
+/// Stream producer grain that sends a single event at a time (when told, see SendEvent) and tracks the number of events sent
+/// </summary>
+public interface IProducerEventCountingGrain : IGrainWithGuidKey
 {
+    Task BecomeProducer(Guid streamId, string providerToUse);
+
     /// <summary>
-    /// Stream producer grain that sends a single event at a time (when told, see SendEvent) and tracks the number of events sent
+    /// Sends a single event and, upon successful completion, updates the number of events produced.
     /// </summary>
-    public interface IProducerEventCountingGrain : IGrainWithGuidKey
-    {
-        Task BecomeProducer(Guid streamId, string providerToUse);
+    /// <returns></returns>
+    Task SendEvent();
 
-        /// <summary>
-        /// Sends a single event and, upon successful completion, updates the number of events produced.
-        /// </summary>
-        /// <returns></returns>
-        Task SendEvent();
-
-        Task<int> GetNumberProduced();
-    }
+    Task<int> GetNumberProduced();
 }

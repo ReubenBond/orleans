@@ -5,70 +5,69 @@ using System.Buffers.Text;
 using Orleans.Metadata;
 
 #nullable enable
-namespace Orleans.BroadcastChannel
+namespace Orleans.BroadcastChannel;
+
+/// <summary>
+/// The default <see cref="IChannelIdMapper"/> implementation.
+/// </summary>
+public sealed class DefaultChannelIdMapper : IChannelIdMapper
 {
     /// <summary>
-    /// The default <see cref="IChannelIdMapper"/> implementation.
+    /// The name of this stream identity mapper.
     /// </summary>
-    public sealed class DefaultChannelIdMapper : IChannelIdMapper
+    public const string Name = "default";
+
+    /// <inheritdoc />
+    public IdSpan GetGrainKeyId(GrainBindings grainBindings, ChannelId streamId)
     {
-        /// <summary>
-        /// The name of this stream identity mapper.
-        /// </summary>
-        public const string Name = "default";
+        string? keyType = null;
+        bool includeNamespaceInGrainId = false;
 
-        /// <inheritdoc />
-        public IdSpan GetGrainKeyId(GrainBindings grainBindings, ChannelId streamId)
+        foreach (var grainBinding in grainBindings.Bindings)
         {
-            string? keyType = null;
-            bool includeNamespaceInGrainId = false;
-
-            foreach (var grainBinding in grainBindings.Bindings)
+            if (!grainBinding.TryGetValue(WellKnownGrainTypeProperties.BindingTypeKey, out var type)
+                    || !string.Equals(type, WellKnownGrainTypeProperties.BroadcastChannelBindingTypeValue, StringComparison.Ordinal))
             {
-                if (!grainBinding.TryGetValue(WellKnownGrainTypeProperties.BindingTypeKey, out var type)
-                        || !string.Equals(type, WellKnownGrainTypeProperties.BroadcastChannelBindingTypeValue, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                if (grainBinding.TryGetValue(WellKnownGrainTypeProperties.LegacyGrainKeyType, out keyType))
-                {
-                    if (grainBinding.TryGetValue(WellKnownGrainTypeProperties.StreamBindingIncludeNamespaceKey, out var value)
-                        && string.Equals(value, "true", StringComparison.OrdinalIgnoreCase))
-                    {
-                        includeNamespaceInGrainId = true;
-                    }
-                }
+                continue;
             }
 
-            return keyType switch
+            if (grainBinding.TryGetValue(WellKnownGrainTypeProperties.LegacyGrainKeyType, out keyType))
             {
-                nameof(Guid) => GetGuidKey(streamId, includeNamespaceInGrainId),
-                nameof(Int64) => GetIntegerKey(streamId, includeNamespaceInGrainId),
-                _ => streamId.GetKeyIdSpan(), // null or string
-            };
+                if (grainBinding.TryGetValue(WellKnownGrainTypeProperties.StreamBindingIncludeNamespaceKey, out var value)
+                    && string.Equals(value, "true", StringComparison.OrdinalIgnoreCase))
+                {
+                    includeNamespaceInGrainId = true;
+                }
+            }
         }
 
-        private static IdSpan GetGuidKey(ChannelId streamId, bool includeNamespaceInGrainId)
+        return keyType switch
         {
-            var key = streamId.Key.Span;
-            if (!Utf8Parser.TryParse(key, out Guid guidKey, out var len, 'N') || len < key.Length) throw new ArgumentException(nameof(streamId));
+            nameof(Guid) => GetGuidKey(streamId, includeNamespaceInGrainId),
+            nameof(Int64) => GetIntegerKey(streamId, includeNamespaceInGrainId),
+            _ => streamId.GetKeyIdSpan(), // null or string
+        };
+    }
 
-            if (!includeNamespaceInGrainId)
-                return streamId.GetKeyIdSpan();
+    private static IdSpan GetGuidKey(ChannelId streamId, bool includeNamespaceInGrainId)
+    {
+        var key = streamId.Key.Span;
+        if (!Utf8Parser.TryParse(key, out Guid guidKey, out var len, 'N') || len < key.Length) throw new ArgumentException(nameof(streamId));
 
-            var ns = streamId.Namespace.Span;
-            return ns.IsEmpty ? streamId.GetKeyIdSpan() : GrainIdKeyExtensions.CreateGuidKey(guidKey, ns);
-        }
+        if (!includeNamespaceInGrainId)
+            return streamId.GetKeyIdSpan();
 
-        private static IdSpan GetIntegerKey(ChannelId streamId, bool includeNamespaceInGrainId)
-        {
-            var key = streamId.Key.Span;
-            if (!Utf8Parser.TryParse(key, out int intKey, out var len) || len < key.Length) throw new ArgumentException(nameof(streamId));
+        var ns = streamId.Namespace.Span;
+        return ns.IsEmpty ? streamId.GetKeyIdSpan() : GrainIdKeyExtensions.CreateGuidKey(guidKey, ns);
+    }
 
-            return includeNamespaceInGrainId
-                ? GrainIdKeyExtensions.CreateIntegerKey(intKey, streamId.Namespace.Span)
-                : GrainIdKeyExtensions.CreateIntegerKey(intKey);
-        }
+    private static IdSpan GetIntegerKey(ChannelId streamId, bool includeNamespaceInGrainId)
+    {
+        var key = streamId.Key.Span;
+        if (!Utf8Parser.TryParse(key, out int intKey, out var len) || len < key.Length) throw new ArgumentException(nameof(streamId));
+
+        return includeNamespaceInGrainId
+            ? GrainIdKeyExtensions.CreateIntegerKey(intKey, streamId.Namespace.Span)
+            : GrainIdKeyExtensions.CreateIntegerKey(intKey);
     }
 }

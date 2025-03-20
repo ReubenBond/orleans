@@ -3,9 +3,8 @@
 
 using UnitTests.Interfaces;
 
-namespace UnitTests.GrainInterfaces
+namespace UnitTests.GrainInterfaces;
+
+public interface IGeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain : IGrainWithGuidKey, ICSharpBaseInterface
 {
-    public interface IGeneratorTestDerivedFromCSharpInterfaceInExternalAssemblyGrain : IGrainWithGuidKey, ICSharpBaseInterface
-    {
-    }
 }

@@ -1,13 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Runtime.Placement
+namespace Orleans.Runtime.Placement;
+
+/// <summary>
+/// ClientObserversPlacementDirector is used to prevent placement of client observer activations.
+/// </summary>
+internal class ClientObserversPlacementDirector : IPlacementDirector
 {
-    /// <summary>
-    /// ClientObserversPlacementDirector is used to prevent placement of client observer activations.
-    /// </summary>
-    internal class ClientObserversPlacementDirector : IPlacementDirector
-    {
-        public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context) => throw new ClientNotAvailableException(target.GrainIdentity);
-    }
+    public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context) => throw new ClientNotAvailableException(target.GrainIdentity);
 }

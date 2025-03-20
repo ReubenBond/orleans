@@ -1,109 +1,108 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Runtime.Scheduler
+namespace Orleans.Runtime.Scheduler;
+
+internal sealed class AsyncClosureWorkItem : WorkItemBase
 {
-    internal sealed class AsyncClosureWorkItem : WorkItemBase
+    private readonly TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly Func<Task> continuation;
+    private readonly string name;
+
+    public override string Name => this.name ?? GetMethodName(this.continuation);
+    public Task Task => this.completion.Task;
+
+    public AsyncClosureWorkItem(Func<Task> closure, string name, IGrainContext grainContext)
     {
-        private readonly TaskCompletionSource<bool> completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly Func<Task> continuation;
-        private readonly string name;
-
-        public override string Name => this.name ?? GetMethodName(this.continuation);
-        public Task Task => this.completion.Task;
-
-        public AsyncClosureWorkItem(Func<Task> closure, string name, IGrainContext grainContext)
-        {
-            this.continuation = closure;
-            this.name = name;
-            this.GrainContext = grainContext;
-        }
-
-        public AsyncClosureWorkItem(Func<Task> closure, IGrainContext grainContext)
-        {
-            this.continuation = closure;
-            this.GrainContext = grainContext;
-        }
-
-        public override async void Execute()
-        {
-            try
-            {
-                RequestContext.Clear();
-                await this.continuation();
-                this.completion.TrySetResult(true);
-            }
-            catch (Exception exception)
-            {
-                this.completion.TrySetException(exception);
-            }
-        }
-
-        public override IGrainContext GrainContext { get; }
-
-        internal static string GetMethodName(Delegate action) => $"{action.Target}->{action.Method}";
+        this.continuation = closure;
+        this.name = name;
+        this.GrainContext = grainContext;
     }
 
-    internal sealed class AsyncClosureWorkItem<T> : WorkItemBase
+    public AsyncClosureWorkItem(Func<Task> closure, IGrainContext grainContext)
     {
-        private readonly TaskCompletionSource<T> completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly Func<Task<T>> continuation;
-        private readonly string name;
-
-        public override string Name => this.name ?? AsyncClosureWorkItem.GetMethodName(this.continuation);
-        public Task<T> Task => this.completion.Task;
-
-        public AsyncClosureWorkItem(Func<Task<T>> closure, string name, IGrainContext grainContext)
-        {
-            this.continuation = closure;
-            this.name = name;
-            this.GrainContext = grainContext;
-        }
-
-        public AsyncClosureWorkItem(Func<Task<T>> closure, IGrainContext grainContext)
-        {
-            this.continuation = closure;
-            this.GrainContext = grainContext;
-        }
-
-        public override async void Execute()
-        {
-            try
-            {
-                RequestContext.Clear();
-                var result = await this.continuation();
-                this.completion.TrySetResult(result);
-            }
-            catch (Exception exception)
-            {
-                this.completion.TrySetException(exception);
-            }
-        }
-
-        public override IGrainContext GrainContext { get; }
+        this.continuation = closure;
+        this.GrainContext = grainContext;
     }
 
-    internal sealed class ClosureWorkItem<TState>(Action<TState> closure, TState state, string name, IGrainContext grainContext) : WorkItemBase
+    public override async void Execute()
     {
-        private readonly TaskCompletionSource<bool> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public override string Name => name ?? AsyncClosureWorkItem.GetMethodName(closure);
-        public Task Task => _completion.Task;
-
-        public override void Execute()
+        try
         {
-            try
-            {
-                RequestContext.Clear();
-                closure(state);
-                _completion.TrySetResult(true);
-            }
-            catch (Exception exception)
-            {
-                _completion.TrySetException(exception);
-            }
+            RequestContext.Clear();
+            await this.continuation();
+            this.completion.TrySetResult(true);
         }
-
-        public override IGrainContext GrainContext { get; } = grainContext;
+        catch (Exception exception)
+        {
+            this.completion.TrySetException(exception);
+        }
     }
+
+    public override IGrainContext GrainContext { get; }
+
+    internal static string GetMethodName(Delegate action) => $"{action.Target}->{action.Method}";
+}
+
+internal sealed class AsyncClosureWorkItem<T> : WorkItemBase
+{
+    private readonly TaskCompletionSource<T> completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly Func<Task<T>> continuation;
+    private readonly string name;
+
+    public override string Name => this.name ?? AsyncClosureWorkItem.GetMethodName(this.continuation);
+    public Task<T> Task => this.completion.Task;
+
+    public AsyncClosureWorkItem(Func<Task<T>> closure, string name, IGrainContext grainContext)
+    {
+        this.continuation = closure;
+        this.name = name;
+        this.GrainContext = grainContext;
+    }
+
+    public AsyncClosureWorkItem(Func<Task<T>> closure, IGrainContext grainContext)
+    {
+        this.continuation = closure;
+        this.GrainContext = grainContext;
+    }
+
+    public override async void Execute()
+    {
+        try
+        {
+            RequestContext.Clear();
+            var result = await this.continuation();
+            this.completion.TrySetResult(result);
+        }
+        catch (Exception exception)
+        {
+            this.completion.TrySetException(exception);
+        }
+    }
+
+    public override IGrainContext GrainContext { get; }
+}
+
+internal sealed class ClosureWorkItem<TState>(Action<TState> closure, TState state, string name, IGrainContext grainContext) : WorkItemBase
+{
+    private readonly TaskCompletionSource<bool> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    public override string Name => name ?? AsyncClosureWorkItem.GetMethodName(closure);
+    public Task Task => _completion.Task;
+
+    public override void Execute()
+    {
+        try
+        {
+            RequestContext.Clear();
+            closure(state);
+            _completion.TrySetResult(true);
+        }
+        catch (Exception exception)
+        {
+            _completion.TrySetException(exception);
+        }
+    }
+
+    public override IGrainContext GrainContext { get; } = grainContext;
 }

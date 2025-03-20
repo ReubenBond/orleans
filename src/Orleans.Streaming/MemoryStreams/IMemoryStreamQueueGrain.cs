@@ -1,27 +1,26 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Providers
+namespace Orleans.Providers;
+
+/// <summary>
+/// Interface for In-memory stream queue grain.
+/// </summary>
+public interface IMemoryStreamQueueGrain : IGrainWithGuidKey
 {
     /// <summary>
-    /// Interface for In-memory stream queue grain.
+    /// Enqueues an event.
     /// </summary>
-    public interface IMemoryStreamQueueGrain : IGrainWithGuidKey
-    {
-        /// <summary>
-        /// Enqueues an event.
-        /// </summary>
-        /// <param name="data">The data.</param>
-        /// <returns>A <see cref="Task"/> representing the operation.</returns>
-        Task Enqueue(MemoryMessageData data);
+    /// <param name="data">The data.</param>
+    /// <returns>A <see cref="Task"/> representing the operation.</returns>
+    Task Enqueue(MemoryMessageData data);
 
-        /// <summary>
-        /// Dequeues up to <paramref name="maxCount"/> events.
-        /// </summary>
-        /// <param name="maxCount">
-        /// The maximum number of events to dequeue.
-        /// </param>
-        /// <returns>A <see cref="Task"/> representing the operation.</returns>
-        Task<List<MemoryMessageData>> Dequeue(int maxCount);
-    }
+    /// <summary>
+    /// Dequeues up to <paramref name="maxCount"/> events.
+    /// </summary>
+    /// <param name="maxCount">
+    /// The maximum number of events to dequeue.
+    /// </param>
+    /// <returns>A <see cref="Task"/> representing the operation.</returns>
+    Task<List<MemoryMessageData>> Dequeue(int maxCount);
 }

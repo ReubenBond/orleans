@@ -5,44 +5,43 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration.Internal;
 using Orleans.Runtime.ReminderService;
 
-namespace Orleans.Hosting
+namespace Orleans.Hosting;
+
+/// <summary>
+/// Extensions to <see cref="ISiloBuilder"/> for configuring the in-memory reminder provider.
+/// </summary>
+public static class SiloBuilderReminderMemoryExtensions
 {
     /// <summary>
-    /// Extensions to <see cref="ISiloBuilder"/> for configuring the in-memory reminder provider.
+    /// Configures reminder storage using an in-memory, non-persistent store.
     /// </summary>
-    public static class SiloBuilderReminderMemoryExtensions
+    /// <remarks>
+    /// Note that this is for development and testing scenarios only and should not be used in production.
+    /// </remarks>
+    /// <param name="builder">The silo host builder.</param>
+    /// <returns>The provided <see cref="ISiloBuilder"/>, for chaining.</returns>
+    public static ISiloBuilder UseInMemoryReminderService(this ISiloBuilder builder)
     {
-        /// <summary>
-        /// Configures reminder storage using an in-memory, non-persistent store.
-        /// </summary>
-        /// <remarks>
-        /// Note that this is for development and testing scenarios only and should not be used in production.
-        /// </remarks>
-        /// <param name="builder">The silo host builder.</param>
-        /// <returns>The provided <see cref="ISiloBuilder"/>, for chaining.</returns>
-        public static ISiloBuilder UseInMemoryReminderService(this ISiloBuilder builder)
-        {
-            builder.AddReminders();
+        builder.AddReminders();
 
-            // The reminder table is a reference to a singleton IReminderTableGrain.
-            builder.ConfigureServices(services => services.UseInMemoryReminderService());
-            return builder;
-        }
+        // The reminder table is a reference to a singleton IReminderTableGrain.
+        builder.ConfigureServices(services => services.UseInMemoryReminderService());
+        return builder;
+    }
 
-        /// <summary>
-        /// Configures reminder storage using an in-memory, non-persistent store.
-        /// </summary>
-        /// <remarks>
-        /// Note that this is for development and testing scenarios only and should not be used in production.
-        /// </remarks>
-        /// <param name="services">The service collection.</param>
-        /// <returns>The provided <see cref="IServiceCollection"/>, for chaining.</returns>
-        internal static IServiceCollection UseInMemoryReminderService(this IServiceCollection services)
-        {
-            services.AddSingleton<InMemoryReminderTable>();
-            services.AddFromExisting<IReminderTable, InMemoryReminderTable>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InMemoryReminderTable>();
-            return services;
-        }
+    /// <summary>
+    /// Configures reminder storage using an in-memory, non-persistent store.
+    /// </summary>
+    /// <remarks>
+    /// Note that this is for development and testing scenarios only and should not be used in production.
+    /// </remarks>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The provided <see cref="IServiceCollection"/>, for chaining.</returns>
+    internal static IServiceCollection UseInMemoryReminderService(this IServiceCollection services)
+    {
+        services.AddSingleton<InMemoryReminderTable>();
+        services.AddFromExisting<IReminderTable, InMemoryReminderTable>();
+        services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InMemoryReminderTable>();
+        return services;
     }
 }

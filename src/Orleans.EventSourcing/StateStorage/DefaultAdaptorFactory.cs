@@ -3,23 +3,22 @@
 
 using Orleans.Storage;
 
-namespace Orleans.EventSourcing.StateStorage
+namespace Orleans.EventSourcing.StateStorage;
+
+internal class DefaultAdaptorFactory : ILogViewAdaptorFactory
 {
-    internal class DefaultAdaptorFactory : ILogViewAdaptorFactory
+    public bool UsesStorageProvider
     {
-        public bool UsesStorageProvider
+        get
         {
-            get
-            {
-                return true;
-            }
+            return true;
         }
-
-         public ILogViewAdaptor<T, E> MakeLogViewAdaptor<T, E>(ILogViewAdaptorHost<T, E> hostgrain, T initialstate, string graintypename, IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
-            where T : class, new() where E : class
-        {
-            return new LogViewAdaptor<T, E>(hostgrain, initialstate, grainStorage, graintypename, services);
-        }
-
     }
+
+     public ILogViewAdaptor<T, E> MakeLogViewAdaptor<T, E>(ILogViewAdaptorHost<T, E> hostgrain, T initialstate, string graintypename, IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
+        where T : class, new() where E : class
+    {
+        return new LogViewAdaptor<T, E>(hostgrain, initialstate, grainStorage, graintypename, services);
+    }
+
 }

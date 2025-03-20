@@ -3,116 +3,115 @@
 
 using Tester.StorageFacet.Abstractions;
 
-namespace Tester
+namespace Tester;
+
+public interface IStorageFacetGrain : IGrainWithIntegerKey
 {
-    public interface IStorageFacetGrain : IGrainWithIntegerKey
+    Task<string[]> GetNames();
+    Task<string[]> GetExtendedInfo();
+}
+
+public class StorageFacetGrain : Grain, IStorageFacetGrain
+{
+    private readonly IExampleStorage<string> first;
+    private readonly IExampleStorage<string> second;
+
+    public StorageFacetGrain(
+        [ExampleStorage("Blob", "FirstState")] IExampleStorage<string> first,
+        [ExampleStorage("Table")] IExampleStorage<string> second)
     {
-        Task<string[]> GetNames();
-        Task<string[]> GetExtendedInfo();
+        this.first = first;
+        this.second = second;
     }
 
-    public class StorageFacetGrain : Grain, IStorageFacetGrain
+    public Task<string[]> GetNames()
     {
-        private readonly IExampleStorage<string> first;
-        private readonly IExampleStorage<string> second;
-
-        public StorageFacetGrain(
-            [ExampleStorage("Blob", "FirstState")] IExampleStorage<string> first,
-            [ExampleStorage("Table")] IExampleStorage<string> second)
-        {
-            this.first = first;
-            this.second = second;
-        }
-
-        public Task<string[]> GetNames()
-        {
-            return Task.FromResult(new[] { this.first.Name, this.second.Name });
-        }
-
-        public Task<string[]> GetExtendedInfo()
-        {
-            return Task.FromResult(new[] { this.first.GetExtendedInfo(), this.second.GetExtendedInfo() });
-        }
+        return Task.FromResult(new[] { this.first.Name, this.second.Name });
     }
 
-    public interface IStorageFactoryGrain : IStorageFacetGrain
+    public Task<string[]> GetExtendedInfo()
     {
+        return Task.FromResult(new[] { this.first.GetExtendedInfo(), this.second.GetExtendedInfo() });
     }
-    public class StorageFactoryGrain : Grain, IStorageFactoryGrain
+}
+
+public interface IStorageFactoryGrain : IStorageFacetGrain
+{
+}
+public class StorageFactoryGrain : Grain, IStorageFactoryGrain
+{
+    private readonly IExampleStorage<string> first;
+    private readonly IExampleStorage<string> second;
+
+    public StorageFactoryGrain(
+        INamedExampleStorageFactory namedExampleStorageFactory)
     {
-        private readonly IExampleStorage<string> first;
-        private readonly IExampleStorage<string> second;
-
-        public StorageFactoryGrain(
-            INamedExampleStorageFactory namedExampleStorageFactory)
-        {
-            this.first = namedExampleStorageFactory.Create<string>("Blob", new ExampleStorageConfig("FirstState"));
-            this.second = namedExampleStorageFactory.Create<string>("Table", new ExampleStorageConfig("second"));
-        }
-
-        public Task<string[]> GetNames()
-        {
-            return Task.FromResult(new[] { this.first.Name, this.second.Name });
-        }
-
-        public Task<string[]> GetExtendedInfo()
-        {
-            return Task.FromResult(new[] { this.first.GetExtendedInfo(), this.second.GetExtendedInfo() });
-        }
+        this.first = namedExampleStorageFactory.Create<string>("Blob", new ExampleStorageConfig("FirstState"));
+        this.second = namedExampleStorageFactory.Create<string>("Table", new ExampleStorageConfig("second"));
     }
 
-    public interface IStorageDefaultFactoryGrain : IStorageFacetGrain
+    public Task<string[]> GetNames()
     {
+        return Task.FromResult(new[] { this.first.Name, this.second.Name });
     }
 
-    public class StorageDefaultFactoryGrain : Grain, IStorageDefaultFactoryGrain
+    public Task<string[]> GetExtendedInfo()
     {
-        private readonly IExampleStorage<string> first;
-        private readonly IExampleStorage<string> second;
+        return Task.FromResult(new[] { this.first.GetExtendedInfo(), this.second.GetExtendedInfo() });
+    }
+}
 
-        public StorageDefaultFactoryGrain(
-            IExampleStorageFactory ExampleStorageFactory)
-        {
-            this.first = ExampleStorageFactory.Create<string>(new ExampleStorageConfig("FirstState"));
-            this.second = ExampleStorageFactory.Create<string>(new ExampleStorageConfig("second"));
-        }
+public interface IStorageDefaultFactoryGrain : IStorageFacetGrain
+{
+}
 
-        public Task<string[]> GetNames()
-        {
-            return Task.FromResult(new[] { this.first.Name, this.second.Name });
-        }
+public class StorageDefaultFactoryGrain : Grain, IStorageDefaultFactoryGrain
+{
+    private readonly IExampleStorage<string> first;
+    private readonly IExampleStorage<string> second;
 
-        public Task<string[]> GetExtendedInfo()
-        {
-            return Task.FromResult(new[] { this.first.GetExtendedInfo(), this.second.GetExtendedInfo() });
-        }
+    public StorageDefaultFactoryGrain(
+        IExampleStorageFactory ExampleStorageFactory)
+    {
+        this.first = ExampleStorageFactory.Create<string>(new ExampleStorageConfig("FirstState"));
+        this.second = ExampleStorageFactory.Create<string>(new ExampleStorageConfig("second"));
     }
 
-    public interface IStorageDefaultFacetGrain : IStorageFacetGrain
+    public Task<string[]> GetNames()
     {
+        return Task.FromResult(new[] { this.first.Name, this.second.Name });
     }
 
-    public class StorageDefaultFacetGrain : Grain, IStorageDefaultFacetGrain
+    public Task<string[]> GetExtendedInfo()
     {
-        private readonly IExampleStorage<string> first;
-        private readonly IExampleStorage<string> second;
+        return Task.FromResult(new[] { this.first.GetExtendedInfo(), this.second.GetExtendedInfo() });
+    }
+}
 
-        public StorageDefaultFacetGrain(
-            [ExampleStorage(stateName: "FirstState")] IExampleStorage<string> first,
-            [ExampleStorage] IExampleStorage<string> second)
-        {
-            this.first = first;
-            this.second = second;
-        }
+public interface IStorageDefaultFacetGrain : IStorageFacetGrain
+{
+}
 
-        public Task<string[]> GetNames()
-        {
-            return Task.FromResult(new[] { this.first.Name, this.second.Name });
-        }
+public class StorageDefaultFacetGrain : Grain, IStorageDefaultFacetGrain
+{
+    private readonly IExampleStorage<string> first;
+    private readonly IExampleStorage<string> second;
 
-        public Task<string[]> GetExtendedInfo()
-        {
-            return Task.FromResult(new[] { this.first.GetExtendedInfo(), this.second.GetExtendedInfo() });
-        }
+    public StorageDefaultFacetGrain(
+        [ExampleStorage(stateName: "FirstState")] IExampleStorage<string> first,
+        [ExampleStorage] IExampleStorage<string> second)
+    {
+        this.first = first;
+        this.second = second;
+    }
+
+    public Task<string[]> GetNames()
+    {
+        return Task.FromResult(new[] { this.first.Name, this.second.Name });
+    }
+
+    public Task<string[]> GetExtendedInfo()
+    {
+        return Task.FromResult(new[] { this.first.GetExtendedInfo(), this.second.GetExtendedInfo() });
     }
 }

@@ -3,36 +3,35 @@
 
 using Xunit;
 
-namespace UnitTests
+namespace UnitTests;
+
+public class ConnectionStringFixture
 {
-    public class ConnectionStringFixture
+    private Lazy<Task<string>> connectionStringLazy;
+
+    public void InitializeConnectionStringAccessor(Func<Task<string>> connectionStringAccessor)
     {
-        private Lazy<Task<string>> connectionStringLazy;
+        Interlocked.CompareExchange(ref this.connectionStringLazy,
+            new Lazy<Task<string>>(connectionStringAccessor, LazyThreadSafetyMode.ExecutionAndPublication), null);
+    }
 
-        public void InitializeConnectionStringAccessor(Func<Task<string>> connectionStringAccessor)
+    public string ConnectionString
+    {
+        get
         {
-            Interlocked.CompareExchange(ref this.connectionStringLazy,
-                new Lazy<Task<string>>(connectionStringAccessor, LazyThreadSafetyMode.ExecutionAndPublication), null);
-        }
-
-        public string ConnectionString
-        {
-            get
+            if (this.connectionStringLazy == null)
             {
-                if (this.connectionStringLazy == null)
-                {
-                    throw new InvalidOperationException(
-                        $"{nameof(InitializeConnectionStringAccessor)} was not called before accessing the connection string");
-                }
-
-                var connString = this.connectionStringLazy.Value.Result;
-                if (connString != null)
-                {
-                    return connString;
-                }
-
-                throw new SkipException("Environment is not correctly set up to run these tests. Connection string is empty.");
+                throw new InvalidOperationException(
+                    $"{nameof(InitializeConnectionStringAccessor)} was not called before accessing the connection string");
             }
+
+            var connString = this.connectionStringLazy.Value.Result;
+            if (connString != null)
+            {
+                return connString;
+            }
+
+            throw new SkipException("Environment is not correctly set up to run these tests. Connection string is empty.");
         }
     }
 }

@@ -1,13 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace UnitTests.GrainInterfaces
-{
-    public interface IImplicitSubscriptionKeyTypeGrain
-    {
-        Task<int> GetValue();
-    }
+namespace UnitTests.GrainInterfaces;
 
-    public interface IImplicitSubscriptionLongKeyGrain : IImplicitSubscriptionKeyTypeGrain, IGrainWithIntegerKey
-    { }
+public interface IImplicitSubscriptionKeyTypeGrain
+{
+    Task<int> GetValue();
 }
+
+public interface IImplicitSubscriptionLongKeyGrain : IImplicitSubscriptionKeyTypeGrain, IGrainWithIntegerKey
+{ }

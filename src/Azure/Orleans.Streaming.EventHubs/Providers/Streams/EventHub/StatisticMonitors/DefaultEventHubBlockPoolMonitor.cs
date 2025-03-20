@@ -3,19 +3,18 @@
 
 using Orleans.Providers.Streams.Common;
 
-namespace Orleans.Streaming.EventHubs.StatisticMonitors
+namespace Orleans.Streaming.EventHubs.StatisticMonitors;
+
+/// <summary>
+/// Default monitor for Object pool used by EventHubStreamProvider
+/// </summary>
+public class DefaultEventHubBlockPoolMonitor : DefaultBlockPoolMonitor
 {
     /// <summary>
-    /// Default monitor for Object pool used by EventHubStreamProvider
+    /// Constructor
     /// </summary>
-    public class DefaultEventHubBlockPoolMonitor : DefaultBlockPoolMonitor
+    /// <param name="dimensions"></param>
+    public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions) : base(new KeyValuePair<string, object>[] { new("Path", dimensions.EventHubPath), new("ObjectPoolId", dimensions.BlockPoolId) })
     {
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="dimensions"></param>
-        public DefaultEventHubBlockPoolMonitor(EventHubBlockPoolMonitorDimensions dimensions) : base(new KeyValuePair<string, object>[] { new("Path", dimensions.EventHubPath), new("ObjectPoolId", dimensions.BlockPoolId) })
-        {
-        }
     }
 }

@@ -4,97 +4,96 @@
 using Microsoft.Extensions.Logging;
 using Orleans.BroadcastChannel.SubscriberTable;
 
-namespace Orleans.BroadcastChannel
+namespace Orleans.BroadcastChannel;
+
+/// <summary>
+/// Interface to allow writing to a channel.
+/// </summary>
+/// <typeparam name="T">The channel element type.</typeparam>
+public interface IBroadcastChannelWriter<T>
 {
     /// <summary>
-    /// Interface to allow writing to a channel.
+    /// Publish an element to the channel.
     /// </summary>
-    /// <typeparam name="T">The channel element type.</typeparam>
-    public interface IBroadcastChannelWriter<T>
+    /// <param name="item">The element to publish.</param>
+    Task Publish(T item);
+}
+
+/// <inheritdoc />
+internal class BroadcastChannelWriter<T> : IBroadcastChannelWriter<T>
+{
+    private static readonly string LoggingCategory = typeof(BroadcastChannelWriter<>).FullName;
+
+    private readonly InternalChannelId _channelId;
+    private readonly IGrainFactory _grainFactory;
+    private readonly ImplicitChannelSubscriberTable _subscriberTable;
+    private readonly bool _fireAndForgetDelivery;
+    private readonly ILogger _logger;
+
+    public BroadcastChannelWriter(
+        InternalChannelId channelId,
+        IGrainFactory grainFactory,
+        ImplicitChannelSubscriberTable subscriberTable,
+        bool fireAndForgetDelivery,
+        ILoggerFactory loggerFactory)
     {
-        /// <summary>
-        /// Publish an element to the channel.
-        /// </summary>
-        /// <param name="item">The element to publish.</param>
-        Task Publish(T item);
+        _channelId = channelId;
+        _grainFactory = grainFactory;
+        _subscriberTable = subscriberTable;
+        _fireAndForgetDelivery = fireAndForgetDelivery;
+        _logger = loggerFactory.CreateLogger(LoggingCategory);
     }
 
     /// <inheritdoc />
-    internal class BroadcastChannelWriter<T> : IBroadcastChannelWriter<T>
+    public async Task Publish(T item)
     {
-        private static readonly string LoggingCategory = typeof(BroadcastChannelWriter<>).FullName;
+        var subscribers = _subscriberTable.GetImplicitSubscribers(_channelId, _grainFactory);
 
-        private readonly InternalChannelId _channelId;
-        private readonly IGrainFactory _grainFactory;
-        private readonly ImplicitChannelSubscriberTable _subscriberTable;
-        private readonly bool _fireAndForgetDelivery;
-        private readonly ILogger _logger;
-
-        public BroadcastChannelWriter(
-            InternalChannelId channelId,
-            IGrainFactory grainFactory,
-            ImplicitChannelSubscriberTable subscriberTable,
-            bool fireAndForgetDelivery,
-            ILoggerFactory loggerFactory)
+        if (subscribers.Count == 0)
         {
-            _channelId = channelId;
-            _grainFactory = grainFactory;
-            _subscriberTable = subscriberTable;
-            _fireAndForgetDelivery = fireAndForgetDelivery;
-            _logger = loggerFactory.CreateLogger(LoggingCategory);
+            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("No consumer found for {Item}", item);
+            return;
         }
 
-        /// <inheritdoc />
-        public async Task Publish(T item)
+        if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Publishing item {Item} to {ConsumerCount} consumers", item, subscribers.Count);
+
+        if (_fireAndForgetDelivery)
         {
-            var subscribers = _subscriberTable.GetImplicitSubscribers(_channelId, _grainFactory);
-
-            if (subscribers.Count == 0)
+            foreach (var sub in subscribers)
             {
-                if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("No consumer found for {Item}", item);
-                return;
-            }
-
-            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Publishing item {Item} to {ConsumerCount} consumers", item, subscribers.Count);
-
-            if (_fireAndForgetDelivery)
-            {
-                foreach (var sub in subscribers)
-                {
-                    PublishToSubscriber(sub.Value, item).Ignore();
-                }
-            }
-            else
-            {
-                var tasks = new List<Task>();
-                foreach (var sub in subscribers)
-                {
-                    tasks.Add(PublishToSubscriber(sub.Value, item));
-                }
-                try
-                {
-                    await Task.WhenAll(tasks);
-                }
-                catch (Exception)
-                {
-                    throw new AggregateException(tasks.Select(t => t.Exception).Where(ex => ex != null));
-                }
+                PublishToSubscriber(sub.Value, item).Ignore();
             }
         }
-
-        private async Task PublishToSubscriber(IBroadcastChannelConsumerExtension consumer, T item)
+        else
         {
+            var tasks = new List<Task>();
+            foreach (var sub in subscribers)
+            {
+                tasks.Add(PublishToSubscriber(sub.Value, item));
+            }
             try
             {
-                await consumer.OnPublished(_channelId, item);
+                await Task.WhenAll(tasks);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _logger.LogError(ex, "Exception when sending item to {GrainId}", consumer.GetGrainId());
-                if (!_fireAndForgetDelivery)
-                {
-                    throw;
-                }
+                throw new AggregateException(tasks.Select(t => t.Exception).Where(ex => ex != null));
+            }
+        }
+    }
+
+    private async Task PublishToSubscriber(IBroadcastChannelConsumerExtension consumer, T item)
+    {
+        try
+        {
+            await consumer.OnPublished(_channelId, item);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception when sending item to {GrainId}", consumer.GetGrainId());
+            if (!_fireAndForgetDelivery)
+            {
+                throw;
             }
         }
     }

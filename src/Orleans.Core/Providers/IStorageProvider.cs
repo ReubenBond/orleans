@@ -3,26 +3,25 @@
 
 using System.Runtime.Serialization;
 
-namespace Orleans.Storage
-{
-    /// <summary>
-    /// Exception thrown whenever a grain call is attempted with a bad / missing storage provider configuration settings for that grain.
-    /// </summary>
-    [Serializable, GenerateSerializer]
-    public sealed class BadProviderConfigException : OrleansException
-    {
-        public BadProviderConfigException()
-        { }
-        public BadProviderConfigException(string msg)
-            : base(msg)
-        { }
-        public BadProviderConfigException(string msg, Exception exc)
-            : base(msg, exc)
-        { }
+namespace Orleans.Storage;
 
-        [Obsolete]
-        private BadProviderConfigException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        { }
-    }
+/// <summary>
+/// Exception thrown whenever a grain call is attempted with a bad / missing storage provider configuration settings for that grain.
+/// </summary>
+[Serializable, GenerateSerializer]
+public sealed class BadProviderConfigException : OrleansException
+{
+    public BadProviderConfigException()
+    { }
+    public BadProviderConfigException(string msg)
+        : base(msg)
+    { }
+    public BadProviderConfigException(string msg, Exception exc)
+        : base(msg, exc)
+    { }
+
+    [Obsolete]
+    private BadProviderConfigException(SerializationInfo info, StreamingContext context)
+        : base(info, context)
+    { }
 }

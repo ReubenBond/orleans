@@ -1,37 +1,36 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Streams
+namespace Orleans.Streams;
+
+/// <summary>
+/// Stream position uniquely identifies the position of an event in a stream.
+/// If acquiring a stream position for a batch of events, the stream position will be of the first event in the batch.
+/// </summary>
+public class StreamPosition
 {
     /// <summary>
-    /// Stream position uniquely identifies the position of an event in a stream.
-    /// If acquiring a stream position for a batch of events, the stream position will be of the first event in the batch.
+    /// Stream position consists of the stream identity and the sequence token
     /// </summary>
-    public class StreamPosition
+    /// <param name="streamId">The stream identity.</param>
+    /// <param name="sequenceToken">The stream sequence token.</param>
+    public StreamPosition(StreamId streamId, StreamSequenceToken sequenceToken)
     {
-        /// <summary>
-        /// Stream position consists of the stream identity and the sequence token
-        /// </summary>
-        /// <param name="streamId">The stream identity.</param>
-        /// <param name="sequenceToken">The stream sequence token.</param>
-        public StreamPosition(StreamId streamId, StreamSequenceToken sequenceToken)
+        if (sequenceToken == null)
         {
-            if (sequenceToken == null)
-            {
-                throw new ArgumentNullException(nameof(sequenceToken));
-            }
-            StreamId = streamId;
-            SequenceToken = sequenceToken;
+            throw new ArgumentNullException(nameof(sequenceToken));
         }
-
-        /// <summary>
-        /// Gets the identity of the stream
-        /// </summary>
-        public StreamId StreamId { get; }
-
-        /// <summary>
-        /// Gets the position in the stream
-        /// </summary>
-        public StreamSequenceToken SequenceToken { get; }
+        StreamId = streamId;
+        SequenceToken = sequenceToken;
     }
+
+    /// <summary>
+    /// Gets the identity of the stream
+    /// </summary>
+    public StreamId StreamId { get; }
+
+    /// <summary>
+    /// Gets the position in the stream
+    /// </summary>
+    public StreamSequenceToken SequenceToken { get; }
 }

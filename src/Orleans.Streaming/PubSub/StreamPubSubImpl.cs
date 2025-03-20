@@ -3,94 +3,93 @@
 
 using Orleans.Streams.Core;
 
-namespace Orleans.Streams
+namespace Orleans.Streams;
+
+internal class StreamPubSubImpl : IStreamPubSub
 {
-    internal class StreamPubSubImpl : IStreamPubSub
+    private readonly IStreamPubSub explicitPubSub;
+    private readonly ImplicitStreamPubSub implicitPubSub;
+
+    public StreamPubSubImpl(IStreamPubSub explicitPubSub, ImplicitStreamPubSub implicitPubSub)
     {
-        private readonly IStreamPubSub explicitPubSub;
-        private readonly ImplicitStreamPubSub implicitPubSub;
-
-        public StreamPubSubImpl(IStreamPubSub explicitPubSub, ImplicitStreamPubSub implicitPubSub)
+        if (explicitPubSub == null)
         {
-            if (explicitPubSub == null)
-            {
-                throw new ArgumentNullException(nameof(explicitPubSub));
-            }
-
-            if (implicitPubSub == null)
-            {
-                throw new ArgumentNullException(nameof(implicitPubSub));
-            }
-
-            this.explicitPubSub = explicitPubSub;
-            this.implicitPubSub = implicitPubSub;
+            throw new ArgumentNullException(nameof(explicitPubSub));
         }
 
-        public async Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
+        if (implicitPubSub == null)
         {
-            ISet<PubSubSubscriptionState> explicitRes = await explicitPubSub.RegisterProducer(streamId, streamProducer);
-            ISet<PubSubSubscriptionState> implicitRes = await implicitPubSub.RegisterProducer(streamId, streamProducer);
-            explicitRes.UnionWith(implicitRes);
-            return explicitRes;
+            throw new ArgumentNullException(nameof(implicitPubSub));
         }
 
-        public Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
-        {
-            return explicitPubSub.UnregisterProducer(streamId, streamProducer);
-        }
+        this.explicitPubSub = explicitPubSub;
+        this.implicitPubSub = implicitPubSub;
+    }
 
-        public Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData)
-        {
-            return implicitPubSub.IsImplicitSubscriber(streamConsumer, streamId)
-                ? implicitPubSub.RegisterConsumer(subscriptionId, streamId, streamConsumer, filterData)
-                : explicitPubSub.RegisterConsumer(subscriptionId, streamId, streamConsumer, filterData);
-        }
+    public async Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
+    {
+        ISet<PubSubSubscriptionState> explicitRes = await explicitPubSub.RegisterProducer(streamId, streamProducer);
+        ISet<PubSubSubscriptionState> implicitRes = await implicitPubSub.RegisterProducer(streamId, streamProducer);
+        explicitRes.UnionWith(implicitRes);
+        return explicitRes;
+    }
 
-        public Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId)
-        {
-            return implicitPubSub.IsImplicitSubscriber(subscriptionId, streamId)
-                ? implicitPubSub.UnregisterConsumer(subscriptionId, streamId)
-                : explicitPubSub.UnregisterConsumer(subscriptionId, streamId);
-        }
+    public Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
+    {
+        return explicitPubSub.UnregisterProducer(streamId, streamProducer);
+    }
 
-        public Task<int> ProducerCount(QualifiedStreamId streamId)
-        {
-            return explicitPubSub.ProducerCount(streamId); 
-        }
+    public Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData)
+    {
+        return implicitPubSub.IsImplicitSubscriber(streamConsumer, streamId)
+            ? implicitPubSub.RegisterConsumer(subscriptionId, streamId, streamConsumer, filterData)
+            : explicitPubSub.RegisterConsumer(subscriptionId, streamId, streamConsumer, filterData);
+    }
 
-        public Task<int> ConsumerCount(QualifiedStreamId streamId)
-        {
-            return explicitPubSub.ConsumerCount(streamId); 
-        }
+    public Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId)
+    {
+        return implicitPubSub.IsImplicitSubscriber(subscriptionId, streamId)
+            ? implicitPubSub.UnregisterConsumer(subscriptionId, streamId)
+            : explicitPubSub.UnregisterConsumer(subscriptionId, streamId);
+    }
 
-        public async Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer)
-        {
-            if (streamConsumer != default)
-            {
-                return implicitPubSub.IsImplicitSubscriber(streamConsumer, streamId)
-                    ? await implicitPubSub.GetAllSubscriptions(streamId, streamConsumer)
-                    : await explicitPubSub.GetAllSubscriptions(streamId, streamConsumer);
-            }
-            else
-            {
-                var implicitSubs = await implicitPubSub.GetAllSubscriptions(streamId);
-                var explicitSubs = await explicitPubSub.GetAllSubscriptions(streamId);
-                return implicitSubs.Concat(explicitSubs).ToList();
-            }
-        }
+    public Task<int> ProducerCount(QualifiedStreamId streamId)
+    {
+        return explicitPubSub.ProducerCount(streamId); 
+    }
 
-        public GuidId CreateSubscriptionId(QualifiedStreamId streamId, GrainId streamConsumer)
+    public Task<int> ConsumerCount(QualifiedStreamId streamId)
+    {
+        return explicitPubSub.ConsumerCount(streamId); 
+    }
+
+    public async Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer)
+    {
+        if (streamConsumer != default)
         {
             return implicitPubSub.IsImplicitSubscriber(streamConsumer, streamId)
-               ? implicitPubSub.CreateSubscriptionId(streamId, streamConsumer)
-               : explicitPubSub.CreateSubscriptionId(streamId, streamConsumer);
+                ? await implicitPubSub.GetAllSubscriptions(streamId, streamConsumer)
+                : await explicitPubSub.GetAllSubscriptions(streamId, streamConsumer);
         }
-
-        public Task<bool> FaultSubscription(QualifiedStreamId streamId, GuidId subscriptionId)
+        else
         {
-            return implicitPubSub.IsImplicitSubscriber(subscriptionId, streamId)
-                ? implicitPubSub.FaultSubscription(streamId, subscriptionId)
-                : explicitPubSub.FaultSubscription(streamId, subscriptionId);
+            var implicitSubs = await implicitPubSub.GetAllSubscriptions(streamId);
+            var explicitSubs = await explicitPubSub.GetAllSubscriptions(streamId);
+            return implicitSubs.Concat(explicitSubs).ToList();
         }
+    }
+
+    public GuidId CreateSubscriptionId(QualifiedStreamId streamId, GrainId streamConsumer)
+    {
+        return implicitPubSub.IsImplicitSubscriber(streamConsumer, streamId)
+           ? implicitPubSub.CreateSubscriptionId(streamId, streamConsumer)
+           : explicitPubSub.CreateSubscriptionId(streamId, streamConsumer);
+    }
+
+    public Task<bool> FaultSubscription(QualifiedStreamId streamId, GuidId subscriptionId)
+    {
+        return implicitPubSub.IsImplicitSubscriber(subscriptionId, streamId)
+            ? implicitPubSub.FaultSubscription(streamId, subscriptionId)
+            : explicitPubSub.FaultSubscription(streamId, subscriptionId);
     }
 }

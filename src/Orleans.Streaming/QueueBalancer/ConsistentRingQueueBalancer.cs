@@ -5,59 +5,58 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.ConsistentRing;
 
-namespace Orleans.Streams
+namespace Orleans.Streams;
+
+internal class ConsistentRingQueueBalancer : QueueBalancerBase, IStreamQueueBalancer, IRingRangeListener
 {
-    internal class ConsistentRingQueueBalancer : QueueBalancerBase, IStreamQueueBalancer, IRingRangeListener
+    private IConsistentRingStreamQueueMapper _streamQueueMapper;
+    private IRingRange _myRange;
+
+    public static IStreamQueueBalancer Create(IServiceProvider services, string name)
     {
-        private IConsistentRingStreamQueueMapper _streamQueueMapper;
-        private IRingRange _myRange;
+        return ActivatorUtilities.CreateInstance<ConsistentRingQueueBalancer>(services);
+    }
 
-        public static IStreamQueueBalancer Create(IServiceProvider services, string name)
+    public ConsistentRingQueueBalancer(IConsistentRingProvider consistentRingProvider, ILoggerFactory loggerFactory, IServiceProvider services, ILogger<ConsistentRingQueueBalancer> logger)
+        : base(services, logger)
+    {
+        if (consistentRingProvider == null)
         {
-            return ActivatorUtilities.CreateInstance<ConsistentRingQueueBalancer>(services);
+            throw new ArgumentNullException("streamProviderRuntime");
         }
 
-        public ConsistentRingQueueBalancer(IConsistentRingProvider consistentRingProvider, ILoggerFactory loggerFactory, IServiceProvider services, ILogger<ConsistentRingQueueBalancer> logger)
-            : base(services, logger)
-        {
-            if (consistentRingProvider == null)
-            {
-                throw new ArgumentNullException("streamProviderRuntime");
-            }
+        _myRange = consistentRingProvider.GetMyRange();
+        consistentRingProvider.SubscribeToRangeChangeEvents(this);
+    }
 
-            _myRange = consistentRingProvider.GetMyRange();
-            consistentRingProvider.SubscribeToRangeChangeEvents(this);
+    public override Task Initialize(IStreamQueueMapper queueMapper)
+    {
+        if (queueMapper == null)
+        {
+            throw new ArgumentNullException(nameof(queueMapper));
         }
 
-        public override Task Initialize(IStreamQueueMapper queueMapper)
+        if (queueMapper is not IConsistentRingStreamQueueMapper streamQueueMapper)
         {
-            if (queueMapper == null)
-            {
-                throw new ArgumentNullException(nameof(queueMapper));
-            }
-
-            if (queueMapper is not IConsistentRingStreamQueueMapper streamQueueMapper)
-            {
-                throw new ArgumentException("IStreamQueueMapper for ConsistentRingQueueBalancer should implement IConsistentRingStreamQueueMapper", nameof(queueMapper));
-            }
-
-            _streamQueueMapper = streamQueueMapper;
-            return base.Initialize(queueMapper);
+            throw new ArgumentException("IStreamQueueMapper for ConsistentRingQueueBalancer should implement IConsistentRingStreamQueueMapper", nameof(queueMapper));
         }
 
-        public override IEnumerable<QueueId> GetMyQueues()
-        {
-            return _streamQueueMapper.GetQueuesForRange(_myRange);
-        }
+        _streamQueueMapper = streamQueueMapper;
+        return base.Initialize(queueMapper);
+    }
 
-        protected override void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos)
-        {
-        }
+    public override IEnumerable<QueueId> GetMyQueues()
+    {
+        return _streamQueueMapper.GetQueuesForRange(_myRange);
+    }
 
-        public void RangeChangeNotification(IRingRange old, IRingRange now, bool increased)
-        {
-            _myRange = now;
-            base.NotifyListeners().Ignore();
-        }
+    protected override void OnClusterMembershipChange(HashSet<SiloAddress> activeSilos)
+    {
+    }
+
+    public void RangeChangeNotification(IRingRange old, IRingRange now, bool increased)
+    {
+        _myRange = now;
+        base.NotifyListeners().Ignore();
     }
 }

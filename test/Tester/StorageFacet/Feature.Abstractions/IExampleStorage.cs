@@ -1,59 +1,58 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Tester.StorageFacet.Abstractions
+namespace Tester.StorageFacet.Abstractions;
+
+/// <summary>
+/// Primary storage feature interface.
+///  This is the actual functionality the users need.
+/// </summary>
+/// <typeparam name="TState"></typeparam>
+public interface IExampleStorage<TState>
 {
-    /// <summary>
-    /// Primary storage feature interface.
-    ///  This is the actual functionality the users need.
-    /// </summary>
-    /// <typeparam name="TState"></typeparam>
-    public interface IExampleStorage<TState>
+    TState State { get; set; }
+
+    Task Save();
+
+    // Test calls - used to verify facet wiring works
+    string Name { get; }
+    string GetExtendedInfo();
+}
+
+/// <summary>
+/// Feature configuration information which application layer can provide to the
+///  feature per instance (by grain type if using attributes).
+/// </summary>
+public interface IExampleStorageConfig
+{
+    string StateName { get; }
+}
+
+/// <summary>
+/// Feature configuration utility class
+/// </summary>
+public class ExampleStorageConfig : IExampleStorageConfig
+{
+    public ExampleStorageConfig(string stateName)
     {
-        TState State { get; set; }
-
-        Task Save();
-
-        // Test calls - used to verify facet wiring works
-        string Name { get; }
-        string GetExtendedInfo();
+        this.StateName = stateName;
     }
 
-    /// <summary>
-    /// Feature configuration information which application layer can provide to the
-    ///  feature per instance (by grain type if using attributes).
-    /// </summary>
-    public interface IExampleStorageConfig
-    {
-        string StateName { get; }
-    }
+    public string StateName { get; }
+}
 
-    /// <summary>
-    /// Feature configuration utility class
-    /// </summary>
-    public class ExampleStorageConfig : IExampleStorageConfig
-    {
-        public ExampleStorageConfig(string stateName)
-        {
-            this.StateName = stateName;
-        }
+/// <summary>
+/// Creates a storage feature from a configuration
+/// </summary>
+public interface IExampleStorageFactory
+{
+    IExampleStorage<TState> Create<TState>(IExampleStorageConfig config);
+}
 
-        public string StateName { get; }
-    }
-
-    /// <summary>
-    /// Creates a storage feature from a configuration
-    /// </summary>
-    public interface IExampleStorageFactory
-    {
-        IExampleStorage<TState> Create<TState>(IExampleStorageConfig config);
-    }
-
-    /// <summary>
-    /// Creates a storage feature by name from a configuration
-    /// </summary>
-    public interface INamedExampleStorageFactory
-    {
-        IExampleStorage<TState> Create<TState>(string name, IExampleStorageConfig config);
-    }
+/// <summary>
+/// Creates a storage feature by name from a configuration
+/// </summary>
+public interface INamedExampleStorageFactory
+{
+    IExampleStorage<TState> Create<TState>(string name, IExampleStorageConfig config);
 }

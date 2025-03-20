@@ -6,55 +6,54 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Versions.Selector;
 
-namespace Orleans.Runtime.Versions.Selector
+namespace Orleans.Runtime.Versions.Selector;
+
+internal class VersionSelectorManager
 {
-    internal class VersionSelectorManager
+    private readonly VersionSelectorStrategy strategyFromConfig;
+    private readonly IServiceProvider serviceProvider;
+    private readonly Dictionary<GrainInterfaceType, IVersionSelector> versionSelectors;
+
+    public IVersionSelector Default { get; set; }
+
+    public VersionSelectorManager(IServiceProvider serviceProvider, IOptions<GrainVersioningOptions> options)
     {
-        private readonly VersionSelectorStrategy strategyFromConfig;
-        private readonly IServiceProvider serviceProvider;
-        private readonly Dictionary<GrainInterfaceType, IVersionSelector> versionSelectors;
+        this.serviceProvider = serviceProvider;
+        this.strategyFromConfig = serviceProvider.GetRequiredKeyedService<VersionSelectorStrategy>(options.Value.DefaultVersionSelectorStrategy);
+        Default = ResolveVersionSelector(serviceProvider, this.strategyFromConfig);
+        versionSelectors = new Dictionary<GrainInterfaceType, IVersionSelector>();
+    }
 
-        public IVersionSelector Default { get; set; }
+    public IVersionSelector GetSelector(GrainInterfaceType interfaceType)
+    {
+        IVersionSelector selector;
+        return this.versionSelectors.TryGetValue(interfaceType, out selector)
+            ? selector
+            : Default;
+    }
 
-        public VersionSelectorManager(IServiceProvider serviceProvider, IOptions<GrainVersioningOptions> options)
+    public void SetSelector(VersionSelectorStrategy strategy)
+    {
+        var selector = ResolveVersionSelector(this.serviceProvider, strategy ?? this.strategyFromConfig);
+        Default = selector;
+    }
+
+    public void SetSelector(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy)
+    {
+        if (strategy == null)
         {
-            this.serviceProvider = serviceProvider;
-            this.strategyFromConfig = serviceProvider.GetRequiredKeyedService<VersionSelectorStrategy>(options.Value.DefaultVersionSelectorStrategy);
-            Default = ResolveVersionSelector(serviceProvider, this.strategyFromConfig);
-            versionSelectors = new Dictionary<GrainInterfaceType, IVersionSelector>();
+            versionSelectors.Remove(interfaceType);
         }
-
-        public IVersionSelector GetSelector(GrainInterfaceType interfaceType)
+        else
         {
-            IVersionSelector selector;
-            return this.versionSelectors.TryGetValue(interfaceType, out selector)
-                ? selector
-                : Default;
+            var selector = ResolveVersionSelector(this.serviceProvider, strategy);
+            versionSelectors[interfaceType] = selector;
         }
+    }
 
-        public void SetSelector(VersionSelectorStrategy strategy)
-        {
-            var selector = ResolveVersionSelector(this.serviceProvider, strategy ?? this.strategyFromConfig);
-            Default = selector;
-        }
-
-        public void SetSelector(GrainInterfaceType interfaceType, VersionSelectorStrategy strategy)
-        {
-            if (strategy == null)
-            {
-                versionSelectors.Remove(interfaceType);
-            }
-            else
-            {
-                var selector = ResolveVersionSelector(this.serviceProvider, strategy);
-                versionSelectors[interfaceType] = selector;
-            }
-        }
-
-        private static IVersionSelector ResolveVersionSelector(IServiceProvider serviceProvider, VersionSelectorStrategy strategy)
-        {
-            var policyType = strategy.GetType();
-            return serviceProvider.GetRequiredKeyedService<IVersionSelector>(policyType);
-        }
+    private static IVersionSelector ResolveVersionSelector(IServiceProvider serviceProvider, VersionSelectorStrategy strategy)
+    {
+        var policyType = strategy.GetType();
+        return serviceProvider.GetRequiredKeyedService<IVersionSelector>(policyType);
     }
 }

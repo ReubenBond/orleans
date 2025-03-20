@@ -3,28 +3,27 @@
 
 using Orleans.Streams.Core;
 
-namespace Orleans.Streams
+namespace Orleans.Streams;
+
+internal interface IPubSubRendezvousGrain : IGrainWithStringKey
 {
-    internal interface IPubSubRendezvousGrain : IGrainWithStringKey
-    {
-        Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
+    Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
 
-        Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
+    Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer);
 
-        Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData);
+    Task RegisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId, GrainId streamConsumer, string filterData);
 
-        Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId);
+    Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId);
 
-        Task<int> ProducerCount(QualifiedStreamId streamId);
+    Task<int> ProducerCount(QualifiedStreamId streamId);
 
-        Task<int> ConsumerCount(QualifiedStreamId streamId);
+    Task<int> ConsumerCount(QualifiedStreamId streamId);
 
-        Task<PubSubSubscriptionState[]> DiagGetConsumers(QualifiedStreamId streamId);
+    Task<PubSubSubscriptionState[]> DiagGetConsumers(QualifiedStreamId streamId);
 
-        Task Validate();
+    Task Validate();
 
-        Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer = default);
+    Task<List<StreamSubscription>> GetAllSubscriptions(QualifiedStreamId streamId, GrainId streamConsumer = default);
 
-        Task FaultSubscription(GuidId subscriptionId);
-    }
+    Task FaultSubscription(GuidId subscriptionId);
 }

@@ -1,37 +1,36 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.EventSourcing
+namespace Orleans.EventSourcing;
+
+/// <summary>
+/// Grain interface for grains that participate in multi-cluster log-consistency protocols.
+/// </summary>
+public interface ILogConsistencyProtocolParticipant  : IGrain  
 {
     /// <summary>
-    /// Grain interface for grains that participate in multi-cluster log-consistency protocols.
+    /// Called immediately before the user-level OnActivateAsync, on same scheduler.
     /// </summary>
-    public interface ILogConsistencyProtocolParticipant  : IGrain  
-    {
-        /// <summary>
-        /// Called immediately before the user-level OnActivateAsync, on same scheduler.
-        /// </summary>
-        /// <returns></returns>
-        Task PreActivateProtocolParticipant();
-
-        /// <summary>
-        /// Called immediately after the user-level OnActivateAsync, on same scheduler.
-        /// </summary>
-        /// <returns></returns>
-        Task PostActivateProtocolParticipant();
-
-        /// <summary>
-        /// Called immediately after the user-level OnDeactivateAsync, on same scheduler.
-        /// </summary>
-        /// <returns></returns>
-        Task DeactivateProtocolParticipant();
-    }
+    /// <returns></returns>
+    Task PreActivateProtocolParticipant();
 
     /// <summary>
-    /// interface to mark classes that represent protocol messages.
-    /// All such classes must be serializable.
+    /// Called immediately after the user-level OnActivateAsync, on same scheduler.
     /// </summary>
-    public interface ILogConsistencyProtocolMessage
-    {
-    }
+    /// <returns></returns>
+    Task PostActivateProtocolParticipant();
+
+    /// <summary>
+    /// Called immediately after the user-level OnDeactivateAsync, on same scheduler.
+    /// </summary>
+    /// <returns></returns>
+    Task DeactivateProtocolParticipant();
+}
+
+/// <summary>
+/// interface to mark classes that represent protocol messages.
+/// All such classes must be serializable.
+/// </summary>
+public interface ILogConsistencyProtocolMessage
+{
 }

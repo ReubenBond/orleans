@@ -5,25 +5,24 @@ using TestExtensions;
 using UnitTests.Serialization;
 using Xunit;
 
-namespace UnitTests.OrleansRuntime
+namespace UnitTests.OrleansRuntime;
+
+[Collection(TestEnvironmentFixture.DefaultCollection)]
+public class ExceptionsTests
 {
-    [Collection(TestEnvironmentFixture.DefaultCollection)]
-    public class ExceptionsTests
+    private readonly TestEnvironmentFixture fixture;
+
+    public ExceptionsTests(TestEnvironmentFixture fixture)
     {
-        private readonly TestEnvironmentFixture fixture;
+        this.fixture = fixture;
+    }
 
-        public ExceptionsTests(TestEnvironmentFixture fixture)
-        {
-            this.fixture = fixture;
-        }
+    [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+    public void SerializationTests_Exception_Orleans()
+    {
+        var original = new SiloUnavailableException("Some message");
+        var output = this.fixture.Serializer.RoundTripSerializationForTesting(original);
 
-        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
-        public void SerializationTests_Exception_Orleans()
-        {
-            var original = new SiloUnavailableException("Some message");
-            var output = this.fixture.Serializer.RoundTripSerializationForTesting(original);
-
-            Assert.Equal(original.Message, output.Message);
-        }
+        Assert.Equal(original.Message, output.Message);
     }
 }

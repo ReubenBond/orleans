@@ -3,222 +3,221 @@
 
 using TestGrainInterfaces;
 
-namespace TestGrains
+namespace TestGrains;
+
+public class DoSomethingEmptyGrain : Grain, IDoSomethingEmptyGrain
 {
-    public class DoSomethingEmptyGrain : Grain, IDoSomethingEmptyGrain
+    private int A;
+
+    public Task<string> DoIt()
     {
-        private int A;
-
-        public Task<string> DoIt()
-        {
-            return Task.FromResult(GetType().Name);
-        }
-
-        public Task SetA(int a)
-        {
-            A = a;
-            return Task.CompletedTask;
-        }
-
-        public Task IncrementA()
-        {
-            A++;
-            return Task.CompletedTask;
-        }
-
-        public Task<int> GetA()
-        {
-            return Task.FromResult(A);
-        }
+        return Task.FromResult(GetType().Name);
     }
 
-    public class DoSomethingEmptyWithMoreGrain : Grain, IDoSomethingEmptyWithMoreGrain
+    public Task SetA(int a)
     {
-        private int A;
-
-        public Task<string> DoIt()
-        {
-            return Task.FromResult(GetType().Name);
-        }
-
-        public Task<string> DoMore()
-        {
-            return Task.FromResult(GetType().Name);
-        }
-
-        public Task SetA(int a)
-        {
-            A = a;
-            return Task.CompletedTask;
-        }
-
-        public Task IncrementA()
-        {
-            A++;
-            return Task.CompletedTask;
-        }
-
-        public Task<int> GetA()
-        {
-            return Task.FromResult(A);
-        }
+        A = a;
+        return Task.CompletedTask;
     }
 
-    public class DoSomethingWithMoreGrain : Grain, IDoSomethingWithMoreGrain
+    public Task IncrementA()
     {
-        private int A;
-        private int B;
-
-        public Task<string> DoIt()
-        {
-            return Task.FromResult(GetType().Name);
-        }
-
-        public Task<string> DoThat()
-        {
-            return Task.FromResult(GetType().Name);
-        }
-        
-        public Task SetA(int a)
-        {
-            A = a;
-            return Task.CompletedTask;
-        }
-
-        public Task IncrementA()
-        {
-            A++;
-            return Task.CompletedTask;
-        }
-
-        public Task<int> GetA()
-        {
-            return Task.FromResult(A);
-        }
-
-        public Task SetB(int b)
-        {
-            B = b;
-            return Task.CompletedTask;
-        }
-
-        public Task IncrementB()
-        {
-            B++;
-            return Task.CompletedTask;
-        }
-
-        public Task<int> GetB()
-        {
-            return Task.FromResult(B);
-        }
-
+        A++;
+        return Task.CompletedTask;
     }
 
-    public class DoSomethingWithMoreEmptyGrain : Grain, IDoSomethingWithMoreEmptyGrain
+    public Task<int> GetA()
     {
-        private int A;
+        return Task.FromResult(A);
+    }
+}
 
-        public Task<string> DoIt()
-        {
-            return Task.FromResult(GetType().Name);
-        }
+public class DoSomethingEmptyWithMoreGrain : Grain, IDoSomethingEmptyWithMoreGrain
+{
+    private int A;
 
-        public Task SetA(int a)
-        {
-            A = a;
-            return Task.CompletedTask;
-        }
-
-        public Task IncrementA()
-        {
-            A++;
-            return Task.CompletedTask;
-        }
-
-        public Task<int> GetA()
-        {
-            return Task.FromResult(A);
-        }
-
-        public Task<string> DoMore()
-        {
-            return Task.FromResult(GetType().Name);
-        }
+    public Task<string> DoIt()
+    {
+        return Task.FromResult(GetType().Name);
     }
 
-
-
-    public class DoSomethingCombinedGrain : Grain, IDoSomethingCombinedGrain
+    public Task<string> DoMore()
     {
-        private int A;
-        private int B;
-        private int C;
+        return Task.FromResult(GetType().Name);
+    }
 
-        public Task<string> DoIt()
-        {
-            return Task.FromResult(GetType().Name);
-        }
+    public Task SetA(int a)
+    {
+        A = a;
+        return Task.CompletedTask;
+    }
 
-        public Task<string> DoMore()
-        {
-            return Task.FromResult(GetType().Name);
-        }
+    public Task IncrementA()
+    {
+        A++;
+        return Task.CompletedTask;
+    }
 
-        public Task<string> DoThat()
-        {
-            return Task.FromResult(GetType().Name);
-        }
+    public Task<int> GetA()
+    {
+        return Task.FromResult(A);
+    }
+}
 
-        public Task SetA(int a)
-        {
-            A = a;
-            return Task.CompletedTask;
-        }
+public class DoSomethingWithMoreGrain : Grain, IDoSomethingWithMoreGrain
+{
+    private int A;
+    private int B;
 
-        public Task IncrementA()
-        {
-            A++;
-            return Task.CompletedTask;
-        }
+    public Task<string> DoIt()
+    {
+        return Task.FromResult(GetType().Name);
+    }
 
-        public Task<int> GetA()
-        {
-            return Task.FromResult(A);
-        }
+    public Task<string> DoThat()
+    {
+        return Task.FromResult(GetType().Name);
+    }
+    
+    public Task SetA(int a)
+    {
+        A = a;
+        return Task.CompletedTask;
+    }
 
-        public Task SetB(int b)
-        {
-            B = b;
-            return Task.CompletedTask;
-        }
+    public Task IncrementA()
+    {
+        A++;
+        return Task.CompletedTask;
+    }
 
-        public Task IncrementB()
-        {
-            B++;
-            return Task.CompletedTask;
-        }
+    public Task<int> GetA()
+    {
+        return Task.FromResult(A);
+    }
 
-        public Task<int> GetB()
-        {
-            return Task.FromResult(B);
-        }
+    public Task SetB(int b)
+    {
+        B = b;
+        return Task.CompletedTask;
+    }
 
-        public Task SetC(int c)
-        {
-            C = c;
-            return Task.CompletedTask;
-        }
+    public Task IncrementB()
+    {
+        B++;
+        return Task.CompletedTask;
+    }
 
-        public Task IncrementC()
-        {
-            C++;
-            return Task.CompletedTask;
-        }
+    public Task<int> GetB()
+    {
+        return Task.FromResult(B);
+    }
 
-        public Task<int> GetC()
-        {
-            return Task.FromResult(C);
-        }
+}
+
+public class DoSomethingWithMoreEmptyGrain : Grain, IDoSomethingWithMoreEmptyGrain
+{
+    private int A;
+
+    public Task<string> DoIt()
+    {
+        return Task.FromResult(GetType().Name);
+    }
+
+    public Task SetA(int a)
+    {
+        A = a;
+        return Task.CompletedTask;
+    }
+
+    public Task IncrementA()
+    {
+        A++;
+        return Task.CompletedTask;
+    }
+
+    public Task<int> GetA()
+    {
+        return Task.FromResult(A);
+    }
+
+    public Task<string> DoMore()
+    {
+        return Task.FromResult(GetType().Name);
+    }
+}
+
+
+
+public class DoSomethingCombinedGrain : Grain, IDoSomethingCombinedGrain
+{
+    private int A;
+    private int B;
+    private int C;
+
+    public Task<string> DoIt()
+    {
+        return Task.FromResult(GetType().Name);
+    }
+
+    public Task<string> DoMore()
+    {
+        return Task.FromResult(GetType().Name);
+    }
+
+    public Task<string> DoThat()
+    {
+        return Task.FromResult(GetType().Name);
+    }
+
+    public Task SetA(int a)
+    {
+        A = a;
+        return Task.CompletedTask;
+    }
+
+    public Task IncrementA()
+    {
+        A++;
+        return Task.CompletedTask;
+    }
+
+    public Task<int> GetA()
+    {
+        return Task.FromResult(A);
+    }
+
+    public Task SetB(int b)
+    {
+        B = b;
+        return Task.CompletedTask;
+    }
+
+    public Task IncrementB()
+    {
+        B++;
+        return Task.CompletedTask;
+    }
+
+    public Task<int> GetB()
+    {
+        return Task.FromResult(B);
+    }
+
+    public Task SetC(int c)
+    {
+        C = c;
+        return Task.CompletedTask;
+    }
+
+    public Task IncrementC()
+    {
+        C++;
+        return Task.CompletedTask;
+    }
+
+    public Task<int> GetC()
+    {
+        return Task.FromResult(C);
     }
 }

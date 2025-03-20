@@ -1,26 +1,25 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Streams
+namespace Orleans.Streams;
+
+/// <summary>
+/// Uniquely identifies a stream.
+/// </summary>
+/// <remarks>
+/// Use <see cref="StreamId"/> instead, where possible.
+/// </remarks>
+public interface IStreamIdentity
 {
     /// <summary>
-    /// Uniquely identifies a stream.
+    /// Gets the unique identifier.
     /// </summary>
-    /// <remarks>
-    /// Use <see cref="StreamId"/> instead, where possible.
-    /// </remarks>
-    public interface IStreamIdentity
-    {
-        /// <summary>
-        /// Gets the unique identifier.
-        /// </summary>
-        /// <value>The unique identifier.</value>
-        Guid Guid { get; }
+    /// <value>The unique identifier.</value>
+    Guid Guid { get; }
 
-        /// <summary>
-        /// Gets the namespace.
-        /// </summary>
-        /// <value>The namespace.</value>
-        string Namespace { get; }
-    }
+    /// <summary>
+    /// Gets the namespace.
+    /// </summary>
+    /// <value>The namespace.</value>
+    string Namespace { get; }
 }

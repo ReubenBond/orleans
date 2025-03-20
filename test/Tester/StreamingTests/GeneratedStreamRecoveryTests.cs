@@ -13,87 +13,86 @@ using TestGrains;
 using UnitTests.Grains;
 using Xunit;
 
-namespace UnitTests.StreamingTests
+namespace UnitTests.StreamingTests;
+
+public class GeneratedImplicitSubscriptionStreamRecoveryTests : OrleansTestingBase, IClassFixture<GeneratedImplicitSubscriptionStreamRecoveryTests.Fixture>
 {
-    public class GeneratedImplicitSubscriptionStreamRecoveryTests : OrleansTestingBase, IClassFixture<GeneratedImplicitSubscriptionStreamRecoveryTests.Fixture>
+    private static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
+    private const int TotalQueueCount = 4;
+    private readonly Fixture fixture;
+    private readonly ImplicitSubscritionRecoverableStreamTestRunner runner;
+
+    public class Fixture : BaseTestClusterFixture
     {
-        private static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;
-        private const int TotalQueueCount = 4;
-        private readonly Fixture fixture;
-        private readonly ImplicitSubscritionRecoverableStreamTestRunner runner;
+        public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
 
-        public class Fixture : BaseTestClusterFixture
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
+            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+        }
 
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        private class MySiloBuilderConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
             {
-                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-            }
-
-            private class MySiloBuilderConfigurator : ISiloConfigurator
-            {
-                public void Configure(ISiloBuilder hostBuilder)
-                {
-                    hostBuilder
-                         .AddMemoryGrainStorageAsDefault()
-                        .AddMemoryGrainStorage("MemoryStore")
-                        .AddPersistentStreams(StreamProviderName,
-                            GeneratorAdapterFactory.Create,
-                            b =>
-                            {
-                                b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
-                                b.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = TotalQueueCount));
-                                b.UseDynamicClusterConfigDeploymentBalancer();
-                            });
-                }
+                hostBuilder
+                     .AddMemoryGrainStorageAsDefault()
+                    .AddMemoryGrainStorage("MemoryStore")
+                    .AddPersistentStreams(StreamProviderName,
+                        GeneratorAdapterFactory.Create,
+                        b =>
+                        {
+                            b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                            b.Configure<HashRingStreamQueueMapperOptions>(ob => ob.Configure(options => options.TotalQueueCount = TotalQueueCount));
+                            b.UseDynamicClusterConfigDeploymentBalancer();
+                        });
             }
         }
+    }
 
-        public GeneratedImplicitSubscriptionStreamRecoveryTests(Fixture fixture)
+    public GeneratedImplicitSubscriptionStreamRecoveryTests(Fixture fixture)
+    {
+        this.fixture = fixture;
+        this.runner = new ImplicitSubscritionRecoverableStreamTestRunner(
+            this.fixture.GrainFactory,
+            Fixture.StreamProviderName);
+    }
+
+    [Fact, TestCategory("Functional"), TestCategory("Streaming")]
+    public async Task Recoverable100EventStreamsWithTransientErrorsTest()
+    {
+        this.fixture.Logger.LogInformation("************************ Recoverable100EventStreamsWithTransientErrorsTest *********************************");
+        await runner.Recoverable100EventStreamsWithTransientErrors(GenerateEvents,
+            ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain.StreamNamespace,
+            TotalQueueCount,
+            100);
+    }
+
+    [Fact, TestCategory("Functional"), TestCategory("Streaming")]
+    public async Task Recoverable100EventStreamsWith1NonTransientErrorTest()
+    {
+        this.fixture.Logger.LogInformation("************************ Recoverable100EventStreamsWith1NonTransientErrorTest *********************************");
+        await runner.Recoverable100EventStreamsWith1NonTransientError(GenerateEvents,
+            ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain.StreamNamespace,
+            TotalQueueCount,
+            100);
+    }
+
+    private async Task GenerateEvents(string streamNamespace, int streamCount, int eventsInStream)
+    {
+        var generatorConfig = new SimpleGeneratorOptions
         {
-            this.fixture = fixture;
-            this.runner = new ImplicitSubscritionRecoverableStreamTestRunner(
-                this.fixture.GrainFactory,
-                Fixture.StreamProviderName);
-        }
+            StreamNamespace = streamNamespace,
+            EventsInStream = eventsInStream
+        };
 
-        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
-        public async Task Recoverable100EventStreamsWithTransientErrorsTest()
+        var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
+        object[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
+        Assert.Equal(2, results.Length);
+        bool[] bResults = results.Cast<bool>().ToArray();
+        foreach (var result in bResults)
         {
-            this.fixture.Logger.LogInformation("************************ Recoverable100EventStreamsWithTransientErrorsTest *********************************");
-            await runner.Recoverable100EventStreamsWithTransientErrors(GenerateEvents,
-                ImplicitSubscription_TransientError_RecoverableStream_CollectorGrain.StreamNamespace,
-                TotalQueueCount,
-                100);
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
-        public async Task Recoverable100EventStreamsWith1NonTransientErrorTest()
-        {
-            this.fixture.Logger.LogInformation("************************ Recoverable100EventStreamsWith1NonTransientErrorTest *********************************");
-            await runner.Recoverable100EventStreamsWith1NonTransientError(GenerateEvents,
-                ImplicitSubscription_NonTransientError_RecoverableStream_CollectorGrain.StreamNamespace,
-                TotalQueueCount,
-                100);
-        }
-
-        private async Task GenerateEvents(string streamNamespace, int streamCount, int eventsInStream)
-        {
-            var generatorConfig = new SimpleGeneratorOptions
-            {
-                StreamNamespace = streamNamespace,
-                EventsInStream = eventsInStream
-            };
-
-            var mgmt = this.fixture.GrainFactory.GetGrain<IManagementGrain>(0);
-            object[] results = await mgmt.SendControlCommandToProvider<PersistentStreamProvider>(Fixture.StreamProviderName, (int)StreamGeneratorCommand.Configure, generatorConfig);
-            Assert.Equal(2, results.Length);
-            bool[] bResults = results.Cast<bool>().ToArray();
-            foreach (var result in bResults)
-            {
-                Assert.True(result, "Control command result");
-            }
+            Assert.True(result, "Control command result");
         }
     }
 }

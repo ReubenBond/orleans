@@ -3,22 +3,21 @@
 
 using UnitTests.GrainInterfaces;
 
-namespace UnitTests.Grains
+namespace UnitTests.Grains;
+
+
+public class ClientAddressableTestRendezvousGrain : Grain, IClientAddressableTestRendezvousGrain
 {
+    private IClientAddressableTestProducer producer;
 
-    public class ClientAddressableTestRendezvousGrain : Grain, IClientAddressableTestRendezvousGrain
+    public Task<IClientAddressableTestProducer> GetProducer()
     {
-        private IClientAddressableTestProducer producer;
+        return Task.FromResult(producer);
+    }
 
-        public Task<IClientAddressableTestProducer> GetProducer()
-        {
-            return Task.FromResult(producer);
-        }
-
-        public Task SetProducer(IClientAddressableTestProducer producer)
-        {
-            this.producer = producer;
-            return Task.CompletedTask;
-        }
+    public Task SetProducer(IClientAddressableTestProducer producer)
+    {
+        this.producer = producer;
+        return Task.CompletedTask;
     }
 }

@@ -7,54 +7,53 @@ using Orleans.Streams;
 using TestGrainInterfaces;
 using UnitTests.Grains;
 
-namespace TestGrains
+namespace TestGrains;
+
+[RegexImplicitStreamSubscription("THIS.WONT.MATCH.ONLY.FOR.TESTING.SERIALIZATION")]
+[ImplicitStreamSubscription(StreamNamespace)]
+public class GeneratedEventCollectorGrain : Grain, IGeneratedEventCollectorGrain
 {
-    [RegexImplicitStreamSubscription("THIS.WONT.MATCH.ONLY.FOR.TESTING.SERIALIZATION")]
-    [ImplicitStreamSubscription(StreamNamespace)]
-    public class GeneratedEventCollectorGrain : Grain, IGeneratedEventCollectorGrain
+    public const string StreamNamespace = "Generated";
+
+    private readonly ILogger logger;
+    private IAsyncStream<GeneratedEvent> stream;
+    private int accumulated;
+
+    public GeneratedEventCollectorGrain(ILoggerFactory loggerFactory)
     {
-        public const string StreamNamespace = "Generated";
+        this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+    }
 
-        private readonly ILogger logger;
-        private IAsyncStream<GeneratedEvent> stream;
-        private int accumulated;
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        logger.LogInformation("OnActivateAsync");
 
-        public GeneratedEventCollectorGrain(ILoggerFactory loggerFactory)
+        var streamProvider = this.GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
+        stream = streamProvider.GetStream<GeneratedEvent>(StreamNamespace, this.GetPrimaryKey());
+
+        IList<StreamSubscriptionHandle<GeneratedEvent>> handles = await stream.GetAllSubscriptionHandles();
+        if (handles.Count == 0)
         {
-            this.logger = loggerFactory.CreateLogger($"{this.GetType().Name}-{this.IdentityString}");
+            await stream.SubscribeAsync(OnNextAsync);
         }
-
-        public override async Task OnActivateAsync(CancellationToken cancellationToken)
+        else
         {
-            logger.LogInformation("OnActivateAsync");
-
-            var streamProvider = this.GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
-            stream = streamProvider.GetStream<GeneratedEvent>(StreamNamespace, this.GetPrimaryKey());
-
-            IList<StreamSubscriptionHandle<GeneratedEvent>> handles = await stream.GetAllSubscriptionHandles();
-            if (handles.Count == 0)
+            foreach (StreamSubscriptionHandle<GeneratedEvent> handle in handles)
             {
-                await stream.SubscribeAsync(OnNextAsync);
-            }
-            else
-            {
-                foreach (StreamSubscriptionHandle<GeneratedEvent> handle in handles)
-                {
-                    await handle.ResumeAsync(OnNextAsync);
-                }
+                await handle.ResumeAsync(OnNextAsync);
             }
         }
+    }
 
-        public Task OnNextAsync(IList<SequentialItem<GeneratedEvent>> items)
+    public Task OnNextAsync(IList<SequentialItem<GeneratedEvent>> items)
+    {
+        this.accumulated += items.Count;
+        logger.LogInformation("Received {Count} generated event. Accumulated {Accumulated} events so far.", items.Count, this.accumulated);
+        if (items.Last().Item.EventType == GeneratedEvent.GeneratedEventType.Fill)
         {
-            this.accumulated += items.Count;
-            logger.LogInformation("Received {Count} generated event. Accumulated {Accumulated} events so far.", items.Count, this.accumulated);
-            if (items.Last().Item.EventType == GeneratedEvent.GeneratedEventType.Fill)
-            {
-                return Task.CompletedTask;
-            }
-            var reporter = this.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
-            return reporter.ReportResult(this.GetPrimaryKey(), GeneratedStreamTestConstants.StreamProviderName, StreamNamespace, this.accumulated);
+            return Task.CompletedTask;
         }
+        var reporter = this.GrainFactory.GetGrain<IGeneratedEventReporterGrain>(GeneratedStreamTestConstants.ReporterId);
+        return reporter.ReportResult(this.GetPrimaryKey(), GeneratedStreamTestConstants.StreamProviderName, StreamNamespace, this.accumulated);
     }
 }

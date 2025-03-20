@@ -5,48 +5,47 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Clustering.Redis;
 using StackExchange.Redis;
 
-namespace Microsoft.Extensions.Hosting
+namespace Microsoft.Extensions.Hosting;
+
+/// <summary>
+/// Hosting extensions for the Redis clustering provider.
+/// </summary>
+public static class RedisClusteringISiloBuilderExtensions
 {
     /// <summary>
-    /// Hosting extensions for the Redis clustering provider.
+    /// Configures Redis as the clustering provider.
     /// </summary>
-    public static class RedisClusteringISiloBuilderExtensions
+    public static ISiloBuilder UseRedisClustering(this ISiloBuilder builder, Action<RedisClusteringOptions> configuration)
     {
-        /// <summary>
-        /// Configures Redis as the clustering provider.
-        /// </summary>
-        public static ISiloBuilder UseRedisClustering(this ISiloBuilder builder, Action<RedisClusteringOptions> configuration)
+        return builder.ConfigureServices(services =>
         {
-            return builder.ConfigureServices(services =>
+            if (configuration != null)
             {
-                if (configuration != null)
-                {
-                    services.Configure(configuration);
-                }
+                services.Configure(configuration);
+            }
 
-                services.AddRedisClustering();
-            });
-        }
+            services.AddRedisClustering();
+        });
+    }
 
-        /// <summary>
-        /// Configures Redis as the clustering provider.
-        /// </summary>
-        public static ISiloBuilder UseRedisClustering(this ISiloBuilder builder, string redisConnectionString)
-        {
-            return builder.ConfigureServices(services => services
-                .Configure<RedisClusteringOptions>(options =>
-                {
-                    options.ConfigurationOptions = ConfigurationOptions.Parse(redisConnectionString);
-                })
-                .AddRedisClustering());
-        }
+    /// <summary>
+    /// Configures Redis as the clustering provider.
+    /// </summary>
+    public static ISiloBuilder UseRedisClustering(this ISiloBuilder builder, string redisConnectionString)
+    {
+        return builder.ConfigureServices(services => services
+            .Configure<RedisClusteringOptions>(options =>
+            {
+                options.ConfigurationOptions = ConfigurationOptions.Parse(redisConnectionString);
+            })
+            .AddRedisClustering());
+    }
 
-        internal static IServiceCollection AddRedisClustering(this IServiceCollection services)
-        {
-            services.AddSingleton<RedisMembershipTable>();
-            services.AddSingleton<IConfigurationValidator, RedisClusteringOptionsValidator>();
-            services.AddSingleton<IMembershipTable>(sp => sp.GetRequiredService<RedisMembershipTable>());
-            return services;
-        }
+    internal static IServiceCollection AddRedisClustering(this IServiceCollection services)
+    {
+        services.AddSingleton<RedisMembershipTable>();
+        services.AddSingleton<IConfigurationValidator, RedisClusteringOptionsValidator>();
+        services.AddSingleton<IMembershipTable>(sp => sp.GetRequiredService<RedisMembershipTable>());
+        return services;
     }
 }

@@ -1,47 +1,46 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.EventSourcing.Common
+namespace Orleans.EventSourcing.Common;
+
+/// <summary>
+/// Base class for notification messages that are sent by log view adaptors to other 
+/// clusters, after updating the log. All subclasses must be serializable.
+/// </summary>
+public interface INotificationMessage : ILogConsistencyProtocolMessage
 {
-    /// <summary>
-    /// Base class for notification messages that are sent by log view adaptors to other 
-    /// clusters, after updating the log. All subclasses must be serializable.
-    /// </summary>
-    public interface INotificationMessage : ILogConsistencyProtocolMessage
-    {
-        ///<summary>The version number.</summary>
-        int Version { get; }
+    ///<summary>The version number.</summary>
+    int Version { get; }
 
-        // a log-consistency provider can subclass this to add more information
-        // for example, the log entries that were appended, or the view
-    }
+    // a log-consistency provider can subclass this to add more information
+    // for example, the log entries that were appended, or the view
+}
 
-    /// <summary>A simple notification message containing only the version.</summary>
-    [Serializable]
-    [GenerateSerializer]
-    public sealed class VersionNotificationMessage : INotificationMessage
-    {
-        /// <inheritdoc/>
-        [Id(0)]
-        public int Version { get; set;  }
-    }
+/// <summary>A simple notification message containing only the version.</summary>
+[Serializable]
+[GenerateSerializer]
+public sealed class VersionNotificationMessage : INotificationMessage
+{
+    /// <inheritdoc/>
+    [Id(0)]
+    public int Version { get; set;  }
+}
 
 
-    /// <summary>A notification message containing a batch of notification messages.</summary>
-    [Serializable]
-    [GenerateSerializer]
-    public sealed class BatchedNotificationMessage : INotificationMessage
-    {
-        /// <summary>The notification messages contained in this batch.</summary>
-        [Id(0)]
-        public List<INotificationMessage> Notifications { get; set; }
+/// <summary>A notification message containing a batch of notification messages.</summary>
+[Serializable]
+[GenerateSerializer]
+public sealed class BatchedNotificationMessage : INotificationMessage
+{
+    /// <summary>The notification messages contained in this batch.</summary>
+    [Id(0)]
+    public List<INotificationMessage> Notifications { get; set; }
 
-        /// <summary>The version number - for a batch, this is the maximum version contained.</summary>
-        public int Version {
-            get
-            {
-                return Notifications.Aggregate(0, (v, m) => Math.Max(v, m.Version));
-            }
+    /// <summary>The version number - for a batch, this is the maximum version contained.</summary>
+    public int Version {
+        get
+        {
+            return Notifications.Aggregate(0, (v, m) => Math.Max(v, m.Version));
         }
     }
 }

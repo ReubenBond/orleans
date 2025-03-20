@@ -1,18 +1,17 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Transactions.Abstractions
-{
-    [AttributeUsage(AttributeTargets.Parameter)]
-    public class TransactionalStateAttribute : Attribute, IFacetMetadata, ITransactionalStateConfiguration
-    {
-        public string StateName { get; }
-        public string StorageName { get; }
+namespace Orleans.Transactions.Abstractions;
 
-        public TransactionalStateAttribute(string stateName, string storageName = null)
-        {
-            this.StateName = stateName;
-            this.StorageName = storageName;
-        }
+[AttributeUsage(AttributeTargets.Parameter)]
+public class TransactionalStateAttribute : Attribute, IFacetMetadata, ITransactionalStateConfiguration
+{
+    public string StateName { get; }
+    public string StorageName { get; }
+
+    public TransactionalStateAttribute(string stateName, string storageName = null)
+    {
+        this.StateName = stateName;
+        this.StorageName = storageName;
     }
 }

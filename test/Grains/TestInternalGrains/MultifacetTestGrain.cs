@@ -4,34 +4,33 @@
 using Orleans.Providers;
 using UnitTests.GrainInterfaces;
 
-namespace UnitTests.Grains
+namespace UnitTests.Grains;
+
+[Serializable]
+[GenerateSerializer]
+public class MultifacetTestGrainState
 {
-    [Serializable]
-    [GenerateSerializer]
-    public class MultifacetTestGrainState
+    [Id(0)]
+    public int Value { get; set; }
+}
+
+[StorageProvider(ProviderName = "MemoryStore")]
+public class MultifacetTestGrain : Grain<MultifacetTestGrainState>, IMultifacetTestGrain
+{
+    
+    public string GetRuntimeInstanceId()
     {
-        [Id(0)]
-        public int Value { get; set; }
+        return RuntimeIdentity;
     }
 
-    [StorageProvider(ProviderName = "MemoryStore")]
-    public class MultifacetTestGrain : Grain<MultifacetTestGrainState>, IMultifacetTestGrain
+    public Task SetValue(int x)
     {
-        
-        public string GetRuntimeInstanceId()
-        {
-            return RuntimeIdentity;
-        }
+        State.Value = x;
+        return Task.CompletedTask;
+    }
 
-        public Task SetValue(int x)
-        {
-            State.Value = x;
-            return Task.CompletedTask;
-        }
-
-        Task<int> IMultifacetReader.GetValue()
-        {
-            return Task.FromResult(State.Value);
-        }
+    Task<int> IMultifacetReader.GetValue()
+    {
+        return Task.FromResult(State.Value);
     }
 }

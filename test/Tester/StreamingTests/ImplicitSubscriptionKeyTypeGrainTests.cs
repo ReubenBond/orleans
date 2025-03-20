@@ -10,77 +10,76 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 
-namespace UnitTests.StreamingTests
+namespace UnitTests.StreamingTests;
+
+public sealed class ImplicitSubscriptionKeyTypeGrainTests : OrleansTestingBase, IClassFixture<ImplicitSubscriptionKeyTypeGrainTests.Fixture>
 {
-    public sealed class ImplicitSubscriptionKeyTypeGrainTests : OrleansTestingBase, IClassFixture<ImplicitSubscriptionKeyTypeGrainTests.Fixture>
+    private readonly Fixture fixture;
+    private readonly IStreamProvider _streamProvider;
+
+    public class Fixture : BaseTestClusterFixture
     {
-        private readonly Fixture fixture;
-        private readonly IStreamProvider _streamProvider;
+        public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
 
-        public class Fixture : BaseTestClusterFixture
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            public const string StreamProviderName = GeneratedStreamTestConstants.StreamProviderName;
+            builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
+        }
 
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        private class MySiloBuilderConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
             {
-                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
-                builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
-            }
+                hostBuilder.AddMemoryGrainStorageAsDefault();
 
-            private class MySiloBuilderConfigurator : ISiloConfigurator
-            {
-                public void Configure(ISiloBuilder hostBuilder)
-                {
-                    hostBuilder.AddMemoryGrainStorageAsDefault();
-
-                    hostBuilder.AddMemoryStreams(ImplicitStreamTestConstants.StreamProviderName)
-                        .AddMemoryGrainStorage("PubSubStore");
-                }
-            }
-
-            private class MyClientBuilderConfigurator : IClientBuilderConfigurator
-            {
-                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-                {
-                    clientBuilder.AddMemoryStreams(ImplicitStreamTestConstants.StreamProviderName);
-                }
+                hostBuilder.AddMemoryStreams(ImplicitStreamTestConstants.StreamProviderName)
+                    .AddMemoryGrainStorage("PubSubStore");
             }
         }
 
-        public ImplicitSubscriptionKeyTypeGrainTests(Fixture fixture)
+        private class MyClientBuilderConfigurator : IClientBuilderConfigurator
         {
-            this.fixture = fixture;
-            _streamProvider = fixture.Client.GetStreamProvider(ImplicitStreamTestConstants.StreamProviderName);
-        }
-
-        [Fact, TestCategory("Functional"), TestCategory("Streaming")]
-        public async Task LongKey()
-        {
-            long grainId = 13;
-            int value = 87;
-            IAsyncStream<int> stream = _streamProvider.GetStream<int>(nameof(IImplicitSubscriptionLongKeyGrain), grainId);
-
-            await stream.OnNextAsync(value);
-
-            var consumer = fixture.GrainFactory.GetGrain<IImplicitSubscriptionLongKeyGrain>(grainId);
-            await TestingUtils.WaitUntilAsync(lastTry => CheckValue(consumer, value, lastTry), TimeSpan.FromSeconds(30));
-        }
-
-        private async Task<bool> CheckValue(IImplicitSubscriptionKeyTypeGrain consumer, int expectedValue, bool assertIsTrue)
-        {
-            int value = await consumer.GetValue();
-
-            if (assertIsTrue)
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                Assert.Equal(expectedValue, value);
+                clientBuilder.AddMemoryStreams(ImplicitStreamTestConstants.StreamProviderName);
             }
-
-            if (expectedValue != value)
-            {
-                return false;
-            }
-
-            return true;
         }
+    }
+
+    public ImplicitSubscriptionKeyTypeGrainTests(Fixture fixture)
+    {
+        this.fixture = fixture;
+        _streamProvider = fixture.Client.GetStreamProvider(ImplicitStreamTestConstants.StreamProviderName);
+    }
+
+    [Fact, TestCategory("Functional"), TestCategory("Streaming")]
+    public async Task LongKey()
+    {
+        long grainId = 13;
+        int value = 87;
+        IAsyncStream<int> stream = _streamProvider.GetStream<int>(nameof(IImplicitSubscriptionLongKeyGrain), grainId);
+
+        await stream.OnNextAsync(value);
+
+        var consumer = fixture.GrainFactory.GetGrain<IImplicitSubscriptionLongKeyGrain>(grainId);
+        await TestingUtils.WaitUntilAsync(lastTry => CheckValue(consumer, value, lastTry), TimeSpan.FromSeconds(30));
+    }
+
+    private async Task<bool> CheckValue(IImplicitSubscriptionKeyTypeGrain consumer, int expectedValue, bool assertIsTrue)
+    {
+        int value = await consumer.GetValue();
+
+        if (assertIsTrue)
+        {
+            Assert.Equal(expectedValue, value);
+        }
+
+        if (expectedValue != value)
+        {
+            return false;
+        }
+
+        return true;
     }
 }

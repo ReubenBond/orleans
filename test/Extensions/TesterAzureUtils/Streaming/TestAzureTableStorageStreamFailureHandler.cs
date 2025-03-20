@@ -7,42 +7,41 @@ using Orleans.Persistence.AzureStorage;
 using Orleans.Providers.Streams.PersistentStreams;
 using TestExtensions;
 
-namespace Tester.AzureUtils.Streaming
+namespace Tester.AzureUtils.Streaming;
+
+public static class TestAzureTableStorageStreamFailureHandler
 {
-    public static class TestAzureTableStorageStreamFailureHandler
+    private const string TableName = "TestStreamFailures";
+    private const string DeploymentId = "TestDeployment";
+
+    public static async Task<int> GetDeliveryFailureCount(string streamProviderName)
     {
-        private const string TableName = "TestStreamFailures";
-        private const string DeploymentId = "TestDeployment";
+        var dataManager = GetDataManager();
+        await dataManager.InitTableAsync();
+        var deliveryErrors =
+            await dataManager.ReadAllTableEntriesForPartitionAsync(
+                    StreamDeliveryFailureEntity.MakeDefaultPartitionKey(streamProviderName, DeploymentId));
+        return deliveryErrors.Count;
+    }
 
-        public static async Task<int> GetDeliveryFailureCount(string streamProviderName)
-        {
-            var dataManager = GetDataManager();
-            await dataManager.InitTableAsync();
-            var deliveryErrors =
-                await dataManager.ReadAllTableEntriesForPartitionAsync(
-                        StreamDeliveryFailureEntity.MakeDefaultPartitionKey(streamProviderName, DeploymentId));
-            return deliveryErrors.Count;
-        }
+    public static async Task DeleteAll()
+    {
+        var dataManager = GetDataManager();
+        await dataManager.InitTableAsync();
+        await dataManager.DeleteTableAsync();
+    }
 
-        public static async Task DeleteAll()
+    private static AzureTableDataManager<TableEntity> GetDataManager()
+    {
+        var options = new AzureStorageOperationOptions { TableName = TableName };
+        if (TestDefaultConfiguration.UseAadAuthentication)
         {
-            var dataManager = GetDataManager();
-            await dataManager.InitTableAsync();
-            await dataManager.DeleteTableAsync();
+            options.TableServiceClient = new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential);
         }
-
-        private static AzureTableDataManager<TableEntity> GetDataManager()
+        else
         {
-            var options = new AzureStorageOperationOptions { TableName = TableName };
-            if (TestDefaultConfiguration.UseAadAuthentication)
-            {
-                options.TableServiceClient = new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential);
-            }
-            else
-            {
-                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
-            }
-            return new AzureTableDataManager<TableEntity>(options, NullLogger.Instance);
+            options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
         }
+        return new AzureTableDataManager<TableEntity>(options, NullLogger.Instance);
     }
 }

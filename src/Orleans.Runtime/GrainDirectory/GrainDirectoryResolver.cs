@@ -7,82 +7,81 @@ using Orleans.GrainDirectory;
 using Orleans.Metadata;
 using Orleans.Runtime.Hosting;
 
-namespace Orleans.Runtime.GrainDirectory
+namespace Orleans.Runtime.GrainDirectory;
+
+internal class GrainDirectoryResolver
 {
-    internal class GrainDirectoryResolver
+    private readonly Dictionary<string, IGrainDirectory> directoryPerName = new Dictionary<string, IGrainDirectory>();
+    private readonly ConcurrentDictionary<GrainType, IGrainDirectory> directoryPerType = new();
+    private readonly GrainPropertiesResolver grainPropertiesResolver;
+    private readonly IGrainDirectoryResolver[] resolvers;
+    private readonly Func<GrainType, IGrainDirectory> getGrainDirectoryInternal;
+
+    public GrainDirectoryResolver(
+        IServiceProvider serviceProvider,
+        GrainPropertiesResolver grainPropertiesResolver,
+        IEnumerable<IGrainDirectoryResolver> resolvers)
     {
-        private readonly Dictionary<string, IGrainDirectory> directoryPerName = new Dictionary<string, IGrainDirectory>();
-        private readonly ConcurrentDictionary<GrainType, IGrainDirectory> directoryPerType = new();
-        private readonly GrainPropertiesResolver grainPropertiesResolver;
-        private readonly IGrainDirectoryResolver[] resolvers;
-        private readonly Func<GrainType, IGrainDirectory> getGrainDirectoryInternal;
+        this.getGrainDirectoryInternal = GetGrainDirectoryPerType;
+        this.resolvers = resolvers.ToArray();
 
-        public GrainDirectoryResolver(
-            IServiceProvider serviceProvider,
-            GrainPropertiesResolver grainPropertiesResolver,
-            IEnumerable<IGrainDirectoryResolver> resolvers)
+        // Load all registered directories
+        var services = serviceProvider.GetGrainDirectories();
+        foreach (var svc in services)
         {
-            this.getGrainDirectoryInternal = GetGrainDirectoryPerType;
-            this.resolvers = resolvers.ToArray();
-
-            // Load all registered directories
-            var services = serviceProvider.GetGrainDirectories();
-            foreach (var svc in services)
-            {
-                this.directoryPerName[svc.Name] = serviceProvider.GetRequiredKeyedService<IGrainDirectory>(svc.Name);
-            }
-
-            this.directoryPerName.TryGetValue(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, out var defaultDirectory);
-            this.DefaultGrainDirectory = defaultDirectory;
-            this.grainPropertiesResolver = grainPropertiesResolver;
+            this.directoryPerName[svc.Name] = serviceProvider.GetRequiredKeyedService<IGrainDirectory>(svc.Name);
         }
 
-        public IReadOnlyCollection<IGrainDirectory> Directories => this.directoryPerName.Values;
+        this.directoryPerName.TryGetValue(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, out var defaultDirectory);
+        this.DefaultGrainDirectory = defaultDirectory;
+        this.grainPropertiesResolver = grainPropertiesResolver;
+    }
 
-        public IGrainDirectory DefaultGrainDirectory { get; }
+    public IReadOnlyCollection<IGrainDirectory> Directories => this.directoryPerName.Values;
 
-        public IGrainDirectory Resolve(GrainType grainType) => this.directoryPerType.GetOrAdd(grainType, this.getGrainDirectoryInternal);
+    public IGrainDirectory DefaultGrainDirectory { get; }
 
-        public bool IsUsingDefaultDirectory(GrainType grainType) => Resolve(grainType) == null;
+    public IGrainDirectory Resolve(GrainType grainType) => this.directoryPerType.GetOrAdd(grainType, this.getGrainDirectoryInternal);
 
-        private IGrainDirectory GetGrainDirectoryPerType(GrainType grainType)
+    public bool IsUsingDefaultDirectory(GrainType grainType) => Resolve(grainType) == null;
+
+    private IGrainDirectory GetGrainDirectoryPerType(GrainType grainType)
+    {
+        if (this.TryGetNonDefaultGrainDirectory(grainType, out var result))
         {
-            if (this.TryGetNonDefaultGrainDirectory(grainType, out var result))
-            {
-                return result;
-            }
-
-            return this.DefaultGrainDirectory;
+            return result;
         }
 
-        internal bool TryGetNonDefaultGrainDirectory(GrainType grainType, out IGrainDirectory directory)
+        return this.DefaultGrainDirectory;
+    }
+
+    internal bool TryGetNonDefaultGrainDirectory(GrainType grainType, out IGrainDirectory directory)
+    {
+        this.grainPropertiesResolver.TryGetGrainProperties(grainType, out var properties);
+
+        foreach (var resolver in this.resolvers)
         {
-            this.grainPropertiesResolver.TryGetGrainProperties(grainType, out var properties);
-
-            foreach (var resolver in this.resolvers)
+            if (resolver.TryResolveGrainDirectory(grainType, properties, out directory))
             {
-                if (resolver.TryResolveGrainDirectory(grainType, properties, out directory))
-                {
-                    return true;
-                }
+                return true;
             }
-
-            if (properties is not null
-                && properties.Properties.TryGetValue(WellKnownGrainTypeProperties.GrainDirectory, out var directoryName)
-                && !string.IsNullOrWhiteSpace(directoryName))
-            {
-                if (this.directoryPerName.TryGetValue(directoryName, out directory))
-                {
-                    return true;
-                }
-                else
-                {
-                    throw new KeyNotFoundException($"Could not resolve grain directory {directoryName} for grain type {grainType}");
-                }
-            }
-
-            directory = null;
-            return false;
         }
+
+        if (properties is not null
+            && properties.Properties.TryGetValue(WellKnownGrainTypeProperties.GrainDirectory, out var directoryName)
+            && !string.IsNullOrWhiteSpace(directoryName))
+        {
+            if (this.directoryPerName.TryGetValue(directoryName, out directory))
+            {
+                return true;
+            }
+            else
+            {
+                throw new KeyNotFoundException($"Could not resolve grain directory {directoryName} for grain type {grainType}");
+            }
+        }
+
+        directory = null;
+        return false;
     }
 }

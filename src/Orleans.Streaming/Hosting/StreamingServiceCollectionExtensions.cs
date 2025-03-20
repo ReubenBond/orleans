@@ -12,79 +12,78 @@ using Orleans.Streams;
 using Orleans.Streams.Core;
 using Orleans.Streams.Filtering;
 
-namespace Orleans.Hosting
+namespace Orleans.Hosting;
+
+/// <summary>
+/// Extension methods for configuring streaming on silos.
+/// </summary>
+public static class StreamingServiceCollectionExtensions
 {
     /// <summary>
-    /// Extension methods for configuring streaming on silos.
+    /// Add support for streaming to this silo.
     /// </summary>
-    public static class StreamingServiceCollectionExtensions
+    /// <param name="services">The services.</param>
+    public static void AddSiloStreaming(this IServiceCollection services)
     {
-        /// <summary>
-        /// Add support for streaming to this silo.
-        /// </summary>
-        /// <param name="services">The services.</param>
-        public static void AddSiloStreaming(this IServiceCollection services)
+        if (services.Any(service => service.ServiceType.Equals(typeof(SiloStreamProviderRuntime))))
         {
-            if (services.Any(service => service.ServiceType.Equals(typeof(SiloStreamProviderRuntime))))
-            {
-                return;
-            }
-
-            services.AddSingleton<PubSubGrainStateStorageFactory>();
-            services.AddSingleton<SiloStreamProviderRuntime>();
-            services.AddFromExisting<IStreamProviderRuntime, SiloStreamProviderRuntime>();
-            services.AddSingleton<ImplicitStreamSubscriberTable>();
-            services.AddSingleton<IConfigureGrainContext, StreamConsumerGrainContextAction>();
-            services.AddSingleton<IStreamNamespacePredicateProvider, DefaultStreamNamespacePredicateProvider>();
-            services.AddSingleton<IStreamNamespacePredicateProvider, ConstructorStreamNamespacePredicateProvider>();
-            services.AddKeyedSingleton<IStreamIdMapper, DefaultStreamIdMapper>(DefaultStreamIdMapper.Name);
-            services.AddKeyedTransient<IGrainExtension>(typeof(IStreamConsumerExtension), (sp, _) =>
-            {
-                var runtime = sp.GetRequiredService<IStreamProviderRuntime>();
-                var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
-                return new StreamConsumerExtension(runtime, grainContextAccessor.GrainContext?.GrainInstance as IStreamSubscriptionObserver);
-            });
-            services.AddSingleton<IStreamSubscriptionManagerAdmin>(sp =>
-                new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderRuntime>()));
-            services.AddTransient<IStreamQueueBalancer, ConsistentRingQueueBalancer>();
-            services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, StreamingConverterConfigurator>();
-
-            // One stream directory per activation
-            services.AddScoped<StreamDirectory>();
+            return;
         }
 
-        /// <summary>
-        /// Add support for streaming to this client.
-        /// </summary>
-        /// <param name="services">The services.</param>
-        public static void AddClientStreaming(this IServiceCollection services)
+        services.AddSingleton<PubSubGrainStateStorageFactory>();
+        services.AddSingleton<SiloStreamProviderRuntime>();
+        services.AddFromExisting<IStreamProviderRuntime, SiloStreamProviderRuntime>();
+        services.AddSingleton<ImplicitStreamSubscriberTable>();
+        services.AddSingleton<IConfigureGrainContext, StreamConsumerGrainContextAction>();
+        services.AddSingleton<IStreamNamespacePredicateProvider, DefaultStreamNamespacePredicateProvider>();
+        services.AddSingleton<IStreamNamespacePredicateProvider, ConstructorStreamNamespacePredicateProvider>();
+        services.AddKeyedSingleton<IStreamIdMapper, DefaultStreamIdMapper>(DefaultStreamIdMapper.Name);
+        services.AddKeyedTransient<IGrainExtension>(typeof(IStreamConsumerExtension), (sp, _) =>
         {
-            if (services.Any(service => service.ServiceType.Equals(typeof(ClientStreamingProviderRuntime))))
-            {
-                return;
-            }
+            var runtime = sp.GetRequiredService<IStreamProviderRuntime>();
+            var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
+            return new StreamConsumerExtension(runtime, grainContextAccessor.GrainContext?.GrainInstance as IStreamSubscriptionObserver);
+        });
+        services.AddSingleton<IStreamSubscriptionManagerAdmin>(sp =>
+            new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderRuntime>()));
+        services.AddTransient<IStreamQueueBalancer, ConsistentRingQueueBalancer>();
+        services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, StreamingConverterConfigurator>();
 
-            services.AddSingleton<ClientStreamingProviderRuntime>();
-            services.AddFromExisting<IStreamProviderRuntime, ClientStreamingProviderRuntime>();
-            services.AddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
-            services.AddSingleton<ImplicitStreamSubscriberTable>();
-            services.AddSingleton<IStreamNamespacePredicateProvider, DefaultStreamNamespacePredicateProvider>();
-            services.AddSingleton<IStreamNamespacePredicateProvider, ConstructorStreamNamespacePredicateProvider>();
-            services.AddKeyedSingleton<IStreamIdMapper, DefaultStreamIdMapper>(DefaultStreamIdMapper.Name);
-            services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientStreamingProviderRuntime>();
-            services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, StreamingConverterConfigurator>();
+        // One stream directory per activation
+        services.AddScoped<StreamDirectory>();
+    }
+
+    /// <summary>
+    /// Add support for streaming to this client.
+    /// </summary>
+    /// <param name="services">The services.</param>
+    public static void AddClientStreaming(this IServiceCollection services)
+    {
+        if (services.Any(service => service.ServiceType.Equals(typeof(ClientStreamingProviderRuntime))))
+        {
+            return;
         }
 
-        /// <summary>
-        /// Adds a stream filter. 
-        /// </summary>
-        /// <typeparam name="T">The stream filter type.</typeparam>
-        /// <param name="services">The service collection.</param>
-        /// <param name="name">The stream filter name.</param>
-        /// <returns>The service collection.</returns>
-        public static IServiceCollection AddStreamFilter<T>(this IServiceCollection services, string name) where T : class, IStreamFilter
-        {
-            return services.AddKeyedSingleton<IStreamFilter, T>(name);
-        }
+        services.AddSingleton<ClientStreamingProviderRuntime>();
+        services.AddFromExisting<IStreamProviderRuntime, ClientStreamingProviderRuntime>();
+        services.AddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
+        services.AddSingleton<ImplicitStreamSubscriberTable>();
+        services.AddSingleton<IStreamNamespacePredicateProvider, DefaultStreamNamespacePredicateProvider>();
+        services.AddSingleton<IStreamNamespacePredicateProvider, ConstructorStreamNamespacePredicateProvider>();
+        services.AddKeyedSingleton<IStreamIdMapper, DefaultStreamIdMapper>(DefaultStreamIdMapper.Name);
+        services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientStreamingProviderRuntime>();
+        services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, StreamingConverterConfigurator>();
+    }
+
+    /// <summary>
+    /// Adds a stream filter. 
+    /// </summary>
+    /// <typeparam name="T">The stream filter type.</typeparam>
+    /// <param name="services">The service collection.</param>
+    /// <param name="name">The stream filter name.</param>
+    /// <returns>The service collection.</returns>
+    public static IServiceCollection AddStreamFilter<T>(this IServiceCollection services, string name) where T : class, IStreamFilter
+    {
+        return services.AddKeyedSingleton<IStreamFilter, T>(name);
     }
 }

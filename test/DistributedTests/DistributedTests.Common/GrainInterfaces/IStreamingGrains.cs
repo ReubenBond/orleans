@@ -1,40 +1,39 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace DistributedTests.GrainInterfaces
+namespace DistributedTests.GrainInterfaces;
+
+public static class StreamingConstants
 {
-    public static class StreamingConstants
-    {
-        public const string StreamingProvider = "TestStreamingProvider";
-        public const string StreamingNamespace = "TestStreamingNamespace";
+    public const string StreamingProvider = "TestStreamingProvider";
+    public const string StreamingNamespace = "TestStreamingNamespace";
 
-        public const string DefaultCounterGrain = "default";
-    }
+    public const string DefaultCounterGrain = "default";
+}
 
-    public class ReportingOptions
-    {
-        public DateTime ReportAt { get; set; }
+public class ReportingOptions
+{
+    public DateTime ReportAt { get; set; }
 
-        public int Duration { get; set; }
-    }
+    public int Duration { get; set; }
+}
 
-    public interface IGrainWithCounter : IGrainWithGuidKey
-    {
-        Task<int> GetCounterValue(string counterName);
-    }
+public interface IGrainWithCounter : IGrainWithGuidKey
+{
+    Task<int> GetCounterValue(string counterName);
+}
 
-    public interface IImplicitSubscriberGrain : IGrainWithCounter
-    {
-    }
+public interface IImplicitSubscriberGrain : IGrainWithCounter
+{
+}
 
-    public interface ICounterGrain : IGrainWithStringKey
-    {
-        Task Track(IGrainWithCounter grain);
+public interface ICounterGrain : IGrainWithStringKey
+{
+    Task Track(IGrainWithCounter grain);
 
-        Task<TimeSpan> GetRunDuration();
+    Task<TimeSpan> GetRunDuration();
 
-        Task<TimeSpan> WaitTimeForReport();
+    Task<TimeSpan> WaitTimeForReport();
 
-        Task<int> GetTotalCounterValue(string counterName);
-    }
+    Task<int> GetTotalCounterValue(string counterName);
 }

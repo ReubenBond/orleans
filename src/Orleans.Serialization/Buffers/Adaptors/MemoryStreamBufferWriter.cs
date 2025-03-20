@@ -3,63 +3,62 @@
 
 using System.Buffers;
 
-namespace Orleans.Serialization.Buffers.Adaptors
+namespace Orleans.Serialization.Buffers.Adaptors;
+
+/// <summary>
+/// An implementation of <see cref="IBufferWriter{T}"/> which writes to a <see cref="MemoryStream"/>.
+/// </summary>
+public readonly struct MemoryStreamBufferWriter : IBufferWriter<byte>
 {
+    private readonly MemoryStream _stream;
+    private const int MinRequestSize = 256;
+
     /// <summary>
-    /// An implementation of <see cref="IBufferWriter{T}"/> which writes to a <see cref="MemoryStream"/>.
+    /// Initializes a new instance of the <see cref="MemoryStreamBufferWriter"/> struct.
     /// </summary>
-    public readonly struct MemoryStreamBufferWriter : IBufferWriter<byte>
+    /// <param name="stream">The stream.</param>
+    public MemoryStreamBufferWriter(MemoryStream stream)
     {
-        private readonly MemoryStream _stream;
-        private const int MinRequestSize = 256;
+        _stream = stream;
+    }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="MemoryStreamBufferWriter"/> struct.
-        /// </summary>
-        /// <param name="stream">The stream.</param>
-        public MemoryStreamBufferWriter(MemoryStream stream)
+    /// <inheritdoc />
+    public void Advance(int count)
+    {
+        _stream.Position += count;
+    }
+
+    /// <inheritdoc />
+    public Memory<byte> GetMemory(int sizeHint = 0)
+    {
+        if (sizeHint < MinRequestSize)
         {
-            _stream = stream;
+            sizeHint = MinRequestSize;
         }
 
-        /// <inheritdoc />
-        public void Advance(int count)
+        if (_stream.Capacity - _stream.Position < sizeHint)
         {
-            _stream.Position += count;
+            _stream.Capacity += sizeHint;
+            _stream.SetLength(_stream.Capacity);
         }
 
-        /// <inheritdoc />
-        public Memory<byte> GetMemory(int sizeHint = 0)
+        return _stream.GetBuffer().AsMemory((int)_stream.Position);
+    }
+
+    /// <inheritdoc />
+    public Span<byte> GetSpan(int sizeHint = 0)
+    {
+        if (sizeHint < MinRequestSize)
         {
-            if (sizeHint < MinRequestSize)
-            {
-                sizeHint = MinRequestSize;
-            }
-
-            if (_stream.Capacity - _stream.Position < sizeHint)
-            {
-                _stream.Capacity += sizeHint;
-                _stream.SetLength(_stream.Capacity);
-            }
-
-            return _stream.GetBuffer().AsMemory((int)_stream.Position);
+            sizeHint = MinRequestSize;
         }
 
-        /// <inheritdoc />
-        public Span<byte> GetSpan(int sizeHint = 0)
+        if (_stream.Capacity - _stream.Position < sizeHint)
         {
-            if (sizeHint < MinRequestSize)
-            {
-                sizeHint = MinRequestSize;
-            }
-
-            if (_stream.Capacity - _stream.Position < sizeHint)
-            {
-                _stream.Capacity += sizeHint;
-                _stream.SetLength(_stream.Capacity);
-            }
-
-            return _stream.GetBuffer().AsSpan((int)_stream.Position);
+            _stream.Capacity += sizeHint;
+            _stream.SetLength(_stream.Capacity);
         }
+
+        return _stream.GetBuffer().AsSpan((int)_stream.Position);
     }
 }

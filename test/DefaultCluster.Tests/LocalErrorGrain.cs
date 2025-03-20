@@ -1,49 +1,48 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace DefaultCluster.Tests
+namespace DefaultCluster.Tests;
+
+internal class LocalErrorGrain
 {
-    internal class LocalErrorGrain
+    private int m_a = 0;
+    private int m_b = 0;
+
+    public LocalErrorGrain() { }
+
+    public Task SetA(int a)
     {
-        private int m_a = 0;
-        private int m_b = 0;
+        m_a = a;
+        return Task.CompletedTask;
+    }
 
-        public LocalErrorGrain() { }
+    public Task SetB(int b)
+    {
+        m_b = b;
+        return Task.CompletedTask;
+    }
 
-        public Task SetA(int a)
-        {
-            m_a = a;
-            return Task.CompletedTask;
-        }
+    public Task<int> GetAxB()
+    {
+        return Task.FromResult(m_a * m_b);
+    }
 
-        public Task SetB(int b)
-        {
-            m_b = b;
-            return Task.CompletedTask;
-        }
+    public async Task<int> GetAxBError()
+    {
+        await Task.CompletedTask;
+        throw new Exception("GetAxBError-Exception");
+    }
 
-        public Task<int> GetAxB()
-        {
-            return Task.FromResult(m_a * m_b);
-        }
+    public Task LongMethod(int waitTime)
+    {
+        Thread.Sleep(waitTime);
+        return Task.CompletedTask;
+    }
 
-        public async Task<int> GetAxBError()
-        {
-            await Task.CompletedTask;
-            throw new Exception("GetAxBError-Exception");
-        }
-
-        public Task LongMethod(int waitTime)
-        {
-            Thread.Sleep(waitTime);
-            return Task.CompletedTask;
-        }
-
-        public async Task LongMethodWithError(int waitTime)
-        {
-            Thread.Sleep(waitTime);
-            await Task.CompletedTask;
-            throw new Exception("LongMethodWithError(" + waitTime + ")");
-        }
+    public async Task LongMethodWithError(int waitTime)
+    {
+        Thread.Sleep(waitTime);
+        await Task.CompletedTask;
+        throw new Exception("LongMethodWithError(" + waitTime + ")");
     }
 }

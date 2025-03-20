@@ -3,15 +3,14 @@
 
 using Microsoft.CodeAnalysis;
 
-namespace Orleans.CodeGenerator
-{
-    public class OrleansGeneratorDiagnosticAnalysisException : Exception
-    {
-        public OrleansGeneratorDiagnosticAnalysisException(Diagnostic diagnostic) : base(diagnostic.GetMessage())
-        {
-            Diagnostic = diagnostic;
-        }
+namespace Orleans.CodeGenerator;
 
-        public Diagnostic Diagnostic { get; }
+public class OrleansGeneratorDiagnosticAnalysisException : Exception
+{
+    public OrleansGeneratorDiagnosticAnalysisException(Diagnostic diagnostic) : base(diagnostic.GetMessage())
+    {
+        Diagnostic = diagnostic;
     }
+
+    public Diagnostic Diagnostic { get; }
 }

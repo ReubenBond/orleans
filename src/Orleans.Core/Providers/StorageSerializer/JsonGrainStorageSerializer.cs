@@ -3,34 +3,33 @@
 
 using Orleans.Serialization;
 
-namespace Orleans.Storage
+namespace Orleans.Storage;
+
+/// <summary>
+/// Grain storage serializer that uses Newtonsoft.Json
+/// </summary>
+public class JsonGrainStorageSerializer : IGrainStorageSerializer
 {
+    private readonly OrleansJsonSerializer _orleansJsonSerializer;
+
     /// <summary>
-    /// Grain storage serializer that uses Newtonsoft.Json
+    /// Initializes a new instance of the <see cref="JsonGrainStorageSerializer"/> class.
     /// </summary>
-    public class JsonGrainStorageSerializer : IGrainStorageSerializer
+    public JsonGrainStorageSerializer(OrleansJsonSerializer orleansJsonSerializer)
     {
-        private readonly OrleansJsonSerializer _orleansJsonSerializer;
+        _orleansJsonSerializer = orleansJsonSerializer;
+    }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="JsonGrainStorageSerializer"/> class.
-        /// </summary>
-        public JsonGrainStorageSerializer(OrleansJsonSerializer orleansJsonSerializer)
-        {
-            _orleansJsonSerializer = orleansJsonSerializer;
-        }
+    /// <inheritdoc/>
+    public BinaryData Serialize<T>(T value)
+    {
+        var data = _orleansJsonSerializer.Serialize(value, typeof(T));
+        return new BinaryData(data);
+    }
 
-        /// <inheritdoc/>
-        public BinaryData Serialize<T>(T value)
-        {
-            var data = _orleansJsonSerializer.Serialize(value, typeof(T));
-            return new BinaryData(data);
-        }
-
-        /// <inheritdoc/>
-        public T Deserialize<T>(BinaryData input)
-        {
-            return (T)_orleansJsonSerializer.Deserialize(typeof(T), input.ToString());
-        }
+    /// <inheritdoc/>
+    public T Deserialize<T>(BinaryData input)
+    {
+        return (T)_orleansJsonSerializer.Deserialize(typeof(T), input.ToString());
     }
 }

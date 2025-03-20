@@ -7,192 +7,191 @@ using UnitTests.General;
 using Xunit.Abstractions;
 using Microsoft.Extensions.Hosting;
 
-namespace UnitTests.MembershipTests
+namespace UnitTests.MembershipTests;
+
+[TestCategory("SqlServer")]
+public class LivenessTests_SqlServer : LivenessTestsBase
 {
-    [TestCategory("SqlServer")]
-    public class LivenessTests_SqlServer : LivenessTestsBase
+    public const string TestDatabaseName = "OrleansTest_SqlServer_Liveness";
+    public LivenessTests_SqlServer(ITestOutputHelper output) : base(output)
     {
-        public const string TestDatabaseName = "OrleansTest_SqlServer_Liveness";
-        public LivenessTests_SqlServer(ITestOutputHelper output) : base(output)
-        {
-        }
+    }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, TestDatabaseName).Result;
-            builder.Properties["RelationalStorageConnectionString"] = relationalStorage.CurrentConnectionString;
-            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-        }
+    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    {
+        var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameSqlServer, TestDatabaseName).Result;
+        builder.Properties["RelationalStorageConnectionString"] = relationalStorage.CurrentConnectionString;
+        builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+    }
 
-        public class SiloConfigurator : IHostConfigurator
+    public class SiloConfigurator : IHostConfigurator
+    {
+        public void Configure(IHostBuilder hostBuilder)
         {
-            public void Configure(IHostBuilder hostBuilder)
+            var cfg = hostBuilder.GetConfiguration();
+            var connectionString = cfg["RelationalStorageConnectionString"];
+            hostBuilder.UseOrleans((ctx, siloBuilder) =>
             {
-                var cfg = hostBuilder.GetConfiguration();
-                var connectionString = cfg["RelationalStorageConnectionString"];
-                hostBuilder.UseOrleans((ctx, siloBuilder) =>
+                siloBuilder.UseAdoNetClustering(options =>
                 {
-                    siloBuilder.UseAdoNetClustering(options =>
-                    {
-                        options.ConnectionString = connectionString;
-                        options.Invariant = AdoNetInvariants.InvariantNameSqlServer;
-                    });
+                    options.ConnectionString = connectionString;
+                    options.Invariant = AdoNetInvariants.InvariantNameSqlServer;
                 });
-            }
-        }
-
-        [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
-        public async Task Liveness_SqlServer_1()
-        {
-            await Do_Liveness_OracleTest_1();
-        }
-
-        [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
-        public async Task Liveness_SqlServer_2_Restart_Primary()
-        {
-            await Do_Liveness_OracleTest_2(0);
-        }
-
-        [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
-        public async Task Liveness_SqlServer_3_Restartl_GW()
-        {
-            await Do_Liveness_OracleTest_2(1);
-        }
-
-        [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
-        public async Task Liveness_SqlServer_4_Restart_Silo_1()
-        {
-            await Do_Liveness_OracleTest_2(2);
-        }
-
-        [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
-        public async Task Liveness_SqlServer_5_Kill_Silo_1_With_Timers()
-        {
-            await Do_Liveness_OracleTest_2(2, false, true);
+            });
         }
     }
 
-    public class LivenessTests_PostgreSql : LivenessTestsBase
+    [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
+    public async Task Liveness_SqlServer_1()
     {
-        public const string TestDatabaseName = "OrleansTest_Postgres_Liveness";
-        public LivenessTests_PostgreSql(ITestOutputHelper output) : base(output)
-        {
-        }
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNamePostgreSql, TestDatabaseName).Result;
-            builder.Properties["RelationalStorageConnectionString"] = relationalStorage.CurrentConnectionString;
-            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-        }
+        await Do_Liveness_OracleTest_1();
+    }
 
-        public class SiloConfigurator : IHostConfigurator
+    [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
+    public async Task Liveness_SqlServer_2_Restart_Primary()
+    {
+        await Do_Liveness_OracleTest_2(0);
+    }
+
+    [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
+    public async Task Liveness_SqlServer_3_Restartl_GW()
+    {
+        await Do_Liveness_OracleTest_2(1);
+    }
+
+    [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
+    public async Task Liveness_SqlServer_4_Restart_Silo_1()
+    {
+        await Do_Liveness_OracleTest_2(2);
+    }
+
+    [Fact, TestCategory("Membership"), TestCategory("AdoNet")]
+    public async Task Liveness_SqlServer_5_Kill_Silo_1_With_Timers()
+    {
+        await Do_Liveness_OracleTest_2(2, false, true);
+    }
+}
+
+public class LivenessTests_PostgreSql : LivenessTestsBase
+{
+    public const string TestDatabaseName = "OrleansTest_Postgres_Liveness";
+    public LivenessTests_PostgreSql(ITestOutputHelper output) : base(output)
+    {
+    }
+    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    {
+        var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNamePostgreSql, TestDatabaseName).Result;
+        builder.Properties["RelationalStorageConnectionString"] = relationalStorage.CurrentConnectionString;
+        builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+    }
+
+    public class SiloConfigurator : IHostConfigurator
+    {
+        public void Configure(IHostBuilder hostBuilder)
         {
-            public void Configure(IHostBuilder hostBuilder)
+            var cfg = hostBuilder.GetConfiguration();
+            var connectionString = cfg["RelationalStorageConnectionString"];
+            hostBuilder.UseOrleans((ctx, siloBuilder) =>
             {
-                var cfg = hostBuilder.GetConfiguration();
-                var connectionString = cfg["RelationalStorageConnectionString"];
-                hostBuilder.UseOrleans((ctx, siloBuilder) =>
+                siloBuilder.UseAdoNetClustering(options =>
                 {
-                    siloBuilder.UseAdoNetClustering(options =>
-                    {
-                        options.ConnectionString = connectionString;
-                        options.Invariant = AdoNetInvariants.InvariantNamePostgreSql;
-                    });
+                    options.ConnectionString = connectionString;
+                    options.Invariant = AdoNetInvariants.InvariantNamePostgreSql;
                 });
-            }
-        }
-
-        [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
-        public async Task Liveness_PostgreSql_1()
-        {
-            await Do_Liveness_OracleTest_1();
-        }
-
-        [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
-        public async Task Liveness_PostgreSql_2_Restart_Primary()
-        {
-            await Do_Liveness_OracleTest_2(0);
-        }
-
-        [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
-        public async Task Liveness_PostgreSql_3_Restartl_GW()
-        {
-            await Do_Liveness_OracleTest_2(1);
-        }
-
-        [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
-        public async Task Liveness_PostgreSql_4_Restart_Silo_1()
-        {
-            await Do_Liveness_OracleTest_2(2);
-        }
-
-        [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
-        public async Task Liveness_PostgreSql_5_Kill_Silo_1_With_Timers()
-        {
-            await Do_Liveness_OracleTest_2(2, false, true);
+            });
         }
     }
 
-    [TestCategory("Membership"), TestCategory("MySql")]
-    public class LivenessTests_MySql : LivenessTestsBase
+    [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
+    public async Task Liveness_PostgreSql_1()
     {
-        public const string TestDatabaseName = "OrleansTest_MySql_Liveness";
-        public LivenessTests_MySql(ITestOutputHelper output) : base(output)
-        {
-        }
+        await Do_Liveness_OracleTest_1();
+    }
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
-        {
-            var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameMySql, TestDatabaseName).Result;
-            builder.Properties["RelationalStorageConnectionString"] = relationalStorage.CurrentConnectionString;
-            builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-        }
+    [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
+    public async Task Liveness_PostgreSql_2_Restart_Primary()
+    {
+        await Do_Liveness_OracleTest_2(0);
+    }
 
-        public class SiloConfigurator : IHostConfigurator
+    [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
+    public async Task Liveness_PostgreSql_3_Restartl_GW()
+    {
+        await Do_Liveness_OracleTest_2(1);
+    }
+
+    [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
+    public async Task Liveness_PostgreSql_4_Restart_Silo_1()
+    {
+        await Do_Liveness_OracleTest_2(2);
+    }
+
+    [Fact, TestCategory("Membership"), TestCategory("PostgreSql")]
+    public async Task Liveness_PostgreSql_5_Kill_Silo_1_With_Timers()
+    {
+        await Do_Liveness_OracleTest_2(2, false, true);
+    }
+}
+
+[TestCategory("Membership"), TestCategory("MySql")]
+public class LivenessTests_MySql : LivenessTestsBase
+{
+    public const string TestDatabaseName = "OrleansTest_MySql_Liveness";
+    public LivenessTests_MySql(ITestOutputHelper output) : base(output)
+    {
+    }
+
+    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    {
+        var relationalStorage = RelationalStorageForTesting.SetupInstance(AdoNetInvariants.InvariantNameMySql, TestDatabaseName).Result;
+        builder.Properties["RelationalStorageConnectionString"] = relationalStorage.CurrentConnectionString;
+        builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+    }
+
+    public class SiloConfigurator : IHostConfigurator
+    {
+        public void Configure(IHostBuilder hostBuilder)
         {
-            public void Configure(IHostBuilder hostBuilder)
+            var cfg = hostBuilder.GetConfiguration();
+            var connectionString = cfg["RelationalStorageConnectionString"];
+            hostBuilder.UseOrleans((ctx, siloBuilder) =>
             {
-                var cfg = hostBuilder.GetConfiguration();
-                var connectionString = cfg["RelationalStorageConnectionString"];
-                hostBuilder.UseOrleans((ctx, siloBuilder) =>
+                siloBuilder.UseAdoNetClustering(options =>
                 {
-                    siloBuilder.UseAdoNetClustering(options =>
-                    {
-                        options.ConnectionString = connectionString;
-                        options.Invariant = AdoNetInvariants.InvariantNameMySql;
-                    });
+                    options.ConnectionString = connectionString;
+                    options.Invariant = AdoNetInvariants.InvariantNameMySql;
                 });
-            }
+            });
         }
+    }
 
-        [Fact]
-        public async Task Liveness_MySql_1()
-        {
-            await Do_Liveness_OracleTest_1();
-        }
+    [Fact]
+    public async Task Liveness_MySql_1()
+    {
+        await Do_Liveness_OracleTest_1();
+    }
 
-        [Fact]
-        public async Task Liveness_MySql_2_Restart_Primary()
-        {
-            await Do_Liveness_OracleTest_2(0);
-        }
+    [Fact]
+    public async Task Liveness_MySql_2_Restart_Primary()
+    {
+        await Do_Liveness_OracleTest_2(0);
+    }
 
-        [Fact]
-        public async Task Liveness_MySql_3_Restartl_GW()
-        {
-            await Do_Liveness_OracleTest_2(1);
-        }
+    [Fact]
+    public async Task Liveness_MySql_3_Restartl_GW()
+    {
+        await Do_Liveness_OracleTest_2(1);
+    }
 
-        [Fact]
-        public async Task Liveness_MySql_4_Restart_Silo_1()
-        {
-            await Do_Liveness_OracleTest_2(2);
-        }
+    [Fact]
+    public async Task Liveness_MySql_4_Restart_Silo_1()
+    {
+        await Do_Liveness_OracleTest_2(2);
+    }
 
-        [Fact]
-        public async Task Liveness_MySql_5_Kill_Silo_1_With_Timers()
-        {
-            await Do_Liveness_OracleTest_2(2, false, true);
-        }
+    [Fact]
+    public async Task Liveness_MySql_5_Kill_Silo_1_With_Timers()
+    {
+        await Do_Liveness_OracleTest_2(2, false, true);
     }
 }

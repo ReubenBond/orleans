@@ -1,22 +1,21 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Runtime
+namespace Orleans.Runtime;
+
+/// <summary>
+/// The prefer local placement strategy indicates that a grain should always be placed on the local host if the grain
+/// is not already active elsewhere in the cluster and the local host is compatible with it.
+/// </summary>
+/// <remarks>
+/// If the host is not compatible with the grain type or if a grain receives an incompatible request, the grain will be
+/// placed on a random, compatible server.
+/// </remarks>
+[Serializable, GenerateSerializer, Immutable, SuppressReferenceTracking]
+public sealed class PreferLocalPlacement : PlacementStrategy
 {
     /// <summary>
-    /// The prefer local placement strategy indicates that a grain should always be placed on the local host if the grain
-    /// is not already active elsewhere in the cluster and the local host is compatible with it.
+    /// Gets the singleton instance of this class.
     /// </summary>
-    /// <remarks>
-    /// If the host is not compatible with the grain type or if a grain receives an incompatible request, the grain will be
-    /// placed on a random, compatible server.
-    /// </remarks>
-    [Serializable, GenerateSerializer, Immutable, SuppressReferenceTracking]
-    public sealed class PreferLocalPlacement : PlacementStrategy
-    {
-        /// <summary>
-        /// Gets the singleton instance of this class.
-        /// </summary>
-        internal static PreferLocalPlacement Singleton { get; } = new PreferLocalPlacement();
-    }
+    internal static PreferLocalPlacement Singleton { get; } = new PreferLocalPlacement();
 }

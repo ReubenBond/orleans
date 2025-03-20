@@ -10,185 +10,184 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
-namespace Orleans.GrainDirectory.AzureStorage
+namespace Orleans.GrainDirectory.AzureStorage;
+
+public class AzureTableGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>
 {
-    public class AzureTableGrainDirectory : IGrainDirectory, ILifecycleParticipant<ISiloLifecycle>
+    private readonly AzureTableDataManager<GrainDirectoryEntity> tableDataManager;
+    private readonly string clusterId;
+
+    internal class GrainDirectoryEntity : ITableEntity
     {
-        private readonly AzureTableDataManager<GrainDirectoryEntity> tableDataManager;
-        private readonly string clusterId;
+        public required string SiloAddress { get; set; }
+        public required string ActivationId { get; set; }
+        public required long MembershipVersion { get; set; }
+        public required string PartitionKey { get; set; }
+        public required string RowKey { get; set; }
+        public DateTimeOffset? Timestamp { get; set; }
+        public ETag ETag { get; set; }
 
-        internal class GrainDirectoryEntity : ITableEntity
+        public GrainAddress ToGrainAddress()
         {
-            public required string SiloAddress { get; set; }
-            public required string ActivationId { get; set; }
-            public required long MembershipVersion { get; set; }
-            public required string PartitionKey { get; set; }
-            public required string RowKey { get; set; }
-            public DateTimeOffset? Timestamp { get; set; }
-            public ETag ETag { get; set; }
-
-            public GrainAddress ToGrainAddress()
+            return new GrainAddress
             {
-                return new GrainAddress
-                {
-                    GrainId = RowKeyToGrainId(this.RowKey),
-                    SiloAddress = Runtime.SiloAddress.FromParsableString(this.SiloAddress),
-                    ActivationId = Runtime.ActivationId.FromParsableString(this.ActivationId),
-                    MembershipVersion = new MembershipVersion(this.MembershipVersion)
-                };
-            }
-
-            public static GrainDirectoryEntity FromGrainAddress(string clusterId, GrainAddress address)
-            {
-                ArgumentNullException.ThrowIfNull(address.SiloAddress);
-
-                return new GrainDirectoryEntity
-                {
-                    PartitionKey = clusterId,
-                    RowKey = GrainIdToRowKey(address.GrainId),
-                    SiloAddress = address.SiloAddress.ToParsableString(),
-                    ActivationId = address.ActivationId.ToParsableString(),
-                    MembershipVersion = address.MembershipVersion.Value,
-                };
-            }
-
-            internal static string GrainIdToRowKey(GrainId grainId) => HttpUtility.UrlEncode(grainId.ToString(), Encoding.UTF8);
-
-            internal static GrainId RowKeyToGrainId(string rowKey) => GrainId.Parse(HttpUtility.UrlDecode(rowKey, Encoding.UTF8));
+                GrainId = RowKeyToGrainId(this.RowKey),
+                SiloAddress = Runtime.SiloAddress.FromParsableString(this.SiloAddress),
+                ActivationId = Runtime.ActivationId.FromParsableString(this.ActivationId),
+                MembershipVersion = new MembershipVersion(this.MembershipVersion)
+            };
         }
 
-        public AzureTableGrainDirectory(
-            AzureTableGrainDirectoryOptions directoryOptions,
-            IOptions<ClusterOptions> clusterOptions,
-            ILoggerFactory loggerFactory)
+        public static GrainDirectoryEntity FromGrainAddress(string clusterId, GrainAddress address)
         {
-            this.tableDataManager = new AzureTableDataManager<GrainDirectoryEntity>(
-                directoryOptions,
-                loggerFactory.CreateLogger<AzureTableDataManager<GrainDirectoryEntity>>());
-            this.clusterId = clusterOptions.Value.ClusterId;
+            ArgumentNullException.ThrowIfNull(address.SiloAddress);
+
+            return new GrainDirectoryEntity
+            {
+                PartitionKey = clusterId,
+                RowKey = GrainIdToRowKey(address.GrainId),
+                SiloAddress = address.SiloAddress.ToParsableString(),
+                ActivationId = address.ActivationId.ToParsableString(),
+                MembershipVersion = address.MembershipVersion.Value,
+            };
         }
 
-        public async Task<GrainAddress?> Lookup(GrainId grainId)
+        internal static string GrainIdToRowKey(GrainId grainId) => HttpUtility.UrlEncode(grainId.ToString(), Encoding.UTF8);
+
+        internal static GrainId RowKeyToGrainId(string rowKey) => GrainId.Parse(HttpUtility.UrlDecode(rowKey, Encoding.UTF8));
+    }
+
+    public AzureTableGrainDirectory(
+        AzureTableGrainDirectoryOptions directoryOptions,
+        IOptions<ClusterOptions> clusterOptions,
+        ILoggerFactory loggerFactory)
+    {
+        this.tableDataManager = new AzureTableDataManager<GrainDirectoryEntity>(
+            directoryOptions,
+            loggerFactory.CreateLogger<AzureTableDataManager<GrainDirectoryEntity>>());
+        this.clusterId = clusterOptions.Value.ClusterId;
+    }
+
+    public async Task<GrainAddress?> Lookup(GrainId grainId)
+    {
+        var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(grainId));
+
+        if (result.Entity is null)
         {
-            var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(grainId));
-
-            if (result.Entity is null)
-            {
-                return null;
-            }
-
-            return result.Item1.ToGrainAddress();
+            return null;
         }
 
-        public Task<GrainAddress?> Register(GrainAddress address) => Register(address, null);
+        return result.Item1.ToGrainAddress();
+    }
 
-        public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress)
+    public Task<GrainAddress?> Register(GrainAddress address) => Register(address, null);
+
+    public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress)
+    {
+        (bool isSuccess, string eTag) result;
+        if (previousAddress is not null)
         {
-            (bool isSuccess, string eTag) result;
-            if (previousAddress is not null)
+            var entry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, address);
+            var previousEntry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, previousAddress);
+            var (storedEntry, eTag) = await tableDataManager.ReadSingleTableEntryAsync(entry.PartitionKey, entry.RowKey);
+            if (storedEntry is null)
             {
-                var entry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, address);
-                var previousEntry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, previousAddress);
-                var (storedEntry, eTag) = await tableDataManager.ReadSingleTableEntryAsync(entry.PartitionKey, entry.RowKey);
-                if (storedEntry is null)
-                {
-                    result = await this.tableDataManager.InsertTableEntryAsync(entry);
-                }
-                else if (storedEntry.ActivationId != previousEntry.ActivationId || storedEntry.SiloAddress != previousEntry.SiloAddress)
-                {
-                    return await Lookup(address.GrainId);
-                }
-                else
-                {
-                    _ = await tableDataManager.UpdateTableEntryAsync(entry, eTag);
-                    return address;
-                }
-            }
-            else
-            {
-                var entry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, address);
                 result = await this.tableDataManager.InsertTableEntryAsync(entry);
             }
-
-            // Possible race condition?
-            return result.isSuccess ? address : await Lookup(address.GrainId);
-        }
-
-        public async Task Unregister(GrainAddress address)
-        {
-            var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(address.GrainId));
-
-            // No entry found
-            if (result.Entity is null)
+            else if (storedEntry.ActivationId != previousEntry.ActivationId || storedEntry.SiloAddress != previousEntry.SiloAddress)
             {
-                return;
-            }
-
-            // Check if the entry in storage match the one we were asked to delete
-            var entity = result.Item1;
-            if (entity.ActivationId == address.ActivationId.ToParsableString())
-                await this.tableDataManager.DeleteTableEntryAsync(GrainDirectoryEntity.FromGrainAddress(this.clusterId, address), entity.ETag.ToString());
-        }
-
-        public async Task UnregisterMany(List<GrainAddress> addresses)
-        {
-            if (addresses.Count <= this.tableDataManager.StoragePolicyOptions.MaxBulkUpdateRows)
-            {
-                await UnregisterManyBlock(addresses);
+                return await Lookup(address.GrainId);
             }
             else
             {
-                var tasks = new List<Task>();
-                foreach (var subList in addresses.BatchIEnumerable(this.tableDataManager.StoragePolicyOptions.MaxBulkUpdateRows))
-                {
-                    tasks.Add(UnregisterManyBlock(subList));
-                }
-                await Task.WhenAll(tasks);
+                _ = await tableDataManager.UpdateTableEntryAsync(entry, eTag);
+                return address;
             }
         }
-
-        public Task UnregisterSilos(List<SiloAddress> siloAddresses)
+        else
         {
-            // Too costly to implement using Azure Table
-            return Task.CompletedTask;
+            var entry = GrainDirectoryEntity.FromGrainAddress(this.clusterId, address);
+            result = await this.tableDataManager.InsertTableEntryAsync(entry);
         }
 
-        private async Task UnregisterManyBlock(List<GrainAddress> addresses)
+        // Possible race condition?
+        return result.isSuccess ? address : await Lookup(address.GrainId);
+    }
+
+    public async Task Unregister(GrainAddress address)
+    {
+        var result = await this.tableDataManager.ReadSingleTableEntryAsync(this.clusterId, GrainDirectoryEntity.GrainIdToRowKey(address.GrainId));
+
+        // No entry found
+        if (result.Entity is null)
         {
-            var queryBuilder = new StringBuilder();
-            queryBuilder.Append(TableClient.CreateQueryFilter($"(PartitionKey eq {clusterId}) and ("));
-            var first = true;
-            foreach (var addr in addresses)
+            return;
+        }
+
+        // Check if the entry in storage match the one we were asked to delete
+        var entity = result.Item1;
+        if (entity.ActivationId == address.ActivationId.ToParsableString())
+            await this.tableDataManager.DeleteTableEntryAsync(GrainDirectoryEntity.FromGrainAddress(this.clusterId, address), entity.ETag.ToString());
+    }
+
+    public async Task UnregisterMany(List<GrainAddress> addresses)
+    {
+        if (addresses.Count <= this.tableDataManager.StoragePolicyOptions.MaxBulkUpdateRows)
+        {
+            await UnregisterManyBlock(addresses);
+        }
+        else
+        {
+            var tasks = new List<Task>();
+            foreach (var subList in addresses.BatchIEnumerable(this.tableDataManager.StoragePolicyOptions.MaxBulkUpdateRows))
             {
-                if (!first)
-                {
-                    queryBuilder.Append(" or ");
-                }
-                else
-                {
-                    first = false;
-                }
+                tasks.Add(UnregisterManyBlock(subList));
+            }
+            await Task.WhenAll(tasks);
+        }
+    }
 
-                var rowKey = GrainDirectoryEntity.GrainIdToRowKey(addr.GrainId);
-                var queryClause = TableClient.CreateQueryFilter($"((RowKey eq {rowKey}) and (ActivationId eq {addr.ActivationId.ToString()}))");
-                queryBuilder.Append(queryClause);
+    public Task UnregisterSilos(List<SiloAddress> siloAddresses)
+    {
+        // Too costly to implement using Azure Table
+        return Task.CompletedTask;
+    }
+
+    private async Task UnregisterManyBlock(List<GrainAddress> addresses)
+    {
+        var queryBuilder = new StringBuilder();
+        queryBuilder.Append(TableClient.CreateQueryFilter($"(PartitionKey eq {clusterId}) and ("));
+        var first = true;
+        foreach (var addr in addresses)
+        {
+            if (!first)
+            {
+                queryBuilder.Append(" or ");
+            }
+            else
+            {
+                first = false;
             }
 
-            queryBuilder.Append(')');
-            var entities = await this.tableDataManager.ReadTableEntriesAndEtagsAsync(queryBuilder.ToString());
-            await this.tableDataManager.DeleteTableEntriesAsync(entities);
+            var rowKey = GrainDirectoryEntity.GrainIdToRowKey(addr.GrainId);
+            var queryClause = TableClient.CreateQueryFilter($"((RowKey eq {rowKey}) and (ActivationId eq {addr.ActivationId.ToString()}))");
+            queryBuilder.Append(queryClause);
         }
 
-        // Called by lifecycle, should not be called explicitely, except for tests
-        public async Task InitializeIfNeeded(CancellationToken ct = default)
-        {
-            await this.tableDataManager.InitTableAsync();
-        }
+        queryBuilder.Append(')');
+        var entities = await this.tableDataManager.ReadTableEntriesAndEtagsAsync(queryBuilder.ToString());
+        await this.tableDataManager.DeleteTableEntriesAsync(entities);
+    }
 
-        public void Participate(ISiloLifecycle lifecycle)
-        {
+    // Called by lifecycle, should not be called explicitely, except for tests
+    public async Task InitializeIfNeeded(CancellationToken ct = default)
+    {
+        await this.tableDataManager.InitTableAsync();
+    }
 
-            lifecycle.Subscribe(nameof(AzureTableGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, InitializeIfNeeded);
-        }
+    public void Participate(ISiloLifecycle lifecycle)
+    {
+
+        lifecycle.Subscribe(nameof(AzureTableGrainDirectory), ServiceLifecycleStage.RuntimeInitialize, InitializeIfNeeded);
     }
 }

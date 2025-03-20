@@ -6,55 +6,68 @@ using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using UnitTests.StreamingTests;
 
-namespace UnitTests.Streaming
+namespace UnitTests.Streaming;
+
+public class MultipleStreamsTestRunner
 {
-    public class MultipleStreamsTestRunner
+    public const string SMS_STREAM_PROVIDER_NAME = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
+    public const string AQ_STREAM_PROVIDER_NAME = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
+    private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
+
+    private readonly ILogger logger;
+    private readonly string streamProviderName;
+    private readonly int testNumber;
+    private readonly bool runFullTest;
+    private readonly IInternalClusterClient client;
+
+    internal MultipleStreamsTestRunner(IInternalClusterClient client, string streamProvider, int testNum = 0, bool fullTest = true)
     {
-        public const string SMS_STREAM_PROVIDER_NAME = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
-        public const string AQ_STREAM_PROVIDER_NAME = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-        private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
+        this.client = client;
+        this.streamProviderName = streamProvider;
+        this.logger = (TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log")).CreateLogger<MultipleStreamsTestRunner>();
+        this.testNumber = testNum;
+        this.runFullTest = fullTest;
+    }
 
-        private readonly ILogger logger;
-        private readonly string streamProviderName;
-        private readonly int testNumber;
-        private readonly bool runFullTest;
-        private readonly IInternalClusterClient client;
+    private void Heading(string testName)
+    {
+        logger.LogInformation("\n\n************************ {StreamProviderName}_{TestNumber}_{TestName} ********************************* \n\n", streamProviderName, testNumber, testName);
+    }
 
-        internal MultipleStreamsTestRunner(IInternalClusterClient client, string streamProvider, int testNum = 0, bool fullTest = true)
+    public async Task StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(Func<SiloHandle> startSiloFunc = null, Action<SiloHandle> stopSiloFunc = null)
+    {
+        Heading("MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains");
+        List<SingleStreamTestRunner> runners = new List<SingleStreamTestRunner>();
+        List<Task> tasks = new List<Task>();
+        for (int i = 0; i < 10; i++)
         {
-            this.client = client;
-            this.streamProviderName = streamProvider;
-            this.logger = (TestingUtils.CreateDefaultLoggerFactory($"{this.GetType().Name}.log")).CreateLogger<MultipleStreamsTestRunner>();
-            this.testNumber = testNum;
-            this.runFullTest = fullTest;
+            runners.Add(new SingleStreamTestRunner(this.client, this.streamProviderName, i, runFullTest));
+        }
+        foreach (var runner in runners)
+        {
+            tasks.Add(runner.StreamTest_Create_OneProducerGrainOneConsumerGrain());
+        }
+        await Task.WhenAll(tasks);
+        tasks.Clear();
+
+        SiloHandle silo = null;
+        if (startSiloFunc != null)
+        {
+            silo = startSiloFunc();
         }
 
-        private void Heading(string testName)
+        foreach (var runner in runners)
         {
-            logger.LogInformation("\n\n************************ {StreamProviderName}_{TestNumber}_{TestName} ********************************* \n\n", streamProviderName, testNumber, testName);
+            tasks.Add(runner.BasicTestAsync(runFullTest));
         }
+        await Task.WhenAll(tasks);
+        tasks.Clear();
 
-        public async Task StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(Func<SiloHandle> startSiloFunc = null, Action<SiloHandle> stopSiloFunc = null)
+        if (stopSiloFunc != null)
         {
-            Heading("MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains");
-            List<SingleStreamTestRunner> runners = new List<SingleStreamTestRunner>();
-            List<Task> tasks = new List<Task>();
-            for (int i = 0; i < 10; i++)
-            {
-                runners.Add(new SingleStreamTestRunner(this.client, this.streamProviderName, i, runFullTest));
-            }
-            foreach (var runner in runners)
-            {
-                tasks.Add(runner.StreamTest_Create_OneProducerGrainOneConsumerGrain());
-            }
-            await Task.WhenAll(tasks);
-            tasks.Clear();
+            logger.LogInformation("\n\n\nAbout to stop silo {SiloAddress} \n\n", silo.SiloAddress);
 
-            SiloHandle silo = null;
-            if (startSiloFunc != null)
-            {
-                silo = startSiloFunc();
-            }
+            stopSiloFunc(silo);
 
             foreach (var runner in runners)
             {
@@ -62,26 +75,12 @@ namespace UnitTests.Streaming
             }
             await Task.WhenAll(tasks);
             tasks.Clear();
-
-            if (stopSiloFunc != null)
-            {
-                logger.LogInformation("\n\n\nAbout to stop silo {SiloAddress} \n\n", silo.SiloAddress);
-
-                stopSiloFunc(silo);
-
-                foreach (var runner in runners)
-                {
-                    tasks.Add(runner.BasicTestAsync(runFullTest));
-                }
-                await Task.WhenAll(tasks);
-                tasks.Clear();
-            }
-
-            foreach (var runner in runners)
-            {
-                tasks.Add(runner.StopProxies());
-            }
-            await Task.WhenAll(tasks);
         }
+
+        foreach (var runner in runners)
+        {
+            tasks.Add(runner.StopProxies());
+        }
+        await Task.WhenAll(tasks);
     }
 }

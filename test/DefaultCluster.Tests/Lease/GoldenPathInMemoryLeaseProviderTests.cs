@@ -7,18 +7,17 @@ using Orleans.Runtime.Development;
 using TestExtensions;
 using TestExtensions.Runners;
 
-namespace DefaultCluster.Tests
-{
-    [TestCategory("BVT"), TestCategory("Lease")]
-    public class GoldenPathInMemoryLeaseProviderTests : GoldenPathLeaseProviderTestRunner, IClassFixture<GoldenPathInMemoryLeaseProviderTests.Fixture>
-    {
-        public GoldenPathInMemoryLeaseProviderTests(Fixture fixture, ITestOutputHelper output)
-            : base(new InMemoryLeaseProvider(fixture.GrainFactory), output)
-        {
-        }
+namespace DefaultCluster.Tests;
 
-        public class Fixture : BaseTestClusterFixture
-        {
-        }
+[TestCategory("BVT"), TestCategory("Lease")]
+public class GoldenPathInMemoryLeaseProviderTests : GoldenPathLeaseProviderTestRunner, IClassFixture<GoldenPathInMemoryLeaseProviderTests.Fixture>
+{
+    public GoldenPathInMemoryLeaseProviderTests(Fixture fixture, ITestOutputHelper output)
+        : base(new InMemoryLeaseProvider(fixture.GrainFactory), output)
+    {
+    }
+
+    public class Fixture : BaseTestClusterFixture
+    {
     }
 }

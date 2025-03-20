@@ -3,20 +3,19 @@
 
 using UnitTests.GrainInterfaces;
 
-namespace UnitTests.Grains
-{
-    public class NullStateGrain : Grain<NullableState>, INullStateGrain
-    {
-        public async Task SetStateAndDeactivate(NullableState state)
-        {
-            this.State = state;
-            await WriteStateAsync();
-            DeactivateOnIdle();
-        }
+namespace UnitTests.Grains;
 
-        public Task<NullableState> GetState()
-        {
-            return Task.FromResult(this.State);
-        }
+public class NullStateGrain : Grain<NullableState>, INullStateGrain
+{
+    public async Task SetStateAndDeactivate(NullableState state)
+    {
+        this.State = state;
+        await WriteStateAsync();
+        DeactivateOnIdle();
+    }
+
+    public Task<NullableState> GetState()
+    {
+        return Task.FromResult(this.State);
     }
 }

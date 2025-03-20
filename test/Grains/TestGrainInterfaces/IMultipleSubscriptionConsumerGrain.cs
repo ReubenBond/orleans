@@ -3,22 +3,21 @@
 
 using Orleans.Streams;
 
-namespace UnitTests.GrainInterfaces
+namespace UnitTests.GrainInterfaces;
+
+public interface IMultipleSubscriptionConsumerGrain : IGrainWithGuidKey
 {
-    public interface IMultipleSubscriptionConsumerGrain : IGrainWithGuidKey
-    {
-        Task<StreamSubscriptionHandle<int>> BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse);
+    Task<StreamSubscriptionHandle<int>> BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse);
 
-        Task<StreamSubscriptionHandle<int>> Resume(StreamSubscriptionHandle<int> handle);
+    Task<StreamSubscriptionHandle<int>> Resume(StreamSubscriptionHandle<int> handle);
 
-        Task StopConsuming(StreamSubscriptionHandle<int> handle);
+    Task StopConsuming(StreamSubscriptionHandle<int> handle);
 
-        Task<IList<StreamSubscriptionHandle<int>>> GetAllSubscriptions(Guid streamId, string streamNamespace, string providerToUse);
+    Task<IList<StreamSubscriptionHandle<int>>> GetAllSubscriptions(Guid streamId, string streamNamespace, string providerToUse);
 
-        Task<Dictionary<StreamSubscriptionHandle<int>, Tuple<int,int>>> GetNumberConsumed();
+    Task<Dictionary<StreamSubscriptionHandle<int>, Tuple<int,int>>> GetNumberConsumed();
 
-        Task ClearNumberConsumed();
+    Task ClearNumberConsumed();
 
-        Task Deactivate();
-    }
+    Task Deactivate();
 }

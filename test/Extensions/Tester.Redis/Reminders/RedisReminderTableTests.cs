@@ -11,68 +11,67 @@ using UnitTests;
 using UnitTests.RemindersTest;
 using Xunit;
 
-namespace Tester.Redis.Reminders
+namespace Tester.Redis.Reminders;
+
+[TestCategory("Redis"), TestCategory("Reminders"), TestCategory("Functional")]
+[Collection(TestEnvironmentFixture.DefaultCollection)]
+public class RedisRemindersTableTests : ReminderTableTestsBase
 {
-    [TestCategory("Redis"), TestCategory("Reminders"), TestCategory("Functional")]
-    [Collection(TestEnvironmentFixture.DefaultCollection)]
-    public class RedisRemindersTableTests : ReminderTableTestsBase
+    public RedisRemindersTableTests(ConnectionStringFixture fixture, CommonFixture clusterFixture) : base (fixture, clusterFixture, CreateFilters())
     {
-        public RedisRemindersTableTests(ConnectionStringFixture fixture, CommonFixture clusterFixture) : base (fixture, clusterFixture, CreateFilters())
-        {
-            TestUtils.CheckForRedis();
-        }
+        TestUtils.CheckForRedis();
+    }
 
-        private static LoggerFilterOptions CreateFilters()
-        {
-            LoggerFilterOptions filters = new LoggerFilterOptions();
-            filters.AddFilter(nameof(RedisRemindersTableTests), LogLevel.Trace);
-            return filters;
-        }
+    private static LoggerFilterOptions CreateFilters()
+    {
+        LoggerFilterOptions filters = new LoggerFilterOptions();
+        filters.AddFilter(nameof(RedisRemindersTableTests), LogLevel.Trace);
+        return filters;
+    }
 
-        protected override IReminderTable CreateRemindersTable()
-        {
-            TestUtils.CheckForRedis();
+    protected override IReminderTable CreateRemindersTable()
+    {
+        TestUtils.CheckForRedis();
 
-            RedisReminderTable reminderTable = new(
-                this.loggerFactory.CreateLogger<RedisReminderTable>(),
-                this.clusterOptions,
-                Options.Create(new RedisReminderTableOptions()
-                {
-                    ConfigurationOptions = ConfigurationOptions.Parse(GetConnectionString().Result),
-                    EntryExpiry = TimeSpan.FromHours(1)
-                })); 
-
-            if (reminderTable == null)
+        RedisReminderTable reminderTable = new(
+            this.loggerFactory.CreateLogger<RedisReminderTable>(),
+            this.clusterOptions,
+            Options.Create(new RedisReminderTableOptions()
             {
-                throw new InvalidOperationException("RedisReminderTable not configured");
-            }
+                ConfigurationOptions = ConfigurationOptions.Parse(GetConnectionString().Result),
+                EntryExpiry = TimeSpan.FromHours(1)
+            })); 
 
-            return reminderTable;
-        }
-
-        protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString);
-
-        [SkippableFact]
-        public void RemindersTable_Redis_Init()
+        if (reminderTable == null)
         {
+            throw new InvalidOperationException("RedisReminderTable not configured");
         }
 
-        [SkippableFact]
-        public async Task RemindersTable_Redis_RemindersRange()
-        {
-            await RemindersRange(iterations: 50);
-        }
+        return reminderTable;
+    }
 
-        [SkippableFact]
-        public async Task RemindersTable_Redis_RemindersParallelUpsert()
-        {
-            await RemindersParallelUpsert();
-        }
+    protected override Task<string> GetConnectionString() => Task.FromResult(TestDefaultConfiguration.RedisConnectionString);
 
-        [SkippableFact]
-        public async Task RemindersTable_Redis_ReminderSimple()
-        {
-            await ReminderSimple();
-        }
+    [SkippableFact]
+    public void RemindersTable_Redis_Init()
+    {
+    }
+
+    [SkippableFact]
+    public async Task RemindersTable_Redis_RemindersRange()
+    {
+        await RemindersRange(iterations: 50);
+    }
+
+    [SkippableFact]
+    public async Task RemindersTable_Redis_RemindersParallelUpsert()
+    {
+        await RemindersParallelUpsert();
+    }
+
+    [SkippableFact]
+    public async Task RemindersTable_Redis_ReminderSimple()
+    {
+        await ReminderSimple();
     }
 }

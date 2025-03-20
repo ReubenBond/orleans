@@ -6,54 +6,53 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using System.Security;
 
-namespace Orleans.Serialization
+namespace Orleans.Serialization;
+
+internal class ValueTypeSerializerFactory
 {
-    internal class ValueTypeSerializerFactory
+    private readonly SerializationConstructorFactory _constructorFactory;
+    private readonly SerializationCallbacksFactory _callbacksFactory;
+    private readonly SerializationEntryCodec _entrySerializer;
+    private readonly StreamingContext _streamingContext;
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
+    private readonly IFormatterConverter _formatterConverter;
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
+    private readonly Func<Type, ValueTypeSerializer> _createSerializerDelegate;
+
+    private readonly ConcurrentDictionary<Type, ValueTypeSerializer> _serializers = new();
+
+    private readonly MethodInfo _createTypedSerializerMethodInfo = typeof(ValueTypeSerializerFactory).GetMethod(
+        nameof(CreateTypedSerializer),
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+    [SecurityCritical]
+    public ValueTypeSerializerFactory(
+        SerializationEntryCodec entrySerializer,
+        SerializationConstructorFactory constructorFactory,
+        SerializationCallbacksFactory callbacksFactory,
+#pragma warning disable SYSLIB0050 // Type or member is obsolete
+        IFormatterConverter formatterConverter,
+#pragma warning restore SYSLIB0050 // Type or member is obsolete
+        StreamingContext streamingContext)
     {
-        private readonly SerializationConstructorFactory _constructorFactory;
-        private readonly SerializationCallbacksFactory _callbacksFactory;
-        private readonly SerializationEntryCodec _entrySerializer;
-        private readonly StreamingContext _streamingContext;
-#pragma warning disable SYSLIB0050 // Type or member is obsolete
-        private readonly IFormatterConverter _formatterConverter;
-#pragma warning restore SYSLIB0050 // Type or member is obsolete
-        private readonly Func<Type, ValueTypeSerializer> _createSerializerDelegate;
+        _constructorFactory = constructorFactory;
+        _callbacksFactory = callbacksFactory;
+        _entrySerializer = entrySerializer;
+        _streamingContext = streamingContext;
+        _formatterConverter = formatterConverter;
+        _createSerializerDelegate = type => (ValueTypeSerializer)_createTypedSerializerMethodInfo.MakeGenericMethod(type).Invoke(this, null);
+    }
 
-        private readonly ConcurrentDictionary<Type, ValueTypeSerializer> _serializers = new();
+    [SecurityCritical]
+    public ValueTypeSerializer GetSerializer(Type type) => _serializers.GetOrAdd(type, _createSerializerDelegate);
 
-        private readonly MethodInfo _createTypedSerializerMethodInfo = typeof(ValueTypeSerializerFactory).GetMethod(
-            nameof(CreateTypedSerializer),
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-
-        [SecurityCritical]
-        public ValueTypeSerializerFactory(
-            SerializationEntryCodec entrySerializer,
-            SerializationConstructorFactory constructorFactory,
-            SerializationCallbacksFactory callbacksFactory,
-#pragma warning disable SYSLIB0050 // Type or member is obsolete
-            IFormatterConverter formatterConverter,
-#pragma warning restore SYSLIB0050 // Type or member is obsolete
-            StreamingContext streamingContext)
-        {
-            _constructorFactory = constructorFactory;
-            _callbacksFactory = callbacksFactory;
-            _entrySerializer = entrySerializer;
-            _streamingContext = streamingContext;
-            _formatterConverter = formatterConverter;
-            _createSerializerDelegate = type => (ValueTypeSerializer)_createTypedSerializerMethodInfo.MakeGenericMethod(type).Invoke(this, null);
-        }
-
-        [SecurityCritical]
-        public ValueTypeSerializer GetSerializer(Type type) => _serializers.GetOrAdd(type, _createSerializerDelegate);
-
-        [SecurityCritical]
-        private ValueTypeSerializer CreateTypedSerializer<T>() where T : struct
-        {
-            var constructor = _constructorFactory.GetSerializationConstructorDelegate<T, ValueTypeSerializer<T>.ValueConstructor>();
-            var callbacks =
-                _callbacksFactory.GetValueTypeCallbacks<T, ValueTypeSerializer<T>.SerializationCallback>(typeof(T));
-            var serializer = new ValueTypeSerializer<T>(constructor, callbacks, _entrySerializer, _streamingContext, _formatterConverter);
-            return serializer;
-        }
+    [SecurityCritical]
+    private ValueTypeSerializer CreateTypedSerializer<T>() where T : struct
+    {
+        var constructor = _constructorFactory.GetSerializationConstructorDelegate<T, ValueTypeSerializer<T>.ValueConstructor>();
+        var callbacks =
+            _callbacksFactory.GetValueTypeCallbacks<T, ValueTypeSerializer<T>.SerializationCallback>(typeof(T));
+        var serializer = new ValueTypeSerializer<T>(constructor, callbacks, _entrySerializer, _streamingContext, _formatterConverter);
+        return serializer;
     }
 }

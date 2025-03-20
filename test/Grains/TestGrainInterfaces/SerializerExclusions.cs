@@ -1,29 +1,28 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.UnitTest.GrainInterfaces
+namespace Orleans.UnitTest.GrainInterfaces;
+
+[Serializable]
+[GenerateSerializer]
+public class MyTypeWithAnInternalTypeField
 {
-    [Serializable]
+    [Id(0)]
+    private readonly MyInternalDependency _dependency;
+
+    public MyTypeWithAnInternalTypeField()
+    {
+        _dependency = new MyInternalDependency();
+    }
+
     [GenerateSerializer]
-    public class MyTypeWithAnInternalTypeField
+    internal class MyInternalDependency
     {
-        [Id(0)]
-        private readonly MyInternalDependency _dependency;
-
-        public MyTypeWithAnInternalTypeField()
-        {
-            _dependency = new MyInternalDependency();
-        }
-
-        [GenerateSerializer]
-        internal class MyInternalDependency
-        {
-        }
     }
+}
 
-    // Verify that we do generate a custom serializer for MyTypeWithAnInternalTypeField because it is visible within the assembly.
-    public interface IInternalReturnType : IGrainWithIntegerKey
-    {
-        Task<MyTypeWithAnInternalTypeField> Foo();
-    }
+// Verify that we do generate a custom serializer for MyTypeWithAnInternalTypeField because it is visible within the assembly.
+public interface IInternalReturnType : IGrainWithIntegerKey
+{
+    Task<MyTypeWithAnInternalTypeField> Foo();
 }

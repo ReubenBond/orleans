@@ -1,38 +1,37 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace TestGrainInterfaces
+namespace TestGrainInterfaces;
+
+public enum GenderType
 {
-    public enum GenderType
-    {
-        Male,
-        Female
-    }
+    Male,
+    Female
+}
 
-    [Serializable]
-    [Orleans.GenerateSerializer]
-    public class PersonAttributes
-    {
-        [Orleans.Id(0)]
-        public string FirstName { get; set; }
-        [Orleans.Id(1)]
-        public string LastName { get; set; }
-        [Orleans.Id(2)]
-        public GenderType Gender { get; set; }
-    }
+[Serializable]
+[Orleans.GenerateSerializer]
+public class PersonAttributes
+{
+    [Orleans.Id(0)]
+    public string FirstName { get; set; }
+    [Orleans.Id(1)]
+    public string LastName { get; set; }
+    [Orleans.Id(2)]
+    public GenderType Gender { get; set; }
+}
 
-    /// <summary>
-    /// Orleans grain communication interface IPerson
-    /// </summary>
-    public interface IPersonGrain : Orleans.IGrainWithGuidKey
-    {
-        Task RegisterBirth(PersonAttributes person);
-        Task Marry(IPersonGrain spouse);
+/// <summary>
+/// Orleans grain communication interface IPerson
+/// </summary>
+public interface IPersonGrain : Orleans.IGrainWithGuidKey
+{
+    Task RegisterBirth(PersonAttributes person);
+    Task Marry(IPersonGrain spouse);
 
-        Task<PersonAttributes> GetTentativePersonalAttributes();
+    Task<PersonAttributes> GetTentativePersonalAttributes();
 
-        // Tests
+    // Tests
 
-        Task RunTentativeConfirmedStateTest();
-    }
+    Task RunTentativeConfirmedStateTest();
 }

@@ -1,21 +1,20 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Storage
+namespace Orleans.Storage;
+
+/// <summary>
+/// A default implementation uses the same hash as Orleans in grains placement.
+/// </summary>
+public sealed class OrleansDefaultHasher: IHasher
 {
     /// <summary>
-    /// A default implementation uses the same hash as Orleans in grains placement.
+    /// <see cref="IHasher.Description"/>
     /// </summary>
-    public sealed class OrleansDefaultHasher: IHasher
-    {
-        /// <summary>
-        /// <see cref="IHasher.Description"/>
-        /// </summary>
-        public string Description => $"The default Orleans hash function ({nameof(StableHash)}).";
+    public string Description => $"The default Orleans hash function ({nameof(StableHash)}).";
 
-        /// <summary>
-        /// <see cref="IHasher.Hash(byte[])"/>.
-        /// </summary>
-        public int Hash(byte[] data) => (int)StableHash.ComputeHash(data);
-    }
+    /// <summary>
+    /// <see cref="IHasher.Hash(byte[])"/>.
+    /// </summary>
+    public int Hash(byte[] data) => (int)StableHash.ComputeHash(data);
 }

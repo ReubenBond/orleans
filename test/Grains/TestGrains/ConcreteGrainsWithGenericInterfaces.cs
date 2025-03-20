@@ -3,78 +3,77 @@
 
 using UnitTests.GrainInterfaces;
 
-namespace UnitTests.Grains
+namespace UnitTests.Grains;
+
+internal class ConcreteGrainWithGenericInterfaceOfIntFloat : Grain, IGenericGrain<int, float>
 {
-    internal class ConcreteGrainWithGenericInterfaceOfIntFloat : Grain, IGenericGrain<int, float>
+    protected int T { get; set; }
+
+    public Task SetT(int t)
     {
-        protected int T { get; set; }
-
-        public Task SetT(int t)
-        {
-            T = t;
-            return Task.CompletedTask;
-        }
-
-        public Task<float> MapT2U()
-        {
-            return Task.FromResult((float)T);
-        }
+        T = t;
+        return Task.CompletedTask;
     }
 
-    internal class ConcreteGrainWithGenericInterfaceOfFloatString : Grain, IGenericGrain<float, string>
+    public Task<float> MapT2U()
     {
-        protected float T { get; set; }
+        return Task.FromResult((float)T);
+    }
+}
 
-        public Task SetT(float t)
-        {
-            T = t;
-            return Task.CompletedTask;
-        }
+internal class ConcreteGrainWithGenericInterfaceOfFloatString : Grain, IGenericGrain<float, string>
+{
+    protected float T { get; set; }
 
-        public Task<string> MapT2U()
-        {
-            return Task.FromResult(Convert.ToString(T));
-        }
+    public Task SetT(float t)
+    {
+        T = t;
+        return Task.CompletedTask;
     }
 
-    internal class ConcreteGrainWith2GenericInterfaces : Grain, IGenericGrain<int, string>, ISimpleGenericGrain<int>
+    public Task<string> MapT2U()
     {
-        // IGenericGrain<int, string> methods:
+        return Task.FromResult(Convert.ToString(T));
+    }
+}
 
-        protected int T { get; set; }
+internal class ConcreteGrainWith2GenericInterfaces : Grain, IGenericGrain<int, string>, ISimpleGenericGrain<int>
+{
+    // IGenericGrain<int, string> methods:
 
-        public Task SetT(int t)
-        {
-            T = t;
-            return Task.CompletedTask;
-        }
+    protected int T { get; set; }
 
-        public Task<string> MapT2U()
-        {
-            return Task.FromResult(Convert.ToString(T * 10, 10));
-        }
+    public Task SetT(int t)
+    {
+        T = t;
+        return Task.CompletedTask;
+    }
 
-        //ISimpleGenericGrain<int> methods:
+    public Task<string> MapT2U()
+    {
+        return Task.FromResult(Convert.ToString(T * 10, 10));
+    }
 
-        public Task Set(int t)
-        {
-            return SetT(t);
-        }
+    //ISimpleGenericGrain<int> methods:
 
-        public Task Transform()
-        {
-            T = T * 10;
-            return Task.CompletedTask;
-        }
+    public Task Set(int t)
+    {
+        return SetT(t);
+    }
 
-        public Task<int> Get()
-        {
-            return Task.FromResult(T);
-        }
+    public Task Transform()
+    {
+        T = T * 10;
+        return Task.CompletedTask;
+    }
 
-        public Task CompareGrainReferences(ISimpleGenericGrain<int> clientReference)
-        {
-            throw new NotImplementedException();
-        }
+    public Task<int> Get()
+    {
+        return Task.FromResult(T);
+    }
+
+    public Task CompareGrainReferences(ISimpleGenericGrain<int> clientReference)
+    {
+        throw new NotImplementedException();
     }
 }

@@ -3,22 +3,21 @@
 
 using System.Security.Authentication;
 
-namespace Orleans.Connections.Security
+namespace Orleans.Connections.Security;
+
+public interface ITlsHandshakeFeature
 {
-    public interface ITlsHandshakeFeature
-    {
-        SslProtocols Protocol { get; }
+    SslProtocols Protocol { get; }
 
-        CipherAlgorithmType CipherAlgorithm { get; }
+    CipherAlgorithmType CipherAlgorithm { get; }
 
-        int CipherStrength { get; }
+    int CipherStrength { get; }
 
-        HashAlgorithmType HashAlgorithm { get; }
+    HashAlgorithmType HashAlgorithm { get; }
 
-        int HashStrength { get; }
+    int HashStrength { get; }
 
-        ExchangeAlgorithmType KeyExchangeAlgorithm { get; }
+    ExchangeAlgorithmType KeyExchangeAlgorithm { get; }
 
-        int KeyExchangeStrength { get; }
-    }
+    int KeyExchangeStrength { get; }
 }

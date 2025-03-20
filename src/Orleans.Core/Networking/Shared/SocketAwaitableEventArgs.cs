@@ -6,70 +6,69 @@ using System.IO.Pipelines;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 
-namespace Orleans.Networking.Shared
+namespace Orleans.Networking.Shared;
+
+internal class SocketAwaitableEventArgs : SocketAsyncEventArgs, ICriticalNotifyCompletion
 {
-    internal class SocketAwaitableEventArgs : SocketAsyncEventArgs, ICriticalNotifyCompletion
+    private static readonly Action _callbackCompleted = () => { };
+
+    private readonly PipeScheduler _ioScheduler;
+
+    private Action _callback;
+
+    public SocketAwaitableEventArgs(PipeScheduler ioScheduler)
     {
-        private static readonly Action _callbackCompleted = () => { };
+        _ioScheduler = ioScheduler;
+    }
 
-        private readonly PipeScheduler _ioScheduler;
+    public SocketAwaitableEventArgs GetAwaiter() => this;
+    public bool IsCompleted => ReferenceEquals(_callback, _callbackCompleted);
 
-        private Action _callback;
+    public int GetResult()
+    {
+        Debug.Assert(ReferenceEquals(_callback, _callbackCompleted));
 
-        public SocketAwaitableEventArgs(PipeScheduler ioScheduler)
+        _callback = null;
+
+        if (SocketError != SocketError.Success)
         {
-            _ioScheduler = ioScheduler;
+            ThrowSocketException(SocketError);
         }
 
-        public SocketAwaitableEventArgs GetAwaiter() => this;
-        public bool IsCompleted => ReferenceEquals(_callback, _callbackCompleted);
+        return BytesTransferred;
 
-        public int GetResult()
+        void ThrowSocketException(SocketError e)
         {
-            Debug.Assert(ReferenceEquals(_callback, _callbackCompleted));
-
-            _callback = null;
-
-            if (SocketError != SocketError.Success)
-            {
-                ThrowSocketException(SocketError);
-            }
-
-            return BytesTransferred;
-
-            void ThrowSocketException(SocketError e)
-            {
-                throw new SocketException((int)e);
-            }
+            throw new SocketException((int)e);
         }
+    }
 
-        public void OnCompleted(Action continuation)
+    public void OnCompleted(Action continuation)
+    {
+        if (ReferenceEquals(_callback, _callbackCompleted) ||
+            ReferenceEquals(Interlocked.CompareExchange(ref _callback, continuation, null), _callbackCompleted))
         {
-            if (ReferenceEquals(_callback, _callbackCompleted) ||
-                ReferenceEquals(Interlocked.CompareExchange(ref _callback, continuation, null), _callbackCompleted))
-            {
-                Task.Run(continuation);
-            }
+            Task.Run(continuation);
         }
+    }
 
-        public void UnsafeOnCompleted(Action continuation)
+    public void UnsafeOnCompleted(Action continuation)
+    {
+        OnCompleted(continuation);
+    }
+
+    public void Complete()
+    {
+        OnCompleted(this);
+    }
+
+    protected override void OnCompleted(SocketAsyncEventArgs _)
+    {
+        var continuation = Interlocked.Exchange(ref _callback, _callbackCompleted);
+
+        if (continuation != null)
         {
-            OnCompleted(continuation);
-        }
-
-        public void Complete()
-        {
-            OnCompleted(this);
-        }
-
-        protected override void OnCompleted(SocketAsyncEventArgs _)
-        {
-            var continuation = Interlocked.Exchange(ref _callback, _callbackCompleted);
-
-            if (continuation != null)
-            {
-                _ioScheduler.Schedule(state => ((Action)state)(), continuation);
-            }
+            _ioScheduler.Schedule(state => ((Action)state)(), continuation);
         }
     }
 }

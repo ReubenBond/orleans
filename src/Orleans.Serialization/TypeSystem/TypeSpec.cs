@@ -5,395 +5,394 @@
 
 using System.Text;
 
-namespace Orleans.Serialization.TypeSystem
+namespace Orleans.Serialization.TypeSystem;
+
+/// <summary>
+/// Represents a type.
+/// </summary>
+public abstract class TypeSpec
 {
     /// <summary>
-    /// Represents a type.
+    /// Formats this instance in a way that can be parsed by <see cref="RuntimeTypeNameParser"/>.
     /// </summary>
-    public abstract class TypeSpec
+    public abstract string Format();
+}
+
+/// <summary>
+/// Represents a pointer (*) type.
+/// </summary>
+public class PointerTypeSpec : TypeSpec
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PointerTypeSpec"/> class.
+    /// </summary>
+    /// <param name="elementType">The element type.</param>
+    public PointerTypeSpec(TypeSpec elementType)
     {
-        /// <summary>
-        /// Formats this instance in a way that can be parsed by <see cref="RuntimeTypeNameParser"/>.
-        /// </summary>
-        public abstract string Format();
+        if (elementType is null)
+        {
+            throw new ArgumentNullException(nameof(elementType));
+        }
+
+        ElementType = elementType;
     }
 
     /// <summary>
-    /// Represents a pointer (*) type.
+    /// Gets the element type.
     /// </summary>
-    public class PointerTypeSpec : TypeSpec
-    {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="PointerTypeSpec"/> class.
-        /// </summary>
-        /// <param name="elementType">The element type.</param>
-        public PointerTypeSpec(TypeSpec elementType)
-        {
-            if (elementType is null)
-            {
-                throw new ArgumentNullException(nameof(elementType));
-            }
+    public TypeSpec ElementType { get; }
 
-            ElementType = elementType;
+    /// <inheritdoc/>
+    public override string Format() => ToString();
+
+    /// <inheritdoc/>
+    public override string ToString() => $"{ElementType}*";
+}
+
+/// <summary>
+/// Represents a reference (&amp;) type.
+/// </summary>
+public class ReferenceTypeSpec : TypeSpec
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ReferenceTypeSpec"/> class.
+    /// </summary>
+    /// <param name="elementType">The element type.</param>
+    public ReferenceTypeSpec(TypeSpec elementType)
+    {
+        if (elementType is null)
+        {
+            throw new ArgumentNullException(nameof(elementType));
         }
 
-        /// <summary>
-        /// Gets the element type.
-        /// </summary>
-        public TypeSpec ElementType { get; }
-
-        /// <inheritdoc/>
-        public override string Format() => ToString();
-
-        /// <inheritdoc/>
-        public override string ToString() => $"{ElementType}*";
+        ElementType = elementType;
     }
 
     /// <summary>
-    /// Represents a reference (&amp;) type.
+    /// Gets the element type.
     /// </summary>
-    public class ReferenceTypeSpec : TypeSpec
-    {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ReferenceTypeSpec"/> class.
-        /// </summary>
-        /// <param name="elementType">The element type.</param>
-        public ReferenceTypeSpec(TypeSpec elementType)
-        {
-            if (elementType is null)
-            {
-                throw new ArgumentNullException(nameof(elementType));
-            }
+    public TypeSpec ElementType { get; }
 
-            ElementType = elementType;
+    /// <inheritdoc/>
+    public override string Format() => ToString();
+
+    /// <inheritdoc/>
+    public override string ToString() => $"{ElementType}&";
+}
+
+/// <summary>
+/// Represents an array type.
+/// </summary>
+public class ArrayTypeSpec : TypeSpec
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ArrayTypeSpec"/> class.
+    /// </summary>
+    /// <param name="elementType">The array element type.</param>
+    /// <param name="dimensions">The number of dimensions for the array.</param>
+    public ArrayTypeSpec(TypeSpec elementType, int dimensions)
+    {
+        if (elementType is null)
+        {
+            throw new ArgumentNullException(nameof(elementType));
         }
 
-        /// <summary>
-        /// Gets the element type.
-        /// </summary>
-        public TypeSpec ElementType { get; }
+        if (dimensions <= 0)
+        {
+            throw new ArgumentOutOfRangeException($"An array cannot have a dimension count of {dimensions}");
+        }
 
-        /// <inheritdoc/>
-        public override string Format() => ToString();
-
-        /// <inheritdoc/>
-        public override string ToString() => $"{ElementType}&";
+        ElementType = elementType;
+        Dimensions = dimensions;
     }
 
     /// <summary>
-    /// Represents an array type.
+    /// Gets the number of array dimensions.
     /// </summary>
-    public class ArrayTypeSpec : TypeSpec
+    public int Dimensions { get; }
+
+    /// <summary>
+    /// Gets the element type.
+    /// </summary>
+    public TypeSpec ElementType { get; }
+
+    /// <inheritdoc/>
+    public override string Format() => ToString();
+
+    /// <inheritdoc/>
+    public override string ToString() => $"{ElementType}[{new string(',', Dimensions - 1)}]";
+}
+
+/// <summary>
+/// Represents an constructed generic type.
+/// </summary>
+public class ConstructedGenericTypeSpec : TypeSpec
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ConstructedGenericTypeSpec"/> class.
+    /// </summary>
+    /// <param name="unconstructedType">The unconstructed type.</param>
+    /// <param name="arity">The expected number of type arguments.</param>
+    /// <param name="arguments">The generic type arguments.</param>
+    public ConstructedGenericTypeSpec(TypeSpec unconstructedType, int arity, TypeSpec[] arguments)
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ArrayTypeSpec"/> class.
-        /// </summary>
-        /// <param name="elementType">The array element type.</param>
-        /// <param name="dimensions">The number of dimensions for the array.</param>
-        public ArrayTypeSpec(TypeSpec elementType, int dimensions)
+        if (unconstructedType is AssemblyQualifiedTypeSpec)
         {
-            if (elementType is null)
-            {
-                throw new ArgumentNullException(nameof(elementType));
-            }
-
-            if (dimensions <= 0)
-            {
-                throw new ArgumentOutOfRangeException($"An array cannot have a dimension count of {dimensions}");
-            }
-
-            ElementType = elementType;
-            Dimensions = dimensions;
+            throw new InvalidOperationException();
         }
 
-        /// <summary>
-        /// Gets the number of array dimensions.
-        /// </summary>
-        public int Dimensions { get; }
+        if (unconstructedType is null)
+        {
+            throw new ArgumentNullException(nameof(unconstructedType));
+        }
 
-        /// <summary>
-        /// Gets the element type.
-        /// </summary>
-        public TypeSpec ElementType { get; }
+        if (arguments is null)
+        {
+            throw new ArgumentNullException(nameof(arguments));
+        }
 
-        /// <inheritdoc/>
-        public override string Format() => ToString();
+        if (arity != arguments.Length)
+        {
+            throw new ArgumentException($"Invalid number of arguments {arguments.Length} provided while constructing generic type of arity {arity}: {unconstructedType}", nameof(arguments));
+        }
 
-        /// <inheritdoc/>
-        public override string ToString() => $"{ElementType}[{new string(',', Dimensions - 1)}]";
+        foreach (var arg in arguments)
+        {
+            if (arg is null)
+            {
+                throw new ArgumentNullException(nameof(arguments), "Cannot construct a generic type using a null argument");
+            }
+        }
+
+        UnconstructedType = unconstructedType;
+        Arguments = arguments;
     }
 
     /// <summary>
-    /// Represents an constructed generic type.
+    /// Gets the unconstructed type.
     /// </summary>
-    public class ConstructedGenericTypeSpec : TypeSpec
+    public TypeSpec UnconstructedType { get; }
+
+    /// <summary>
+    /// Gets the type arguments.
+    /// </summary>
+    public TypeSpec[] Arguments { get; }
+
+    /// <inheritdoc/>
+    public override string Format() => ToString();
+
+    /// <inheritdoc/>
+    public override string ToString() => $"{UnconstructedType}[{string.Join(",", Arguments.Select(a => $"[{a}]"))}]";
+}
+
+/// <summary>
+/// Represents a named type, which may be an unconstructed generic type.
+/// </summary>
+public class NamedTypeSpec : TypeSpec
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NamedTypeSpec"/> class.
+    /// </summary>
+    /// <param name="containingType">The containing type.</param>
+    /// <param name="name">The type name.</param>
+    /// <param name="arity">The generic arity of the type, which must be greater than or equal to the generic arity of the containing type.</param>
+    public NamedTypeSpec(NamedTypeSpec containingType, string name, int arity)
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ConstructedGenericTypeSpec"/> class.
-        /// </summary>
-        /// <param name="unconstructedType">The unconstructed type.</param>
-        /// <param name="arity">The expected number of type arguments.</param>
-        /// <param name="arguments">The generic type arguments.</param>
-        public ConstructedGenericTypeSpec(TypeSpec unconstructedType, int arity, TypeSpec[] arguments)
+        ContainingType = containingType;
+        Name = name;
+        if (containingType is NamedTypeSpec c && c.Arity > arity)
         {
-            if (unconstructedType is AssemblyQualifiedTypeSpec)
-            {
-                throw new InvalidOperationException();
-            }
-
-            if (unconstructedType is null)
-            {
-                throw new ArgumentNullException(nameof(unconstructedType));
-            }
-
-            if (arguments is null)
-            {
-                throw new ArgumentNullException(nameof(arguments));
-            }
-
-            if (arity != arguments.Length)
-            {
-                throw new ArgumentException($"Invalid number of arguments {arguments.Length} provided while constructing generic type of arity {arity}: {unconstructedType}", nameof(arguments));
-            }
-
-            foreach (var arg in arguments)
-            {
-                if (arg is null)
-                {
-                    throw new ArgumentNullException(nameof(arguments), "Cannot construct a generic type using a null argument");
-                }
-            }
-
-            UnconstructedType = unconstructedType;
-            Arguments = arguments;
+            throw new ArgumentException("A named type cannot have an arity less than that of its containing type", nameof(arity));
         }
 
-        /// <summary>
-        /// Gets the unconstructed type.
-        /// </summary>
-        public TypeSpec UnconstructedType { get; }
+        if (arity < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(arity), "A type cannot have a negative arity");
+        }
 
-        /// <summary>
-        /// Gets the type arguments.
-        /// </summary>
-        public TypeSpec[] Arguments { get; }
-
-        /// <inheritdoc/>
-        public override string Format() => ToString();
-
-        /// <inheritdoc/>
-        public override string ToString() => $"{UnconstructedType}[{string.Join(",", Arguments.Select(a => $"[{a}]"))}]";
+        Arity = arity;
     }
 
     /// <summary>
-    /// Represents a named type, which may be an unconstructed generic type.
+    /// Gets the number of generic parameters which this type requires.
     /// </summary>
-    public class NamedTypeSpec : TypeSpec
+    public int Arity { get; }
+
+    /// <summary>
+    /// Gets the type name, which includes the namespace if this is not a nested type.
+    /// </summary>
+    public string Name { get; }
+
+    /// <summary>
+    /// Gets the containing type.
+    /// </summary>
+    public NamedTypeSpec? ContainingType { get; }
+
+    /// <summary>
+    /// Gets the namespace-qualified type name, including containing types (for nested types).
+    /// </summary>
+    /// <returns>The namespace-qualified type name.</returns>
+    public string GetNamespaceQualifiedName()
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="NamedTypeSpec"/> class.
-        /// </summary>
-        /// <param name="containingType">The containing type.</param>
-        /// <param name="name">The type name.</param>
-        /// <param name="arity">The generic arity of the type, which must be greater than or equal to the generic arity of the containing type.</param>
-        public NamedTypeSpec(NamedTypeSpec containingType, string name, int arity)
+        var builder = new StringBuilder();
+        GetQualifiedNameInternal(this, builder);
+        return builder.ToString();
+
+        static void GetQualifiedNameInternal(NamedTypeSpec n, StringBuilder b)
         {
-            ContainingType = containingType;
-            Name = name;
-            if (containingType is NamedTypeSpec c && c.Arity > arity)
+            if (n.ContainingType is not null)
             {
-                throw new ArgumentException("A named type cannot have an arity less than that of its containing type", nameof(arity));
+                GetQualifiedNameInternal(n.ContainingType, b);
+                _ = b.Append('+');
             }
 
-            if (arity < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(arity), "A type cannot have a negative arity");
-            }
+            _ = b.Append(n.Name);
+        }
+    }
 
-            Arity = arity;
+    /// <inheritdoc/>
+    public override string Format() => ToString();
+
+    /// <inheritdoc/>
+    public override string ToString() => ContainingType is not null ? $"{ContainingType}+{Name}" : Name;
+}
+
+/// <summary>
+/// Represents an assembly-qualified type.
+/// </summary>
+public class AssemblyQualifiedTypeSpec : TypeSpec
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AssemblyQualifiedTypeSpec"/> class.
+    /// </summary>
+    /// <param name="type">The type.</param>
+    /// <param name="assembly">The assembly.</param>
+    public AssemblyQualifiedTypeSpec(TypeSpec type, string? assembly)
+    {
+        if (type is null)
+        {
+            throw new ArgumentNullException(nameof(type));
         }
 
-        /// <summary>
-        /// Gets the number of generic parameters which this type requires.
-        /// </summary>
-        public int Arity { get; }
-
-        /// <summary>
-        /// Gets the type name, which includes the namespace if this is not a nested type.
-        /// </summary>
-        public string Name { get; }
-
-        /// <summary>
-        /// Gets the containing type.
-        /// </summary>
-        public NamedTypeSpec? ContainingType { get; }
-
-        /// <summary>
-        /// Gets the namespace-qualified type name, including containing types (for nested types).
-        /// </summary>
-        /// <returns>The namespace-qualified type name.</returns>
-        public string GetNamespaceQualifiedName()
+        if (string.IsNullOrWhiteSpace(assembly))
         {
-            var builder = new StringBuilder();
-            GetQualifiedNameInternal(this, builder);
-            return builder.ToString();
-
-            static void GetQualifiedNameInternal(NamedTypeSpec n, StringBuilder b)
-            {
-                if (n.ContainingType is not null)
-                {
-                    GetQualifiedNameInternal(n.ContainingType, b);
-                    _ = b.Append('+');
-                }
-
-                _ = b.Append(n.Name);
-            }
+            throw new ArgumentNullException(nameof(assembly));
         }
 
-        /// <inheritdoc/>
-        public override string Format() => ToString();
-
-        /// <inheritdoc/>
-        public override string ToString() => ContainingType is not null ? $"{ContainingType}+{Name}" : Name;
+        Type = type;
+        Assembly = assembly;
     }
 
     /// <summary>
-    /// Represents an assembly-qualified type.
+    /// Gets the assembly specification.
     /// </summary>
-    public class AssemblyQualifiedTypeSpec : TypeSpec
+    public string? Assembly { get; }
+
+    /// <summary>
+    /// Gets the qualified type.
+    /// </summary>
+    public TypeSpec Type { get; }
+
+    /// <inheritdoc/>
+    public override string Format() => ToString();
+
+    /// <inheritdoc/>
+    public override string ToString() => Assembly switch
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="AssemblyQualifiedTypeSpec"/> class.
-        /// </summary>
-        /// <param name="type">The type.</param>
-        /// <param name="assembly">The assembly.</param>
-        public AssemblyQualifiedTypeSpec(TypeSpec type, string? assembly)
+        { Length: > 0 } => $"{Type},{Assembly!}",
+        _ => $"{Type}"
+    };
+}
+
+/// <summary>
+/// Represents a type function.
+/// </summary>
+public class TupleTypeSpec : TypeSpec
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TupleTypeSpec"/> class.
+    /// </summary>
+    /// <param name="elements">The tuple elements.</param>
+    /// <param name="arity">The number of generic type parameters which the type accepts.</param>
+    public TupleTypeSpec(TypeSpec[] elements, int arity)
+    {
+        if (elements is null)
         {
-            if (type is null)
-            {
-                throw new ArgumentNullException(nameof(type));
-            }
-
-            if (string.IsNullOrWhiteSpace(assembly))
-            {
-                throw new ArgumentNullException(nameof(assembly));
-            }
-
-            Type = type;
-            Assembly = assembly;
+            throw new ArgumentNullException(nameof(elements));
         }
 
-        /// <summary>
-        /// Gets the assembly specification.
-        /// </summary>
-        public string? Assembly { get; }
-
-        /// <summary>
-        /// Gets the qualified type.
-        /// </summary>
-        public TypeSpec Type { get; }
-
-        /// <inheritdoc/>
-        public override string Format() => ToString();
-
-        /// <inheritdoc/>
-        public override string ToString() => Assembly switch
+        if (elements is { Length: 0 })
         {
-            { Length: > 0 } => $"{Type},{Assembly!}",
-            _ => $"{Type}"
+            throw new ArgumentNullException(nameof(elements));
+        }
+
+        if (arity < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(arity), "A type cannot have a negative arity");
+        }
+
+        Arity = arity;
+
+        Elements = elements;
+    }
+
+    /// <summary>
+    /// Gets the number of generic parameters which this type requires.
+    /// </summary>
+    public int Arity { get; }
+
+    /// <summary>
+    /// Gets the tuple elements.
+    /// </summary>
+    public TypeSpec[] Elements { get; }
+
+    /// <inheritdoc/>
+    public override string Format() => ToString();
+
+    /// <inheritdoc/>
+    public override string ToString()
+    {
+        var elements = string.Join(",", Elements.Select(element => element switch
+        {
+            LiteralTypeSpec => element.ToString(),
+            _ => $"[{element}]"
+        }));
+
+        return Arity switch
+        {
+            > 0 => $"({elements})`{Arity}",
+            _ => $"({elements})"
         };
     }
+}
 
+/// <summary>
+/// Represents a literal.
+/// </summary>
+public class LiteralTypeSpec : TypeSpec
+{
     /// <summary>
-    /// Represents a type function.
+    /// Initializes a new instance of the <see cref="LiteralTypeSpec"/> class.
     /// </summary>
-    public class TupleTypeSpec : TypeSpec
+    /// <param name="value">The value.</param>
+    public LiteralTypeSpec(string value)
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="TupleTypeSpec"/> class.
-        /// </summary>
-        /// <param name="elements">The tuple elements.</param>
-        /// <param name="arity">The number of generic type parameters which the type accepts.</param>
-        public TupleTypeSpec(TypeSpec[] elements, int arity)
+        if (string.IsNullOrWhiteSpace(value))
         {
-            if (elements is null)
-            {
-                throw new ArgumentNullException(nameof(elements));
-            }
-
-            if (elements is { Length: 0 })
-            {
-                throw new ArgumentNullException(nameof(elements));
-            }
-
-            if (arity < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(arity), "A type cannot have a negative arity");
-            }
-
-            Arity = arity;
-
-            Elements = elements;
+            throw new ArgumentNullException(nameof(value));
         }
 
-        /// <summary>
-        /// Gets the number of generic parameters which this type requires.
-        /// </summary>
-        public int Arity { get; }
-
-        /// <summary>
-        /// Gets the tuple elements.
-        /// </summary>
-        public TypeSpec[] Elements { get; }
-
-        /// <inheritdoc/>
-        public override string Format() => ToString();
-
-        /// <inheritdoc/>
-        public override string ToString()
-        {
-            var elements = string.Join(",", Elements.Select(element => element switch
-            {
-                LiteralTypeSpec => element.ToString(),
-                _ => $"[{element}]"
-            }));
-
-            return Arity switch
-            {
-                > 0 => $"({elements})`{Arity}",
-                _ => $"({elements})"
-            };
-        }
+        Value = value;
     }
 
     /// <summary>
-    /// Represents a literal.
+    /// Gets the value.
     /// </summary>
-    public class LiteralTypeSpec : TypeSpec
-    {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="LiteralTypeSpec"/> class.
-        /// </summary>
-        /// <param name="value">The value.</param>
-        public LiteralTypeSpec(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                throw new ArgumentNullException(nameof(value));
-            }
+    public string Value { get; }
 
-            Value = value;
-        }
+    /// <inheritdoc/>
+    public override string Format() => ToString();
 
-        /// <summary>
-        /// Gets the value.
-        /// </summary>
-        public string Value { get; }
-
-        /// <inheritdoc/>
-        public override string Format() => ToString();
-
-        /// <inheritdoc/>
-        public override string ToString() => $"\"{Value}\"";
-    }
+    /// <inheritdoc/>
+    public override string ToString() => $"\"{Value}\"";
 }

@@ -3,19 +3,18 @@
 
 using Microsoft.Extensions.Logging;
 
-namespace Orleans
+namespace Orleans;
+
+/// <summary>
+/// Implementation of <see cref="IClusterClientLifecycle"/>.
+/// </summary>
+internal class ClusterClientLifecycle : LifecycleSubject, IClusterClientLifecycle
 {
     /// <summary>
-    /// Implementation of <see cref="IClusterClientLifecycle"/>.
+    /// Initializes a new instance of the <see cref="ClusterClientLifecycle"/> class.
     /// </summary>
-    internal class ClusterClientLifecycle : LifecycleSubject, IClusterClientLifecycle
+    /// <param name="logger">The logger.</param>
+    public ClusterClientLifecycle(ILogger logger) : base(logger)
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ClusterClientLifecycle"/> class.
-        /// </summary>
-        /// <param name="logger">The logger.</param>
-        public ClusterClientLifecycle(ILogger logger) : base(logger)
-        {
-        }
     }
 }

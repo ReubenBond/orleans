@@ -1,44 +1,43 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Streams
+namespace Orleans.Streams;
+
+/// <summary>
+/// Factory for creating <see cref="IStreamQueueCheckpointer{TCheckpoint}"/> instances.
+/// </summary>
+public interface IStreamQueueCheckpointerFactory
 {
     /// <summary>
-    /// Factory for creating <see cref="IStreamQueueCheckpointer{TCheckpoint}"/> instances.
+    /// Creates a stream checkpointer for the specified partition.
     /// </summary>
-    public interface IStreamQueueCheckpointerFactory
-    {
-        /// <summary>
-        /// Creates a stream checkpointer for the specified partition.
-        /// </summary>
-        /// <param name="partition">The partition.</param>
-        /// <returns>The stream checkpointer.</returns>
-        Task<IStreamQueueCheckpointer<string>> Create(string partition);
-    }
+    /// <param name="partition">The partition.</param>
+    /// <returns>The stream checkpointer.</returns>
+    Task<IStreamQueueCheckpointer<string>> Create(string partition);
+}
+
+/// <summary>
+/// Functionality for checkpointing a stream.
+/// </summary>
+/// <typeparam name="TCheckpoint">The checkpoint type.</typeparam>
+public interface IStreamQueueCheckpointer<TCheckpoint>
+{
+    /// <summary>
+    /// Gets a value indicating whether a checkpoint exists.
+    /// </summary>
+    /// <value><see langword="true" /> if checkpoint exists; otherwise, <see langword="false" />.</value>
+    bool CheckpointExists { get; }
 
     /// <summary>
-    /// Functionality for checkpointing a stream.
+    /// Loads the checkpoint.
     /// </summary>
-    /// <typeparam name="TCheckpoint">The checkpoint type.</typeparam>
-    public interface IStreamQueueCheckpointer<TCheckpoint>
-    {
-        /// <summary>
-        /// Gets a value indicating whether a checkpoint exists.
-        /// </summary>
-        /// <value><see langword="true" /> if checkpoint exists; otherwise, <see langword="false" />.</value>
-        bool CheckpointExists { get; }
+    /// <returns>The checkpoint.</returns>
+    Task<TCheckpoint> Load();
 
-        /// <summary>
-        /// Loads the checkpoint.
-        /// </summary>
-        /// <returns>The checkpoint.</returns>
-        Task<TCheckpoint> Load();
-
-        /// <summary>
-        /// Updates the checkpoint.
-        /// </summary>
-        /// <param name="offset">The offset.</param>
-        /// <param name="utcNow">The current UTC time.</param>
-        void Update(TCheckpoint offset, DateTime utcNow);
-    }
+    /// <summary>
+    /// Updates the checkpoint.
+    /// </summary>
+    /// <param name="offset">The offset.</param>
+    /// <param name="utcNow">The current UTC time.</param>
+    void Update(TCheckpoint offset, DateTime utcNow);
 }

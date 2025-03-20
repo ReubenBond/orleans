@@ -7,52 +7,51 @@ using Orleans.Configuration;
 using Orleans.Storage;
 using Orleans.TestingHost;
 
-namespace Orleans.Hosting
+namespace Orleans.Hosting;
+
+/// <summary>
+/// Extension methods for <see cref="IServiceCollection"/>.
+/// </summary>
+public static class FaultInjectionStorageServiceCollectionExtensions
 {
     /// <summary>
-    /// Extension methods for <see cref="IServiceCollection"/>.
+    /// Configures a silo to use <see cref="FaultInjectionGrainStorage" />.
     /// </summary>
-    public static class FaultInjectionStorageServiceCollectionExtensions
+    /// <param name="services">The services.</param>
+    /// <param name="name">The storage provider name.</param>
+    /// <param name="configureOptions">The memory storage configuration delegate.</param>
+    /// <param name="configureFaultInjectionOptions">The fault injection provider configuration delegate.</param>
+    /// <returns>The service collection.</returns>
+    public static IServiceCollection AddFaultInjectionMemoryStorage(
+        this IServiceCollection services,
+        string name,
+        Action<MemoryGrainStorageOptions> configureOptions,
+        Action<FaultInjectionGrainStorageOptions> configureFaultInjectionOptions)
     {
-        /// <summary>
-        /// Configures a silo to use <see cref="FaultInjectionGrainStorage" />.
-        /// </summary>
-        /// <param name="services">The services.</param>
-        /// <param name="name">The storage provider name.</param>
-        /// <param name="configureOptions">The memory storage configuration delegate.</param>
-        /// <param name="configureFaultInjectionOptions">The fault injection provider configuration delegate.</param>
-        /// <returns>The service collection.</returns>
-        public static IServiceCollection AddFaultInjectionMemoryStorage(
-            this IServiceCollection services,
-            string name,
-            Action<MemoryGrainStorageOptions> configureOptions,
-            Action<FaultInjectionGrainStorageOptions> configureFaultInjectionOptions)
-        {
-            return services.AddFaultInjectionMemoryStorage(name,
-                ob => ob.Configure(configureOptions), faultOb => faultOb.Configure(configureFaultInjectionOptions));
-        }
+        return services.AddFaultInjectionMemoryStorage(name,
+            ob => ob.Configure(configureOptions), faultOb => faultOb.Configure(configureFaultInjectionOptions));
+    }
 
-        /// <summary>
-        /// Configures a silo to use <see cref="FaultInjectionGrainStorage" />.
-        /// </summary>
-        /// <param name="services">The services.</param>
-        /// <param name="name">The storage provider name.</param>
-        /// <param name="configureOptions">The memory storage configuration delegate.</param>
-        /// <param name="configureFaultInjectionOptions">The fault injection provider configuration delegate.</param>
-        /// <returns>The service collection.</returns>
-        public static IServiceCollection AddFaultInjectionMemoryStorage(
-            this IServiceCollection services,
-            string name,
-            Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null,
-            Action<OptionsBuilder<FaultInjectionGrainStorageOptions>> configureFaultInjectionOptions = null)
-        {
-            configureOptions?.Invoke(services.AddOptions<MemoryGrainStorageOptions>(name));
-            configureFaultInjectionOptions?.Invoke(services.AddOptions<FaultInjectionGrainStorageOptions>(name));
-            services.ConfigureNamedOptionForLogging<MemoryGrainStorageOptions>(name);
-            services.ConfigureNamedOptionForLogging<FaultInjectionGrainStorageOptions>(name);
-            services.AddKeyedSingleton<IGrainStorage>(name, (svc, n) => FaultInjectionGrainStorageFactory.Create(svc, n as string, MemoryGrainStorageFactory.Create))
-                .AddKeyedSingleton<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredKeyedService<IGrainStorage>(n));
-            return services;
-        }
+    /// <summary>
+    /// Configures a silo to use <see cref="FaultInjectionGrainStorage" />.
+    /// </summary>
+    /// <param name="services">The services.</param>
+    /// <param name="name">The storage provider name.</param>
+    /// <param name="configureOptions">The memory storage configuration delegate.</param>
+    /// <param name="configureFaultInjectionOptions">The fault injection provider configuration delegate.</param>
+    /// <returns>The service collection.</returns>
+    public static IServiceCollection AddFaultInjectionMemoryStorage(
+        this IServiceCollection services,
+        string name,
+        Action<OptionsBuilder<MemoryGrainStorageOptions>> configureOptions = null,
+        Action<OptionsBuilder<FaultInjectionGrainStorageOptions>> configureFaultInjectionOptions = null)
+    {
+        configureOptions?.Invoke(services.AddOptions<MemoryGrainStorageOptions>(name));
+        configureFaultInjectionOptions?.Invoke(services.AddOptions<FaultInjectionGrainStorageOptions>(name));
+        services.ConfigureNamedOptionForLogging<MemoryGrainStorageOptions>(name);
+        services.ConfigureNamedOptionForLogging<FaultInjectionGrainStorageOptions>(name);
+        services.AddKeyedSingleton<IGrainStorage>(name, (svc, n) => FaultInjectionGrainStorageFactory.Create(svc, n as string, MemoryGrainStorageFactory.Create))
+            .AddKeyedSingleton<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => (ILifecycleParticipant<ISiloLifecycle>)s.GetRequiredKeyedService<IGrainStorage>(n));
+        return services;
     }
 }

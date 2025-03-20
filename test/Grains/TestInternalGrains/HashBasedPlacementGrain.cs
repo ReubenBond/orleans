@@ -4,15 +4,14 @@
 using Orleans.Placement;
 using UnitTests.GrainInterfaces;
 
-namespace UnitTests.Grains
-{
-    [HashBasedPlacement]
-    public class HashBasedBasedPlacementGrain : Grain, IHashBasedPlacementGrain
-    {
+namespace UnitTests.Grains;
 
-        public Task<SiloAddress> GetSiloAddress()
-        {
-            return Task.FromResult(this.Runtime.SiloAddress);
-        }
+[HashBasedPlacement]
+public class HashBasedBasedPlacementGrain : Grain, IHashBasedPlacementGrain
+{
+
+    public Task<SiloAddress> GetSiloAddress()
+    {
+        return Task.FromResult(this.Runtime.SiloAddress);
     }
 }

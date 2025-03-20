@@ -3,21 +3,20 @@
 
 using Orleans.Placement;
 
-namespace UnitTests.GrainInterfaces
-{
-    [AttributeUsage(AttributeTargets.Class)]
-    public sealed class VersionAwareStrategyAttribute : PlacementAttribute
-    {
-        public VersionAwareStrategyAttribute()
-            : base(VersionAwarePlacementStrategy.Singleton)
-        {
-        }
-    }
+namespace UnitTests.GrainInterfaces;
 
-    [Serializable]
-    [Orleans.GenerateSerializer]
-    public class VersionAwarePlacementStrategy : PlacementStrategy
+[AttributeUsage(AttributeTargets.Class)]
+public sealed class VersionAwareStrategyAttribute : PlacementAttribute
+{
+    public VersionAwareStrategyAttribute()
+        : base(VersionAwarePlacementStrategy.Singleton)
     {
-        internal static VersionAwarePlacementStrategy Singleton { get; } = new VersionAwarePlacementStrategy();
     }
+}
+
+[Serializable]
+[Orleans.GenerateSerializer]
+public class VersionAwarePlacementStrategy : PlacementStrategy
+{
+    internal static VersionAwarePlacementStrategy Singleton { get; } = new VersionAwarePlacementStrategy();
 }

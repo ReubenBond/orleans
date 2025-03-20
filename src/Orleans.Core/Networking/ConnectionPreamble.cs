@@ -7,120 +7,119 @@ using System.IO.Pipelines;
 using Microsoft.AspNetCore.Connections;
 using Orleans.Serialization;
 
-namespace Orleans.Runtime.Messaging
+namespace Orleans.Runtime.Messaging;
+
+[GenerateSerializer, Immutable]
+internal sealed class ConnectionPreamble
 {
-    [GenerateSerializer, Immutable]
-    internal sealed class ConnectionPreamble
+    [Id(0)]
+    public NetworkProtocolVersion NetworkProtocolVersion { get; init; }
+
+    [Id(1)]
+    public GrainId NodeIdentity { get; init; }
+
+    [Id(2)]
+    public SiloAddress SiloAddress { get; init; }
+
+    [Id(3)]
+    public string ClusterId { get; init; }
+}
+
+internal sealed class ConnectionPreambleHelper
+{
+    private const int MaxPreambleLength = 1024;
+    private readonly Serializer<ConnectionPreamble> _preambleSerializer;
+    public ConnectionPreambleHelper(Serializer<ConnectionPreamble> preambleSerializer)
     {
-        [Id(0)]
-        public NetworkProtocolVersion NetworkProtocolVersion { get; init; }
-
-        [Id(1)]
-        public GrainId NodeIdentity { get; init; }
-
-        [Id(2)]
-        public SiloAddress SiloAddress { get; init; }
-
-        [Id(3)]
-        public string ClusterId { get; init; }
+        _preambleSerializer = preambleSerializer;
     }
 
-    internal sealed class ConnectionPreambleHelper
+    internal async ValueTask Write(ConnectionContext connection, ConnectionPreamble preamble)
     {
-        private const int MaxPreambleLength = 1024;
-        private readonly Serializer<ConnectionPreamble> _preambleSerializer;
-        public ConnectionPreambleHelper(Serializer<ConnectionPreamble> preambleSerializer)
+        var output = connection.Transport.Output;
+        using var outputWriter = new PrefixingBufferWriter(sizeof(int), 1024, MemoryPool<byte>.Shared);
+        outputWriter.Init(output);
+        _preambleSerializer.Serialize(
+            preamble,
+            outputWriter);
+
+        var length = outputWriter.CommittedBytes;
+
+        if (length > MaxPreambleLength)
         {
-            _preambleSerializer = preambleSerializer;
+            throw new InvalidOperationException($"Created preamble of length {length}, which is greater than maximum allowed size of {MaxPreambleLength}.");
         }
 
-        internal async ValueTask Write(ConnectionContext connection, ConnectionPreamble preamble)
+        WriteLength(outputWriter, length);
+
+        var flushResult = await output.FlushAsync();
+        if (flushResult.IsCanceled)
         {
-            var output = connection.Transport.Output;
-            using var outputWriter = new PrefixingBufferWriter(sizeof(int), 1024, MemoryPool<byte>.Shared);
-            outputWriter.Init(output);
-            _preambleSerializer.Serialize(
-                preamble,
-                outputWriter);
-
-            var length = outputWriter.CommittedBytes;
-
-            if (length > MaxPreambleLength)
-            {
-                throw new InvalidOperationException($"Created preamble of length {length}, which is greater than maximum allowed size of {MaxPreambleLength}.");
-            }
-
-            WriteLength(outputWriter, length);
-
-            var flushResult = await output.FlushAsync();
-            if (flushResult.IsCanceled)
-            {
-                throw new OperationCanceledException("Flush canceled");
-            }
-
-            return;
+            throw new OperationCanceledException("Flush canceled");
         }
 
-        private static void WriteLength(PrefixingBufferWriter outputWriter, int length)
-        {
-            Span<byte> lengthSpan = stackalloc byte[4];
-            BinaryPrimitives.WriteInt32LittleEndian(lengthSpan, length);
-            outputWriter.Complete(lengthSpan);
-        }
+        return;
+    }
 
-        internal async ValueTask<ConnectionPreamble> Read(ConnectionContext connection)
-        {
-            var input = connection.Transport.Input;
+    private static void WriteLength(PrefixingBufferWriter outputWriter, int length)
+    {
+        Span<byte> lengthSpan = stackalloc byte[4];
+        BinaryPrimitives.WriteInt32LittleEndian(lengthSpan, length);
+        outputWriter.Complete(lengthSpan);
+    }
 
-            var readResult = await input.ReadAsync();
-            var buffer = readResult.Buffer;
+    internal async ValueTask<ConnectionPreamble> Read(ConnectionContext connection)
+    {
+        var input = connection.Transport.Input;
+
+        var readResult = await input.ReadAsync();
+        var buffer = readResult.Buffer;
+        CheckForCompletion(ref readResult);
+        while (buffer.Length < 4)
+        {
+            input.AdvanceTo(buffer.Start, buffer.End);
+            readResult = await input.ReadAsync();
+            buffer = readResult.Buffer;
             CheckForCompletion(ref readResult);
-            while (buffer.Length < 4)
-            {
-                input.AdvanceTo(buffer.Start, buffer.End);
-                readResult = await input.ReadAsync();
-                buffer = readResult.Buffer;
-                CheckForCompletion(ref readResult);
-            }
+        }
 
-            int ReadLength(ref ReadOnlySequence<byte> b)
-            {
-                Span<byte> lengthBytes = stackalloc byte[4];
-                b.Slice(0, 4).CopyTo(lengthBytes);
-                b = b.Slice(4);
-                return BinaryPrimitives.ReadInt32LittleEndian(lengthBytes);
-            }
+        int ReadLength(ref ReadOnlySequence<byte> b)
+        {
+            Span<byte> lengthBytes = stackalloc byte[4];
+            b.Slice(0, 4).CopyTo(lengthBytes);
+            b = b.Slice(4);
+            return BinaryPrimitives.ReadInt32LittleEndian(lengthBytes);
+        }
 
-            var length = ReadLength(ref buffer);
-            if (length > MaxPreambleLength)
-            {
-                throw new InvalidOperationException($"Remote connection sent preamble length of {length}, which is greater than maximum allowed size of {MaxPreambleLength}.");
-            }
+        var length = ReadLength(ref buffer);
+        if (length > MaxPreambleLength)
+        {
+            throw new InvalidOperationException($"Remote connection sent preamble length of {length}, which is greater than maximum allowed size of {MaxPreambleLength}.");
+        }
 
-            while (buffer.Length < length)
-            {
-                input.AdvanceTo(buffer.Start, buffer.End);
-                readResult = await input.ReadAsync();
-                buffer = readResult.Buffer;
-                CheckForCompletion(ref readResult);
-            }
+        while (buffer.Length < length)
+        {
+            input.AdvanceTo(buffer.Start, buffer.End);
+            readResult = await input.ReadAsync();
+            buffer = readResult.Buffer;
+            CheckForCompletion(ref readResult);
+        }
 
-            var payloadBuffer = buffer.Slice(0, length);
+        var payloadBuffer = buffer.Slice(0, length);
 
-            try
-            {
-                var preamble = _preambleSerializer.Deserialize(payloadBuffer);
-                return preamble;
-            }
-            finally
-            {
-                input.AdvanceTo(payloadBuffer.End);
-            }
+        try
+        {
+            var preamble = _preambleSerializer.Deserialize(payloadBuffer);
+            return preamble;
+        }
+        finally
+        {
+            input.AdvanceTo(payloadBuffer.End);
+        }
 
-            void CheckForCompletion(ref ReadResult r)
-            {
-                if (r.IsCanceled || r.IsCompleted) throw new InvalidOperationException("Connection terminated prematurely");
-            }
+        void CheckForCompletion(ref ReadResult r)
+        {
+            if (r.IsCanceled || r.IsCompleted) throw new InvalidOperationException("Connection terminated prematurely");
         }
     }
 }

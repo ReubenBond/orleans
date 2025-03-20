@@ -1,28 +1,27 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Streams
+namespace Orleans.Streams;
+
+/// <summary>
+/// A <see cref="IQueueFlowController"/> which aggregates multiple other <see cref="IQueueFlowController"/> values.
+/// </summary>
+public class AggregatedQueueFlowController : List<IQueueFlowController>, IQueueFlowController
 {
+    private readonly int defaultMaxAddCount;
+
     /// <summary>
-    /// A <see cref="IQueueFlowController"/> which aggregates multiple other <see cref="IQueueFlowController"/> values.
+    /// Initializes a new instance of the <see cref="AggregatedQueueFlowController"/> class.
     /// </summary>
-    public class AggregatedQueueFlowController : List<IQueueFlowController>, IQueueFlowController
+    /// <param name="defaultMaxAddCount">The default maximum add count, see <see cref="IQueueFlowController.GetMaxAddCount"/>.</param>
+    public AggregatedQueueFlowController(int defaultMaxAddCount)
     {
-        private readonly int defaultMaxAddCount;
+        this.defaultMaxAddCount = defaultMaxAddCount;
+    }
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="AggregatedQueueFlowController"/> class.
-        /// </summary>
-        /// <param name="defaultMaxAddCount">The default maximum add count, see <see cref="IQueueFlowController.GetMaxAddCount"/>.</param>
-        public AggregatedQueueFlowController(int defaultMaxAddCount)
-        {
-            this.defaultMaxAddCount = defaultMaxAddCount;
-        }
-
-        /// <inheritdoc/>
-        public int GetMaxAddCount()
-        {
-            return this.Aggregate(defaultMaxAddCount, (count, fc) => Math.Min(count, fc.GetMaxAddCount()));
-        }
+    /// <inheritdoc/>
+    public int GetMaxAddCount()
+    {
+        return this.Aggregate(defaultMaxAddCount, (count, fc) => Math.Min(count, fc.GetMaxAddCount()));
     }
 }

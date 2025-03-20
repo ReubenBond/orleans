@@ -5,95 +5,94 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 
-namespace Orleans.Runtime.GrainDirectory
+namespace Orleans.Runtime.GrainDirectory;
+
+/// <summary>
+/// Creates <see cref="IGrainDirectoryCache"/> instances.
+/// </summary>
+public static class GrainDirectoryCacheFactory
 {
     /// <summary>
-    /// Creates <see cref="IGrainDirectoryCache"/> instances.
+    /// Creates a new grain directory cache instance.
     /// </summary>
-    public static class GrainDirectoryCacheFactory
+    /// <param name="services">The services.</param>
+    /// <param name="options">The options.</param>
+    /// <returns>The newly created <see cref="IGrainDirectoryCache"/> instance.</returns>
+    public static IGrainDirectoryCache CreateGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
     {
-        /// <summary>
-        /// Creates a new grain directory cache instance.
-        /// </summary>
-        /// <param name="services">The services.</param>
-        /// <param name="options">The options.</param>
-        /// <returns>The newly created <see cref="IGrainDirectoryCache"/> instance.</returns>
-        public static IGrainDirectoryCache CreateGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
+        if (options.CacheSize <= 0)
+            return new NullGrainDirectoryCache();
+
+        switch (options.CachingStrategy)
         {
-            if (options.CacheSize <= 0)
+            case GrainDirectoryOptions.CachingStrategyType.None:
                 return new NullGrainDirectoryCache();
-
-            switch (options.CachingStrategy)
-            {
-                case GrainDirectoryOptions.CachingStrategyType.None:
-                    return new NullGrainDirectoryCache();
-                case GrainDirectoryOptions.CachingStrategyType.LRU:
-                    return new LRUBasedGrainDirectoryCache(options.CacheSize, options.MaximumCacheTTL);
-                case GrainDirectoryOptions.CachingStrategyType.Adaptive:
-                    return new AdaptiveGrainDirectoryCache(options.InitialCacheTTL, options.MaximumCacheTTL, options.CacheTTLExtensionFactor, options.CacheSize);
-                case GrainDirectoryOptions.CachingStrategyType.Custom:
-                default:
-                    return services.GetRequiredService<IGrainDirectoryCache>();
-            }
-        }
-
-        internal static IGrainDirectoryCache CreateCustomGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
-        {
-            var grainDirectoryCache = services.GetService<IGrainDirectoryCache>();
-            if (grainDirectoryCache != null)
-            {
-                return grainDirectoryCache;
-            }
-            else
-            {
+            case GrainDirectoryOptions.CachingStrategyType.LRU:
                 return new LRUBasedGrainDirectoryCache(options.CacheSize, options.MaximumCacheTTL);
-            }
-        }
-
-        internal static AdaptiveDirectoryCacheMaintainer CreateGrainDirectoryCacheMaintainer(
-            LocalGrainDirectory router,
-            IGrainDirectoryCache cache,
-            IInternalGrainFactory grainFactory,
-            ILoggerFactory loggerFactory)
-        {
-            var adaptiveCache = cache as AdaptiveGrainDirectoryCache;
-            return adaptiveCache != null
-                ? new AdaptiveDirectoryCacheMaintainer(router, adaptiveCache, grainFactory, loggerFactory)
-                : null;
+            case GrainDirectoryOptions.CachingStrategyType.Adaptive:
+                return new AdaptiveGrainDirectoryCache(options.InitialCacheTTL, options.MaximumCacheTTL, options.CacheTTLExtensionFactor, options.CacheSize);
+            case GrainDirectoryOptions.CachingStrategyType.Custom:
+            default:
+                return services.GetRequiredService<IGrainDirectoryCache>();
         }
     }
 
-    internal class NullGrainDirectoryCache : IGrainDirectoryCache
+    internal static IGrainDirectoryCache CreateCustomGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
     {
-        public void AddOrUpdate(GrainAddress value, int version)
+        var grainDirectoryCache = services.GetService<IGrainDirectoryCache>();
+        if (grainDirectoryCache != null)
         {
+            return grainDirectoryCache;
         }
+        else
+        {
+            return new LRUBasedGrainDirectoryCache(options.CacheSize, options.MaximumCacheTTL);
+        }
+    }
 
-        public bool Remove(GrainId key)
-        {
-            return false;
-        }
+    internal static AdaptiveDirectoryCacheMaintainer CreateGrainDirectoryCacheMaintainer(
+        LocalGrainDirectory router,
+        IGrainDirectoryCache cache,
+        IInternalGrainFactory grainFactory,
+        ILoggerFactory loggerFactory)
+    {
+        var adaptiveCache = cache as AdaptiveGrainDirectoryCache;
+        return adaptiveCache != null
+            ? new AdaptiveDirectoryCacheMaintainer(router, adaptiveCache, grainFactory, loggerFactory)
+            : null;
+    }
+}
 
-        public bool Remove(GrainAddress key)
-        {
-            return false;
-        }
+internal class NullGrainDirectoryCache : IGrainDirectoryCache
+{
+    public void AddOrUpdate(GrainAddress value, int version)
+    {
+    }
 
-        public void Clear()
-        {
-        }
+    public bool Remove(GrainId key)
+    {
+        return false;
+    }
 
-        public bool LookUp(GrainId key, out GrainAddress result, out int version)
-        {
-            result = default;
-            version = default;
-            return false;
-        }
+    public bool Remove(GrainAddress key)
+    {
+        return false;
+    }
 
-        public IEnumerable<(GrainAddress ActivationAddress, int Version)> KeyValues
-        {
-            get { yield break; }
-        }
+    public void Clear()
+    {
+    }
+
+    public bool LookUp(GrainId key, out GrainAddress result, out int version)
+    {
+        result = default;
+        version = default;
+        return false;
+    }
+
+    public IEnumerable<(GrainAddress ActivationAddress, int Version)> KeyValues
+    {
+        get { yield break; }
     }
 }
 

@@ -6,45 +6,44 @@ using System.Diagnostics;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
-namespace Orleans.Runtime
+namespace Orleans.Runtime;
+
+internal class FatalErrorHandler : IFatalErrorHandler
 {
-    internal class FatalErrorHandler : IFatalErrorHandler
+    private readonly ILogger<FatalErrorHandler> log;
+    private readonly ClusterMembershipOptions clusterMembershipOptions;
+
+    public FatalErrorHandler(
+        ILogger<FatalErrorHandler> log,
+        IOptions<ClusterMembershipOptions> clusterMembershipOptions)
     {
-        private readonly ILogger<FatalErrorHandler> log;
-        private readonly ClusterMembershipOptions clusterMembershipOptions;
+        this.log = log;
+        this.clusterMembershipOptions = clusterMembershipOptions.Value;
+    }
 
-        public FatalErrorHandler(
-            ILogger<FatalErrorHandler> log,
-            IOptions<ClusterMembershipOptions> clusterMembershipOptions)
-        {
-            this.log = log;
-            this.clusterMembershipOptions = clusterMembershipOptions.Value;
-        }
+    public bool IsUnexpected(Exception exception)
+    {
+        return !(exception is ThreadAbortException);
+    }
 
-        public bool IsUnexpected(Exception exception)
-        {
-            return !(exception is ThreadAbortException);
-        }
+    public void OnFatalException(object sender, string context, Exception exception)
+    {
+        this.log.LogError(
+            (int)ErrorCode.Logger_ProcessCrashing,
+            exception,
+            "Fatal error from {Sender}. Context: {Context}",
+            sender,
+            context);
 
-        public void OnFatalException(object sender, string context, Exception exception)
-        {
-            this.log.LogError(
-                (int)ErrorCode.Logger_ProcessCrashing,
-                exception,
-                "Fatal error from {Sender}. Context: {Context}",
-                sender,
-                context);
+        var msg = @$"FATAL EXCEPTION from {sender?.ToString() ?? "null"}. Context: {context ?? "null"
+            }. Exception: {(exception != null ? LogFormatter.PrintException(exception) : "null")}.\nCurrent stack: {Environment.StackTrace}";
+        Console.Error.WriteLine(msg);
 
-            var msg = @$"FATAL EXCEPTION from {sender?.ToString() ?? "null"}. Context: {context ?? "null"
-                }. Exception: {(exception != null ? LogFormatter.PrintException(exception) : "null")}.\nCurrent stack: {Environment.StackTrace}";
-            Console.Error.WriteLine(msg);
+        // Allow some time for loggers to flush.
+        Thread.Sleep(2000);
 
-            // Allow some time for loggers to flush.
-            Thread.Sleep(2000);
+        if (Debugger.IsAttached) Debugger.Break();
 
-            if (Debugger.IsAttached) Debugger.Break();
-
-            Environment.FailFast(msg, exception);
-        }
+        Environment.FailFast(msg, exception);
     }
 }

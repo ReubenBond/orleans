@@ -3,29 +3,28 @@
 
 using Orleans.Concurrency;
 
-namespace Orleans.Transactions.Abstractions
+namespace Orleans.Transactions.Abstractions;
+
+public interface ITransactionalResourceExtension : IGrainExtension
 {
-    public interface ITransactionalResourceExtension : IGrainExtension
-    {
-        [AlwaysInterleave]
-        [Transaction(TransactionOption.Suppress)]
-        Task<TransactionalStatus> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp);
+    [AlwaysInterleave]
+    [Transaction(TransactionOption.Suppress)]
+    Task<TransactionalStatus> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp);
 
-        [AlwaysInterleave]
-        [Transaction(TransactionOption.Suppress)]
-        Task Abort(string resourceId, Guid transactionId);
+    [AlwaysInterleave]
+    [Transaction(TransactionOption.Suppress)]
+    Task Abort(string resourceId, Guid transactionId);
 
-        [AlwaysInterleave]
-        [Transaction(TransactionOption.Suppress)]
-        Task Cancel(string resourceId, Guid transactionId, DateTime timeStamp, TransactionalStatus status);
+    [AlwaysInterleave]
+    [Transaction(TransactionOption.Suppress)]
+    Task Cancel(string resourceId, Guid transactionId, DateTime timeStamp, TransactionalStatus status);
 
-        [AlwaysInterleave]
-        [Transaction(TransactionOption.Suppress)]
-        Task Confirm(string resourceId, Guid transactionId, DateTime timeStamp);
+    [AlwaysInterleave]
+    [Transaction(TransactionOption.Suppress)]
+    Task Confirm(string resourceId, Guid transactionId, DateTime timeStamp);
 
-        [AlwaysInterleave]
-        [Transaction(TransactionOption.Suppress)]
-        [OneWay]
-        Task Prepare(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager);
-    }
+    [AlwaysInterleave]
+    [Transaction(TransactionOption.Suppress)]
+    [OneWay]
+    Task Prepare(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager);
 }

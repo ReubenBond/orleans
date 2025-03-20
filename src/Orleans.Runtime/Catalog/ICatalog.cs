@@ -1,20 +1,19 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Runtime
+namespace Orleans.Runtime;
+
+/// <summary>
+/// Remote interface to grain and activation state
+/// </summary>
+internal interface ICatalog : ISystemTarget
 {
     /// <summary>
-    /// Remote interface to grain and activation state
+    /// Delete activations from this silo
     /// </summary>
-    internal interface ICatalog : ISystemTarget
-    {
-        /// <summary>
-        /// Delete activations from this silo
-        /// </summary>
-        /// <param name="activationAddresses"></param>
-        /// <param name="reasonCode"></param>
-        /// <param name="reasonText"></param>
-        /// <returns></returns>
-        Task DeleteActivations(List<GrainAddress> activationAddresses, DeactivationReasonCode reasonCode, string reasonText);
-    }
+    /// <param name="activationAddresses"></param>
+    /// <param name="reasonCode"></param>
+    /// <param name="reasonText"></param>
+    /// <returns></returns>
+    Task DeleteActivations(List<GrainAddress> activationAddresses, DeactivationReasonCode reasonCode, string reasonText);
 }

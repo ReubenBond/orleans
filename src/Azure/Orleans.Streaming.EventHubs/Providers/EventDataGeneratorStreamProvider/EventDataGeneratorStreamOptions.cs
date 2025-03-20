@@ -1,21 +1,20 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Configuration
+namespace Orleans.Configuration;
+
+/// <summary>
+/// Setting class for EHGeneratorStreamProvider
+/// </summary>
+public class EventDataGeneratorStreamOptions 
 {
     /// <summary>
-    /// Setting class for EHGeneratorStreamProvider
+    /// Configure eventhub partition count wanted. EventDataGeneratorStreamProvider would generate the same set of partitions based on the count, when initializing.
+    /// For example, if partition count set at 5, the generated partitions will be  partition-0, partition-1, partition-2, partition-3, partition-4
     /// </summary>
-    public class EventDataGeneratorStreamOptions 
-    {
-        /// <summary>
-        /// Configure eventhub partition count wanted. EventDataGeneratorStreamProvider would generate the same set of partitions based on the count, when initializing.
-        /// For example, if partition count set at 5, the generated partitions will be  partition-0, partition-1, partition-2, partition-3, partition-4
-        /// </summary>
-        public int EventHubPartitionCount = DefaultEventHubPartitionCount;
-        /// <summary>
-        /// Default EventHubPartitionRangeStart
-        /// </summary>
-        public const int DefaultEventHubPartitionCount = 4;
-    }
+    public int EventHubPartitionCount = DefaultEventHubPartitionCount;
+    /// <summary>
+    /// Default EventHubPartitionRangeStart
+    /// </summary>
+    public const int DefaultEventHubPartitionCount = 4;
 }

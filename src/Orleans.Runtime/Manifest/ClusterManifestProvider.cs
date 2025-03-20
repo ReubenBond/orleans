@@ -11,245 +11,244 @@ using Orleans.Internal;
 using Orleans.Metadata;
 using Orleans.Runtime.Utilities;
 
-namespace Orleans.Runtime.Metadata
+namespace Orleans.Runtime.Metadata;
+
+internal class ClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable, ILifecycleParticipant<ISiloLifecycle>
 {
-    internal class ClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable, ILifecycleParticipant<ISiloLifecycle>
+    private readonly SiloAddress _localSiloAddress;
+    private readonly ILogger<ClusterManifestProvider> _logger;
+    private readonly IServiceProvider _services;
+    private readonly IClusterMembershipService _clusterMembershipService;
+    private readonly IFatalErrorHandler _fatalErrorHandler;
+    private readonly CancellationTokenSource _shutdownCts = new();
+    private readonly AsyncEnumerable<ClusterManifest> _updates;
+    private ClusterManifest _current;
+    private IInternalGrainFactory? _grainFactory;
+    private Task? _runTask;
+
+    public ClusterManifestProvider(
+        ILocalSiloDetails localSiloDetails,
+        SiloManifestProvider siloManifestProvider,
+        ClusterMembershipService clusterMembershipService,
+        IFatalErrorHandler fatalErrorHandler,
+        ILogger<ClusterManifestProvider> logger,
+        IServiceProvider services)
     {
-        private readonly SiloAddress _localSiloAddress;
-        private readonly ILogger<ClusterManifestProvider> _logger;
-        private readonly IServiceProvider _services;
-        private readonly IClusterMembershipService _clusterMembershipService;
-        private readonly IFatalErrorHandler _fatalErrorHandler;
-        private readonly CancellationTokenSource _shutdownCts = new();
-        private readonly AsyncEnumerable<ClusterManifest> _updates;
-        private ClusterManifest _current;
-        private IInternalGrainFactory? _grainFactory;
-        private Task? _runTask;
+        _localSiloAddress = localSiloDetails.SiloAddress;
+        _logger = logger;
+        _services = services;
+        _clusterMembershipService = clusterMembershipService;
+        _fatalErrorHandler = fatalErrorHandler;
+        LocalGrainManifest = siloManifestProvider.SiloManifest;
+        _current = new ClusterManifest(
+            MajorMinorVersion.Zero,
+            ImmutableDictionary.CreateRange([new KeyValuePair<SiloAddress, GrainManifest>(localSiloDetails.SiloAddress, LocalGrainManifest)]));
+        _updates = new AsyncEnumerable<ClusterManifest>(
+            initialValue: _current,
+            updateValidator: (previous, proposed) => proposed.Version > previous.Version,
+            onPublished: update => Interlocked.Exchange(ref _current, update));
+    }
 
-        public ClusterManifestProvider(
-            ILocalSiloDetails localSiloDetails,
-            SiloManifestProvider siloManifestProvider,
-            ClusterMembershipService clusterMembershipService,
-            IFatalErrorHandler fatalErrorHandler,
-            ILogger<ClusterManifestProvider> logger,
-            IServiceProvider services)
+    public ClusterManifest Current => _current;
+
+    public IAsyncEnumerable<ClusterManifest> Updates => _updates;
+
+    public GrainManifest LocalGrainManifest { get; }
+
+    private async Task ProcessMembershipUpdates()
+    {
+        try
         {
-            _localSiloAddress = localSiloDetails.SiloAddress;
-            _logger = logger;
-            _services = services;
-            _clusterMembershipService = clusterMembershipService;
-            _fatalErrorHandler = fatalErrorHandler;
-            LocalGrainManifest = siloManifestProvider.SiloManifest;
-            _current = new ClusterManifest(
-                MajorMinorVersion.Zero,
-                ImmutableDictionary.CreateRange([new KeyValuePair<SiloAddress, GrainManifest>(localSiloDetails.SiloAddress, LocalGrainManifest)]));
-            _updates = new AsyncEnumerable<ClusterManifest>(
-                initialValue: _current,
-                updateValidator: (previous, proposed) => proposed.Version > previous.Version,
-                onPublished: update => Interlocked.Exchange(ref _current, update));
-        }
-
-        public ClusterManifest Current => _current;
-
-        public IAsyncEnumerable<ClusterManifest> Updates => _updates;
-
-        public GrainManifest LocalGrainManifest { get; }
-
-        private async Task ProcessMembershipUpdates()
-        {
-            try
+            if (_logger.IsEnabled(LogLevel.Debug))
             {
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("Starting to process membership updates");
-                }
+                _logger.LogDebug("Starting to process membership updates");
+            }
 
-                var cancellation = _shutdownCts.Token;
-                await foreach (var _ in _clusterMembershipService.MembershipUpdates.WithCancellation(cancellation))
+            var cancellation = _shutdownCts.Token;
+            await foreach (var _ in _clusterMembershipService.MembershipUpdates.WithCancellation(cancellation))
+            {
+                while (true)
                 {
-                    while (true)
+                    var membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
+
+                    var success = await UpdateManifest(membershipSnapshot);
+
+                    if (success || cancellation.IsCancellationRequested)
                     {
-                        var membershipSnapshot = _clusterMembershipService.CurrentSnapshot;
-
-                        var success = await UpdateManifest(membershipSnapshot);
-
-                        if (success || cancellation.IsCancellationRequested)
-                        {
-                            break;
-                        }
-
-                        await Task.Delay(TimeSpan.FromSeconds(5), cancellation);
+                        break;
                     }
-                }
-            }
-            catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
-            {
-                // Ignore during shutdown.
-            }
-            catch (Exception exception) when (_fatalErrorHandler.IsUnexpected(exception))
-            {
-                _fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
-            }
-            finally
-            {
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("Stopped processing membership updates");
+
+                    await Task.Delay(TimeSpan.FromSeconds(5), cancellation);
                 }
             }
         }
-
-        private async Task<bool> UpdateManifest(ClusterMembershipSnapshot clusterMembership)
+        catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
         {
-            var existingManifest = _current;
-            var builder = existingManifest.Silos.ToBuilder();
-            var modified = false;
-
-            // First, remove defunct entries.
-            foreach (var entry in existingManifest.Silos)
-            {
-                var address = entry.Key;
-                var status = clusterMembership.GetSiloStatus(address);
-
-                if (address.Equals(_localSiloAddress))
-                {
-                    // The local silo is always present in the manifest.
-                    continue;
-                }
-
-                if (status == SiloStatus.None || status == SiloStatus.Dead)
-                {
-                    builder.Remove(address);
-                    modified = true;
-                }
-            }
-
-            // Next, fill missing entries.
-            var tasks = new List<Task<(SiloAddress Key, GrainManifest? Value, Exception? Exception)>>();
-            foreach (var entry in clusterMembership.Members)
-            {
-                var member = entry.Value;
-
-                if (member.SiloAddress.Equals(_localSiloAddress))
-                {
-                    // The local silo is always present in the manifest.
-                    continue;
-                }
-
-                if (existingManifest.Silos.ContainsKey(member.SiloAddress))
-                {
-                    // Manifest has already been retrieved for the cluster member.
-                    continue;
-                }
-
-                if (member.Status != SiloStatus.Active)
-                {
-                    // If the member is not yet active, it may not be ready to process requests.
-                    continue;
-                }
-
-                tasks.Add(GetManifest(member.SiloAddress));
-
-                async Task<(SiloAddress, GrainManifest?, Exception?)> GetManifest(SiloAddress siloAddress)
-                {
-                    try
-                    {
-                        // Get the manifest from the remote silo.
-                        var remoteManifestProvider = _grainFactory!.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, member.SiloAddress);
-                        var manifest = await remoteManifestProvider.GetSiloManifest().AsTask().WaitAsync(_shutdownCts.Token);
-                        return (siloAddress, manifest, null);
-                    }
-                    catch (Exception exception)
-                    {
-                        return (siloAddress, null, exception);
-                    }
-                }
-            }
-
-            var fetchSuccess = true;
-            await Task.WhenAll(tasks);
-            foreach (var task in tasks)
-            {
-                var result = await task;
-                if (result.Exception is Exception exception)
-                {
-                    fetchSuccess = false;
-                    if (exception is not OperationCanceledException)
-                    {
-                        _logger.LogWarning(exception, "Error retrieving silo manifest for silo {SiloAddress}", result.Key);
-                    }
-                }
-                else
-                {
-                    modified = true;
-                    builder[result.Key] = result.Value;
-                }
-            }
-
-            // Regardless of success or failure, update the manifest if it has been modified.
-            var version = new MajorMinorVersion(clusterMembership.Version.Value, existingManifest.Version.Minor + 1);
-            if (modified)
-            {
-                return _updates.TryPublish(new ClusterManifest(version, builder.ToImmutable())) && fetchSuccess;
-            }
-
-            return fetchSuccess;
+            // Ignore during shutdown.
         }
-
-        [MemberNotNull(nameof(_runTask))]
-        private Task StartAsync(CancellationToken cancellationToken)
+        catch (Exception exception) when (_fatalErrorHandler.IsUnexpected(exception))
         {
-            Debug.Assert(_grainFactory is not null);
-            _runTask = Task.Run(ProcessMembershipUpdates);
-            return Task.CompletedTask;
+            _fatalErrorHandler.OnFatalException(this, nameof(ProcessMembershipUpdates), exception);
         }
-
-        [MemberNotNull(nameof(_grainFactory))]
-        private Task Initialize(CancellationToken cancellationToken)
+        finally
         {
-            _grainFactory = _services.GetRequiredService<IInternalGrainFactory>();
-            var catalog = _services.GetRequiredService<Catalog>();
-            catalog.RegisterSystemTarget(ActivatorUtilities.CreateInstance<ClusterManifestSystemTarget>(_services));
-            return Task.CompletedTask;
-        }
-
-        private async Task StopAsync(CancellationToken cancellationToken)
-        {
-            _shutdownCts.Cancel();
-            if (_runTask is Task task)
+            if (_logger.IsEnabled(LogLevel.Debug))
             {
-                await task.WaitAsync(cancellationToken).SuppressThrowing();
+                _logger.LogDebug("Stopped processing membership updates");
+            }
+        }
+    }
+
+    private async Task<bool> UpdateManifest(ClusterMembershipSnapshot clusterMembership)
+    {
+        var existingManifest = _current;
+        var builder = existingManifest.Silos.ToBuilder();
+        var modified = false;
+
+        // First, remove defunct entries.
+        foreach (var entry in existingManifest.Silos)
+        {
+            var address = entry.Key;
+            var status = clusterMembership.GetSiloStatus(address);
+
+            if (address.Equals(_localSiloAddress))
+            {
+                // The local silo is always present in the manifest.
+                continue;
+            }
+
+            if (status == SiloStatus.None || status == SiloStatus.Dead)
+            {
+                builder.Remove(address);
+                modified = true;
             }
         }
 
-        public void Participate(ISiloLifecycle lifecycle)
+        // Next, fill missing entries.
+        var tasks = new List<Task<(SiloAddress Key, GrainManifest? Value, Exception? Exception)>>();
+        foreach (var entry in clusterMembership.Members)
         {
-            lifecycle.Subscribe(
-                nameof(ClusterManifestProvider),
-                ServiceLifecycleStage.RuntimeServices,
-                Initialize,
-                _ => Task.CompletedTask);
+            var member = entry.Value;
 
-            lifecycle.Subscribe(
-                nameof(ClusterManifestProvider),
-                ServiceLifecycleStage.RuntimeGrainServices,
-                StartAsync,
-                StopAsync);
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            if (_shutdownCts.IsCancellationRequested)
+            if (member.SiloAddress.Equals(_localSiloAddress))
             {
-                return;
+                // The local silo is always present in the manifest.
+                continue;
             }
 
-            await StopAsync(CancellationToken.None);
+            if (existingManifest.Silos.ContainsKey(member.SiloAddress))
+            {
+                // Manifest has already been retrieved for the cluster member.
+                continue;
+            }
+
+            if (member.Status != SiloStatus.Active)
+            {
+                // If the member is not yet active, it may not be ready to process requests.
+                continue;
+            }
+
+            tasks.Add(GetManifest(member.SiloAddress));
+
+            async Task<(SiloAddress, GrainManifest?, Exception?)> GetManifest(SiloAddress siloAddress)
+            {
+                try
+                {
+                    // Get the manifest from the remote silo.
+                    var remoteManifestProvider = _grainFactory!.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, member.SiloAddress);
+                    var manifest = await remoteManifestProvider.GetSiloManifest().AsTask().WaitAsync(_shutdownCts.Token);
+                    return (siloAddress, manifest, null);
+                }
+                catch (Exception exception)
+                {
+                    return (siloAddress, null, exception);
+                }
+            }
         }
 
-        public void Dispose()
+        var fetchSuccess = true;
+        await Task.WhenAll(tasks);
+        foreach (var task in tasks)
         {
-            DisposeAsync().AsTask().GetAwaiter().GetResult();
+            var result = await task;
+            if (result.Exception is Exception exception)
+            {
+                fetchSuccess = false;
+                if (exception is not OperationCanceledException)
+                {
+                    _logger.LogWarning(exception, "Error retrieving silo manifest for silo {SiloAddress}", result.Key);
+                }
+            }
+            else
+            {
+                modified = true;
+                builder[result.Key] = result.Value;
+            }
         }
+
+        // Regardless of success or failure, update the manifest if it has been modified.
+        var version = new MajorMinorVersion(clusterMembership.Version.Value, existingManifest.Version.Minor + 1);
+        if (modified)
+        {
+            return _updates.TryPublish(new ClusterManifest(version, builder.ToImmutable())) && fetchSuccess;
+        }
+
+        return fetchSuccess;
+    }
+
+    [MemberNotNull(nameof(_runTask))]
+    private Task StartAsync(CancellationToken cancellationToken)
+    {
+        Debug.Assert(_grainFactory is not null);
+        _runTask = Task.Run(ProcessMembershipUpdates);
+        return Task.CompletedTask;
+    }
+
+    [MemberNotNull(nameof(_grainFactory))]
+    private Task Initialize(CancellationToken cancellationToken)
+    {
+        _grainFactory = _services.GetRequiredService<IInternalGrainFactory>();
+        var catalog = _services.GetRequiredService<Catalog>();
+        catalog.RegisterSystemTarget(ActivatorUtilities.CreateInstance<ClusterManifestSystemTarget>(_services));
+        return Task.CompletedTask;
+    }
+
+    private async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _shutdownCts.Cancel();
+        if (_runTask is Task task)
+        {
+            await task.WaitAsync(cancellationToken).SuppressThrowing();
+        }
+    }
+
+    public void Participate(ISiloLifecycle lifecycle)
+    {
+        lifecycle.Subscribe(
+            nameof(ClusterManifestProvider),
+            ServiceLifecycleStage.RuntimeServices,
+            Initialize,
+            _ => Task.CompletedTask);
+
+        lifecycle.Subscribe(
+            nameof(ClusterManifestProvider),
+            ServiceLifecycleStage.RuntimeGrainServices,
+            StartAsync,
+            StopAsync);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_shutdownCts.IsCancellationRequested)
+        {
+            return;
+        }
+
+        await StopAsync(CancellationToken.None);
+    }
+
+    public void Dispose()
+    {
+        DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
 }

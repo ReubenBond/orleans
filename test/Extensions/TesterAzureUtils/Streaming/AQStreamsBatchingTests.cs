@@ -13,81 +13,80 @@ using UnitTests.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace Tester.AzureUtils.Streaming
+namespace Tester.AzureUtils.Streaming;
+
+[TestCategory("AQStreaming"), TestCategory("AzureStorage")]
+public class AQStreamsBatchingTests : StreamBatchingTestRunner, IClassFixture<AQStreamsBatchingTests.Fixture>
 {
-    [TestCategory("AQStreaming"), TestCategory("AzureStorage")]
-    public class AQStreamsBatchingTests : StreamBatchingTestRunner, IClassFixture<AQStreamsBatchingTests.Fixture>
+    private const int queueCount = 8;
+    public class Fixture : BaseAzureTestClusterFixture
     {
-        private const int queueCount = 8;
-        public class Fixture : BaseAzureTestClusterFixture
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
-                builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
-            }
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+            builder.AddClientBuilderConfigurator<ClientBuilderConfigurator>();
+        }
 
-            private class SiloBuilderConfigurator : ISiloConfigurator
+        private class SiloBuilderConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
             {
-                public void Configure(ISiloBuilder hostBuilder)
-                {
-                    hostBuilder
-                        .AddAzureQueueStreams(StreamBatchingTestConst.ProviderName, b =>
-                        {
-                            b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
-                                (options, dep) =>
-                                {
-                                    options.ConfigureTestDefaults();
-                                    options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
-                                }));
-                            b.ConfigurePullingAgent(ob => ob.Configure(options =>
+                hostBuilder
+                    .AddAzureQueueStreams(StreamBatchingTestConst.ProviderName, b =>
+                    {
+                        b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
+                            (options, dep) =>
                             {
-                                options.BatchContainerBatchSize = 10;
+                                options.ConfigureTestDefaults();
+                                options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
                             }));
-                            b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
-                        });
-                }
-            }
-
-            private class ClientBuilderConfigurator : IClientBuilderConfigurator
-            {
-                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
-                {
-                    clientBuilder
-                        .AddAzureQueueStreams(StreamBatchingTestConst.ProviderName, b =>
+                        b.ConfigurePullingAgent(ob => ob.Configure(options =>
                         {
-                            b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
-                                (options, dep) =>
-                                {
-                                    options.ConfigureTestDefaults();
-                                    options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
-                                }));
-                            b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
-                        });
-                }
-            }
-
-            public override async Task DisposeAsync()
-            {
-                await base.DisposeAsync();
-                try
-                {
-                    TestUtils.CheckForAzureStorage();
-                    await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                        AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
-                        new AzureQueueOptions().ConfigureTestDefaults());
-                    await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
-                        AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
-                        new AzureQueueOptions().ConfigureTestDefaults());
-                }
-                catch (SkipException) { }
+                            options.BatchContainerBatchSize = 10;
+                        }));
+                        b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                    });
             }
         }
 
-        public AQStreamsBatchingTests(Fixture fixture, ITestOutputHelper output)
-            : base(fixture, output)
+        private class ClientBuilderConfigurator : IClientBuilderConfigurator
         {
-            fixture.EnsurePreconditionsMet();
+            public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+            {
+                clientBuilder
+                    .AddAzureQueueStreams(StreamBatchingTestConst.ProviderName, b =>
+                    {
+                        b.ConfigureAzureQueue(ob => ob.Configure<IOptions<ClusterOptions>>(
+                            (options, dep) =>
+                            {
+                                options.ConfigureTestDefaults();
+                                options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, queueCount);
+                            }));
+                        b.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
+                    });
+            }
         }
+
+        public override async Task DisposeAsync()
+        {
+            await base.DisposeAsync();
+            try
+            {
+                TestUtils.CheckForAzureStorage();
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                    AzureQueueUtilities.GenerateQueueNames(this.HostedCluster.Options.ClusterId, queueCount),
+                    new AzureQueueOptions().ConfigureTestDefaults());
+                await AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(NullLoggerFactory.Instance,
+                    AzureQueueUtilities.GenerateQueueNames($"{this.HostedCluster.Options.ClusterId}2", queueCount),
+                    new AzureQueueOptions().ConfigureTestDefaults());
+            }
+            catch (SkipException) { }
+        }
+    }
+
+    public AQStreamsBatchingTests(Fixture fixture, ITestOutputHelper output)
+        : base(fixture, output)
+    {
+        fixture.EnsurePreconditionsMet();
     }
 }

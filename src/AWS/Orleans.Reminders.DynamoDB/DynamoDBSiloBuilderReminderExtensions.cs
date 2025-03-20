@@ -3,29 +3,28 @@
 
 using Orleans.Configuration;
 
-namespace Orleans.Hosting
+namespace Orleans.Hosting;
+
+/// <summary>
+/// Silo host builder extensions.
+/// </summary>
+public static class DynamoDBSiloBuilderReminderExtensions
 {
     /// <summary>
-    /// Silo host builder extensions.
+    /// Adds reminder storage backed by Amazon DynamoDB.
     /// </summary>
-    public static class DynamoDBSiloBuilderReminderExtensions
+    /// <param name="builder">
+    /// The builder.
+    /// </param>
+    /// <param name="configure">
+    /// The delegate used to configure the reminder store.
+    /// </param>
+    /// <returns>
+    /// The provided <see cref="ISiloBuilder"/>, for chaining.
+    /// </returns>
+    public static ISiloBuilder UseDynamoDBReminderService(this ISiloBuilder builder, Action<DynamoDBReminderStorageOptions> configure)
     {
-        /// <summary>
-        /// Adds reminder storage backed by Amazon DynamoDB.
-        /// </summary>
-        /// <param name="builder">
-        /// The builder.
-        /// </param>
-        /// <param name="configure">
-        /// The delegate used to configure the reminder store.
-        /// </param>
-        /// <returns>
-        /// The provided <see cref="ISiloBuilder"/>, for chaining.
-        /// </returns>
-        public static ISiloBuilder UseDynamoDBReminderService(this ISiloBuilder builder, Action<DynamoDBReminderStorageOptions> configure)
-        {
-            builder.ConfigureServices(services => services.UseDynamoDBReminderService(configure));
-            return builder;
-        }
+        builder.ConfigureServices(services => services.UseDynamoDBReminderService(configure));
+        return builder;
     }
 }

@@ -1,48 +1,47 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Serialization
+namespace Orleans.Serialization;
+
+/// <summary>
+/// Converts between <see cref="Type"/> and <see cref="string"/> representations.
+/// </summary>
+public interface ITypeConverter
 {
     /// <summary>
-    /// Converts between <see cref="Type"/> and <see cref="string"/> representations.
+    /// Formats the provided type as a string.
     /// </summary>
-    public interface ITypeConverter
-    {
-        /// <summary>
-        /// Formats the provided type as a string.
-        /// </summary>
-        bool TryFormat(Type type, out string formatted);
-
-        /// <summary>
-        /// Parses the provided type.
-        /// </summary>
-        bool TryParse(string formatted, out Type type);
-    }
+    bool TryFormat(Type type, out string formatted);
 
     /// <summary>
-    /// Functionality for allowing types to be loaded and to participate in serialization, deserialization, etcetera.
+    /// Parses the provided type.
     /// </summary>
-    public interface ITypeNameFilter
-    {
-        /// <summary>
-        /// Determines whether the specified type name corresponds to a type which is allowed to be loaded, serialized, deserialized, etcetera.
-        /// </summary>
-        /// <param name="typeName">Name of the type.</param>
-        /// <param name="assemblyName">Name of the assembly.</param>
-        /// <returns><see langword="true" /> if the specified type is allowed; <see langword="false" /> if the type is not allowed; <see langword="null" /> if the type is unknown by this filter.</returns>
-        bool? IsTypeNameAllowed(string typeName, string assemblyName);
-    }
+    bool TryParse(string formatted, out Type type);
+}
 
+/// <summary>
+/// Functionality for allowing types to be loaded and to participate in serialization, deserialization, etcetera.
+/// </summary>
+public interface ITypeNameFilter
+{
     /// <summary>
-    /// Functionality for allowing types to be loaded and to participate in serialization, deserialization, etcetera.
+    /// Determines whether the specified type name corresponds to a type which is allowed to be loaded, serialized, deserialized, etcetera.
     /// </summary>
-    public interface ITypeFilter
-    {
-        /// <summary>
-        /// Determines whether the specified type is allowed to be serialized, deserialized, etcetera.
-        /// </summary>
-        /// <param name="type">The type</param>
-        /// <returns><see langword="true" /> if the specified type is allowed; <see langword="false" /> if the type is not allowed; <see langword="null" /> if the type is unknown by this filter.</returns>
-        bool? IsTypeAllowed(Type type);
-    }
+    /// <param name="typeName">Name of the type.</param>
+    /// <param name="assemblyName">Name of the assembly.</param>
+    /// <returns><see langword="true" /> if the specified type is allowed; <see langword="false" /> if the type is not allowed; <see langword="null" /> if the type is unknown by this filter.</returns>
+    bool? IsTypeNameAllowed(string typeName, string assemblyName);
+}
+
+/// <summary>
+/// Functionality for allowing types to be loaded and to participate in serialization, deserialization, etcetera.
+/// </summary>
+public interface ITypeFilter
+{
+    /// <summary>
+    /// Determines whether the specified type is allowed to be serialized, deserialized, etcetera.
+    /// </summary>
+    /// <param name="type">The type</param>
+    /// <returns><see langword="true" /> if the specified type is allowed; <see langword="false" /> if the type is not allowed; <see langword="null" /> if the type is unknown by this filter.</returns>
+    bool? IsTypeAllowed(Type type);
 }

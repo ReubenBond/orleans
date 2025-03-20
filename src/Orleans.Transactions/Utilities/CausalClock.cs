@@ -1,44 +1,43 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Transactions
+namespace Orleans.Transactions;
+
+public class CausalClock
 {
-    public class CausalClock
+    private readonly object lockable = new object();
+    private readonly IClock clock;
+    private long previous;
+
+    public CausalClock(IClock clock)
     {
-        private readonly object lockable = new object();
-        private readonly IClock clock;
-        private long previous;
+        this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
+    }
 
-        public CausalClock(IClock clock)
+    public DateTime UtcNow()
+    {
+        lock (this.lockable)
         {
-            this.clock = clock ?? throw new ArgumentNullException(nameof(clock));
+            var ticks = previous = Math.Max(previous + 1, this.clock.UtcNow().Ticks);
+            return new DateTime(ticks, DateTimeKind.Utc);
         }
+    }
 
-        public DateTime UtcNow()
+    public DateTime Merge(DateTime timestamp)
+    {
+        lock (this.lockable)
         {
-            lock (this.lockable)
-            {
-                var ticks = previous = Math.Max(previous + 1, this.clock.UtcNow().Ticks);
-                return new DateTime(ticks, DateTimeKind.Utc);
-            }
+            var ticks = previous = Math.Max(previous, timestamp.Ticks);
+            return new DateTime(ticks, DateTimeKind.Utc);
         }
+    }
 
-        public DateTime Merge(DateTime timestamp)
+    public DateTime MergeUtcNow(DateTime timestamp)
+    {
+        lock (this.lockable)
         {
-            lock (this.lockable)
-            {
-                var ticks = previous = Math.Max(previous, timestamp.Ticks);
-                return new DateTime(ticks, DateTimeKind.Utc);
-            }
-        }
-
-        public DateTime MergeUtcNow(DateTime timestamp)
-        {
-            lock (this.lockable)
-            {
-                var ticks = previous = Math.Max(Math.Max(previous + 1, timestamp.Ticks + 1), this.clock.UtcNow().Ticks);
-                return new DateTime(ticks, DateTimeKind.Utc);
-            }
+            var ticks = previous = Math.Max(Math.Max(previous + 1, timestamp.Ticks + 1), this.clock.UtcNow().Ticks);
+            return new DateTime(ticks, DateTimeKind.Utc);
         }
     }
 }

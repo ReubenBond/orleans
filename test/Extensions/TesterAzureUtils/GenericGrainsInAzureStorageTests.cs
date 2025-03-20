@@ -8,116 +8,115 @@ using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
-namespace Tester.AzureUtils.General
+namespace Tester.AzureUtils.General;
+
+[TestCategory("AzureStorage"), TestCategory("Generics")]
+public class GenericGrainsInAzureTableStorageTests : OrleansTestingBase, IClassFixture<GenericGrainsInAzureTableStorageTests.Fixture>
 {
-    [TestCategory("AzureStorage"), TestCategory("Generics")]
-    public class GenericGrainsInAzureTableStorageTests : OrleansTestingBase, IClassFixture<GenericGrainsInAzureTableStorageTests.Fixture>
+    private readonly Fixture fixture;
+
+    public class Fixture : BaseAzureTestClusterFixture
     {
-        private readonly Fixture fixture;
-
-        public class Fixture : BaseAzureTestClusterFixture
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
-            }
-
-            protected override void CheckPreconditionsOrThrow()
-            {
-                base.CheckPreconditionsOrThrow();
-                StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
-            }
-
-            private class SiloBuilderConfigurator : ISiloConfigurator
-            {
-                public void Configure(ISiloBuilder hostBuilder)
-                {
-                    hostBuilder
-                        .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
-                        {
-                            options.ConfigureTestDefaults();
-                        }));
-                }
-            }
+            builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
 
-        public GenericGrainsInAzureTableStorageTests(Fixture fixture)
+        protected override void CheckPreconditionsOrThrow()
         {
-            fixture.EnsurePreconditionsMet();
-            this.fixture = fixture;
+            base.CheckPreconditionsOrThrow();
+            StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
         }
 
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Generic_OnAzureTableStorage_LongNamedGrain_EchoValue()
+        private class SiloBuilderConfigurator : ISiloConfigurator
         {
-            var grain = this.fixture.GrainFactory.GetGrain<ISimpleGenericGrainUsingAzureStorageAndLongGrainName<int>>(Guid.NewGuid());
-            await grain.EchoAsync(42);
-
-            await grain.ClearState();
-        }
-
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Generic_OnAzureTableStorage_ShortNamedGrain_EchoValue()
-        {
-            var grain = this.fixture.GrainFactory.GetGrain<ITinyNameGrain<int>>(Guid.NewGuid());
-            await grain.EchoAsync(42);
-
-            await grain.ClearState();
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder
+                    .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
+                    {
+                        options.ConfigureTestDefaults();
+                    }));
+            }
         }
     }
 
-    [TestCategory("AzureStorage"), TestCategory("Generics")]
-    public class GenericGrainsInAzureBlobStorageTests : OrleansTestingBase, IClassFixture<GenericGrainsInAzureBlobStorageTests.Fixture>
+    public GenericGrainsInAzureTableStorageTests(Fixture fixture)
     {
-        private readonly Fixture fixture;
+        fixture.EnsurePreconditionsMet();
+        this.fixture = fixture;
+    }
 
-        public class Fixture : BaseAzureTestClusterFixture
+    [SkippableFact, TestCategory("Functional")]
+    public async Task Generic_OnAzureTableStorage_LongNamedGrain_EchoValue()
+    {
+        var grain = this.fixture.GrainFactory.GetGrain<ISimpleGenericGrainUsingAzureStorageAndLongGrainName<int>>(Guid.NewGuid());
+        await grain.EchoAsync(42);
+
+        await grain.ClearState();
+    }
+
+    [SkippableFact, TestCategory("Functional")]
+    public async Task Generic_OnAzureTableStorage_ShortNamedGrain_EchoValue()
+    {
+        var grain = this.fixture.GrainFactory.GetGrain<ITinyNameGrain<int>>(Guid.NewGuid());
+        await grain.EchoAsync(42);
+
+        await grain.ClearState();
+    }
+}
+
+[TestCategory("AzureStorage"), TestCategory("Generics")]
+public class GenericGrainsInAzureBlobStorageTests : OrleansTestingBase, IClassFixture<GenericGrainsInAzureBlobStorageTests.Fixture>
+{
+    private readonly Fixture fixture;
+
+    public class Fixture : BaseAzureTestClusterFixture
+    {
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<StorageSiloBuilderConfigurator>();
-            }
+            builder.AddSiloBuilderConfigurator<StorageSiloBuilderConfigurator>();
+        }
 
-            private class StorageSiloBuilderConfigurator : ISiloConfigurator
+        private class StorageSiloBuilderConfigurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
             {
-                public void Configure(ISiloBuilder hostBuilder)
+                hostBuilder.AddAzureBlobGrainStorage("AzureStore", (AzureBlobStorageOptions options) =>
                 {
-                    hostBuilder.AddAzureBlobGrainStorage("AzureStore", (AzureBlobStorageOptions options) =>
-                    {
-                        options.ConfigureTestDefaults();
-                    });
-                }
-            }
-
-            protected override void CheckPreconditionsOrThrow()
-            {
-                base.CheckPreconditionsOrThrow();
-                StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
+                    options.ConfigureTestDefaults();
+                });
             }
         }
 
-        public GenericGrainsInAzureBlobStorageTests(Fixture fixture)
+        protected override void CheckPreconditionsOrThrow()
         {
-            fixture.EnsurePreconditionsMet();
-            this.fixture = fixture;
+            base.CheckPreconditionsOrThrow();
+            StorageEmulatorUtilities.EnsureEmulatorIsNotUsed();
         }
+    }
 
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Generic_OnAzureBlobStorage_LongNamedGrain_EchoValue()
-        {
-            var grain = this.fixture.GrainFactory.GetGrain<ISimpleGenericGrainUsingAzureStorageAndLongGrainName<int>>(Guid.NewGuid());
-            await grain.EchoAsync(42);
+    public GenericGrainsInAzureBlobStorageTests(Fixture fixture)
+    {
+        fixture.EnsurePreconditionsMet();
+        this.fixture = fixture;
+    }
 
-            await grain.ClearState();
-        }
+    [SkippableFact, TestCategory("Functional")]
+    public async Task Generic_OnAzureBlobStorage_LongNamedGrain_EchoValue()
+    {
+        var grain = this.fixture.GrainFactory.GetGrain<ISimpleGenericGrainUsingAzureStorageAndLongGrainName<int>>(Guid.NewGuid());
+        await grain.EchoAsync(42);
 
-        [SkippableFact, TestCategory("Functional")]
-        public async Task Generic_OnAzureBlobStorage_ShortNamedGrain_EchoValue()
-        {
-            var grain = this.fixture.GrainFactory.GetGrain<ITinyNameGrain<int>>(Guid.NewGuid());
-            await grain.EchoAsync(42);
+        await grain.ClearState();
+    }
 
-            await grain.ClearState();
-        }
+    [SkippableFact, TestCategory("Functional")]
+    public async Task Generic_OnAzureBlobStorage_ShortNamedGrain_EchoValue()
+    {
+        var grain = this.fixture.GrainFactory.GetGrain<ITinyNameGrain<int>>(Guid.NewGuid());
+        await grain.EchoAsync(42);
+
+        await grain.ClearState();
     }
 }

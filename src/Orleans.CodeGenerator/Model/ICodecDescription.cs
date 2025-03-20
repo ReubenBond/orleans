@@ -3,10 +3,9 @@
 
 using Microsoft.CodeAnalysis;
 
-namespace Orleans.CodeGenerator
+namespace Orleans.CodeGenerator;
+
+internal interface ICopierDescription
 {
-    internal interface ICopierDescription
-    {
-        ITypeSymbol UnderlyingType { get; }
-    }
+    ITypeSymbol UnderlyingType { get; }
 }

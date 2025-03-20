@@ -3,41 +3,40 @@
 
 using Orleans.Transactions.Abstractions;
 
-namespace Orleans.Transactions
+namespace Orleans.Transactions;
+
+public class TransactionManagerExtension : ITransactionManagerExtension
 {
-    public class TransactionManagerExtension : ITransactionManagerExtension
+    private readonly ResourceFactoryRegistry<ITransactionManager> factories;
+    private readonly Dictionary<string, ITransactionManager> managers;
+
+    public TransactionManagerExtension(IGrainContextAccessor contextAccessor)
     {
-        private readonly ResourceFactoryRegistry<ITransactionManager> factories;
-        private readonly Dictionary<string, ITransactionManager> managers;
+        this.factories = contextAccessor.GrainContext.GetResourceFactoryRegistry<ITransactionManager>();
+        this.managers = new Dictionary<string, ITransactionManager>();
+    }
 
-        public TransactionManagerExtension(IGrainContextAccessor contextAccessor)
-        {
-            this.factories = contextAccessor.GrainContext.GetResourceFactoryRegistry<ITransactionManager>();
-            this.managers = new Dictionary<string, ITransactionManager>();
-        }
+    public Task Ping(string resourceId, Guid transactionId, DateTime timeStamp, ParticipantId resource)
+    {
+        return GetManager(resourceId).Ping(transactionId, timeStamp, resource);
+    }
 
-        public Task Ping(string resourceId, Guid transactionId, DateTime timeStamp, ParticipantId resource)
-        {
-            return GetManager(resourceId).Ping(transactionId, timeStamp, resource);
-        }
+    public Task<TransactionalStatus> PrepareAndCommit(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ParticipantId> writeResources, int totalResources)
+    {
+        return GetManager(resourceId).PrepareAndCommit(transactionId, accessCount, timeStamp, writeResources, totalResources);
+    }
 
-        public Task<TransactionalStatus> PrepareAndCommit(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ParticipantId> writeResources, int totalResources)
-        {
-            return GetManager(resourceId).PrepareAndCommit(transactionId, accessCount, timeStamp, writeResources, totalResources);
-        }
+    public Task Prepared(string resourceId, Guid transactionId, DateTime timestamp, ParticipantId resource, TransactionalStatus status)
+    {
+        return GetManager(resourceId).Prepared(transactionId, timestamp, resource, status);
+    }
 
-        public Task Prepared(string resourceId, Guid transactionId, DateTime timestamp, ParticipantId resource, TransactionalStatus status)
+    private ITransactionManager GetManager(string resourceId)
+    {
+        if (!this.managers.TryGetValue(resourceId, out ITransactionManager manager))
         {
-            return GetManager(resourceId).Prepared(transactionId, timestamp, resource, status);
+            this.managers[resourceId] = manager = this.factories[resourceId].Invoke();
         }
-
-        private ITransactionManager GetManager(string resourceId)
-        {
-            if (!this.managers.TryGetValue(resourceId, out ITransactionManager manager))
-            {
-                this.managers[resourceId] = manager = this.factories[resourceId].Invoke();
-            }
-            return manager;
-        }
+        return manager;
     }
 }

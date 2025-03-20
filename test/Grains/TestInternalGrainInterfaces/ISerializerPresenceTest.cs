@@ -1,12 +1,11 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace UnitTests.GrainInterfaces
-{
-    internal interface ISerializerPresenceTest : IGrainWithGuidKey
-    {
-        Task<bool> SerializerExistsForType(System.Type param);
+namespace UnitTests.GrainInterfaces;
 
-        Task TakeSerializedData(object data);
-    }
+internal interface ISerializerPresenceTest : IGrainWithGuidKey
+{
+    Task<bool> SerializerExistsForType(System.Type param);
+
+    Task TakeSerializedData(object data);
 }

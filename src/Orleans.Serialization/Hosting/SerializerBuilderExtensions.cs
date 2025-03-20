@@ -6,67 +6,66 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Reflection;
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Serialization
+namespace Orleans.Serialization;
+
+/// <summary>
+/// Extensions for <see cref="ISerializerBuilder"/>.
+/// </summary>
+public static class SerializerBuilderExtensions
 {
+    private static readonly object _assembliesKey = new();
+
     /// <summary>
-    /// Extensions for <see cref="ISerializerBuilder"/>.
+    /// Configures the serialization builder.
     /// </summary>
-    public static class SerializerBuilderExtensions
+    /// <param name="builder">The builder.</param>
+    /// <param name="factory">The factory.</param>
+    /// <returns>The serialization builder</returns>
+    public static ISerializerBuilder Configure(this ISerializerBuilder builder, Func<IServiceProvider, IConfigureOptions<TypeManifestOptions>> factory)
     {
-        private static readonly object _assembliesKey = new();
+        builder.Services.AddSingleton<IConfigureOptions<TypeManifestOptions>>(factory);
+        return builder;
+    }
 
-        /// <summary>
-        /// Configures the serialization builder.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="factory">The factory.</param>
-        /// <returns>The serialization builder</returns>
-        public static ISerializerBuilder Configure(this ISerializerBuilder builder, Func<IServiceProvider, IConfigureOptions<TypeManifestOptions>> factory)
+    /// <summary>
+    /// Configures the serialization builder.
+    /// </summary>
+    /// <param name="builder">The builder.</param>
+    /// <param name="configure">The configuration delegate.</param>
+    /// <returns>The serialization builder</returns>
+    public static ISerializerBuilder Configure(this ISerializerBuilder builder, IConfigureOptions<TypeManifestOptions> configure)
+    {
+        builder.Services.AddSingleton<IConfigureOptions<TypeManifestOptions>>(configure);
+        return builder;
+    }
+
+    /// <summary>
+    /// Configures the serialization builder.
+    /// </summary>
+    /// <param name="builder">The builder.</param>
+    /// <param name="configure">The configuration delegate.</param>
+    /// <returns>The serialization builder</returns>
+    public static ISerializerBuilder Configure(this ISerializerBuilder builder, Action<TypeManifestOptions> configure)
+    {
+        builder.Services.Configure(configure);
+        return builder;
+    }
+
+    /// <summary>
+    /// Adds an assembly to the builder.
+    /// </summary>
+    /// <param name="builder">The builder.</param>
+    /// <param name="assembly">The assembly.</param>
+    /// <returns>The serialization builder</returns>
+    public static ISerializerBuilder AddAssembly(this ISerializerBuilder builder, Assembly assembly)
+    {
+        var attrs = assembly.GetCustomAttributes<TypeManifestProviderAttribute>();
+
+        foreach (var attr in attrs)
         {
-            builder.Services.AddSingleton<IConfigureOptions<TypeManifestOptions>>(factory);
-            return builder;
+            _ = builder.Services.AddSingleton(typeof(IConfigureOptions<TypeManifestOptions>), attr.ProviderType);
         }
 
-        /// <summary>
-        /// Configures the serialization builder.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="configure">The configuration delegate.</param>
-        /// <returns>The serialization builder</returns>
-        public static ISerializerBuilder Configure(this ISerializerBuilder builder, IConfigureOptions<TypeManifestOptions> configure)
-        {
-            builder.Services.AddSingleton<IConfigureOptions<TypeManifestOptions>>(configure);
-            return builder;
-        }
-
-        /// <summary>
-        /// Configures the serialization builder.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="configure">The configuration delegate.</param>
-        /// <returns>The serialization builder</returns>
-        public static ISerializerBuilder Configure(this ISerializerBuilder builder, Action<TypeManifestOptions> configure)
-        {
-            builder.Services.Configure(configure);
-            return builder;
-        }
-
-        /// <summary>
-        /// Adds an assembly to the builder.
-        /// </summary>
-        /// <param name="builder">The builder.</param>
-        /// <param name="assembly">The assembly.</param>
-        /// <returns>The serialization builder</returns>
-        public static ISerializerBuilder AddAssembly(this ISerializerBuilder builder, Assembly assembly)
-        {
-            var attrs = assembly.GetCustomAttributes<TypeManifestProviderAttribute>();
-
-            foreach (var attr in attrs)
-            {
-                _ = builder.Services.AddSingleton(typeof(IConfigureOptions<TypeManifestOptions>), attr.ProviderType);
-            }
-
-            return builder;
-        }
+        return builder;
     }
 }

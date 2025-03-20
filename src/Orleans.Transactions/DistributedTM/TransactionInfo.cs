@@ -5,190 +5,189 @@ using System.Collections.Concurrent;
 using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 
-namespace Orleans.Transactions
+namespace Orleans.Transactions;
+
+[GenerateSerializer]
+public sealed class TransactionInfo
 {
-    [GenerateSerializer]
-    public sealed class TransactionInfo
+    public TransactionInfo()
     {
-        public TransactionInfo()
+        this.Participants = new Dictionary<ParticipantId, AccessCounter>(ParticipantId.Comparer);
+        this.joined = new ConcurrentQueue<TransactionInfo>();
+    }
+
+    public TransactionInfo(Guid id, DateTime timeStamp, DateTime priority, bool readOnly = false) : this()
+    {
+        this.TransactionId = id;
+        this.IsReadOnly = readOnly;
+        this.TimeStamp = timeStamp;
+        this.Priority = priority;
+    }
+
+    /// <summary>
+    /// Constructor used when TransactionInfo is transferred to a request
+    /// </summary>
+    /// <param name="other"></param>
+    public TransactionInfo(TransactionInfo other) : this()
+    {
+        this.TransactionId = other.TransactionId;
+        this.TryToCommit = other.TryToCommit;
+        this.IsReadOnly = other.IsReadOnly;
+        this.TimeStamp = other.TimeStamp;
+        this.Priority = other.Priority;
+    }
+
+    public string Id => TransactionId.ToString();
+
+    [Id(0)]
+    public Guid TransactionId { get; }
+
+    [Id(1)]
+    public DateTime TimeStamp { get; set; }
+
+    [Id(2)]
+    public DateTime Priority { get; set; }
+
+    [Id(3)]
+    public bool IsReadOnly { get; }
+
+    [Id(4)]
+    public byte[] OriginalException { get; set; }
+
+    // counts how many writes were done per each accessed resource
+    // zero means the resource was only read
+    [Id(5)]
+    public Dictionary<ParticipantId, AccessCounter> Participants { get; }
+
+    [Id(6)]
+    public bool TryToCommit { get; internal set; } = true;
+
+    [NonSerialized]
+    public int PendingCalls;
+
+    [NonSerialized]
+    private readonly ConcurrentQueue<TransactionInfo> joined;
+
+    public TransactionInfo Fork()
+    {
+        PendingCalls++;
+        return new TransactionInfo(this);
+    }
+
+    public void Join(TransactionInfo x)
+    {
+        joined.Enqueue(x);
+    }
+
+    public OrleansTransactionAbortedException MustAbort(Serializer<OrleansTransactionAbortedException> serializer)
+    {
+        if (OriginalException != null)
         {
-            this.Participants = new Dictionary<ParticipantId, AccessCounter>(ParticipantId.Comparer);
-            this.joined = new ConcurrentQueue<TransactionInfo>();
+            return serializer.Deserialize(OriginalException);
+        }
+        else if (PendingCalls != 0)
+        {
+            return new OrleansOrphanCallException(TransactionId.ToString(), PendingCalls);
+        }
+        else
+        {
+            return null;
+        }
+    }
+
+    public void RecordException(Exception e, Serializer<OrleansTransactionAbortedException> sm)
+    {
+        if (OriginalException == null)
+        {
+            var exception = (e as OrleansTransactionAbortedException)
+                ?? new OrleansTransactionAbortedException(TransactionId.ToString(), e);
+
+            OriginalException = sm.SerializeToArray(exception);
+        }
+    }
+
+    /// <summary>
+    /// Reconciles all pending calls that have join the transaction.
+    /// </summary>
+    /// <returns>true if there are no orphans, false otherwise</returns>
+    public void ReconcilePending()
+    {
+        TransactionInfo transactionInfo;
+        while (this.joined.TryDequeue(out transactionInfo))
+        {
+            Union(transactionInfo);
+            PendingCalls--;
+        }
+    }
+
+    private void Union(TransactionInfo other)
+    {
+        if (OriginalException == null)
+        {
+            OriginalException = other.OriginalException;
         }
 
-        public TransactionInfo(Guid id, DateTime timeStamp, DateTime priority, bool readOnly = false) : this()
+        // Take sum of write counts
+        foreach (KeyValuePair<ParticipantId, AccessCounter> participant in other.Participants)
         {
-            this.TransactionId = id;
-            this.IsReadOnly = readOnly;
-            this.TimeStamp = timeStamp;
-            this.Priority = priority;
-        }
-
-        /// <summary>
-        /// Constructor used when TransactionInfo is transferred to a request
-        /// </summary>
-        /// <param name="other"></param>
-        public TransactionInfo(TransactionInfo other) : this()
-        {
-            this.TransactionId = other.TransactionId;
-            this.TryToCommit = other.TryToCommit;
-            this.IsReadOnly = other.IsReadOnly;
-            this.TimeStamp = other.TimeStamp;
-            this.Priority = other.Priority;
-        }
-
-        public string Id => TransactionId.ToString();
-
-        [Id(0)]
-        public Guid TransactionId { get; }
-
-        [Id(1)]
-        public DateTime TimeStamp { get; set; }
-
-        [Id(2)]
-        public DateTime Priority { get; set; }
-
-        [Id(3)]
-        public bool IsReadOnly { get; }
-
-        [Id(4)]
-        public byte[] OriginalException { get; set; }
-
-        // counts how many writes were done per each accessed resource
-        // zero means the resource was only read
-        [Id(5)]
-        public Dictionary<ParticipantId, AccessCounter> Participants { get; }
-
-        [Id(6)]
-        public bool TryToCommit { get; internal set; } = true;
-
-        [NonSerialized]
-        public int PendingCalls;
-
-        [NonSerialized]
-        private readonly ConcurrentQueue<TransactionInfo> joined;
-
-        public TransactionInfo Fork()
-        {
-            PendingCalls++;
-            return new TransactionInfo(this);
-        }
-
-        public void Join(TransactionInfo x)
-        {
-            joined.Enqueue(x);
-        }
-
-        public OrleansTransactionAbortedException MustAbort(Serializer<OrleansTransactionAbortedException> serializer)
-        {
-            if (OriginalException != null)
+            if (!this.Participants.TryGetValue(participant.Key, out var existing))
             {
-                return serializer.Deserialize(OriginalException);
-            }
-            else if (PendingCalls != 0)
-            {
-                return new OrleansOrphanCallException(TransactionId.ToString(), PendingCalls);
+                this.Participants[participant.Key] = participant.Value;
             }
             else
             {
-                return null;
+                this.Participants[participant.Key] = existing + participant.Value;
             }
         }
 
-        public void RecordException(Exception e, Serializer<OrleansTransactionAbortedException> sm)
+        // take max of timestamp
+        if (TimeStamp < other.TimeStamp)
+            TimeStamp = other.TimeStamp;
+
+        // take commit pending flag
+        if (TryToCommit)
+            TryToCommit = other.TryToCommit;
+    }
+
+    public void RecordRead(ParticipantId id, DateTime minTime)
+    {
+        this.Participants.TryGetValue(id, out AccessCounter count);
+
+        count.Reads++;
+
+        this.Participants[id] = count;
+
+        if (minTime > TimeStamp)
         {
-            if (OriginalException == null)
-            {
-                var exception = (e as OrleansTransactionAbortedException)
-                    ?? new OrleansTransactionAbortedException(TransactionId.ToString(), e);
-
-                OriginalException = sm.SerializeToArray(exception);
-            }
+            TimeStamp = minTime;
         }
+    }
 
-        /// <summary>
-        /// Reconciles all pending calls that have join the transaction.
-        /// </summary>
-        /// <returns>true if there are no orphans, false otherwise</returns>
-        public void ReconcilePending()
+    public void RecordWrite(ParticipantId id, DateTime minTime)
+    {
+        this.Participants.TryGetValue(id, out AccessCounter count);
+
+        count.Writes++;
+
+        this.Participants[id] = count;
+
+        if (minTime > TimeStamp)
         {
-            TransactionInfo transactionInfo;
-            while (this.joined.TryDequeue(out transactionInfo))
-            {
-                Union(transactionInfo);
-                PendingCalls--;
-            }
+            TimeStamp = minTime;
         }
+    }
 
-        private void Union(TransactionInfo other)
-        {
-            if (OriginalException == null)
-            {
-                OriginalException = other.OriginalException;
-            }
-
-            // Take sum of write counts
-            foreach (KeyValuePair<ParticipantId, AccessCounter> participant in other.Participants)
-            {
-                if (!this.Participants.TryGetValue(participant.Key, out var existing))
-                {
-                    this.Participants[participant.Key] = participant.Value;
-                }
-                else
-                {
-                    this.Participants[participant.Key] = existing + participant.Value;
-                }
-            }
-
-            // take max of timestamp
-            if (TimeStamp < other.TimeStamp)
-                TimeStamp = other.TimeStamp;
-
-            // take commit pending flag
-            if (TryToCommit)
-                TryToCommit = other.TryToCommit;
-        }
-
-        public void RecordRead(ParticipantId id, DateTime minTime)
-        {
-            this.Participants.TryGetValue(id, out AccessCounter count);
-
-            count.Reads++;
-
-            this.Participants[id] = count;
-
-            if (minTime > TimeStamp)
-            {
-                TimeStamp = minTime;
-            }
-        }
-
-        public void RecordWrite(ParticipantId id, DateTime minTime)
-        {
-            this.Participants.TryGetValue(id, out AccessCounter count);
-
-            count.Writes++;
-
-            this.Participants[id] = count;
-
-            if (minTime > TimeStamp)
-            {
-                TimeStamp = minTime;
-            }
-        }
-
-        /// <summary>
-        /// For verbose tracing and debugging.
-        /// </summary>
-        public override string ToString()
-        {
-            return string.Join("",
-                $"{TransactionId} {TimeStamp:o}",
-                (IsReadOnly ? " RO" : ""),
-                (TryToCommit ? " Committing" : ""),
-                (OriginalException != null ? " Aborting" : ""),
-                $" {{{string.Join(" ", this.Participants.Select(kvp => $"{kvp.Key}:{kvp.Value.Reads},{kvp.Value.Writes}"))}}}"
-            );
-        }
+    /// <summary>
+    /// For verbose tracing and debugging.
+    /// </summary>
+    public override string ToString()
+    {
+        return string.Join("",
+            $"{TransactionId} {TimeStamp:o}",
+            (IsReadOnly ? " RO" : ""),
+            (TryToCommit ? " Committing" : ""),
+            (OriginalException != null ? " Aborting" : ""),
+            $" {{{string.Join(" ", this.Participants.Select(kvp => $"{kvp.Key}:{kvp.Value.Reads},{kvp.Value.Writes}"))}}}"
+        );
     }
 }

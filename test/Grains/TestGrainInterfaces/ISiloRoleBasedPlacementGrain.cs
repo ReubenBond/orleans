@@ -1,10 +1,9 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace UnitTests.GrainInterfaces
+namespace UnitTests.GrainInterfaces;
+
+public interface ISiloRoleBasedPlacementGrain : IGrainWithStringKey
 {
-    public interface ISiloRoleBasedPlacementGrain : IGrainWithStringKey
-    {
-        Task<bool> Ping();
-    }
+    Task<bool> Ping();
 }

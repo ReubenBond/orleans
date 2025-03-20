@@ -6,49 +6,48 @@ using Orleans.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Orleans.EventSourcing.CustomStorage
+namespace Orleans.EventSourcing.CustomStorage;
+
+/// <summary>
+/// A log-consistency provider that relies on grain-specific custom code for 
+/// reading states from storage, and appending deltas to storage.
+/// Grains that wish to use this provider must implement the <see cref="ICustomStorageInterface{TState, TDelta}"/>
+/// interface, to define how state is read and how deltas are written.
+/// If the provider attribute "PrimaryCluster" is supplied in the provider configuration, then only the specified cluster
+/// accesses storage, and other clusters may not issue updates. 
+/// </summary>
+public class LogConsistencyProvider : ILogViewAdaptorFactory
 {
+    private readonly CustomStorageLogConsistencyOptions options;
+
     /// <summary>
-    /// A log-consistency provider that relies on grain-specific custom code for 
-    /// reading states from storage, and appending deltas to storage.
-    /// Grains that wish to use this provider must implement the <see cref="ICustomStorageInterface{TState, TDelta}"/>
-    /// interface, to define how state is read and how deltas are written.
-    /// If the provider attribute "PrimaryCluster" is supplied in the provider configuration, then only the specified cluster
-    /// accesses storage, and other clusters may not issue updates. 
+    /// Specifies a cluster id of the primary cluster from which to access storage exclusively, null if
+    /// storage should be accessed directly from all clusters.
     /// </summary>
-    public class LogConsistencyProvider : ILogViewAdaptorFactory
+    public string PrimaryCluster => options.PrimaryCluster;
+
+    /// <inheritdoc/>
+    public bool UsesStorageProvider => false;
+    
+    public LogConsistencyProvider(CustomStorageLogConsistencyOptions options)
     {
-        private readonly CustomStorageLogConsistencyOptions options;
-
-        /// <summary>
-        /// Specifies a cluster id of the primary cluster from which to access storage exclusively, null if
-        /// storage should be accessed directly from all clusters.
-        /// </summary>
-        public string PrimaryCluster => options.PrimaryCluster;
-
-        /// <inheritdoc/>
-        public bool UsesStorageProvider => false;
-        
-        public LogConsistencyProvider(CustomStorageLogConsistencyOptions options)
-        {
-            this.options = options;
-        }
-
-        /// <inheritdoc/>
-        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
-            where TView : class, new()
-            where TEntry : class
-        {
-            return new CustomStorageAdaptor<TView, TEntry>(hostGrain, initialState, services, PrimaryCluster);
-        }
+        this.options = options;
     }
 
-    public static class LogConsistencyProviderFactory
+    /// <inheritdoc/>
+    public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
+        where TView : class, new()
+        where TEntry : class
     {
-        public static ILogViewAdaptorFactory Create(IServiceProvider services, string name)
-        {
-            var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CustomStorageLogConsistencyOptions>>();
-            return ActivatorUtilities.CreateInstance<LogConsistencyProvider>(services, optionsMonitor.Get(name));
-        }
+        return new CustomStorageAdaptor<TView, TEntry>(hostGrain, initialState, services, PrimaryCluster);
+    }
+}
+
+public static class LogConsistencyProviderFactory
+{
+    public static ILogViewAdaptorFactory Create(IServiceProvider services, string name)
+    {
+        var optionsMonitor = services.GetRequiredService<IOptionsMonitor<CustomStorageLogConsistencyOptions>>();
+        return ActivatorUtilities.CreateInstance<LogConsistencyProvider>(services, optionsMonitor.Get(name));
     }
 }

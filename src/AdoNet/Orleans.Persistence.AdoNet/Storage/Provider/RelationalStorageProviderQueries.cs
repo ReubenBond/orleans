@@ -1,56 +1,55 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Storage
+namespace Orleans.Storage;
+
+/// <summary>
+/// A container class for the queries currently used by the <see cref="AdoNetGrainStorage"/>.
+/// </summary>
+/// <remarks>This is provided as a separate entity in order to make these dynamically updatable.</remarks>
+public class RelationalStorageProviderQueries
 {
     /// <summary>
-    /// A container class for the queries currently used by the <see cref="AdoNetGrainStorage"/>.
+    /// The clause to write to the storage.
     /// </summary>
-    /// <remarks>This is provided as a separate entity in order to make these dynamically updatable.</remarks>
-    public class RelationalStorageProviderQueries
+    public string WriteToStorage { get; }
+
+    /// <summary>
+    /// The clause to read from the storage.
+    /// </summary>
+    public string ReadFromStorage { get; set; }
+
+    /// <summary>
+    /// The clause to clear the storage.
+    /// </summary>
+    public string ClearState { get; set; }
+
+
+    /// <summary>
+    /// Constructor.
+    /// </summary>
+    /// <param name="writeToStorage">The clause to write to a storage.</param>
+    /// <param name="readFromStorage">The clause to read from a storage.</param>
+    /// <param name="clearState">The clause to clear the storage.</param>
+    public RelationalStorageProviderQueries(string writeToStorage, string readFromStorage, string clearState)
     {
-        /// <summary>
-        /// The clause to write to the storage.
-        /// </summary>
-        public string WriteToStorage { get; }
-
-        /// <summary>
-        /// The clause to read from the storage.
-        /// </summary>
-        public string ReadFromStorage { get; set; }
-
-        /// <summary>
-        /// The clause to clear the storage.
-        /// </summary>
-        public string ClearState { get; set; }
-
-
-        /// <summary>
-        /// Constructor.
-        /// </summary>
-        /// <param name="writeToStorage">The clause to write to a storage.</param>
-        /// <param name="readFromStorage">The clause to read from a storage.</param>
-        /// <param name="clearState">The clause to clear the storage.</param>
-        public RelationalStorageProviderQueries(string writeToStorage, string readFromStorage, string clearState)
+        if(writeToStorage == null)
         {
-            if(writeToStorage == null)
-            {
-                throw new ArgumentNullException(nameof(writeToStorage));
-            }
-
-            if(readFromStorage == null)
-            {
-                throw new ArgumentNullException(nameof(readFromStorage));
-            }
-
-            if(clearState == null)
-            {
-                throw new ArgumentNullException(nameof(clearState));
-            }
-
-            WriteToStorage = writeToStorage;
-            ReadFromStorage = readFromStorage;
-            ClearState = clearState;
+            throw new ArgumentNullException(nameof(writeToStorage));
         }
+
+        if(readFromStorage == null)
+        {
+            throw new ArgumentNullException(nameof(readFromStorage));
+        }
+
+        if(clearState == null)
+        {
+            throw new ArgumentNullException(nameof(clearState));
+        }
+
+        WriteToStorage = writeToStorage;
+        ReadFromStorage = readFromStorage;
+        ClearState = clearState;
     }
 }

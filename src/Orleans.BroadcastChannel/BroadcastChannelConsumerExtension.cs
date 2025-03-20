@@ -3,102 +3,101 @@
 
 using System.Collections.Concurrent;
 
-namespace Orleans.BroadcastChannel
+namespace Orleans.BroadcastChannel;
+
+internal interface IBroadcastChannelConsumerExtension : IGrainExtension
 {
-    internal interface IBroadcastChannelConsumerExtension : IGrainExtension
+    Task OnError(InternalChannelId streamId, Exception exception);
+    Task OnPublished(InternalChannelId streamId, object item);
+}
+
+internal class BroadcastChannelConsumerExtension : IBroadcastChannelConsumerExtension
+{
+    private readonly ConcurrentDictionary<InternalChannelId, ICallback> _handlers = new();
+    private readonly IOnBroadcastChannelSubscribed _subscriptionObserver;
+    private readonly AsyncLock _lock = new AsyncLock();
+
+    private interface ICallback
     {
-        Task OnError(InternalChannelId streamId, Exception exception);
-        Task OnPublished(InternalChannelId streamId, object item);
+        Task OnError(Exception exception);
+
+        Task OnPublished(object item);
     }
 
-    internal class BroadcastChannelConsumerExtension : IBroadcastChannelConsumerExtension
+    private class Callback<T> : ICallback
     {
-        private readonly ConcurrentDictionary<InternalChannelId, ICallback> _handlers = new();
-        private readonly IOnBroadcastChannelSubscribed _subscriptionObserver;
-        private readonly AsyncLock _lock = new AsyncLock();
+        private readonly Func<T, Task> _onPublished;
+        private readonly Func<Exception, Task> _onError;
 
-        private interface ICallback
+        private static Task NoOp(Exception _) => Task.CompletedTask;
+
+        public Callback(Func<T, Task> onPublished, Func<Exception, Task> onError)
         {
-            Task OnError(Exception exception);
-
-            Task OnPublished(object item);
+            _onPublished = onPublished;
+            _onError = onError ?? NoOp;
         }
 
-        private class Callback<T> : ICallback
+        public Task OnError(Exception exception) => _onError(exception);
+
+        public Task OnPublished(object item)
         {
-            private readonly Func<T, Task> _onPublished;
-            private readonly Func<Exception, Task> _onError;
-
-            private static Task NoOp(Exception _) => Task.CompletedTask;
-
-            public Callback(Func<T, Task> onPublished, Func<Exception, Task> onError)
-            {
-                _onPublished = onPublished;
-                _onError = onError ?? NoOp;
-            }
-
-            public Task OnError(Exception exception) => _onError(exception);
-
-            public Task OnPublished(object item)
-            {
-                return item is T typedItem
-                    ? _onPublished(typedItem)
-                    : _onError(new InvalidCastException($"Received an item of type {item.GetType().Name}, expected {typeof(T).FullName}"));
-            }
+            return item is T typedItem
+                ? _onPublished(typedItem)
+                : _onError(new InvalidCastException($"Received an item of type {item.GetType().Name}, expected {typeof(T).FullName}"));
         }
+    }
 
-        public BroadcastChannelConsumerExtension(IGrainContextAccessor grainContextAccessor)
+    public BroadcastChannelConsumerExtension(IGrainContextAccessor grainContextAccessor)
+    {
+        _subscriptionObserver = grainContextAccessor.GrainContext?.GrainInstance as IOnBroadcastChannelSubscribed;
+        if (_subscriptionObserver == null)
         {
-            _subscriptionObserver = grainContextAccessor.GrainContext?.GrainInstance as IOnBroadcastChannelSubscribed;
-            if (_subscriptionObserver == null)
-            {
-                throw new ArgumentException($"The grain doesn't implement interface {nameof(IOnBroadcastChannelSubscribed)}");
-            }
+            throw new ArgumentException($"The grain doesn't implement interface {nameof(IOnBroadcastChannelSubscribed)}");
         }
+    }
 
-        public async Task OnError(InternalChannelId streamId, Exception exception)
+    public async Task OnError(InternalChannelId streamId, Exception exception)
+    {
+        var callback = await GetStreamCallback(streamId);
+        if (callback != default)
         {
-            var callback = await GetStreamCallback(streamId);
-            if (callback != default)
-            {
-                await callback.OnError(exception);
-            }
+            await callback.OnError(exception);
         }
+    }
 
-        public async Task OnPublished(InternalChannelId streamId, object item)
+    public async Task OnPublished(InternalChannelId streamId, object item)
+    {
+        var callback = await GetStreamCallback(streamId);
+        if (callback != default)
         {
-            var callback = await GetStreamCallback(streamId);
-            if (callback != default)
-            {
-                await callback.OnPublished(item);
-            }
+            await callback.OnPublished(item);
         }
+    }
 
-        public void Attach<T>(InternalChannelId streamId, Func<T, Task> onPublished, Func<Exception, Task> onError)
+    public void Attach<T>(InternalChannelId streamId, Func<T, Task> onPublished, Func<Exception, Task> onError)
+    {
+        _handlers.TryAdd(streamId, new Callback<T>(onPublished, onError));
+    }
+
+    private async ValueTask<ICallback> GetStreamCallback(InternalChannelId streamId)
+    {
+        ICallback callback;
+        if (_handlers.TryGetValue(streamId, out callback))
         {
-            _handlers.TryAdd(streamId, new Callback<T>(onPublished, onError));
+            return callback;
         }
-
-        private async ValueTask<ICallback> GetStreamCallback(InternalChannelId streamId)
+        using (await _lock.LockAsync())
         {
-            ICallback callback;
             if (_handlers.TryGetValue(streamId, out callback))
             {
                 return callback;
             }
-            using (await _lock.LockAsync())
-            {
-                if (_handlers.TryGetValue(streamId, out callback))
-                {
-                    return callback;
-                }
-                // Give a chance to the grain to attach a handler for this streamId
-                var subscription = new BroadcastChannelSubscription(this, streamId);
-                await _subscriptionObserver.OnSubscribed(subscription);
-            }
-            _handlers.TryGetValue(streamId, out callback);
-            return callback;
+            // Give a chance to the grain to attach a handler for this streamId
+            var subscription = new BroadcastChannelSubscription(this, streamId);
+            await _subscriptionObserver.OnSubscribed(subscription);
         }
+        _handlers.TryGetValue(streamId, out callback);
+        return callback;
     }
 }
 

@@ -4,86 +4,85 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace Orleans.Serialization.Session
+namespace Orleans.Serialization.Session;
+
+/// <summary>
+/// Collection of referenced <see cref="Type"/> instances.
+/// </summary>
+public sealed class ReferencedTypeCollection
 {
+    private readonly Dictionary<uint, Type> _referencedTypes = new();
+    private readonly Dictionary<Type, uint> _referencedTypeToIdMap = new();
+
+    private uint _currentReferenceId;
+
     /// <summary>
-    /// Collection of referenced <see cref="Type"/> instances.
+    /// Gets the type with the specified reference id.
     /// </summary>
-    public sealed class ReferencedTypeCollection
+    /// <param name="reference">The reference id.</param>
+    /// <returns>The referenced type.</returns>
+    public Type GetReferencedType(uint reference)
     {
-        private readonly Dictionary<uint, Type> _referencedTypes = new();
-        private readonly Dictionary<Type, uint> _referencedTypeToIdMap = new();
+        if (!_referencedTypes.TryGetValue(reference, out var type))
+            ThrowUnknownReferencedType(reference);
+        return type;
+    }
 
-        private uint _currentReferenceId;
+    private static void ThrowUnknownReferencedType(uint id) => throw new UnknownReferencedTypeException(id);
 
-        /// <summary>
-        /// Gets the type with the specified reference id.
-        /// </summary>
-        /// <param name="reference">The reference id.</param>
-        /// <returns>The referenced type.</returns>
-        public Type GetReferencedType(uint reference)
-        {
-            if (!_referencedTypes.TryGetValue(reference, out var type))
-                ThrowUnknownReferencedType(reference);
-            return type;
-        }
+    /// <summary>
+    /// Gets the type with the specified reference id.
+    /// </summary>
+    /// <param name="reference">The reference id.</param>
+    /// <param name="type">The referenced type.</param>
+    /// <returns><see langword="true" /> if the referenced type was found, <see langword="false" /> otherwise.</returns>
+    public bool TryGetReferencedType(uint reference, out Type type) => _referencedTypes.TryGetValue(reference, out type);
 
-        private static void ThrowUnknownReferencedType(uint id) => throw new UnknownReferencedTypeException(id);
+    /// <summary>
+    /// Records a type with the specified identifier.
+    /// </summary>
+    public void RecordReferencedType(Type type) => _referencedTypes.Add(++_currentReferenceId, type);
 
-        /// <summary>
-        /// Gets the type with the specified reference id.
-        /// </summary>
-        /// <param name="reference">The reference id.</param>
-        /// <param name="type">The referenced type.</param>
-        /// <returns><see langword="true" /> if the referenced type was found, <see langword="false" /> otherwise.</returns>
-        public bool TryGetReferencedType(uint reference, out Type type) => _referencedTypes.TryGetValue(reference, out type);
+    /// <summary>
+    /// Gets the identifier for the specified type.
+    /// </summary>
+    /// <param name="type">The type.</param>
+    /// <param name="reference">The reference.</param>
+    /// <returns><see langword="true" /> if the type has been previoulsy referenced, <see langword="false" /> otherwise.</returns>
+    public bool TryGetTypeReference(Type type, out uint reference) => _referencedTypeToIdMap.TryGetValue(type, out reference);
 
-        /// <summary>
-        /// Records a type with the specified identifier.
-        /// </summary>
-        public void RecordReferencedType(Type type) => _referencedTypes.Add(++_currentReferenceId, type);
-
-        /// <summary>
-        /// Gets the identifier for the specified type.
-        /// </summary>
-        /// <param name="type">The type.</param>
-        /// <param name="reference">The reference.</param>
-        /// <returns><see langword="true" /> if the type has been previoulsy referenced, <see langword="false" /> otherwise.</returns>
-        public bool TryGetTypeReference(Type type, out uint reference) => _referencedTypeToIdMap.TryGetValue(type, out reference);
-
-        /// <summary>
-        /// Gets or adds the identifier for the specified type.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public uint GetOrAddTypeReference(Type type)
-        {
+    /// <summary>
+    /// Gets or adds the identifier for the specified type.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public uint GetOrAddTypeReference(Type type)
+    {
 #if NET6_0_OR_GREATER
-            ref var refValue = ref CollectionsMarshal.GetValueRefOrAddDefault(_referencedTypeToIdMap, type, out var exists);
-            if (exists)
-                return refValue;
+        ref var refValue = ref CollectionsMarshal.GetValueRefOrAddDefault(_referencedTypeToIdMap, type, out var exists);
+        if (exists)
+            return refValue;
 
-            refValue = ++_currentReferenceId;
+        refValue = ++_currentReferenceId;
 #else
-            if (_referencedTypeToIdMap.TryGetValue(type, out var existing))
-            {
-                return existing;
-            }
-            else
-            {
-                _referencedTypeToIdMap[type] = ++_currentReferenceId;
-            }
-#endif
-            return 0;
-        }
-
-        /// <summary>
-        /// Resets this instance.
-        /// </summary>
-        public void Reset()
+        if (_referencedTypeToIdMap.TryGetValue(type, out var existing))
         {
-            _currentReferenceId = 0;
-            _referencedTypes.Clear();
-            _referencedTypeToIdMap.Clear();
+            return existing;
         }
+        else
+        {
+            _referencedTypeToIdMap[type] = ++_currentReferenceId;
+        }
+#endif
+        return 0;
+    }
+
+    /// <summary>
+    /// Resets this instance.
+    /// </summary>
+    public void Reset()
+    {
+        _currentReferenceId = 0;
+        _referencedTypes.Clear();
+        _referencedTypeToIdMap.Clear();
     }
 }

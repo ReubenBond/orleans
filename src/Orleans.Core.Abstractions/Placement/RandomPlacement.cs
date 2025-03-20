@@ -1,17 +1,16 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Runtime
+namespace Orleans.Runtime;
+
+/// <summary>
+/// The random placement strategy specifies that new activations of a grain should be placed on a random, compatible server.
+/// </summary>
+[Serializable, GenerateSerializer, Immutable, SuppressReferenceTracking]
+public sealed class RandomPlacement : PlacementStrategy
 {
     /// <summary>
-    /// The random placement strategy specifies that new activations of a grain should be placed on a random, compatible server.
+    /// Gets the singleton instance of this class.
     /// </summary>
-    [Serializable, GenerateSerializer, Immutable, SuppressReferenceTracking]
-    public sealed class RandomPlacement : PlacementStrategy
-    {
-        /// <summary>
-        /// Gets the singleton instance of this class.
-        /// </summary>
-        internal static RandomPlacement Singleton { get; } = new RandomPlacement();
-    }
+    internal static RandomPlacement Singleton { get; } = new RandomPlacement();
 }

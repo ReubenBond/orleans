@@ -4,43 +4,42 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Orleans.Hosting
+namespace Orleans.Hosting;
+
+internal class SiloHostedService : IHostedService
 {
-    internal class SiloHostedService : IHostedService
+    private readonly ILogger logger;
+    private readonly Silo silo;
+
+    public SiloHostedService(
+        Silo silo,
+        IEnumerable<IConfigurationValidator> configurationValidators,
+        ILogger<SiloHostedService> logger)
     {
-        private readonly ILogger logger;
-        private readonly Silo silo;
+        ValidateSystemConfiguration(configurationValidators);
+        this.silo = silo;
+        this.logger = logger;
+    }
 
-        public SiloHostedService(
-            Silo silo,
-            IEnumerable<IConfigurationValidator> configurationValidators,
-            ILogger<SiloHostedService> logger)
-        {
-            ValidateSystemConfiguration(configurationValidators);
-            this.silo = silo;
-            this.logger = logger;
-        }
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        this.logger.LogInformation("Starting Orleans Silo.");
+        await this.silo.StartAsync(cancellationToken).ConfigureAwait(false);
+        this.logger.LogInformation("Orleans Silo started.");
+    }
 
-        public async Task StartAsync(CancellationToken cancellationToken)
-        {
-            this.logger.LogInformation("Starting Orleans Silo.");
-            await this.silo.StartAsync(cancellationToken).ConfigureAwait(false);
-            this.logger.LogInformation("Orleans Silo started.");
-        }
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        this.logger.LogInformation("Stopping Orleans Silo");
+        await this.silo.StopAsync(cancellationToken).ConfigureAwait(false);
+        this.logger.LogInformation("Orleans Silo stopped.");
+    }
 
-        public async Task StopAsync(CancellationToken cancellationToken)
+    private static void ValidateSystemConfiguration(IEnumerable<IConfigurationValidator> configurationValidators)
+    {
+        foreach (var validator in configurationValidators)
         {
-            this.logger.LogInformation("Stopping Orleans Silo");
-            await this.silo.StopAsync(cancellationToken).ConfigureAwait(false);
-            this.logger.LogInformation("Orleans Silo stopped.");
-        }
-
-        private static void ValidateSystemConfiguration(IEnumerable<IConfigurationValidator> configurationValidators)
-        {
-            foreach (var validator in configurationValidators)
-            {
-                validator.ValidateConfiguration();
-            }
+            validator.ValidateConfiguration();
         }
     }
 }

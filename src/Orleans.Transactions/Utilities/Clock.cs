@@ -1,13 +1,12 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace Orleans.Transactions
+namespace Orleans.Transactions;
+
+public class Clock : IClock
 {
-    public class Clock : IClock
+    public DateTime UtcNow()
     {
-        public DateTime UtcNow()
-        {
-            return DateTime.UtcNow;
-        }
+        return DateTime.UtcNow;
     }
 }

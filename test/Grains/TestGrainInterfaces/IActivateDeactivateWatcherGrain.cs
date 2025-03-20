@@ -1,16 +1,15 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace UnitTests.GrainInterfaces
+namespace UnitTests.GrainInterfaces;
+
+public interface IActivateDeactivateWatcherGrain : IGrainWithIntegerKey
 {
-    public interface IActivateDeactivateWatcherGrain : IGrainWithIntegerKey
-    {
-        Task<string[]> GetActivateCalls();
-        Task<string[]> GetDeactivateCalls();
+    Task<string[]> GetActivateCalls();
+    Task<string[]> GetDeactivateCalls();
 
-        Task Clear();
+    Task Clear();
 
-        Task RecordActivateCall(string activation);
-        Task RecordDeactivateCall(string activation);
-    }
+    Task RecordActivateCall(string activation);
+    Task RecordDeactivateCall(string activation);
 }
