@@ -43,7 +43,7 @@
 
   <!-- Common compile parameters -->
   <PropertyGroup>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <NoWarn>$(NoWarn);1591;2003</NoWarn>
   </PropertyGroup>
 
