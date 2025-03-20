@@ -6,7 +6,6 @@ using System.Globalization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Streams;
 using OrleansAWSUtils.Streams;
 using AWSUtils.Tests.StorageTests;

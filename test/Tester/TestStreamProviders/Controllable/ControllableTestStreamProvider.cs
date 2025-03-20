@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Tester.TestStreamProviders.Controllable

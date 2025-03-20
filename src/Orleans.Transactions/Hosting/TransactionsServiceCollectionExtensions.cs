@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions;
 using Microsoft.Extensions.DependencyInjection;

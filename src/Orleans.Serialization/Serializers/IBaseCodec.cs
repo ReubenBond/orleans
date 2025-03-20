@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Orleans.Serialization.Buffers;
-using System;
 using System.Buffers;
 
 namespace Orleans.Serialization.Serializers

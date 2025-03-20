@@ -4,7 +4,6 @@
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
-using System;
 using System.Buffers;
 
 namespace Orleans.Serialization.Codecs

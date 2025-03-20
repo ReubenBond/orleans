@@ -3,7 +3,6 @@
 
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Streaming.EventHubs.Testing;
 using Orleans.Streams;
 using Orleans.TestingHost;

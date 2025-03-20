@@ -4,7 +4,6 @@
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Metadata;
-using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;

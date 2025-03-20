@@ -3,11 +3,8 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Orleans;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Messaging;
-using Orleans.Runtime;
 using Xunit;
 
 namespace NonSilo.Tests

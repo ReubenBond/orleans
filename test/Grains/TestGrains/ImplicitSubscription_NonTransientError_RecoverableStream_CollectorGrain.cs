@@ -5,7 +5,6 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Orleans.Placement;
 using Orleans.Providers.Streams.Generator;
-using Orleans.Runtime;
 using Orleans.Streams;
 using TestGrainInterfaces;
 using UnitTests.Grains;

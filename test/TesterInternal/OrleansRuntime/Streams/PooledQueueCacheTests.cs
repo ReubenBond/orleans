@@ -4,7 +4,6 @@
 using System.Globalization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Streams;
 using Xunit;
 

@@ -3,14 +3,10 @@
 
 using Orleans.Providers;
 using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Hosting;
 using StackExchange.Redis;
-using System;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using System.Threading.Tasks;
 
 [assembly: RegisterProvider("Redis", "GrainDirectory", "Silo", typeof(RedisGrainDirectoryProviderBuilder))]
 

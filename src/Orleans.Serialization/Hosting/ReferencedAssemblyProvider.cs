@@ -2,10 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Microsoft.Extensions.DependencyModel;
-using System;
 using System.Buffers;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 
 #if NETCOREAPP3_1_OR_GREATER

@@ -3,7 +3,6 @@
 
 using System.Diagnostics;
 using System.Net;
-using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
 using Xunit;
 using static TestExtensions.TestDefaultConfiguration;

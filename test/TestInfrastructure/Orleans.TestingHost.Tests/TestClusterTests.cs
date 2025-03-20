@@ -7,7 +7,6 @@ using Microsoft.Extensions.Hosting;
 using Orleans.TestingHost.Tests.Grains;
 using TestExtensions;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.TestingHost.Tests
 {

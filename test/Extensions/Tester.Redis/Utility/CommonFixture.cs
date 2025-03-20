@@ -8,7 +8,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Persistence;
 using Orleans.Providers;
-using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
 using StackExchange.Redis;

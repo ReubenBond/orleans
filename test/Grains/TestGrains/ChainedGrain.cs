@@ -3,7 +3,6 @@
 
 using Microsoft.Extensions.Logging;
 using Orleans.Providers;
-using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains

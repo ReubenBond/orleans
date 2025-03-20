@@ -3,7 +3,6 @@
 
 using Newtonsoft.Json;
 using Orleans.Concurrency;
-using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
 using TestExtensions;

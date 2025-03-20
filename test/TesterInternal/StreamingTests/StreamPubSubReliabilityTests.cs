@@ -4,9 +4,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers;
-using Orleans.Runtime;
 using Orleans.Runtime.Hosting;
-using Orleans.Storage;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;

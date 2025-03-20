@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Orleans.TestingHost;
-using TestExtensions;
 using Tester.AzureUtils;
 using UnitTests.Grains.Directories;
 

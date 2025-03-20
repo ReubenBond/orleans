@@ -4,7 +4,6 @@
 using System.Net;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
 namespace Orleans

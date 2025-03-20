@@ -4,7 +4,6 @@
 using Orleans.Providers.Streams.Common;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streaming.EventHubs.Testing;
 using Orleans.Configuration;

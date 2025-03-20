@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Amazon.DynamoDBv2.Model;
-using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Text;
 

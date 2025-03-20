@@ -8,12 +8,9 @@ using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.Placement;
-using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.TestHooks;
-using Orleans.Statistics;
 using UnitTests.GrainInterfaces;
-using Xunit;
 
 namespace UnitTests.Grains
 {

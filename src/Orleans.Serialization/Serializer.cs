@@ -8,9 +8,7 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
-using System;
 using System.Buffers;
-using System.IO;
 
 namespace Orleans.Serialization
 {

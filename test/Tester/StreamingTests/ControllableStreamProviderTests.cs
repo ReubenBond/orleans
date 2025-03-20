@@ -3,7 +3,6 @@
 
 using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester.TestStreamProviders.Controllable;

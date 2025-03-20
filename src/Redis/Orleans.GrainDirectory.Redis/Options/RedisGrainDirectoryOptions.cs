@@ -1,10 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System;
-using System.Threading.Tasks;
 using Orleans.GrainDirectory.Redis;
-using Orleans.Runtime;
 using StackExchange.Redis;
 
 namespace Orleans.Configuration

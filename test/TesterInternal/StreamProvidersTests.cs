@@ -8,7 +8,6 @@ using UnitTests.Grains;
 using UnitTests.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Runtime;
 using UnitTests.StorageTests;
 using Orleans.Storage;
 using Orleans.Providers;

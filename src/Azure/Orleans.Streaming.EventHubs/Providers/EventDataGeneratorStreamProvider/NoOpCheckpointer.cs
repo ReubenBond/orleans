@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Orleans.Streams;
-using System;
-using System.Threading.Tasks;
 
 namespace Orleans.Streaming.EventHubs.Testing
 {

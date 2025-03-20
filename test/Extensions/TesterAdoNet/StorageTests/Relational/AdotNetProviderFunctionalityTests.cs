@@ -4,7 +4,6 @@
 using Orleans.Storage;
 using System.Globalization;
 using System.Text;
-using Xunit;
 
 
 namespace UnitTests.StorageTests.Relational

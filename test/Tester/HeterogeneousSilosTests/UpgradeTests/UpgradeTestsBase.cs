@@ -4,7 +4,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using System.Runtime.InteropServices;
 using TestExtensions;

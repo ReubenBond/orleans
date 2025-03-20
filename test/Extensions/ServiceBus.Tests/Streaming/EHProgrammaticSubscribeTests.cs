@@ -4,7 +4,6 @@
 using Microsoft.Extensions.Configuration;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
-using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 

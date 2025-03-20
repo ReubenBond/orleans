@@ -3,7 +3,6 @@
 
 using System.Net;
 using Microsoft.Extensions.Configuration;
-using Orleans.Runtime;
 
 namespace Orleans.Configuration
 {

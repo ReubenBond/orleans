@@ -3,14 +3,10 @@
 
 using Orleans.Providers;
 using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Hosting;
 using StackExchange.Redis;
 using Orleans.Clustering.Redis.Hosting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Threading.Tasks;
 
 [assembly: RegisterProvider("Redis", "Clustering", "Silo", typeof(RedisClusteringProviderBuilder))]
 [assembly: RegisterProvider("Redis", "Clustering", "Client", typeof(RedisClusteringProviderBuilder))]

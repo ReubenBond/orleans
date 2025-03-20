@@ -3,7 +3,6 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.Streams.Filtering;
 using TestExtensions;
 using UnitTests.GrainInterfaces;

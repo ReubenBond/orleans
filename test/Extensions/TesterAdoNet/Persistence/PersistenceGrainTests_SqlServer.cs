@@ -8,7 +8,6 @@ using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using TestExtensions.Runners;
 using UnitTests.General;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace Tester.AdoNet.Persistence

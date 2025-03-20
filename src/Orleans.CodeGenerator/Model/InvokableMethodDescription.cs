@@ -3,8 +3,6 @@
 
 using Microsoft.CodeAnalysis;
 using Orleans.CodeGenerator.SyntaxGeneration;
-using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
 

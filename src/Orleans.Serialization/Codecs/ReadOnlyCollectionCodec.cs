@@ -3,8 +3,6 @@
 
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 
 namespace Orleans.Serialization.Codecs

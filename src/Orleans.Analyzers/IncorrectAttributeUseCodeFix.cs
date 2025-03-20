@@ -5,10 +5,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
 using System.Collections.Immutable;
-using System.Threading.Tasks;
 using System.Composition;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Linq;
 
 namespace Orleans.Analyzers;
 

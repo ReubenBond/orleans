@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Amazon;
-using System;
 
 #if CLUSTERING_DYNAMODB
 namespace Orleans.Clustering.DynamoDB

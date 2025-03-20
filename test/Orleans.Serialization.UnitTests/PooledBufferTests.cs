@@ -3,7 +3,6 @@
 
 using System;
 using System.Buffers;
-using System.Runtime.InteropServices;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;

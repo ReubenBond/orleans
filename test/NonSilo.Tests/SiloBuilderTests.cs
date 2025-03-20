@@ -4,12 +4,9 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Orleans;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
-using Orleans.Hosting;
-using Orleans.Runtime;
 using Orleans.Statistics;
 using UnitTests.Grains;
 using Xunit;

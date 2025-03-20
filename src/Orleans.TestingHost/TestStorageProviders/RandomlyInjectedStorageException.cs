@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Orleans.Storage;
-using System;
 using System.Runtime.Serialization;
 
 namespace Orleans.TestingHost

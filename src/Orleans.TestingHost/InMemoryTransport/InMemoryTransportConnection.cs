@@ -5,8 +5,6 @@
 using System.Buffers;
 using System.IO.Pipelines;
 using System.Net;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Orleans.Networking.Shared;

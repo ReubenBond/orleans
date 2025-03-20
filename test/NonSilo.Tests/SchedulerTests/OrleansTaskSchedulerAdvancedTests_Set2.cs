@@ -3,8 +3,6 @@
 
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Orleans.Internal;
-using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.TestHooks;
 using Orleans.Statistics;

@@ -2,14 +2,11 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 using UnitTests.TesterInternal;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.TestingHost.Utils;
-using Orleans.Internal;
-using Orleans;
 
 // ReSharper disable ConvertToConstant.Local
 

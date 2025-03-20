@@ -2,10 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Net;
-using Orleans.Metadata;
-using Orleans.Placement;
 using Orleans.Runtime.MembershipService.SiloMetadata;
-using Orleans.Runtime.Placement;
 using Orleans.Runtime.Placement.Filtering;
 using Xunit;
 

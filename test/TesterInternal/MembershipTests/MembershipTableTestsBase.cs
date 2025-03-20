@@ -3,14 +3,12 @@
 
 using System.Net;
 using Orleans.Messaging;
-using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using Xunit;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Internal;
 
 namespace UnitTests.MembershipTests
 {

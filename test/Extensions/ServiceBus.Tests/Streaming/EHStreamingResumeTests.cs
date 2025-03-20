@@ -7,7 +7,6 @@ using Orleans.Streaming.EventHubs;
 using Orleans.TestingHost;
 using Tester;
 using Tester.StreamingTests;
-using TestExtensions;
 
 namespace ServiceBus.Tests.Streaming
 {

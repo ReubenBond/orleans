@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Orleans.Configuration;
-using System;
-using System.Linq;
 
 namespace Orleans.Clustering.DynamoDB
 {

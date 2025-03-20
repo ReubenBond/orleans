@@ -8,8 +8,6 @@ using UnitTests.General;
 using UnitTests.GrainInterfaces;
 using UnitTests.TimerTests;
 using Orleans.Tests.SqlUtils;
-using Orleans.Internal;
-using Xunit;
 using Microsoft.Extensions.Hosting;
 
 // ReSharper disable InconsistentNaming

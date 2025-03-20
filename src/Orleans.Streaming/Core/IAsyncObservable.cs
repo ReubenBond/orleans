@@ -3,8 +3,6 @@
 
 #nullable enable
 
-using System.Threading.Tasks;
-
 namespace Orleans.Streams
 {
     /// <summary>

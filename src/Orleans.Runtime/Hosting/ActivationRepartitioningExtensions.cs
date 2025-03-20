@@ -3,7 +3,6 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration.Internal;
-using Orleans.Runtime;
 using Orleans.Configuration;
 using Orleans.Runtime.Placement.Repartitioning;
 using System.Diagnostics.CodeAnalysis;

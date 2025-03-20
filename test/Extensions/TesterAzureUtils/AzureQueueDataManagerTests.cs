@@ -5,7 +5,6 @@ using Azure.Storage.Queues.Models;
 using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using Orleans.TestingHost.Utils;
 using Xunit;
 

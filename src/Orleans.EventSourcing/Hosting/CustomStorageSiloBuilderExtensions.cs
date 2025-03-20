@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.EventSourcing;
 using Orleans.Providers;
-using Orleans.Runtime;
 using Orleans.EventSourcing.CustomStorage;
 using Orleans.Configuration;
 

@@ -4,7 +4,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
-using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;

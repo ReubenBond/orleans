@@ -9,7 +9,6 @@ using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester.StreamingTests.ProgrammaticSubscribeTests;
-using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 

@@ -2,13 +2,11 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Azure.Data.Tables;
-using Azure.Identity;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Providers.Streams.PersistentStreams;
 using Orleans.Serialization;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
-using TestExtensions;
 using Tester.AzureUtils;
 
 namespace ServiceBus.Tests.TestStreamProviders.EventHub

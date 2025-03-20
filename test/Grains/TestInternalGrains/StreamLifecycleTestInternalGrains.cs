@@ -4,7 +4,6 @@
 #define USE_STORAGE
 
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.Streams;
 using UnitTests.GrainInterfaces;
 

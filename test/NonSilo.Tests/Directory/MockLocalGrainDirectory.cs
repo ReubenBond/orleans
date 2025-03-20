@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Orleans.GrainDirectory;
-using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 
 namespace UnitTests.Directory

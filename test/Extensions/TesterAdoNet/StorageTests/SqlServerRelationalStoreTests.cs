@@ -3,7 +3,6 @@
 
 using Orleans.Tests.SqlUtils;
 using UnitTests.General;
-using Xunit;
 
 namespace UnitTests.StorageTests.AdoNet
 {

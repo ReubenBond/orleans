@@ -3,7 +3,6 @@
 
 using System.Diagnostics;
 using System.Text;
-using Orleans.Runtime;
 using Orleans.Storage;
 using TestExtensions;
 using UnitTests.Persistence;

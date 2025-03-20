@@ -10,7 +10,6 @@ using Orleans.Tests.SqlUtils;
 using Orleans.Configuration;
 using TestExtensions;
 using UnitTests.General;
-using Xunit;
 
 namespace UnitTests.MembershipTests
 {

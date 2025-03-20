@@ -3,7 +3,6 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration.Internal;
-using Orleans.Runtime;
 using Orleans.Runtime.ReminderService;
 
 namespace Orleans.Hosting

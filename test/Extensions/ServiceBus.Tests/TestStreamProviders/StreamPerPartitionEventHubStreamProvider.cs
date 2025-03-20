@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Text;
-using Orleans.Runtime;
 using Azure.Messaging.EventHubs;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streams;

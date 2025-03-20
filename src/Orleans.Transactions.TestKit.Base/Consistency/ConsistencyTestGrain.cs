@@ -4,10 +4,6 @@
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Transactions.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Orleans.Transactions.TestKit.Consistency
 {

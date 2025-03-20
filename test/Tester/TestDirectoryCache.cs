@@ -3,7 +3,6 @@
 
 using System.Collections.Concurrent;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 
 namespace UnitTests.General

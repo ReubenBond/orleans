@@ -11,7 +11,6 @@ using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
 using Orleans.Providers;
-using System.Diagnostics;
 
 namespace UnitTests.General
 {

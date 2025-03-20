@@ -6,7 +6,6 @@ using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
 using DistributedTests.Common.MessageChannel;
 using Microsoft.Extensions.Logging;
-using Azure.Identity;
 using DistributedTests.Common;
 
 namespace DistributedTests.Server

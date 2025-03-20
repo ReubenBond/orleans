@@ -3,7 +3,6 @@
 
 using Orleans.Metadata;
 using Orleans.Placement;
-using Orleans.Runtime;
 
 namespace UnitTests.GrainInterfaces
 {

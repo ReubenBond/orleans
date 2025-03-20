@@ -4,7 +4,6 @@
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using Tester;
 using Tester.AzureUtils;

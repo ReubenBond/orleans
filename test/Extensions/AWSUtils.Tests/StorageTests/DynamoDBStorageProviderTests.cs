@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers;
-using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
 using TestExtensions;

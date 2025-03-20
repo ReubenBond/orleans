@@ -3,10 +3,8 @@
 
 using System.Globalization;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.ObjectPool;
 using Orleans.Concurrency;
 using Orleans.Providers;
-using Orleans.Runtime;
 using Orleans.Timers;
 using UnitTests.GrainInterfaces;
 

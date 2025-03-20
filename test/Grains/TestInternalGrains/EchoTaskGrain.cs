@@ -5,7 +5,6 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Providers;
-using Orleans.Runtime;
 using Orleans.Runtime.Utilities;
 using UnitTests.GrainInterfaces;
 using Xunit;

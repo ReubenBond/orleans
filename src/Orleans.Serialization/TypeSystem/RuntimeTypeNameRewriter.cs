@@ -3,8 +3,6 @@
 
 #nullable enable
 
-using System;
-
 namespace Orleans.Serialization.TypeSystem;
 
 /// <summary>

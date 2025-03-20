@@ -5,7 +5,6 @@ using System.Net;
 using Microsoft.Extensions.Hosting;
 using Xunit;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using StackExchange.Redis;
 using TestExtensions;
 

@@ -2,10 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Orleans.Streams;
-using Orleans.Internal;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Orleans.Runtime;
 using Orleans.Core.Internal;
 
 namespace UnitTests.StreamingTests

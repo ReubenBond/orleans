@@ -3,13 +3,9 @@
 
 using Orleans.Providers;
 using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Hosting;
 using StackExchange.Redis;
-using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using System.Threading.Tasks;
 
 [assembly: RegisterProvider("Redis", "Reminders", "Silo", typeof(RedisRemindersProviderBuilder))]
 

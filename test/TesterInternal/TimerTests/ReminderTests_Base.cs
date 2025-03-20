@@ -3,8 +3,6 @@
 
 using System.Text;
 using Microsoft.Extensions.Logging;
-using Orleans.Internal;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using TestExtensions;

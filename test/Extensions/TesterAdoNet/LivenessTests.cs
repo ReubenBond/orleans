@@ -4,7 +4,6 @@
 using Orleans.Tests.SqlUtils;
 using Orleans.TestingHost;
 using UnitTests.General;
-using Xunit;
 using Xunit.Abstractions;
 using Microsoft.Extensions.Hosting;
 

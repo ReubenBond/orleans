@@ -7,8 +7,6 @@ using Orleans.Configuration;
 using Orleans.Runtime.MembershipService;
 using Xunit;
 using NSubstitute;
-using Orleans.Runtime;
-using Orleans;
 using Xunit.Abstractions;
 using TestExtensions;
 using System.Collections.Concurrent;

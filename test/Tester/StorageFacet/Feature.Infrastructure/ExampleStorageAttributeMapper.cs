@@ -3,7 +3,6 @@
 
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime;
 using Tester.StorageFacet.Abstractions;
 
 namespace Tester.StorageFacet.Infrastructure

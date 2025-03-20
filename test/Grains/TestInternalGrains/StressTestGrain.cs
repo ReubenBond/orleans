@@ -3,7 +3,6 @@
 
 using System.Net;
 using Orleans.Concurrency;
-using Orleans.Runtime;
 using UnitTests.GrainInterfaces;
 using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;

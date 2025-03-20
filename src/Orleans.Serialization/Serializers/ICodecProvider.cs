@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Orleans.Serialization.Cloning;
-using System;
 
 namespace Orleans.Serialization.Serializers
 {

@@ -5,7 +5,6 @@ using Microsoft.Extensions.ObjectPool;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
-using System;
 
 namespace Orleans.Serialization.Session
 {

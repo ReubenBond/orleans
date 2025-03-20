@@ -4,7 +4,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Providers;
-using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using Microsoft.Extensions.Logging.Abstractions;

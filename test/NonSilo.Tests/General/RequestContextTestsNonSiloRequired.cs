@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Globalization;
-using Orleans;
-using Orleans.Runtime;
 using TestExtensions;
 using Xunit;
 using Tester;

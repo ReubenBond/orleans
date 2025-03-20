@@ -4,7 +4,6 @@
 #nullable enable
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.GrainDirectory

@@ -7,7 +7,6 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit.Abstractions;
 using TestExtensions;
-using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.Providers;
 using Orleans.Configuration;

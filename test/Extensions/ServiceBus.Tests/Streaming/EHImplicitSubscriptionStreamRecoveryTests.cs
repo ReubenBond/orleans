@@ -5,7 +5,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Generator;
-using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Tester.StreamingTests;

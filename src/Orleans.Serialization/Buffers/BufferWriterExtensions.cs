@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Orleans.Serialization.Session;
-using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
 

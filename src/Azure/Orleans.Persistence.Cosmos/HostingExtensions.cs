@@ -3,7 +3,6 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans.Storage;
 using Orleans.Providers;
 using Orleans.Persistence.Cosmos;
 using Orleans.Runtime.Hosting;

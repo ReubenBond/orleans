@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
 using Orleans.LeaseProviders;
 
 namespace Orleans.Runtime.Development

@@ -10,7 +10,6 @@ using Tester;
 
 using Orleans.Configuration;
 using Azure.Data.Tables;
-using Azure.Identity;
 
 namespace Tests.GeoClusterTests
 {

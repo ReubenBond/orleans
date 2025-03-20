@@ -4,7 +4,6 @@
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using StackExchange.Redis;

@@ -5,7 +5,6 @@
 
 using System.Text;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.Streams;
 using UnitTests.GrainInterfaces;
 

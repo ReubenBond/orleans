@@ -10,10 +10,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.IO.Pipelines;
 using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 using Xunit;
 using Xunit.Abstractions;
 

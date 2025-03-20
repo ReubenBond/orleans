@@ -11,7 +11,6 @@ using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json;
 
 using Orleans.Serialization;
-using Orleans.Runtime;
 using Orleans.Serialization.Serializers;
 using Orleans.Streaming.EventHubs;
 using Microsoft.Extensions.Options;

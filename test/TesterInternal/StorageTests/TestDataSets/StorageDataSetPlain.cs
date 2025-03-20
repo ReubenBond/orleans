@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Collections;
-using Orleans.Runtime;
 
 namespace UnitTests.StorageTests.Relational.TestDataSets
 {

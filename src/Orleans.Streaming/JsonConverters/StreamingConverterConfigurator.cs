@@ -4,7 +4,6 @@
 #nullable enable
 
 using Microsoft.Extensions.Options;
-using Orleans.Runtime;
 using Orleans.Serialization;
 
 namespace Orleans.Streaming.JsonConverters

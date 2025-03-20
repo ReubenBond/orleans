@@ -4,7 +4,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.EventSourcing;
-using Orleans.Runtime;
 using Orleans.Runtime.LogConsistency;
 
 namespace Orleans.Hosting

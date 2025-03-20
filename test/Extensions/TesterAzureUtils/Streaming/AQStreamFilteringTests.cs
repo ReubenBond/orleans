@@ -8,7 +8,6 @@ using Orleans.Configuration;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.TestingHost;
 using Tester.StreamingTests.Filtering;
-using TestExtensions;
 using UnitTests.StreamingTests;
 using Xunit;
 

@@ -4,7 +4,6 @@
 using System.Net.Sockets;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Messaging;
-using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;

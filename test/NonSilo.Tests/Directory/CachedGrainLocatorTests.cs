@@ -11,7 +11,6 @@ using NSubstitute.ReceivedExtensions;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Metadata;
-using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Hosting;
 using TestExtensions;

@@ -8,7 +8,6 @@ using Orleans.Runtime.ReminderService;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
-using Xunit;
 
 namespace UnitTests.RemindersTest
 {

@@ -4,7 +4,6 @@
 using System.Diagnostics;
 using BenchmarkGrainInterfaces.GrainStorage;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 
 namespace BenchmarkGrains.GrainStorage
 {

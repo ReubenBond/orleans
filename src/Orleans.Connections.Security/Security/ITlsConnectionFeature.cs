@@ -2,8 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Security.Cryptography.X509Certificates;
-using System.Threading.Tasks;
-using System.Threading;
 
 namespace Orleans.Connections.Security
 {

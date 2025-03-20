@@ -3,8 +3,6 @@
 
 using System.Net;
 using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Runtime.Hosting.ProviderConfiguration;
 

@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Orleans.Transactions.Abstractions;
-using System.Threading.Tasks;
 
 namespace Orleans.Transactions.TestKit
 {

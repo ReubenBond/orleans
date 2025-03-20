@@ -1,14 +1,11 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System;
-using System.Threading.Tasks;
 using Azure;
 using Azure.Core;
 using Azure.Storage;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Options;
-using Orleans.Runtime;
 using Orleans.Streaming.AzureStorage;
 
 namespace Orleans.Configuration

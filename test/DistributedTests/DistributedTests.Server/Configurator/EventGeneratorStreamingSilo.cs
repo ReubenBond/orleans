@@ -7,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
-using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace DistributedTests.Server.Configurator

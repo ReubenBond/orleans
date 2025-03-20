@@ -10,7 +10,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Concurrency;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
 using UnitTests.GrainInterfaces;

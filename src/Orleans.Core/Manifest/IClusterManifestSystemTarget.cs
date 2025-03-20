@@ -3,7 +3,6 @@
 
 #nullable enable
 using System.Collections.Immutable;
-using System.Threading.Tasks;
 using Orleans.Metadata;
 
 namespace Orleans.Runtime
