@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Core.Internal;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using Xunit;
@@ -9,17 +11,24 @@ namespace Orleans.Journaling.Tests;
 
 public class JournalingIntegrationTests
 {
-    private class TestClusterFixture : IDisposable
+    public class TestClusterFixture : IDisposable, IAsyncLifetime
     {
-        public TestCluster Cluster { get; }
+        public InProcessTestCluster Cluster { get; }
 
         public TestClusterFixture()
         {
-            var builder = new TestClusterBuilder();
-            builder.AddSiloBuilderConfigurator<TestSiloConfigurator>();
-            builder.AddClientBuilderConfigurator<TestClientConfigurator>();
+            var builder = new InProcessTestClusterBuilder();
+            builder.ConfigureSilo((options, siloBuilder) =>
+                siloBuilder.ConfigureServices(services =>
+                {
+                    services.AddSerializer();
+                }));
+            builder.ConfigureClient(clientBuilder => 
+                clientBuilder.ConfigureServices(services =>
+                {
+                    services.AddSerializer();
+                }));
             Cluster = builder.Build();
-            Cluster.Deploy();
         }
 
         public void Dispose()
@@ -27,26 +36,14 @@ public class JournalingIntegrationTests
             Cluster.StopAllSilos();
         }
 
-        private class TestSiloConfigurator : ISiloConfigurator
+        public async Task InitializeAsync()
         {
-            public void Configure(ISiloBuilder siloBuilder)
-            {
-                siloBuilder.ConfigureServices(services =>
-                {
-                    services.AddSerializer();
-                });
-            }
+            await Cluster.DeployAsync();
         }
 
-        private class TestClientConfigurator : IClientBuilderConfigurator
+        public async Task DisposeAsync()
         {
-            public void Configure(IClientBuilder clientBuilder)
-            {
-                clientBuilder.ConfigureServices(services =>
-                {
-                    services.AddSerializer();
-                });
-            }
+            await Cluster.DisposeAsync();
         }
     }
 
@@ -63,15 +60,14 @@ public class JournalingIntegrationTests
         public async Task Grain_State_Should_Persist_Between_Activations()
         {
             // Arrange - Get a reference to a grain
-            var grain = _fixture.Cluster.GrainFactory.GetGrain<ITestDurableGrainInterface>(Guid.NewGuid());
+            var grain = _fixture.Cluster.Client.GetGrain<ITestDurableGrainInterface>(Guid.NewGuid());
 
             // Act - Set the grain state
             await grain.SetValues("Test Name", 42);
             var initialState = await grain.GetValues();
 
             // Deactivate the grain forcefully
-            await _fixture.Cluster.GrainFactory.GetGrain<IManagementGrain>(0)
-                .DeactivateGrain(grain.GetGrainId());
+            await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
 
             // Wait a moment to ensure deactivation
             await Task.Delay(500);
@@ -88,7 +84,7 @@ public class JournalingIntegrationTests
         public async Task Grain_Should_Handle_Multiple_Collections()
         {
             // Arrange
-            var grain = _fixture.Cluster.GrainFactory.GetGrain<ITestMultiCollectionGrainInterface>(Guid.NewGuid());
+            var grain = _fixture.Cluster.Client.GetGrain<ITestMultiCollectionGrainInterface>(Guid.NewGuid());
 
             // Act - Add items to collections
             await grain.AddToDictionary("key1", 1);
@@ -111,8 +107,7 @@ public class JournalingIntegrationTests
             Assert.Equal(2, await grain.GetSetCount());
 
             // Deactivate the grain forcefully
-            await _fixture.Cluster.GrainFactory.GetGrain<IManagementGrain>(0)
-                .DeactivateGrain(grain.GetGrainId());
+            await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
 
             // Wait a moment to ensure deactivation
             await Task.Delay(500);
@@ -139,8 +134,7 @@ public class JournalingIntegrationTests
             Assert.Equal(1, await grain.GetSetCount());
 
             // Deactivate the grain again
-            await _fixture.Cluster.GrainFactory.GetGrain<IManagementGrain>(0)
-                .DeactivateGrain(grain.GetGrainId());
+            await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
 
             // Wait a moment to ensure deactivation
             await Task.Delay(500);
@@ -160,7 +154,7 @@ public class JournalingIntegrationTests
         public async Task Grain_Should_Handle_Large_State()
         {
             // Arrange
-            var grain = _fixture.Cluster.GrainFactory.GetGrain<ITestMultiCollectionGrainInterface>(Guid.NewGuid());
+            var grain = _fixture.Cluster.Client.GetGrain<ITestMultiCollectionGrainInterface>(Guid.NewGuid());
 
             // Act - Add many items
             const int itemCount = 1000;
@@ -182,8 +176,7 @@ public class JournalingIntegrationTests
             Assert.Equal(100, await grain.GetSetCount());
 
             // Deactivate the grain forcefully
-            await _fixture.Cluster.GrainFactory.GetGrain<IManagementGrain>(0)
-                .DeactivateGrain(grain.GetGrainId());
+            await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
 
             // Wait a moment to ensure deactivation
             await Task.Delay(500);

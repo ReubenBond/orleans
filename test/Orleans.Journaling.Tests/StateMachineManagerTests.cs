@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
+using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
+using Orleans.Serialization.Session;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -263,7 +265,7 @@ public class StateMachineManagerTests : TestBase
             
             // Register with manager
             var stateMachine = new SimpleStateMachine(name);
-            _manager.Register(stateMachine);
+            _manager.RegisterStateMachine(stateMachine);
             
             // Subscribe to events
             stateMachine.OnRecovery += RecoverValue;
