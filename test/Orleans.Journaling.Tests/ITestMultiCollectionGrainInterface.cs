@@ -28,6 +28,4 @@ public interface ITestMultiCollectionGrainInterface : IGrainWithGuidKey
     Task RemoveFromSet(string item);
     Task<bool> ContainsSetItem(string item);
     Task<int> GetSetCount();
-
-    Task WriteStateAsync();
 }

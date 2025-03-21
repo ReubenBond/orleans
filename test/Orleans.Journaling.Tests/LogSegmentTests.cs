@@ -61,7 +61,7 @@ public class LogSegmentTests
     [Fact]
     public async Task DurableListTest()
     {
-        var blobServiceClient = new BlobServiceClient("DefaultEndpointsProtocol=https;AccountName=rbnstor;AccountKey=YLMI6gPvI3XTKFcSvJ7GvEfzwUYMqEHlM0MTdhOcLtc9X6Mzp9J4kTCnWTp9bEh0BnpB363grEVw+AStc6WG5w==;EndpointSuffix=core.windows.net");
+        var blobServiceClient = new BlobServiceClient("fixme");
         var container = blobServiceClient.GetBlobContainerClient("graindb");
         await container.CreateIfNotExistsAsync();
         var blobClient = container.GetAppendBlobClient("my-grain");
@@ -103,7 +103,7 @@ public class LogSegmentTests
     [Fact]
     public async Task DurableList_Snapshot_Test()
     {
-        var blobServiceClient = new BlobServiceClient("DefaultEndpointsProtocol=https;AccountName=rbnstor;AccountKey=YLMI6gPvI3XTKFcSvJ7GvEfzwUYMqEHlM0MTdhOcLtc9X6Mzp9J4kTCnWTp9bEh0BnpB363grEVw+AStc6WG5w==;EndpointSuffix=core.windows.net");
+        var blobServiceClient = new BlobServiceClient("fixme");
         var container = blobServiceClient.GetBlobContainerClient("graindb");
         await container.CreateIfNotExistsAsync();
         var blobClient = container.GetAppendBlobClient("my-grain");

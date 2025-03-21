@@ -1,5 +1,6 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Collections;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -12,6 +13,8 @@ namespace Orleans.Journaling;
 
 public interface IDurableList<T> : IList<T>
 {
+    void AddRange(IEnumerable<T> collection);
+    ReadOnlyCollection<T> AsReadOnly();
 }
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
@@ -251,6 +254,15 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
     }
 
     public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
+    public void AddRange(IEnumerable<T> collection)
+    {
+        foreach (var element in collection)
+        {
+            Add(element);
+        }
+    }
+
+    public ReadOnlyCollection<T> AsReadOnly() => _items.AsReadOnly();
 
     private enum CommandType
     {

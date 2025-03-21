@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Orleans.Journaling.Tests;
 
-public class DurableListTests : TestBase
+public class DurableListTests : StateMachineTestBase
 {
     [Fact]
     public async Task DurableList_BasicOperations_Test()

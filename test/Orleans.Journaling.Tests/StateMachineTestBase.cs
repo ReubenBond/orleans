@@ -9,14 +9,14 @@ namespace Orleans.Journaling.Tests;
 /// <summary>
 /// Base class for journaling tests with common setup
 /// </summary>
-public abstract class TestBase
+public abstract class StateMachineTestBase
 {
     protected readonly ServiceProvider ServiceProvider;
     protected readonly SerializerSessionPool SessionPool;
     protected readonly ICodecProvider CodecProvider;
     protected readonly ILoggerFactory LoggerFactory;
 
-    protected TestBase()
+    protected StateMachineTestBase()
     {
         var services = new ServiceCollection();
         services.AddSerializer();

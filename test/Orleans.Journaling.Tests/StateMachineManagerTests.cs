@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Orleans.Journaling.Tests;
 
-public class StateMachineManagerTests : TestBase
+public class StateMachineManagerTests : StateMachineTestBase
 {
     [Fact]
     public async Task StateMachineManager_RegisterStateMachine_Test()
