@@ -1,114 +1,121 @@
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
+using Orleans.Journaling;
 
 namespace Orleans.Journaling.Tests;
 
-public class TestMultiCollectionGrain : DurableGrain, ITestMultiCollectionGrainInterface
+public class TestMultiCollectionGrain : DurableGrain<MultiCollectionState>, ITestMultiCollectionGrainInterface
 {
-    private readonly DurableDictionary<string, int> _dictionary;
-    private readonly DurableList<string> _list;
-    private readonly DurableQueue<int> _queue;
-    private readonly DurableSet<string> _set;
-    
-    public TestMultiCollectionGrain(ILogger<TestMultiCollectionGrain> logger) 
-        : base(logger)
+    public class MultiCollectionState : DurableState
     {
-        _dictionary = CreateDurableDictionary<string, int>("dictionary");
-        _list = CreateDurableList<string>("list");
-        _queue = CreateDurableQueue<int>("queue");
-        _set = CreateDurableSet<string>("set");
+        public virtual DurableDictionary<string, int>? Dictionary { get; set; }
+        public virtual DurableList<string>? List { get; set; }
+        public virtual DurableQueue<int>? Queue { get; set; }
+        public virtual DurableSet<string>? Set { get; set; }
     }
-    
+
+    private DurableDictionary<string, int> _dictionary = null!;
+    private DurableList<string> _list = null!;
+    private DurableQueue<int> _queue = null!;
+    private DurableSet<string> _set = null!;
+
+    public TestMultiCollectionGrain(ILogger<TestMultiCollectionGrain> logger)
+    {
+        _dictionary = this.State.CreateDurableDictionary<string, int>("dictionary");
+        _list = this.State.CreateDurableList<string>("list");
+        _queue = this.State.CreateDurableQueue<int>("queue");
+        _set = this.State.CreateDurableSet<string>("set");
+    }
+
     // Dictionary operations
-    public Task AddToDictionary(string key, int value)
+    public async Task AddToDictionary(string key, int value)
     {
-        _dictionary[key] = value;
-        return WriteStateAsync();
+        this.State.Dictionary[key] = value;
+        await this.State.WriteStateAsync();
     }
-    
-    public Task RemoveFromDictionary(string key)
+
+    public async Task RemoveFromDictionary(string key)
     {
-        _dictionary.Remove(key);
-        return WriteStateAsync();
+        this.State.Dictionary.Remove(key);
+        await this.State.WriteStateAsync();
     }
-    
-    public Task<int> GetDictionaryValue(string key)
+
+    public async Task<int> GetDictionaryValue(string key)
     {
-        return Task.FromResult(_dictionary[key]);
+        return await Task.FromResult(this.State.Dictionary[key]);
     }
-    
-    public Task<int> GetDictionaryCount()
+
+    public async Task<int> GetDictionaryCount()
     {
-        return Task.FromResult(_dictionary.Count);
+        return await Task.FromResult(this.State.Dictionary.Count);
     }
-    
+
     // List operations
-    public Task AddToList(string item)
+    public async Task AddToList(string item)
     {
-        _list.Add(item);
-        return WriteStateAsync();
+        this.State.List.Add(item);
+        await this.State.WriteStateAsync();
     }
-    
-    public Task RemoveListItemAt(int index)
+
+    public async Task RemoveListItemAt(int index)
     {
-        _list.RemoveAt(index);
-        return WriteStateAsync();
+        this.State.List.RemoveAt(index);
+        await this.State.WriteStateAsync();
     }
-    
-    public Task<string> GetListItem(int index)
+
+    public async Task<string> GetListItem(int index)
     {
-        return Task.FromResult(_list[index]);
+        return await Task.FromResult(this.State.List[index]);
     }
-    
-    public Task<int> GetListCount()
+
+    public async Task<int> GetListCount()
     {
-        return Task.FromResult(_list.Count);
+        return await Task.FromResult(this.State.List.Count);
     }
-    
+
     // Queue operations
-    public Task AddToQueue(int item)
+    public async Task AddToQueue(int item)
     {
-        _queue.Enqueue(item);
-        return WriteStateAsync();
+        this.State.Queue.Enqueue(item);
+        await this.State.WriteStateAsync();
     }
-    
-    public Task<int> DequeueItem()
+
+    public async Task<int> DequeueItem()
     {
-        var item = _queue.Dequeue();
-        WriteStateAsync();
-        return Task.FromResult(item);
+        var item = this.State.Queue.Dequeue();
+        return await Task.FromResult(item);
     }
-    
-    public Task<int> PeekQueueItem()
+
+    public async Task<int> PeekQueueItem()
     {
-        return Task.FromResult(_queue.Peek());
+        return await Task.FromResult(this.State.Queue.Peek());
     }
-    
-    public Task<int> GetQueueCount()
+
+    public async Task<int> GetQueueCount()
     {
-        return Task.FromResult(_queue.Count);
+        return await Task.FromResult(this.State.Queue.Count);
     }
-    
+
     // Set operations
-    public Task AddToSet(string item)
+    public async Task AddToSet(string item)
     {
-        _set.Add(item);
-        return WriteStateAsync();
+        this.State.Set.Add(item);
+        await this.State.WriteStateAsync();
     }
-    
-    public Task RemoveFromSet(string item)
+
+    public async Task RemoveFromSet(string item)
     {
-        _set.Remove(item);
-        return WriteStateAsync();
+        this.State.Set.Remove(item);
+        await this.State.WriteStateAsync();
     }
-    
-    public Task<bool> ContainsSetItem(string item)
+
+    public async Task<bool> ContainsSetItem(string item)
     {
-        return Task.FromResult(_set.Contains(item));
+        return await Task.FromResult(this.State.Set.Contains(item));
     }
-    
-    public Task<int> GetSetCount()
+
+    public async Task<int> GetSetCount()
     {
-        return Task.FromResult(_set.Count);
+        return await Task.FromResult(this.State.Set.Count);
     }
 }

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Serializers;
 using Xunit;
 
@@ -43,7 +44,7 @@ public class DurableQueueTests : TestBase
         
         // Assert
         Assert.Equal("two", dequeued2);
-        Assert.Equal(1, queue.Count);
+        Assert.Single(queue);
         
         // Act - Dequeue last item
         var dequeued3 = queue.Dequeue();
@@ -51,7 +52,7 @@ public class DurableQueueTests : TestBase
         
         // Assert
         Assert.Equal("three", dequeued3);
-        Assert.Equal(0, queue.Count);
+        Assert.Empty(queue);
     }
     
     [Fact]
@@ -119,7 +120,7 @@ public class DurableQueueTests : TestBase
         await manager.WriteStateAsync(CancellationToken.None);
         
         // Assert
-        Assert.Equal(1, queue.Count);
+        Assert.Single(queue);
         Assert.Equal("John", dequeued.Name);
         Assert.Equal(30, dequeued.Age);
     }
@@ -143,7 +144,7 @@ public class DurableQueueTests : TestBase
         await manager.WriteStateAsync(CancellationToken.None);
         
         // Assert
-        Assert.Equal(0, queue.Count);
+        Assert.Empty(queue);
         Assert.Empty(queue);
     }
     
@@ -157,7 +158,7 @@ public class DurableQueueTests : TestBase
         await manager.WriteStateAsync(CancellationToken.None);
         
         // Assert
-        Assert.Equal(0, queue.Count);
+        Assert.Empty(queue);
         
         // Act & Assert - Peek and Dequeue on empty queue should throw
         Assert.Throws<InvalidOperationException>(() => queue.Peek());
@@ -229,7 +230,7 @@ public class DurableQueueTests : TestBase
         }
         
         await manager2.WriteStateAsync(CancellationToken.None);
-        Assert.Equal(0, queue2.Count);
+        Assert.Empty(queue2);
     }
     
     [Fact]
@@ -293,6 +294,6 @@ public class DurableQueueTests : TestBase
         }
         
         await manager2.WriteStateAsync(CancellationToken.None);
-        Assert.Equal(0, queue2.Count);
+        Assert.Empty(queue2);
     }
 }

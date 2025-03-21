@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Serializers;
 using Xunit;
 
@@ -150,7 +151,7 @@ public class DurableDictionaryTests : TestBase
         await manager.WriteStateAsync(CancellationToken.None);
         
         // Assert
-        Assert.Equal(0, dictionary.Count);
+        Assert.Empty(dictionary);
         Assert.Empty(dictionary);
     }
     

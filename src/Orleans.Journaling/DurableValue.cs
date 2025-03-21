@@ -1,9 +1,8 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
@@ -21,16 +20,14 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine
     private const byte VersionByte = 0;
     private readonly SerializerSessionPool _serializerSessionPool;
     private readonly IFieldCodec<T> _codec;
-    private readonly DeepCopier<T> _copier;
     private IStateMachineLogWriter? _storage;
     private T? _value;
     private bool _isDirty;
 
-    public DurableValue([ServiceKey] string key, IStateMachineManager manager, IFieldCodec<T> codec, DeepCopier<T> copier, SerializerSessionPool serializerSessionPool)
+    public DurableValue([ServiceKey] string key, IStateMachineManager manager, IFieldCodec<T> codec, SerializerSessionPool serializerSessionPool)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
-        _copier = copier;
         _serializerSessionPool = serializerSessionPool;
         manager.RegisterStateMachine(key, this);
     }

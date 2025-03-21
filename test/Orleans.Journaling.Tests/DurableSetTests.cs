@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Serializers;
 using Xunit;
 
@@ -120,7 +121,7 @@ public class DurableSetTests : TestBase
         await manager.WriteStateAsync(CancellationToken.None);
         
         // Assert
-        Assert.Equal(0, set.Count);
+        Assert.Empty(set);
         Assert.Empty(set);
     }
     

@@ -1,0 +1,14 @@
+using System.Buffers;
+using Orleans.Serialization.Serializers;
+using Orleans.Serialization.Session;
+
+namespace Orleans.Journaling.Tests;
+
+/// <summary>
+/// Interface for the test durable grain
+/// </summary>
+public interface ITestDurableGrainInterface : IGrainWithGuidKey
+{
+    Task SetValues(string name, int counter);
+    Task<(string Name, int Counter)> GetValues();
+}

@@ -1,7 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans.Hosting;
-using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 public static class HostingExtensions

@@ -23,7 +23,7 @@ public class JournalingIntegrationTests
                 {
                     services.AddSerializer();
                 }));
-            builder.ConfigureClient(clientBuilder => 
+            builder.ConfigureClient(clientBuilder =>
                 clientBuilder.ConfigureServices(services =>
                 {
                     services.AddSerializer();
@@ -186,7 +186,7 @@ public class JournalingIntegrationTests
             {
                 var randomIndex = new Random().Next(0, itemCount - 1);
                 Assert.Equal(randomIndex, await grain.GetDictionaryValue($"key{randomIndex}"));
-                
+
                 if (randomIndex < 100)
                 {
                     Assert.Equal($"item{randomIndex}", await grain.GetListItem(randomIndex));
@@ -195,34 +195,4 @@ public class JournalingIntegrationTests
             }
         }
     }
-}
-
-// Grain interfaces
-public interface ITestDurableGrainInterface : IGrainWithGuidKey
-{
-    Task SetValues(string name, int counter);
-    Task<(string Name, int Counter)> GetValues();
-}
-
-public interface ITestMultiCollectionGrainInterface : IGrainWithGuidKey
-{
-    Task AddToDictionary(string key, int value);
-    Task RemoveFromDictionary(string key);
-    Task<int> GetDictionaryValue(string key);
-    Task<int> GetDictionaryCount();
-
-    Task AddToList(string item);
-    Task RemoveListItemAt(int index);
-    Task<string> GetListItem(int index);
-    Task<int> GetListCount();
-
-    Task AddToQueue(int item);
-    Task<int> DequeueItem();
-    Task<int> PeekQueueItem();
-    Task<int> GetQueueCount();
-
-    Task AddToSet(string item);
-    Task RemoveFromSet(string item);
-    Task<bool> ContainsSetItem(string item);
-    Task<int> GetSetCount();
 }

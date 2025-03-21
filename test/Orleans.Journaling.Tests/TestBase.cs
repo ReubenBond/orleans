@@ -21,7 +21,7 @@ public abstract class TestBase
         var services = new ServiceCollection();
         services.AddSerializer();
         services.AddLogging(builder => builder.AddConsole());
-        
+
         ServiceProvider = services.BuildServiceProvider();
         SessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
         CodecProvider = ServiceProvider.GetRequiredService<ICodecProvider>();
@@ -39,7 +39,7 @@ public abstract class TestBase
     /// <summary>
     /// Creates a state machine manager with in-memory storage
     /// </summary>
-    protected async Task<StateMachineManager> CreateManagerAsync()
+    internal async Task<StateMachineManager> CreateManagerAsync()
     {
         var storage = CreateInMemoryStorage();
         var logger = LoggerFactory.CreateLogger<StateMachineManager>();

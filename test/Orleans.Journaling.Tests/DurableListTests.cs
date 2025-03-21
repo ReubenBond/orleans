@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Serializers;
 using Xunit;
 
@@ -123,7 +124,7 @@ public class DurableListTests : TestBase
         await manager.WriteStateAsync(CancellationToken.None);
         
         // Assert
-        Assert.Equal(0, list.Count);
+        Assert.Empty(list);
         Assert.Empty(list);
     }
     
@@ -142,15 +143,15 @@ public class DurableListTests : TestBase
         await manager.WriteStateAsync(CancellationToken.None);
         
         // Act & Assert
-        Assert.True(list.Contains("two"));
-        Assert.False(list.Contains("four"));
+        Assert.Contains("two", list);
+        Assert.DoesNotContain("four", list);
         
         // Act - Remove
         list.Remove("two");
         await manager.WriteStateAsync(CancellationToken.None);
         
         // Assert
-        Assert.False(list.Contains("two"));
+        Assert.DoesNotContain("two", list);
     }
     
     [Fact]
