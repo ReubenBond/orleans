@@ -1,10 +1,6 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Orleans.Core.Internal;
-using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.TestingHost;
-using Orleans.TestingHost.Utils;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;

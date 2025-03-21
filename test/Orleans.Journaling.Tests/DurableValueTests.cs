@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Orleans.Serialization.Serializers;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -10,7 +9,7 @@ public class DurableValueTests : TestBase
     public async Task DurableValue_BasicOperations_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<string>();
         var durableValue = new DurableValue<string>("testValue", manager, codec, SessionPool);
 
@@ -61,7 +60,7 @@ public class DurableValueTests : TestBase
     public async Task DurableValue_NullValue_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<string?>();
         var durableValue = new DurableValue<string?>("nullableValue", manager, codec, SessionPool);
 
@@ -91,7 +90,7 @@ public class DurableValueTests : TestBase
     public async Task DurableValue_ComplexType_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<TestPerson>();
         var durableValue = new DurableValue<TestPerson>("person", manager, codec, SessionPool);
 

@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Orleans.Serialization.Serializers;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -10,7 +9,7 @@ public class DurableDictionaryTests : TestBase
     public async Task DurableDictionary_BasicOperations_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
         var dictionary = new DurableDictionary<string, int>("testDict", manager, keyCodec, valueCodec, SessionPool);
@@ -82,7 +81,7 @@ public class DurableDictionaryTests : TestBase
     public async Task DurableDictionary_ComplexKeys_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var keyCodec = CodecProvider.GetCodec<TestKey>();
         var valueCodec = CodecProvider.GetCodec<string>();
         var dictionary = new DurableDictionary<TestKey, string>("complexDict", manager, keyCodec, valueCodec, SessionPool);
@@ -105,7 +104,7 @@ public class DurableDictionaryTests : TestBase
     public async Task DurableDictionary_ComplexValues_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<TestPerson>();
         var dictionary = new DurableDictionary<string, TestPerson>("peopleDict", manager, keyCodec, valueCodec, SessionPool);
@@ -135,7 +134,7 @@ public class DurableDictionaryTests : TestBase
     public async Task DurableDictionary_Clear_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
         var dictionary = new DurableDictionary<string, int>("clearDict", manager, keyCodec, valueCodec, SessionPool);
@@ -159,7 +158,7 @@ public class DurableDictionaryTests : TestBase
     public async Task DurableDictionary_Enumeration_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
         var dictionary = new DurableDictionary<string, int>("enumDict", manager, keyCodec, valueCodec, SessionPool);

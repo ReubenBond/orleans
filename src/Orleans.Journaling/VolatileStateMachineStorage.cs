@@ -1,4 +1,4 @@
-﻿using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.Journaling;
@@ -6,7 +6,7 @@ namespace Orleans.Journaling;
 /// <summary>
 /// An in-memory, volatile implementation of <see cref="IStateMachineStorage"/> for non-durable use cases, such as development and testing.
 /// </summary>
-public class VolatileStateMachineStorage : IStateMachineStorage
+public sealed class VolatileStateMachineStorage : IStateMachineStorage
 {
     private readonly List<byte[]> _segments = [];
 

@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Orleans.Serialization.Serializers;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -10,7 +9,7 @@ public class DurableSetTests : TestBase
     public async Task DurableSet_BasicOperations_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<string>();
         var set = new DurableSet<string>("testSet", manager, codec, SessionPool);
         
@@ -82,7 +81,7 @@ public class DurableSetTests : TestBase
     public async Task DurableSet_ComplexValues_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<TestPerson>();
         var set = new DurableSet<TestPerson>("personSet", manager, codec, SessionPool);
         
@@ -106,7 +105,7 @@ public class DurableSetTests : TestBase
     public async Task DurableSet_Clear_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<string>();
         var set = new DurableSet<string>("clearSet", manager, codec, SessionPool);
         
@@ -129,7 +128,7 @@ public class DurableSetTests : TestBase
     public async Task DurableSet_Enumeration_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<string>();
         var set = new DurableSet<string>("enumSet", manager, codec, SessionPool);
         
@@ -154,7 +153,7 @@ public class DurableSetTests : TestBase
     public async Task DurableSet_LargeNumberOfItems_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, storage) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<int>();
         var set = new DurableSet<int>("largeSet", manager, codec, SessionPool);
         
@@ -177,7 +176,6 @@ public class DurableSetTests : TestBase
         Assert.Equal(itemCount, set.Count);
         
         // Create a new manager with the same storage to test recovery
-        var storage = (VolatileStateMachineStorage)manager.Storage;
         var logger = LoggerFactory.CreateLogger<StateMachineManager>();
         var manager2 = new StateMachineManager(storage, logger, SessionPool);
         await manager2.InitializeAsync(CancellationToken.None);
@@ -196,7 +194,7 @@ public class DurableSetTests : TestBase
     public async Task DurableSet_SetOperations_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<int>();
         var set1 = new DurableSet<int>("set1", manager, codec, SessionPool);
         var set2 = new DurableSet<int>("set2", manager, codec, SessionPool);
@@ -239,7 +237,7 @@ public class DurableSetTests : TestBase
     public async Task DurableSet_ExceptWith_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<int>();
         var set = new DurableSet<int>("exceptSet", manager, codec, SessionPool);
         

@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
@@ -8,7 +8,7 @@ using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
-internal sealed class StateMachineManager : IStateMachineManager, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver
+internal sealed class StateMachineManager : IStateMachineManager, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const int MinApplicationStateMachineId = 8;
     private static readonly StringCodec StringCodec = new();
@@ -22,9 +22,7 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
     private readonly Queue<WorkItem> _workQueue = new();
     private readonly CancellationTokenSource _shutdownCancellation = new();
     private readonly StateMachineManagerState _stateMachineIds;
-#pragma warning disable IDE0052 // Remove unread private members
-    private readonly Task? _workLoop; // Retained for diagnostics.
-#pragma warning restore IDE0052 // Remove unread private members
+    private readonly Task _workLoop;
     private ManagerState _state;
     private Task? _pendingWrite;
     private ulong _nextStateMachineId = MinApplicationStateMachineId;
@@ -48,6 +46,7 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
 
     public void RegisterStateMachine(string name, IDurableStateMachine stateMachine)
     {
+        _shutdownCancellation.Token.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNullOrEmpty(name);
 
         lock (_lock)
@@ -65,6 +64,7 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
     public async ValueTask InitializeAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        _shutdownCancellation.Token.ThrowIfCancellationRequested();
 
         Task task;
         lock (_lock)
@@ -86,6 +86,7 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
 
     private async Task WorkLoop()
     {
+        using var cancellationRegistration = _shutdownCancellation.Token.Register(state => ((StateMachineManager)state!)._workSignal.Signal(), this);
         await Task.Yield();
         var needsRecovery = true;
         while (true)
@@ -93,6 +94,7 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
             try
             {
                 await _workSignal.WaitAsync().ConfigureAwait(false);
+                _shutdownCancellation.Token.ThrowIfCancellationRequested();
 
                 while (true)
                 {
@@ -253,7 +255,7 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
         }
     }
 
-    private void AppendUpdatesOrSnapshotStateMachine(LogExtentBuilder logSegment, bool isSnapshot, ulong id, IDurableStateMachine stateMachine)  
+    private static void AppendUpdatesOrSnapshotStateMachine(LogExtentBuilder logSegment, bool isSnapshot, ulong id, IDurableStateMachine stateMachine)  
     {
         var writer = logSegment.CreateLogWriter(new(id));
         if (isSnapshot)
@@ -368,7 +370,16 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
 
     void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer) => observer.Subscribe(GrainLifecycleStage.SetupState, this);
     Task ILifecycleObserver.OnStart(CancellationToken cancellationToken) => InitializeAsync(cancellationToken).AsTask();
-    Task ILifecycleObserver.OnStop(CancellationToken cancellationToken) => Task.CompletedTask;
+    async Task ILifecycleObserver.OnStop(CancellationToken cancellationToken)
+    {
+        _shutdownCancellation.Cancel();
+        await _workLoop.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+    }
+
+    void IDisposable.Dispose()
+    {
+        _shutdownCancellation.Dispose();
+    }
 
     private sealed class StateMachineLogWriter(StateMachineManager manager, StateMachineId streamId) : IStateMachineLogWriter
     {

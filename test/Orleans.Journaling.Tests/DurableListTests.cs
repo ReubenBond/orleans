@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Orleans.Serialization.Serializers;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -10,7 +9,7 @@ public class DurableListTests : TestBase
     public async Task DurableList_BasicOperations_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<string>();
         var list = new DurableList<string>("testList", manager, codec, SessionPool);
         
@@ -80,7 +79,7 @@ public class DurableListTests : TestBase
     public async Task DurableList_ComplexValues_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<TestPerson>();
         var list = new DurableList<TestPerson>("personList", manager, codec, SessionPool);
         
@@ -109,7 +108,7 @@ public class DurableListTests : TestBase
     public async Task DurableList_Clear_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<string>();
         var list = new DurableList<string>("clearList", manager, codec, SessionPool);
         
@@ -132,7 +131,7 @@ public class DurableListTests : TestBase
     public async Task DurableList_Contains_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<string>();
         var list = new DurableList<string>("containsList", manager, codec, SessionPool);
         
@@ -158,7 +157,7 @@ public class DurableListTests : TestBase
     public async Task DurableList_InsertAndRemove_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<string>();
         var list = new DurableList<string>("insertList", manager, codec, SessionPool);
         
@@ -192,7 +191,7 @@ public class DurableListTests : TestBase
     public async Task DurableList_Enumeration_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<string>();
         var list = new DurableList<string>("enumList", manager, codec, SessionPool);
         
@@ -217,7 +216,7 @@ public class DurableListTests : TestBase
     public async Task DurableList_LargeNumberOfOperations_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, storage) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<int>();
         var list = new DurableList<int>("largeList", manager, codec, SessionPool);
         
@@ -255,7 +254,6 @@ public class DurableListTests : TestBase
         }
         
         // Create a new manager with the same storage to test recovery of large list
-        var storage = (VolatileStateMachineStorage)manager.Storage;
         var logger = LoggerFactory.CreateLogger<StateMachineManager>();
         var manager2 = new StateMachineManager(storage, logger, SessionPool);
         await manager2.InitializeAsync(CancellationToken.None);

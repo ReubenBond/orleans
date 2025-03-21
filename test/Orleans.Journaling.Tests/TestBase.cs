@@ -39,12 +39,12 @@ public abstract class TestBase
     /// <summary>
     /// Creates a state machine manager with in-memory storage
     /// </summary>
-    internal async Task<StateMachineManager> CreateManagerAsync()
+    internal async Task<(StateMachineManager Manaager, VolatileStateMachineStorage Storage)> CreateManagerAsync()
     {
         var storage = CreateInMemoryStorage();
         var logger = LoggerFactory.CreateLogger<StateMachineManager>();
         var manager = new StateMachineManager(storage, logger, SessionPool);
         await manager.InitializeAsync(CancellationToken.None);
-        return manager;
+        return (manager, storage);
     }
 }

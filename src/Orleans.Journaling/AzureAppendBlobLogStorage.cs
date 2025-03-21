@@ -14,15 +14,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Journaling;
 
-public interface IStateMachineStorageProvider
-{
-    IStateMachineStorage Create(IGrainContext grainContext);
-}
-
 /// <summary>
 /// Options for configuring the Azure Append Blob state machine storage provider.
 /// </summary>
-public class AzureAppendBlobStateMachineStorageOptions
+public sealed class AzureAppendBlobStateMachineStorageOptions
 {
     /// <summary>
     /// Container name where state machine state is stored.
@@ -144,7 +139,7 @@ public interface IBlobContainerFactory
 /// Initializes a new instance of the <see cref="DefaultBlobContainerFactory"/> class.
 /// </remarks>
 /// <param name="options">The blob storage options</param>
-internal class DefaultBlobContainerFactory(AzureAppendBlobStateMachineStorageOptions options) : IBlobContainerFactory
+internal sealed class DefaultBlobContainerFactory(AzureAppendBlobStateMachineStorageOptions options) : IBlobContainerFactory
 {
     private BlobContainerClient _defaultContainer = null!;
 

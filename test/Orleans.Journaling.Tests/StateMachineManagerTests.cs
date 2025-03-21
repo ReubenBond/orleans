@@ -1,7 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Serializers;
-using Orleans.Serialization.Session;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -9,26 +6,10 @@ namespace Orleans.Journaling.Tests;
 public class StateMachineManagerTests : TestBase
 {
     [Fact]
-    public async Task StateMachineManager_Initialization_Test()
-    {
-        // Arrange
-        var storage = CreateInMemoryStorage();
-        var logger = LoggerFactory.CreateLogger<StateMachineManager>();
-
-        // Act
-        var manager = new StateMachineManager(storage, logger, SessionPool);
-        await manager.InitializeAsync(CancellationToken.None);
-
-        // Assert
-        Assert.NotNull(manager);
-        Assert.Equal(storage, manager.Storage);
-    }
-
-    [Fact]
     public async Task StateMachineManager_RegisterStateMachine_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<int>();
 
         // Act - Register state machines
@@ -93,7 +74,7 @@ public class StateMachineManagerTests : TestBase
     public async Task StateMachineManager_MultipleWriteStates_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, storage) = await CreateManagerAsync();
         var dictionary = new DurableDictionary<string, int>("dict1", manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
 
         // Act - Multiple operations with WriteState in between
@@ -115,7 +96,6 @@ public class StateMachineManagerTests : TestBase
         Assert.False(dictionary.ContainsKey("key2"));
 
         // Create new manager to verify recovery
-        var storage = (VolatileStateMachineStorage)manager.Storage;
         var logger = LoggerFactory.CreateLogger<StateMachineManager>();
         var manager2 = new StateMachineManager(storage, logger, SessionPool);
         await manager2.InitializeAsync(CancellationToken.None);
@@ -132,7 +112,7 @@ public class StateMachineManagerTests : TestBase
     public async Task StateMachineManager_MultipleStateMachines_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, storage) = await CreateManagerAsync();
 
         // Create multiple state machines with different types
         var intDict = new DurableDictionary<int, string>("intDict", manager, CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<string>(), SessionPool);
@@ -162,7 +142,6 @@ public class StateMachineManagerTests : TestBase
         Assert.Equal("Test Person", personValue.Value.Name);
 
         // Create new manager to verify recovery of multiple state machines
-        var storage = (VolatileStateMachineStorage)manager.Storage;
         var logger = LoggerFactory.CreateLogger<StateMachineManager>();
         var manager2 = new StateMachineManager(storage, logger, SessionPool);
         await manager2.InitializeAsync(CancellationToken.None);
@@ -187,7 +166,7 @@ public class StateMachineManagerTests : TestBase
     public async Task StateMachineManager_Concurrency_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var dict1 = new DurableDictionary<string, int>("dict1", manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
         var dict2 = new DurableDictionary<string, int>("dict2", manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
 

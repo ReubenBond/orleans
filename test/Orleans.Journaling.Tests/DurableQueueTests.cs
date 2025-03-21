@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Orleans.Serialization.Serializers;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -10,7 +9,7 @@ public class DurableQueueTests : TestBase
     public async Task DurableQueue_BasicOperations_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<string>();
         var queue = new DurableQueue<string>("testQueue", manager, codec, SessionPool);
         
@@ -98,7 +97,7 @@ public class DurableQueueTests : TestBase
     public async Task DurableQueue_ComplexValues_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<TestPerson>();
         var queue = new DurableQueue<TestPerson>("personQueue", manager, codec, SessionPool);
         
@@ -129,7 +128,7 @@ public class DurableQueueTests : TestBase
     public async Task DurableQueue_Clear_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<string>();
         var queue = new DurableQueue<string>("clearQueue", manager, codec, SessionPool);
         
@@ -152,7 +151,7 @@ public class DurableQueueTests : TestBase
     public async Task DurableQueue_EmptyQueueOperations_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<string>();
         var queue = new DurableQueue<string>("emptyQueue", manager, codec, SessionPool);
         await manager.WriteStateAsync(CancellationToken.None);
@@ -169,7 +168,7 @@ public class DurableQueueTests : TestBase
     public async Task DurableQueue_Enumeration_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, _) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<string>();
         var queue = new DurableQueue<string>("enumQueue", manager, codec, SessionPool);
         
@@ -194,7 +193,7 @@ public class DurableQueueTests : TestBase
     public async Task DurableQueue_LargeNumberOfOperations_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, storage) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<int>();
         var queue = new DurableQueue<int>("largeQueue", manager, codec, SessionPool);
         
@@ -212,7 +211,6 @@ public class DurableQueueTests : TestBase
         Assert.Equal(0, queue.Peek());
         
         // Create a new manager with the same storage to test recovery
-        var storage = (VolatileStateMachineStorage)manager.Storage;
         var logger = LoggerFactory.CreateLogger<StateMachineManager>();
         var manager2 = new StateMachineManager(storage, logger, SessionPool);
         await manager2.InitializeAsync(CancellationToken.None);
@@ -237,7 +235,7 @@ public class DurableQueueTests : TestBase
     public async Task DurableQueue_Concurrent_EnqueueDequeue_Test()
     {
         // Arrange
-        var manager = await CreateManagerAsync();
+        var (manager, storage) = await CreateManagerAsync();
         var codec = CodecProvider.GetCodec<int>();
         var queue = new DurableQueue<int>("concurrentQueue", manager, codec, SessionPool);
         
@@ -269,7 +267,6 @@ public class DurableQueueTests : TestBase
         Assert.Equal(batchSize + batchSize / 2, queue.Count); // Should have 150 items
         
         // Create a new manager with the same storage to test recovery
-        var storage = (VolatileStateMachineStorage)manager.Storage;
         var logger = LoggerFactory.CreateLogger<StateMachineManager>();
         var manager2 = new StateMachineManager(storage, logger, SessionPool);
         await manager2.InitializeAsync(CancellationToken.None);

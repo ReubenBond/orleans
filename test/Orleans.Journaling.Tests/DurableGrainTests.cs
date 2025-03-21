@@ -1,6 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
-using Orleans.Serialization.Serializers;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -368,6 +366,8 @@ internal class TestDurableGrainWithCollections : DurableGrain, ITestMultiCollect
     {
         return (VolatileStateMachineStorage)StateStorage;
     }
+
+    public Task WriteStateAsync() => base.WriteStateAsync().AsTask();
 }
 
 #endregion
