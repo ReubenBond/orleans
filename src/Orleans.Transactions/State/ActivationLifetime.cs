@@ -3,62 +3,60 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-namespace Orleans.Transactions.State
+namespace Orleans.Transactions.State;
+
+internal sealed class ActivationLifetime : ILifecycleObserver
 {
-    internal class ActivationLifetime : IActivationLifetime, ILifecycleObserver
+    private readonly CancellationTokenSource _onDeactivating = new();
+    private int _pendingDeactivationLocks;
+
+    public ActivationLifetime(IGrainContext activationContext)
     {
-        private readonly CancellationTokenSource onDeactivating = new CancellationTokenSource();
+        activationContext.ObservableLifecycle.Subscribe(GrainLifecycleStage.First, this);
+        activationContext.ObservableLifecycle.Subscribe(GrainLifecycleStage.Last, this);
+    }
 
-        private int pendingDeactivationLocks;
+    public CancellationToken OnDeactivating => _onDeactivating.Token;
 
-        public ActivationLifetime(IGrainContext activationContext)
+    public Task OnStart(CancellationToken ct) => Task.CompletedTask;
+
+    public Task OnStop(CancellationToken ct)
+    {
+        _onDeactivating.Cancel(throwOnFirstException: false);
+
+        if (!ct.IsCancellationRequested && _pendingDeactivationLocks > 0)
         {
-            activationContext.ObservableLifecycle.Subscribe(GrainLifecycleStage.First, this);
-            activationContext.ObservableLifecycle.Subscribe(GrainLifecycleStage.Last, this);
+            return OnStopAsync(ct);
         }
 
-        public CancellationToken OnDeactivating => this.onDeactivating.Token;
+        return Task.CompletedTask;
+    }
 
-        public Task OnStart(CancellationToken ct) => Task.CompletedTask;
-
-        public Task OnStop(CancellationToken ct)
+    private async Task OnStopAsync(CancellationToken ct)
+    {
+        var startTime = DateTime.UtcNow;
+        var maxTime = TimeSpan.FromSeconds(5);
+        while (!ct.IsCancellationRequested && _pendingDeactivationLocks > 0 && DateTime.UtcNow - startTime < maxTime)
         {
-            this.onDeactivating.Cancel(throwOnFirstException: false);
+            await Task.Delay(TimeSpan.FromMilliseconds(10));
+        }
+    }
 
-            if (!ct.IsCancellationRequested && pendingDeactivationLocks > 0)
-            {
-                return OnStopAsync(ct);
-            }
+    public DeactivationBlocker BlockDeactivation() => new(this);
 
-            return Task.CompletedTask;
+    internal readonly struct DeactivationBlocker : IDisposable
+    {
+        private readonly ActivationLifetime _owner;
+
+        public DeactivationBlocker(ActivationLifetime owner)
+        {
+            _owner = owner;
+            Interlocked.Increment(ref owner._pendingDeactivationLocks);
         }
 
-        private async Task OnStopAsync(CancellationToken ct)
+        public void Dispose()
         {
-            var startTime = DateTime.UtcNow;
-            var maxTime = TimeSpan.FromSeconds(5);
-            while (!ct.IsCancellationRequested && pendingDeactivationLocks > 0 && DateTime.UtcNow - startTime < maxTime)
-            {
-                await Task.Delay(TimeSpan.FromMilliseconds(10));
-            }
-        }
-
-        public IDisposable BlockDeactivation() => new BlockDeactivationDisposable(this);
-
-        private class BlockDeactivationDisposable : IDisposable
-        {
-            private readonly ActivationLifetime owner;
-
-            public BlockDeactivationDisposable(ActivationLifetime owner)
-            {
-                this.owner = owner;
-                Interlocked.Increment(ref owner.pendingDeactivationLocks);
-            }
-
-            public void Dispose()
-            {
-                Interlocked.Decrement(ref owner.pendingDeactivationLocks);
-            }
+            Interlocked.Decrement(ref _owner._pendingDeactivationLocks);
         }
     }
 }

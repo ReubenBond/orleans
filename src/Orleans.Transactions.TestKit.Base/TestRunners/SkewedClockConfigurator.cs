@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.TestingHost;
@@ -13,7 +13,7 @@ namespace Orleans.Transactions.TestKit
         public void Configure(ISiloBuilder hostBuilder)
         {
             hostBuilder
-                .ConfigureServices(services => services.AddSingleton<IClock>(sp => new SkewedClock(MinSkew, MaxSkew)));
+                .ConfigureServices(services => services.AddSingleton<TimeProvider>(sp => new SkewedClock(MinSkew, MaxSkew)));
         }
     }
 }

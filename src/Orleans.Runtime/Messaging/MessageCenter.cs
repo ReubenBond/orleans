@@ -455,10 +455,7 @@ namespace Orleans.Runtime.Messaging
 
         /// <summary>
         /// Send an outgoing message, may complete synchronously
-        /// - may buffer for transaction completion / commit if it ends a transaction
-        /// - choose target placement address, maintaining send order
-        /// - add ordering info and maintain send order
-        ///
+        /// - choose target placement address
         /// </summary>
         internal Task AddressAndSendMessage(Message message)
         {

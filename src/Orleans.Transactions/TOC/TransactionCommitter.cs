@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
-using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.State;
 using Orleans.Transactions.TOC;
@@ -141,10 +140,9 @@ namespace Orleans.Transactions
             // setup transaction processing pipe
             void deactivate() => grainRuntime.DeactivateOnIdle(context);
             var options = this.context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
-            var clock = this.context.ActivationServices.GetRequiredService<IClock>();
+            var timeProvider = this.context.ActivationServices.GetRequiredService<TimeProvider>();
             TService service = this.context.ActivationServices.GetRequiredKeyedService<TService>(this.config.ServiceName);
-            var timerManager = this.context.ActivationServices.GetRequiredService<ITimerManager>();
-            this.queue = new TocTransactionQueue<TService>(service, options, this.participantId, deactivate, storage, clock, logger, timerManager, this.activationLifetime);
+            this.queue = new TocTransactionQueue<TService>(service, options, this.participantId, deactivate, storage, timeProvider, logger, this.activationLifetime);
 
             // Add transaction manager factory to the grain context
             this.context.RegisterResourceFactory<ITransactionManager>(this.config.ServiceName, () => new TransactionManager<OperationState>(this.queue));

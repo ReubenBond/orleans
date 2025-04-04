@@ -1357,7 +1357,7 @@ internal sealed class ActivationData :
     }
 
     /// <summary>
-    /// Invoked when an activation has finished a transaction and may be ready for additional transactions
+    /// Invoked when an activation has finished a request and may be ready for additional requests
     /// </summary>
     /// <param name="message">The message that has just completed processing.</param>
     private void OnCompletedRequest(Message message)

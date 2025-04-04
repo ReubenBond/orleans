@@ -1,25 +1,19 @@
 using System;
 
-namespace Orleans.Transactions.TestKit
+namespace Orleans.Transactions.TestKit;
+
+public class SkewedClock(TimeSpan minSkew, TimeSpan maxSkew) : TimeProvider
 {
-    public class SkewedClock : IClock
+    private readonly int _skewRangeTicks = (int)(maxSkew.Ticks - minSkew.Ticks);
+
+    public override DateTimeOffset GetUtcNow()
     {
-        private readonly TimeSpan minSkew;
-        private readonly int skewRangeTicks;
+        var skew = TimeSpan.FromTicks(minSkew.Ticks + Random.Shared.Next(_skewRangeTicks));
 
-        public SkewedClock(TimeSpan minSkew, TimeSpan maxSkew)
-        {
-            this.minSkew = minSkew;
-            this.skewRangeTicks = (int)(maxSkew.Ticks - minSkew.Ticks);
-        }
-
-        public DateTime UtcNow()
-        {
-            TimeSpan skew = TimeSpan.FromTicks(minSkew.Ticks + Random.Shared.Next(skewRangeTicks));
-            // skew forward in time or backward in time
-            return ((Random.Shared.Next() & 1) != 0)
-                ? DateTime.UtcNow + skew
-                : DateTime.UtcNow - skew;
-        }
+        // skew forward in time or backward in time
+        var baseValue = base.GetUtcNow();
+        return ((Random.Shared.Next() & 1) != 0)
+            ? baseValue + skew
+            : baseValue - skew;
     }
 }

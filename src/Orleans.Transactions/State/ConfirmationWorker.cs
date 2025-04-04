@@ -5,185 +5,164 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
 
-namespace Orleans.Transactions.State
+namespace Orleans.Transactions.State;
+
+internal sealed class ConfirmationWorker<TState>(
+    IOptions<TransactionalStateOptions> options,
+    ParticipantId me,
+    BatchWorker storageWorker,
+    Func<StorageBatch<TState>> getStorageBatch,
+    ILogger logger,
+    ActivationLifetime activationLifetime)
+    where TState : class, new()
 {
-    internal class ConfirmationWorker<TState>
-        where TState : class, new()
+    private readonly TransactionalStateOptions _options = options.Value;
+    private readonly ParticipantId _me = me;
+    private readonly BatchWorker _storageWorker = storageWorker;
+    private readonly Func<StorageBatch<TState>> _getStorageBatch = getStorageBatch;
+    private readonly ILogger _logger = logger;
+    private readonly ActivationLifetime _activationLifetime = activationLifetime;
+    private readonly HashSet<Guid> _pending = [];
+
+    public void Add(Guid transactionId, DateTime timestamp, List<ParticipantId> participants)
     {
-        private readonly TransactionalStateOptions options;
-        private readonly ParticipantId me;
-        private readonly BatchWorker storageWorker;
-        private readonly Func<StorageBatch<TState>> getStorageBatch;
-        private readonly ILogger logger;
-        private readonly ITimerManager timerManager;
-        private readonly IActivationLifetime activationLifetime;
-        private readonly HashSet<Guid> pending;
-
-        public ConfirmationWorker(
-            IOptions<TransactionalStateOptions> options,
-            ParticipantId me,
-            BatchWorker storageWorker,
-            Func<StorageBatch<TState>> getStorageBatch,
-            ILogger logger,
-            ITimerManager timerManager,
-            IActivationLifetime activationLifetime)
+        if (!IsConfirmed(transactionId))
         {
-            this.options = options.Value;
-            this.me = me;
-            this.storageWorker = storageWorker;
-            this.getStorageBatch = getStorageBatch;
-            this.logger = logger;
-            this.timerManager = timerManager;
-            this.activationLifetime = activationLifetime;
-            this.pending = new HashSet<Guid>();
+            _pending.Add(transactionId);
+            SendConfirmation(transactionId, timestamp, participants).Ignore();
         }
+    }
 
-        public void Add(Guid transactionId, DateTime timestamp, List<ParticipantId> participants)
+    public bool IsConfirmed(Guid transactionId)
+    {
+        return _pending.Contains(transactionId);
+    }
+
+    private async Task SendConfirmation(Guid transactionId, DateTime timestamp, List<ParticipantId> participants)
+    {
+        await NotifyAll(transactionId, timestamp, participants);
+        await Collect(transactionId);
+    }
+
+    private async Task NotifyAll(Guid transactionId, DateTime timestamp, List<ParticipantId> participants)
+    {
+        List<Confirmation> confirmations = participants
+                .Where(p => !p.Equals(_me))
+                .Select(p => new Confirmation(
+                    p,
+                    transactionId,
+                    timestamp,
+                    () => p.Id.AsReference<ITransactionalResourceExtension>()
+                        .Confirm(p.Name, transactionId, timestamp),
+                    _logger))
+                .ToList();
+
+        if (confirmations.Count == 0) return;
+
+        // attempts to confirm all, will retry every ConfirmationRetryDelay until all succeed
+        var ct = _activationLifetime.OnDeactivating;
+
+        bool hasPendingConfirmations = true;
+        while (!ct.IsCancellationRequested && hasPendingConfirmations)
         {
-            if (!IsConfirmed(transactionId))
+            using var _ = _activationLifetime.BlockDeactivation();
+            var confirmationResults = await Task.WhenAll(confirmations.Select(c => c.Confirmed()));
+            hasPendingConfirmations = false;
+            foreach (var confirmed in confirmationResults)
             {
-                this.pending.Add(transactionId);
-                SendConfirmation(transactionId, timestamp, participants).Ignore();
-            }
-        }
-
-        public bool IsConfirmed(Guid transactionId)
-        {
-            return this.pending.Contains(transactionId);
-        }
-
-        private async Task SendConfirmation(Guid transactionId, DateTime timestamp, List<ParticipantId> participants)
-        {
-            await NotifyAll(transactionId, timestamp, participants);
-            await Collect(transactionId);
-        }
-
-        private async Task NotifyAll(Guid transactionId, DateTime timestamp, List<ParticipantId> participants)
-        {
-            List<Confirmation> confirmations = participants
-                    .Where(p => !p.Equals(this.me))
-                    .Select(p => new Confirmation(
-                        p,
-                        transactionId,
-                        timestamp,
-                        () => p.Reference.AsReference<ITransactionalResourceExtension>()
-                            .Confirm(p.Name, transactionId, timestamp),
-                        this.logger))
-                    .ToList();
-
-            if (confirmations.Count == 0) return;
-
-            // attempts to confirm all, will retry every ConfirmationRetryDelay until all succeed
-            var ct = this.activationLifetime.OnDeactivating;
-
-            bool hasPendingConfirmations = true;
-            while (!ct.IsCancellationRequested && hasPendingConfirmations)
-            {
-                using (this.activationLifetime.BlockDeactivation())
+                if (!confirmed)
                 {
-                    var confirmationResults = await Task.WhenAll(confirmations.Select(c => c.Confirmed()));
-                    hasPendingConfirmations = false;
-                    foreach (var confirmed in confirmationResults)
-                    {
-                        if (!confirmed)
-                        {
-                            hasPendingConfirmations = true;
-                            await this.timerManager.Delay(this.options.ConfirmationRetryDelay, ct);
-                            break;
-                        }
-                    }
+                    hasPendingConfirmations = true;
+                    await Task.Delay(_options.ConfirmationRetryDelay, ct);
+                    break;
                 }
             }
         }
+    }
 
-        // retries collect until it succeeds
-        private async Task Collect(Guid transactionId)
+    // retries collect until it succeeds
+    private async Task Collect(Guid transactionId)
+    {
+        var ct = _activationLifetime.OnDeactivating;
+        while (!ct.IsCancellationRequested)
         {
-            var ct = this.activationLifetime.OnDeactivating;
-            while (!ct.IsCancellationRequested)
+            using var _ = _activationLifetime.BlockDeactivation();
+            if (await TryCollect(transactionId))
             {
-                using (this.activationLifetime.BlockDeactivation())
-                {
-                    if (await TryCollect(transactionId)) break;
-
-                    await this.timerManager.Delay(this.options.ConfirmationRetryDelay, ct);
-                }
+                break;
             }
+
+            await Task.Delay(_options.ConfirmationRetryDelay, ct);
+        }
+    }
+
+    // attempt to clear transaction from commit log
+    private async Task<bool> TryCollect(Guid transactionId)
+    {
+        try
+        {
+            var storeComplete = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            // Now we can remove the commit record.
+            StorageBatch<TState> storageBatch = _getStorageBatch();
+            storageBatch.Collect(transactionId);
+            storageBatch.FollowUpAction(() =>
+            {
+                if (_logger.IsEnabled(LogLevel.Trace))
+                {
+                    _logger.LogTrace("Collection completed. TransactionId:{TransactionId}", transactionId);
+                }
+                _pending.Remove(transactionId);
+                storeComplete.TrySetResult(true);
+            });
+
+            _storageWorker.Notify();
+
+            // wait for storage call, so we don't free spin
+            return await storeComplete.Task;
+        }
+        catch(Exception ex)
+        {
+            _logger.LogWarning(ex, "Error occurred while cleaning up transaction {TransactionId} from commit log.  Will retry.", transactionId);
         }
 
-        // attempt to clear transaction from commit log
-        private async Task<bool> TryCollect(Guid transactionId)
+        return false;
+    }
+
+    // Tracks the effort to notify a participant, will not call again once it succeeds.
+    private struct Confirmation(
+        ParticipantId participant,
+        Guid transactionId,
+        DateTime timestamp,
+        Func<Task> call,
+        ILogger logger)
+    {
+        private readonly ILogger _logger = logger;
+        private Task _pending = null;
+        private bool _complete = false;
+
+        public async Task<bool> Confirmed()
         {
+            if (_complete)
+            {
+                return _complete;
+            }
+
+            _pending = _pending ?? call();
+
             try
             {
-                var storeComplete = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-                // Now we can remove the commit record.
-                StorageBatch<TState> storageBatch = getStorageBatch();
-                storageBatch.Collect(transactionId);
-                storageBatch.FollowUpAction(() =>
-                {
-                    if (this.logger.IsEnabled(LogLevel.Trace))
-                    {
-                        this.logger.LogTrace("Collection completed. TransactionId:{TransactionId}", transactionId);
-                    }
-                    this.pending.Remove(transactionId);
-                    storeComplete.TrySetResult(true);
-                });
-
-                storageWorker.Notify();
-
-                // wait for storage call, so we don't free spin
-                return await storeComplete.Task;
+                await _pending;
+                _complete = true;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                this.logger.LogWarning(ex, "Error occured while cleaning up transaction {TransactionId} from commit log.  Will retry.", transactionId);
+                _pending = null;
+                _logger.LogWarning(ex, "Confirmation of transaction {TransactionId} with timestamp {Timestamp} to participant {Participant} failed.  Retrying", transactionId, timestamp, participant);
             }
 
-            return false;
-        }
-
-        // Tracks the effort to notify a participant, will not call again once it succeeds.
-        private struct Confirmation
-        {
-            private readonly ParticipantId participant;
-            private readonly Guid transactionId;
-            private readonly DateTime timestamp;
-            private readonly Func<Task> call;
-            private readonly ILogger logger;
-            private Task pending;
-            private bool complete;
-
-            public Confirmation(ParticipantId paricipant, Guid transactionId, DateTime timestamp, Func<Task> call, ILogger logger)
-            {
-                this.participant = paricipant;
-                this.transactionId = transactionId;
-                this.timestamp = timestamp;
-                this.call = call;
-                this.logger = logger;
-                this.pending = null;
-                this.complete = false;
-            }
-
-            public async Task<bool> Confirmed()
-            {
-                if (this.complete) return this.complete;
-                this.pending = this.pending ?? call();
-                try
-                {
-                    await this.pending;
-                    this.complete = true;
-                }
-                catch (Exception ex)
-                {
-                    this.pending = null;
-                    logger.LogWarning(ex, "Confirmation of transaction {TransactionId} with timestamp {Timestamp} to participant {Participant} failed.  Retrying", this.transactionId, this.timestamp, this.participant);
-                }
-                return this.complete;
-            }
+            return _complete;
         }
     }
 }

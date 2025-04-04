@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Orleans.Timers.Internal;
 
 #nullable enable
 namespace Orleans
@@ -91,7 +90,11 @@ namespace Orleans
 
         private async Task ScheduleNotify(DateTime time, DateTime now)
         {
-            await TimerManager.Delay(time - now, this.CancellationToken);
+            var period = time - now;
+            if (period > TimeSpan.Zero)
+            {
+                await Task.Delay(period, CancellationToken);
+            }
 
             if (scheduledNotify == time)
             {
@@ -176,7 +179,7 @@ namespace Orleans
 
         private Task CreateNextWorkCyclePromise()
         {
-            // it's OK to run any continuations synchrnously because this promise only gets signaled at the very end of CheckForMoreWork
+            // it's OK to run any continuations synchronously because this promise only gets signaled at the very end of CheckForMoreWork
             nextWorkCyclePromise = new TaskCompletionSource<Task>();
             return nextWorkCycle = nextWorkCyclePromise.Task.Unwrap();
         }
@@ -206,7 +209,7 @@ namespace Orleans
     /// </summary>
     public class BatchWorkerFromDelegate : BatchWorker
     {
-        private readonly Func<Task> work;
+        private readonly Func<Task> _work;
 
         /// <summary>
         /// Initializes a new <see cref="BatchWorkerFromDelegate"/> instance.
@@ -215,14 +218,14 @@ namespace Orleans
         /// <param name="cancellationToken">The cancellation token used to stop the worker.</param>
         public BatchWorkerFromDelegate(Func<Task> work, CancellationToken cancellationToken = default)
         {
-            this.work = work;
+            this._work = work;
             this.CancellationToken = cancellationToken;
         }
 
         /// <inheritdoc />
         protected override Task Work()
         {
-            return work();
+            return _work();
         }
     }
 }
