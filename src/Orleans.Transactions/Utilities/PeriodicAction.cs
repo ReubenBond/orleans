@@ -1,26 +1,20 @@
 using System;
 
-namespace Orleans.Internal.Trasactions
+namespace Orleans.Internal.Trasactions;
+
+internal sealed class PeriodicAction(TimeSpan period, Action action, DateTime? start = null)
 {
-    internal class PeriodicAction
+    private DateTime _nextUtc = start ?? DateTime.UtcNow + period;
+
+    public bool TryAction(DateTime nowUtc)
     {
-        private readonly Action action;
-        private readonly TimeSpan period;
-        private DateTime nextUtc;
-
-        public PeriodicAction(TimeSpan period, Action action, DateTime? start = null)
+        if (nowUtc < _nextUtc)
         {
-            this.period = period;
-            this.nextUtc = start ?? DateTime.UtcNow + period;
-            this.action = action;
+            return false;
         }
 
-        public bool TryAction(DateTime nowUtc)
-        {
-            if (nowUtc < this.nextUtc) return false;
-            this.nextUtc = nowUtc + this.period;
-            this.action();
-            return true;
-        }
+        _nextUtc = nowUtc + period;
+        action();
+        return true;
     }
 }
