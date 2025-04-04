@@ -1,55 +1,37 @@
-
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
-namespace Orleans.Transactions
+namespace Orleans.Transactions;
+
+internal sealed class TransactionalResourceExtension(IGrainContext grainContext) : ITransactionalResourceExtension
 {
-    public class TransactionalResourceExtension : ITransactionalResourceExtension
+    private readonly ResourceFactoryRegistry<ITransactionalResource> _factories = grainContext.GetResourceFactoryRegistry<ITransactionalResource>();
+    private readonly Dictionary<string, ITransactionalResource> _resources = [];
+
+    public Task<TransactionalStatus> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp) => GetResource(resourceId).CommitReadOnly(transactionId, accessCount, timeStamp);
+
+    public Task Abort(string resourceId, Guid transactionId)
+        => GetResource(resourceId).Abort(transactionId);
+
+    public Task Cancel(string resourceId, Guid transactionId, DateTime timeStamp, TransactionalStatus status)
+        => GetResource(resourceId).Cancel(transactionId, timeStamp, status);
+
+    public Task Confirm(string resourceId, Guid transactionId, DateTime timeStamp)
+        => GetResource(resourceId).Confirm(transactionId, timeStamp);
+
+    public Task Prepare(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
+        => GetResource(resourceId).Prepare(transactionId, accessCount, timeStamp, transactionManager);
+
+    private ITransactionalResource GetResource(string resourceId)
     {
-        private readonly ResourceFactoryRegistry<ITransactionalResource> factories;
-        private readonly Dictionary<string, ITransactionalResource> resources;
-
-        public TransactionalResourceExtension(IGrainContextAccessor contextAccessor)
+        if (!_resources.TryGetValue(resourceId, out var resource))
         {
-            this.factories = contextAccessor.GrainContext.GetResourceFactoryRegistry<ITransactionalResource>();
-            this.resources = new Dictionary<string, ITransactionalResource>();
+            _resources[resourceId] = resource = _factories[resourceId].Invoke();
         }
 
-        public Task<TransactionalStatus> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
-        {
-            return GetResource(resourceId).CommitReadOnly(transactionId, accessCount, timeStamp);
-        }
-
-        public Task Abort(string resourceId, Guid transactionId)
-        {
-            return GetResource(resourceId).Abort(transactionId);
-        }
-
-        public Task Cancel(string resourceId, Guid transactionId, DateTime timeStamp, TransactionalStatus status)
-        {
-            return GetResource(resourceId).Cancel(transactionId, timeStamp, status);
-        }
-
-        public Task Confirm(string resourceId, Guid transactionId, DateTime timeStamp)
-        {
-            return GetResource(resourceId).Confirm(transactionId, timeStamp);
-        }
-
-        public Task Prepare(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
-        {
-            return GetResource(resourceId).Prepare(transactionId, accessCount, timeStamp, transactionManager);
-        }
-
-        private ITransactionalResource GetResource(string resourceId)
-        {
-            if (!this.resources.TryGetValue(resourceId, out ITransactionalResource resource))
-            {
-                this.resources[resourceId] = resource = this.factories[resourceId].Invoke();
-            }
-            return resource;
-        }
+        return resource;
     }
 }

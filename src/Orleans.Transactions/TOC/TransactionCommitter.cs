@@ -10,153 +10,145 @@ using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.State;
 using Orleans.Transactions.TOC;
 
-namespace Orleans.Transactions
+namespace Orleans.Transactions;
+
+public sealed class TransactionCommitter<TService> : ITransactionCommitter<TService>, ILifecycleParticipant<IGrainLifecycle>
+    where TService : class
 {
-    public class TransactionCommitter<TService> : ITransactionCommitter<TService>, ILifecycleParticipant<IGrainLifecycle>
-        where TService : class
+    private readonly ITransactionCommitterConfiguration _config;
+    private readonly IGrainContext _context;
+    private readonly ITransactionDataCopier<OperationState> _copier;
+    private readonly ILogger _logger;
+    private readonly ParticipantId _participantId;
+    private readonly TransactionQueue<OperationState> _queue;
+
+    private bool _detectReentrancy;
+
+    public TransactionCommitter(
+        ITransactionCommitterConfiguration config,
+        IGrainContextAccessor contextAccessor,
+        ITransactionDataCopier<OperationState> copier,
+        ILogger<TransactionCommitter<TService>> logger,
+        IOptions<TransactionalStateOptions> options,
+        INamedTransactionalStateStorageFactory storageFactory,
+        TimeProvider timeProvider)
     {
-        private readonly ITransactionCommitterConfiguration config;
-        private readonly IGrainContext context;
-        private readonly ITransactionDataCopier<OperationState> copier;
-        private readonly IGrainRuntime grainRuntime;
-        private readonly ActivationLifetime activationLifetime;
-        private readonly ILogger logger;
-        private ParticipantId participantId;
-        private TransactionQueue<OperationState> queue;
+        _config = config;
+        _context = contextAccessor.GrainContext;
+        _copier = copier;
+        _logger = logger;
+        _participantId = new ParticipantId(_config.ServiceName, _context.GrainReference, ParticipantId.Role.Resource | ParticipantId.Role.PriorityManager);
 
-        private bool detectReentrancy;
+        ITransactionalStateStorage<OperationState> storage = storageFactory.Create<OperationState>(_config.StorageName, _config.ServiceName);
 
-        public TransactionCommitter(
-            ITransactionCommitterConfiguration config,
-            IGrainContextAccessor contextAccessor,
-            ITransactionDataCopier<OperationState> copier,
-            IGrainRuntime grainRuntime,
-            ILogger<TransactionCommitter<TService>> logger)
+        // setup transaction processing pipe
+        TService service = _context.ActivationServices.GetRequiredKeyedService<TService>(_config.ServiceName);
+        _queue = new TocTransactionQueue<TService>(service, options, _participantId, _context, storage, timeProvider, logger);
+
+        // Add transaction manager factory to the grain context
+        _context.RegisterResourceFactory<ITransactionManager>(_config.ServiceName, () => new TransactionManager<OperationState>(_queue));
+    }
+
+    /// <inheritdoc/>
+    public Task OnCommit(ITransactionCommitOperation<TService> operation)
+    {
+        if (operation == null) throw new ArgumentNullException(nameof(operation));
+        if (_detectReentrancy)
         {
-            this.config = config;
-            this.context = contextAccessor.GrainContext;
-            this.copier = copier;
-            this.grainRuntime = grainRuntime;
-            this.logger = logger;
-            this.activationLifetime = new ActivationLifetime(this.context);
+            throw new LockRecursionException("cannot perform an update operation from within another operation");
         }
 
-        /// <inheritdoc/>
-        public Task OnCommit(ITransactionCommitOperation<TService> operation)
+        var info = TransactionContext.GetRequiredTransactionInfo();
+
+        if (_logger.IsEnabled(LogLevel.Trace))
+            _logger.LogTrace("StartWrite {Info}", info);
+
+        if (info.IsReadOnly)
         {
-            if (operation == null) throw new ArgumentNullException(nameof(operation));
-            if (detectReentrancy)
+            throw new OrleansReadOnlyViolatedException(info.Id);
+        }
+
+        info.Participants.TryGetValue(_participantId, out var recordedaccesses);
+
+        return _queue.RWLock.EnterLock(info.TransactionId, info.Priority, recordedaccesses, false,
+            () =>
             {
-                throw new LockRecursionException("cannot perform an update operation from within another operation");
-            }
-
-            var info = TransactionContext.GetRequiredTransactionInfo();
-
-            if (logger.IsEnabled(LogLevel.Trace))
-                logger.LogTrace("StartWrite {Info}", info);
-
-            if (info.IsReadOnly)
-            {
-                throw new OrleansReadOnlyViolatedException(info.Id);
-            }
-
-            info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
-
-            return this.queue.RWLock.EnterLock<bool>(info.TransactionId, info.Priority, recordedaccesses, false,
-                () =>
+                // check if we expired while waiting
+                if (!_queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<OperationState> record))
                 {
-                    // check if we expired while waiting
-                    if (!this.queue.RWLock.TryGetRecord(info.TransactionId, out TransactionRecord<OperationState> record))
-                    {
-                        throw new OrleansCascadingAbortException(info.TransactionId.ToString());
-                    }
-
-                    // merge the current clock into the transaction time stamp
-                    record.Timestamp = this.queue.Clock.MergeUtcNow(info.TimeStamp);
-
-                    // link to the latest state
-                    if (record.State == null)
-                    {
-                        this.queue.GetMostRecentState(out record.State, out record.SequenceNumber);
-                    }
-
-                    // if this is the first write, make a deep copy of the state
-                    if (!record.HasCopiedState)
-                    {
-                        record.State = this.copier.DeepCopy(record.State);
-                        record.SequenceNumber++;
-                        record.HasCopiedState = true;
-                    }
-
-                    if (logger.IsEnabled(LogLevel.Debug))
-                    {
-                        logger.LogDebug(
-                            "Update-lock write v{SequenceNumber} {TransactionId} {Timestamp}",
-                            record.SequenceNumber,
-                            record.TransactionId,
-                            record.Timestamp.ToString("o"));
-                    }
-
-                    // record this write in the transaction info data structure
-                    info.RecordWrite(this.participantId, record.Timestamp);
-
-                    // perform the write
-                    try
-                    {
-                        detectReentrancy = true;
-
-                        record.State.Operation = operation;
-                        return true;
-                    }
-                    finally
-                    {
-                        if (logger.IsEnabled(LogLevel.Trace))
-                            logger.LogTrace(
-                                "EndWrite {Info} {TransactionId} {Timestamp}",
-                                info,
-                                record.TransactionId,
-                                record.Timestamp);
-
-                        detectReentrancy = false;
-                    }
+                    throw new OrleansCascadingAbortException(info.TransactionId.ToString());
                 }
-            );
-        }
 
-        public void Participate(IGrainLifecycle lifecycle)
-        {
-            lifecycle.Subscribe<TransactionalState<OperationState>>(GrainLifecycleStage.SetupState, OnSetupState);
-        }
+                // merge the current clock into the transaction time stamp
+                record.Timestamp = _queue.Clock.MergeUtcNow(info.TimeStamp);
 
-        private async Task OnSetupState(CancellationToken ct)
-        {
-            if (ct.IsCancellationRequested) return;
+                // link to the latest state
+                if (record.State == null)
+                {
+                    _queue.GetMostRecentState(out record.State, out record.SequenceNumber);
+                }
 
-            this.participantId = new ParticipantId(this.config.ServiceName, this.context.GrainReference, ParticipantId.Role.Resource | ParticipantId.Role.PriorityManager);
+                // if this is the first write, make a deep copy of the state
+                if (!record.HasCopiedState)
+                {
+                    record.State = _copier.DeepCopy(record.State);
+                    record.SequenceNumber++;
+                    record.HasCopiedState = true;
+                }
 
-            var storageFactory = this.context.ActivationServices.GetRequiredService<INamedTransactionalStateStorageFactory>();
-            ITransactionalStateStorage<OperationState> storage = storageFactory.Create<OperationState>(this.config.StorageName, this.config.ServiceName);
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug(
+                        "Update-lock write v{SequenceNumber} {TransactionId} {Timestamp}",
+                        record.SequenceNumber,
+                        record.TransactionId,
+                        record.Timestamp.ToString("o"));
+                }
 
-            // setup transaction processing pipe
-            void deactivate() => grainRuntime.DeactivateOnIdle(context);
-            var options = this.context.ActivationServices.GetRequiredService<IOptions<TransactionalStateOptions>>();
-            var timeProvider = this.context.ActivationServices.GetRequiredService<TimeProvider>();
-            TService service = this.context.ActivationServices.GetRequiredKeyedService<TService>(this.config.ServiceName);
-            this.queue = new TocTransactionQueue<TService>(service, options, this.participantId, deactivate, storage, timeProvider, logger, this.activationLifetime);
+                // record this write in the transaction info data structure
+                info.RecordWrite(_participantId, record.Timestamp);
 
-            // Add transaction manager factory to the grain context
-            this.context.RegisterResourceFactory<ITransactionManager>(this.config.ServiceName, () => new TransactionManager<OperationState>(this.queue));
+                // perform the write
+                try
+                {
+                    _detectReentrancy = true;
 
-            // recover state
-            await this.queue.NotifyOfRestore();
-        }
+                    record.State.Operation = operation;
+                    return true;
+                }
+                finally
+                {
+                    if (_logger.IsEnabled(LogLevel.Trace))
+                        _logger.LogTrace(
+                            "EndWrite {Info} {TransactionId} {Timestamp}",
+                            info,
+                            record.TransactionId,
+                            record.Timestamp);
 
-        [Serializable]
-        [GenerateSerializer]
-        public sealed class OperationState
-        {
-            [Id(0)]
-            public ITransactionCommitOperation<TService> Operation { get; set; }
-        }
+                    _detectReentrancy = false;
+                }
+            }
+        );
+    }
+
+    public void Participate(IGrainLifecycle lifecycle)
+    {
+        lifecycle.Subscribe<TransactionalState<OperationState>>(GrainLifecycleStage.SetupState, OnSetupState);
+    }
+
+    private async Task OnSetupState(CancellationToken ct)
+    {
+        if (ct.IsCancellationRequested) return;
+
+        // recover state
+        await _queue.NotifyOfRestore();
+    }
+
+    [Serializable]
+    [GenerateSerializer]
+    public sealed class OperationState
+    {
+        [Id(0)]
+        public ITransactionCommitOperation<TService> Operation { get; set; }
     }
 }

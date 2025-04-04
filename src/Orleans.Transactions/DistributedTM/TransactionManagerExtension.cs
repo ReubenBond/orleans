@@ -1,45 +1,32 @@
-
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
-namespace Orleans.Transactions
+namespace Orleans.Transactions;
+
+internal sealed class TransactionManagerExtension(IGrainContext grainContext) : ITransactionManagerExtension
 {
-    public class TransactionManagerExtension : ITransactionManagerExtension
+    private readonly ResourceFactoryRegistry<ITransactionManager> _factories = grainContext.GetResourceFactoryRegistry<ITransactionManager>();
+    private readonly Dictionary<string, ITransactionManager> _managers = [];
+
+    public Task Ping(string resourceId, Guid transactionId, DateTime timeStamp, ParticipantId resource)
+        => GetManager(resourceId).Ping(transactionId, timeStamp, resource);
+
+    public Task<TransactionalStatus> PrepareAndCommit(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ParticipantId> writeResources, int totalResources)
+        => GetManager(resourceId).PrepareAndCommit(transactionId, accessCount, timeStamp, writeResources, totalResources);
+
+    public Task Prepared(string resourceId, Guid transactionId, DateTime timestamp, ParticipantId resource, TransactionalStatus status)
+        => GetManager(resourceId).Prepared(transactionId, timestamp, resource, status);
+
+    private ITransactionManager GetManager(string resourceId)
     {
-        private readonly ResourceFactoryRegistry<ITransactionManager> factories;
-        private readonly Dictionary<string, ITransactionManager> managers;
-
-        public TransactionManagerExtension(IGrainContextAccessor contextAccessor)
+        if (!_managers.TryGetValue(resourceId, out var manager))
         {
-            this.factories = contextAccessor.GrainContext.GetResourceFactoryRegistry<ITransactionManager>();
-            this.managers = new Dictionary<string, ITransactionManager>();
+            _managers[resourceId] = manager = _factories[resourceId].Invoke();
         }
 
-        public Task Ping(string resourceId, Guid transactionId, DateTime timeStamp, ParticipantId resource)
-        {
-            return GetManager(resourceId).Ping(transactionId, timeStamp, resource);
-        }
-
-        public Task<TransactionalStatus> PrepareAndCommit(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ParticipantId> writeResources, int totalResources)
-        {
-            return GetManager(resourceId).PrepareAndCommit(transactionId, accessCount, timeStamp, writeResources, totalResources);
-        }
-
-        public Task Prepared(string resourceId, Guid transactionId, DateTime timestamp, ParticipantId resource, TransactionalStatus status)
-        {
-            return GetManager(resourceId).Prepared(transactionId, timestamp, resource, status);
-        }
-
-        private ITransactionManager GetManager(string resourceId)
-        {
-            if (!this.managers.TryGetValue(resourceId, out ITransactionManager manager))
-            {
-                this.managers[resourceId] = manager = this.factories[resourceId].Invoke();
-            }
-            return manager;
-        }
+        return manager;
     }
 }

@@ -1,8 +1,7 @@
 ﻿
-namespace Orleans.Transactions.Abstractions
+namespace Orleans.Transactions.Abstractions;
+
+public interface ITransactionDataCopier<TData>
 {
-    public interface ITransactionDataCopier<TData>
-    {
-        TData DeepCopy(TData original);
-    }
+    TData DeepCopy(TData original);
 }

@@ -5,29 +5,22 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Transactions.Abstractions;
 
-namespace Orleans.Transactions
+namespace Orleans.Transactions;
+
+public sealed class TransactionalStateFactory(IGrainContextAccessor contextAccessor) : ITransactionalStateFactory
 {
-    public class TransactionalStateFactory : ITransactionalStateFactory
+    public ITransactionalState<TState> Create<TState>(TransactionalStateConfiguration config) where TState : class, new()
     {
-        private readonly IGrainContextAccessor contextAccessor;
-        public TransactionalStateFactory(IGrainContextAccessor contextAccessor)
-        {
-            this.contextAccessor = contextAccessor;
-        }
+        var currentContext = contextAccessor.GrainContext;
+        TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(currentContext.ActivationServices, config, contextAccessor);
+        transactionalState.Participate(currentContext.ObservableLifecycle);
+        return transactionalState;
+    }
 
-        public ITransactionalState<TState> Create<TState>(TransactionalStateConfiguration config) where TState : class, new()
-        {
-            var currentContext = this.contextAccessor.GrainContext;
-            TransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<TransactionalState<TState>>(currentContext.ActivationServices, config, this.contextAccessor);
-            transactionalState.Participate(currentContext.ObservableLifecycle);
-            return transactionalState;
-        }
-
-        public static JsonSerializerSettings GetJsonSerializerSettings(IServiceProvider serviceProvider)
-        {
-            var serializerSettings = OrleansJsonSerializerSettings.GetDefaultSerializerSettings(serviceProvider);
-            serializerSettings.PreserveReferencesHandling = PreserveReferencesHandling.None;
-            return serializerSettings;
-        }
+    public static JsonSerializerSettings GetJsonSerializerSettings(IServiceProvider serviceProvider)
+    {
+        var serializerSettings = OrleansJsonSerializerSettings.GetDefaultSerializerSettings(serviceProvider);
+        serializerSettings.PreserveReferencesHandling = PreserveReferencesHandling.None;
+        return serializerSettings;
     }
 }

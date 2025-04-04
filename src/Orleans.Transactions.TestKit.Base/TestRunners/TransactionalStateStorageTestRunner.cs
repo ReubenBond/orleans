@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using FluentAssertions;
 using FluentAssertions.Equivalency;
+using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.TestKit
@@ -161,14 +162,7 @@ namespace Orleans.Transactions.TestKit
             return result;
         }
 
-        private static ParticipantId MakeParticipantId()
-        {
-            return new ParticipantId(
-                                    "tm",
-                                    null,
-                                    // (GrainReference) grainFactory.GetGrain<ITransactionTestGrain>(Guid.NewGuid(), TransactionTestConstants.SingleStateTransactionalGrain),
-                                    ParticipantId.Role.Resource | ParticipantId.Role.Manager);
-        }
+        private static ParticipantId MakeParticipantId() => new("tm", null, ParticipantId.Role.Resource | ParticipantId.Role.Manager);
 
         private static Dictionary<Guid, CommitRecord> MakeCommitRecords(int count, int size)
         {

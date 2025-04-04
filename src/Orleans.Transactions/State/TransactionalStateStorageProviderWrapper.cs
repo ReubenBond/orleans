@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
@@ -7,116 +8,115 @@ using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.Transactions.Abstractions;
 
-#nullable enable
-namespace Orleans.Transactions
+namespace Orleans.Transactions;
+
+internal sealed class TransactionalStateStorageProviderWrapper<TState> : ITransactionalStateStorage<TState>
+    where TState : class, new()
 {
-    internal sealed class TransactionalStateStorageProviderWrapper<TState> : ITransactionalStateStorage<TState>
-        where TState : class, new()
+    private readonly IGrainStorage _grainStorage;
+    private readonly IGrainContext _context;
+    private readonly string _stateName;
+
+    private StateStorageBridge<TransactionalStateRecord<TState>>? _stateStorage;
+
+    [MemberNotNull(nameof(_stateStorage))]
+    private StateStorageBridge<TransactionalStateRecord<TState>> StateStorage => _stateStorage ??= GetStateStorage();
+
+    public TransactionalStateStorageProviderWrapper(IGrainStorage grainStorage, string stateName, IGrainContext context)
     {
-        private readonly IGrainStorage grainStorage;
-        private readonly IGrainContext context;
-        private readonly string stateName;
+        _grainStorage = grainStorage;
+        _context = context;
+        _stateName = stateName;
+    }
 
-        private StateStorageBridge<TransactionalStateRecord<TState>>? stateStorage;
-        [MemberNotNull(nameof(stateStorage))]
-        private StateStorageBridge<TransactionalStateRecord<TState>> StateStorage => stateStorage ??= GetStateStorage();
+    public async Task<TransactionalStorageLoadResponse<TState>> Load()
+    {
+        await StateStorage.ReadStateAsync();
+        var state = _stateStorage.State;
+        return new TransactionalStorageLoadResponse<TState>(_stateStorage.Etag, state.CommittedState, state.CommittedSequenceId, state.Metadata, state.PendingStates);
+    }
 
-        public TransactionalStateStorageProviderWrapper(IGrainStorage grainStorage, string stateName, IGrainContext context)
+    public async Task<string> Store(string expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
+    {
+        if (StateStorage.Etag != expectedETag)
+            throw new ArgumentException(nameof(expectedETag), "Etag does not match");
+        var state = _stateStorage.State;
+        state.Metadata = metadata;
+
+        var pendingList = state.PendingStates;
+
+        // abort
+        if (abortAfter.HasValue && pendingList.Count != 0)
         {
-            this.grainStorage = grainStorage;
-            this.context = context;
-            this.stateName = stateName;
+            var pos = pendingList.FindIndex(t => t.SequenceId > abortAfter.Value);
+            if (pos != -1)
+            {
+                pendingList.RemoveRange(pos, pendingList.Count - pos);
+            }
         }
 
-        public async Task<TransactionalStorageLoadResponse<TState>> Load()
+        // prepare
+        if (statesToPrepare?.Count > 0)
         {
-            await this.StateStorage.ReadStateAsync();
-            var state = stateStorage.State;
-            return new TransactionalStorageLoadResponse<TState>(stateStorage.Etag, state.CommittedState, state.CommittedSequenceId, state.Metadata, state.PendingStates);
-        }
-
-        public async Task<string> Store(string expectedETag, TransactionalStateMetaData metadata, List<PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter)
-        {
-            if (this.StateStorage.Etag != expectedETag)
-                throw new ArgumentException(nameof(expectedETag), "Etag does not match");
-            var state = stateStorage.State;
-            state.Metadata = metadata;
-
-            var pendinglist = state.PendingStates;
-
-            // abort
-            if (abortAfter.HasValue && pendinglist.Count != 0)
+            foreach (var p in statesToPrepare)
             {
-                var pos = pendinglist.FindIndex(t => t.SequenceId > abortAfter.Value);
-                if (pos != -1)
+                var pos = pendingList.FindIndex(t => t.SequenceId >= p.SequenceId);
+                if (pos == -1)
                 {
-                    pendinglist.RemoveRange(pos, pendinglist.Count - pos);
+                    pendingList.Add(p); //append
                 }
-            }
-
-            // prepare
-            if (statesToPrepare?.Count > 0)
-            {
-                foreach (var p in statesToPrepare)
+                else if (pendingList[pos].SequenceId == p.SequenceId)
                 {
-                    var pos = pendinglist.FindIndex(t => t.SequenceId >= p.SequenceId);
-                    if (pos == -1)
-                    {
-                        pendinglist.Add(p); //append
-                    }
-                    else if (pendinglist[pos].SequenceId == p.SequenceId)
-                    {
-                        pendinglist[pos] = p;  //replace
-                    }
-                    else
-                    {
-                        pendinglist.Insert(pos, p); //insert
-                    }
-                }
-            }
-
-            // commit
-            if (commitUpTo.HasValue && commitUpTo.Value > state.CommittedSequenceId)
-            {
-                var pos = pendinglist.FindIndex(t => t.SequenceId == commitUpTo.Value);
-                if (pos != -1)
-                {
-                    var committedState = pendinglist[pos];
-                    state.CommittedSequenceId = committedState.SequenceId;
-                    state.CommittedState = committedState.State;
-                    pendinglist.RemoveRange(0, pos + 1);
+                    pendingList[pos] = p;  //replace
                 }
                 else
                 {
-                    throw new InvalidOperationException($"Transactional state corrupted. Missing prepare record (SequenceId={commitUpTo.Value}) for committed transaction.");
+                    pendingList.Insert(pos, p); //insert
                 }
             }
-
-            await stateStorage.WriteStateAsync();
-            return stateStorage.Etag!;
         }
 
-        private StateStorageBridge<TransactionalStateRecord<TState>> GetStateStorage()
+        // commit
+        if (commitUpTo.HasValue && commitUpTo.Value > state.CommittedSequenceId)
         {
-            return new(this.stateName, context, grainStorage);
+            var pos = pendingList.FindIndex(t => t.SequenceId == commitUpTo.Value);
+            if (pos != -1)
+            {
+                var committedState = pendingList[pos];
+                state.CommittedSequenceId = committedState.SequenceId;
+                state.CommittedState = committedState.State;
+                pendingList.RemoveRange(0, pos + 1);
+            }
+            else
+            {
+                throw new InvalidOperationException($"Transactional state corrupted. Missing prepare record (SequenceId={commitUpTo.Value}) for committed transaction.");
+            }
         }
+
+        await _stateStorage.WriteStateAsync();
+        return _stateStorage.Etag!;
     }
 
-    [Serializable]
-    [GenerateSerializer]
-    public sealed class TransactionalStateRecord<TState>
-        where TState : class, new()
+    private StateStorageBridge<TransactionalStateRecord<TState>> GetStateStorage()
     {
-        [Id(0)]
-        public TState CommittedState { get; set; } = new TState();
-
-        [Id(1)]
-        public long CommittedSequenceId { get; set; }
-
-        [Id(2)]
-        public TransactionalStateMetaData Metadata { get; set; } = new TransactionalStateMetaData();
-
-        [Id(3)]
-        public List<PendingTransactionState<TState>> PendingStates { get; set; } = new List<PendingTransactionState<TState>>();
+        return new(_stateName, _context, _grainStorage);
     }
+}
+
+[Serializable]
+[GenerateSerializer]
+public sealed class TransactionalStateRecord<TState>
+    where TState : class, new()
+{
+    [Id(0)]
+    public TState CommittedState { get; set; } = new TState();
+
+    [Id(1)]
+    public long CommittedSequenceId { get; set; }
+
+    [Id(2)]
+    public TransactionalStateMetaData Metadata { get; set; } = new TransactionalStateMetaData();
+
+    [Id(3)]
+    public List<PendingTransactionState<TState>> PendingStates { get; set; } = new List<PendingTransactionState<TState>>();
 }

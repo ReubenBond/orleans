@@ -1,27 +1,24 @@
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
-using System.Reflection;
 
-namespace Orleans.Transactions
+namespace Orleans.Transactions;
+
+internal sealed class TransactionCommitterAttributeMapper : IAttributeToFactoryMapper<TransactionCommitterAttribute>
 {
-    internal class TransactionCommitterAttributeMapper : IAttributeToFactoryMapper<TransactionCommitterAttribute>
+    private static readonly MethodInfo CreateMethodInfo = typeof(ITransactionCommitterFactory).GetMethod("Create");
+
+    public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, TransactionCommitterAttribute attribute)
     {
-        private static readonly MethodInfo create = typeof(ITransactionCommitterFactory).GetMethod("Create");
+        // use generic type args to define collection type.
+        var genericCreate = CreateMethodInfo.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
+        return context => Create(context, genericCreate, [attribute]);
+    }
 
-        public Factory<IGrainContext, object> GetFactory(ParameterInfo parameter, TransactionCommitterAttribute attribute)
-        {
-            TransactionCommitterAttribute config = attribute;
-            // use generic type args to define collection type.
-            MethodInfo genericCreate = create.MakeGenericMethod(parameter.ParameterType.GetGenericArguments());
-            object[] args = new object[] { config };
-            return context => Create(context, genericCreate, args);
-        }
-
-        private static object Create(IGrainContext context, MethodInfo genericCreate, object[] args)
-        {
-            ITransactionCommitterFactory factory = context.ActivationServices.GetRequiredService<ITransactionCommitterFactory>();
-            return genericCreate.Invoke(factory, args);
-        }
+    private static object Create(IGrainContext context, MethodInfo genericCreate, object[] args)
+    {
+        ITransactionCommitterFactory factory = context.ActivationServices.GetRequiredService<ITransactionCommitterFactory>();
+        return genericCreate.Invoke(factory, args);
     }
 }

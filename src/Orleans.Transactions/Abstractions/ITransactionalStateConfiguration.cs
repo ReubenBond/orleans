@@ -1,9 +1,8 @@
 ﻿
-namespace Orleans.Transactions.Abstractions
+namespace Orleans.Transactions.Abstractions;
+
+public interface ITransactionalStateConfiguration
 {
-    public interface ITransactionalStateConfiguration
-    {
-        string StateName { get; }
-        string StorageName { get; }
-    }
+    string StateName { get; }
+    string StorageName { get; }
 }

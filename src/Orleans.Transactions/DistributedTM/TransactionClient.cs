@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
-
 using Orleans.Serialization;
 
 namespace Orleans.Transactions;
@@ -66,7 +65,7 @@ internal class TransactionClient : ITransactionClient
                     await RunDelegateWithTransaction(ambientTransactionInfo, transactionDelegate);
                     break;
                 case TransactionOption.Suppress:
-                    await RunDelegateWithSupressedTransaction(ambientTransactionInfo, transactionDelegate);
+                    await RunDelegateWithSuppressedTransaction(ambientTransactionInfo, transactionDelegate);
                     break;
                 case TransactionOption.Supported:
                     await RunDelegateWithSupportedTransaction(ambientTransactionInfo, transactionDelegate);
@@ -111,7 +110,7 @@ internal class TransactionClient : ITransactionClient
         }
     }
 
-    private static async Task RunDelegateWithSupressedTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
+    private static async Task RunDelegateWithSuppressedTransaction(TransactionInfo ambientTransactionInfo, Func<Task<bool>> transactionDelegate)
     {
         // Clear transaction context
         TransactionContext.Clear();
@@ -135,7 +134,7 @@ internal class TransactionClient : ITransactionClient
         if (ambientTransactionInfo is null)
         {
             // TODO: this should be a configurable parameter
-            var transactionTimeout = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(10);
+            var transactionTimeout = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(30);
 
             // Start transaction
             transactionInfo = await _transactionAgent.StartTransaction(readOnly: false, transactionTimeout);
