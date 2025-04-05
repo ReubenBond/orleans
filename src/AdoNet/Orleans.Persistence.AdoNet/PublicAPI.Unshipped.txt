@@ -1,0 +1,92 @@
+#nullable enable
+const Orleans.Configuration.AdoNetGrainStorageOptions.DEFAULT_INIT_STAGE = 10000 -> int
+Orleans.Configuration.AdoNetGrainStorageOptions
+Orleans.Configuration.AdoNetGrainStorageOptions.AdoNetGrainStorageOptions() -> void
+Orleans.Configuration.AdoNetGrainStorageOptions.InitStage.get -> int
+Orleans.Configuration.AdoNetGrainStorageOptions.InitStage.set -> void
+Orleans.Configuration.AdoNetGrainStorageOptions.UseOrleans3CompatibleHasher() -> void
+Orleans.Configuration.AdoNetGrainStorageOptionsValidator
+Orleans.Configuration.AdoNetGrainStorageOptionsValidator.ValidateConfiguration() -> void
+Orleans.Configuration.DefaultAdoNetGrainStorageOptionsHashPickerConfigurator
+Orleans.Configuration.DefaultAdoNetGrainStorageOptionsHashPickerConfigurator.DefaultAdoNetGrainStorageOptionsHashPickerConfigurator() -> void
+Orleans.Hosting.AdoNetGrainStorageServiceCollectionExtensions
+Orleans.Hosting.AdoNetGrainStorageSiloBuilderExtensions
+Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream
+Orleans.Storage.AdoNetGrainStorage
+Orleans.Storage.AdoNetGrainStorageFactory
+Orleans.Storage.IHasher
+Orleans.Storage.IStorageHasherPicker
+Orleans.Storage.Orleans3CompatibleStorageHashPicker
+Orleans.Storage.Orleans3CompatibleStorageHashPicker.Orleans3CompatibleStorageHashPicker() -> void
+Orleans.Storage.OrleansDefaultHasher
+Orleans.Storage.OrleansDefaultHasher.OrleansDefaultHasher() -> void
+Orleans.Storage.RelationalStorageProviderQueries
+Orleans.Storage.StorageHasherPicker
+override Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream.CanRead.get -> bool
+override Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream.CanSeek.get -> bool
+override Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream.CanTimeout.get -> bool
+override Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream.CanWrite.get -> bool
+override Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream.Dispose(bool disposing) -> void
+override Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream.Flush() -> void
+override Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream.Length.get -> long
+override Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream.Position.get -> long
+override Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream.Position.set -> void
+override Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream.Seek(long offset, System.IO.SeekOrigin origin) -> long
+override Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream.SetLength(long value) -> void
+~const Orleans.Configuration.AdoNetGrainStorageOptions.DEFAULT_ADONET_INVARIANT = "System.Data.SqlClient" -> string
+~const Orleans.Storage.AdoNetGrainStorage.BinaryFormatSerializerTag = "BinaryFormatSerializer" -> string
+~const Orleans.Storage.AdoNetGrainStorage.DefaultInitializationQuery = "SELECT QueryKey, QueryText FROM OrleansQuery WHERE QueryKey = 'WriteToStorageKey' OR QueryKey = 'ReadFromStorageKey' OR QueryKey = 'ClearStorageKey'" -> string
+~const Orleans.Storage.AdoNetGrainStorage.JsonFormatSerializerTag = "JsonFormatSerializer" -> string
+~const Orleans.Storage.AdoNetGrainStorage.XmlFormatSerializerTag = "XmlFormatSerializer" -> string
+~Orleans.Configuration.AdoNetGrainStorageOptions.ConnectionString.get -> string
+~Orleans.Configuration.AdoNetGrainStorageOptions.ConnectionString.set -> void
+~Orleans.Configuration.AdoNetGrainStorageOptions.GrainStorageSerializer.get -> Orleans.Storage.IGrainStorageSerializer
+~Orleans.Configuration.AdoNetGrainStorageOptions.GrainStorageSerializer.set -> void
+~Orleans.Configuration.AdoNetGrainStorageOptions.HashPicker.get -> Orleans.Storage.IStorageHasherPicker
+~Orleans.Configuration.AdoNetGrainStorageOptions.HashPicker.set -> void
+~Orleans.Configuration.AdoNetGrainStorageOptions.Invariant.get -> string
+~Orleans.Configuration.AdoNetGrainStorageOptions.Invariant.set -> void
+~Orleans.Configuration.AdoNetGrainStorageOptionsValidator.AdoNetGrainStorageOptionsValidator(Orleans.Configuration.AdoNetGrainStorageOptions configurationOptions, string name) -> void
+~Orleans.Configuration.DefaultAdoNetGrainStorageOptionsHashPickerConfigurator.PostConfigure(string name, Orleans.Configuration.AdoNetGrainStorageOptions options) -> void
+~Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream.OrleansRelationalDownloadStream(System.Data.Common.DbDataReader reader, int ordinal) -> void
+~Orleans.Storage.AdoNetGrainStorage.AdoNetGrainStorage(Orleans.Serialization.Serializers.IActivatorProvider activatorProvider, Microsoft.Extensions.Logging.ILogger<Orleans.Storage.AdoNetGrainStorage> logger, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.AdoNetGrainStorageOptions> options, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions, string name) -> void
+~Orleans.Storage.AdoNetGrainStorage.ClearStateAsync<T>(string grainType, Orleans.Runtime.GrainId grainReference, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~Orleans.Storage.AdoNetGrainStorage.CurrentOperationalQueries.get -> Orleans.Storage.RelationalStorageProviderQueries
+~Orleans.Storage.AdoNetGrainStorage.CurrentOperationalQueries.set -> void
+~Orleans.Storage.AdoNetGrainStorage.HashPicker.get -> Orleans.Storage.IStorageHasherPicker
+~Orleans.Storage.AdoNetGrainStorage.HashPicker.set -> void
+~Orleans.Storage.AdoNetGrainStorage.Participate(Orleans.Runtime.ISiloLifecycle lifecycle) -> void
+~Orleans.Storage.AdoNetGrainStorage.ReadStateAsync<T>(string grainType, Orleans.Runtime.GrainId grainReference, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~Orleans.Storage.AdoNetGrainStorage.Serializer.get -> Orleans.Storage.IGrainStorageSerializer
+~Orleans.Storage.AdoNetGrainStorage.Serializer.set -> void
+~Orleans.Storage.AdoNetGrainStorage.WriteStateAsync<T>(string grainType, Orleans.Runtime.GrainId grainReference, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~Orleans.Storage.IHasher.Description.get -> string
+~Orleans.Storage.IHasher.Hash(byte[] data) -> int
+~Orleans.Storage.IStorageHasherPicker.HashProviders.get -> System.Collections.Generic.ICollection<Orleans.Storage.IHasher>
+~Orleans.Storage.IStorageHasherPicker.PickHasher<T>(string serviceId, string storageProviderInstanceName, string grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState, string tag = null) -> Orleans.Storage.IHasher
+~Orleans.Storage.Orleans3CompatibleStorageHashPicker.HashProviders.get -> System.Collections.Generic.ICollection<Orleans.Storage.IHasher>
+~Orleans.Storage.Orleans3CompatibleStorageHashPicker.PickHasher<T>(string serviceId, string storageProviderInstanceName, string grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState, string tag = null) -> Orleans.Storage.IHasher
+~Orleans.Storage.OrleansDefaultHasher.Description.get -> string
+~Orleans.Storage.OrleansDefaultHasher.Hash(byte[] data) -> int
+~Orleans.Storage.RelationalStorageProviderQueries.ClearState.get -> string
+~Orleans.Storage.RelationalStorageProviderQueries.ClearState.set -> void
+~Orleans.Storage.RelationalStorageProviderQueries.ReadFromStorage.get -> string
+~Orleans.Storage.RelationalStorageProviderQueries.ReadFromStorage.set -> void
+~Orleans.Storage.RelationalStorageProviderQueries.RelationalStorageProviderQueries(string writeToStorage, string readFromStorage, string clearState) -> void
+~Orleans.Storage.RelationalStorageProviderQueries.WriteToStorage.get -> string
+~Orleans.Storage.StorageHasherPicker.HashProviders.get -> System.Collections.Generic.ICollection<Orleans.Storage.IHasher>
+~Orleans.Storage.StorageHasherPicker.PickHasher<T>(string serviceId, string storageProviderInstanceName, string grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState, string tag = null) -> Orleans.Storage.IHasher
+~Orleans.Storage.StorageHasherPicker.StorageHasherPicker(System.Collections.Generic.IEnumerable<Orleans.Storage.IHasher> hashProviders) -> void
+~override Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream.CopyToAsync(System.IO.Stream destination, int bufferSize, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task
+~override Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream.Read(byte[] buffer, int offset, int count) -> int
+~override Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream.ReadAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<int>
+~override Orleans.Persistence.AdoNet.Storage.OrleansRelationalDownloadStream.Write(byte[] buffer, int offset, int count) -> void
+~static Orleans.Hosting.AdoNetGrainStorageServiceCollectionExtensions.AddAdoNetGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AdoNetGrainStorageOptions>> configureOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.AdoNetGrainStorageServiceCollectionExtensions.AddAdoNetGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Orleans.Configuration.AdoNetGrainStorageOptions> configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.AdoNetGrainStorageServiceCollectionExtensions.AddAdoNetGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Orleans.Configuration.AdoNetGrainStorageOptions> configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.AdoNetGrainStorageServiceCollectionExtensions.AddAdoNetGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AdoNetGrainStorageOptions>> configureOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.AdoNetGrainStorageSiloBuilderExtensions.AddAdoNetGrainStorage(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AdoNetGrainStorageOptions>> configureOptions = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AdoNetGrainStorageSiloBuilderExtensions.AddAdoNetGrainStorage(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Configuration.AdoNetGrainStorageOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AdoNetGrainStorageSiloBuilderExtensions.AddAdoNetGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AdoNetGrainStorageOptions>> configureOptions = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AdoNetGrainStorageSiloBuilderExtensions.AddAdoNetGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Configuration.AdoNetGrainStorageOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Storage.AdoNetGrainStorageFactory.Create(System.IServiceProvider services, string name) -> Orleans.Storage.AdoNetGrainStorage

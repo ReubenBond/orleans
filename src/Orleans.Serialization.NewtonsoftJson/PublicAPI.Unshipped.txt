@@ -1,0 +1,16 @@
+#nullable enable
+Orleans.Serialization.NewtonsoftJsonCodec
+Orleans.Serialization.NewtonsoftJsonCodecOptions
+Orleans.Serialization.NewtonsoftJsonCodecOptions.NewtonsoftJsonCodecOptions() -> void
+Orleans.Serialization.SerializationHostingExtensions
+~const Orleans.Serialization.NewtonsoftJsonCodec.WellKnownAlias = "json.net" -> string
+~Orleans.Serialization.NewtonsoftJsonCodec.NewtonsoftJsonCodec(System.Collections.Generic.IEnumerable<Orleans.Serialization.Serializers.ICodecSelector> serializableTypeSelectors, System.Collections.Generic.IEnumerable<Orleans.Serialization.Serializers.ICopierSelector> copyableTypeSelectors, Microsoft.Extensions.Options.IOptions<Orleans.Serialization.NewtonsoftJsonCodecOptions> options) -> void
+~Orleans.Serialization.NewtonsoftJsonCodecOptions.IsCopyableType.get -> System.Func<System.Type, bool?>
+~Orleans.Serialization.NewtonsoftJsonCodecOptions.IsCopyableType.set -> void
+~Orleans.Serialization.NewtonsoftJsonCodecOptions.IsSerializableType.get -> System.Func<System.Type, bool?>
+~Orleans.Serialization.NewtonsoftJsonCodecOptions.IsSerializableType.set -> void
+~Orleans.Serialization.NewtonsoftJsonCodecOptions.SerializerSettings.get -> Newtonsoft.Json.JsonSerializerSettings
+~Orleans.Serialization.NewtonsoftJsonCodecOptions.SerializerSettings.set -> void
+~static Orleans.Serialization.SerializationHostingExtensions.AddNewtonsoftJsonSerializer(this Orleans.Serialization.ISerializerBuilder serializerBuilder, System.Func<System.Type, bool> isSerializable, System.Func<System.Type, bool> isCopyable, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Serialization.NewtonsoftJsonCodecOptions>> configureOptions) -> Orleans.Serialization.ISerializerBuilder
+~static Orleans.Serialization.SerializationHostingExtensions.AddNewtonsoftJsonSerializer(this Orleans.Serialization.ISerializerBuilder serializerBuilder, System.Func<System.Type, bool> isSupported, Newtonsoft.Json.JsonSerializerSettings jsonSerializerSettings = null) -> Orleans.Serialization.ISerializerBuilder
+~static Orleans.Serialization.SerializationHostingExtensions.AddNewtonsoftJsonSerializer(this Orleans.Serialization.ISerializerBuilder serializerBuilder, System.Func<System.Type, bool> isSupported, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Serialization.NewtonsoftJsonCodecOptions>> configureOptions) -> Orleans.Serialization.ISerializerBuilder

@@ -1,0 +1,93 @@
+#nullable enable
+Orleans.Serialization.FSharpChoiceCodec<T1, T2, T3, T4, T5, T6>
+Orleans.Serialization.FSharpChoiceCodec<T1, T2, T3, T4, T5>
+Orleans.Serialization.FSharpChoiceCodec<T1, T2, T3, T4>
+Orleans.Serialization.FSharpChoiceCodec<T1, T2, T3>
+Orleans.Serialization.FSharpChoiceCodec<T1, T2>
+Orleans.Serialization.FSharpChoiceCopier<T1, T2, T3, T4, T5, T6>
+Orleans.Serialization.FSharpChoiceCopier<T1, T2, T3, T4, T5>
+Orleans.Serialization.FSharpChoiceCopier<T1, T2, T3, T4>
+Orleans.Serialization.FSharpChoiceCopier<T1, T2, T3>
+Orleans.Serialization.FSharpChoiceCopier<T1, T2>
+Orleans.Serialization.FSharpListCodec<T>
+Orleans.Serialization.FSharpListCopier<T>
+Orleans.Serialization.FSharpListSurrogate<T>
+Orleans.Serialization.FSharpListSurrogate<T>.FSharpListSurrogate() -> void
+Orleans.Serialization.FSharpMapCodec<TKey, TValue>
+Orleans.Serialization.FSharpMapCopier<TKey, TValue>
+Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>
+Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>.FSharpMapSurrogate() -> void
+Orleans.Serialization.FSharpOptionCodec<T>
+Orleans.Serialization.FSharpOptionCopier<T>
+Orleans.Serialization.FSharpRefCodec<T>
+Orleans.Serialization.FSharpRefCopier<T>
+Orleans.Serialization.FSharpRefSurrogate<T>
+Orleans.Serialization.FSharpRefSurrogate<T>.FSharpRefSurrogate() -> void
+Orleans.Serialization.FSharpRefSurrogate<T>.Value.get -> T
+Orleans.Serialization.FSharpRefSurrogate<T>.Value.set -> void
+Orleans.Serialization.FSharpResultCodec<T, TError>
+Orleans.Serialization.FSharpResultCopier<T, TError>
+Orleans.Serialization.FSharpSetCodec<T>
+Orleans.Serialization.FSharpSetCopier<T>
+Orleans.Serialization.FSharpSetSurrogate<T>
+Orleans.Serialization.FSharpSetSurrogate<T>.FSharpSetSurrogate() -> void
+Orleans.Serialization.FSharpUnitCodec
+Orleans.Serialization.FSharpUnitCodec.FSharpUnitCodec() -> void
+Orleans.Serialization.FSharpUnitCopier
+Orleans.Serialization.FSharpUnitCopier.FSharpUnitCopier() -> void
+Orleans.Serialization.FSharpValueOptionCodec<T>
+Orleans.Serialization.FSharpValueOptionCopier<T>
+~Orleans.Serialization.FSharpChoiceCodec<T1, T2, T3, T4, T5, T6>.FSharpChoiceCodec(Orleans.Serialization.Codecs.IFieldCodec<T1> item1Codec, Orleans.Serialization.Codecs.IFieldCodec<T2> item2Codec, Orleans.Serialization.Codecs.IFieldCodec<T3> item3Codec, Orleans.Serialization.Codecs.IFieldCodec<T4> item4Codec, Orleans.Serialization.Codecs.IFieldCodec<T5> item5Codec, Orleans.Serialization.Codecs.IFieldCodec<T6> item6Codec) -> void
+~Orleans.Serialization.FSharpChoiceCodec<T1, T2, T3, T4, T5>.FSharpChoiceCodec(Orleans.Serialization.Codecs.IFieldCodec<T1> item1Codec, Orleans.Serialization.Codecs.IFieldCodec<T2> item2Codec, Orleans.Serialization.Codecs.IFieldCodec<T3> item3Codec, Orleans.Serialization.Codecs.IFieldCodec<T4> item4Codec, Orleans.Serialization.Codecs.IFieldCodec<T5> item5Codec) -> void
+~Orleans.Serialization.FSharpChoiceCodec<T1, T2, T3, T4>.FSharpChoiceCodec(Orleans.Serialization.Codecs.IFieldCodec<T1> item1Codec, Orleans.Serialization.Codecs.IFieldCodec<T2> item2Codec, Orleans.Serialization.Codecs.IFieldCodec<T3> item3Codec, Orleans.Serialization.Codecs.IFieldCodec<T4> item4Codec) -> void
+~Orleans.Serialization.FSharpChoiceCodec<T1, T2, T3>.FSharpChoiceCodec(Orleans.Serialization.Codecs.IFieldCodec<T1> item1Codec, Orleans.Serialization.Codecs.IFieldCodec<T2> item2Codec, Orleans.Serialization.Codecs.IFieldCodec<T3> item3Codec) -> void
+~Orleans.Serialization.FSharpChoiceCodec<T1, T2>.FSharpChoiceCodec(Orleans.Serialization.Codecs.IFieldCodec<T1> item1Codec, Orleans.Serialization.Codecs.IFieldCodec<T2> item2Codec) -> void
+~Orleans.Serialization.FSharpChoiceCopier<T1, T2, T3, T4, T5, T6>.DeepCopy(Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5, T6> input, Orleans.Serialization.Cloning.CopyContext context) -> Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5, T6>
+~Orleans.Serialization.FSharpChoiceCopier<T1, T2, T3, T4, T5, T6>.FSharpChoiceCopier(Orleans.Serialization.Cloning.IDeepCopier<T1> copier1, Orleans.Serialization.Cloning.IDeepCopier<T2> copier2, Orleans.Serialization.Cloning.IDeepCopier<T3> copier3, Orleans.Serialization.Cloning.IDeepCopier<T4> copier4, Orleans.Serialization.Cloning.IDeepCopier<T5> copier5, Orleans.Serialization.Cloning.IDeepCopier<T6> copier6) -> void
+~Orleans.Serialization.FSharpChoiceCopier<T1, T2, T3, T4, T5>.DeepCopy(Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5> input, Orleans.Serialization.Cloning.CopyContext context) -> Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4, T5>
+~Orleans.Serialization.FSharpChoiceCopier<T1, T2, T3, T4, T5>.FSharpChoiceCopier(Orleans.Serialization.Cloning.IDeepCopier<T1> copier1, Orleans.Serialization.Cloning.IDeepCopier<T2> copier2, Orleans.Serialization.Cloning.IDeepCopier<T3> copier3, Orleans.Serialization.Cloning.IDeepCopier<T4> copier4, Orleans.Serialization.Cloning.IDeepCopier<T5> copier5) -> void
+~Orleans.Serialization.FSharpChoiceCopier<T1, T2, T3, T4>.DeepCopy(Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4> input, Orleans.Serialization.Cloning.CopyContext context) -> Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3, T4>
+~Orleans.Serialization.FSharpChoiceCopier<T1, T2, T3, T4>.FSharpChoiceCopier(Orleans.Serialization.Cloning.IDeepCopier<T1> copier1, Orleans.Serialization.Cloning.IDeepCopier<T2> copier2, Orleans.Serialization.Cloning.IDeepCopier<T3> copier3, Orleans.Serialization.Cloning.IDeepCopier<T4> copier4) -> void
+~Orleans.Serialization.FSharpChoiceCopier<T1, T2, T3>.DeepCopy(Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3> input, Orleans.Serialization.Cloning.CopyContext context) -> Microsoft.FSharp.Core.FSharpChoice<T1, T2, T3>
+~Orleans.Serialization.FSharpChoiceCopier<T1, T2, T3>.FSharpChoiceCopier(Orleans.Serialization.Cloning.IDeepCopier<T1> copier1, Orleans.Serialization.Cloning.IDeepCopier<T2> copier2, Orleans.Serialization.Cloning.IDeepCopier<T3> copier3) -> void
+~Orleans.Serialization.FSharpChoiceCopier<T1, T2>.DeepCopy(Microsoft.FSharp.Core.FSharpChoice<T1, T2> input, Orleans.Serialization.Cloning.CopyContext context) -> Microsoft.FSharp.Core.FSharpChoice<T1, T2>
+~Orleans.Serialization.FSharpChoiceCopier<T1, T2>.FSharpChoiceCopier(Orleans.Serialization.Cloning.IDeepCopier<T1> copier1, Orleans.Serialization.Cloning.IDeepCopier<T2> copier2) -> void
+~Orleans.Serialization.FSharpListCodec<T>.FSharpListCodec(Orleans.Serialization.Serializers.IValueSerializer<Orleans.Serialization.FSharpListSurrogate<T>> surrogateSerializer) -> void
+~Orleans.Serialization.FSharpListCopier<T>.DeepCopy(Microsoft.FSharp.Collections.FSharpList<T> input, Orleans.Serialization.Cloning.CopyContext context) -> Microsoft.FSharp.Collections.FSharpList<T>
+~Orleans.Serialization.FSharpListCopier<T>.FSharpListCopier(Orleans.Serialization.Cloning.IDeepCopier<T> copier) -> void
+~Orleans.Serialization.FSharpListSurrogate<T>.Value.get -> System.Collections.Generic.List<T>
+~Orleans.Serialization.FSharpListSurrogate<T>.Value.set -> void
+~Orleans.Serialization.FSharpMapCodec<TKey, TValue>.FSharpMapCodec(Orleans.Serialization.Serializers.IValueSerializer<Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>> surrogateSerializer) -> void
+~Orleans.Serialization.FSharpMapCopier<TKey, TValue>.DeepCopy(Microsoft.FSharp.Collections.FSharpMap<TKey, TValue> input, Orleans.Serialization.Cloning.CopyContext context) -> Microsoft.FSharp.Collections.FSharpMap<TKey, TValue>
+~Orleans.Serialization.FSharpMapCopier<TKey, TValue>.FSharpMapCopier(Orleans.Serialization.Cloning.IDeepCopier<TKey> keyCopier, Orleans.Serialization.Cloning.IDeepCopier<TValue> valueCopier) -> void
+~Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>.Value.get -> System.Collections.Generic.List<System.Tuple<TKey, TValue>>
+~Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>.Value.set -> void
+~Orleans.Serialization.FSharpOptionCodec<T>.FSharpOptionCodec(Orleans.Serialization.Codecs.IFieldCodec<T> fieldCodec) -> void
+~Orleans.Serialization.FSharpOptionCodec<T>.ReadValue<TInput>(ref Orleans.Serialization.Buffers.Reader<TInput> reader, Orleans.Serialization.WireProtocol.Field field) -> Microsoft.FSharp.Core.FSharpOption<T>
+~Orleans.Serialization.FSharpOptionCodec<T>.WriteField<TBufferWriter>(ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Microsoft.FSharp.Core.FSharpOption<T> value) -> void
+~Orleans.Serialization.FSharpOptionCopier<T>.DeepCopy(Microsoft.FSharp.Core.FSharpOption<T> input, Orleans.Serialization.Cloning.CopyContext context) -> Microsoft.FSharp.Core.FSharpOption<T>
+~Orleans.Serialization.FSharpOptionCopier<T>.FSharpOptionCopier(Orleans.Serialization.Cloning.IDeepCopier<T> valueCopier) -> void
+~Orleans.Serialization.FSharpRefCodec<T>.FSharpRefCodec(Orleans.Serialization.Serializers.IValueSerializer<Orleans.Serialization.FSharpRefSurrogate<T>> surrogateSerializer) -> void
+~Orleans.Serialization.FSharpRefCopier<T>.DeepCopy(Microsoft.FSharp.Core.FSharpRef<T> input, Orleans.Serialization.Cloning.CopyContext context) -> Microsoft.FSharp.Core.FSharpRef<T>
+~Orleans.Serialization.FSharpRefCopier<T>.FSharpRefCopier(Orleans.Serialization.Cloning.IDeepCopier<T> copier) -> void
+~Orleans.Serialization.FSharpResultCodec<T, TError>.FSharpResultCodec(Orleans.Serialization.Codecs.IFieldCodec<T> item1Codec, Orleans.Serialization.Codecs.IFieldCodec<TError> item2Codec) -> void
+~Orleans.Serialization.FSharpResultCopier<T, TError>.DeepCopy(Microsoft.FSharp.Core.FSharpResult<T, TError> input, Orleans.Serialization.Cloning.CopyContext context) -> Microsoft.FSharp.Core.FSharpResult<T, TError>
+~Orleans.Serialization.FSharpResultCopier<T, TError>.FSharpResultCopier(Orleans.Serialization.Cloning.IDeepCopier<T> copier1, Orleans.Serialization.Cloning.IDeepCopier<TError> copier2) -> void
+~Orleans.Serialization.FSharpSetCodec<T>.FSharpSetCodec(Orleans.Serialization.Serializers.IValueSerializer<Orleans.Serialization.FSharpSetSurrogate<T>> surrogateSerializer) -> void
+~Orleans.Serialization.FSharpSetCopier<T>.DeepCopy(Microsoft.FSharp.Collections.FSharpSet<T> input, Orleans.Serialization.Cloning.CopyContext context) -> Microsoft.FSharp.Collections.FSharpSet<T>
+~Orleans.Serialization.FSharpSetCopier<T>.FSharpSetCopier(Orleans.Serialization.Cloning.IDeepCopier<T> copier) -> void
+~Orleans.Serialization.FSharpSetSurrogate<T>.Value.get -> System.Collections.Generic.List<T>
+~Orleans.Serialization.FSharpSetSurrogate<T>.Value.set -> void
+~Orleans.Serialization.FSharpUnitCodec.ReadValue<TInput>(ref Orleans.Serialization.Buffers.Reader<TInput> reader, Orleans.Serialization.WireProtocol.Field field) -> Microsoft.FSharp.Core.Unit
+~Orleans.Serialization.FSharpUnitCodec.WriteField<TBufferWriter>(ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Microsoft.FSharp.Core.Unit value) -> void
+~Orleans.Serialization.FSharpValueOptionCodec<T>.FSharpValueOptionCodec(Orleans.Serialization.Codecs.IFieldCodec<T> item1Codec) -> void
+~Orleans.Serialization.FSharpValueOptionCopier<T>.DeepCopy(Microsoft.FSharp.Core.FSharpValueOption<T> input, Orleans.Serialization.Cloning.CopyContext context) -> Microsoft.FSharp.Core.FSharpValueOption<T>
+~Orleans.Serialization.FSharpValueOptionCopier<T>.FSharpValueOptionCopier(Orleans.Serialization.Cloning.IDeepCopier<T> valueCopier) -> void
+~override Orleans.Serialization.FSharpListCodec<T>.ConvertFromSurrogate(ref Orleans.Serialization.FSharpListSurrogate<T> surrogate) -> Microsoft.FSharp.Collections.FSharpList<T>
+~override Orleans.Serialization.FSharpListCodec<T>.ConvertToSurrogate(Microsoft.FSharp.Collections.FSharpList<T> value, ref Orleans.Serialization.FSharpListSurrogate<T> surrogate) -> void
+~override Orleans.Serialization.FSharpMapCodec<TKey, TValue>.ConvertFromSurrogate(ref Orleans.Serialization.FSharpMapSurrogate<TKey, TValue> surrogate) -> Microsoft.FSharp.Collections.FSharpMap<TKey, TValue>
+~override Orleans.Serialization.FSharpMapCodec<TKey, TValue>.ConvertToSurrogate(Microsoft.FSharp.Collections.FSharpMap<TKey, TValue> value, ref Orleans.Serialization.FSharpMapSurrogate<TKey, TValue> surrogate) -> void
+~override Orleans.Serialization.FSharpRefCodec<T>.ConvertFromSurrogate(ref Orleans.Serialization.FSharpRefSurrogate<T> surrogate) -> Microsoft.FSharp.Core.FSharpRef<T>
+~override Orleans.Serialization.FSharpRefCodec<T>.ConvertToSurrogate(Microsoft.FSharp.Core.FSharpRef<T> value, ref Orleans.Serialization.FSharpRefSurrogate<T> surrogate) -> void
+~override Orleans.Serialization.FSharpSetCodec<T>.ConvertFromSurrogate(ref Orleans.Serialization.FSharpSetSurrogate<T> surrogate) -> Microsoft.FSharp.Collections.FSharpSet<T>
+~override Orleans.Serialization.FSharpSetCodec<T>.ConvertToSurrogate(Microsoft.FSharp.Collections.FSharpSet<T> value, ref Orleans.Serialization.FSharpSetSurrogate<T> surrogate) -> void

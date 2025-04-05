@@ -1,0 +1,39 @@
+#nullable enable
+const Orleans.Configuration.MemoryGrainStorageOptions.DEFAULT_INIT_STAGE = 10000 -> int
+const Orleans.Configuration.MemoryGrainStorageOptions.NumStorageGrainsDefaultValue = 10 -> int
+Orleans.Configuration.MemoryGrainStorageOptions
+Orleans.Configuration.MemoryGrainStorageOptions.InitStage.get -> int
+Orleans.Configuration.MemoryGrainStorageOptions.InitStage.set -> void
+Orleans.Configuration.MemoryGrainStorageOptions.MemoryGrainStorageOptions() -> void
+Orleans.Configuration.MemoryGrainStorageOptions.NumStorageGrains.get -> int
+Orleans.Configuration.MemoryGrainStorageOptions.NumStorageGrains.set -> void
+Orleans.Configuration.MemoryGrainStorageOptionsValidator
+Orleans.Configuration.MemoryGrainStorageOptionsValidator.ValidateConfiguration() -> void
+Orleans.Hosting.MemoryGrainStorageSiloBuilderExtensions
+Orleans.Storage.MemoryGrainStorage
+Orleans.Storage.MemoryGrainStorage.Dispose() -> void
+Orleans.Storage.MemoryGrainStorage.MemoryGrainStorage(string! name, Orleans.Configuration.MemoryGrainStorageOptions! options, Microsoft.Extensions.Logging.ILogger<Orleans.Storage.MemoryGrainStorage!>! logger, Orleans.IGrainFactory! grainFactory, Orleans.Storage.IGrainStorageSerializer! defaultGrainStorageSerializer, Orleans.Serialization.Serializers.IActivatorProvider! activatorProvider) -> void
+Orleans.Storage.MemoryGrainStorageFactory
+Orleans.Storage.MemoryGrainStorageWithLatency
+Orleans.Storage.MemoryStorageWithLatencyOptions
+Orleans.Storage.MemoryStorageWithLatencyOptions.Latency.get -> System.TimeSpan
+Orleans.Storage.MemoryStorageWithLatencyOptions.Latency.set -> void
+Orleans.Storage.MemoryStorageWithLatencyOptions.MemoryStorageWithLatencyOptions() -> void
+Orleans.Storage.MemoryStorageWithLatencyOptions.MockCallsOnly.get -> bool
+Orleans.Storage.MemoryStorageWithLatencyOptions.MockCallsOnly.set -> void
+static Orleans.Storage.MemoryGrainStorageFactory.Create(System.IServiceProvider! services, string! name) -> Orleans.Storage.MemoryGrainStorage!
+static readonly Orleans.Storage.MemoryStorageWithLatencyOptions.DefaultLatency -> System.TimeSpan
+virtual Orleans.Storage.MemoryGrainStorage.ClearStateAsync<T>(string! grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
+virtual Orleans.Storage.MemoryGrainStorage.ReadStateAsync<T>(string! grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
+virtual Orleans.Storage.MemoryGrainStorage.WriteStateAsync<T>(string! grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
+~Orleans.Configuration.MemoryGrainStorageOptions.GrainStorageSerializer.get -> Orleans.Storage.IGrainStorageSerializer
+~Orleans.Configuration.MemoryGrainStorageOptions.GrainStorageSerializer.set -> void
+~Orleans.Configuration.MemoryGrainStorageOptionsValidator.MemoryGrainStorageOptionsValidator(Orleans.Configuration.MemoryGrainStorageOptions options, string name) -> void
+~Orleans.Storage.MemoryGrainStorageWithLatency.ClearStateAsync<T>(string grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~Orleans.Storage.MemoryGrainStorageWithLatency.MemoryGrainStorageWithLatency(string name, Orleans.Storage.MemoryStorageWithLatencyOptions options, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Orleans.IGrainFactory grainFactory, Orleans.Serialization.Serializers.IActivatorProvider activatorProvider, Orleans.Storage.IGrainStorageSerializer defaultGrainStorageSerializer) -> void
+~Orleans.Storage.MemoryGrainStorageWithLatency.ReadStateAsync<T>(string grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~Orleans.Storage.MemoryGrainStorageWithLatency.WriteStateAsync<T>(string grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~static Orleans.Hosting.MemoryGrainStorageSiloBuilderExtensions.AddMemoryGrainStorage(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.MemoryGrainStorageOptions>> configureOptions = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.MemoryGrainStorageSiloBuilderExtensions.AddMemoryGrainStorage(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Configuration.MemoryGrainStorageOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.MemoryGrainStorageSiloBuilderExtensions.AddMemoryGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.MemoryGrainStorageOptions>> configureOptions = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.MemoryGrainStorageSiloBuilderExtensions.AddMemoryGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Configuration.MemoryGrainStorageOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder

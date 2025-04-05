@@ -1,0 +1,21 @@
+#nullable enable
+Orleans.Configuration.RedisReminderTableOptions
+Orleans.Configuration.RedisReminderTableOptions.EntryExpiry.get -> System.TimeSpan?
+Orleans.Configuration.RedisReminderTableOptions.EntryExpiry.set -> void
+Orleans.Configuration.RedisReminderTableOptions.RedisReminderTableOptions() -> void
+Orleans.Configuration.RedisReminderTableOptionsValidator
+Orleans.Configuration.RedisReminderTableOptionsValidator.ValidateConfiguration() -> void
+Orleans.Hosting.SiloBuilderReminderExtensions
+Orleans.Reminders.Redis.RedisRemindersException
+Orleans.Reminders.Redis.RedisRemindersException.RedisRemindersException() -> void
+~Orleans.Configuration.RedisReminderTableOptions.ConfigurationOptions.get -> StackExchange.Redis.ConfigurationOptions
+~Orleans.Configuration.RedisReminderTableOptions.ConfigurationOptions.set -> void
+~Orleans.Configuration.RedisReminderTableOptions.CreateMultiplexer.get -> System.Func<Orleans.Configuration.RedisReminderTableOptions, System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer>>
+~Orleans.Configuration.RedisReminderTableOptions.CreateMultiplexer.set -> void
+~Orleans.Configuration.RedisReminderTableOptionsValidator.RedisReminderTableOptionsValidator(Microsoft.Extensions.Options.IOptions<Orleans.Configuration.RedisReminderTableOptions> options) -> void
+~Orleans.Reminders.Redis.RedisRemindersException.RedisRemindersException(string message) -> void
+~Orleans.Reminders.Redis.RedisRemindersException.RedisRemindersException(string message, System.Exception inner) -> void
+~Orleans.Reminders.Redis.RedisRemindersException.RedisRemindersException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~static Orleans.Configuration.RedisReminderTableOptions.DefaultCreateMultiplexer(Orleans.Configuration.RedisReminderTableOptions options) -> System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer>
+~static Orleans.Hosting.SiloBuilderReminderExtensions.UseRedisReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Orleans.Configuration.RedisReminderTableOptions> configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.SiloBuilderReminderExtensions.UseRedisReminderService(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Configuration.RedisReminderTableOptions> configure) -> Orleans.Hosting.ISiloBuilder

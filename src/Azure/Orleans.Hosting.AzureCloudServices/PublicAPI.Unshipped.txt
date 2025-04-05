@@ -1,0 +1,15 @@
+#nullable enable
+Orleans.Hosting.SiloPersistentStreamConfiguratorExtension
+Orleans.Runtime.Host.IServiceRuntimeWrapper
+Orleans.Runtime.Host.IServiceRuntimeWrapper.FaultDomain.get -> int
+Orleans.Runtime.Host.IServiceRuntimeWrapper.RoleInstanceCount.get -> int
+Orleans.Runtime.Host.IServiceRuntimeWrapper.UpdateDomain.get -> int
+~Orleans.Runtime.Host.IServiceRuntimeWrapper.DeploymentId.get -> string
+~Orleans.Runtime.Host.IServiceRuntimeWrapper.GetConfigurationSettingValue(string configurationSettingName) -> string
+~Orleans.Runtime.Host.IServiceRuntimeWrapper.GetIPEndpoint(string endpointName) -> System.Net.IPEndPoint
+~Orleans.Runtime.Host.IServiceRuntimeWrapper.InstanceName.get -> string
+~Orleans.Runtime.Host.IServiceRuntimeWrapper.RoleName.get -> string
+~Orleans.Runtime.Host.IServiceRuntimeWrapper.SubscribeForStoppingNotification(object handlerObject, System.EventHandler<object> handler) -> void
+~Orleans.Runtime.Host.IServiceRuntimeWrapper.UnsubscribeFromStoppingNotification(object handlerObject, System.EventHandler<object> handler) -> void
+~static Orleans.Hosting.SiloPersistentStreamConfiguratorExtension.UseDynamicAzureDeploymentBalancer(this Orleans.Hosting.ISiloPersistentStreamConfigurator configurator, System.TimeSpan? siloMaturityPeriod = null) -> void
+~static Orleans.Hosting.SiloPersistentStreamConfiguratorExtension.UseStaticAzureDeploymentBalancer(this Orleans.Hosting.ISiloPersistentStreamConfigurator configurator, System.TimeSpan? siloMaturityPeriod = null) -> void

@@ -1,0 +1,2029 @@
+#nullable enable
+abstract Orleans.Runtime.AsyncEnumerableRequest<T>.InvokeInner() -> System.Collections.Generic.IAsyncEnumerable<T>!
+abstract Orleans.Runtime.Request.InvokeInner() -> System.Threading.Tasks.ValueTask
+abstract Orleans.Runtime.Request<TResult>.InvokeInner() -> System.Threading.Tasks.ValueTask<TResult>
+abstract Orleans.Runtime.RequestBase.Dispose() -> void
+abstract Orleans.Runtime.VoidRequest.InvokeInner() -> void
+const Orleans.Runtime.GrainLifecycleStage.Activate = 2000 -> int
+const Orleans.Runtime.GrainLifecycleStage.First = -2147483648 -> int
+const Orleans.Runtime.GrainLifecycleStage.Last = 2147483647 -> int
+const Orleans.Runtime.GrainLifecycleStage.SetupState = 1000 -> int
+const Orleans.Runtime.LogFormatter.MAX_LOG_MESSAGE_SIZE = 20000 -> int
+Orleans.CodeGeneration.InvokeMethodOptions
+Orleans.CodeGeneration.InvokeMethodOptions.AlwaysInterleave = 4 -> Orleans.CodeGeneration.InvokeMethodOptions
+Orleans.CodeGeneration.InvokeMethodOptions.None = 0 -> Orleans.CodeGeneration.InvokeMethodOptions
+Orleans.CodeGeneration.InvokeMethodOptions.OneWay = 1 -> Orleans.CodeGeneration.InvokeMethodOptions
+Orleans.CodeGeneration.InvokeMethodOptions.ReadOnly = 2 -> Orleans.CodeGeneration.InvokeMethodOptions
+Orleans.CodeGeneration.InvokeMethodOptions.Unordered = 8 -> Orleans.CodeGeneration.InvokeMethodOptions
+Orleans.CodeGeneration.VersionAttribute
+Orleans.CodeGeneration.VersionAttribute.Version.get -> ushort
+Orleans.CodeGeneration.VersionAttribute.VersionAttribute(ushort version) -> void
+Orleans.Concurrency.AlwaysInterleaveAttribute
+Orleans.Concurrency.AlwaysInterleaveAttribute.AlwaysInterleaveAttribute() -> void
+Orleans.Concurrency.Immutable<T>
+Orleans.Concurrency.Immutable<T>.Immutable() -> void
+Orleans.Concurrency.Immutable<T>.Immutable(T value) -> void
+Orleans.Concurrency.ImmutableExtensions
+Orleans.Concurrency.MayInterleaveAttribute
+Orleans.Concurrency.OneWayAttribute
+Orleans.Concurrency.OneWayAttribute.OneWayAttribute() -> void
+Orleans.Concurrency.ReadOnlyAttribute
+Orleans.Concurrency.ReadOnlyAttribute.ReadOnlyAttribute() -> void
+Orleans.Concurrency.ReentrantAttribute
+Orleans.Concurrency.ReentrantAttribute.ReentrantAttribute() -> void
+Orleans.Concurrency.StatelessWorkerAttribute
+Orleans.Concurrency.StatelessWorkerAttribute.StatelessWorkerAttribute() -> void
+Orleans.Concurrency.StatelessWorkerAttribute.StatelessWorkerAttribute(int maxLocalWorkers) -> void
+Orleans.Concurrency.StatelessWorkerAttribute.StatelessWorkerAttribute(int maxLocalWorkers, bool removeIdleWorkers) -> void
+Orleans.Concurrency.UnorderedAttribute
+Orleans.Concurrency.UnorderedAttribute.UnorderedAttribute() -> void
+Orleans.Core.Internal.ICallChainReentrantGrainContext
+Orleans.Core.Internal.ICallChainReentrantGrainContext.OnEnterReentrantSection(System.Guid reentrancyId) -> void
+Orleans.Core.Internal.ICallChainReentrantGrainContext.OnExitReentrantSection(System.Guid reentrancyId) -> void
+Orleans.Core.Internal.IGrainManagementExtension
+Orleans.Core.Internal.IGrainManagementExtension.DeactivateOnIdle() -> System.Threading.Tasks.ValueTask
+Orleans.Core.Internal.IGrainManagementExtension.MigrateOnIdle() -> System.Threading.Tasks.ValueTask
+Orleans.Core.IStorage
+Orleans.Core.IStorage.RecordExists.get -> bool
+Orleans.Core.IStorage<TState>
+Orleans.Core.IStorage<TState>.State.get -> TState
+Orleans.Core.IStorage<TState>.State.set -> void
+Orleans.DeactivationReason
+Orleans.DeactivationReason.DeactivationReason() -> void
+Orleans.DeactivationReason.ReasonCode.get -> Orleans.DeactivationReasonCode
+Orleans.DeactivationReasonCode
+Orleans.DeactivationReasonCode.ActivationFailed = 2 -> Orleans.DeactivationReasonCode
+Orleans.DeactivationReasonCode.ActivationIdle = 4 -> Orleans.DeactivationReasonCode
+Orleans.DeactivationReasonCode.ActivationUnresponsive = 5 -> Orleans.DeactivationReasonCode
+Orleans.DeactivationReasonCode.ApplicationError = 8 -> Orleans.DeactivationReasonCode
+Orleans.DeactivationReasonCode.ApplicationRequested = 9 -> Orleans.DeactivationReasonCode
+Orleans.DeactivationReasonCode.DirectoryFailure = 3 -> Orleans.DeactivationReasonCode
+Orleans.DeactivationReasonCode.DuplicateActivation = 6 -> Orleans.DeactivationReasonCode
+Orleans.DeactivationReasonCode.IncompatibleRequest = 7 -> Orleans.DeactivationReasonCode
+Orleans.DeactivationReasonCode.Migrating = 10 -> Orleans.DeactivationReasonCode
+Orleans.DeactivationReasonCode.None = 0 -> Orleans.DeactivationReasonCode
+Orleans.DeactivationReasonCode.RuntimeRequested = 11 -> Orleans.DeactivationReasonCode
+Orleans.DeactivationReasonCode.ShuttingDown = 1 -> Orleans.DeactivationReasonCode
+Orleans.ErrorCode
+Orleans.ErrorCode.AzureServiceRuntimeWrapper = 103700 -> Orleans.ErrorCode
+Orleans.ErrorCode.AzureServiceRuntime_FailedToLoad = 103702 -> Orleans.ErrorCode
+Orleans.ErrorCode.AzureServiceRuntime_NotLoaded = 103701 -> Orleans.ErrorCode
+Orleans.ErrorCode.CancellationExtensionCreationFailed = 104002 -> Orleans.ErrorCode
+Orleans.ErrorCode.CancellationTokenCancelFailed = 104001 -> Orleans.ErrorCode
+Orleans.ErrorCode.CancellationTokenManagerBase = 104000 -> Orleans.ErrorCode
+Orleans.ErrorCode.CannotCheckRoleEnvironment = 100429 -> Orleans.ErrorCode
+Orleans.ErrorCode.CatalogBase = 100500 -> Orleans.ErrorCode
+Orleans.ErrorCode.CatalogNonExistingActivation1 = 100501 -> Orleans.ErrorCode
+Orleans.ErrorCode.CatalogNonExistingActivation2 = 100510 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_ActivationCollector_BadState_1 = 100537 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_ActivationCollector_BadState_2 = 100538 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_ActivationCollector_BadState_3 = 100546 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_ActivationDirectory_Statistics = 100528 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_ActivationException = 100505 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_AfterCallingActivate = 100512 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_AfterCallingDeactivate = 100515 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_AfterCollection = 100508 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_AttemptToCollectActivationEarly = 100526 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_BeforeCallingActivate = 100511 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_BeforeCallingDeactivate = 100514 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_BeforeCollection = 100507 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_DeactivateActivation_Exception = 100527 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_DeactivateAllActivations = 100545 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_DeactivateStreamResources_Exception = 100542 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_DestroyActivations = 100503 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_DestroyActivations_Done = 100539 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_DuplicateActivation = 100520 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_ErrorCallingActivate = 100513 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_ErrorCallingDeactivate = 100516 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_Failed_InvokeActivate = 100534 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_Failed_SetupActivationState = 100533 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_FinishDeactivateActivation_Exception = 100543 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_FinishGrainDeactivateAndCleanupStreams_Exception = 100544 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_GetApproximateSiloStatuses = 100506 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_MissingTypeOnCreate = 100517 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_NullGetTypeAndStrategies = 100519 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_RegistrationFailure = 100521 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_Reject_ActivationTooManyRequests = 100523 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_RerouteAllQueuedMessages = 100535 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_ResendDuplicateFailed = 100518 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_ShutdownActivations_1 = 100509 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_ShutdownActivations_2 = 100540 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_ShutdownActivations_3 = 100541 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_SiloStatusChangeNotification = 100524 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_SiloStatusChangeNotification_Exception = 100525 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_UnknownActivation = 100504 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_UnregisterAsync = 100547 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_UnregisterManyAsync = 100502 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_UnregisterMessageTarget1 = 100529 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_UnregisterMessageTarget2 = 100530 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_UnregisterMessageTarget3 = 100531 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_UnregisterMessageTarget4 = 100532 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_WaitForAllTimersToFinish_Exception = 100536 -> Orleans.ErrorCode
+Orleans.ErrorCode.Catalog_Warn_ActivationTooManyRequests = 100522 -> Orleans.ErrorCode
+Orleans.ErrorCode.ClientError = 100315 -> Orleans.ErrorCode
+Orleans.ErrorCode.ClientInitializing = 100313 -> Orleans.ErrorCode
+Orleans.ErrorCode.ClientRegistrarFailedToRegister = 101316 -> Orleans.ErrorCode
+Orleans.ErrorCode.ClientRegistrarFailedToRegister_2 = 101317 -> Orleans.ErrorCode
+Orleans.ErrorCode.ClientRegistrarFailedToUnregister = 101318 -> Orleans.ErrorCode
+Orleans.ErrorCode.ClientRegistrarTimerFailed = 101319 -> Orleans.ErrorCode
+Orleans.ErrorCode.ClientStarting = 100314 -> Orleans.ErrorCode
+Orleans.ErrorCode.CodeGenBase = 103800 -> Orleans.ErrorCode
+Orleans.ErrorCode.CodeGenCompilationFailed = 103801 -> Orleans.ErrorCode
+Orleans.ErrorCode.CodeGenCompilationSucceeded = 103802 -> Orleans.ErrorCode
+Orleans.ErrorCode.CodeGenDllMissing = 103806 -> Orleans.ErrorCode
+Orleans.ErrorCode.CodeGenIgnoringTypes = 103805 -> Orleans.ErrorCode
+Orleans.ErrorCode.CodeGenSerializerGenerator = 103804 -> Orleans.ErrorCode
+Orleans.ErrorCode.CodeGenSourceGenerated = 103803 -> Orleans.ErrorCode
+Orleans.ErrorCode.CodeGenSystemTypeRequiresSerializer = 103807 -> Orleans.ErrorCode
+Orleans.ErrorCode.ConsistentRingProviderBase = 103000 -> Orleans.ErrorCode
+Orleans.ErrorCode.CRP_Added_Silo = 103003 -> Orleans.ErrorCode
+Orleans.ErrorCode.CRP_ForGrains_Local_Subscriber_Exception_1 = 103002 -> Orleans.ErrorCode
+Orleans.ErrorCode.CRP_ForGrains_Local_Subscriber_Exception_2 = 103006 -> Orleans.ErrorCode
+Orleans.ErrorCode.CRP_Local_Subscriber_Exception = 103001 -> Orleans.ErrorCode
+Orleans.ErrorCode.CRP_Notify = 103005 -> Orleans.ErrorCode
+Orleans.ErrorCode.CRP_Removed_Silo = 103004 -> Orleans.ErrorCode
+Orleans.ErrorCode.DirectoryBase = 101100 -> Orleans.ErrorCode
+Orleans.ErrorCode.DirectoryBothPrimaryAndBackupForGrain = 101101 -> Orleans.ErrorCode
+Orleans.ErrorCode.DirectoryPartitionPredecessorExpected = 101102 -> Orleans.ErrorCode
+Orleans.ErrorCode.DirectoryUnexpectedDelta = 101104 -> Orleans.ErrorCode
+Orleans.ErrorCode.Directory_SiloStatusChangeNotification_Exception = 101105 -> Orleans.ErrorCode
+Orleans.ErrorCode.DispatcherBase = 101500 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_ActivationEndedTurn_Waiting = 101507 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_ActivationOverloaded = 101530 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_AddressMsg = 101517 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_AddressMsg_GrainOrder = 101518 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_AddressMsg_NullingLastSentTo = 101519 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_AddressMsg_SelectTarget = 101522 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_AddressMsg_SMPlacement = 101520 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_AddressMsg_UnregisteredClient = 101521 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_AddSendOrder = 101512 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_AddSendOrderNoPrior = 101513 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_AddSendOrder_First = 101515 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_AddSendOrder_PriorIds = 101514 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_DetectedDeadlock = 101528 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_EnqueueMessage = 101516 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_ErrorCreatingActivation = 101540 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_ExtendedMessageProcessing = 101534 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_FailedToUnregisterCallback = 101542 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_FailedToUnregisterNonExistingAct = 101535 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_HandleMsg = 101523 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_InjectingMessageLoss = 100300 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_InjectingRejection = 100299 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_Intermediate_GetOrCreateActivation = 100147 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_InvalidActivation = 101538 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_InvalidEnum_Direction = 100072 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_InvalidEnum_RejectionType = 100075 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_InvalidMsg_Direction = 100077 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_NoCallbackForRejectionResp = 100073 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_NoCallbackForResp = 100076 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_NoGrainInstance = 101536 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_NoTargetActivation = 100148 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_OnActivationCompletedRequest_Waiting = 101524 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_QueueingRequestBadTargetState = 100152 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_ReceiveOrderCorrelation = 101511 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_Receive_InvalidActivation = 101505 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_RegisterCallback_Replaced = 101502 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_Retarget = 101508 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_RuntimeStatisticsUnavailable = 101537 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_SelectTarget_Failed = 100071 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_SelectTarget_FailPending = 101501 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_Send_AddressedMessage = 101504 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_Send_BufferResponse = 101503 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_StuckActivation = 101541 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_TryAcceptMessage = 101509 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_UnknownTypeCode = 100303 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_UpdateReceiveOrder = 101510 -> Orleans.ErrorCode
+Orleans.ErrorCode.Dispatcher_WriteGrainFailed = 101506 -> Orleans.ErrorCode
+Orleans.ErrorCode.ExecutorProcessingError = 101233 -> Orleans.ErrorCode
+Orleans.ErrorCode.ExecutorTurnTooLong = 101212 -> Orleans.ErrorCode
+Orleans.ErrorCode.ExecutorWorkerThreadExc = 101230 -> Orleans.ErrorCode
+Orleans.ErrorCode.GatewayAcceptor_ExceptionReceiving = 101308 -> Orleans.ErrorCode
+Orleans.ErrorCode.GatewayAcceptor_InvalidSize = 101322 -> Orleans.ErrorCode
+Orleans.ErrorCode.GatewayAcceptor_SocketClosed = 101307 -> Orleans.ErrorCode
+Orleans.ErrorCode.GatewayAcceptor_WrongClusterId = 101320 -> Orleans.ErrorCode
+Orleans.ErrorCode.GatewayBase = 101300 -> Orleans.ErrorCode
+Orleans.ErrorCode.GatewayByteCountMismatch = 101305 -> Orleans.ErrorCode
+Orleans.ErrorCode.GatewayClientClosedSocket = 101302 -> Orleans.ErrorCode
+Orleans.ErrorCode.GatewayClientOpenedSocket = 101301 -> Orleans.ErrorCode
+Orleans.ErrorCode.GatewayDroppingClient = 101303 -> Orleans.ErrorCode
+Orleans.ErrorCode.GatewayExceptionSendingToClient = 101306 -> Orleans.ErrorCode
+Orleans.ErrorCode.GatewayFailedToParse = 101315 -> Orleans.ErrorCode
+Orleans.ErrorCode.GatewayManager_AllGatewaysDead = 101321 -> Orleans.ErrorCode
+Orleans.ErrorCode.GatewayManager_FoundKnownGateways = 101309 -> Orleans.ErrorCode
+Orleans.ErrorCode.GatewayManager_NoGateways = 101313 -> Orleans.ErrorCode
+Orleans.ErrorCode.GatewayNetworkError = 101314 -> Orleans.ErrorCode
+Orleans.ErrorCode.GatewayTryingToSendToUnrecognizedClient = 101304 -> Orleans.ErrorCode
+Orleans.ErrorCode.GlobalSingleInstanceBase = 104100 -> Orleans.ErrorCode
+Orleans.ErrorCode.GlobalSingleInstance_MaintainerException = 104103 -> Orleans.ErrorCode
+Orleans.ErrorCode.GlobalSingleInstance_MultipleOwners = 104104 -> Orleans.ErrorCode
+Orleans.ErrorCode.GlobalSingleInstance_ProtocolError = 104101 -> Orleans.ErrorCode
+Orleans.ErrorCode.GlobalSingleInstance_WarningInvalidOrigin = 104102 -> Orleans.ErrorCode
+Orleans.ErrorCode.GrainInvokeException = 100322 -> Orleans.ErrorCode
+Orleans.ErrorCode.IGC_DisposeError = 101525 -> Orleans.ErrorCode
+Orleans.ErrorCode.IGC_SendExceptionResponseFailed = 101532 -> Orleans.ErrorCode
+Orleans.ErrorCode.IGC_SendRequest_NullContext = 101526 -> Orleans.ErrorCode
+Orleans.ErrorCode.IGC_SendResponseFailed = 101531 -> Orleans.ErrorCode
+Orleans.ErrorCode.IGC_SniffIncomingMessage_Exc = 101527 -> Orleans.ErrorCode
+Orleans.ErrorCode.IGC_UnhandledExceptionInInvoke = 101533 -> Orleans.ErrorCode
+Orleans.ErrorCode.InvokeWorkItem_UnhandledExceptionInInvoke = 101539 -> Orleans.ErrorCode
+Orleans.ErrorCode.LifecycleStagesReport = 100453 -> Orleans.ErrorCode
+Orleans.ErrorCode.LifecycleStartFailure = 100450 -> Orleans.ErrorCode
+Orleans.ErrorCode.LifecycleStopFailure = 100451 -> Orleans.ErrorCode
+Orleans.ErrorCode.LoaderBase = 101700 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_AssemblyInspectError = 101710 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_AssemblyInspectionError = 101713 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_AssemblyLoadError = 101724 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_AssemblyLookupFailed = 101701 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_AssemblyLookupResolved = 101702 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_DirNotFound = 101705 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_FoundBinary = 101714 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_GrainTypeFullList = 101711 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_IgnoreAbstractGrainClass = 101712 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_IgnoreNonPublicGrainClass = 101715 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_LoadAndCreateInstance_Failure = 101721 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_LoadingFromDir = 101703 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_LoadingFromFile = 101704 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_LoadingGrainType = 101707 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_LoadingSerInfo = 101706 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_NotGrainAssembly = 100047 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_ProxyLoadError = 100049 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_SkippingBadAssembly = 101717 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_SkippingDynamicAssembly = 101709 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_SkippingFile = 101708 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_TryLoadAndCreateInstance_Failure = 101722 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_TypeLoadError = 100048 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_TypeLoadError_2 = 101718 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_TypeLoadError_3 = 101719 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_TypeLoadError_4 = 101720 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_TypeLoadError_5 = 101723 -> Orleans.ErrorCode
+Orleans.ErrorCode.Loader_UnexpectedException = 101716 -> Orleans.ErrorCode
+Orleans.ErrorCode.LogConsistencyBase = 104300 -> Orleans.ErrorCode
+Orleans.ErrorCode.LogConsistency_CaughtException = 104302 -> Orleans.ErrorCode
+Orleans.ErrorCode.LogConsistency_ProtocolError = 104303 -> Orleans.ErrorCode
+Orleans.ErrorCode.LogConsistency_ProtocolFatalError = 104304 -> Orleans.ErrorCode
+Orleans.ErrorCode.LogConsistency_UserCodeException = 104301 -> Orleans.ErrorCode
+Orleans.ErrorCode.LoggerBase = 102700 -> Orleans.ErrorCode
+Orleans.ErrorCode.Logger_LogMessageTruncated = 102701 -> Orleans.ErrorCode
+Orleans.ErrorCode.Logger_ProcessCrashing = 100002 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipBase = 100600 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipBecomeActive = 100604 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipCantWriteLivenessDisabled = 100225 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipCleanDeadEntriesFailure = 100662 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipDelayedIAmAliveUpdateTimer = 100624 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipDelayedProbeOtherSilosTimer = 100622 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipDelayedTableUpdateTimer = 100621 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipDetectedNewer = 100620 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipDetectedOlder = 100619 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFactory1 = 100635 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFactory2 = 100636 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFailedToBecomeActive = 100647 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFailedToJoin = 100664 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFailedToKillMyself = 100650 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFailedToReadSilo = 100623 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFailedToShutdown = 100649 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFailedToStart = 100646 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFailedToStop = 100648 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFailedToSuspect = 100651 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFailedToWrite = 100615 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFailedToWriteConditional = 100616 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFileBasedTable1 = 100640 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFileBasedTable2 = 100641 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFileBasedTable3 = 100642 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFileBasedTable4 = 100643 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFinishBecomeActive = 100605 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFoundMyselfDead1 = 100617 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFoundMyselfDead2 = 100618 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipFoundMyselfDead3 = 100628 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipGossipProcessingFailure = 100655 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipGossipSendFailure = 100656 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipGrainBasedTable1 = 100637 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipGrainBasedTable2 = 100638 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipGrainBasedTable3 = 100639 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipJoining = 100663 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipJoiningPreconditionFailure = 100661 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipKillMyself = 100609 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipKillMyselfFailure = 100654 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipKillMyselfLocally = 100627 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipLocalSubscriberException = 100626 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipMarkDeadWriteFailed = 100629 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipMarkingAsDead = 100611 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipMissedIAmAliveTableUpdate = 100625 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipMissedPing = 100613 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipNodeMigrated = 100601 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipNodeRestarted = 100602 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipPingedSiloNotInWatchList = 100644 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipReadAll_1 = 100634 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipReadAll_2 = 100645 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipReadAll_Cleanup = 100652 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipReadTable = 100608 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipSendingPreJoinPing = 100614 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipSendPingFailure = 100658 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipShutDown = 100606 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipShutDownFailure = 100653 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipStarting = 100603 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipStartingIAmAliveTimer = 100660 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipStop = 100607 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipTableGrainInit1 = 100630 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipTableGrainInit2 = 100631 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipTableGrainInit3 = 100632 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipTableGrainInit4 = 100633 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipTimerProcessingFailure = 100657 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipUpdateIAmAliveFailure = 100659 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipVotingForKill = 100610 -> Orleans.ErrorCode
+Orleans.ErrorCode.MembershipWatchList = 100612 -> Orleans.ErrorCode
+Orleans.ErrorCode.MessageAcceptor_Connection = 101310 -> Orleans.ErrorCode
+Orleans.ErrorCode.MessageAcceptor_NotAProxiedConnection = 101311 -> Orleans.ErrorCode
+Orleans.ErrorCode.MessageAcceptor_UnexpectedProxiedConnection = 101312 -> Orleans.ErrorCode
+Orleans.ErrorCode.MessagingAcceptAsyncSocketException = 101036 -> Orleans.ErrorCode
+Orleans.ErrorCode.MessagingAcceptingSocketClosed = 101005 -> Orleans.ErrorCode
+Orleans.ErrorCode.MessagingBase = 101000 -> Orleans.ErrorCode
+Orleans.ErrorCode.MessagingBeginAcceptSocketException = 101004 -> Orleans.ErrorCode
+Orleans.ErrorCode.MessagingBeginReceiveException = 101003 -> Orleans.ErrorCode
+Orleans.ErrorCode.MessagingEndAcceptSocketException = 101006 -> Orleans.ErrorCode
+Orleans.ErrorCode.MessagingMessageFromUnknownActivation = 101009 -> Orleans.ErrorCode
+Orleans.ErrorCode.MessagingProcessReceiveBufferException = 101017 -> Orleans.ErrorCode
+Orleans.ErrorCode.MessagingSendingRejection = 101008 -> Orleans.ErrorCode
+Orleans.ErrorCode.MessagingUnexpectedSendError = 101007 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_CountMismatchSending = 101023 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_Dispatcher_DiscardRejection = 101002 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_Dispatcher_ForwardingRequests = 101033 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_Dispatcher_Rejected = 101042 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_Dispatcher_ReturnToOriginCluster = 101035 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_Dispatcher_TryForward = 101031 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_Dispatcher_TryForwardFailed = 101032 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_DroppingBlockedMessage = 101039 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_DroppingExpiredMessage = 101038 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_ExceptionBeginReceiving = 101025 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_ExceptionReceiveAsync = 101037 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_ExceptionReceiving = 101024 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_ExceptionSending = 101022 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_IMA_AcceptCallbackNullState = 101011 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_IMA_AcceptCallbackUnexpectedState = 101012 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_IMA_ActivationOverloaded = 101028 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_IMA_BadBufferReceived = 101027 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_IMA_ClosingSocket = 101015 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_IMA_DroppingConnection = 101001 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_IMA_ExceptionAccepting = 101026 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_IMA_NewBeginReceiveException = 101013 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_IMA_OpenedListeningSocket = 101010 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_Inbound_Dequeue = 101041 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_Inbound_Enqueue = 101040 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_LargeMsg_Incoming = 101019 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_LargeMsg_Outgoing = 101018 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_OutgoingMS_DroppingMessage = 101016 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_SerializationError = 101029 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_SiloNetworkError = 101020 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_SimulatedMessageLoss = 101034 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_Socket_ReceiveError = 101014 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_UnableToDeserializeBody = 101030 -> Orleans.ErrorCode
+Orleans.ErrorCode.Messaging_UnableToGetSendingSocket = 101021 -> Orleans.ErrorCode
+Orleans.ErrorCode.MultiClusterNetworkBase = 103900 -> Orleans.ErrorCode
+Orleans.ErrorCode.MultiClusterNetwork_FailedToStart = 103903 -> Orleans.ErrorCode
+Orleans.ErrorCode.MultiClusterNetwork_GossipCommunicationFailure = 103905 -> Orleans.ErrorCode
+Orleans.ErrorCode.MultiClusterNetwork_LocalSubscriberException = 103904 -> Orleans.ErrorCode
+Orleans.ErrorCode.MultiClusterNetwork_NoChannelsConfigured = 103906 -> Orleans.ErrorCode
+Orleans.ErrorCode.MultiClusterNetwork_Started = 103902 -> Orleans.ErrorCode
+Orleans.ErrorCode.MultiClusterNetwork_Starting = 103901 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipBecomeActive = 100671 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipDetectedNewer = 100682 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipDetectedOlder = 100681 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipFailedToBecomeActive = 100672 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipFoundMyselfDead2 = 100680 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipKillMyself = 100675 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipKillMyselfFailure = 100685 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipKillMyselfLocally = 100676 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipNotificationProcessingFailure = 100677 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipNSDetails = 100686 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipReadAll_1 = 100678 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipReadAll_2 = 100679 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipShutDown = 100673 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipShutDownFailure = 100684 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipStarting = 100670 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipStop = 100674 -> Orleans.ErrorCode
+Orleans.ErrorCode.NSMembershipTimerProcessingFailure = 100683 -> Orleans.ErrorCode
+Orleans.ErrorCode.OSBase = 104600 -> Orleans.ErrorCode
+Orleans.ErrorCode.OS_InvalidOS = 104601 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterBase = 100700 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterCategoryCheckError = 100718 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterConnectError = 100719 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterDumpAll = 100704 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterFailedToInitialize = 100720 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterNotFound = 100701 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterNotRegistered = 100708 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterRegistering = 100716 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterSkipping = 100712 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterStarting = 100702 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterStopping = 100703 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterTimerError = 100717 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterUnableToConnect = 100709 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterUnableToWrite = 100710 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterWriteErrors = 100705 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterWriteSuccess = 100706 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterWriteTooManyErrors = 100707 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfCounterWriting = 100711 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfMetricsStartingTimer = 100714 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfMetricsStoppingTimer = 100713 -> Orleans.ErrorCode
+Orleans.ErrorCode.PerfStatistics = 100715 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgentBase = 103300 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_01 = 103301 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_02 = 103302 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_03 = 103303 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_04 = 103304 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_05 = 103305 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_06 = 103306 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_07 = 103307 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_08 = 103308 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_09 = 103309 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_10 = 103310 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_11 = 103311 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_12 = 103312 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_13 = 103313 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_14 = 103314 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_15 = 103315 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_16 = 103316 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_17 = 103317 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_18 = 103318 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_19 = 103319 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_20 = 103320 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_21 = 103321 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_22 = 103322 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_23 = 103323 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_24 = 103324 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_25 = 103325 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_26 = 103326 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_27 = 103327 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingAgent_28 = 103328 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManagerBase = 103500 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_01 = 103501 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_02 = 103502 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_03 = 103503 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_04 = 103504 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_05 = 103505 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_06 = 103506 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_07 = 103507 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_08 = 103508 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_09 = 103509 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_10 = 103510 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_11 = 103511 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_12 = 103512 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_13 = 103513 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_14 = 103514 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_15 = 103515 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_16 = 103516 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_AlreadyStarted = 103521 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_AlreadyStopped = 103522 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_PeriodicPrint = 103523 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_Started = 103519 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_Starting = 103517 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_Stopped = 103520 -> Orleans.ErrorCode
+Orleans.ErrorCode.PersistentStreamPullingManager_Stopping = 103518 -> Orleans.ErrorCode
+Orleans.ErrorCode.PlacementBase = 101800 -> Orleans.ErrorCode
+Orleans.ErrorCode.Placement_ActivationCountBasedDirector_NoSilos = 101804 -> Orleans.ErrorCode
+Orleans.ErrorCode.Placement_RuntimeStatisticsUpdateFailure_1 = 101801 -> Orleans.ErrorCode
+Orleans.ErrorCode.Placement_RuntimeStatisticsUpdateFailure_2 = 101802 -> Orleans.ErrorCode
+Orleans.ErrorCode.Placement_RuntimeStatisticsUpdateFailure_3 = 101803 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProviderManagerBase = 103100 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_AssemblyLoadError = 103103 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_CatalogLogConsistencyProviderAllocated = 103118 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_CatalogNoLogConsistencyProvider = 103117 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_CatalogNoStorageProvider_1 = 103104 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_CatalogNoStorageProvider_2 = 103105 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_CatalogNoStorageProvider_3 = 103113 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_CatalogStorageProviderAllocated = 103106 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_ConfiguredProviderNotLoaded = 103108 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_ErrorFromClose = 103119 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_ErrorFromInit = 103109 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_IgnoringExplicitSet = 103110 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_InstanceConstructionError1 = 103101 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_Loaded = 103102 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_Manager_Already_Loaded = 103112 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_NoDefaultProvider = 103107 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_NotLoaded = 103111 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_ProviderLoadedOk = 103114 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_ProviderNotControllable = 103116 -> Orleans.ErrorCode
+Orleans.ErrorCode.Provider_ProviderNotFound = 103115 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClientBase = 100900 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClientUnhandledExceptionWhileReceiving = 100902 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClientUnhandledExceptionWhileSending = 100901 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_AppDomain_Unload = 100931 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_ByteCountMismatch = 100163 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_CannotConnect = 100178 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_CannotSend = 100903 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_CannotSend_NoGateway = 100904 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_ClientInvokeCallback_Error = 100928 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_Connected = 100908 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_CreatedGatewayToGrain = 100916 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_CreatedGatewayUnordered = 100915 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_DeadGateway = 100911 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_DroppingMsg = 100905 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_FailedToUnregisterCallback = 100933 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_GatewayConnStarted = 100914 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_GatewayUnknownStatus = 100932 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_GetGateways = 100921 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_MarkGatewayDead = 100912 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_MarkGatewayDisconnected = 100913 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_MsgCtrNotRunning = 100910 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_MsgSent = 100907 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_NetworkError = 100922 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_NewBucketIndex = 100917 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_OGC_SendExceptionResponseFailed = 100926 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_OGC_SendResponseFailed = 100925 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_OGC_TargetNotFound = 100924 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_OGC_TargetNotFound_2 = 100930 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_OGC_UnhandledExceptionInOneWayInvoke = 100927 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_OperationCancelled = 100920 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_PauseBeforeRetry = 100909 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_QueueRequest = 100918 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_ReceiveError = 100021 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_RejectingMsg = 100906 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_SendException = 100923 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_SerializationError = 100159 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_SocketSendError = 100161 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_StartDone = 100929 -> Orleans.ErrorCode
+Orleans.ErrorCode.ProxyClient_ThreadAbort = 100919 -> Orleans.ErrorCode
+Orleans.ErrorCode.ReminderServiceBase = 102900 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_Factory1 = 102919 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_FailedToReadTableAndStartTimer = 102920 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_FastReminderInterval = 102939 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_GetReminder = 102932 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_GetReminders = 102933 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_GrainBasedTable1 = 102918 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_GrainBasedTable2 = 102924 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_LocalStop = 102935 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_NotResponsible = 102910 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_Not_Started = 102916 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_RangeChanged = 102934 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_RegisterOrUpdate = 102928 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_Register_AlreadyRegistered = 102907 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_Register_InvalidPeriod = 102908 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_Register_NotRemindable = 102909 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_Register_TableError = 102905 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_RemoveFromTable = 102931 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_ServiceInitialLoadFailed = 102938 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_ServiceInitialLoadFailing = 102937 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_ServiceStarted = 102926 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_ServiceStarting = 102925 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_ServiceStopping = 102927 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_Started = 102936 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_Stop = 102930 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_TableGrainInit1 = 102921 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_TableGrainInit2 = 102922 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_TableGrainInit3 = 102923 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_Table_Insert = 102913 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_Table_Remove = 102914 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_Tick_Delivery_Error = 102915 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_Unregister = 102929 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_UnregisterGrain_TableError = 102917 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_Unregister_NotFoundLocally = 102911 -> Orleans.ErrorCode
+Orleans.ErrorCode.RS_Unregister_TableError = 102912 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime = 100000 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100001 = 100001 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100002 = 100002 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100003 = 100003 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100004 = 100004 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100005 = 100005 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100006 = 100006 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100007 = 100007 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100008 = 100008 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100009 = 100009 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100010 = 100010 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100011 = 100011 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100012 = 100012 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100013 = 100013 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100014 = 100014 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100015 = 100015 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100016 = 100016 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100017 = 100017 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100018 = 100018 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100019 = 100019 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100020 = 100020 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100021 = 100021 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100022 = 100022 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100023 = 100023 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100024 = 100024 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100025 = 100025 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100026 = 100026 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100027 = 100027 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100028 = 100028 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100029 = 100029 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100030 = 100030 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100031 = 100031 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100032 = 100032 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100033 = 100033 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100034 = 100034 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100035 = 100035 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100036 = 100036 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100037 = 100037 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100039 = 100039 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100040 = 100040 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100041 = 100041 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100042 = 100042 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100043 = 100043 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100044 = 100044 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100045 = 100045 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100046 = 100046 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100047 = 100047 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100048 = 100048 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100049 = 100049 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100050 = 100050 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100051 = 100051 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100052 = 100052 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100053 = 100053 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100054 = 100054 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100055 = 100055 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100056 = 100056 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100057 = 100057 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100058 = 100058 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100059 = 100059 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100060 = 100060 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100061 = 100061 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100062 = 100062 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100063 = 100063 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100064 = 100064 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100065 = 100065 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100066 = 100066 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100067 = 100067 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100068 = 100068 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100069 = 100069 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100070 = 100070 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100071 = 100071 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100072 = 100072 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100073 = 100073 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100074 = 100074 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100075 = 100075 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100076 = 100076 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100077 = 100077 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100078 = 100078 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100079 = 100079 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100080 = 100080 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100081 = 100081 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100082 = 100082 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100083 = 100083 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100084 = 100084 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100085 = 100085 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100086 = 100086 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100087 = 100087 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100088 = 100088 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100089 = 100089 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100090 = 100090 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100091 = 100091 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100092 = 100092 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100093 = 100093 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100094 = 100094 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100095 = 100095 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100096 = 100096 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100097 = 100097 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100098 = 100098 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100099 = 100099 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100100 = 100100 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100101 = 100101 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100102 = 100102 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100103 = 100103 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100104 = 100104 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100105 = 100105 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100106 = 100106 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100107 = 100107 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100108 = 100108 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100109 = 100109 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100110 = 100110 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100111 = 100111 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100112 = 100112 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100113 = 100113 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100114 = 100114 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100115 = 100115 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100116 = 100116 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100117 = 100117 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100118 = 100118 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100119 = 100119 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100120 = 100120 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100121 = 100121 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100122 = 100122 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100123 = 100123 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100124 = 100124 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100125 = 100125 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100126 = 100126 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100127 = 100127 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100128 = 100128 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100129 = 100129 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100130 = 100130 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100131 = 100131 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100132 = 100132 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100133 = 100133 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100134 = 100134 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100135 = 100135 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100136 = 100136 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100137 = 100137 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100138 = 100138 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100139 = 100139 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100140 = 100140 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100141 = 100141 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100142 = 100142 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100143 = 100143 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100144 = 100144 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100145 = 100145 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100146 = 100146 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100147 = 100147 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100148 = 100148 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100149 = 100149 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100150 = 100150 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100151 = 100151 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100152 = 100152 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100153 = 100153 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100154 = 100154 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100155 = 100155 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100156 = 100156 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100157 = 100157 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100158 = 100158 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100159 = 100159 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100160 = 100160 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100161 = 100161 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100162 = 100162 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100163 = 100163 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100164 = 100164 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100165 = 100165 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100166 = 100166 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100167 = 100167 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100168 = 100168 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100169 = 100169 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100170 = 100170 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100171 = 100171 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100172 = 100172 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100173 = 100173 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100174 = 100174 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100175 = 100175 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100176 = 100176 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100177 = 100177 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100178 = 100178 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100179 = 100179 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100180 = 100180 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100181 = 100181 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100182 = 100182 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100183 = 100183 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100184 = 100184 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100185 = 100185 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100186 = 100186 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100187 = 100187 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100188 = 100188 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100189 = 100189 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100190 = 100190 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100191 = 100191 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100192 = 100192 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100193 = 100193 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100194 = 100194 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100195 = 100195 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100196 = 100196 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100197 = 100197 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100198 = 100198 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100199 = 100199 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100200 = 100200 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100201 = 100201 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100202 = 100202 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100203 = 100203 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100204 = 100204 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100205 = 100205 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100206 = 100206 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100207 = 100207 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100208 = 100208 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100209 = 100209 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100210 = 100210 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100211 = 100211 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100212 = 100212 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100213 = 100213 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100214 = 100214 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100215 = 100215 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100216 = 100216 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100217 = 100217 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100218 = 100218 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100219 = 100219 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100220 = 100220 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100221 = 100221 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100222 = 100222 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100223 = 100223 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100224 = 100224 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100225 = 100225 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100226 = 100226 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100227 = 100227 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100228 = 100228 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100229 = 100229 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100230 = 100230 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100231 = 100231 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100232 = 100232 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100233 = 100233 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100234 = 100234 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100235 = 100235 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100236 = 100236 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100237 = 100237 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100238 = 100238 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100239 = 100239 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100240 = 100240 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100241 = 100241 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100242 = 100242 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100243 = 100243 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100244 = 100244 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100245 = 100245 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100246 = 100246 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100247 = 100247 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100248 = 100248 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100249 = 100249 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100250 = 100250 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100251 = 100251 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100252 = 100252 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100253 = 100253 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100254 = 100254 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100255 = 100255 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100256 = 100256 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100257 = 100257 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100258 = 100258 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100259 = 100259 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100260 = 100260 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100261 = 100261 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100262 = 100262 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100263 = 100263 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100264 = 100264 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100265 = 100265 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100266 = 100266 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100267 = 100267 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100268 = 100268 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100269 = 100269 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100270 = 100270 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100271 = 100271 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100272 = 100272 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100273 = 100273 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100274 = 100274 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100275 = 100275 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100276 = 100276 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100277 = 100277 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100278 = 100278 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100279 = 100279 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100280 = 100280 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100281 = 100281 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100282 = 100282 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100283 = 100283 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100284 = 100284 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100285 = 100285 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100286 = 100286 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100287 = 100287 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100288 = 100288 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100289 = 100289 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100290 = 100290 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100291 = 100291 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100292 = 100292 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100293 = 100293 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100294 = 100294 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100295 = 100295 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100296 = 100296 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100297 = 100297 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100298 = 100298 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100299 = 100299 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100300 = 100300 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100301 = 100301 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100302 = 100302 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100303 = 100303 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100304 = 100304 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100305 = 100305 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100306 = 100306 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100307 = 100307 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100308 = 100308 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100309 = 100309 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100310 = 100310 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100311 = 100311 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100312 = 100312 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100316 = 100316 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100317 = 100317 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100318 = 100318 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100319 = 100319 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100320 = 100320 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100321 = 100321 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100323 = 100323 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100324 = 100324 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100325 = 100325 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100326 = 100326 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100327 = 100327 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100328 = 100328 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100329 = 100329 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100330 = 100330 -> Orleans.ErrorCode
+Orleans.ErrorCode.Runtime_Error_100331 = 100331 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerAppTurnsStopped_1 = 101219 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerAppTurnsStopped_2 = 101232 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerBase = 101200 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerEnqueueWorkWhenShutdown = 101217 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerExceptionFromExecute = 101206 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerFinishShutdown = 101204 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerNotExecuteWhenShutdown = 101218 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerNullActivation = 101205 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerNullContext = 101207 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerQueueTaskWrongCall = 101225 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerQueueWorkItemWrongCall = 101224 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerQueueWorkItemWrongContext = 101231 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerSkipWorkCancelled = 101222 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerSkipWorkStopping = 101221 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerStatistics = 101203 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerStatus = 101210 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerTaskExecuteIncomplete1 = 101208 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerTaskExecuteIncomplete2 = 101226 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerTaskExecuteIncomplete3 = 101227 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerTaskExecuteIncomplete4 = 101228 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerTaskRunningOnWrongScheduler1 = 101223 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerTaskWaitIncomplete = 101229 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerTooManyPendingItems = 101213 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerTurnTooLong2 = 101214 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerTurnTooLong3 = 101215 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerWorkerPoolThreadQueueWaitTime = 101201 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerWorkGroupShuttingDown = 101216 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerWorkGroupStopping = 101220 -> Orleans.ErrorCode
+Orleans.ErrorCode.SchedulerWorkItemGroupQueueWaitTime = 101202 -> Orleans.ErrorCode
+Orleans.ErrorCode.SerializationBase = 101600 -> Orleans.ErrorCode
+Orleans.ErrorCode.SerializationManagerBase = 102400 -> Orleans.ErrorCode
+Orleans.ErrorCode.SerMgr_ArtifactReport = 102410 -> Orleans.ErrorCode
+Orleans.ErrorCode.SerMgr_ErrorBindingMethods = 102403 -> Orleans.ErrorCode
+Orleans.ErrorCode.SerMgr_ErrorLoadingAssemblyTypes = 102404 -> Orleans.ErrorCode
+Orleans.ErrorCode.SerMgr_IgnoreAssembly = 102408 -> Orleans.ErrorCode
+Orleans.ErrorCode.SerMgr_MissingRegisterMethod = 102402 -> Orleans.ErrorCode
+Orleans.ErrorCode.SerMgr_SerializationMethodsMissing = 102412 -> Orleans.ErrorCode
+Orleans.ErrorCode.SerMgr_TooLongDeepCopy = 102407 -> Orleans.ErrorCode
+Orleans.ErrorCode.SerMgr_TooLongDeserialize = 102406 -> Orleans.ErrorCode
+Orleans.ErrorCode.SerMgr_TooLongSerialize = 102405 -> Orleans.ErrorCode
+Orleans.ErrorCode.SerMgr_TypeRegistrationFailure = 102401 -> Orleans.ErrorCode
+Orleans.ErrorCode.SerMgr_TypeRegistrationFailureIgnore = 102409 -> Orleans.ErrorCode
+Orleans.ErrorCode.SerMgr_UnavailableSerializer = 102411 -> Orleans.ErrorCode
+Orleans.ErrorCode.ServiceFabricBase = 104400 -> Orleans.ErrorCode
+Orleans.ErrorCode.Ser_AssemblyLoadError = 101601 -> Orleans.ErrorCode
+Orleans.ErrorCode.Ser_AssemblyLoadErrorDetails = 101603 -> Orleans.ErrorCode
+Orleans.ErrorCode.Ser_AssemblyLoadSuccess = 101604 -> Orleans.ErrorCode
+Orleans.ErrorCode.Ser_BadRegisterSerializer = 101602 -> Orleans.ErrorCode
+Orleans.ErrorCode.Ser_CannotConstructBaseObj = 100034 -> Orleans.ErrorCode
+Orleans.ErrorCode.Ser_IncompatibleIntermediateType = 100033 -> Orleans.ErrorCode
+Orleans.ErrorCode.Ser_IncompatibleType = 100035 -> Orleans.ErrorCode
+Orleans.ErrorCode.Ser_LargeObjectAllocated = 101605 -> Orleans.ErrorCode
+Orleans.ErrorCode.SetReminderServiceType = 100438 -> Orleans.ErrorCode
+Orleans.ErrorCode.SetSiloLivenessType = 100434 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloAddSeedNode = 100410 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloBase = 100400 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloCallingProviderInit = 100437 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloCannotResetHeartbeatTimer = 100421 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloConfigDeprecated = 100440 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloConfiguredServicePointManager = 100436 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloConfiguredThreadPool = 100430 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloDebugDump = 100416 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloEndpointConfigError = 100435 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloFailedToConfigureThreadPool = 100431 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloFailedToLoadDI = 100446 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloFailedToStopMembership = 100419 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloFileNotFoundLoadingDI = 100447 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloGcSetting = 100404 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloGcWarning = 100405 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloHeartbeatTimerStalled = 100150 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloIgnoreErrorDuringStop = 100420 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloInitConfig = 100415 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloInitializing = 100403 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloInitializingFinished = 100422 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloLoadedDI = 100445 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloSetDeploymentId = 100406 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloSetPrimaryNode = 100411 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloSetProxyEndpoint = 100408 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloSetSeedNode = 100409 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloSetSiloEndpoint = 100407 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloSetSiloType = 100423 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloSetWorkingDir = 100412 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloShutDown = 100418 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloShutdownEventCreated = 100442 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloShutdownEventFailure = 100449 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloShutdownEventName = 100441 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloShutdownEventOpened = 100443 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloShutdownEventReceived = 100444 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloShuttingDown = 100417 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloStarted = 100402 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloStartError = 100439 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloStarting = 100401 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloStartPerfMeasure = 100452 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloStartupEventCreated = 100425 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloStartupEventFailure = 100448 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloStartupEventName = 100424 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloStartupEventOpened = 100426 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloStopInProgress = 100427 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloStopped = 100413 -> Orleans.ErrorCode
+Orleans.ErrorCode.SiloStopping = 100414 -> Orleans.ErrorCode
+Orleans.ErrorCode.SSMT_EtagMismatch_Insert = 100692 -> Orleans.ErrorCode
+Orleans.ErrorCode.SSMT_EtagMismatch_Update = 100693 -> Orleans.ErrorCode
+Orleans.ErrorCode.SSMT_InsertRowError = 100689 -> Orleans.ErrorCode
+Orleans.ErrorCode.SSMT_MergeRowError = 100691 -> Orleans.ErrorCode
+Orleans.ErrorCode.SSMT_ReadAllError = 100688 -> Orleans.ErrorCode
+Orleans.ErrorCode.SSMT_ReadRowError = 100687 -> Orleans.ErrorCode
+Orleans.ErrorCode.SSMT_UpdateRowError = 100690 -> Orleans.ErrorCode
+Orleans.ErrorCode.StorageProviderBase = 102200 -> Orleans.ErrorCode
+Orleans.ErrorCode.StorageProvider_DeleteFailed = 102204 -> Orleans.ErrorCode
+Orleans.ErrorCode.StorageProvider_ForceReRead = 102205 -> Orleans.ErrorCode
+Orleans.ErrorCode.StorageProvider_ReadFailed = 102202 -> Orleans.ErrorCode
+Orleans.ErrorCode.StorageProvider_WriteFailed = 102203 -> Orleans.ErrorCode
+Orleans.ErrorCode.StreamProviderManagerBase = 103400 -> Orleans.ErrorCode
+Orleans.ErrorCode.StreamProvider_AddObserverException = 103404 -> Orleans.ErrorCode
+Orleans.ErrorCode.StreamProvider_ConsumerFailedToUnregister = 103408 -> Orleans.ErrorCode
+Orleans.ErrorCode.StreamProvider_FailedToDispose = 103401 -> Orleans.ErrorCode
+Orleans.ErrorCode.StreamProvider_NoStreamForBatch = 103407 -> Orleans.ErrorCode
+Orleans.ErrorCode.StreamProvider_NoStreamForItem = 103403 -> Orleans.ErrorCode
+Orleans.ErrorCode.StreamProvider_ProducerFailedToUnregister = 103402 -> Orleans.ErrorCode
+Orleans.ErrorCode.Stream_ConsumerIsDead = 103409 -> Orleans.ErrorCode
+Orleans.ErrorCode.Stream_ExtensionNotInstalled = 103405 -> Orleans.ErrorCode
+Orleans.ErrorCode.Stream_ProducerIsDead = 103406 -> Orleans.ErrorCode
+Orleans.ErrorCode.Stream_RegisterConsumerFailed = 103412 -> Orleans.ErrorCode
+Orleans.ErrorCode.Stream_RegisterProducerFailed = 103410 -> Orleans.ErrorCode
+Orleans.ErrorCode.Stream_SetSubscriptionToFaultedFailed = 103414 -> Orleans.ErrorCode
+Orleans.ErrorCode.Stream_UnegisterProducerFailed = 103411 -> Orleans.ErrorCode
+Orleans.ErrorCode.Stream_UnregisterConsumerFailed = 103413 -> Orleans.ErrorCode
+Orleans.ErrorCode.TimerAfterCallback = 101406 -> Orleans.ErrorCode
+Orleans.ErrorCode.TimerBase = 101400 -> Orleans.ErrorCode
+Orleans.ErrorCode.TimerBeforeCallback = 101405 -> Orleans.ErrorCode
+Orleans.ErrorCode.TimerCallbackError = 100037 -> Orleans.ErrorCode
+Orleans.ErrorCode.TimerChangeError = 100717 -> Orleans.ErrorCode
+Orleans.ErrorCode.TimerChanging = 101404 -> Orleans.ErrorCode
+Orleans.ErrorCode.TimerDisposeError = 101401 -> Orleans.ErrorCode
+Orleans.ErrorCode.TimerDisposing = 101408 -> Orleans.ErrorCode
+Orleans.ErrorCode.TimerNextTick = 101407 -> Orleans.ErrorCode
+Orleans.ErrorCode.TimerQueueTickError = 101403 -> Orleans.ErrorCode
+Orleans.ErrorCode.TimerStopError = 101402 -> Orleans.ErrorCode
+Orleans.ErrorCode.TimerStopped = 101409 -> Orleans.ErrorCode
+Orleans.ErrorCode.Timer_GrainTimerCallbackError = 101413 -> Orleans.ErrorCode
+Orleans.ErrorCode.Timer_InvalidContext = 101414 -> Orleans.ErrorCode
+Orleans.ErrorCode.Timer_SafeTimerIsNotTicking = 101412 -> Orleans.ErrorCode
+Orleans.ErrorCode.Timer_TimerInsideGrainIsDelayed = 101411 -> Orleans.ErrorCode
+Orleans.ErrorCode.Timer_TimerInsideGrainIsNotTicking = 101410 -> Orleans.ErrorCode
+Orleans.ErrorCode.TransactionsBase = 104500 -> Orleans.ErrorCode
+Orleans.ErrorCode.Transactions_ReceivedTMResponse = 104502 -> Orleans.ErrorCode
+Orleans.ErrorCode.Transactions_SendingTMRequest = 104501 -> Orleans.ErrorCode
+Orleans.ErrorCode.Transactions_TMError = 104503 -> Orleans.ErrorCode
+Orleans.ErrorCode.TypeManagerBase = 104200 -> Orleans.ErrorCode
+Orleans.ErrorCode.TypeManager_GetClusterGrainTypeResolverError = 104202 -> Orleans.ErrorCode
+Orleans.ErrorCode.TypeManager_GetSiloGrainInterfaceMapError = 104201 -> Orleans.ErrorCode
+Orleans.ErrorCode.WaitCalledInServerCode = 101211 -> Orleans.ErrorCode
+Orleans.ErrorCode.WaitCalledInsideGrain = 101209 -> Orleans.ErrorCode
+Orleans.ErrorCode.WaitingForSiloStop = 100428 -> Orleans.ErrorCode
+Orleans.ErrorCode.WatchdogBase = 102600 -> Orleans.ErrorCode
+Orleans.ErrorCode.Watchdog_HealthCheckFailure = 102603 -> Orleans.ErrorCode
+Orleans.ErrorCode.Watchdog_InternalError = 102602 -> Orleans.ErrorCode
+Orleans.ErrorCode.Watchdog_ParticipantThrownException = 102601 -> Orleans.ErrorCode
+Orleans.ErrorCode.WFServiceBase = 102800 -> Orleans.ErrorCode
+Orleans.ErrorCode.WFService_Error_1 = 102801 -> Orleans.ErrorCode
+Orleans.ErrorCode.WFService_Error_2 = 102802 -> Orleans.ErrorCode
+Orleans.ErrorCode.WFService_Error_3 = 102803 -> Orleans.ErrorCode
+Orleans.ErrorCode.WFService_Error_4 = 102804 -> Orleans.ErrorCode
+Orleans.ErrorCode.WFService_Error_5 = 102805 -> Orleans.ErrorCode
+Orleans.ErrorCode.WFService_Error_6 = 102806 -> Orleans.ErrorCode
+Orleans.ErrorCode.WFService_Error_7 = 102807 -> Orleans.ErrorCode
+Orleans.ErrorCode.WFService_Error_8 = 102808 -> Orleans.ErrorCode
+Orleans.ErrorCode.WFService_Error_9 = 102809 -> Orleans.ErrorCode
+Orleans.Grain
+Orleans.Grain.DeactivateOnIdle() -> void
+Orleans.Grain.DelayDeactivation(System.TimeSpan timeSpan) -> void
+Orleans.Grain.Grain() -> void
+Orleans.Grain.Grain(Orleans.Runtime.IGrainContext! grainContext, Orleans.Runtime.IGrainRuntime? grainRuntime = null) -> void
+Orleans.Grain.GrainContext.get -> Orleans.Runtime.IGrainContext!
+Orleans.Grain.GrainFactory.get -> Orleans.IGrainFactory!
+Orleans.Grain.GrainReference.get -> Orleans.Runtime.GrainReference!
+Orleans.Grain.IdentityString.get -> string!
+Orleans.Grain.MigrateOnIdle() -> void
+Orleans.Grain.RegisterTimer(System.Func<object?, System.Threading.Tasks.Task!>! callback, object? state, System.TimeSpan dueTime, System.TimeSpan period) -> System.IDisposable!
+Orleans.Grain.RuntimeIdentity.get -> string!
+Orleans.Grain.ServiceProvider.get -> System.IServiceProvider!
+Orleans.Grain<TGrainState>
+Orleans.Grain<TGrainState>.Grain() -> void
+Orleans.Grain<TGrainState>.Grain(Orleans.Core.IStorage<TGrainState>! storage) -> void
+Orleans.Grain<TGrainState>.State.get -> TGrainState
+Orleans.Grain<TGrainState>.State.set -> void
+Orleans.GrainBaseExtensions
+Orleans.GrainCallFilterDelegate
+Orleans.GrainCancellationToken
+Orleans.GrainCancellationToken.CancellationToken.get -> System.Threading.CancellationToken
+Orleans.GrainCancellationToken.Dispose() -> void
+Orleans.GrainCancellationTokenSource
+Orleans.GrainCancellationTokenSource.Dispose() -> void
+Orleans.GrainCancellationTokenSource.GrainCancellationTokenSource() -> void
+Orleans.GrainCancellationTokenSource.IsCancellationRequested.get -> bool
+Orleans.GrainContextComponentExtensions
+Orleans.GrainDirectory.GrainDirectoryAttribute
+Orleans.GrainDirectory.GrainDirectoryAttribute.GrainDirectoryAttribute() -> void
+Orleans.GrainDirectory.IGrainDirectory
+Orleans.GrainDirectory.IGrainDirectory.Lookup(Orleans.Runtime.GrainId grainId) -> System.Threading.Tasks.Task<Orleans.Runtime.GrainAddress?>!
+Orleans.GrainDirectory.IGrainDirectory.Register(Orleans.Runtime.GrainAddress! address) -> System.Threading.Tasks.Task<Orleans.Runtime.GrainAddress?>!
+Orleans.GrainDirectory.IGrainDirectory.Register(Orleans.Runtime.GrainAddress! address, Orleans.Runtime.GrainAddress? previousAddress) -> System.Threading.Tasks.Task<Orleans.Runtime.GrainAddress?>!
+Orleans.GrainDirectory.IGrainDirectory.Unregister(Orleans.Runtime.GrainAddress! address) -> System.Threading.Tasks.Task!
+Orleans.GrainDirectory.IGrainDirectory.UnregisterSilos(System.Collections.Generic.List<Orleans.Runtime.SiloAddress!>! siloAddresses) -> System.Threading.Tasks.Task!
+Orleans.GrainExtensions
+Orleans.GrainTypeAttribute
+Orleans.IConfigurationValidator
+Orleans.IConfigurationValidator.ValidateConfiguration() -> void
+Orleans.IGrain
+Orleans.IGrainBase
+Orleans.IGrainCallContext
+Orleans.IGrainCallContext.Grain.get -> object!
+Orleans.IGrainCallContext.InterfaceMethod.get -> System.Reflection.MethodInfo!
+Orleans.IGrainCallContext.InterfaceName.get -> string!
+Orleans.IGrainCallContext.InterfaceType.get -> Orleans.Runtime.GrainInterfaceType
+Orleans.IGrainCallContext.Invoke() -> System.Threading.Tasks.Task!
+Orleans.IGrainCallContext.MethodName.get -> string!
+Orleans.IGrainCallContext.Request.get -> Orleans.Serialization.Invocation.IInvokable!
+Orleans.IGrainCallContext.Response.get -> Orleans.Serialization.Invocation.Response?
+Orleans.IGrainCallContext.Response.set -> void
+Orleans.IGrainCallContext.Result.get -> object?
+Orleans.IGrainCallContext.Result.set -> void
+Orleans.IGrainCallContext.SourceId.get -> Orleans.Runtime.GrainId?
+Orleans.IGrainCallContext.TargetId.get -> Orleans.Runtime.GrainId
+Orleans.IGrainFactory
+Orleans.IGrainObserver
+Orleans.IGrainWithGuidCompoundKey
+Orleans.IGrainWithGuidKey
+Orleans.IGrainWithIntegerCompoundKey
+Orleans.IGrainWithIntegerKey
+Orleans.IGrainWithStringKey
+Orleans.IIncomingGrainCallContext
+Orleans.IIncomingGrainCallContext.ImplementationMethod.get -> System.Reflection.MethodInfo!
+Orleans.IIncomingGrainCallContext.TargetContext.get -> Orleans.Runtime.IGrainContext!
+Orleans.IIncomingGrainCallFilter
+Orleans.ILifecycleObservable
+Orleans.ILifecycleObserver
+Orleans.ILifecycleParticipant<TLifecycleObservable>.Participate(TLifecycleObservable lifecycle) -> void
+Orleans.ILifecycleSubject
+Orleans.IncomingGrainCallFilterDelegate
+Orleans.IOutgoingGrainCallContext
+Orleans.IOutgoingGrainCallContext.SourceContext.get -> Orleans.Runtime.IGrainContext?
+Orleans.IOutgoingGrainCallFilter
+Orleans.ISystemTarget
+Orleans.IVersionManager
+Orleans.LifecycleExtensions
+Orleans.Metadata.AttributeGrainBindingsProvider
+Orleans.Metadata.AttributeGrainPropertiesProvider
+Orleans.Metadata.AttributeGrainTypeProvider
+Orleans.Metadata.ClusterManifest
+Orleans.Metadata.ClusterManifest.Version.get -> Orleans.Metadata.MajorMinorVersion
+Orleans.Metadata.DefaultGrainTypeAttribute
+Orleans.Metadata.GrainInterfaceProperties
+Orleans.Metadata.GrainManifest
+Orleans.Metadata.GrainProperties
+Orleans.Metadata.IGrainBindingsProviderAttribute
+Orleans.Metadata.IGrainInterfacePropertiesProvider
+Orleans.Metadata.IGrainInterfacePropertiesProviderAttribute
+Orleans.Metadata.IGrainPropertiesProvider
+Orleans.Metadata.IGrainPropertiesProviderAttribute
+Orleans.Metadata.IGrainTypeProvider
+Orleans.Metadata.IGrainTypeProviderAttribute
+Orleans.Metadata.MajorMinorVersion
+Orleans.Metadata.MajorMinorVersion.CompareTo(Orleans.Metadata.MajorMinorVersion other) -> int
+Orleans.Metadata.MajorMinorVersion.Equals(Orleans.Metadata.MajorMinorVersion other) -> bool
+Orleans.Metadata.MajorMinorVersion.Major.get -> long
+Orleans.Metadata.MajorMinorVersion.MajorMinorVersion() -> void
+Orleans.Metadata.MajorMinorVersion.MajorMinorVersion(long majorVersion, long minorVersion) -> void
+Orleans.Metadata.MajorMinorVersion.Minor.get -> long
+Orleans.Metadata.WellKnownGrainInterfaceProperties
+Orleans.Metadata.WellKnownGrainTypeProperties
+Orleans.OutgoingGrainCallFilterDelegate
+Orleans.Placement.ActivationCountBasedPlacementAttribute
+Orleans.Placement.ActivationCountBasedPlacementAttribute.ActivationCountBasedPlacementAttribute() -> void
+Orleans.Placement.HashBasedPlacementAttribute
+Orleans.Placement.HashBasedPlacementAttribute.HashBasedPlacementAttribute() -> void
+Orleans.Placement.ImmovableAttribute
+Orleans.Placement.ImmovableAttribute.ImmovableAttribute(Orleans.Placement.ImmovableKind kind = Orleans.Placement.ImmovableKind.Any) -> void
+Orleans.Placement.ImmovableAttribute.Kind.get -> Orleans.Placement.ImmovableKind
+Orleans.Placement.ImmovableKind
+Orleans.Placement.ImmovableKind.Any = Orleans.Placement.ImmovableKind.Repartitioner | Orleans.Placement.ImmovableKind.Rebalancer -> Orleans.Placement.ImmovableKind
+Orleans.Placement.ImmovableKind.Rebalancer = 2 -> Orleans.Placement.ImmovableKind
+Orleans.Placement.ImmovableKind.Repartitioner = 1 -> Orleans.Placement.ImmovableKind
+Orleans.Placement.PlacementAttribute
+Orleans.Placement.PlacementFilterAttribute
+Orleans.Placement.PlacementFilterAttribute.PlacementFilterAttribute(Orleans.Placement.PlacementFilterStrategy! placement) -> void
+Orleans.Placement.PlacementFilterAttribute.PlacementFilterStrategy.get -> Orleans.Placement.PlacementFilterStrategy!
+Orleans.Placement.PlacementFilterStrategy
+Orleans.Placement.PlacementFilterStrategy.GetPlacementFilterGrainProperty(string! key, Orleans.Metadata.GrainProperties! properties) -> string?
+Orleans.Placement.PlacementFilterStrategy.Initialize(Orleans.Metadata.GrainProperties! properties) -> void
+Orleans.Placement.PlacementFilterStrategy.Order.get -> int
+Orleans.Placement.PlacementFilterStrategy.PlacementFilterStrategy(int order) -> void
+Orleans.Placement.PlacementFilterStrategy.PopulateGrainProperties(System.IServiceProvider! services, System.Type! grainClass, Orleans.Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string!, string!>! properties) -> void
+Orleans.Placement.PreferLocalPlacementAttribute
+Orleans.Placement.PreferLocalPlacementAttribute.PreferLocalPlacementAttribute() -> void
+Orleans.Placement.RandomPlacementAttribute
+Orleans.Placement.RandomPlacementAttribute.RandomPlacementAttribute() -> void
+Orleans.Placement.ResourceOptimizedPlacementAttribute
+Orleans.Placement.ResourceOptimizedPlacementAttribute.ResourceOptimizedPlacementAttribute() -> void
+Orleans.Placement.SiloRoleBasedPlacementAttribute
+Orleans.Placement.SiloRoleBasedPlacementAttribute.SiloRoleBasedPlacementAttribute() -> void
+Orleans.Providers.IProviderBuilder<TBuilder>
+Orleans.Providers.LogConsistencyProviderAttribute
+Orleans.Providers.LogConsistencyProviderAttribute.LogConsistencyProviderAttribute() -> void
+Orleans.Providers.ProviderConstants
+Orleans.Providers.StorageProviderAttribute
+Orleans.Providers.StorageProviderAttribute.StorageProviderAttribute() -> void
+Orleans.PublicOrleansTaskExtensions
+Orleans.Runtime.ActivationCountBasedPlacement
+Orleans.Runtime.ActivationCountBasedPlacement.ActivationCountBasedPlacement() -> void
+Orleans.Runtime.ActivationId
+Orleans.Runtime.ActivationId.ActivationId() -> void
+Orleans.Runtime.ActivationId.ActivationId(System.Guid key) -> void
+Orleans.Runtime.ActivationId.Equals(Orleans.Runtime.ActivationId other) -> bool
+Orleans.Runtime.ActivationId.IsDefault.get -> bool
+Orleans.Runtime.ActivationId.ToParsableString() -> string!
+Orleans.Runtime.ActivationIdConverter
+Orleans.Runtime.ActivationIdConverter.ActivationIdConverter() -> void
+Orleans.Runtime.AsyncEnumerableExtensions
+Orleans.Runtime.AsyncEnumerableRequest<T>
+Orleans.Runtime.AsyncEnumerableRequest<T>.AsyncEnumerableRequest() -> void
+Orleans.Runtime.AsyncEnumerableRequest<T>.GetAsyncEnumerator(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerator<T>!
+Orleans.Runtime.AsyncEnumerableRequest<T>.InitializeRequest(Orleans.Runtime.GrainReference! targetGrainReference) -> System.Collections.Generic.IAsyncEnumerable<T>!
+Orleans.Runtime.AsyncEnumerableRequest<T>.InvokeImplementation() -> System.Collections.Generic.IAsyncEnumerable<T>!
+Orleans.Runtime.AsyncEnumerableRequest<T>.MaxBatchSize.get -> int
+Orleans.Runtime.AsyncEnumerableRequest<T>.MaxBatchSize.set -> void
+Orleans.Runtime.AttributeGrainInterfaceTypeProvider
+Orleans.Runtime.AttributeGrainInterfaceTypeProvider.AttributeGrainInterfaceTypeProvider(System.IServiceProvider! serviceProvider) -> void
+Orleans.Runtime.AttributeGrainInterfaceTypeProvider.TryGetGrainInterfaceType(System.Type! type, out Orleans.Runtime.GrainInterfaceType grainInterfaceType) -> bool
+Orleans.Runtime.ClientNotAvailableException
+Orleans.Runtime.EnumerationAbortedException
+Orleans.Runtime.EnumerationAbortedException.EnumerationAbortedException() -> void
+Orleans.Runtime.EnumerationAbortedException.EnumerationAbortedException(string! message) -> void
+Orleans.Runtime.EnumerationAbortedException.EnumerationAbortedException(string! message, System.Exception! innerException) -> void
+Orleans.Runtime.EnumerationResult
+Orleans.Runtime.EnumerationResult.Batch = 4 -> Orleans.Runtime.EnumerationResult
+Orleans.Runtime.EnumerationResult.Canceled = 64 -> Orleans.Runtime.EnumerationResult
+Orleans.Runtime.EnumerationResult.Completed = 8 -> Orleans.Runtime.EnumerationResult
+Orleans.Runtime.EnumerationResult.CompletedWithBatch = 12 -> Orleans.Runtime.EnumerationResult
+Orleans.Runtime.EnumerationResult.CompletedWithElement = 10 -> Orleans.Runtime.EnumerationResult
+Orleans.Runtime.EnumerationResult.Element = 2 -> Orleans.Runtime.EnumerationResult
+Orleans.Runtime.EnumerationResult.Error = 32 -> Orleans.Runtime.EnumerationResult
+Orleans.Runtime.EnumerationResult.Heartbeat = 1 -> Orleans.Runtime.EnumerationResult
+Orleans.Runtime.EnumerationResult.MissingEnumeratorError = 16 -> Orleans.Runtime.EnumerationResult
+Orleans.Runtime.GatewayTooBusyException
+Orleans.Runtime.GatewayTooBusyException.GatewayTooBusyException() -> void
+Orleans.Runtime.GrainAddress
+Orleans.Runtime.GrainAddress.ActivationId.get -> Orleans.Runtime.ActivationId
+Orleans.Runtime.GrainAddress.ActivationId.init -> void
+Orleans.Runtime.GrainAddress.Equals(Orleans.Runtime.GrainAddress? other) -> bool
+Orleans.Runtime.GrainAddress.GrainAddress() -> void
+Orleans.Runtime.GrainAddress.GrainId.get -> Orleans.Runtime.GrainId
+Orleans.Runtime.GrainAddress.GrainId.init -> void
+Orleans.Runtime.GrainAddress.IsComplete.get -> bool
+Orleans.Runtime.GrainAddress.Matches(Orleans.Runtime.GrainAddress? other) -> bool
+Orleans.Runtime.GrainAddress.MembershipVersion.get -> Orleans.Runtime.MembershipVersion
+Orleans.Runtime.GrainAddress.MembershipVersion.init -> void
+Orleans.Runtime.GrainAddress.SiloAddress.get -> Orleans.Runtime.SiloAddress?
+Orleans.Runtime.GrainAddress.SiloAddress.init -> void
+Orleans.Runtime.GrainAddress.ToFullString() -> string!
+Orleans.Runtime.GrainAddressCacheUpdate
+Orleans.Runtime.GrainAddressCacheUpdate.GrainAddressCacheUpdate(Orleans.Runtime.GrainAddress! invalidAddress, Orleans.Runtime.GrainAddress? validAddress) -> void
+Orleans.Runtime.GrainAddressCacheUpdate.GrainId.get -> Orleans.Runtime.GrainId
+Orleans.Runtime.GrainAddressCacheUpdate.InvalidActivationId.get -> Orleans.Runtime.ActivationId
+Orleans.Runtime.GrainAddressCacheUpdate.InvalidGrainAddress.get -> Orleans.Runtime.GrainAddress!
+Orleans.Runtime.GrainAddressCacheUpdate.InvalidSiloAddress.get -> Orleans.Runtime.SiloAddress?
+Orleans.Runtime.GrainAddressCacheUpdate.ToFullString() -> string!
+Orleans.Runtime.GrainAddressCacheUpdate.ValidGrainAddress.get -> Orleans.Runtime.GrainAddress?
+Orleans.Runtime.GrainContextExtensions
+Orleans.Runtime.GrainExtensionNotInstalledException
+Orleans.Runtime.GrainExtensionNotInstalledException.GrainExtensionNotInstalledException() -> void
+Orleans.Runtime.GrainId
+Orleans.Runtime.GrainId.CompareTo(Orleans.Runtime.GrainId other) -> int
+Orleans.Runtime.GrainId.Equals(Orleans.Runtime.GrainId other) -> bool
+Orleans.Runtime.GrainId.GetObjectData(System.Runtime.Serialization.SerializationInfo! info, System.Runtime.Serialization.StreamingContext context) -> void
+Orleans.Runtime.GrainId.GetUniformHashCode() -> uint
+Orleans.Runtime.GrainId.GrainId() -> void
+Orleans.Runtime.GrainId.GrainId(Orleans.Runtime.GrainType type, Orleans.Runtime.IdSpan key) -> void
+Orleans.Runtime.GrainId.IsDefault.get -> bool
+Orleans.Runtime.GrainId.Key.get -> Orleans.Runtime.IdSpan
+Orleans.Runtime.GrainId.Type.get -> Orleans.Runtime.GrainType
+Orleans.Runtime.GrainIdJsonConverter
+Orleans.Runtime.GrainIdJsonConverter.GrainIdJsonConverter() -> void
+Orleans.Runtime.GrainIdKeyExtensions
+Orleans.Runtime.GrainInterfaceType
+Orleans.Runtime.GrainInterfaceType.Equals(Orleans.Runtime.GrainInterfaceType other) -> bool
+Orleans.Runtime.GrainInterfaceType.GrainInterfaceType() -> void
+Orleans.Runtime.GrainInterfaceType.GrainInterfaceType(Orleans.Runtime.IdSpan value) -> void
+Orleans.Runtime.GrainInterfaceType.GrainInterfaceType(string! value) -> void
+Orleans.Runtime.GrainInterfaceType.IsDefault.get -> bool
+Orleans.Runtime.GrainInterfaceType.Value.get -> Orleans.Runtime.IdSpan
+Orleans.Runtime.GrainInterfaceTypeAttribute
+Orleans.Runtime.GrainInterfaceTypeAttribute.GetGrainInterfaceType(System.IServiceProvider! services, System.Type! type) -> Orleans.Runtime.GrainInterfaceType
+Orleans.Runtime.GrainInterfaceTypeAttribute.GrainInterfaceTypeAttribute(string! value) -> void
+Orleans.Runtime.GrainLifecycleStage
+Orleans.Runtime.GrainReference
+Orleans.Runtime.GrainReference.GetInvokable<TInvokable>() -> TInvokable
+Orleans.Runtime.GrainReference.GetUniformHashCode() -> uint
+Orleans.Runtime.GrainReference.GrainId.get -> Orleans.Runtime.GrainId
+Orleans.Runtime.GrainReference.InterfaceType.get -> Orleans.Runtime.GrainInterfaceType
+Orleans.Runtime.GrainReference.InterfaceVersion.get -> ushort
+Orleans.Runtime.GrainReferenceNotBoundException
+Orleans.Runtime.GrainReferenceShared
+Orleans.Runtime.GrainReferenceShared.GrainType.get -> Orleans.Runtime.GrainType
+Orleans.Runtime.GrainReferenceShared.InterfaceType.get -> Orleans.Runtime.GrainInterfaceType
+Orleans.Runtime.GrainReferenceShared.InterfaceVersion.get -> ushort
+Orleans.Runtime.GrainReferenceShared.InvokeMethodOptions.get -> Orleans.CodeGeneration.InvokeMethodOptions
+Orleans.Runtime.GrainTimerCreationOptions
+Orleans.Runtime.GrainTimerCreationOptions.DueTime.get -> System.TimeSpan
+Orleans.Runtime.GrainTimerCreationOptions.DueTime.init -> void
+Orleans.Runtime.GrainTimerCreationOptions.GrainTimerCreationOptions() -> void
+Orleans.Runtime.GrainTimerCreationOptions.GrainTimerCreationOptions(System.TimeSpan dueTime, System.TimeSpan period) -> void
+Orleans.Runtime.GrainTimerCreationOptions.Interleave.get -> bool
+Orleans.Runtime.GrainTimerCreationOptions.Interleave.init -> void
+Orleans.Runtime.GrainTimerCreationOptions.KeepAlive.get -> bool
+Orleans.Runtime.GrainTimerCreationOptions.KeepAlive.init -> void
+Orleans.Runtime.GrainTimerCreationOptions.Period.get -> System.TimeSpan
+Orleans.Runtime.GrainTimerCreationOptions.Period.init -> void
+Orleans.Runtime.GrainType
+Orleans.Runtime.GrainType.AsSpan() -> System.ReadOnlySpan<byte>
+Orleans.Runtime.GrainType.CompareTo(Orleans.Runtime.GrainType other) -> int
+Orleans.Runtime.GrainType.Equals(Orleans.Runtime.GrainType obj) -> bool
+Orleans.Runtime.GrainType.GetObjectData(System.Runtime.Serialization.SerializationInfo! info, System.Runtime.Serialization.StreamingContext context) -> void
+Orleans.Runtime.GrainType.GetUniformHashCode() -> uint
+Orleans.Runtime.GrainType.GrainType() -> void
+Orleans.Runtime.GrainType.GrainType(byte[]! value) -> void
+Orleans.Runtime.GrainType.GrainType(Orleans.Runtime.IdSpan id) -> void
+Orleans.Runtime.GrainType.IsDefault.get -> bool
+Orleans.Runtime.GrainType.Value.get -> Orleans.Runtime.IdSpan
+Orleans.Runtime.GrainTypePrefix
+Orleans.Runtime.GuidId
+Orleans.Runtime.GuidId.CompareTo(Orleans.Runtime.GuidId? other) -> int
+Orleans.Runtime.GuidId.Equals(Orleans.Runtime.GuidId? other) -> bool
+Orleans.Runtime.GuidId.GetObjectData(System.Runtime.Serialization.SerializationInfo! info, System.Runtime.Serialization.StreamingContext context) -> void
+Orleans.Runtime.HashBasedPlacement
+Orleans.Runtime.HashBasedPlacement.HashBasedPlacement() -> void
+Orleans.Runtime.IAddressable
+Orleans.Runtime.IAsyncEnumerableGrainExtension
+Orleans.Runtime.IAsyncEnumerableGrainExtension.DisposeAsync(System.Guid requestId) -> System.Threading.Tasks.ValueTask
+Orleans.Runtime.IAsyncEnumerableGrainExtension.MoveNext<T>(System.Guid requestId) -> System.Threading.Tasks.ValueTask<(Orleans.Runtime.EnumerationResult Status, object! Value)>
+Orleans.Runtime.IAsyncEnumerableGrainExtension.StartEnumeration<T>(System.Guid requestId, Orleans.Runtime.IAsyncEnumerableRequest<T>! request) -> System.Threading.Tasks.ValueTask<(Orleans.Runtime.EnumerationResult Status, object! Value)>
+Orleans.Runtime.IAsyncEnumerableRequest<T>
+Orleans.Runtime.IAsyncEnumerableRequest<T>.InvokeImplementation() -> System.Collections.Generic.IAsyncEnumerable<T>!
+Orleans.Runtime.IAsyncEnumerableRequest<T>.MaxBatchSize.get -> int
+Orleans.Runtime.IAsyncEnumerableRequest<T>.MaxBatchSize.set -> void
+Orleans.Runtime.IDehydrationContext
+Orleans.Runtime.IDehydrationContext.AddBytes(string! key, System.ReadOnlySpan<byte> value) -> void
+Orleans.Runtime.IDehydrationContext.AddBytes<T>(string! key, System.Action<T, System.Buffers.IBufferWriter<byte>!>! valueWriter, T value) -> void
+Orleans.Runtime.IDehydrationContext.Keys.get -> System.Collections.Generic.IEnumerable<string!>!
+Orleans.Runtime.IDehydrationContext.TryAddValue<T>(string! key, T? value) -> bool
+Orleans.Runtime.IdSpan
+Orleans.Runtime.IdSpan.AsSpan() -> System.ReadOnlySpan<byte>
+Orleans.Runtime.IdSpan.CompareTo(Orleans.Runtime.IdSpan other) -> int
+Orleans.Runtime.IdSpan.Equals(Orleans.Runtime.IdSpan obj) -> bool
+Orleans.Runtime.IdSpan.GetObjectData(System.Runtime.Serialization.SerializationInfo! info, System.Runtime.Serialization.StreamingContext context) -> void
+Orleans.Runtime.IdSpan.GetUniformHashCode() -> uint
+Orleans.Runtime.IdSpan.IdSpan() -> void
+Orleans.Runtime.IdSpan.IdSpan(byte[]! value) -> void
+Orleans.Runtime.IdSpan.IsDefault.get -> bool
+Orleans.Runtime.IdSpan.TryFormat(System.Span<char> destination, out int charsWritten) -> bool
+Orleans.Runtime.IdSpan.Value.get -> System.ReadOnlyMemory<byte>
+Orleans.Runtime.IdSpanCodec
+Orleans.Runtime.IdSpanCodec.IdSpanCodec() -> void
+Orleans.Runtime.IdSpanCodec.ReadValue<TInput>(ref Orleans.Serialization.Buffers.Reader<TInput> reader, Orleans.Serialization.WireProtocol.Field field) -> Orleans.Runtime.IdSpan
+Orleans.Runtime.IdSpanCodec.WriteField<TBufferWriter>(ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type! expectedType, Orleans.Runtime.IdSpan value) -> void
+Orleans.Runtime.IGrainContext
+Orleans.Runtime.IGrainContext.Activate(System.Collections.Generic.Dictionary<string!, object!>? requestContext, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> void
+Orleans.Runtime.IGrainContext.ActivationId.get -> Orleans.Runtime.ActivationId
+Orleans.Runtime.IGrainContext.ActivationServices.get -> System.IServiceProvider!
+Orleans.Runtime.IGrainContext.Address.get -> Orleans.Runtime.GrainAddress!
+Orleans.Runtime.IGrainContext.Deactivate(Orleans.DeactivationReason deactivationReason, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> void
+Orleans.Runtime.IGrainContext.Deactivated.get -> System.Threading.Tasks.Task!
+Orleans.Runtime.IGrainContext.GrainId.get -> Orleans.Runtime.GrainId
+Orleans.Runtime.IGrainContext.GrainInstance.get -> object?
+Orleans.Runtime.IGrainContext.GrainReference.get -> Orleans.Runtime.GrainReference!
+Orleans.Runtime.IGrainContext.Migrate(System.Collections.Generic.Dictionary<string!, object!>? requestContext, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> void
+Orleans.Runtime.IGrainContext.ObservableLifecycle.get -> Orleans.Runtime.IGrainLifecycle!
+Orleans.Runtime.IGrainContext.ReceiveMessage(object! message) -> void
+Orleans.Runtime.IGrainContext.Rehydrate(Orleans.Runtime.IRehydrationContext! context) -> void
+Orleans.Runtime.IGrainContext.Scheduler.get -> Orleans.Runtime.IWorkItemScheduler!
+Orleans.Runtime.IGrainContext.SetComponent<TComponent>(TComponent? value) -> void
+Orleans.Runtime.IGrainContextAccessor
+Orleans.Runtime.IGrainContextAccessor.GrainContext.get -> Orleans.Runtime.IGrainContext!
+Orleans.Runtime.IGrainExtension
+Orleans.Runtime.IGrainExtensionBinder
+Orleans.Runtime.IGrainExtensionBinder.GetExtension<TExtensionInterface>() -> TExtensionInterface!
+Orleans.Runtime.IGrainExtensionBinder.GetOrSetExtension<TExtension, TExtensionInterface>(System.Func<TExtension!>! newExtensionFunc) -> (TExtension!, TExtensionInterface!)
+Orleans.Runtime.IGrainInterfaceTypeProvider
+Orleans.Runtime.IGrainInterfaceTypeProvider.TryGetGrainInterfaceType(System.Type! type, out Orleans.Runtime.GrainInterfaceType grainInterfaceType) -> bool
+Orleans.Runtime.IGrainInterfaceTypeProviderAttribute
+Orleans.Runtime.IGrainInterfaceTypeProviderAttribute.GetGrainInterfaceType(System.IServiceProvider! services, System.Type! type) -> Orleans.Runtime.GrainInterfaceType
+Orleans.Runtime.IGrainLifecycle
+Orleans.Runtime.IGrainLifecycle.AddMigrationParticipant(Orleans.Runtime.IGrainMigrationParticipant! participant) -> void
+Orleans.Runtime.IGrainLifecycle.RemoveMigrationParticipant(Orleans.Runtime.IGrainMigrationParticipant! participant) -> void
+Orleans.Runtime.IGrainMigrationParticipant
+Orleans.Runtime.IGrainMigrationParticipant.OnDehydrate(Orleans.Runtime.IDehydrationContext! dehydrationContext) -> void
+Orleans.Runtime.IGrainMigrationParticipant.OnRehydrate(Orleans.Runtime.IRehydrationContext! rehydrationContext) -> void
+Orleans.Runtime.IGrainReferenceRuntime
+Orleans.Runtime.IGrainRuntime
+Orleans.Runtime.IGrainRuntime.DeactivateOnIdle(Orleans.Runtime.IGrainContext! grainContext) -> void
+Orleans.Runtime.IGrainRuntime.DelayDeactivation(Orleans.Runtime.IGrainContext! grainContext, System.TimeSpan timeSpan) -> void
+Orleans.Runtime.IGrainRuntime.GetStorage<TGrainState>(Orleans.Runtime.IGrainContext! grainContext) -> Orleans.Core.IStorage<TGrainState>!
+Orleans.Runtime.IGrainRuntime.GrainFactory.get -> Orleans.IGrainFactory!
+Orleans.Runtime.IGrainRuntime.ServiceProvider.get -> System.IServiceProvider!
+Orleans.Runtime.IGrainRuntime.SiloAddress.get -> Orleans.Runtime.SiloAddress!
+Orleans.Runtime.IGrainRuntime.SiloIdentity.get -> string!
+Orleans.Runtime.IGrainRuntime.TimeProvider.get -> System.TimeProvider!
+Orleans.Runtime.IGrainRuntime.TimerRegistry.get -> Orleans.Timers.ITimerRegistry!
+Orleans.Runtime.IGrainTimer
+Orleans.Runtime.IGrainTimer.Change(System.TimeSpan dueTime, System.TimeSpan period) -> void
+Orleans.Runtime.IRehydrationContext
+Orleans.Runtime.IRehydrationContext.Keys.get -> System.Collections.Generic.IEnumerable<string!>!
+Orleans.Runtime.IRehydrationContext.TryGetBytes(string! key, out System.Buffers.ReadOnlySequence<byte> value) -> bool
+Orleans.Runtime.IRehydrationContext.TryGetValue<T>(string! key, out T? value) -> bool
+Orleans.Runtime.IRequest
+Orleans.Runtime.IRequest.AddInvokeMethodOptions(Orleans.CodeGeneration.InvokeMethodOptions options) -> void
+Orleans.Runtime.IRequest.Options.get -> Orleans.CodeGeneration.InvokeMethodOptions
+Orleans.Runtime.IWorkItemScheduler
+Orleans.Runtime.IWorkItemScheduler.QueueAction(System.Action! action) -> void
+Orleans.Runtime.IWorkItemScheduler.QueueAction(System.Action<object!>! action, object! state) -> void
+Orleans.Runtime.IWorkItemScheduler.QueueTask(System.Threading.Tasks.Task! task) -> void
+Orleans.Runtime.LegacyGrainId
+Orleans.Runtime.LegacyGrainId.Category.get -> Orleans.Runtime.UniqueKey.Category
+Orleans.Runtime.LegacyGrainId.GetHashCode_Modulo(uint umod) -> uint
+Orleans.Runtime.LegacyGrainId.GetUniformHashCode() -> uint
+Orleans.Runtime.LegacyGrainId.IsClient.get -> bool
+Orleans.Runtime.LegacyGrainId.IsGrain.get -> bool
+Orleans.Runtime.LegacyGrainId.IsLongKey.get -> bool
+Orleans.Runtime.LegacyGrainId.IsSystemTarget.get -> bool
+Orleans.Runtime.LegacyGrainId.PrimaryKey.get -> System.Guid
+Orleans.Runtime.LegacyGrainId.PrimaryKeyLong.get -> long
+Orleans.Runtime.LegacyGrainId.ToGrainId() -> Orleans.Runtime.GrainId
+Orleans.Runtime.LegacyGrainId.TypeCode.get -> int
+Orleans.Runtime.LimitExceededException
+Orleans.Runtime.LimitExceededException.LimitExceededException() -> void
+Orleans.Runtime.LogFormatter
+Orleans.Runtime.MembershipVersion
+Orleans.Runtime.MembershipVersion.CompareTo(Orleans.Runtime.MembershipVersion other) -> int
+Orleans.Runtime.MembershipVersion.Equals(Orleans.Runtime.MembershipVersion other) -> bool
+Orleans.Runtime.MembershipVersion.MembershipVersion() -> void
+Orleans.Runtime.MembershipVersion.MembershipVersion(long version) -> void
+Orleans.Runtime.MembershipVersion.Value.get -> long
+Orleans.Runtime.MembershipVersion.Value.init -> void
+Orleans.Runtime.MembershipVersionConverter
+Orleans.Runtime.MembershipVersionConverter.MembershipVersionConverter() -> void
+Orleans.Runtime.OrleansConfigurationException
+Orleans.Runtime.OrleansException
+Orleans.Runtime.OrleansException.OrleansException() -> void
+Orleans.Runtime.OrleansLifecycleCanceledException
+Orleans.Runtime.OrleansMessageRejectionException
+Orleans.Runtime.PlacementStrategy
+Orleans.Runtime.PlacementStrategy.PlacementStrategy() -> void
+Orleans.Runtime.PreferLocalPlacement
+Orleans.Runtime.PreferLocalPlacement.PreferLocalPlacement() -> void
+Orleans.Runtime.RandomPlacement
+Orleans.Runtime.RandomPlacement.RandomPlacement() -> void
+Orleans.Runtime.Request
+Orleans.Runtime.Request.Request() -> void
+Orleans.Runtime.Request<TResult>
+Orleans.Runtime.Request<TResult>.Request() -> void
+Orleans.Runtime.RequestBase
+Orleans.Runtime.RequestBase.AddInvokeMethodOptions(Orleans.CodeGeneration.InvokeMethodOptions options) -> void
+Orleans.Runtime.RequestBase.Options.get -> Orleans.CodeGeneration.InvokeMethodOptions
+Orleans.Runtime.RequestBase.Options.set -> void
+Orleans.Runtime.RequestBase.RequestBase() -> void
+Orleans.Runtime.RequestContext
+Orleans.Runtime.RequestContext.ReentrancySection
+Orleans.Runtime.RequestContext.ReentrancySection.Dispose() -> void
+Orleans.Runtime.RequestContext.ReentrancySection.ReentrancySection() -> void
+Orleans.Runtime.RequestContext.ReentrancySection.ReentrancySection(System.Guid originalReentrancyId, System.Guid newReentrancyId) -> void
+Orleans.Runtime.ResourceOptimizedPlacement
+Orleans.Runtime.ResourceOptimizedPlacement.ResourceOptimizedPlacement() -> void
+Orleans.Runtime.Serialization.SiloAddressCodec
+Orleans.Runtime.Serialization.SiloAddressCodec.ReadValue<TReaderInput>(ref Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Orleans.Serialization.WireProtocol.Field field) -> Orleans.Runtime.SiloAddress!
+Orleans.Runtime.Serialization.SiloAddressCodec.SiloAddressCodec() -> void
+Orleans.Runtime.Serialization.SiloAddressCodec.WriteField<TBufferWriter>(ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type! expectedType, Orleans.Runtime.SiloAddress? value) -> void
+Orleans.Runtime.SiloAddress
+Orleans.Runtime.SiloAddress.CompareTo(Orleans.Runtime.SiloAddress? other) -> int
+Orleans.Runtime.SiloAddress.Endpoint.get -> System.Net.IPEndPoint!
+Orleans.Runtime.SiloAddress.Equals(Orleans.Runtime.SiloAddress? other) -> bool
+Orleans.Runtime.SiloAddress.Generation.get -> int
+Orleans.Runtime.SiloAddress.GetConsistentHashCode() -> int
+Orleans.Runtime.SiloAddress.GetUniformHashCodes(int numHashes) -> uint[]!
+Orleans.Runtime.SiloAddress.IsClient.get -> bool
+Orleans.Runtime.SiloAddress.IsPredecessorOf(Orleans.Runtime.SiloAddress! other) -> bool
+Orleans.Runtime.SiloAddress.IsSuccessorOf(Orleans.Runtime.SiloAddress! other) -> bool
+Orleans.Runtime.SiloAddress.ToParsableString() -> string!
+Orleans.Runtime.SiloAddress.ToStringWithHashCode() -> string!
+Orleans.Runtime.SiloAddressConverter
+Orleans.Runtime.SiloAddressConverter.SiloAddressConverter() -> void
+Orleans.Runtime.SiloRoleBasedPlacement
+Orleans.Runtime.SiloRoleBasedPlacement.SiloRoleBasedPlacement() -> void
+Orleans.Runtime.SiloUnavailableException
+Orleans.Runtime.SiloUnavailableException.SiloUnavailableException() -> void
+Orleans.Runtime.SystemTargetGrainId
+Orleans.Runtime.SystemTargetGrainId.CompareTo(Orleans.Runtime.SystemTargetGrainId other) -> int
+Orleans.Runtime.SystemTargetGrainId.Equals(Orleans.Runtime.SystemTargetGrainId other) -> bool
+Orleans.Runtime.SystemTargetGrainId.GetSiloAddress() -> Orleans.Runtime.SiloAddress!
+Orleans.Runtime.SystemTargetGrainId.GrainId.get -> Orleans.Runtime.GrainId
+Orleans.Runtime.SystemTargetGrainId.SystemTargetGrainId() -> void
+Orleans.Runtime.SystemTargetGrainId.WithSiloAddress(Orleans.Runtime.SiloAddress! siloAddress) -> Orleans.Runtime.SystemTargetGrainId
+Orleans.Runtime.SystemTargetPlacementStrategy
+Orleans.Runtime.SystemTargetPlacementStrategy.SystemTargetPlacementStrategy() -> void
+Orleans.Runtime.TaskRequest
+Orleans.Runtime.TaskRequest.TaskRequest() -> void
+Orleans.Runtime.TaskRequest<TResult>
+Orleans.Runtime.TaskRequest<TResult>.TaskRequest() -> void
+Orleans.Runtime.UniqueKey
+Orleans.Runtime.UniqueKey.BaseTypeCode.get -> int
+Orleans.Runtime.UniqueKey.Category
+Orleans.Runtime.UniqueKey.Category.Client = 4 -> Orleans.Runtime.UniqueKey.Category
+Orleans.Runtime.UniqueKey.Category.Grain = 3 -> Orleans.Runtime.UniqueKey.Category
+Orleans.Runtime.UniqueKey.Category.KeyExtGrain = 6 -> Orleans.Runtime.UniqueKey.Category
+Orleans.Runtime.UniqueKey.Category.KeyExtSystemTarget = 8 -> Orleans.Runtime.UniqueKey.Category
+Orleans.Runtime.UniqueKey.Category.None = 0 -> Orleans.Runtime.UniqueKey.Category
+Orleans.Runtime.UniqueKey.Category.SystemGrain = 2 -> Orleans.Runtime.UniqueKey.Category
+Orleans.Runtime.UniqueKey.Category.SystemTarget = 1 -> Orleans.Runtime.UniqueKey.Category
+Orleans.Runtime.UniqueKey.HasKeyExt.get -> bool
+Orleans.Runtime.UniqueKey.IdCategory.get -> Orleans.Runtime.UniqueKey.Category
+Orleans.Runtime.UniqueKey.IsLongKey.get -> bool
+Orleans.Runtime.UniqueKey.IsSystemTargetKey.get -> bool
+Orleans.Runtime.UniqueKey.N0.get -> ulong
+Orleans.Runtime.UniqueKey.N1.get -> ulong
+Orleans.Runtime.UniqueKey.PrimaryKeyToGuid() -> System.Guid
+Orleans.Runtime.UniqueKey.PrimaryKeyToLong() -> long
+Orleans.Runtime.UniqueKey.TypeCodeData.get -> ulong
+Orleans.Runtime.UniqueKey.UniqueKey() -> void
+Orleans.Runtime.Utils
+Orleans.Runtime.VoidRequest
+Orleans.Runtime.VoidRequest.VoidRequest() -> void
+Orleans.Runtime.WrappedException
+Orleans.Serialization.DeserializationContext
+Orleans.Serialization.DeserializationContext.DeserializationContext() -> void
+Orleans.Serialization.IOnDeserialized
+Orleans.Services.IGrainService
+Orleans.StableHash
+Orleans.Statistics.EnvironmentStatistics
+Orleans.Statistics.EnvironmentStatistics.EnvironmentStatistics() -> void
+Orleans.Statistics.IAppEnvironmentStatistics
+Orleans.Statistics.IAppEnvironmentStatistics.MemoryUsage.get -> long?
+Orleans.Statistics.IEnvironmentStatisticsProvider
+Orleans.Statistics.IEnvironmentStatisticsProvider.GetEnvironmentStatistics() -> Orleans.Statistics.EnvironmentStatistics
+Orleans.Statistics.IHostEnvironmentStatistics
+Orleans.Statistics.IHostEnvironmentStatistics.AvailableMemory.get -> long?
+Orleans.Statistics.IHostEnvironmentStatistics.CpuUsage.get -> float?
+Orleans.Statistics.IHostEnvironmentStatistics.TotalPhysicalMemory.get -> long?
+Orleans.Timers.ITimerRegistry
+Orleans.Timers.ITimerRegistry.RegisterGrainTimer<TState>(Orleans.Runtime.IGrainContext! grainContext, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! callback, TState state, Orleans.Runtime.GrainTimerCreationOptions options) -> Orleans.Runtime.IGrainTimer!
+Orleans.Timers.ITimerRegistry.RegisterTimer(Orleans.Runtime.IGrainContext! grainContext, System.Func<object?, System.Threading.Tasks.Task!>! callback, object? state, System.TimeSpan dueTime, System.TimeSpan period) -> System.IDisposable!
+Orleans.Versions.Compatibility.AllVersionsCompatible
+Orleans.Versions.Compatibility.AllVersionsCompatible.AllVersionsCompatible() -> void
+Orleans.Versions.Compatibility.BackwardCompatible
+Orleans.Versions.Compatibility.BackwardCompatible.BackwardCompatible() -> void
+Orleans.Versions.Compatibility.CompatibilityStrategy
+Orleans.Versions.Compatibility.CompatibilityStrategy.CompatibilityStrategy() -> void
+Orleans.Versions.Compatibility.ICompatibilityDirector
+Orleans.Versions.Compatibility.ICompatibilityDirector.IsCompatible(ushort requestedVersion, ushort currentVersion) -> bool
+Orleans.Versions.Compatibility.StrictVersionCompatible
+Orleans.Versions.Compatibility.StrictVersionCompatible.StrictVersionCompatible() -> void
+Orleans.Versions.IVersionStore
+Orleans.Versions.IVersionStore.IsEnabled.get -> bool
+Orleans.Versions.Selector.AllCompatibleVersions
+Orleans.Versions.Selector.AllCompatibleVersions.AllCompatibleVersions() -> void
+Orleans.Versions.Selector.IVersionSelector
+Orleans.Versions.Selector.LatestVersion
+Orleans.Versions.Selector.LatestVersion.LatestVersion() -> void
+Orleans.Versions.Selector.MinimumVersion
+Orleans.Versions.Selector.MinimumVersion.MinimumVersion() -> void
+Orleans.Versions.Selector.VersionSelectorStrategy
+Orleans.Versions.Selector.VersionSelectorStrategy.VersionSelectorStrategy() -> void
+override Orleans.Metadata.MajorMinorVersion.GetHashCode() -> int
+override Orleans.Runtime.ActivationId.Equals(object? obj) -> bool
+override Orleans.Runtime.ActivationId.GetHashCode() -> int
+override Orleans.Runtime.ActivationId.ToString() -> string!
+override Orleans.Runtime.ActivationIdConverter.Read(ref System.Text.Json.Utf8JsonReader reader, System.Type! typeToConvert, System.Text.Json.JsonSerializerOptions! options) -> Orleans.Runtime.ActivationId
+override Orleans.Runtime.ActivationIdConverter.Write(System.Text.Json.Utf8JsonWriter! writer, Orleans.Runtime.ActivationId value, System.Text.Json.JsonSerializerOptions! options) -> void
+override Orleans.Runtime.AsyncEnumerableRequest<T>.Invoke() -> System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response!>
+override Orleans.Runtime.GrainAddress.Equals(object? obj) -> bool
+override Orleans.Runtime.GrainAddress.GetHashCode() -> int
+override Orleans.Runtime.GrainAddress.ToString() -> string!
+override Orleans.Runtime.GrainAddressCacheUpdate.ToString() -> string!
+override Orleans.Runtime.GrainId.Equals(object? obj) -> bool
+override Orleans.Runtime.GrainId.GetHashCode() -> int
+override Orleans.Runtime.GrainId.ToString() -> string!
+override Orleans.Runtime.GrainIdJsonConverter.Read(ref System.Text.Json.Utf8JsonReader reader, System.Type! typeToConvert, System.Text.Json.JsonSerializerOptions! options) -> Orleans.Runtime.GrainId
+override Orleans.Runtime.GrainIdJsonConverter.Write(System.Text.Json.Utf8JsonWriter! writer, Orleans.Runtime.GrainId value, System.Text.Json.JsonSerializerOptions! options) -> void
+override Orleans.Runtime.GrainInterfaceType.Equals(object? obj) -> bool
+override Orleans.Runtime.GrainInterfaceType.GetHashCode() -> int
+override Orleans.Runtime.GrainInterfaceType.ToString() -> string?
+override Orleans.Runtime.GrainReference.GetHashCode() -> int
+override Orleans.Runtime.GrainType.Equals(object? obj) -> bool
+override Orleans.Runtime.GrainType.GetHashCode() -> int
+override Orleans.Runtime.GrainType.ToString() -> string?
+override Orleans.Runtime.GuidId.Equals(object? obj) -> bool
+override Orleans.Runtime.GuidId.GetHashCode() -> int
+override Orleans.Runtime.GuidId.ToString() -> string!
+override Orleans.Runtime.IdSpan.Equals(object? obj) -> bool
+override Orleans.Runtime.IdSpan.GetHashCode() -> int
+override Orleans.Runtime.IdSpan.ToString() -> string?
+override Orleans.Runtime.LegacyGrainId.GetHashCode() -> int
+override Orleans.Runtime.MembershipVersion.GetHashCode() -> int
+override Orleans.Runtime.SiloAddress.Equals(object? obj) -> bool
+override Orleans.Runtime.SiloAddress.GetHashCode() -> int
+override Orleans.Runtime.SiloAddress.ToString() -> string!
+override Orleans.Runtime.SiloAddressConverter.Read(ref System.Text.Json.Utf8JsonReader reader, System.Type! typeToConvert, System.Text.Json.JsonSerializerOptions! options) -> Orleans.Runtime.SiloAddress!
+override Orleans.Runtime.SiloAddressConverter.Write(System.Text.Json.Utf8JsonWriter! writer, Orleans.Runtime.SiloAddress! value, System.Text.Json.JsonSerializerOptions! options) -> void
+override Orleans.Runtime.SystemTargetGrainId.Equals(object? obj) -> bool
+override Orleans.Runtime.SystemTargetGrainId.GetHashCode() -> int
+override Orleans.Runtime.SystemTargetGrainId.ToString() -> string!
+override Orleans.Runtime.SystemTargetPlacementStrategy.IsUsingGrainDirectory.get -> bool
+override Orleans.Runtime.UniqueKey.GetHashCode() -> int
+readonly Orleans.Concurrency.Immutable<T>.Value -> T
+readonly Orleans.Runtime.GuidId.Guid -> System.Guid
+readonly Orleans.Statistics.EnvironmentStatistics.AvailableMemoryBytes -> long
+readonly Orleans.Statistics.EnvironmentStatistics.CpuUsagePercentage -> float
+readonly Orleans.Statistics.EnvironmentStatistics.MaximumAvailableMemoryBytes -> long
+readonly Orleans.Statistics.EnvironmentStatistics.MemoryUsageBytes -> long
+static Orleans.Concurrency.ImmutableExtensions.AsImmutable<T>(this T value) -> Orleans.Concurrency.Immutable<T>
+static Orleans.Metadata.MajorMinorVersion.MinValue.get -> Orleans.Metadata.MajorMinorVersion
+static Orleans.Metadata.MajorMinorVersion.operator !=(Orleans.Metadata.MajorMinorVersion left, Orleans.Metadata.MajorMinorVersion right) -> bool
+static Orleans.Metadata.MajorMinorVersion.operator <(Orleans.Metadata.MajorMinorVersion left, Orleans.Metadata.MajorMinorVersion right) -> bool
+static Orleans.Metadata.MajorMinorVersion.operator <=(Orleans.Metadata.MajorMinorVersion left, Orleans.Metadata.MajorMinorVersion right) -> bool
+static Orleans.Metadata.MajorMinorVersion.operator ==(Orleans.Metadata.MajorMinorVersion left, Orleans.Metadata.MajorMinorVersion right) -> bool
+static Orleans.Metadata.MajorMinorVersion.operator >(Orleans.Metadata.MajorMinorVersion left, Orleans.Metadata.MajorMinorVersion right) -> bool
+static Orleans.Metadata.MajorMinorVersion.operator >=(Orleans.Metadata.MajorMinorVersion left, Orleans.Metadata.MajorMinorVersion right) -> bool
+static Orleans.Metadata.MajorMinorVersion.Zero.get -> Orleans.Metadata.MajorMinorVersion
+static Orleans.Runtime.ActivationId.FromParsableString(string! activationId) -> Orleans.Runtime.ActivationId
+static Orleans.Runtime.ActivationId.GetDeterministic(Orleans.Runtime.GrainId grain) -> Orleans.Runtime.ActivationId
+static Orleans.Runtime.ActivationId.NewId() -> Orleans.Runtime.ActivationId
+static Orleans.Runtime.ActivationId.operator !=(Orleans.Runtime.ActivationId left, Orleans.Runtime.ActivationId right) -> bool
+static Orleans.Runtime.ActivationId.operator ==(Orleans.Runtime.ActivationId left, Orleans.Runtime.ActivationId right) -> bool
+static Orleans.Runtime.AsyncEnumerableExtensions.WithBatchSize<T>(this System.Collections.Generic.IAsyncEnumerable<T>! self, int maxBatchSize) -> System.Collections.Generic.IAsyncEnumerable<T>!
+static Orleans.Runtime.GrainContextExtensions.DeactivateAsync(this Orleans.Runtime.IGrainContext! grainContext, Orleans.DeactivationReason deactivationReason, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+static Orleans.Runtime.GrainId.Create(Orleans.Runtime.GrainType type, Orleans.Runtime.IdSpan key) -> Orleans.Runtime.GrainId
+static Orleans.Runtime.GrainId.Create(Orleans.Runtime.GrainType type, string! key) -> Orleans.Runtime.GrainId
+static Orleans.Runtime.GrainId.Create(string! type, string! key) -> Orleans.Runtime.GrainId
+static Orleans.Runtime.GrainId.operator !=(Orleans.Runtime.GrainId left, Orleans.Runtime.GrainId right) -> bool
+static Orleans.Runtime.GrainId.operator ==(Orleans.Runtime.GrainId left, Orleans.Runtime.GrainId right) -> bool
+static Orleans.Runtime.GrainId.Parse(string! value) -> Orleans.Runtime.GrainId
+static Orleans.Runtime.GrainId.Parse(string! value, System.IFormatProvider? provider = null) -> Orleans.Runtime.GrainId
+static Orleans.Runtime.GrainId.Parse(System.ReadOnlySpan<char> value, System.IFormatProvider? provider = null) -> Orleans.Runtime.GrainId
+static Orleans.Runtime.GrainId.TryParse(string? value, out Orleans.Runtime.GrainId result) -> bool
+static Orleans.Runtime.GrainId.TryParse(string? value, System.IFormatProvider? provider, out Orleans.Runtime.GrainId result) -> bool
+static Orleans.Runtime.GrainId.TryParse(System.ReadOnlySpan<char> value, System.IFormatProvider? provider, out Orleans.Runtime.GrainId result) -> bool
+static Orleans.Runtime.GrainIdKeyExtensions.CreateGuidKey(System.Guid key) -> Orleans.Runtime.IdSpan
+static Orleans.Runtime.GrainIdKeyExtensions.CreateGuidKey(System.Guid key, string? keyExtension) -> Orleans.Runtime.IdSpan
+static Orleans.Runtime.GrainIdKeyExtensions.CreateGuidKey(System.Guid key, System.ReadOnlySpan<byte> keyExtension) -> Orleans.Runtime.IdSpan
+static Orleans.Runtime.GrainIdKeyExtensions.CreateIntegerKey(long key) -> Orleans.Runtime.IdSpan
+static Orleans.Runtime.GrainIdKeyExtensions.CreateIntegerKey(long key, string? keyExtension) -> Orleans.Runtime.IdSpan
+static Orleans.Runtime.GrainIdKeyExtensions.CreateIntegerKey(long key, System.ReadOnlySpan<byte> keyExtension) -> Orleans.Runtime.IdSpan
+static Orleans.Runtime.GrainIdKeyExtensions.GetGuidKey(this Orleans.Runtime.GrainId grainId) -> System.Guid
+static Orleans.Runtime.GrainIdKeyExtensions.GetGuidKey(this Orleans.Runtime.GrainId grainId, out string? keyExt) -> System.Guid
+static Orleans.Runtime.GrainIdKeyExtensions.GetIntegerKey(this Orleans.Runtime.GrainId grainId) -> long
+static Orleans.Runtime.GrainIdKeyExtensions.GetIntegerKey(this Orleans.Runtime.GrainId grainId, out string? keyExt) -> long
+static Orleans.Runtime.GrainIdKeyExtensions.TryGetGuidKey(this Orleans.Runtime.GrainId grainId, out System.Guid key, out string? keyExt) -> bool
+static Orleans.Runtime.GrainIdKeyExtensions.TryGetIntegerKey(this Orleans.Runtime.GrainId grainId, out long key, out string? keyExt) -> bool
+static Orleans.Runtime.GrainInterfaceType.Create(string! value) -> Orleans.Runtime.GrainInterfaceType
+static Orleans.Runtime.GrainInterfaceType.operator !=(Orleans.Runtime.GrainInterfaceType left, Orleans.Runtime.GrainInterfaceType right) -> bool
+static Orleans.Runtime.GrainInterfaceType.operator ==(Orleans.Runtime.GrainInterfaceType left, Orleans.Runtime.GrainInterfaceType right) -> bool
+static Orleans.Runtime.GrainType.Create(string! value) -> Orleans.Runtime.GrainType
+static Orleans.Runtime.GrainType.explicit operator Orleans.Runtime.GrainType(Orleans.Runtime.IdSpan id) -> Orleans.Runtime.GrainType
+static Orleans.Runtime.GrainType.explicit operator Orleans.Runtime.IdSpan(Orleans.Runtime.GrainType kind) -> Orleans.Runtime.IdSpan
+static Orleans.Runtime.GrainType.operator !=(Orleans.Runtime.GrainType left, Orleans.Runtime.GrainType right) -> bool
+static Orleans.Runtime.GrainType.operator ==(Orleans.Runtime.GrainType left, Orleans.Runtime.GrainType right) -> bool
+static Orleans.Runtime.GrainType.UnsafeGetArray(Orleans.Runtime.GrainType id) -> byte[]?
+static Orleans.Runtime.GrainTypePrefix.IsClient(this in Orleans.Runtime.GrainId id) -> bool
+static Orleans.Runtime.GrainTypePrefix.IsClient(this in Orleans.Runtime.GrainType type) -> bool
+static Orleans.Runtime.GrainTypePrefix.IsGrainService(this in Orleans.Runtime.GrainType type) -> bool
+static Orleans.Runtime.GrainTypePrefix.IsLegacyGrain(this in Orleans.Runtime.GrainType type) -> bool
+static Orleans.Runtime.GrainTypePrefix.IsSystemTarget(this in Orleans.Runtime.GrainId id) -> bool
+static Orleans.Runtime.GrainTypePrefix.IsSystemTarget(this in Orleans.Runtime.GrainType type) -> bool
+static Orleans.Runtime.GuidId.GetGuidId(System.Guid guid) -> Orleans.Runtime.GuidId!
+static Orleans.Runtime.GuidId.GetNewGuidId() -> Orleans.Runtime.GuidId!
+static Orleans.Runtime.GuidId.operator !=(Orleans.Runtime.GuidId? left, Orleans.Runtime.GuidId? right) -> bool
+static Orleans.Runtime.GuidId.operator ==(Orleans.Runtime.GuidId? left, Orleans.Runtime.GuidId? right) -> bool
+static Orleans.Runtime.IdSpan.Create(string! id) -> Orleans.Runtime.IdSpan
+static Orleans.Runtime.IdSpan.operator !=(Orleans.Runtime.IdSpan left, Orleans.Runtime.IdSpan right) -> bool
+static Orleans.Runtime.IdSpan.operator ==(Orleans.Runtime.IdSpan left, Orleans.Runtime.IdSpan right) -> bool
+static Orleans.Runtime.IdSpan.UnsafeCreate(byte[]? value, int hashCode) -> Orleans.Runtime.IdSpan
+static Orleans.Runtime.IdSpan.UnsafeGetArray(Orleans.Runtime.IdSpan id) -> byte[]?
+static Orleans.Runtime.IdSpanCodec.ReadRaw<TInput>(ref Orleans.Serialization.Buffers.Reader<TInput> reader) -> Orleans.Runtime.IdSpan
+static Orleans.Runtime.IdSpanCodec.WriteRaw<TBufferWriter>(ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Orleans.Runtime.IdSpan value) -> void
+static Orleans.Runtime.LegacyGrainId.CreateGrainTypeForGrain(int typeCode) -> Orleans.Runtime.GrainType
+static Orleans.Runtime.LegacyGrainId.CreateGrainTypeForSystemTarget(int typeCode) -> Orleans.Runtime.GrainType
+static Orleans.Runtime.MembershipVersion.MinValue.get -> Orleans.Runtime.MembershipVersion
+static Orleans.Runtime.MembershipVersion.operator !=(Orleans.Runtime.MembershipVersion left, Orleans.Runtime.MembershipVersion right) -> bool
+static Orleans.Runtime.MembershipVersion.operator <(Orleans.Runtime.MembershipVersion left, Orleans.Runtime.MembershipVersion right) -> bool
+static Orleans.Runtime.MembershipVersion.operator <=(Orleans.Runtime.MembershipVersion left, Orleans.Runtime.MembershipVersion right) -> bool
+static Orleans.Runtime.MembershipVersion.operator ==(Orleans.Runtime.MembershipVersion left, Orleans.Runtime.MembershipVersion right) -> bool
+static Orleans.Runtime.MembershipVersion.operator >(Orleans.Runtime.MembershipVersion left, Orleans.Runtime.MembershipVersion right) -> bool
+static Orleans.Runtime.MembershipVersion.operator >=(Orleans.Runtime.MembershipVersion left, Orleans.Runtime.MembershipVersion right) -> bool
+static Orleans.Runtime.RequestContext.AllowCallChainReentrancy() -> Orleans.Runtime.RequestContext.ReentrancySection
+static Orleans.Runtime.RequestContext.Clear() -> void
+static Orleans.Runtime.RequestContext.ReentrancyId.get -> System.Guid
+static Orleans.Runtime.RequestContext.ReentrancyId.set -> void
+static Orleans.Runtime.RequestContext.SuppressCallChainReentrancy() -> Orleans.Runtime.RequestContext.ReentrancySection
+static Orleans.Runtime.SiloAddress.AllocateNewGeneration() -> int
+static Orleans.Runtime.SiloAddress.FromParsableString(string! addr) -> Orleans.Runtime.SiloAddress!
+static Orleans.Runtime.SiloAddress.FromUtf8String(System.ReadOnlySpan<byte> addr) -> Orleans.Runtime.SiloAddress!
+static Orleans.Runtime.SiloAddress.New(System.Net.IPAddress! address, int port, int generation) -> Orleans.Runtime.SiloAddress!
+static Orleans.Runtime.SiloAddress.New(System.Net.IPEndPoint! ep, int gen) -> Orleans.Runtime.SiloAddress!
+static Orleans.Runtime.SiloAddress.Zero.get -> Orleans.Runtime.SiloAddress!
+static Orleans.Runtime.SystemTargetGrainId.Create(Orleans.Runtime.GrainType kind, Orleans.Runtime.SiloAddress! address) -> Orleans.Runtime.SystemTargetGrainId
+static Orleans.Runtime.SystemTargetGrainId.Create(Orleans.Runtime.GrainType kind, Orleans.Runtime.SiloAddress! address, string? extraIdentifier) -> Orleans.Runtime.SystemTargetGrainId
+static Orleans.Runtime.SystemTargetGrainId.CreateGrainServiceGrainId(int typeCode, string! grainSystemId, Orleans.Runtime.SiloAddress! address) -> Orleans.Runtime.GrainId
+static Orleans.Runtime.SystemTargetGrainId.CreateGrainType(string! name) -> Orleans.Runtime.GrainType
+static Orleans.Runtime.SystemTargetGrainId.IsSystemTargetGrainId(in Orleans.Runtime.GrainId id) -> bool
+static Orleans.Runtime.SystemTargetGrainId.operator !=(Orleans.Runtime.SystemTargetGrainId left, Orleans.Runtime.SystemTargetGrainId right) -> bool
+static Orleans.Runtime.SystemTargetGrainId.operator <(Orleans.Runtime.SystemTargetGrainId left, Orleans.Runtime.SystemTargetGrainId right) -> bool
+static Orleans.Runtime.SystemTargetGrainId.operator <=(Orleans.Runtime.SystemTargetGrainId left, Orleans.Runtime.SystemTargetGrainId right) -> bool
+static Orleans.Runtime.SystemTargetGrainId.operator ==(Orleans.Runtime.SystemTargetGrainId left, Orleans.Runtime.SystemTargetGrainId right) -> bool
+static Orleans.Runtime.SystemTargetGrainId.operator >(Orleans.Runtime.SystemTargetGrainId left, Orleans.Runtime.SystemTargetGrainId right) -> bool
+static Orleans.Runtime.SystemTargetGrainId.operator >=(Orleans.Runtime.SystemTargetGrainId left, Orleans.Runtime.SystemTargetGrainId right) -> bool
+static Orleans.Runtime.SystemTargetGrainId.TryParse(Orleans.Runtime.GrainId grainId, out Orleans.Runtime.SystemTargetGrainId systemTargetId) -> bool
+static Orleans.Runtime.Utils.AverageTicksToMilliSeconds(float ticks) -> float
+static Orleans.Runtime.Utils.BatchIEnumerable<T>(this System.Collections.Generic.IEnumerable<T>! sequence, int batchSize) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.List<T>!>!
+static Orleans.Runtime.Utils.DictionaryToString<T1, T2>(System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<T1, T2>>! dict, System.Func<T2, string?>? toString = null, string? separator = null) -> string!
+static Orleans.Runtime.Utils.EnumerableToString<T>(System.Collections.Generic.IEnumerable<T>? collection, System.Func<T, string!>? toString = null, string! separator = ", ", bool putInBrackets = true) -> string!
+static Orleans.Runtime.Utils.GetStackTrace(int skipFrames = 0) -> string!
+static Orleans.Runtime.Utils.SafeExecute(System.Action! action) -> void
+static Orleans.Runtime.Utils.SafeExecute(System.Action! action, Microsoft.Extensions.Logging.ILogger? logger = null, string? caller = null) -> void
+static Orleans.Runtime.Utils.SafeExecuteAsync(System.Threading.Tasks.Task! task) -> System.Threading.Tasks.Task!
+static Orleans.Runtime.Utils.TicksToMilliSeconds(long ticks) -> long
+static Orleans.Runtime.Utils.TimeSpanToString(System.TimeSpan timeSpan) -> string!
+static Orleans.Runtime.Utils.ToGatewayAddress(this System.Uri! uri) -> Orleans.Runtime.SiloAddress?
+static Orleans.Runtime.Utils.ToGatewayUri(this Orleans.Runtime.SiloAddress! address) -> System.Uri!
+static Orleans.Runtime.Utils.ToGatewayUri(this System.Net.IPEndPoint! ep) -> System.Uri!
+static Orleans.Runtime.Utils.ToIPEndPoint(this System.Uri! uri) -> System.Net.IPEndPoint?
+static Orleans.StableHash.ComputeHash(string! data) -> uint
+static Orleans.StableHash.ComputeHash(System.ReadOnlySpan<byte> data) -> uint
+static readonly Orleans.Runtime.GrainTypePrefix.ClientGrainType -> Orleans.Runtime.GrainType
+static readonly Orleans.Runtime.GrainTypePrefix.ClientPrefixBytes -> System.ReadOnlyMemory<byte>
+static readonly Orleans.Runtime.GrainTypePrefix.GrainServicePrefixBytes -> System.ReadOnlyMemory<byte>
+static readonly Orleans.Runtime.GrainTypePrefix.LegacyGrainPrefixBytes -> System.ReadOnlyMemory<byte>
+static readonly Orleans.Runtime.GrainTypePrefix.SystemTargetPrefixBytes -> System.ReadOnlyMemory<byte>
+virtual Orleans.Grain.OnActivateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+virtual Orleans.Grain.OnDeactivateAsync(Orleans.DeactivationReason reason, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+virtual Orleans.Grain<TGrainState>.ClearStateAsync() -> System.Threading.Tasks.Task!
+virtual Orleans.Grain<TGrainState>.ReadStateAsync() -> System.Threading.Tasks.Task!
+virtual Orleans.Grain<TGrainState>.WriteStateAsync() -> System.Threading.Tasks.Task!
+virtual Orleans.Placement.PlacementFilterAttribute.Populate(System.IServiceProvider! services, System.Type! grainClass, Orleans.Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string!, string!>! properties) -> void
+virtual Orleans.Placement.PlacementFilterStrategy.AdditionalInitialize(Orleans.Metadata.GrainProperties! properties) -> void
+virtual Orleans.Placement.PlacementFilterStrategy.GetAdditionalGrainProperties(System.IServiceProvider! services, System.Type! grainClass, Orleans.Runtime.GrainType grainType, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! existingProperties) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, string!>>!
+virtual Orleans.Runtime.PlacementStrategy.IsUsingGrainDirectory.get -> bool
+virtual Orleans.Runtime.RequestBase.GetArgumentCount() -> int
+virtual Orleans.Runtime.RequestBase.GetCancellationToken() -> System.Threading.CancellationToken
+virtual Orleans.Runtime.RequestBase.GetDefaultResponseTimeout() -> System.TimeSpan?
+virtual Orleans.Runtime.RequestBase.TryCancel() -> bool
+~abstract Orleans.Runtime.RequestBase.GetActivityName() -> string
+~abstract Orleans.Runtime.RequestBase.GetInterfaceName() -> string
+~abstract Orleans.Runtime.RequestBase.GetInterfaceType() -> System.Type
+~abstract Orleans.Runtime.RequestBase.GetMethod() -> System.Reflection.MethodInfo
+~abstract Orleans.Runtime.RequestBase.GetMethodName() -> string
+~abstract Orleans.Runtime.RequestBase.GetTarget() -> object
+~abstract Orleans.Runtime.RequestBase.Invoke() -> System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response>
+~abstract Orleans.Runtime.RequestBase.SetTarget(Orleans.Serialization.Invocation.ITargetHolder holder) -> void
+~abstract Orleans.Runtime.TaskRequest.InvokeInner() -> System.Threading.Tasks.Task
+~abstract Orleans.Runtime.TaskRequest<TResult>.InvokeInner() -> System.Threading.Tasks.Task<TResult>
+~abstract Orleans.Serialization.DeserializationContext.RuntimeClient.get -> object
+~abstract Orleans.Serialization.DeserializationContext.ServiceProvider.get -> System.IServiceProvider
+~const Orleans.GrainDirectory.GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY = "default" -> string
+~const Orleans.Metadata.WellKnownGrainInterfaceProperties.DefaultGrainType = "primary-grain-type" -> string
+~const Orleans.Metadata.WellKnownGrainInterfaceProperties.TypeName = "type-name" -> string
+~const Orleans.Metadata.WellKnownGrainInterfaceProperties.Version = "version" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.BindingPrefix = "binding" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.BindingTypeKey = "type" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.BroadcastChannelBindingPatternKey = "channel-pattern" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.BroadcastChannelBindingTypeValue = "broadcast-channel" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.ChannelIdMapperKey = "channelid-mapper" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.FullTypeName = "full-type-name" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.GrainDirectory = "directory-policy" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.IdleDeactivationPeriod = "idle-duration" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.Immovable = "immovable" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.ImplementedInterfacePrefix = "interface." -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.IndefiniteIdleDeactivationPeriodValue = "indefinite" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.LegacyGrainKeyType = "legacy-grain-key-type" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.MayInterleavePredicate = "may-interleave-predicate" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.PlacementFilter = "placement-filter" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.PlacementStrategy = "placement-strategy" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.Reentrant = "reentrant" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.StreamBindingIncludeNamespaceKey = "include-namespace" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.StreamBindingPatternKey = "pattern" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.StreamBindingTypeValue = "stream" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.StreamIdMapperKey = "streamid-mapper" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.TypeName = "type-name" -> string
+~const Orleans.Metadata.WellKnownGrainTypeProperties.Unordered = "unordered" -> string
+~const Orleans.Providers.ProviderConstants.DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME = "Default" -> string
+~const Orleans.Providers.ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME = "PubSubStore" -> string
+~const Orleans.Providers.ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME = "Default" -> string
+~const Orleans.Runtime.GrainTypePrefix.ClientPrefix = "sys.client" -> string
+~const Orleans.Runtime.GrainTypePrefix.GrainServicePrefix = "sys.svc.user." -> string
+~const Orleans.Runtime.GrainTypePrefix.LegacyGrainPrefix = "sys.grain.v1." -> string
+~const Orleans.Runtime.GrainTypePrefix.SystemPrefix = "sys." -> string
+~const Orleans.Runtime.GrainTypePrefix.SystemTargetPrefix = "sys.svc." -> string
+~Orleans.Concurrency.MayInterleaveAttribute.MayInterleaveAttribute(string callbackMethodName) -> void
+~Orleans.Concurrency.MayInterleaveAttribute.Populate(System.IServiceProvider services, System.Type grainClass, Orleans.Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) -> void
+~Orleans.Concurrency.ReentrantAttribute.Populate(System.IServiceProvider services, System.Type grainClass, Orleans.Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) -> void
+~Orleans.Core.IStorage.ClearStateAsync() -> System.Threading.Tasks.Task
+~Orleans.Core.IStorage.ClearStateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task
+~Orleans.Core.IStorage.Etag.get -> string
+~Orleans.Core.IStorage.ReadStateAsync() -> System.Threading.Tasks.Task
+~Orleans.Core.IStorage.ReadStateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task
+~Orleans.Core.IStorage.WriteStateAsync() -> System.Threading.Tasks.Task
+~Orleans.Core.IStorage.WriteStateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task
+~Orleans.DeactivationReason.DeactivationReason(Orleans.DeactivationReasonCode code, string text) -> void
+~Orleans.DeactivationReason.DeactivationReason(Orleans.DeactivationReasonCode code, System.Exception exception, string text) -> void
+~Orleans.DeactivationReason.Description.get -> string
+~Orleans.DeactivationReason.Exception.get -> System.Exception
+~Orleans.GrainCancellationTokenSource.Cancel() -> System.Threading.Tasks.Task
+~Orleans.GrainCancellationTokenSource.Token.get -> Orleans.GrainCancellationToken
+~Orleans.GrainDirectory.GrainDirectoryAttribute.GrainDirectoryAttribute(string grainDirectoryName) -> void
+~Orleans.GrainDirectory.GrainDirectoryAttribute.GrainDirectoryName.get -> string
+~Orleans.GrainDirectory.GrainDirectoryAttribute.GrainDirectoryName.set -> void
+~Orleans.GrainDirectory.GrainDirectoryAttribute.Populate(System.IServiceProvider services, System.Type grainClass, Orleans.Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) -> void
+~Orleans.GrainTypeAttribute.GetGrainType(System.IServiceProvider services, System.Type type) -> Orleans.Runtime.GrainType
+~Orleans.GrainTypeAttribute.GrainTypeAttribute(string grainType) -> void
+~Orleans.IGrainBase.GrainContext.get -> Orleans.Runtime.IGrainContext
+~Orleans.IGrainBase.OnActivateAsync(System.Threading.CancellationToken token) -> System.Threading.Tasks.Task
+~Orleans.IGrainBase.OnDeactivateAsync(Orleans.DeactivationReason reason, System.Threading.CancellationToken token) -> System.Threading.Tasks.Task
+~Orleans.IGrainFactory.CreateObjectReference<TGrainObserverInterface>(Orleans.IGrainObserver obj) -> TGrainObserverInterface
+~Orleans.IGrainFactory.DeleteObjectReference<TGrainObserverInterface>(Orleans.IGrainObserver obj) -> void
+~Orleans.IGrainFactory.GetGrain(Orleans.Runtime.GrainId grainId) -> Orleans.Runtime.IAddressable
+~Orleans.IGrainFactory.GetGrain(Orleans.Runtime.GrainId grainId, Orleans.Runtime.GrainInterfaceType interfaceType) -> Orleans.Runtime.IAddressable
+~Orleans.IGrainFactory.GetGrain(System.Type grainInterfaceType, long grainPrimaryKey) -> Orleans.IGrain
+~Orleans.IGrainFactory.GetGrain(System.Type grainInterfaceType, long grainPrimaryKey, string keyExtension) -> Orleans.IGrain
+~Orleans.IGrainFactory.GetGrain(System.Type grainInterfaceType, string grainPrimaryKey) -> Orleans.IGrain
+~Orleans.IGrainFactory.GetGrain(System.Type grainInterfaceType, System.Guid grainPrimaryKey) -> Orleans.IGrain
+~Orleans.IGrainFactory.GetGrain(System.Type grainInterfaceType, System.Guid grainPrimaryKey, string keyExtension) -> Orleans.IGrain
+~Orleans.IGrainFactory.GetGrain<TGrainInterface>(long primaryKey, string grainClassNamePrefix = null) -> TGrainInterface
+~Orleans.IGrainFactory.GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null) -> TGrainInterface
+~Orleans.IGrainFactory.GetGrain<TGrainInterface>(Orleans.Runtime.GrainId grainId) -> TGrainInterface
+~Orleans.IGrainFactory.GetGrain<TGrainInterface>(string primaryKey, string grainClassNamePrefix = null) -> TGrainInterface
+~Orleans.IGrainFactory.GetGrain<TGrainInterface>(System.Guid primaryKey, string grainClassNamePrefix = null) -> TGrainInterface
+~Orleans.IGrainFactory.GetGrain<TGrainInterface>(System.Guid primaryKey, string keyExtension, string grainClassNamePrefix = null) -> TGrainInterface
+~Orleans.IIncomingGrainCallFilter.Invoke(Orleans.IIncomingGrainCallContext context) -> System.Threading.Tasks.Task
+~Orleans.ILifecycleObservable.Subscribe(string observerName, int stage, Orleans.ILifecycleObserver observer) -> System.IDisposable
+~Orleans.ILifecycleObserver.OnStart(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task
+~Orleans.ILifecycleObserver.OnStop(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task
+~Orleans.ILifecycleParticipant<TLifecycleObservable>
+~Orleans.IOutgoingGrainCallFilter.Invoke(Orleans.IOutgoingGrainCallContext context) -> System.Threading.Tasks.Task
+~Orleans.IVersionManager.SetCompatibilityStrategy(Orleans.Runtime.GrainInterfaceType interfaceType, Orleans.Versions.Compatibility.CompatibilityStrategy strategy) -> System.Threading.Tasks.Task
+~Orleans.IVersionManager.SetCompatibilityStrategy(Orleans.Versions.Compatibility.CompatibilityStrategy strategy) -> System.Threading.Tasks.Task
+~Orleans.IVersionManager.SetSelectorStrategy(Orleans.Runtime.GrainInterfaceType interfaceType, Orleans.Versions.Selector.VersionSelectorStrategy strategy) -> System.Threading.Tasks.Task
+~Orleans.IVersionManager.SetSelectorStrategy(Orleans.Versions.Selector.VersionSelectorStrategy strategy) -> System.Threading.Tasks.Task
+~Orleans.Metadata.AttributeGrainBindingsProvider.AttributeGrainBindingsProvider(System.IServiceProvider serviceProvider) -> void
+~Orleans.Metadata.AttributeGrainBindingsProvider.Populate(System.Type grainClass, Orleans.Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) -> void
+~Orleans.Metadata.AttributeGrainPropertiesProvider.AttributeGrainPropertiesProvider(System.IServiceProvider serviceProvider) -> void
+~Orleans.Metadata.AttributeGrainPropertiesProvider.Populate(System.Type grainClass, Orleans.Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) -> void
+~Orleans.Metadata.AttributeGrainTypeProvider.AttributeGrainTypeProvider(System.IServiceProvider serviceProvider) -> void
+~Orleans.Metadata.AttributeGrainTypeProvider.TryGetGrainType(System.Type grainClass, out Orleans.Runtime.GrainType grainType) -> bool
+~Orleans.Metadata.ClusterManifest.AllGrainManifests.get -> System.Collections.Immutable.ImmutableArray<Orleans.Metadata.GrainManifest>
+~Orleans.Metadata.ClusterManifest.ClusterManifest(Orleans.Metadata.MajorMinorVersion version, System.Collections.Immutable.ImmutableDictionary<Orleans.Runtime.SiloAddress, Orleans.Metadata.GrainManifest> silos) -> void
+~Orleans.Metadata.ClusterManifest.Silos.get -> System.Collections.Immutable.ImmutableDictionary<Orleans.Runtime.SiloAddress, Orleans.Metadata.GrainManifest>
+~Orleans.Metadata.DefaultGrainTypeAttribute.DefaultGrainTypeAttribute(string grainType) -> void
+~Orleans.Metadata.GrainInterfaceProperties.GrainInterfaceProperties(System.Collections.Immutable.ImmutableDictionary<string, string> values) -> void
+~Orleans.Metadata.GrainInterfaceProperties.Properties.get -> System.Collections.Immutable.ImmutableDictionary<string, string>
+~Orleans.Metadata.GrainInterfaceProperties.ToDetailedString() -> string
+~Orleans.Metadata.GrainManifest.GrainManifest(System.Collections.Immutable.ImmutableDictionary<Orleans.Runtime.GrainType, Orleans.Metadata.GrainProperties> grains, System.Collections.Immutable.ImmutableDictionary<Orleans.Runtime.GrainInterfaceType, Orleans.Metadata.GrainInterfaceProperties> interfaces) -> void
+~Orleans.Metadata.GrainManifest.Grains.get -> System.Collections.Immutable.ImmutableDictionary<Orleans.Runtime.GrainType, Orleans.Metadata.GrainProperties>
+~Orleans.Metadata.GrainManifest.Interfaces.get -> System.Collections.Immutable.ImmutableDictionary<Orleans.Runtime.GrainInterfaceType, Orleans.Metadata.GrainInterfaceProperties>
+~Orleans.Metadata.GrainProperties.GrainProperties(System.Collections.Immutable.ImmutableDictionary<string, string> values) -> void
+~Orleans.Metadata.GrainProperties.Properties.get -> System.Collections.Immutable.ImmutableDictionary<string, string>
+~Orleans.Metadata.GrainProperties.ToDetailedString() -> string
+~Orleans.Metadata.IGrainBindingsProviderAttribute.GetBindings(System.IServiceProvider services, System.Type grainClass, Orleans.Runtime.GrainType grainType) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.Dictionary<string, string>>
+~Orleans.Metadata.IGrainInterfacePropertiesProvider.Populate(System.Type interfaceType, Orleans.Runtime.GrainInterfaceType grainInterfaceType, System.Collections.Generic.Dictionary<string, string> properties) -> void
+~Orleans.Metadata.IGrainInterfacePropertiesProviderAttribute.Populate(System.IServiceProvider services, System.Type interfaceType, System.Collections.Generic.Dictionary<string, string> properties) -> void
+~Orleans.Metadata.IGrainPropertiesProvider.Populate(System.Type grainClass, Orleans.Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) -> void
+~Orleans.Metadata.IGrainPropertiesProviderAttribute.Populate(System.IServiceProvider services, System.Type grainClass, Orleans.Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) -> void
+~Orleans.Metadata.IGrainTypeProvider.TryGetGrainType(System.Type type, out Orleans.Runtime.GrainType grainType) -> bool
+~Orleans.Metadata.IGrainTypeProviderAttribute.GetGrainType(System.IServiceProvider services, System.Type type) -> Orleans.Runtime.GrainType
+~Orleans.Placement.ImmovableAttribute.Populate(System.IServiceProvider services, System.Type grainClass, Orleans.Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) -> void
+~Orleans.Placement.PlacementAttribute.PlacementAttribute(Orleans.Runtime.PlacementStrategy placement) -> void
+~Orleans.Placement.PlacementAttribute.PlacementStrategy.get -> Orleans.Runtime.PlacementStrategy
+~Orleans.Providers.IProviderBuilder<TBuilder>.Configure(TBuilder builder, string name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection) -> void
+~Orleans.Providers.LogConsistencyProviderAttribute.ProviderName.get -> string
+~Orleans.Providers.LogConsistencyProviderAttribute.ProviderName.set -> void
+~Orleans.Providers.StorageProviderAttribute.ProviderName.get -> string
+~Orleans.Providers.StorageProviderAttribute.ProviderName.set -> void
+~Orleans.Runtime.GatewayTooBusyException.GatewayTooBusyException(string message) -> void
+~Orleans.Runtime.GatewayTooBusyException.GatewayTooBusyException(string message, System.Exception innerException) -> void
+~Orleans.Runtime.GrainExtensionNotInstalledException.GrainExtensionNotInstalledException(string message) -> void
+~Orleans.Runtime.GrainExtensionNotInstalledException.GrainExtensionNotInstalledException(string message, System.Exception innerException) -> void
+~Orleans.Runtime.GrainReference.CodecProvider.get -> Orleans.Serialization.Serializers.CodecProvider
+~Orleans.Runtime.GrainReference.CopyContextPool.get -> Orleans.Serialization.Cloning.CopyContextPool
+~Orleans.Runtime.GrainReference.Equals(Orleans.Runtime.GrainReference other) -> bool
+~Orleans.Runtime.GrainReference.GrainReference(Orleans.Runtime.GrainReferenceShared shared, Orleans.Runtime.IdSpan key) -> void
+~Orleans.Runtime.GrainReference.Invoke(Orleans.Runtime.IRequest methodDescription) -> void
+~Orleans.Runtime.GrainReference.InvokeAsync(Orleans.Runtime.IRequest methodDescription) -> System.Threading.Tasks.ValueTask
+~Orleans.Runtime.GrainReference.InvokeAsync<T>(Orleans.Runtime.IRequest methodDescription) -> System.Threading.Tasks.ValueTask<T>
+~Orleans.Runtime.GrainReferenceShared.CodecProvider.get -> Orleans.Serialization.Serializers.CodecProvider
+~Orleans.Runtime.GrainReferenceShared.CopyContextPool.get -> Orleans.Serialization.Cloning.CopyContextPool
+~Orleans.Runtime.GrainReferenceShared.GrainReferenceShared(Orleans.Runtime.GrainType grainType, Orleans.Runtime.GrainInterfaceType grainInterfaceType, ushort interfaceVersion, Orleans.Runtime.IGrainReferenceRuntime runtime, Orleans.CodeGeneration.InvokeMethodOptions invokeMethodOptions, Orleans.Serialization.Serializers.CodecProvider codecProvider, Orleans.Serialization.Cloning.CopyContextPool copyContextPool, System.IServiceProvider serviceProvider) -> void
+~Orleans.Runtime.GrainReferenceShared.Runtime.get -> Orleans.Runtime.IGrainReferenceRuntime
+~Orleans.Runtime.GrainReferenceShared.ServiceProvider.get -> System.IServiceProvider
+~Orleans.Runtime.IGrainReferenceRuntime.Cast(Orleans.Runtime.IAddressable grain, System.Type interfaceType) -> object
+~Orleans.Runtime.IGrainReferenceRuntime.InvokeMethod(Orleans.Runtime.GrainReference reference, Orleans.Serialization.Invocation.IInvokable request, Orleans.CodeGeneration.InvokeMethodOptions options) -> void
+~Orleans.Runtime.IGrainReferenceRuntime.InvokeMethodAsync(Orleans.Runtime.GrainReference reference, Orleans.Serialization.Invocation.IInvokable request, Orleans.CodeGeneration.InvokeMethodOptions options) -> System.Threading.Tasks.ValueTask
+~Orleans.Runtime.IGrainReferenceRuntime.InvokeMethodAsync<T>(Orleans.Runtime.GrainReference reference, Orleans.Serialization.Invocation.IInvokable request, Orleans.CodeGeneration.InvokeMethodOptions options) -> System.Threading.Tasks.ValueTask<T>
+~Orleans.Runtime.IRequest.ToMethodCallString(Orleans.Runtime.IRequest request) -> string
+~Orleans.Runtime.IRequest.ToString(Orleans.Runtime.IRequest request) -> string
+~Orleans.Runtime.LegacyGrainId.CompareTo(Orleans.Runtime.LegacyGrainId other) -> int
+~Orleans.Runtime.LegacyGrainId.Equals(Orleans.Runtime.LegacyGrainId other) -> bool
+~Orleans.Runtime.LegacyGrainId.GetPrimaryKey(out string keyExt) -> System.Guid
+~Orleans.Runtime.LegacyGrainId.GetPrimaryKeyLong(out string keyExt) -> long
+~Orleans.Runtime.LegacyGrainId.IdentityString.get -> string
+~Orleans.Runtime.LegacyGrainId.PrimaryKeyString.get -> string
+~Orleans.Runtime.LimitExceededException.LimitExceededException(string limitName, int current, int threshold, object extraInfo) -> void
+~Orleans.Runtime.LimitExceededException.LimitExceededException(string message) -> void
+~Orleans.Runtime.LimitExceededException.LimitExceededException(string message, System.Exception innerException) -> void
+~Orleans.Runtime.OrleansConfigurationException.OrleansConfigurationException(string message) -> void
+~Orleans.Runtime.OrleansConfigurationException.OrleansConfigurationException(string message, System.Exception innerException) -> void
+~Orleans.Runtime.OrleansException.OrleansException(string message) -> void
+~Orleans.Runtime.OrleansException.OrleansException(string message, System.Exception innerException) -> void
+~Orleans.Runtime.OrleansException.OrleansException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~Orleans.Runtime.OrleansMessageRejectionException.OrleansMessageRejectionException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~Orleans.Runtime.SiloUnavailableException.SiloUnavailableException(string message, System.Exception innerException) -> void
+~Orleans.Runtime.SiloUnavailableException.SiloUnavailableException(string msg) -> void
+~Orleans.Runtime.UniqueKey.CompareTo(Orleans.Runtime.UniqueKey other) -> int
+~Orleans.Runtime.UniqueKey.Equals(Orleans.Runtime.UniqueKey other) -> bool
+~Orleans.Runtime.UniqueKey.KeyExt.get -> string
+~Orleans.Runtime.UniqueKey.PrimaryKeyToGuid(out string extendedKey) -> System.Guid
+~Orleans.Runtime.UniqueKey.PrimaryKeyToLong(out string extendedKey) -> long
+~Orleans.Runtime.WrappedException.OriginalExceptionType.get -> string
+~Orleans.Runtime.WrappedException.OriginalExceptionType.set -> void
+~Orleans.Runtime.WrappedException.WrappedException(string message) -> void
+~Orleans.Runtime.WrappedException.WrappedException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~Orleans.Serialization.IOnDeserialized.OnDeserialized(Orleans.Serialization.DeserializationContext context) -> void
+~Orleans.Services.IGrainServiceClient<TGrainService>
+~Orleans.Versions.IVersionStore.GetCompatibilityStrategies() -> System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<Orleans.Runtime.GrainInterfaceType, Orleans.Versions.Compatibility.CompatibilityStrategy>>
+~Orleans.Versions.IVersionStore.GetCompatibilityStrategy() -> System.Threading.Tasks.Task<Orleans.Versions.Compatibility.CompatibilityStrategy>
+~Orleans.Versions.IVersionStore.GetSelectorStrategies() -> System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<Orleans.Runtime.GrainInterfaceType, Orleans.Versions.Selector.VersionSelectorStrategy>>
+~Orleans.Versions.IVersionStore.GetSelectorStrategy() -> System.Threading.Tasks.Task<Orleans.Versions.Selector.VersionSelectorStrategy>
+~Orleans.Versions.Selector.IVersionSelector.GetSuitableVersion(ushort requestedVersion, ushort[] availableVersions, Orleans.Versions.Compatibility.ICompatibilityDirector compatibilityDirector) -> ushort[]
+~override Orleans.Concurrency.StatelessWorkerAttribute.Populate(System.IServiceProvider services, System.Type grainClass, Orleans.Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) -> void
+~override Orleans.DeactivationReason.ToString() -> string
+~override Orleans.Metadata.MajorMinorVersion.Equals(object obj) -> bool
+~override Orleans.Metadata.MajorMinorVersion.ToString() -> string
+~override Orleans.Runtime.GrainReference.Equals(object obj) -> bool
+~override Orleans.Runtime.LegacyGrainId.Equals(object obj) -> bool
+~override Orleans.Runtime.LegacyGrainId.ToString() -> string
+~override Orleans.Runtime.MembershipVersion.Equals(object obj) -> bool
+~override Orleans.Runtime.MembershipVersion.ToString() -> string
+~override Orleans.Runtime.MembershipVersionConverter.Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) -> Orleans.Runtime.MembershipVersion
+~override Orleans.Runtime.MembershipVersionConverter.Write(System.Text.Json.Utf8JsonWriter writer, Orleans.Runtime.MembershipVersion value, System.Text.Json.JsonSerializerOptions options) -> void
+~override Orleans.Runtime.RequestBase.ToString() -> string
+~override Orleans.Runtime.UniqueKey.Equals(object o) -> bool
+~override Orleans.Runtime.UniqueKey.ToString() -> string
+~override Orleans.Runtime.WrappedException.GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~override Orleans.Runtime.WrappedException.ToString() -> string
+~override sealed Orleans.Runtime.GrainReference.ToString() -> string
+~override sealed Orleans.Runtime.Request.Invoke() -> System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response>
+~override sealed Orleans.Runtime.Request<TResult>.Invoke() -> System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response>
+~override sealed Orleans.Runtime.TaskRequest.Invoke() -> System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response>
+~override sealed Orleans.Runtime.TaskRequest<TResult>.Invoke() -> System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response>
+~override sealed Orleans.Runtime.VoidRequest.Invoke() -> System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response>
+~static Orleans.GrainBaseExtensions.DeactivateOnIdle(this Orleans.IGrainBase grain) -> void
+~static Orleans.GrainBaseExtensions.MigrateOnIdle(this Orleans.IGrainBase grain) -> void
+~static Orleans.GrainBaseExtensions.RegisterGrainTimer(this Orleans.IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, Orleans.Runtime.GrainTimerCreationOptions options) -> Orleans.Runtime.IGrainTimer
+~static Orleans.GrainBaseExtensions.RegisterGrainTimer(this Orleans.IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, System.TimeSpan dueTime, System.TimeSpan period) -> Orleans.Runtime.IGrainTimer
+~static Orleans.GrainBaseExtensions.RegisterGrainTimer(this Orleans.IGrainBase grain, System.Func<System.Threading.Tasks.Task> callback, Orleans.Runtime.GrainTimerCreationOptions options) -> Orleans.Runtime.IGrainTimer
+~static Orleans.GrainBaseExtensions.RegisterGrainTimer(this Orleans.IGrainBase grain, System.Func<System.Threading.Tasks.Task> callback, System.TimeSpan dueTime, System.TimeSpan period) -> Orleans.Runtime.IGrainTimer
+~static Orleans.GrainBaseExtensions.RegisterGrainTimer<TState>(this Orleans.IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, TState state, Orleans.Runtime.GrainTimerCreationOptions options) -> Orleans.Runtime.IGrainTimer
+~static Orleans.GrainBaseExtensions.RegisterGrainTimer<TState>(this Orleans.IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, TState state, System.TimeSpan dueTime, System.TimeSpan period) -> Orleans.Runtime.IGrainTimer
+~static Orleans.GrainBaseExtensions.RegisterGrainTimer<TState>(this Orleans.IGrainBase grain, System.Func<TState, System.Threading.Tasks.Task> callback, TState state, Orleans.Runtime.GrainTimerCreationOptions options) -> Orleans.Runtime.IGrainTimer
+~static Orleans.GrainBaseExtensions.RegisterGrainTimer<TState>(this Orleans.IGrainBase grain, System.Func<TState, System.Threading.Tasks.Task> callback, TState state, System.TimeSpan dueTime, System.TimeSpan period) -> Orleans.Runtime.IGrainTimer
+~static Orleans.GrainContextComponentExtensions.GetGrainExtension<TComponent>(this Orleans.Runtime.IGrainContext context) -> TComponent
+~static Orleans.GrainExtensions.AsReference(this Orleans.Runtime.IAddressable grain, System.Type interfaceType) -> object
+~static Orleans.GrainExtensions.AsReference<TGrainInterface>(this Orleans.Runtime.IAddressable grain) -> TGrainInterface
+~static Orleans.GrainExtensions.Cast(this Orleans.Runtime.IAddressable grain, System.Type interfaceType) -> object
+~static Orleans.GrainExtensions.Cast<TGrainInterface>(this Orleans.Runtime.IAddressable grain) -> TGrainInterface
+~static Orleans.GrainExtensions.GetGrainId(this Orleans.Runtime.IAddressable grain) -> Orleans.Runtime.GrainId
+~static Orleans.GrainExtensions.GetPrimaryKey(this Orleans.Runtime.IAddressable grain) -> System.Guid
+~static Orleans.GrainExtensions.GetPrimaryKey(this Orleans.Runtime.IAddressable grain, out string keyExt) -> System.Guid
+~static Orleans.GrainExtensions.GetPrimaryKeyLong(this Orleans.Runtime.IAddressable grain) -> long
+~static Orleans.GrainExtensions.GetPrimaryKeyLong(this Orleans.Runtime.IAddressable grain, out string keyExt) -> long
+~static Orleans.GrainExtensions.GetPrimaryKeyString(this Orleans.Runtime.IAddressable grain) -> string
+~static Orleans.GrainExtensions.IsPrimaryKeyBasedOnLong(this Orleans.Runtime.IAddressable grain) -> bool
+~static Orleans.LifecycleExtensions.Subscribe(this Orleans.ILifecycleObservable observable, int stage, Orleans.ILifecycleObserver observer) -> System.IDisposable
+~static Orleans.LifecycleExtensions.Subscribe(this Orleans.ILifecycleObservable observable, string observerName, int stage, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> onStart) -> System.IDisposable
+~static Orleans.LifecycleExtensions.Subscribe(this Orleans.ILifecycleObservable observable, string observerName, int stage, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> onStart, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> onStop) -> System.IDisposable
+~static Orleans.LifecycleExtensions.Subscribe<TObserver>(this Orleans.ILifecycleObservable observable, int stage, Orleans.ILifecycleObserver observer) -> System.IDisposable
+~static Orleans.LifecycleExtensions.Subscribe<TObserver>(this Orleans.ILifecycleObservable observable, int stage, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> onStart) -> System.IDisposable
+~static Orleans.LifecycleExtensions.Subscribe<TObserver>(this Orleans.ILifecycleObservable observable, int stage, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> onStart, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> onStop) -> System.IDisposable
+~static Orleans.Metadata.MajorMinorVersion.Parse(string value) -> Orleans.Metadata.MajorMinorVersion
+~static Orleans.PublicOrleansTaskExtensions.Ignore(this System.Threading.Tasks.Task task) -> void
+~static Orleans.Runtime.GrainReference.operator !=(Orleans.Runtime.GrainReference reference1, Orleans.Runtime.GrainReference reference2) -> bool
+~static Orleans.Runtime.GrainReference.operator ==(Orleans.Runtime.GrainReference reference1, Orleans.Runtime.GrainReference reference2) -> bool
+~static Orleans.Runtime.LegacyGrainId.FromGrainId(Orleans.Runtime.GrainId id) -> Orleans.Runtime.LegacyGrainId
+~static Orleans.Runtime.LegacyGrainId.implicit operator Orleans.Runtime.GrainId(Orleans.Runtime.LegacyGrainId legacy) -> Orleans.Runtime.GrainId
+~static Orleans.Runtime.LegacyGrainId.IsLegacyGrainType(System.Type type) -> bool
+~static Orleans.Runtime.LegacyGrainId.IsLegacyKeyExtGrainType(System.Type type) -> bool
+~static Orleans.Runtime.LegacyGrainId.NewClientId() -> Orleans.Runtime.LegacyGrainId
+~static Orleans.Runtime.LegacyGrainId.NewId() -> Orleans.Runtime.LegacyGrainId
+~static Orleans.Runtime.LegacyGrainId.TryConvertFromGrainId(Orleans.Runtime.GrainId id, out Orleans.Runtime.LegacyGrainId legacyId) -> bool
+~static Orleans.Runtime.LogFormatter.ParseDate(string dateStr) -> System.DateTime
+~static Orleans.Runtime.LogFormatter.PrintDate(System.DateTime date) -> string
+~static Orleans.Runtime.LogFormatter.PrintException(System.Exception exception) -> string
+~static Orleans.Runtime.LogFormatter.PrintTime(System.DateTime date) -> string
+~static Orleans.Runtime.LogFormatter.SetExceptionDecoder(System.Type exceptionType, System.Func<System.Exception, string> decoder) -> void
+~static Orleans.Runtime.RequestContext.Entries.get -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string, object>>
+~static Orleans.Runtime.RequestContext.Get(string key) -> object
+~static Orleans.Runtime.RequestContext.Keys.get -> System.Collections.Generic.IEnumerable<string>
+~static Orleans.Runtime.RequestContext.Remove(string key) -> bool
+~static Orleans.Runtime.RequestContext.Set(string key, object value) -> void
+~static Orleans.Runtime.SystemTargetPlacementStrategy.Instance.get -> Orleans.Runtime.SystemTargetPlacementStrategy
+~static Orleans.Runtime.UniqueKey.NewGrainServiceKey(short key, long typeData) -> Orleans.Runtime.UniqueKey
+~static Orleans.Runtime.UniqueKey.NewGrainServiceKey(string key, long typeData) -> Orleans.Runtime.UniqueKey
+~static Orleans.Runtime.UniqueKey.NewKey() -> Orleans.Runtime.UniqueKey
+~static Orleans.Runtime.UniqueKey.NewSystemTargetKey(short systemId) -> Orleans.Runtime.UniqueKey
+~static Orleans.Runtime.UniqueKey.NewSystemTargetKey(System.Guid guid, long typeData) -> Orleans.Runtime.UniqueKey
+~static Orleans.Runtime.WrappedException.CreateAndRethrow(System.Exception exception) -> void
+~static Orleans.Versions.Compatibility.AllVersionsCompatible.Singleton.get -> Orleans.Versions.Compatibility.AllVersionsCompatible
+~static Orleans.Versions.Compatibility.BackwardCompatible.Singleton.get -> Orleans.Versions.Compatibility.BackwardCompatible
+~static Orleans.Versions.Compatibility.StrictVersionCompatible.Singleton.get -> Orleans.Versions.Compatibility.StrictVersionCompatible
+~static Orleans.Versions.Selector.AllCompatibleVersions.Singleton.get -> Orleans.Versions.Selector.AllCompatibleVersions
+~static Orleans.Versions.Selector.LatestVersion.Singleton.get -> Orleans.Versions.Selector.LatestVersion
+~static Orleans.Versions.Selector.MinimumVersion.Singleton.get -> Orleans.Versions.Selector.MinimumVersion
+~virtual Orleans.Placement.PlacementAttribute.Populate(System.IServiceProvider services, System.Type grainClass, Orleans.Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) -> void
+~virtual Orleans.Runtime.GrainReference.Cast<TGrainInterface>() -> TGrainInterface
+~virtual Orleans.Runtime.GrainReference.InterfaceName.get -> string
+~virtual Orleans.Runtime.PlacementStrategy.Initialize(Orleans.Metadata.GrainProperties properties) -> void
+~virtual Orleans.Runtime.PlacementStrategy.PopulateGrainProperties(System.IServiceProvider services, System.Type grainClass, Orleans.Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) -> void
+~virtual Orleans.Runtime.RequestBase.GetArgument(int index) -> object
+~virtual Orleans.Runtime.RequestBase.SetArgument(int index, object value) -> void

@@ -1,0 +1,17 @@
+#nullable enable
+Orleans.Serialization.MessagePackCodec
+Orleans.Serialization.MessagePackCodecOptions
+Orleans.Serialization.MessagePackCodecOptions.AllowDataContractAttributes.get -> bool
+Orleans.Serialization.MessagePackCodecOptions.AllowDataContractAttributes.set -> void
+Orleans.Serialization.MessagePackCodecOptions.MessagePackCodecOptions() -> void
+Orleans.Serialization.SerializationHostingExtensions
+~const Orleans.Serialization.MessagePackCodec.WellKnownAlias = "msgpack" -> string
+~Orleans.Serialization.MessagePackCodec.MessagePackCodec(System.Collections.Generic.IEnumerable<Orleans.Serialization.Serializers.ICodecSelector> serializableTypeSelectors, System.Collections.Generic.IEnumerable<Orleans.Serialization.Serializers.ICopierSelector> copyableTypeSelectors, Microsoft.Extensions.Options.IOptions<Orleans.Serialization.MessagePackCodecOptions> options) -> void
+~Orleans.Serialization.MessagePackCodecOptions.IsCopyableType.get -> System.Func<System.Type, bool?>
+~Orleans.Serialization.MessagePackCodecOptions.IsCopyableType.set -> void
+~Orleans.Serialization.MessagePackCodecOptions.IsSerializableType.get -> System.Func<System.Type, bool?>
+~Orleans.Serialization.MessagePackCodecOptions.IsSerializableType.set -> void
+~Orleans.Serialization.MessagePackCodecOptions.SerializerOptions.get -> MessagePack.MessagePackSerializerOptions
+~Orleans.Serialization.MessagePackCodecOptions.SerializerOptions.set -> void
+~static Orleans.Serialization.SerializationHostingExtensions.AddMessagePackSerializer(this Orleans.Serialization.ISerializerBuilder serializerBuilder, System.Func<System.Type, bool> isSerializable = null, System.Func<System.Type, bool> isCopyable = null, MessagePack.MessagePackSerializerOptions messagePackSerializerOptions = null) -> Orleans.Serialization.ISerializerBuilder
+~static Orleans.Serialization.SerializationHostingExtensions.AddMessagePackSerializer(this Orleans.Serialization.ISerializerBuilder serializerBuilder, System.Func<System.Type, bool> isSerializable, System.Func<System.Type, bool> isCopyable, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Serialization.MessagePackCodecOptions>> configureOptions = null) -> Orleans.Serialization.ISerializerBuilder

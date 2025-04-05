@@ -1,0 +1,175 @@
+#nullable enable
+Orleans.AzureUtils.AzureQueueDataManager
+Orleans.Configuration.AzureBlobLeaseProviderOptions
+Orleans.Configuration.AzureBlobLeaseProviderOptions.AzureBlobLeaseProviderOptions() -> void
+Orleans.Configuration.AzureBlobLeaseProviderOptionsValidator
+Orleans.Configuration.AzureBlobLeaseProviderOptionsValidator.ValidateConfiguration() -> void
+Orleans.Configuration.AzureQueueOptions
+Orleans.Configuration.AzureQueueOptions.AzureQueueOptions() -> void
+Orleans.Configuration.AzureQueueOptions.MessageVisibilityTimeout.get -> System.TimeSpan?
+Orleans.Configuration.AzureQueueOptions.MessageVisibilityTimeout.set -> void
+Orleans.Configuration.AzureQueueOptionsValidator
+Orleans.Configuration.AzureQueueOptionsValidator.ValidateConfiguration() -> void
+Orleans.Hosting.AzureQueueStreamConfiguratorExtensions
+Orleans.Hosting.AzureQueueStreamProviderBuilder
+Orleans.Hosting.AzureQueueStreamProviderBuilder.AzureQueueStreamProviderBuilder() -> void
+Orleans.Hosting.ClientBuilderExtensions
+Orleans.Hosting.ClusterClientAzureQueueStreamConfigurator
+Orleans.Hosting.IAzureQueueStreamConfigurator
+Orleans.Hosting.IClusterClientAzureQueueStreamConfigurator
+Orleans.Hosting.ISiloAzureQueueStreamConfigurator
+Orleans.Hosting.SiloAzureQueueStreamConfigurator
+Orleans.Hosting.SiloAzureQueueStreamConfiguratorExtensions
+Orleans.Hosting.SiloBuilderExtensions
+Orleans.LeaseProviders.AzureBlobLeaseProvider
+Orleans.Providers.Streams.AzureQueue.AzureQueueAdapterFactory
+Orleans.Providers.Streams.AzureQueue.AzureQueueDataAdapterV1
+Orleans.Providers.Streams.AzureQueue.AzureQueueDataAdapterV2
+Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProviderUtils
+Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProviderUtils.AzureQueueStreamProviderUtils() -> void
+Orleans.Providers.Streams.PersistentStreams.AzureTableStorageStreamFailureHandler<TEntity>.ShouldFaultSubsriptionOnError.get -> bool
+Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity
+Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.ETag.get -> Azure.ETag
+Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.ETag.set -> void
+Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.StreamDeliveryFailureEntity() -> void
+Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.SubscriptionId.get -> System.Guid
+Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.SubscriptionId.set -> void
+Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.Timestamp.get -> System.DateTimeOffset?
+Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.Timestamp.set -> void
+Orleans.Streaming.AzureStorage.AzureStorageOperationOptions
+Orleans.Streaming.AzureStorage.AzureStorageOperationOptions.AzureStorageOperationOptions() -> void
+Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions
+Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions.AzureStoragePolicyOptions() -> void
+Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions.CreationTimeout.get -> System.TimeSpan
+Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions.CreationTimeout.set -> void
+Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions.MaxBulkUpdateRows.get -> int
+Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions.MaxBulkUpdateRows.set -> void
+Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions.MaxCreationRetries.get -> int
+Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions.MaxCreationRetries.set -> void
+Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions.MaxOperationRetries.get -> int
+Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions.MaxOperationRetries.set -> void
+Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions.OperationTimeout.get -> System.TimeSpan
+Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions.OperationTimeout.set -> void
+Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions.PauseBetweenCreationRetries.get -> System.TimeSpan
+Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions.PauseBetweenCreationRetries.set -> void
+Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions.PauseBetweenOperationRetries.get -> System.TimeSpan
+Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions.PauseBetweenOperationRetries.set -> void
+static Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.ReverseOrderTimestampTicks() -> long
+virtual Orleans.Providers.Streams.AzureQueue.AzureQueueAdapterFactory.Init() -> void
+virtual Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.SetRowkey() -> void
+virtual Orleans.Streaming.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.ValidateConfiguration() -> void
+~const Orleans.Configuration.AzureBlobLeaseProviderOptions.DefaultBlobContainerName = "Leases" -> string
+~Orleans.AzureUtils.AzureQueueDataManager.AddQueueMessage(string message) -> System.Threading.Tasks.Task
+~Orleans.AzureUtils.AzureQueueDataManager.AzureQueueDataManager(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, string queueName, Orleans.Configuration.AzureQueueOptions options) -> void
+~Orleans.AzureUtils.AzureQueueDataManager.AzureQueueDataManager(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, string queueName, string storageConnectionString, System.TimeSpan? visibilityTimeout = null) -> void
+~Orleans.AzureUtils.AzureQueueDataManager.ClearQueue() -> System.Threading.Tasks.Task
+~Orleans.AzureUtils.AzureQueueDataManager.DeleteQueue() -> System.Threading.Tasks.Task
+~Orleans.AzureUtils.AzureQueueDataManager.DeleteQueueMessage(Azure.Storage.Queues.Models.QueueMessage message) -> System.Threading.Tasks.Task
+~Orleans.AzureUtils.AzureQueueDataManager.GetApproximateMessageCount() -> System.Threading.Tasks.Task<int>
+~Orleans.AzureUtils.AzureQueueDataManager.GetQueueMessage() -> System.Threading.Tasks.Task<Azure.Storage.Queues.Models.QueueMessage>
+~Orleans.AzureUtils.AzureQueueDataManager.GetQueueMessages(int? count = null) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Storage.Queues.Models.QueueMessage>>
+~Orleans.AzureUtils.AzureQueueDataManager.InitQueueAsync() -> System.Threading.Tasks.Task
+~Orleans.AzureUtils.AzureQueueDataManager.PeekQueueMessage() -> System.Threading.Tasks.Task<Azure.Storage.Queues.Models.PeekedMessage>
+~Orleans.AzureUtils.AzureQueueDataManager.QueueName.get -> string
+~Orleans.Configuration.AzureBlobLeaseProviderOptions.BlobContainerName.get -> string
+~Orleans.Configuration.AzureBlobLeaseProviderOptions.BlobContainerName.set -> void
+~Orleans.Configuration.AzureBlobLeaseProviderOptions.BlobServiceClient.get -> Azure.Storage.Blobs.BlobServiceClient
+~Orleans.Configuration.AzureBlobLeaseProviderOptions.BlobServiceClient.set -> void
+~Orleans.Configuration.AzureBlobLeaseProviderOptions.ClientOptions.get -> Azure.Storage.Blobs.BlobClientOptions
+~Orleans.Configuration.AzureBlobLeaseProviderOptions.ClientOptions.set -> void
+~Orleans.Configuration.AzureBlobLeaseProviderOptions.ConfigureBlobServiceClient(string connectionString) -> void
+~Orleans.Configuration.AzureBlobLeaseProviderOptions.ConfigureBlobServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Storage.Blobs.BlobServiceClient>> createClientCallback) -> void
+~Orleans.Configuration.AzureBlobLeaseProviderOptions.ConfigureBlobServiceClient(System.Uri serviceUri) -> void
+~Orleans.Configuration.AzureBlobLeaseProviderOptions.ConfigureBlobServiceClient(System.Uri serviceUri, Azure.AzureSasCredential azureSasCredential) -> void
+~Orleans.Configuration.AzureBlobLeaseProviderOptions.ConfigureBlobServiceClient(System.Uri serviceUri, Azure.Core.TokenCredential tokenCredential) -> void
+~Orleans.Configuration.AzureBlobLeaseProviderOptions.ConfigureBlobServiceClient(System.Uri serviceUri, Azure.Storage.StorageSharedKeyCredential sharedKeyCredential) -> void
+~Orleans.Configuration.AzureBlobLeaseProviderOptionsValidator.AzureBlobLeaseProviderOptionsValidator(Microsoft.Extensions.Options.IOptions<Orleans.Configuration.AzureBlobLeaseProviderOptions> options) -> void
+~Orleans.Configuration.AzureQueueOptions.ClientOptions.get -> Azure.Storage.Queues.QueueClientOptions
+~Orleans.Configuration.AzureQueueOptions.ClientOptions.set -> void
+~Orleans.Configuration.AzureQueueOptions.ConfigureQueueServiceClient(string connectionString) -> void
+~Orleans.Configuration.AzureQueueOptions.ConfigureQueueServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Storage.Queues.QueueServiceClient>> createClientCallback) -> void
+~Orleans.Configuration.AzureQueueOptions.ConfigureQueueServiceClient(System.Uri serviceUri) -> void
+~Orleans.Configuration.AzureQueueOptions.ConfigureQueueServiceClient(System.Uri serviceUri, Azure.AzureSasCredential azureSasCredential) -> void
+~Orleans.Configuration.AzureQueueOptions.ConfigureQueueServiceClient(System.Uri serviceUri, Azure.Core.TokenCredential tokenCredential) -> void
+~Orleans.Configuration.AzureQueueOptions.ConfigureQueueServiceClient(System.Uri serviceUri, Azure.Storage.StorageSharedKeyCredential sharedKeyCredential) -> void
+~Orleans.Configuration.AzureQueueOptions.QueueNames.get -> System.Collections.Generic.List<string>
+~Orleans.Configuration.AzureQueueOptions.QueueNames.set -> void
+~Orleans.Configuration.AzureQueueOptions.QueueServiceClient.get -> Azure.Storage.Queues.QueueServiceClient
+~Orleans.Configuration.AzureQueueOptions.QueueServiceClient.set -> void
+~Orleans.Hosting.AzureQueueStreamProviderBuilder.Configure(Orleans.Hosting.IClientBuilder builder, string name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection) -> void
+~Orleans.Hosting.AzureQueueStreamProviderBuilder.Configure(Orleans.Hosting.ISiloBuilder builder, string name, Microsoft.Extensions.Configuration.IConfigurationSection configurationSection) -> void
+~Orleans.Hosting.ClusterClientAzureQueueStreamConfigurator.ClusterClientAzureQueueStreamConfigurator(string name, Orleans.Hosting.IClientBuilder builder) -> void
+~Orleans.Hosting.SiloAzureQueueStreamConfigurator.SiloAzureQueueStreamConfigurator(string name, System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>> configureServicesDelegate) -> void
+~Orleans.LeaseProviders.AzureBlobLeaseProvider.Acquire(string category, Orleans.LeaseProviders.LeaseRequest[] leaseRequests) -> System.Threading.Tasks.Task<Orleans.LeaseProviders.AcquireLeaseResult[]>
+~Orleans.LeaseProviders.AzureBlobLeaseProvider.AzureBlobLeaseProvider(Microsoft.Extensions.Options.IOptions<Orleans.Configuration.AzureBlobLeaseProviderOptions> options) -> void
+~Orleans.LeaseProviders.AzureBlobLeaseProvider.Release(string category, Orleans.LeaseProviders.AcquiredLease[] acquiredLeases) -> System.Threading.Tasks.Task
+~Orleans.LeaseProviders.AzureBlobLeaseProvider.Renew(string category, Orleans.LeaseProviders.AcquiredLease[] acquiredLeases) -> System.Threading.Tasks.Task<Orleans.LeaseProviders.AcquireLeaseResult[]>
+~Orleans.Providers.Streams.AzureQueue.AzureQueueAdapterFactory.AzureQueueAdapterFactory(string name, Orleans.Configuration.AzureQueueOptions options, Orleans.Configuration.SimpleQueueCacheOptions cacheOptions, Orleans.Streams.IQueueDataAdapter<string, Orleans.Streams.IBatchContainer> dataAdapter, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) -> void
+~Orleans.Providers.Streams.AzureQueue.AzureQueueAdapterFactory.GetDeliveryFailureHandler(Orleans.Streams.QueueId queueId) -> System.Threading.Tasks.Task<Orleans.Streams.IStreamFailureHandler>
+~Orleans.Providers.Streams.AzureQueue.AzureQueueAdapterFactory.GetStreamQueueMapper() -> Orleans.Streams.IStreamQueueMapper
+~Orleans.Providers.Streams.AzureQueue.AzureQueueAdapterFactory.StreamFailureHandlerFactory.set -> void
+~Orleans.Providers.Streams.AzureQueue.AzureQueueDataAdapterV1.AzureQueueDataAdapterV1(Orleans.Serialization.Serializer serializer) -> void
+~Orleans.Providers.Streams.AzureQueue.AzureQueueDataAdapterV1.FromQueueMessage(string cloudMsg, long sequenceId) -> Orleans.Streams.IBatchContainer
+~Orleans.Providers.Streams.AzureQueue.AzureQueueDataAdapterV1.ToQueueMessage<T>(Orleans.Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken token, System.Collections.Generic.Dictionary<string, object> requestContext) -> string
+~Orleans.Providers.Streams.AzureQueue.AzureQueueDataAdapterV2.AzureQueueDataAdapterV2(Orleans.Serialization.Serializer serializer) -> void
+~Orleans.Providers.Streams.AzureQueue.AzureQueueDataAdapterV2.FromQueueMessage(string cloudMsg, long sequenceId) -> Orleans.Streams.IBatchContainer
+~Orleans.Providers.Streams.AzureQueue.AzureQueueDataAdapterV2.ToQueueMessage<T>(Orleans.Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken token, System.Collections.Generic.Dictionary<string, object> requestContext) -> string
+~Orleans.Providers.Streams.PersistentStreams.AzureTableStorageStreamFailureHandler<TEntity>
+~Orleans.Providers.Streams.PersistentStreams.AzureTableStorageStreamFailureHandler<TEntity>.AzureTableStorageStreamFailureHandler(Orleans.Serialization.Serializer<Orleans.Streams.StreamSequenceToken> serializer, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, bool faultOnFailure, string clusterId, Orleans.Streaming.AzureStorage.AzureStorageOperationOptions azureStorageOptions, System.Func<TEntity> createEntity = null) -> void
+~Orleans.Providers.Streams.PersistentStreams.AzureTableStorageStreamFailureHandler<TEntity>.InitAsync() -> System.Threading.Tasks.Task
+~Orleans.Providers.Streams.PersistentStreams.AzureTableStorageStreamFailureHandler<TEntity>.OnDeliveryFailure(Orleans.Runtime.GuidId subscriptionId, string streamProviderName, Orleans.Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken sequenceToken) -> System.Threading.Tasks.Task
+~Orleans.Providers.Streams.PersistentStreams.AzureTableStorageStreamFailureHandler<TEntity>.OnSubscriptionFailure(Orleans.Runtime.GuidId subscriptionId, string streamProviderName, Orleans.Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken sequenceToken) -> System.Threading.Tasks.Task
+~Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.PartitionKey.get -> string
+~Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.PartitionKey.set -> void
+~Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.RowKey.get -> string
+~Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.RowKey.set -> void
+~Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.SequenceToken.get -> byte[]
+~Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.SequenceToken.set -> void
+~Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.StreamGuid.get -> string
+~Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.StreamGuid.set -> void
+~Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.StreamNamespace.get -> string
+~Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.StreamNamespace.set -> void
+~Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.StreamProviderName.get -> string
+~Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.StreamProviderName.set -> void
+~Orleans.Streaming.AzureStorage.AzureStorageOperationOptions.ClientOptions.get -> Azure.Data.Tables.TableClientOptions
+~Orleans.Streaming.AzureStorage.AzureStorageOperationOptions.ClientOptions.set -> void
+~Orleans.Streaming.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(string connectionString) -> void
+~Orleans.Streaming.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>> createClientCallback) -> void
+~Orleans.Streaming.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri) -> void
+~Orleans.Streaming.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.AzureSasCredential azureSasCredential) -> void
+~Orleans.Streaming.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.Core.TokenCredential tokenCredential) -> void
+~Orleans.Streaming.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.Data.Tables.TableSharedKeyCredential sharedKeyCredential) -> void
+~Orleans.Streaming.AzureStorage.AzureStorageOperationOptions.StoragePolicyOptions.get -> Orleans.Streaming.AzureStorage.AzureStoragePolicyOptions
+~Orleans.Streaming.AzureStorage.AzureStorageOperationOptions.TableServiceClient.get -> Azure.Data.Tables.TableServiceClient
+~Orleans.Streaming.AzureStorage.AzureStorageOperationOptions.TableServiceClient.set -> void
+~Orleans.Streaming.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>
+~Orleans.Streaming.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.AzureStorageOperationOptionsValidator(TOptions options, string name = null) -> void
+~Orleans.Streaming.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.Name.get -> string
+~Orleans.Streaming.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.Options.get -> TOptions
+~static Orleans.Configuration.AzureBlobLeaseProviderOptionsValidator.Create(System.IServiceProvider services, string name) -> Orleans.IConfigurationValidator
+~static Orleans.Configuration.AzureQueueOptionsValidator.Create(System.IServiceProvider services, string name) -> Orleans.IConfigurationValidator
+~static Orleans.Hosting.AzureQueueStreamConfiguratorExtensions.ConfigureAzureQueue(this Orleans.Hosting.IAzureQueueStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureQueueOptions>> configureOptions) -> void
+~static Orleans.Hosting.AzureQueueStreamConfiguratorExtensions.ConfigureQueueDataAdapter(this Orleans.Hosting.IAzureQueueStreamConfigurator configurator, System.Func<System.IServiceProvider, string, Orleans.Streams.IQueueDataAdapter<string, Orleans.Streams.IBatchContainer>> factory) -> void
+~static Orleans.Hosting.AzureQueueStreamConfiguratorExtensions.ConfigureQueueDataAdapter<TQueueDataAdapter>(this Orleans.Hosting.IAzureQueueStreamConfigurator configurator) -> void
+~static Orleans.Hosting.ClientBuilderExtensions.AddAzureQueueStreams(this Orleans.Hosting.IClientBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureQueueOptions>> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.AddAzureQueueStreams(this Orleans.Hosting.IClientBuilder builder, string name, System.Action<Orleans.Hosting.ClusterClientAzureQueueStreamConfigurator> configure) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.SiloAzureQueueStreamConfiguratorExtensions.ConfigureCacheSize(this Orleans.Hosting.ISiloAzureQueueStreamConfigurator configurator, int cacheSize = 4096) -> void
+~static Orleans.Hosting.SiloBuilderExtensions.AddAzureQueueStreams(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureQueueOptions>> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.SiloBuilderExtensions.AddAzureQueueStreams(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Hosting.SiloAzureQueueStreamConfigurator> configure) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.SiloBuilderExtensions.UseAzureBlobLeaseProvider(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureBlobLeaseProviderOptions>> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.SiloBuilderExtensions.UseAzureBlobLeaseProvider(this Orleans.Hosting.ISiloPersistentStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureBlobLeaseProviderOptions>> configureOptions) -> void
+~static Orleans.LeaseProviders.AzureBlobLeaseProvider.Create(System.IServiceProvider services, string name) -> Orleans.LeaseProviders.ILeaseProvider
+~static Orleans.Providers.Streams.AzureQueue.AzureQueueAdapterFactory.Create(System.IServiceProvider services, string name) -> Orleans.Providers.Streams.AzureQueue.AzureQueueAdapterFactory
+~static Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, System.Collections.Generic.List<string> azureQueueNames, Orleans.Configuration.AzureQueueOptions queueOptions) -> System.Threading.Tasks.Task
+~static Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProviderUtils.ClearAllUsedAzureQueues(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, System.Collections.Generic.List<string> azureQueueNames, string storageConnectionString) -> System.Threading.Tasks.Task
+~static Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, System.Collections.Generic.List<string> azureQueueNames, Orleans.Configuration.AzureQueueOptions queueOptions) -> System.Threading.Tasks.Task
+~static Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProviderUtils.DeleteAllUsedAzureQueues(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, System.Collections.Generic.List<string> azureQueueNames, string storageConnectionString) -> System.Threading.Tasks.Task
+~static Orleans.Providers.Streams.AzureQueue.AzureQueueStreamProviderUtils.GenerateDefaultAzureQueueNames(string serviceId, string providerName) -> System.Collections.Generic.List<string>
+~static Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.MakeDefaultPartitionKey(string streamProviderName, string deploymentId) -> string
+~virtual Orleans.Providers.Streams.AzureQueue.AzureQueueAdapterFactory.CreateAdapter() -> System.Threading.Tasks.Task<Orleans.Streams.IQueueAdapter>
+~virtual Orleans.Providers.Streams.AzureQueue.AzureQueueAdapterFactory.GetQueueAdapterCache() -> Orleans.Streams.IQueueAdapterCache
+~virtual Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.GetSequenceToken(Orleans.Serialization.Serializer<Orleans.Streams.StreamSequenceToken> serializer) -> Orleans.Streams.StreamSequenceToken
+~virtual Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.SetPartitionKey(string deploymentId) -> void
+~virtual Orleans.Providers.Streams.PersistentStreams.StreamDeliveryFailureEntity.SetSequenceToken(Orleans.Serialization.Serializer<Orleans.Streams.StreamSequenceToken> serializer, Orleans.Streams.StreamSequenceToken token) -> void
+~virtual Orleans.Streaming.AzureStorage.AzureStorageOperationOptions.TableName.get -> string
+~virtual Orleans.Streaming.AzureStorage.AzureStorageOperationOptions.TableName.set -> void

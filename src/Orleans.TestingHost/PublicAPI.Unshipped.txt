@@ -1,0 +1,341 @@
+#nullable enable
+abstract Orleans.TestingHost.SiloHandle.DisposeAsync() -> System.Threading.Tasks.ValueTask
+abstract Orleans.TestingHost.SiloHandle.IsActive.get -> bool
+Orleans.Hosting.FaultInjectionStorageServiceCollectionExtensions
+Orleans.TestingHost.ConnectionTransportType
+Orleans.TestingHost.ConnectionTransportType.InMemory = 1 -> Orleans.TestingHost.ConnectionTransportType
+Orleans.TestingHost.ConnectionTransportType.TcpSocket = 0 -> Orleans.TestingHost.ConnectionTransportType
+Orleans.TestingHost.ConnectionTransportType.UnixSocket = 2 -> Orleans.TestingHost.ConnectionTransportType
+Orleans.TestingHost.FaultInjectionGrainStorage
+Orleans.TestingHost.FaultInjectionGrainStorageFactory
+Orleans.TestingHost.FaultInjectionGrainStorageOptions
+Orleans.TestingHost.FaultInjectionGrainStorageOptions.FaultInjectionGrainStorageOptions() -> void
+Orleans.TestingHost.FaultInjectionGrainStorageOptions.Latency.get -> System.TimeSpan
+Orleans.TestingHost.FaultInjectionGrainStorageOptions.Latency.set -> void
+Orleans.TestingHost.IClientBuilderConfigurator
+Orleans.TestingHost.IHostConfigurator
+Orleans.TestingHost.InProcessSiloHandle
+Orleans.TestingHost.InProcessSiloHandle.InProcessSiloHandle() -> void
+Orleans.TestingHost.InProcessTestCluster
+Orleans.TestingHost.InProcessTestCluster.Dispose() -> void
+Orleans.TestingHost.InProcessTestCluster.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Orleans.TestingHost.InProcessTestCluster.StopAllSilos() -> void
+Orleans.TestingHost.InProcessTestClusterBuilder
+Orleans.TestingHost.InProcessTestClusterBuilder.InProcessTestClusterBuilder() -> void
+Orleans.TestingHost.InProcessTestClusterBuilder.InProcessTestClusterBuilder(short initialSilosCount) -> void
+Orleans.TestingHost.InProcessTestClusterOptions
+Orleans.TestingHost.InProcessTestClusterOptions.AssumeHomogenousSilosForTesting.get -> bool
+Orleans.TestingHost.InProcessTestClusterOptions.AssumeHomogenousSilosForTesting.set -> void
+Orleans.TestingHost.InProcessTestClusterOptions.ConfigureFileLogging.get -> bool
+Orleans.TestingHost.InProcessTestClusterOptions.ConfigureFileLogging.set -> void
+Orleans.TestingHost.InProcessTestClusterOptions.GatewayPerSilo.get -> bool
+Orleans.TestingHost.InProcessTestClusterOptions.GatewayPerSilo.set -> void
+Orleans.TestingHost.InProcessTestClusterOptions.InitializeClientOnDeploy.get -> bool
+Orleans.TestingHost.InProcessTestClusterOptions.InitializeClientOnDeploy.set -> void
+Orleans.TestingHost.InProcessTestClusterOptions.InitialSilosCount.get -> short
+Orleans.TestingHost.InProcessTestClusterOptions.InitialSilosCount.set -> void
+Orleans.TestingHost.InProcessTestClusterOptions.InProcessTestClusterOptions() -> void
+Orleans.TestingHost.InProcessTestClusterOptions.UseRealEnvironmentStatistics.get -> bool
+Orleans.TestingHost.InProcessTestClusterOptions.UseRealEnvironmentStatistics.set -> void
+Orleans.TestingHost.InProcessTestSiloSpecificOptions
+Orleans.TestingHost.InProcessTestSiloSpecificOptions.GatewayPort.get -> int
+Orleans.TestingHost.InProcessTestSiloSpecificOptions.GatewayPort.set -> void
+Orleans.TestingHost.InProcessTestSiloSpecificOptions.InProcessTestSiloSpecificOptions() -> void
+Orleans.TestingHost.InProcessTestSiloSpecificOptions.SiloPort.get -> int
+Orleans.TestingHost.InProcessTestSiloSpecificOptions.SiloPort.set -> void
+Orleans.TestingHost.ISiloConfigurator
+Orleans.TestingHost.IStorageFaultGrain
+Orleans.TestingHost.ITestClusterPortAllocator
+Orleans.TestingHost.ITestClusterPortAllocator.AllocateConsecutivePortPairs(int numPorts) -> (int, int)
+Orleans.TestingHost.Logging.FileLogger
+Orleans.TestingHost.Logging.FileLogger.IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) -> bool
+Orleans.TestingHost.Logging.FileLoggerProvider
+Orleans.TestingHost.Logging.FileLoggerProvider.Dispose() -> void
+Orleans.TestingHost.Logging.FileLoggerProviderExtensions
+Orleans.TestingHost.Logging.FileLoggingOutput
+Orleans.TestingHost.Logging.FileLoggingOutput.Dispose() -> void
+Orleans.TestingHost.RandomlyInjectedInconsistentStateException
+Orleans.TestingHost.RandomlyInjectedInconsistentStateException.RandomlyInjectedInconsistentStateException() -> void
+Orleans.TestingHost.RandomlyInjectedStorageException
+Orleans.TestingHost.RandomlyInjectedStorageException.RandomlyInjectedStorageException() -> void
+Orleans.TestingHost.SiloBuilderExtensions
+Orleans.TestingHost.SiloHandle
+Orleans.TestingHost.SiloHandle.Dispose() -> void
+Orleans.TestingHost.SiloHandle.InstanceNumber.get -> short
+Orleans.TestingHost.SiloHandle.InstanceNumber.set -> void
+Orleans.TestingHost.SiloHandle.SiloHandle() -> void
+Orleans.TestingHost.SiloHandle.~SiloHandle() -> void
+Orleans.TestingHost.StandaloneSiloHandle
+Orleans.TestingHost.StandaloneSiloHost
+Orleans.TestingHost.StorageFaultGrain
+Orleans.TestingHost.StorageFaultGrain.StorageFaultGrain() -> void
+Orleans.TestingHost.TestCluster
+Orleans.TestingHost.TestCluster.Deploy() -> void
+Orleans.TestingHost.TestCluster.Dispose() -> void
+Orleans.TestingHost.TestCluster.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Orleans.TestingHost.TestCluster.StopAllSilos() -> void
+Orleans.TestingHost.TestClusterBuilder
+Orleans.TestingHost.TestClusterBuilder.TestClusterBuilder() -> void
+Orleans.TestingHost.TestClusterBuilder.TestClusterBuilder(short initialSilosCount) -> void
+Orleans.TestingHost.TestClusterExtensions
+Orleans.TestingHost.TestClusterHostFactory
+Orleans.TestingHost.TestClusterHostFactory.TestClusterHostFactory() -> void
+Orleans.TestingHost.TestClusterOptions
+Orleans.TestingHost.TestClusterOptions.AssumeHomogenousSilosForTesting.get -> bool
+Orleans.TestingHost.TestClusterOptions.AssumeHomogenousSilosForTesting.set -> void
+Orleans.TestingHost.TestClusterOptions.BaseGatewayPort.get -> int
+Orleans.TestingHost.TestClusterOptions.BaseGatewayPort.set -> void
+Orleans.TestingHost.TestClusterOptions.BaseSiloPort.get -> int
+Orleans.TestingHost.TestClusterOptions.BaseSiloPort.set -> void
+Orleans.TestingHost.TestClusterOptions.ConfigureFileLogging.get -> bool
+Orleans.TestingHost.TestClusterOptions.ConfigureFileLogging.set -> void
+Orleans.TestingHost.TestClusterOptions.ConnectionTransport.get -> Orleans.TestingHost.ConnectionTransportType
+Orleans.TestingHost.TestClusterOptions.ConnectionTransport.set -> void
+Orleans.TestingHost.TestClusterOptions.GatewayPerSilo.get -> bool
+Orleans.TestingHost.TestClusterOptions.GatewayPerSilo.set -> void
+Orleans.TestingHost.TestClusterOptions.InitializeClientOnDeploy.get -> bool
+Orleans.TestingHost.TestClusterOptions.InitializeClientOnDeploy.set -> void
+Orleans.TestingHost.TestClusterOptions.InitialSilosCount.get -> short
+Orleans.TestingHost.TestClusterOptions.InitialSilosCount.set -> void
+Orleans.TestingHost.TestClusterOptions.TestClusterOptions() -> void
+Orleans.TestingHost.TestClusterOptions.UseRealEnvironmentStatistics.get -> bool
+Orleans.TestingHost.TestClusterOptions.UseRealEnvironmentStatistics.set -> void
+Orleans.TestingHost.TestClusterOptions.UseTestClusterMembership.get -> bool
+Orleans.TestingHost.TestClusterOptions.UseTestClusterMembership.set -> void
+Orleans.TestingHost.TestClusterPortAllocator
+Orleans.TestingHost.TestClusterPortAllocator.AllocateConsecutivePortPairs(int numPorts = 5) -> (int, int)
+Orleans.TestingHost.TestClusterPortAllocator.Dispose() -> void
+Orleans.TestingHost.TestClusterPortAllocator.TestClusterPortAllocator() -> void
+Orleans.TestingHost.TestClusterPortAllocator.~TestClusterPortAllocator() -> void
+Orleans.TestingHost.TestSiloSpecificOptions
+Orleans.TestingHost.TestSiloSpecificOptions.GatewayPort.get -> int
+Orleans.TestingHost.TestSiloSpecificOptions.GatewayPort.set -> void
+Orleans.TestingHost.TestSiloSpecificOptions.SiloPort.get -> int
+Orleans.TestingHost.TestSiloSpecificOptions.SiloPort.set -> void
+Orleans.TestingHost.TestSiloSpecificOptions.TestSiloSpecificOptions() -> void
+Orleans.TestingHost.UnixSocketTransport.UnixSocketConnectionExtensions
+Orleans.TestingHost.UnixSocketTransport.UnixSocketConnectionOptions
+Orleans.TestingHost.UnixSocketTransport.UnixSocketConnectionOptions.UnixSocketConnectionOptions() -> void
+Orleans.TestingHost.Utils.AsyncResultHandle
+Orleans.TestingHost.Utils.AsyncResultHandle.AsyncResultHandle() -> void
+Orleans.TestingHost.Utils.AsyncResultHandle.Continue.get -> bool
+Orleans.TestingHost.Utils.AsyncResultHandle.Continue.set -> void
+Orleans.TestingHost.Utils.AsyncResultHandle.Done.get -> bool
+Orleans.TestingHost.Utils.AsyncResultHandle.Done.set -> void
+Orleans.TestingHost.Utils.StorageEmulator
+Orleans.TestingHost.Utils.TestingUtils
+override Orleans.TestingHost.InProcessSiloHandle.Dispose(bool disposing) -> void
+override Orleans.TestingHost.InProcessSiloHandle.DisposeAsync() -> System.Threading.Tasks.ValueTask
+override Orleans.TestingHost.InProcessSiloHandle.IsActive.get -> bool
+override Orleans.TestingHost.StandaloneSiloHandle.Dispose(bool disposing) -> void
+override Orleans.TestingHost.StandaloneSiloHandle.DisposeAsync() -> System.Threading.Tasks.ValueTask
+override Orleans.TestingHost.StandaloneSiloHandle.IsActive.get -> bool
+static Orleans.TestingHost.FaultInjectionGrainStorageOptions.DEFAULT_LATENCY -> System.TimeSpan
+static Orleans.TestingHost.Utils.StorageEmulator.Exists.get -> bool
+static Orleans.TestingHost.Utils.StorageEmulator.IsStarted() -> bool
+static Orleans.TestingHost.Utils.StorageEmulator.Start() -> bool
+static Orleans.TestingHost.Utils.StorageEmulator.Stop() -> bool
+static Orleans.TestingHost.Utils.StorageEmulator.TryStart() -> bool
+static Orleans.TestingHost.Utils.TestingUtils.ConfigureThreadPoolSettingsForStorageTests(int numDotNetPoolThreads = 200) -> void
+static Orleans.TestingHost.Utils.TestingUtils.Multiply(System.TimeSpan time, double value) -> System.TimeSpan
+virtual Orleans.TestingHost.SiloHandle.Dispose(bool disposing) -> void
+virtual Orleans.TestingHost.TestClusterPortAllocator.Dispose(bool disposing) -> void
+virtual Orleans.TestingHost.Utils.AsyncResultHandle.Reset() -> void
+~abstract Orleans.TestingHost.SiloHandle.StopSiloAsync(bool stopGracefully) -> System.Threading.Tasks.Task
+~abstract Orleans.TestingHost.SiloHandle.StopSiloAsync(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task
+~const Orleans.TestingHost.StandaloneSiloHandle.ExecutablePathConfigKey = "ExecutablePath" -> string
+~const Orleans.TestingHost.StandaloneSiloHost.GatewayAddressLog = "#### GATEWAY " -> string
+~const Orleans.TestingHost.StandaloneSiloHost.ShutdownCommand = "#### SHUTDOWN" -> string
+~const Orleans.TestingHost.StandaloneSiloHost.SiloAddressLog = "#### SILO " -> string
+~const Orleans.TestingHost.StandaloneSiloHost.StartedLog = "#### STARTED" -> string
+~Orleans.TestingHost.FaultInjectionGrainStorage.ClearStateAsync<T>(string grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.FaultInjectionGrainStorage.FaultInjectionGrainStorage(Orleans.Storage.IGrainStorage realStorageProvider, string name, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Orleans.IGrainFactory grainFactory, Orleans.TestingHost.FaultInjectionGrainStorageOptions faultInjectionOptions) -> void
+~Orleans.TestingHost.FaultInjectionGrainStorage.Participate(Orleans.Runtime.ISiloLifecycle lifecycle) -> void
+~Orleans.TestingHost.FaultInjectionGrainStorage.ReadStateAsync<T>(string grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.FaultInjectionGrainStorage.WriteStateAsync<T>(string grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.IClientBuilderConfigurator.Configure(Microsoft.Extensions.Configuration.IConfiguration configuration, Orleans.Hosting.IClientBuilder clientBuilder) -> void
+~Orleans.TestingHost.IHostConfigurator.Configure(Microsoft.Extensions.Hosting.IHostBuilder hostBuilder) -> void
+~Orleans.TestingHost.InProcessSiloHandle.ServiceProvider.get -> System.IServiceProvider
+~Orleans.TestingHost.InProcessSiloHandle.SiloHost.get -> Microsoft.Extensions.Hosting.IHost
+~Orleans.TestingHost.InProcessSiloHandle.SiloHost.init -> void
+~Orleans.TestingHost.InProcessTestCluster.Client.get -> Orleans.IClusterClient
+~Orleans.TestingHost.InProcessTestCluster.CreateSiloAsync(Orleans.TestingHost.InProcessTestSiloSpecificOptions siloOptions) -> System.Threading.Tasks.Task<Orleans.TestingHost.InProcessSiloHandle>
+~Orleans.TestingHost.InProcessTestCluster.DeployAsync() -> System.Threading.Tasks.Task
+~Orleans.TestingHost.InProcessTestCluster.GetActiveSilos() -> System.Collections.Generic.IEnumerable<Orleans.TestingHost.InProcessSiloHandle>
+~Orleans.TestingHost.InProcessTestCluster.GetLog() -> string
+~Orleans.TestingHost.InProcessTestCluster.GetSiloForAddress(Orleans.Runtime.SiloAddress siloAddress) -> Orleans.TestingHost.InProcessSiloHandle
+~Orleans.TestingHost.InProcessTestCluster.GetSiloServiceProvider(Orleans.Runtime.SiloAddress silo = null) -> System.IServiceProvider
+~Orleans.TestingHost.InProcessTestCluster.InitializeClientAsync() -> System.Threading.Tasks.Task
+~Orleans.TestingHost.InProcessTestCluster.InProcessTestCluster(Orleans.TestingHost.InProcessTestClusterOptions options, Orleans.TestingHost.ITestClusterPortAllocator portAllocator) -> void
+~Orleans.TestingHost.InProcessTestCluster.KillClientAsync() -> System.Threading.Tasks.Task
+~Orleans.TestingHost.InProcessTestCluster.KillSiloAsync(Orleans.TestingHost.InProcessSiloHandle instance) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.InProcessTestCluster.Options.get -> Orleans.TestingHost.InProcessTestClusterOptions
+~Orleans.TestingHost.InProcessTestCluster.PortAllocator.get -> Orleans.TestingHost.ITestClusterPortAllocator
+~Orleans.TestingHost.InProcessTestCluster.RestartSiloAsync(Orleans.TestingHost.InProcessSiloHandle instance) -> System.Threading.Tasks.Task<Orleans.TestingHost.InProcessSiloHandle>
+~Orleans.TestingHost.InProcessTestCluster.RestartStoppedSecondarySiloAsync(string siloName) -> System.Threading.Tasks.Task<Orleans.TestingHost.InProcessSiloHandle>
+~Orleans.TestingHost.InProcessTestCluster.Silos.get -> System.Collections.ObjectModel.ReadOnlyCollection<Orleans.TestingHost.InProcessSiloHandle>
+~Orleans.TestingHost.InProcessTestCluster.StartAdditionalSilo() -> Orleans.TestingHost.InProcessSiloHandle
+~Orleans.TestingHost.InProcessTestCluster.StartAdditionalSilo(bool startAdditionalSiloOnNewPort) -> Orleans.TestingHost.InProcessSiloHandle
+~Orleans.TestingHost.InProcessTestCluster.StartAdditionalSiloAsync() -> System.Threading.Tasks.Task<Orleans.TestingHost.InProcessSiloHandle>
+~Orleans.TestingHost.InProcessTestCluster.StartAdditionalSiloAsync(bool startAdditionalSiloOnNewPort) -> System.Threading.Tasks.Task<Orleans.TestingHost.InProcessSiloHandle>
+~Orleans.TestingHost.InProcessTestCluster.StartSiloAsync(int instanceNumber, Orleans.TestingHost.InProcessTestClusterOptions clusterOptions) -> System.Threading.Tasks.Task<Orleans.TestingHost.InProcessSiloHandle>
+~Orleans.TestingHost.InProcessTestCluster.StartSiloAsync(int instanceNumber, Orleans.TestingHost.InProcessTestClusterOptions clusterOptions, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource> configurationOverrides, bool startSiloOnNewPort) -> System.Threading.Tasks.Task<Orleans.TestingHost.InProcessSiloHandle>
+~Orleans.TestingHost.InProcessTestCluster.StartSilosAsync(int silosToStart) -> System.Threading.Tasks.Task<System.Collections.Generic.List<Orleans.TestingHost.InProcessSiloHandle>>
+~Orleans.TestingHost.InProcessTestCluster.StartSilosAsync(int silosToStart, bool startAdditionalSiloOnNewPort) -> System.Threading.Tasks.Task<System.Collections.Generic.List<Orleans.TestingHost.InProcessSiloHandle>>
+~Orleans.TestingHost.InProcessTestCluster.StopAllSilosAsync() -> System.Threading.Tasks.Task
+~Orleans.TestingHost.InProcessTestCluster.StopClusterClientAsync() -> System.Threading.Tasks.Task
+~Orleans.TestingHost.InProcessTestCluster.StopSiloAsync(Orleans.TestingHost.InProcessSiloHandle instance) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.InProcessTestCluster.StopSilosAsync() -> System.Threading.Tasks.Task
+~Orleans.TestingHost.InProcessTestCluster.WaitForLivenessToStabilizeAsync(bool didKill = false) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.InProcessTestClusterBuilder.Build() -> Orleans.TestingHost.InProcessTestCluster
+~Orleans.TestingHost.InProcessTestClusterBuilder.ConfigureClient(System.Action<Orleans.Hosting.IClientBuilder> configureClientDelegate) -> Orleans.TestingHost.InProcessTestClusterBuilder
+~Orleans.TestingHost.InProcessTestClusterBuilder.ConfigureClientHost(System.Action<Microsoft.Extensions.Hosting.IHostApplicationBuilder> configureHostDelegate) -> Orleans.TestingHost.InProcessTestClusterBuilder
+~Orleans.TestingHost.InProcessTestClusterBuilder.ConfigureHost(System.Action<Microsoft.Extensions.Hosting.IHostApplicationBuilder> configureDelegate) -> Orleans.TestingHost.InProcessTestClusterBuilder
+~Orleans.TestingHost.InProcessTestClusterBuilder.ConfigureSilo(System.Action<Orleans.TestingHost.InProcessTestSiloSpecificOptions, Orleans.Hosting.ISiloBuilder> configureSiloDelegate) -> Orleans.TestingHost.InProcessTestClusterBuilder
+~Orleans.TestingHost.InProcessTestClusterBuilder.ConfigureSiloHost(System.Action<Orleans.TestingHost.InProcessTestSiloSpecificOptions, Microsoft.Extensions.Hosting.IHostApplicationBuilder> configureSiloHostDelegate) -> Orleans.TestingHost.InProcessTestClusterBuilder
+~Orleans.TestingHost.InProcessTestClusterBuilder.Options.get -> Orleans.TestingHost.InProcessTestClusterOptions
+~Orleans.TestingHost.InProcessTestClusterBuilder.PortAllocator.get -> Orleans.TestingHost.ITestClusterPortAllocator
+~Orleans.TestingHost.InProcessTestClusterOptions.ClientHostConfigurationDelegates.get -> System.Collections.Generic.List<System.Action<Microsoft.Extensions.Hosting.IHostApplicationBuilder>>
+~Orleans.TestingHost.InProcessTestClusterOptions.ClusterId.get -> string
+~Orleans.TestingHost.InProcessTestClusterOptions.ClusterId.set -> void
+~Orleans.TestingHost.InProcessTestClusterOptions.ServiceId.get -> string
+~Orleans.TestingHost.InProcessTestClusterOptions.ServiceId.set -> void
+~Orleans.TestingHost.InProcessTestClusterOptions.SiloHostConfigurationDelegates.get -> System.Collections.Generic.List<System.Action<Orleans.TestingHost.InProcessTestSiloSpecificOptions, Microsoft.Extensions.Hosting.IHostApplicationBuilder>>
+~Orleans.TestingHost.InProcessTestSiloSpecificOptions.SiloName.get -> string
+~Orleans.TestingHost.InProcessTestSiloSpecificOptions.SiloName.set -> void
+~Orleans.TestingHost.ISiloConfigurator.Configure(Orleans.Hosting.ISiloBuilder siloBuilder) -> void
+~Orleans.TestingHost.IStorageFaultGrain.AddFaultOnClear(Orleans.Runtime.GrainId grainId, System.Exception exception) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.IStorageFaultGrain.AddFaultOnRead(Orleans.Runtime.GrainId grainId, System.Exception exception) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.IStorageFaultGrain.AddFaultOnWrite(Orleans.Runtime.GrainId grainId, System.Exception exception) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.IStorageFaultGrain.OnClear(Orleans.Runtime.GrainId grainId) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.IStorageFaultGrain.OnRead(Orleans.Runtime.GrainId grainId) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.IStorageFaultGrain.OnWrite(Orleans.Runtime.GrainId grainId) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.Logging.FileLogger.BeginScope<TState>(TState state) -> System.IDisposable
+~Orleans.TestingHost.Logging.FileLogger.FileLogger(Orleans.TestingHost.Logging.FileLoggingOutput output, string category) -> void
+~Orleans.TestingHost.Logging.FileLogger.Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception exception, System.Func<TState, System.Exception, string> formatter) -> void
+~Orleans.TestingHost.Logging.FileLoggerProvider.CreateLogger(string categoryName) -> Microsoft.Extensions.Logging.ILogger
+~Orleans.TestingHost.Logging.FileLoggerProvider.FileLoggerProvider(string filePath) -> void
+~Orleans.TestingHost.Logging.FileLoggingOutput.FileLoggingOutput(string fileName) -> void
+~Orleans.TestingHost.Logging.FileLoggingOutput.Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception exception, System.Func<TState, System.Exception, string> formatter, string category) -> void
+~Orleans.TestingHost.SiloHandle.ClusterOptions.get -> Orleans.TestingHost.TestClusterOptions
+~Orleans.TestingHost.SiloHandle.ClusterOptions.set -> void
+~Orleans.TestingHost.SiloHandle.GatewayAddress.get -> Orleans.Runtime.SiloAddress
+~Orleans.TestingHost.SiloHandle.GatewayAddress.set -> void
+~Orleans.TestingHost.SiloHandle.Name.get -> string
+~Orleans.TestingHost.SiloHandle.Name.set -> void
+~Orleans.TestingHost.SiloHandle.SiloAddress.get -> Orleans.Runtime.SiloAddress
+~Orleans.TestingHost.SiloHandle.SiloAddress.set -> void
+~Orleans.TestingHost.StandaloneSiloHandle.StandaloneSiloHandle(string siloName, Microsoft.Extensions.Configuration.IConfiguration configuration, string executablePath) -> void
+~Orleans.TestingHost.StorageFaultGrain.AddFaultOnClear(Orleans.Runtime.GrainId grainId, System.Exception exception) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.StorageFaultGrain.AddFaultOnRead(Orleans.Runtime.GrainId grainId, System.Exception exception) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.StorageFaultGrain.AddFaultOnWrite(Orleans.Runtime.GrainId grainId, System.Exception exception) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.StorageFaultGrain.OnClear(Orleans.Runtime.GrainId grainId) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.StorageFaultGrain.OnRead(Orleans.Runtime.GrainId grainId) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.StorageFaultGrain.OnWrite(Orleans.Runtime.GrainId grainId) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.TestCluster.Client.get -> Orleans.IClusterClient
+~Orleans.TestingHost.TestCluster.ConfigurationSources.get -> System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource>
+~Orleans.TestingHost.TestCluster.CreateSiloAsync.set -> void
+~Orleans.TestingHost.TestCluster.DefaultCreateSiloAsync(string siloName, Microsoft.Extensions.Configuration.IConfiguration configuration) -> System.Threading.Tasks.Task<Orleans.TestingHost.SiloHandle>
+~Orleans.TestingHost.TestCluster.DeployAsync() -> System.Threading.Tasks.Task
+~Orleans.TestingHost.TestCluster.GetActiveSilos() -> System.Collections.Generic.IEnumerable<Orleans.TestingHost.SiloHandle>
+~Orleans.TestingHost.TestCluster.GetLog() -> string
+~Orleans.TestingHost.TestCluster.GetSiloForAddress(Orleans.Runtime.SiloAddress siloAddress) -> Orleans.TestingHost.SiloHandle
+~Orleans.TestingHost.TestCluster.GetSiloServiceProvider(Orleans.Runtime.SiloAddress silo = null) -> System.IServiceProvider
+~Orleans.TestingHost.TestCluster.GrainFactory.get -> Orleans.IGrainFactory
+~Orleans.TestingHost.TestCluster.InitializeClientAsync() -> System.Threading.Tasks.Task
+~Orleans.TestingHost.TestCluster.KillClientAsync() -> System.Threading.Tasks.Task
+~Orleans.TestingHost.TestCluster.KillSiloAsync(Orleans.TestingHost.SiloHandle instance) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.TestCluster.Options.get -> Orleans.TestingHost.TestClusterOptions
+~Orleans.TestingHost.TestCluster.PortAllocator.get -> Orleans.TestingHost.ITestClusterPortAllocator
+~Orleans.TestingHost.TestCluster.Primary.get -> Orleans.TestingHost.SiloHandle
+~Orleans.TestingHost.TestCluster.RestartSiloAsync(Orleans.TestingHost.SiloHandle instance) -> System.Threading.Tasks.Task<Orleans.TestingHost.SiloHandle>
+~Orleans.TestingHost.TestCluster.RestartStoppedSecondarySiloAsync(string siloName) -> System.Threading.Tasks.Task<Orleans.TestingHost.SiloHandle>
+~Orleans.TestingHost.TestCluster.SecondarySilos.get -> System.Collections.Generic.IReadOnlyList<Orleans.TestingHost.SiloHandle>
+~Orleans.TestingHost.TestCluster.ServiceProvider.get -> System.IServiceProvider
+~Orleans.TestingHost.TestCluster.Silos.get -> System.Collections.ObjectModel.ReadOnlyCollection<Orleans.TestingHost.SiloHandle>
+~Orleans.TestingHost.TestCluster.StartAdditionalSilo(bool startAdditionalSiloOnNewPort = false) -> Orleans.TestingHost.SiloHandle
+~Orleans.TestingHost.TestCluster.StartAdditionalSiloAsync(bool startAdditionalSiloOnNewPort = false) -> System.Threading.Tasks.Task<Orleans.TestingHost.SiloHandle>
+~Orleans.TestingHost.TestCluster.StartAdditionalSilosAsync(int silosToStart, bool startAdditionalSiloOnNewPort = false) -> System.Threading.Tasks.Task<System.Collections.Generic.List<Orleans.TestingHost.SiloHandle>>
+~Orleans.TestingHost.TestCluster.StartSiloAsync(int instanceNumber, Orleans.TestingHost.TestClusterOptions clusterOptions, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false) -> System.Threading.Tasks.Task<Orleans.TestingHost.SiloHandle>
+~Orleans.TestingHost.TestCluster.StopAllSilosAsync() -> System.Threading.Tasks.Task
+~Orleans.TestingHost.TestCluster.StopClusterClientAsync() -> System.Threading.Tasks.Task
+~Orleans.TestingHost.TestCluster.StopPrimarySiloAsync() -> System.Threading.Tasks.Task
+~Orleans.TestingHost.TestCluster.StopSecondarySilosAsync() -> System.Threading.Tasks.Task
+~Orleans.TestingHost.TestCluster.StopSiloAsync(Orleans.TestingHost.SiloHandle instance) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.TestCluster.TestCluster(Orleans.TestingHost.TestClusterOptions options, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource> configurationSources, Orleans.TestingHost.ITestClusterPortAllocator portAllocator) -> void
+~Orleans.TestingHost.TestCluster.WaitForLivenessToStabilizeAsync(bool didKill = false) -> System.Threading.Tasks.Task
+~Orleans.TestingHost.TestClusterBuilder.AddClientBuilderConfigurator<T>() -> Orleans.TestingHost.TestClusterBuilder
+~Orleans.TestingHost.TestClusterBuilder.AddSiloBuilderConfigurator<T>() -> Orleans.TestingHost.TestClusterBuilder
+~Orleans.TestingHost.TestClusterBuilder.Build() -> Orleans.TestingHost.TestCluster
+~Orleans.TestingHost.TestClusterBuilder.ConfigureBuilder(System.Action configureDelegate) -> Orleans.TestingHost.TestClusterBuilder
+~Orleans.TestingHost.TestClusterBuilder.ConfigureHostConfiguration(System.Action<Microsoft.Extensions.Configuration.IConfigurationBuilder> configureDelegate) -> Orleans.TestingHost.TestClusterBuilder
+~Orleans.TestingHost.TestClusterBuilder.CreateSiloAsync.set -> void
+~Orleans.TestingHost.TestClusterBuilder.Options.get -> Orleans.TestingHost.TestClusterOptions
+~Orleans.TestingHost.TestClusterBuilder.PortAllocator.get -> Orleans.TestingHost.ITestClusterPortAllocator
+~Orleans.TestingHost.TestClusterBuilder.PortAllocator.set -> void
+~Orleans.TestingHost.TestClusterBuilder.Properties.get -> System.Collections.Generic.Dictionary<string, string>
+~Orleans.TestingHost.TestClusterOptions.ApplicationBaseDirectory.get -> string
+~Orleans.TestingHost.TestClusterOptions.ApplicationBaseDirectory.set -> void
+~Orleans.TestingHost.TestClusterOptions.ClientBuilderConfiguratorTypes.get -> System.Collections.Generic.List<string>
+~Orleans.TestingHost.TestClusterOptions.ClusterId.get -> string
+~Orleans.TestingHost.TestClusterOptions.ClusterId.set -> void
+~Orleans.TestingHost.TestClusterOptions.ServiceId.get -> string
+~Orleans.TestingHost.TestClusterOptions.ServiceId.set -> void
+~Orleans.TestingHost.TestClusterOptions.SiloBuilderConfiguratorTypes.get -> System.Collections.Generic.List<string>
+~Orleans.TestingHost.TestClusterOptions.ToDictionary() -> System.Collections.Generic.Dictionary<string, string>
+~Orleans.TestingHost.TestSiloSpecificOptions.PrimarySiloEndPoint.get -> System.Net.IPEndPoint
+~Orleans.TestingHost.TestSiloSpecificOptions.PrimarySiloEndPoint.set -> void
+~Orleans.TestingHost.TestSiloSpecificOptions.SiloName.get -> string
+~Orleans.TestingHost.TestSiloSpecificOptions.SiloName.set -> void
+~Orleans.TestingHost.TestSiloSpecificOptions.ToDictionary() -> System.Collections.Generic.Dictionary<string, string>
+~Orleans.TestingHost.UnixSocketTransport.UnixSocketConnectionOptions.ConvertEndpointToPath.get -> System.Func<System.Net.EndPoint, string>
+~Orleans.TestingHost.UnixSocketTransport.UnixSocketConnectionOptions.ConvertEndpointToPath.set -> void
+~Orleans.TestingHost.Utils.AsyncResultHandle.Exception.get -> System.Exception
+~Orleans.TestingHost.Utils.AsyncResultHandle.Exception.set -> void
+~Orleans.TestingHost.Utils.AsyncResultHandle.Result.get -> object
+~Orleans.TestingHost.Utils.AsyncResultHandle.Result.set -> void
+~Orleans.TestingHost.Utils.AsyncResultHandle.WaitFor(System.TimeSpan timeout, System.Func<bool> checkFlag) -> System.Threading.Tasks.Task<bool>
+~Orleans.TestingHost.Utils.AsyncResultHandle.WaitForContinue(System.TimeSpan timeout) -> System.Threading.Tasks.Task<bool>
+~Orleans.TestingHost.Utils.AsyncResultHandle.WaitForFinished(System.TimeSpan timeout) -> System.Threading.Tasks.Task<bool>
+~override Orleans.TestingHost.InProcessSiloHandle.StopSiloAsync(bool stopGracefully) -> System.Threading.Tasks.Task
+~override Orleans.TestingHost.InProcessSiloHandle.StopSiloAsync(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task
+~override Orleans.TestingHost.SiloHandle.ToString() -> string
+~override Orleans.TestingHost.StandaloneSiloHandle.StopSiloAsync(bool stopGracefully) -> System.Threading.Tasks.Task
+~override Orleans.TestingHost.StandaloneSiloHandle.StopSiloAsync(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task
+~override Orleans.TestingHost.StorageFaultGrain.OnActivateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task
+~static Orleans.Hosting.FaultInjectionStorageServiceCollectionExtensions.AddFaultInjectionMemoryStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.MemoryGrainStorageOptions>> configureOptions = null, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.TestingHost.FaultInjectionGrainStorageOptions>> configureFaultInjectionOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.FaultInjectionStorageServiceCollectionExtensions.AddFaultInjectionMemoryStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Orleans.Configuration.MemoryGrainStorageOptions> configureOptions, System.Action<Orleans.TestingHost.FaultInjectionGrainStorageOptions> configureFaultInjectionOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.TestingHost.FaultInjectionGrainStorageFactory.Create(System.IServiceProvider services, string name, System.Func<System.IServiceProvider, string, Orleans.Storage.IGrainStorage> injectedGrainStorageFactory) -> Orleans.Storage.IGrainStorage
+~static Orleans.TestingHost.InProcessSiloHandle.CreateAsync(string siloName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder> postConfigureHostBuilder = null) -> System.Threading.Tasks.Task<Orleans.TestingHost.InProcessSiloHandle>
+~static Orleans.TestingHost.InProcessTestCluster.GetLivenessStabilizationTime(Orleans.Configuration.ClusterMembershipOptions clusterMembershipOptions, bool didKill = false) -> System.TimeSpan
+~static Orleans.TestingHost.InProcessTestCluster.StartSiloAsync(Orleans.TestingHost.InProcessTestCluster cluster, int instanceNumber, Orleans.TestingHost.InProcessTestClusterOptions clusterOptions) -> System.Threading.Tasks.Task<Orleans.TestingHost.InProcessSiloHandle>
+~static Orleans.TestingHost.InProcessTestCluster.StartSiloAsync(Orleans.TestingHost.InProcessTestCluster cluster, int instanceNumber, Orleans.TestingHost.InProcessTestClusterOptions clusterOptions, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource> configurationOverrides, bool startSiloOnNewPort) -> System.Threading.Tasks.Task<Orleans.TestingHost.InProcessSiloHandle>
+~static Orleans.TestingHost.InProcessTestClusterBuilder.CreateClusterId() -> string
+~static Orleans.TestingHost.InProcessTestSiloSpecificOptions.Create(Orleans.TestingHost.InProcessTestCluster testCluster, Orleans.TestingHost.InProcessTestClusterOptions testClusterOptions, int instanceNumber, bool assignNewPort = false) -> Orleans.TestingHost.InProcessTestSiloSpecificOptions
+~static Orleans.TestingHost.Logging.FileLoggerProviderExtensions.AddFile(this Microsoft.Extensions.Logging.ILoggingBuilder builder, string filePathName) -> Microsoft.Extensions.Logging.ILoggingBuilder
+~static Orleans.TestingHost.SiloBuilderExtensions.AddFaultInjectionMemoryStorage(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.MemoryGrainStorageOptions>> configureOptions = null, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.TestingHost.FaultInjectionGrainStorageOptions>> configureFaultInjectionOptions = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.TestingHost.SiloBuilderExtensions.AddFaultInjectionMemoryStorage(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Configuration.MemoryGrainStorageOptions> configureOptions, System.Action<Orleans.TestingHost.FaultInjectionGrainStorageOptions> configureFaultInjectionOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.TestingHost.StandaloneSiloHandle.Create(string siloName, Microsoft.Extensions.Configuration.IConfiguration configuration) -> System.Threading.Tasks.Task<Orleans.TestingHost.SiloHandle>
+~static Orleans.TestingHost.StandaloneSiloHandle.CreateDelegate(string executablePath) -> System.Func<string, Microsoft.Extensions.Configuration.IConfiguration, System.Threading.Tasks.Task<Orleans.TestingHost.SiloHandle>>
+~static Orleans.TestingHost.StandaloneSiloHandle.CreateForAssembly(System.Reflection.Assembly assembly) -> System.Func<string, Microsoft.Extensions.Configuration.IConfiguration, System.Threading.Tasks.Task<Orleans.TestingHost.SiloHandle>>
+~static Orleans.TestingHost.StandaloneSiloHost.Main(string[] args) -> System.Threading.Tasks.Task
+~static Orleans.TestingHost.TestCluster.GetLivenessStabilizationTime(Orleans.Configuration.ClusterMembershipOptions clusterMembershipOptions, bool didKill = false) -> System.TimeSpan
+~static Orleans.TestingHost.TestCluster.StartSiloAsync(Orleans.TestingHost.TestCluster cluster, int instanceNumber, Orleans.TestingHost.TestClusterOptions clusterOptions, System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.Configuration.IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false) -> System.Threading.Tasks.Task<Orleans.TestingHost.SiloHandle>
+~static Orleans.TestingHost.TestClusterBuilder.CreateClusterId() -> string
+~static Orleans.TestingHost.TestClusterExtensions.GetConfiguration(this Microsoft.Extensions.Hosting.IHostBuilder builder) -> Microsoft.Extensions.Configuration.IConfiguration
+~static Orleans.TestingHost.TestClusterExtensions.GetConfigurationValue(this Microsoft.Extensions.Hosting.IHostBuilder hostBuilder, string key) -> string
+~static Orleans.TestingHost.TestClusterExtensions.GetTestClusterOptions(this Microsoft.Extensions.Configuration.IConfiguration config) -> Orleans.TestingHost.TestClusterOptions
+~static Orleans.TestingHost.TestClusterExtensions.GetTestClusterOptions(this Microsoft.Extensions.Hosting.IHostBuilder hostBuilder) -> Orleans.TestingHost.TestClusterOptions
+~static Orleans.TestingHost.TestClusterHostFactory.CreateClusterClient(string hostName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder> postConfigureHostBuilder = null) -> Microsoft.Extensions.Hosting.IHost
+~static Orleans.TestingHost.TestClusterHostFactory.CreateSiloHost(string hostName, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Microsoft.Extensions.Hosting.IHostBuilder> postConfigureHostBuilder = null) -> Microsoft.Extensions.Hosting.IHost
+~static Orleans.TestingHost.TestClusterHostFactory.DeserializeConfiguration(string serializedSources) -> Microsoft.Extensions.Configuration.IConfiguration
+~static Orleans.TestingHost.TestClusterHostFactory.SerializeConfiguration(Microsoft.Extensions.Configuration.IConfiguration configuration) -> string
+~static Orleans.TestingHost.TestSiloSpecificOptions.Create(Orleans.TestingHost.TestCluster testCluster, Orleans.TestingHost.TestClusterOptions testClusterOptions, int instanceNumber, bool assignNewPort = false) -> Orleans.TestingHost.TestSiloSpecificOptions
+~static Orleans.TestingHost.UnixSocketTransport.UnixSocketConnectionExtensions.UseUnixSocketConnection(this Orleans.Hosting.IClientBuilder clientBuilder) -> Orleans.Hosting.IClientBuilder
+~static Orleans.TestingHost.UnixSocketTransport.UnixSocketConnectionExtensions.UseUnixSocketConnection(this Orleans.Hosting.ISiloBuilder siloBuilder) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.TestingHost.Utils.StorageEmulator.Help() -> string
+~static Orleans.TestingHost.Utils.TestingUtils.ConfigureDefaultLoggingBuilder(Microsoft.Extensions.Logging.ILoggingBuilder builder, string filePath) -> void
+~static Orleans.TestingHost.Utils.TestingUtils.CreateDefaultLoggerFactory(string filePath) -> Microsoft.Extensions.Logging.ILoggerFactory
+~static Orleans.TestingHost.Utils.TestingUtils.CreateDefaultLoggerFactory(string filePath, Microsoft.Extensions.Logging.LoggerFilterOptions filters) -> Microsoft.Extensions.Logging.ILoggerFactory
+~static Orleans.TestingHost.Utils.TestingUtils.CreateTraceFileName(string nodeName, string clusterId) -> string
+~static Orleans.TestingHost.Utils.TestingUtils.WaitUntilAsync(System.Func<bool, System.Threading.Tasks.Task<bool>> predicate, System.TimeSpan timeout, System.TimeSpan? delayOnFail = null) -> System.Threading.Tasks.Task

@@ -1,0 +1,37 @@
+#nullable enable
+Orleans.Configuration.DynamoDBReminderStorageOptions
+Orleans.Configuration.DynamoDBReminderStorageOptions.CreateIfNotExists.get -> bool
+Orleans.Configuration.DynamoDBReminderStorageOptions.CreateIfNotExists.set -> void
+Orleans.Configuration.DynamoDBReminderStorageOptions.DynamoDBReminderStorageOptions() -> void
+Orleans.Configuration.DynamoDBReminderStorageOptions.ReadCapacityUnits.get -> int
+Orleans.Configuration.DynamoDBReminderStorageOptions.ReadCapacityUnits.set -> void
+Orleans.Configuration.DynamoDBReminderStorageOptions.UpdateIfExists.get -> bool
+Orleans.Configuration.DynamoDBReminderStorageOptions.UpdateIfExists.set -> void
+Orleans.Configuration.DynamoDBReminderStorageOptions.UseProvisionedThroughput.get -> bool
+Orleans.Configuration.DynamoDBReminderStorageOptions.UseProvisionedThroughput.set -> void
+Orleans.Configuration.DynamoDBReminderStorageOptions.WriteCapacityUnits.get -> int
+Orleans.Configuration.DynamoDBReminderStorageOptions.WriteCapacityUnits.set -> void
+Orleans.Configuration.DynamoDBReminderStorageOptionsExtensions
+Orleans.Configuration.DynamoDBReminderTableOptions
+Orleans.Configuration.DynamoDBReminderTableOptions.DynamoDBReminderTableOptions() -> void
+Orleans.Hosting.DynamoDBServiceCollectionReminderExtensions
+Orleans.Hosting.DynamoDBSiloBuilderReminderExtensions
+Orleans.Reminders.DynamoDB.DynamoDBClientOptions
+Orleans.Reminders.DynamoDB.DynamoDBClientOptions.DynamoDBClientOptions() -> void
+~Orleans.Configuration.DynamoDBReminderStorageOptions.TableName.get -> string
+~Orleans.Configuration.DynamoDBReminderStorageOptions.TableName.set -> void
+~Orleans.Configuration.DynamoDBReminderTableOptions.ConnectionString.get -> string
+~Orleans.Configuration.DynamoDBReminderTableOptions.ConnectionString.set -> void
+~Orleans.Reminders.DynamoDB.DynamoDBClientOptions.AccessKey.get -> string
+~Orleans.Reminders.DynamoDB.DynamoDBClientOptions.AccessKey.set -> void
+~Orleans.Reminders.DynamoDB.DynamoDBClientOptions.ProfileName.get -> string
+~Orleans.Reminders.DynamoDB.DynamoDBClientOptions.ProfileName.set -> void
+~Orleans.Reminders.DynamoDB.DynamoDBClientOptions.SecretKey.get -> string
+~Orleans.Reminders.DynamoDB.DynamoDBClientOptions.SecretKey.set -> void
+~Orleans.Reminders.DynamoDB.DynamoDBClientOptions.Service.get -> string
+~Orleans.Reminders.DynamoDB.DynamoDBClientOptions.Service.set -> void
+~Orleans.Reminders.DynamoDB.DynamoDBClientOptions.Token.get -> string
+~Orleans.Reminders.DynamoDB.DynamoDBClientOptions.Token.set -> void
+~static Orleans.Configuration.DynamoDBReminderStorageOptionsExtensions.ParseConnectionString(this Orleans.Configuration.DynamoDBReminderStorageOptions options, string connectionString) -> void
+~static Orleans.Hosting.DynamoDBServiceCollectionReminderExtensions.UseDynamoDBReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Orleans.Configuration.DynamoDBReminderStorageOptions> configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.DynamoDBSiloBuilderReminderExtensions.UseDynamoDBReminderService(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Configuration.DynamoDBReminderStorageOptions> configure) -> Orleans.Hosting.ISiloBuilder

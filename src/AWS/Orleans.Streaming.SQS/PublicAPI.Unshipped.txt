@@ -1,0 +1,32 @@
+#nullable enable
+Orleans.Configuration.SqsOptions
+Orleans.Configuration.SqsOptions.SqsOptions() -> void
+Orleans.Hosting.ClientBuilderExtensions
+Orleans.Hosting.ClusterClientSqsStreamConfigurator
+Orleans.Hosting.SiloBuilderExtensions
+Orleans.Hosting.SiloSqsStreamConfigurator
+OrleansAWSUtils.Streams.SQSAdapterFactory
+OrleansAWSUtils.Streams.SQSStreamProviderUtils
+OrleansAWSUtils.Streams.SQSStreamProviderUtils.SQSStreamProviderUtils() -> void
+virtual OrleansAWSUtils.Streams.SQSAdapterFactory.Init() -> void
+~Orleans.Configuration.SqsOptions.ConnectionString.get -> string
+~Orleans.Configuration.SqsOptions.ConnectionString.set -> void
+~Orleans.Hosting.ClusterClientSqsStreamConfigurator.ClusterClientSqsStreamConfigurator(string name, Orleans.Hosting.IClientBuilder builder) -> void
+~Orleans.Hosting.ClusterClientSqsStreamConfigurator.ConfigurePartitioning(int numOfparitions = 8) -> Orleans.Hosting.ClusterClientSqsStreamConfigurator
+~Orleans.Hosting.ClusterClientSqsStreamConfigurator.ConfigureSqs(System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.SqsOptions>> configureOptions) -> Orleans.Hosting.ClusterClientSqsStreamConfigurator
+~Orleans.Hosting.SiloSqsStreamConfigurator.ConfigureCache(int cacheSize = 4096) -> Orleans.Hosting.SiloSqsStreamConfigurator
+~Orleans.Hosting.SiloSqsStreamConfigurator.ConfigurePartitioning(int numOfparitions = 8) -> Orleans.Hosting.SiloSqsStreamConfigurator
+~Orleans.Hosting.SiloSqsStreamConfigurator.ConfigureSqs(System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.SqsOptions>> configureOptions) -> Orleans.Hosting.SiloSqsStreamConfigurator
+~Orleans.Hosting.SiloSqsStreamConfigurator.SiloSqsStreamConfigurator(string name, System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>> configureServicesDelegate) -> void
+~OrleansAWSUtils.Streams.SQSAdapterFactory.GetDeliveryFailureHandler(Orleans.Streams.QueueId queueId) -> System.Threading.Tasks.Task<Orleans.Streams.IStreamFailureHandler>
+~OrleansAWSUtils.Streams.SQSAdapterFactory.GetStreamQueueMapper() -> Orleans.Streams.IStreamQueueMapper
+~OrleansAWSUtils.Streams.SQSAdapterFactory.SQSAdapterFactory(string name, Orleans.Configuration.SqsOptions sqsOptions, Orleans.Configuration.HashRingStreamQueueMapperOptions queueMapperOptions, Orleans.Configuration.SimpleQueueCacheOptions cacheOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions, Orleans.Serialization.Serializer serializer, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) -> void
+~OrleansAWSUtils.Streams.SQSAdapterFactory.StreamFailureHandlerFactory.set -> void
+~static Orleans.Hosting.ClientBuilderExtensions.AddSqsStreams(this Orleans.Hosting.IClientBuilder builder, string name, System.Action<Orleans.Configuration.SqsOptions> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.AddSqsStreams(this Orleans.Hosting.IClientBuilder builder, string name, System.Action<Orleans.Hosting.ClusterClientSqsStreamConfigurator> configure) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.SiloBuilderExtensions.AddSqsStreams(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Configuration.SqsOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.SiloBuilderExtensions.AddSqsStreams(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Hosting.SiloSqsStreamConfigurator> configure) -> Orleans.Hosting.ISiloBuilder
+~static OrleansAWSUtils.Streams.SQSAdapterFactory.Create(System.IServiceProvider services, string name) -> OrleansAWSUtils.Streams.SQSAdapterFactory
+~static OrleansAWSUtils.Streams.SQSStreamProviderUtils.DeleteAllUsedQueues(string providerName, string clusterId, string storageConnectionString, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) -> System.Threading.Tasks.Task
+~virtual OrleansAWSUtils.Streams.SQSAdapterFactory.CreateAdapter() -> System.Threading.Tasks.Task<Orleans.Streams.IQueueAdapter>
+~virtual OrleansAWSUtils.Streams.SQSAdapterFactory.GetQueueAdapterCache() -> Orleans.Streams.IQueueAdapterCache

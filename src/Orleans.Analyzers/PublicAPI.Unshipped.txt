@@ -1,0 +1,98 @@
+#nullable enable
+Orleans.Analyzers.AbstractPropertiesCannotBeSerializedAnalyzer
+Orleans.Analyzers.AbstractPropertiesCannotBeSerializedAnalyzer.AbstractPropertiesCannotBeSerializedAnalyzer() -> void
+Orleans.Analyzers.AliasClashAttributeAnalyzer
+Orleans.Analyzers.AliasClashAttributeAnalyzer.AliasClashAttributeAnalyzer() -> void
+Orleans.Analyzers.AliasClashAttributeCodeFix
+Orleans.Analyzers.AliasClashAttributeCodeFix.AliasClashAttributeCodeFix() -> void
+Orleans.Analyzers.AlwaysInterleaveDiagnosticAnalyzer
+Orleans.Analyzers.AlwaysInterleaveDiagnosticAnalyzer.AlwaysInterleaveDiagnosticAnalyzer() -> void
+Orleans.Analyzers.AtMostOneOrleansConstructorAnalyzer
+Orleans.Analyzers.AtMostOneOrleansConstructorAnalyzer.AtMostOneOrleansConstructorAnalyzer() -> void
+Orleans.Analyzers.GenerateAliasAttributesAnalyzer
+Orleans.Analyzers.GenerateAliasAttributesAnalyzer.GenerateAliasAttributesAnalyzer() -> void
+Orleans.Analyzers.GenerateAliasAttributesCodeFix
+Orleans.Analyzers.GenerateAliasAttributesCodeFix.GenerateAliasAttributesCodeFix() -> void
+Orleans.Analyzers.GenerateGenerateSerializerAttributeAnalyzer
+Orleans.Analyzers.GenerateGenerateSerializerAttributeAnalyzer.GenerateGenerateSerializerAttributeAnalyzer() -> void
+Orleans.Analyzers.GenerateOrleansSerializationAttributesCodeFix
+Orleans.Analyzers.GenerateOrleansSerializationAttributesCodeFix.GenerateOrleansSerializationAttributesCodeFix() -> void
+Orleans.Analyzers.GenerateSerializationAttributesAnalyzer
+Orleans.Analyzers.GenerateSerializationAttributesAnalyzer.GenerateSerializationAttributesAnalyzer() -> void
+Orleans.Analyzers.GrainInterfaceMethodReturnTypeDiagnosticAnalyzer
+Orleans.Analyzers.GrainInterfaceMethodReturnTypeDiagnosticAnalyzer.GrainInterfaceMethodReturnTypeDiagnosticAnalyzer() -> void
+Orleans.Analyzers.GrainInterfacePropertyDiagnosticAnalyzer
+Orleans.Analyzers.GrainInterfacePropertyDiagnosticAnalyzer.GrainInterfacePropertyDiagnosticAnalyzer() -> void
+Orleans.Analyzers.IdClashAttributeAnalyzer
+Orleans.Analyzers.IdClashAttributeAnalyzer.IdClashAttributeAnalyzer() -> void
+Orleans.Analyzers.IdClashAttributeCodeFix
+Orleans.Analyzers.IdClashAttributeCodeFix.IdClashAttributeCodeFix() -> void
+Orleans.Analyzers.IncorrectAttributeUseAnalyzer
+Orleans.Analyzers.IncorrectAttributeUseAnalyzer.IncorrectAttributeUseAnalyzer() -> void
+Orleans.Analyzers.IncorrectAttributeUseCodeFix
+Orleans.Analyzers.IncorrectAttributeUseCodeFix.IncorrectAttributeUseCodeFix() -> void
+Orleans.Analyzers.NoRefParamsDiagnosticAnalyzer
+Orleans.Analyzers.NoRefParamsDiagnosticAnalyzer.NoRefParamsDiagnosticAnalyzer() -> void
+~const Orleans.Analyzers.AbstractPropertiesCannotBeSerializedAnalyzer.RuleId = "ORLEANS0006" -> string
+~const Orleans.Analyzers.AliasClashAttributeAnalyzer.RuleId = "ORLEANS0011" -> string
+~const Orleans.Analyzers.AlwaysInterleaveDiagnosticAnalyzer.Category = "Usage" -> string
+~const Orleans.Analyzers.AlwaysInterleaveDiagnosticAnalyzer.DiagnosticId = "ORLEANS0001" -> string
+~const Orleans.Analyzers.AlwaysInterleaveDiagnosticAnalyzer.MessageFormat = "[AlwaysInterleave] must only be used on the grain interface method and not the grain class method" -> string
+~const Orleans.Analyzers.AlwaysInterleaveDiagnosticAnalyzer.Title = "[AlwaysInterleave] must only be used on the grain interface method and not the grain class method" -> string
+~const Orleans.Analyzers.AtMostOneOrleansConstructorAnalyzer.RuleId = "ORLEANS0007" -> string
+~const Orleans.Analyzers.GenerateAliasAttributesAnalyzer.RuleId = "ORLEANS0010" -> string
+~const Orleans.Analyzers.GenerateGenerateSerializerAttributeAnalyzer.RuleId = "ORLEANS0005" -> string
+~const Orleans.Analyzers.GenerateSerializationAttributesAnalyzer.RuleId = "ORLEANS0004" -> string
+~const Orleans.Analyzers.GrainInterfaceMethodReturnTypeDiagnosticAnalyzer.Category = "Usage" -> string
+~const Orleans.Analyzers.GrainInterfaceMethodReturnTypeDiagnosticAnalyzer.DiagnosticId = "ORLEANS0009" -> string
+~const Orleans.Analyzers.GrainInterfaceMethodReturnTypeDiagnosticAnalyzer.MessageFormat = "Grain interfaces methods must return a compatible type, such as Task, Task<T>, ValueTask, ValueTask<T>, or void" -> string
+~const Orleans.Analyzers.GrainInterfaceMethodReturnTypeDiagnosticAnalyzer.Title = "Grain interfaces methods must return a compatible type" -> string
+~const Orleans.Analyzers.GrainInterfacePropertyDiagnosticAnalyzer.Category = "Usage" -> string
+~const Orleans.Analyzers.GrainInterfacePropertyDiagnosticAnalyzer.DiagnosticId = "ORLEANS0008" -> string
+~const Orleans.Analyzers.GrainInterfacePropertyDiagnosticAnalyzer.MessageFormat = "Grain interfaces must not contain properties" -> string
+~const Orleans.Analyzers.GrainInterfacePropertyDiagnosticAnalyzer.Title = "Grain interfaces must not contain properties" -> string
+~const Orleans.Analyzers.IdClashAttributeAnalyzer.RuleId = "ORLEANS0012" -> string
+~const Orleans.Analyzers.IncorrectAttributeUseAnalyzer.RuleId = "ORLEANS0013" -> string
+~const Orleans.Analyzers.NoRefParamsDiagnosticAnalyzer.Category = "Usage" -> string
+~const Orleans.Analyzers.NoRefParamsDiagnosticAnalyzer.DiagnosticId = "ORLEANS0002" -> string
+~const Orleans.Analyzers.NoRefParamsDiagnosticAnalyzer.MessageFormat = "Reference parameter modifiers are not allowed" -> string
+~const Orleans.Analyzers.NoRefParamsDiagnosticAnalyzer.Title = "Reference parameter modifiers are not allowed" -> string
+~override Orleans.Analyzers.AbstractPropertiesCannotBeSerializedAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext context) -> void
+~override Orleans.Analyzers.AbstractPropertiesCannotBeSerializedAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor>
+~override Orleans.Analyzers.AliasClashAttributeAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext context) -> void
+~override Orleans.Analyzers.AliasClashAttributeAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor>
+~override Orleans.Analyzers.AliasClashAttributeCodeFix.FixableDiagnosticIds.get -> System.Collections.Immutable.ImmutableArray<string>
+~override Orleans.Analyzers.AliasClashAttributeCodeFix.GetFixAllProvider() -> Microsoft.CodeAnalysis.CodeFixes.FixAllProvider
+~override Orleans.Analyzers.AliasClashAttributeCodeFix.RegisterCodeFixesAsync(Microsoft.CodeAnalysis.CodeFixes.CodeFixContext context) -> System.Threading.Tasks.Task
+~override Orleans.Analyzers.AlwaysInterleaveDiagnosticAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext context) -> void
+~override Orleans.Analyzers.AlwaysInterleaveDiagnosticAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor>
+~override Orleans.Analyzers.AtMostOneOrleansConstructorAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext context) -> void
+~override Orleans.Analyzers.AtMostOneOrleansConstructorAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor>
+~override Orleans.Analyzers.GenerateAliasAttributesAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext context) -> void
+~override Orleans.Analyzers.GenerateAliasAttributesAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor>
+~override Orleans.Analyzers.GenerateAliasAttributesCodeFix.FixableDiagnosticIds.get -> System.Collections.Immutable.ImmutableArray<string>
+~override Orleans.Analyzers.GenerateAliasAttributesCodeFix.GetFixAllProvider() -> Microsoft.CodeAnalysis.CodeFixes.FixAllProvider
+~override Orleans.Analyzers.GenerateAliasAttributesCodeFix.RegisterCodeFixesAsync(Microsoft.CodeAnalysis.CodeFixes.CodeFixContext context) -> System.Threading.Tasks.Task
+~override Orleans.Analyzers.GenerateGenerateSerializerAttributeAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext context) -> void
+~override Orleans.Analyzers.GenerateGenerateSerializerAttributeAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor>
+~override Orleans.Analyzers.GenerateOrleansSerializationAttributesCodeFix.FixableDiagnosticIds.get -> System.Collections.Immutable.ImmutableArray<string>
+~override Orleans.Analyzers.GenerateOrleansSerializationAttributesCodeFix.GetFixAllProvider() -> Microsoft.CodeAnalysis.CodeFixes.FixAllProvider
+~override Orleans.Analyzers.GenerateOrleansSerializationAttributesCodeFix.RegisterCodeFixesAsync(Microsoft.CodeAnalysis.CodeFixes.CodeFixContext context) -> System.Threading.Tasks.Task
+~override Orleans.Analyzers.GenerateSerializationAttributesAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext context) -> void
+~override Orleans.Analyzers.GenerateSerializationAttributesAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor>
+~override Orleans.Analyzers.GrainInterfaceMethodReturnTypeDiagnosticAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext context) -> void
+~override Orleans.Analyzers.GrainInterfaceMethodReturnTypeDiagnosticAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor>
+~override Orleans.Analyzers.GrainInterfacePropertyDiagnosticAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext context) -> void
+~override Orleans.Analyzers.GrainInterfacePropertyDiagnosticAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor>
+~override Orleans.Analyzers.IdClashAttributeAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext context) -> void
+~override Orleans.Analyzers.IdClashAttributeAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor>
+~override Orleans.Analyzers.IdClashAttributeCodeFix.FixableDiagnosticIds.get -> System.Collections.Immutable.ImmutableArray<string>
+~override Orleans.Analyzers.IdClashAttributeCodeFix.GetFixAllProvider() -> Microsoft.CodeAnalysis.CodeFixes.FixAllProvider
+~override Orleans.Analyzers.IdClashAttributeCodeFix.RegisterCodeFixesAsync(Microsoft.CodeAnalysis.CodeFixes.CodeFixContext context) -> System.Threading.Tasks.Task
+~override Orleans.Analyzers.IncorrectAttributeUseAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext context) -> void
+~override Orleans.Analyzers.IncorrectAttributeUseAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor>
+~override Orleans.Analyzers.NoRefParamsDiagnosticAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext context) -> void
+~override Orleans.Analyzers.NoRefParamsDiagnosticAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor>
+~override sealed Orleans.Analyzers.IncorrectAttributeUseCodeFix.FixableDiagnosticIds.get -> System.Collections.Immutable.ImmutableArray<string>
+~override sealed Orleans.Analyzers.IncorrectAttributeUseCodeFix.GetFixAllProvider() -> Microsoft.CodeAnalysis.CodeFixes.FixAllProvider
+~override sealed Orleans.Analyzers.IncorrectAttributeUseCodeFix.RegisterCodeFixesAsync(Microsoft.CodeAnalysis.CodeFixes.CodeFixContext context) -> System.Threading.Tasks.Task

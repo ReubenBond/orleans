@@ -1,0 +1,243 @@
+#nullable enable
+abstract Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.GetConfirmedVersion() -> int
+abstract Orleans.EventSourcing.ConnectionIssue.ComputeRetryDelay(System.TimeSpan? previous) -> System.TimeSpan
+Orleans.Configuration.CustomStorageLogConsistencyOptions
+Orleans.Configuration.CustomStorageLogConsistencyOptions.CustomStorageLogConsistencyOptions() -> void
+Orleans.EventSourcing.Common.BatchedNotificationMessage
+Orleans.EventSourcing.Common.BatchedNotificationMessage.BatchedNotificationMessage() -> void
+Orleans.EventSourcing.Common.BatchedNotificationMessage.Version.get -> int
+Orleans.EventSourcing.Common.INotificationMessage
+Orleans.EventSourcing.Common.INotificationMessage.Version.get -> int
+Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.ConfirmedVersion.get -> int
+Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.DisableStatsCollection() -> void
+Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.GetNumberPendingUpdates() -> int
+Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.IsMyClusterJoined() -> bool
+Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.LastPrimaryIssue -> Orleans.EventSourcing.Common.RecordedConnectionIssue
+Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.NotifyPromises(int count, bool success) -> void
+Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.RemoveStaleConditionalUpdates() -> void
+Orleans.EventSourcing.Common.PrimaryOperationFailed
+Orleans.EventSourcing.Common.PrimaryOperationFailed.PrimaryOperationFailed() -> void
+Orleans.EventSourcing.Common.RecordedConnectionIssue
+Orleans.EventSourcing.Common.RecordedConnectionIssue.RecordedConnectionIssue() -> void
+Orleans.EventSourcing.Common.StringEncodedWriteVector
+Orleans.EventSourcing.Common.SubmissionEntry<TLogEntry>
+Orleans.EventSourcing.Common.SubmissionEntry<TLogEntry>.ConditionalPosition -> int
+Orleans.EventSourcing.Common.SubmissionEntry<TLogEntry>.Entry -> TLogEntry
+Orleans.EventSourcing.Common.SubmissionEntry<TLogEntry>.SubmissionEntry() -> void
+Orleans.EventSourcing.Common.SubmissionEntry<TLogEntry>.SubmissionTime -> System.DateTime
+Orleans.EventSourcing.Common.VersionNotificationMessage
+Orleans.EventSourcing.Common.VersionNotificationMessage.Version.get -> int
+Orleans.EventSourcing.Common.VersionNotificationMessage.Version.set -> void
+Orleans.EventSourcing.Common.VersionNotificationMessage.VersionNotificationMessage() -> void
+Orleans.EventSourcing.ConnectionIssue
+Orleans.EventSourcing.ConnectionIssue.ConnectionIssue() -> void
+Orleans.EventSourcing.ConnectionIssue.NumberOfConsecutiveFailures.get -> int
+Orleans.EventSourcing.ConnectionIssue.NumberOfConsecutiveFailures.set -> void
+Orleans.EventSourcing.ConnectionIssue.RetryDelay.get -> System.TimeSpan
+Orleans.EventSourcing.ConnectionIssue.RetryDelay.set -> void
+Orleans.EventSourcing.ConnectionIssue.TimeOfFirstFailure.get -> System.DateTime
+Orleans.EventSourcing.ConnectionIssue.TimeOfFirstFailure.set -> void
+Orleans.EventSourcing.ConnectionIssue.TimeStamp.get -> System.DateTime
+Orleans.EventSourcing.ConnectionIssue.TimeStamp.set -> void
+Orleans.EventSourcing.CustomStorage.ICustomStorageInterface<TState, TDelta>
+Orleans.EventSourcing.CustomStorage.LogConsistencyProvider
+Orleans.EventSourcing.CustomStorage.LogConsistencyProvider.UsesStorageProvider.get -> bool
+Orleans.EventSourcing.CustomStorage.LogConsistencyProviderFactory
+Orleans.EventSourcing.IConnectionIssueListener
+Orleans.EventSourcing.ILogConsistencyDiagnostics
+Orleans.EventSourcing.ILogConsistencyDiagnostics.DisableStatsCollection() -> void
+Orleans.EventSourcing.ILogConsistencyDiagnostics.EnableStatsCollection() -> void
+Orleans.EventSourcing.ILogConsistencyProtocolMessage
+Orleans.EventSourcing.ILogConsistencyProtocolParticipant
+Orleans.EventSourcing.ILogConsistencyProtocolServices
+Orleans.EventSourcing.ILogConsistencyProtocolServices.DeepCopy<T>(T value) -> T
+Orleans.EventSourcing.ILogConsistencyProtocolServices.GrainId.get -> Orleans.Runtime.GrainId
+Orleans.EventSourcing.ILogViewAdaptor<TLogView, TLogEntry>
+Orleans.EventSourcing.ILogViewAdaptorFactory
+Orleans.EventSourcing.ILogViewAdaptorFactory.UsesStorageProvider.get -> bool
+Orleans.EventSourcing.ILogViewAdaptorHost<TLogView, TLogEntry>
+Orleans.EventSourcing.ILogViewAdaptorHost<TLogView, TLogEntry>.OnViewChanged(bool tentative, bool confirmed) -> void
+Orleans.EventSourcing.ILogViewAdaptorHost<TLogView, TLogEntry>.UpdateView(TLogView view, TLogEntry entry) -> void
+Orleans.EventSourcing.ILogViewRead<TView, TLogEntry>
+Orleans.EventSourcing.ILogViewRead<TView, TLogEntry>.ConfirmedVersion.get -> int
+Orleans.EventSourcing.ILogViewRead<TView, TLogEntry>.ConfirmedView.get -> TView
+Orleans.EventSourcing.ILogViewRead<TView, TLogEntry>.TentativeView.get -> TView
+Orleans.EventSourcing.ILogViewUpdate<TLogEntry>
+Orleans.EventSourcing.ILogViewUpdate<TLogEntry>.Submit(TLogEntry entry) -> void
+Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.DisableStatsCollection() -> void
+Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.EnableStatsCollection() -> void
+Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.JournaledGrain() -> void
+Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.Version.get -> int
+Orleans.EventSourcing.JournaledGrain<TGrainState>.JournaledGrain() -> void
+Orleans.EventSourcing.LogConsistencyStatistics
+Orleans.EventSourcing.LogConsistencyStatistics.LogConsistencyStatistics() -> void
+Orleans.EventSourcing.LogConsistentGrain<TView>
+Orleans.EventSourcing.LogConsistentGrain<TView>.LogConsistentGrain() -> void
+Orleans.EventSourcing.LogStorage.LogConsistencyProvider
+Orleans.EventSourcing.LogStorage.LogConsistencyProvider.LogConsistencyProvider() -> void
+Orleans.EventSourcing.LogStorage.LogConsistencyProvider.UsesStorageProvider.get -> bool
+Orleans.EventSourcing.LogStorage.LogStateWithMetaData<TEntry>.GlobalVersion.get -> int
+Orleans.EventSourcing.LogStorage.LogStateWithMetaData<TEntry>.LogStateWithMetaData() -> void
+Orleans.EventSourcing.LogStorage.LogStateWithMetaDataAndETag<TEntry>.LogStateWithMetaDataAndETag() -> void
+Orleans.EventSourcing.LogStorage.LogStateWithMetaDataAndETag<TEntry>.RecordExists.get -> bool
+Orleans.EventSourcing.LogStorage.LogStateWithMetaDataAndETag<TEntry>.RecordExists.set -> void
+Orleans.EventSourcing.ProtocolTransportException
+Orleans.EventSourcing.ProtocolTransportException.ProtocolTransportException() -> void
+Orleans.EventSourcing.StateStorage.GrainStateWithMetaData<TView>.GlobalVersion.get -> int
+Orleans.EventSourcing.StateStorage.GrainStateWithMetaData<TView>.GlobalVersion.set -> void
+Orleans.EventSourcing.StateStorage.GrainStateWithMetaData<TView>.GrainStateWithMetaData() -> void
+Orleans.EventSourcing.StateStorage.GrainStateWithMetaDataAndETag<TView>.GrainStateWithMetaDataAndETag() -> void
+Orleans.EventSourcing.StateStorage.GrainStateWithMetaDataAndETag<TView>.RecordExists.get -> bool
+Orleans.EventSourcing.StateStorage.GrainStateWithMetaDataAndETag<TView>.RecordExists.set -> void
+Orleans.EventSourcing.StateStorage.LogConsistencyProvider
+Orleans.EventSourcing.StateStorage.LogConsistencyProvider.LogConsistencyProvider() -> void
+Orleans.EventSourcing.StateStorage.LogConsistencyProvider.UsesStorageProvider.get -> bool
+Orleans.Hosting.CustomStorageSiloBuilderExtensions
+Orleans.Hosting.LogStorageSiloBuilderExtensions
+Orleans.Hosting.StateStorageSiloBuilderExtensions
+override Orleans.EventSourcing.Common.PrimaryOperationFailed.ComputeRetryDelay(System.TimeSpan? previous) -> System.TimeSpan
+virtual Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.EnableStatsCollection() -> void
+virtual Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.ProcessNotifications() -> void
+virtual Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.SupportSubmissions.get -> bool
+virtual Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.OnStateChanged() -> void
+virtual Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.OnTentativeStateChanged() -> void
+~abstract Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.InitializeConfirmedView(TLogView initialstate) -> void
+~abstract Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.LastConfirmedView() -> TLogView
+~abstract Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.MakeSubmissionEntry(TLogEntry entry) -> TSubmissionEntry
+~abstract Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.ReadAsync() -> System.Threading.Tasks.Task
+~abstract Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.WriteAsync() -> System.Threading.Tasks.Task<int>
+~abstract Orleans.EventSourcing.LogConsistentGrain<TView>.DefaultAdaptorFactory.get -> Orleans.EventSourcing.ILogViewAdaptorFactory
+~abstract Orleans.EventSourcing.LogConsistentGrain<TView>.InstallAdaptor(Orleans.EventSourcing.ILogViewAdaptorFactory factory, object state, string grainTypeName, Orleans.Storage.IGrainStorage grainStorage, Orleans.EventSourcing.ILogConsistencyProtocolServices services) -> void
+~Orleans.Configuration.CustomStorageLogConsistencyOptions.PrimaryCluster.get -> string
+~Orleans.Configuration.CustomStorageLogConsistencyOptions.PrimaryCluster.set -> void
+~Orleans.EventSourcing.Common.BatchedNotificationMessage.Notifications.get -> System.Collections.Generic.List<Orleans.EventSourcing.Common.INotificationMessage>
+~Orleans.EventSourcing.Common.BatchedNotificationMessage.Notifications.set -> void
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.ConfirmedView.get -> TLogView
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.ConfirmSubmittedEntries() -> System.Threading.Tasks.Task
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.CopyTentativeState() -> TLogView
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.EnsureClusterJoinedAsync() -> System.Threading.Tasks.Task
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.GetCurrentBatchOfUpdates() -> TSubmissionEntry[]
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.GetStats() -> Orleans.EventSourcing.LogConsistencyStatistics
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.Host.get -> Orleans.EventSourcing.ILogViewAdaptorHost<TLogView, TLogEntry>
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.OnProtocolMessageReceived(Orleans.EventSourcing.ILogConsistencyProtocolMessage payLoad) -> System.Threading.Tasks.Task<Orleans.EventSourcing.ILogConsistencyProtocolMessage>
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.PrimaryBasedLogViewAdaptor(Orleans.EventSourcing.ILogViewAdaptorHost<TLogView, TLogEntry> host, TLogView initialstate, Orleans.EventSourcing.ILogConsistencyProtocolServices services) -> void
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.Services.get -> Orleans.EventSourcing.ILogConsistencyProtocolServices
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.stats -> Orleans.EventSourcing.LogConsistencyStatistics
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.Submit(TLogEntry logEntry) -> void
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.SubmitRange(System.Collections.Generic.IEnumerable<TLogEntry> logEntries) -> void
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.Synchronize() -> System.Threading.Tasks.Task
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.TentativeView.get -> TLogView
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.TryAppend(TLogEntry logEntry) -> System.Threading.Tasks.Task<bool>
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.TryAppendRange(System.Collections.Generic.IEnumerable<TLogEntry> logEntries) -> System.Threading.Tasks.Task<bool>
+~Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.UnconfirmedSuffix.get -> System.Collections.Generic.IEnumerable<TLogEntry>
+~Orleans.EventSourcing.Common.PrimaryOperationFailed.Exception.get -> System.Exception
+~Orleans.EventSourcing.Common.PrimaryOperationFailed.Exception.set -> void
+~Orleans.EventSourcing.Common.RecordedConnectionIssue.DelayBeforeRetry() -> System.Threading.Tasks.Task
+~Orleans.EventSourcing.Common.RecordedConnectionIssue.Issue.get -> Orleans.EventSourcing.ConnectionIssue
+~Orleans.EventSourcing.Common.RecordedConnectionIssue.Record(Orleans.EventSourcing.ConnectionIssue newIssue, Orleans.EventSourcing.IConnectionIssueListener listener, Orleans.EventSourcing.ILogConsistencyProtocolServices services) -> void
+~Orleans.EventSourcing.Common.RecordedConnectionIssue.Resolve(Orleans.EventSourcing.IConnectionIssueListener listener, Orleans.EventSourcing.ILogConsistencyProtocolServices services) -> void
+~Orleans.EventSourcing.Common.SubmissionEntry<TLogEntry>.ResultPromise -> System.Threading.Tasks.TaskCompletionSource<bool>
+~Orleans.EventSourcing.CustomStorage.ICustomStorageInterface<TState, TDelta>.ApplyUpdatesToStorage(System.Collections.Generic.IReadOnlyList<TDelta> updates, int expectedVersion) -> System.Threading.Tasks.Task<bool>
+~Orleans.EventSourcing.CustomStorage.ICustomStorageInterface<TState, TDelta>.ReadStateFromStorage() -> System.Threading.Tasks.Task<System.Collections.Generic.KeyValuePair<int, TState>>
+~Orleans.EventSourcing.CustomStorage.LogConsistencyProvider.LogConsistencyProvider(Orleans.Configuration.CustomStorageLogConsistencyOptions options) -> void
+~Orleans.EventSourcing.CustomStorage.LogConsistencyProvider.MakeLogViewAdaptor<TView, TEntry>(Orleans.EventSourcing.ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, Orleans.Storage.IGrainStorage grainStorage, Orleans.EventSourcing.ILogConsistencyProtocolServices services) -> Orleans.EventSourcing.ILogViewAdaptor<TView, TEntry>
+~Orleans.EventSourcing.CustomStorage.LogConsistencyProvider.PrimaryCluster.get -> string
+~Orleans.EventSourcing.IConnectionIssueListener.OnConnectionIssue(Orleans.EventSourcing.ConnectionIssue connectionIssue) -> void
+~Orleans.EventSourcing.IConnectionIssueListener.OnConnectionIssueResolved(Orleans.EventSourcing.ConnectionIssue connectionIssue) -> void
+~Orleans.EventSourcing.ILogConsistencyDiagnostics.GetStats() -> Orleans.EventSourcing.LogConsistencyStatistics
+~Orleans.EventSourcing.ILogConsistencyProtocolParticipant.DeactivateProtocolParticipant() -> System.Threading.Tasks.Task
+~Orleans.EventSourcing.ILogConsistencyProtocolParticipant.PostActivateProtocolParticipant() -> System.Threading.Tasks.Task
+~Orleans.EventSourcing.ILogConsistencyProtocolParticipant.PreActivateProtocolParticipant() -> System.Threading.Tasks.Task
+~Orleans.EventSourcing.ILogConsistencyProtocolServices.CaughtException(string where, System.Exception e) -> void
+~Orleans.EventSourcing.ILogConsistencyProtocolServices.CaughtUserCodeException(string callback, string where, System.Exception e) -> void
+~Orleans.EventSourcing.ILogConsistencyProtocolServices.Log(Microsoft.Extensions.Logging.LogLevel level, string format, params object[] args) -> void
+~Orleans.EventSourcing.ILogConsistencyProtocolServices.MyClusterId.get -> string
+~Orleans.EventSourcing.ILogConsistencyProtocolServices.ProtocolError(string msg, bool throwexception) -> void
+~Orleans.EventSourcing.ILogViewAdaptor<TLogView, TLogEntry>.PostOnActivate() -> System.Threading.Tasks.Task
+~Orleans.EventSourcing.ILogViewAdaptor<TLogView, TLogEntry>.PostOnDeactivate() -> System.Threading.Tasks.Task
+~Orleans.EventSourcing.ILogViewAdaptor<TLogView, TLogEntry>.PreOnActivate() -> System.Threading.Tasks.Task
+~Orleans.EventSourcing.ILogViewAdaptorFactory.MakeLogViewAdaptor<TLogView, TLogEntry>(Orleans.EventSourcing.ILogViewAdaptorHost<TLogView, TLogEntry> hostGrain, TLogView initialState, string grainTypeName, Orleans.Storage.IGrainStorage grainStorage, Orleans.EventSourcing.ILogConsistencyProtocolServices services) -> Orleans.EventSourcing.ILogViewAdaptor<TLogView, TLogEntry>
+~Orleans.EventSourcing.ILogViewRead<TView, TLogEntry>.RetrieveLogSegment(int fromVersion, int toVersion) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TLogEntry>>
+~Orleans.EventSourcing.ILogViewRead<TView, TLogEntry>.UnconfirmedSuffix.get -> System.Collections.Generic.IEnumerable<TLogEntry>
+~Orleans.EventSourcing.ILogViewUpdate<TLogEntry>.ConfirmSubmittedEntries() -> System.Threading.Tasks.Task
+~Orleans.EventSourcing.ILogViewUpdate<TLogEntry>.SubmitRange(System.Collections.Generic.IEnumerable<TLogEntry> entries) -> void
+~Orleans.EventSourcing.ILogViewUpdate<TLogEntry>.Synchronize() -> System.Threading.Tasks.Task
+~Orleans.EventSourcing.ILogViewUpdate<TLogEntry>.TryAppend(TLogEntry entry) -> System.Threading.Tasks.Task<bool>
+~Orleans.EventSourcing.ILogViewUpdate<TLogEntry>.TryAppendRange(System.Collections.Generic.IEnumerable<TLogEntry> entries) -> System.Threading.Tasks.Task<bool>
+~Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>
+~Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.ConfirmEvents() -> System.Threading.Tasks.Task
+~Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.GetStats() -> Orleans.EventSourcing.LogConsistencyStatistics
+~Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.RefreshNow() -> System.Threading.Tasks.Task
+~Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.RetrieveConfirmedEvents(int fromVersion, int toVersion) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TEventBase>>
+~Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.State.get -> TGrainState
+~Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.TentativeState.get -> TGrainState
+~Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.UnconfirmedEvents.get -> System.Collections.Generic.IEnumerable<TEventBase>
+~Orleans.EventSourcing.JournaledGrain<TGrainState>
+~Orleans.EventSourcing.LogConsistencyStatistics.EventCounters -> System.Collections.Generic.Dictionary<string, long>
+~Orleans.EventSourcing.LogConsistencyStatistics.StabilizationLatenciesInMsecs -> System.Collections.Generic.List<int>
+~Orleans.EventSourcing.LogStorage.LogConsistencyProvider.MakeLogViewAdaptor<TView, TEntry>(Orleans.EventSourcing.ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, Orleans.Storage.IGrainStorage grainStorage, Orleans.EventSourcing.ILogConsistencyProtocolServices services) -> Orleans.EventSourcing.ILogViewAdaptor<TView, TEntry>
+~Orleans.EventSourcing.LogStorage.LogStateWithMetaData<TEntry>
+~Orleans.EventSourcing.LogStorage.LogStateWithMetaData<TEntry>.FlipBit(string replica) -> bool
+~Orleans.EventSourcing.LogStorage.LogStateWithMetaData<TEntry>.GetBit(string replica) -> bool
+~Orleans.EventSourcing.LogStorage.LogStateWithMetaData<TEntry>.Log.get -> System.Collections.Generic.List<TEntry>
+~Orleans.EventSourcing.LogStorage.LogStateWithMetaData<TEntry>.Log.set -> void
+~Orleans.EventSourcing.LogStorage.LogStateWithMetaData<TEntry>.WriteVector.get -> string
+~Orleans.EventSourcing.LogStorage.LogStateWithMetaData<TEntry>.WriteVector.set -> void
+~Orleans.EventSourcing.LogStorage.LogStateWithMetaDataAndETag<TEntry>
+~Orleans.EventSourcing.LogStorage.LogStateWithMetaDataAndETag<TEntry>.ETag.get -> string
+~Orleans.EventSourcing.LogStorage.LogStateWithMetaDataAndETag<TEntry>.ETag.set -> void
+~Orleans.EventSourcing.LogStorage.LogStateWithMetaDataAndETag<TEntry>.State.get -> Orleans.EventSourcing.LogStorage.LogStateWithMetaData<TEntry>
+~Orleans.EventSourcing.LogStorage.LogStateWithMetaDataAndETag<TEntry>.State.set -> void
+~Orleans.EventSourcing.LogStorage.LogStateWithMetaDataAndETag<TEntry>.StateAndMetaData.get -> Orleans.EventSourcing.LogStorage.LogStateWithMetaData<TEntry>
+~Orleans.EventSourcing.LogStorage.LogStateWithMetaDataAndETag<TEntry>.StateAndMetaData.set -> void
+~Orleans.EventSourcing.ProtocolTransportException.ProtocolTransportException(string msg) -> void
+~Orleans.EventSourcing.ProtocolTransportException.ProtocolTransportException(string msg, System.Exception exc) -> void
+~Orleans.EventSourcing.StateStorage.GrainStateWithMetaData<TView>
+~Orleans.EventSourcing.StateStorage.GrainStateWithMetaData<TView>.FlipBit(string Replica) -> bool
+~Orleans.EventSourcing.StateStorage.GrainStateWithMetaData<TView>.GetBit(string Replica) -> bool
+~Orleans.EventSourcing.StateStorage.GrainStateWithMetaData<TView>.GrainStateWithMetaData(TView initialstate) -> void
+~Orleans.EventSourcing.StateStorage.GrainStateWithMetaData<TView>.State.get -> TView
+~Orleans.EventSourcing.StateStorage.GrainStateWithMetaData<TView>.State.set -> void
+~Orleans.EventSourcing.StateStorage.GrainStateWithMetaData<TView>.WriteVector.get -> string
+~Orleans.EventSourcing.StateStorage.GrainStateWithMetaData<TView>.WriteVector.set -> void
+~Orleans.EventSourcing.StateStorage.GrainStateWithMetaDataAndETag<TView>
+~Orleans.EventSourcing.StateStorage.GrainStateWithMetaDataAndETag<TView>.ETag.get -> string
+~Orleans.EventSourcing.StateStorage.GrainStateWithMetaDataAndETag<TView>.ETag.set -> void
+~Orleans.EventSourcing.StateStorage.GrainStateWithMetaDataAndETag<TView>.GrainStateWithMetaDataAndETag(TView initialview) -> void
+~Orleans.EventSourcing.StateStorage.GrainStateWithMetaDataAndETag<TView>.State.get -> Orleans.EventSourcing.StateStorage.GrainStateWithMetaData<TView>
+~Orleans.EventSourcing.StateStorage.GrainStateWithMetaDataAndETag<TView>.State.set -> void
+~Orleans.EventSourcing.StateStorage.GrainStateWithMetaDataAndETag<TView>.StateAndMetaData.get -> Orleans.EventSourcing.StateStorage.GrainStateWithMetaData<TView>
+~Orleans.EventSourcing.StateStorage.GrainStateWithMetaDataAndETag<TView>.StateAndMetaData.set -> void
+~Orleans.EventSourcing.StateStorage.LogConsistencyProvider.MakeLogViewAdaptor<TView, TEntry>(Orleans.EventSourcing.ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, Orleans.Storage.IGrainStorage grainStorage, Orleans.EventSourcing.ILogConsistencyProtocolServices services) -> Orleans.EventSourcing.ILogViewAdaptor<TView, TEntry>
+~override Orleans.EventSourcing.Common.RecordedConnectionIssue.ToString() -> string
+~override Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.DefaultAdaptorFactory.get -> Orleans.EventSourcing.ILogViewAdaptorFactory
+~override Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.InstallAdaptor(Orleans.EventSourcing.ILogViewAdaptorFactory factory, object initialState, string graintypename, Orleans.Storage.IGrainStorage grainStorage, Orleans.EventSourcing.ILogConsistencyProtocolServices services) -> void
+~override Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.OnActivateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task
+~override Orleans.EventSourcing.LogStorage.LogStateWithMetaDataAndETag<TEntry>.ToString() -> string
+~override Orleans.EventSourcing.ProtocolTransportException.ToString() -> string
+~override Orleans.EventSourcing.StateStorage.GrainStateWithMetaDataAndETag<TView>.ToString() -> string
+~static Orleans.EventSourcing.Common.StringEncodedWriteVector.FlipBit(ref string writeVector, string Replica) -> bool
+~static Orleans.EventSourcing.Common.StringEncodedWriteVector.GetBit(string writeVector, string Replica) -> bool
+~static Orleans.EventSourcing.CustomStorage.LogConsistencyProviderFactory.Create(System.IServiceProvider services, string name) -> Orleans.EventSourcing.ILogViewAdaptorFactory
+~static Orleans.Hosting.CustomStorageSiloBuilderExtensions.AddCustomStorageBasedLogConsistencyProvider(this Orleans.Hosting.ISiloBuilder builder, string name = "LogStorage", string primaryCluster = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.CustomStorageSiloBuilderExtensions.AddCustomStorageBasedLogConsistencyProviderAsDefault(this Orleans.Hosting.ISiloBuilder builder, string primaryCluster = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.LogStorageSiloBuilderExtensions.AddLogStorageBasedLogConsistencyProvider(this Orleans.Hosting.ISiloBuilder builder, string name = "LogStorage") -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.LogStorageSiloBuilderExtensions.AddLogStorageBasedLogConsistencyProviderAsDefault(this Orleans.Hosting.ISiloBuilder builder) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.StateStorageSiloBuilderExtensions.AddStateStorageBasedLogConsistencyProvider(this Orleans.Hosting.ISiloBuilder builder, string name = "StateStorage") -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.StateStorageSiloBuilderExtensions.AddStateStorageBasedLogConsistencyProviderAsDefault(this Orleans.Hosting.ISiloBuilder builder) -> Orleans.Hosting.ISiloBuilder
+~virtual Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.Merge(Orleans.EventSourcing.Common.INotificationMessage earliermessage, Orleans.EventSourcing.Common.INotificationMessage latermessage) -> Orleans.EventSourcing.Common.INotificationMessage
+~virtual Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.OnMessageReceived(Orleans.EventSourcing.ILogConsistencyProtocolMessage payload) -> System.Threading.Tasks.Task<Orleans.EventSourcing.ILogConsistencyProtocolMessage>
+~virtual Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.OnNotificationReceived(Orleans.EventSourcing.Common.INotificationMessage payload) -> void
+~virtual Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.PostOnActivate() -> System.Threading.Tasks.Task
+~virtual Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.PostOnDeactivate() -> System.Threading.Tasks.Task
+~virtual Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.PreOnActivate() -> System.Threading.Tasks.Task
+~virtual Orleans.EventSourcing.Common.PrimaryBasedLogViewAdaptor<TLogView, TLogEntry, TSubmissionEntry>.RetrieveLogSegment(int fromVersion, int length) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TLogEntry>>
+~virtual Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.OnConnectionIssue(Orleans.EventSourcing.ConnectionIssue issue) -> void
+~virtual Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.OnConnectionIssueResolved(Orleans.EventSourcing.ConnectionIssue issue) -> void
+~virtual Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.RaiseConditionalEvent<TEvent>(TEvent event) -> System.Threading.Tasks.Task<bool>
+~virtual Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.RaiseConditionalEvents<TEvent>(System.Collections.Generic.IEnumerable<TEvent> events) -> System.Threading.Tasks.Task<bool>
+~virtual Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.RaiseEvent<TEvent>(TEvent event) -> void
+~virtual Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.RaiseEvents<TEvent>(System.Collections.Generic.IEnumerable<TEvent> events) -> void
+~virtual Orleans.EventSourcing.JournaledGrain<TGrainState, TEventBase>.TransitionState(TGrainState state, TEventBase event) -> void
+~virtual Orleans.EventSourcing.LogConsistentGrain<TView>.Participate(Orleans.Runtime.IGrainLifecycle lifecycle) -> void

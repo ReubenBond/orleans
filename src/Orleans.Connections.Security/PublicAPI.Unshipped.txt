@@ -1,0 +1,87 @@
+#nullable enable
+Orleans.Connections.Security.CertificateLoader
+Orleans.Connections.Security.ClientCertificateSelectionCallback
+Orleans.Connections.Security.ITlsApplicationProtocolFeature
+Orleans.Connections.Security.ITlsApplicationProtocolFeature.ApplicationProtocol.get -> System.ReadOnlyMemory<byte>
+Orleans.Connections.Security.ITlsConnectionFeature
+Orleans.Connections.Security.ITlsHandshakeFeature
+Orleans.Connections.Security.ITlsHandshakeFeature.CipherAlgorithm.get -> System.Security.Authentication.CipherAlgorithmType
+Orleans.Connections.Security.ITlsHandshakeFeature.CipherStrength.get -> int
+Orleans.Connections.Security.ITlsHandshakeFeature.HashAlgorithm.get -> System.Security.Authentication.HashAlgorithmType
+Orleans.Connections.Security.ITlsHandshakeFeature.HashStrength.get -> int
+Orleans.Connections.Security.ITlsHandshakeFeature.KeyExchangeAlgorithm.get -> System.Security.Authentication.ExchangeAlgorithmType
+Orleans.Connections.Security.ITlsHandshakeFeature.KeyExchangeStrength.get -> int
+Orleans.Connections.Security.ITlsHandshakeFeature.Protocol.get -> System.Security.Authentication.SslProtocols
+Orleans.Connections.Security.RemoteCertificateMode
+Orleans.Connections.Security.RemoteCertificateMode.AllowCertificate = 1 -> Orleans.Connections.Security.RemoteCertificateMode
+Orleans.Connections.Security.RemoteCertificateMode.NoCertificate = 0 -> Orleans.Connections.Security.RemoteCertificateMode
+Orleans.Connections.Security.RemoteCertificateMode.RequireCertificate = 2 -> Orleans.Connections.Security.RemoteCertificateMode
+Orleans.Connections.Security.RemoteCertificateValidator
+Orleans.Connections.Security.ServerCertificateSelectionCallback
+Orleans.Connections.Security.TlsClientAuthenticationOptions
+Orleans.Connections.Security.TlsClientAuthenticationOptions.CertificateRevocationCheckMode.get -> System.Security.Cryptography.X509Certificates.X509RevocationMode
+Orleans.Connections.Security.TlsClientAuthenticationOptions.CertificateRevocationCheckMode.set -> void
+Orleans.Connections.Security.TlsClientAuthenticationOptions.EnabledSslProtocols.get -> System.Security.Authentication.SslProtocols
+Orleans.Connections.Security.TlsClientAuthenticationOptions.EnabledSslProtocols.set -> void
+Orleans.Connections.Security.TlsClientAuthenticationOptions.TlsClientAuthenticationOptions() -> void
+Orleans.Connections.Security.TlsOptions
+Orleans.Connections.Security.TlsOptions.AllowAnyRemoteCertificate() -> void
+Orleans.Connections.Security.TlsOptions.CheckCertificateRevocation.get -> bool
+Orleans.Connections.Security.TlsOptions.CheckCertificateRevocation.set -> void
+Orleans.Connections.Security.TlsOptions.ClientCertificateMode.get -> Orleans.Connections.Security.RemoteCertificateMode
+Orleans.Connections.Security.TlsOptions.ClientCertificateMode.set -> void
+Orleans.Connections.Security.TlsOptions.HandshakeTimeout.get -> System.TimeSpan
+Orleans.Connections.Security.TlsOptions.HandshakeTimeout.set -> void
+Orleans.Connections.Security.TlsOptions.RemoteCertificateMode.get -> Orleans.Connections.Security.RemoteCertificateMode
+Orleans.Connections.Security.TlsOptions.RemoteCertificateMode.set -> void
+Orleans.Connections.Security.TlsOptions.SslProtocols.get -> System.Security.Authentication.SslProtocols
+Orleans.Connections.Security.TlsOptions.SslProtocols.set -> void
+Orleans.Connections.Security.TlsOptions.TlsOptions() -> void
+Orleans.Connections.Security.TlsServerAuthenticationOptions
+Orleans.Connections.Security.TlsServerAuthenticationOptions.CertificateRevocationCheckMode.get -> System.Security.Cryptography.X509Certificates.X509RevocationMode
+Orleans.Connections.Security.TlsServerAuthenticationOptions.CertificateRevocationCheckMode.set -> void
+Orleans.Connections.Security.TlsServerAuthenticationOptions.ClientCertificateRequired.get -> bool
+Orleans.Connections.Security.TlsServerAuthenticationOptions.ClientCertificateRequired.set -> void
+Orleans.Connections.Security.TlsServerAuthenticationOptions.EnabledSslProtocols.get -> System.Security.Authentication.SslProtocols
+Orleans.Connections.Security.TlsServerAuthenticationOptions.EnabledSslProtocols.set -> void
+Orleans.Connections.Security.TlsServerAuthenticationOptions.TlsServerAuthenticationOptions() -> void
+Orleans.Hosting.OrleansConnectionSecurityHostingExtensions
+Orleans.TlsConnectionBuilderExtensions
+~Orleans.Connections.Security.ITlsConnectionFeature.GetRemoteCertificateAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Security.Cryptography.X509Certificates.X509Certificate2>
+~Orleans.Connections.Security.ITlsConnectionFeature.RemoteCertificate.get -> System.Security.Cryptography.X509Certificates.X509Certificate2
+~Orleans.Connections.Security.ITlsConnectionFeature.RemoteCertificate.set -> void
+~Orleans.Connections.Security.TlsClientAuthenticationOptions.ClientCertificates.get -> System.Security.Cryptography.X509Certificates.X509CertificateCollection
+~Orleans.Connections.Security.TlsClientAuthenticationOptions.ClientCertificates.set -> void
+~Orleans.Connections.Security.TlsClientAuthenticationOptions.LocalCertificateSelectionCallback.get -> Orleans.Connections.Security.ClientCertificateSelectionCallback
+~Orleans.Connections.Security.TlsClientAuthenticationOptions.LocalCertificateSelectionCallback.set -> void
+~Orleans.Connections.Security.TlsClientAuthenticationOptions.SslClientAuthenticationOptions.get -> object
+~Orleans.Connections.Security.TlsClientAuthenticationOptions.TargetHost.get -> string
+~Orleans.Connections.Security.TlsClientAuthenticationOptions.TargetHost.set -> void
+~Orleans.Connections.Security.TlsOptions.LocalCertificate.get -> System.Security.Cryptography.X509Certificates.X509Certificate2
+~Orleans.Connections.Security.TlsOptions.LocalCertificate.set -> void
+~Orleans.Connections.Security.TlsOptions.LocalClientCertificateSelector.get -> System.Func<object, string, System.Security.Cryptography.X509Certificates.X509CertificateCollection, System.Security.Cryptography.X509Certificates.X509Certificate, string[], System.Security.Cryptography.X509Certificates.X509Certificate2>
+~Orleans.Connections.Security.TlsOptions.LocalClientCertificateSelector.set -> void
+~Orleans.Connections.Security.TlsOptions.LocalServerCertificateSelector.get -> System.Func<Microsoft.AspNetCore.Connections.ConnectionContext, string, System.Security.Cryptography.X509Certificates.X509Certificate2>
+~Orleans.Connections.Security.TlsOptions.LocalServerCertificateSelector.set -> void
+~Orleans.Connections.Security.TlsOptions.OnAuthenticateAsClient.get -> System.Action<Microsoft.AspNetCore.Connections.ConnectionContext, Orleans.Connections.Security.TlsClientAuthenticationOptions>
+~Orleans.Connections.Security.TlsOptions.OnAuthenticateAsClient.set -> void
+~Orleans.Connections.Security.TlsOptions.OnAuthenticateAsServer.get -> System.Action<Microsoft.AspNetCore.Connections.ConnectionContext, Orleans.Connections.Security.TlsServerAuthenticationOptions>
+~Orleans.Connections.Security.TlsOptions.OnAuthenticateAsServer.set -> void
+~Orleans.Connections.Security.TlsOptions.RemoteCertificateValidation.get -> Orleans.Connections.Security.RemoteCertificateValidator
+~Orleans.Connections.Security.TlsOptions.RemoteCertificateValidation.set -> void
+~Orleans.Connections.Security.TlsServerAuthenticationOptions.ServerCertificate.get -> System.Security.Cryptography.X509Certificates.X509Certificate
+~Orleans.Connections.Security.TlsServerAuthenticationOptions.ServerCertificate.set -> void
+~Orleans.Connections.Security.TlsServerAuthenticationOptions.ServerCertificateSelectionCallback.get -> Orleans.Connections.Security.ServerCertificateSelectionCallback
+~Orleans.Connections.Security.TlsServerAuthenticationOptions.ServerCertificateSelectionCallback.set -> void
+~Orleans.Connections.Security.TlsServerAuthenticationOptions.SslServerAuthenticationOptions.get -> object
+~static Orleans.Connections.Security.CertificateLoader.LoadFromStoreCert(string subject, string storeName, System.Security.Cryptography.X509Certificates.StoreLocation storeLocation, bool allowInvalid, bool server) -> System.Security.Cryptography.X509Certificates.X509Certificate2
+~static Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls(this Orleans.Hosting.IClientBuilder builder, System.Action<Orleans.Connections.Security.TlsOptions> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls(this Orleans.Hosting.IClientBuilder builder, System.Security.Cryptography.X509Certificates.StoreName storeName, string subject, bool allowInvalid, System.Security.Cryptography.X509Certificates.StoreLocation location, System.Action<Orleans.Connections.Security.TlsOptions> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls(this Orleans.Hosting.IClientBuilder builder, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls(this Orleans.Hosting.IClientBuilder builder, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate, System.Action<Orleans.Connections.Security.TlsOptions> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Connections.Security.TlsOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls(this Orleans.Hosting.ISiloBuilder builder, System.Security.Cryptography.X509Certificates.StoreName storeName, string subject, bool allowInvalid, System.Security.Cryptography.X509Certificates.StoreLocation location, System.Action<Orleans.Connections.Security.TlsOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls(this Orleans.Hosting.ISiloBuilder builder, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.OrleansConnectionSecurityHostingExtensions.UseTls(this Orleans.Hosting.ISiloBuilder builder, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate, System.Action<Orleans.Connections.Security.TlsOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.TlsConnectionBuilderExtensions.UseClientTls(this Microsoft.AspNetCore.Connections.IConnectionBuilder builder, Orleans.Connections.Security.TlsOptions options) -> void
+~static Orleans.TlsConnectionBuilderExtensions.UseServerTls(this Microsoft.AspNetCore.Connections.IConnectionBuilder builder, Orleans.Connections.Security.TlsOptions options) -> void

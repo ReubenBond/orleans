@@ -1,0 +1,30 @@
+#nullable enable
+Orleans.Configuration.ZooKeeperClusteringSiloOptions
+Orleans.Configuration.ZooKeeperClusteringSiloOptions.ZooKeeperClusteringSiloOptions() -> void
+Orleans.Configuration.ZooKeeperGatewayListProviderOptions
+Orleans.Configuration.ZooKeeperGatewayListProviderOptions.ZooKeeperGatewayListProviderOptions() -> void
+Orleans.Hosting.ZooKeeperHostingExtensions
+Orleans.Runtime.Membership.ZooKeeperBasedMembershipTable
+Orleans.Runtime.Membership.ZooKeeperGatewayListProvider
+Orleans.Runtime.Membership.ZooKeeperGatewayListProvider.IsUpdatable.get -> bool
+Orleans.Runtime.Membership.ZooKeeperGatewayListProvider.MaxStaleness.get -> System.TimeSpan
+~Orleans.Configuration.ZooKeeperClusteringSiloOptions.ConnectionString.get -> string
+~Orleans.Configuration.ZooKeeperClusteringSiloOptions.ConnectionString.set -> void
+~Orleans.Configuration.ZooKeeperGatewayListProviderOptions.ConnectionString.get -> string
+~Orleans.Configuration.ZooKeeperGatewayListProviderOptions.ConnectionString.set -> void
+~Orleans.Runtime.Membership.ZooKeeperBasedMembershipTable.CleanupDefunctSiloEntries(System.DateTimeOffset beforeDate) -> System.Threading.Tasks.Task
+~Orleans.Runtime.Membership.ZooKeeperBasedMembershipTable.DeleteMembershipTableEntries(string clusterId) -> System.Threading.Tasks.Task
+~Orleans.Runtime.Membership.ZooKeeperBasedMembershipTable.InitializeMembershipTable(bool tryInitPath) -> System.Threading.Tasks.Task
+~Orleans.Runtime.Membership.ZooKeeperBasedMembershipTable.InsertRow(Orleans.MembershipEntry entry, Orleans.TableVersion tableVersion) -> System.Threading.Tasks.Task<bool>
+~Orleans.Runtime.Membership.ZooKeeperBasedMembershipTable.ReadAll() -> System.Threading.Tasks.Task<Orleans.MembershipTableData>
+~Orleans.Runtime.Membership.ZooKeeperBasedMembershipTable.ReadRow(Orleans.Runtime.SiloAddress siloAddress) -> System.Threading.Tasks.Task<Orleans.MembershipTableData>
+~Orleans.Runtime.Membership.ZooKeeperBasedMembershipTable.UpdateIAmAlive(Orleans.MembershipEntry entry) -> System.Threading.Tasks.Task
+~Orleans.Runtime.Membership.ZooKeeperBasedMembershipTable.UpdateRow(Orleans.MembershipEntry entry, string etag, Orleans.TableVersion tableVersion) -> System.Threading.Tasks.Task<bool>
+~Orleans.Runtime.Membership.ZooKeeperBasedMembershipTable.ZooKeeperBasedMembershipTable(Microsoft.Extensions.Logging.ILogger<Orleans.Runtime.Membership.ZooKeeperBasedMembershipTable> logger, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ZooKeeperClusteringSiloOptions> membershipTableOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions) -> void
+~Orleans.Runtime.Membership.ZooKeeperGatewayListProvider.GetGateways() -> System.Threading.Tasks.Task<System.Collections.Generic.IList<System.Uri>>
+~Orleans.Runtime.Membership.ZooKeeperGatewayListProvider.InitializeGatewayListProvider() -> System.Threading.Tasks.Task
+~Orleans.Runtime.Membership.ZooKeeperGatewayListProvider.ZooKeeperGatewayListProvider(Microsoft.Extensions.Logging.ILogger<Orleans.Runtime.Membership.ZooKeeperGatewayListProvider> logger, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ZooKeeperGatewayListProviderOptions> options, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.GatewayOptions> gatewayOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions) -> void
+~static Orleans.Hosting.ZooKeeperHostingExtensions.UseZooKeeperClustering(this Orleans.Hosting.IClientBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.ZooKeeperGatewayListProviderOptions>> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ZooKeeperHostingExtensions.UseZooKeeperClustering(this Orleans.Hosting.IClientBuilder builder, System.Action<Orleans.Configuration.ZooKeeperGatewayListProviderOptions> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ZooKeeperHostingExtensions.UseZooKeeperClustering(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.ZooKeeperClusteringSiloOptions>> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.ZooKeeperHostingExtensions.UseZooKeeperClustering(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Configuration.ZooKeeperClusteringSiloOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder

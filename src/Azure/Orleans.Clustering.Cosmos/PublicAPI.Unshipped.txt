@@ -1,0 +1,44 @@
+#nullable enable
+Orleans.Clustering.Cosmos.CosmosClusteringOptions
+Orleans.Clustering.Cosmos.CosmosClusteringOptions.CosmosClusteringOptions() -> void
+Orleans.Clustering.Cosmos.CosmosClusteringOptionsValidator
+Orleans.Clustering.Cosmos.CosmosClusteringOptionsValidator.CosmosClusteringOptionsValidator(Orleans.Clustering.Cosmos.CosmosClusteringOptions! options, string! name) -> void
+Orleans.Clustering.Cosmos.CosmosOptions
+Orleans.Clustering.Cosmos.CosmosOptions.CleanResourcesOnInitialization.get -> bool
+Orleans.Clustering.Cosmos.CosmosOptions.CleanResourcesOnInitialization.set -> void
+Orleans.Clustering.Cosmos.CosmosOptions.ClientOptions.get -> Microsoft.Azure.Cosmos.CosmosClientOptions!
+Orleans.Clustering.Cosmos.CosmosOptions.ClientOptions.set -> void
+Orleans.Clustering.Cosmos.CosmosOptions.ConfigureCosmosClient(string! accountEndpoint, Azure.AzureKeyCredential! authKeyOrResourceTokenCredential) -> void
+Orleans.Clustering.Cosmos.CosmosOptions.ConfigureCosmosClient(string! accountEndpoint, Azure.Core.TokenCredential! tokenCredential) -> void
+Orleans.Clustering.Cosmos.CosmosOptions.ConfigureCosmosClient(string! accountEndpoint, string! authKeyOrResourceToken) -> void
+Orleans.Clustering.Cosmos.CosmosOptions.ConfigureCosmosClient(string! connectionString) -> void
+Orleans.Clustering.Cosmos.CosmosOptions.ConfigureCosmosClient(System.Func<System.IServiceProvider!, System.Threading.Tasks.ValueTask<Microsoft.Azure.Cosmos.CosmosClient!>>! createClient) -> void
+Orleans.Clustering.Cosmos.CosmosOptions.ContainerName.get -> string!
+Orleans.Clustering.Cosmos.CosmosOptions.ContainerName.set -> void
+Orleans.Clustering.Cosmos.CosmosOptions.ContainerThroughputProperties.get -> Microsoft.Azure.Cosmos.ThroughputProperties?
+Orleans.Clustering.Cosmos.CosmosOptions.ContainerThroughputProperties.set -> void
+Orleans.Clustering.Cosmos.CosmosOptions.CosmosOptions() -> void
+Orleans.Clustering.Cosmos.CosmosOptions.DatabaseName.get -> string!
+Orleans.Clustering.Cosmos.CosmosOptions.DatabaseName.set -> void
+Orleans.Clustering.Cosmos.CosmosOptions.DatabaseThroughput.get -> int?
+Orleans.Clustering.Cosmos.CosmosOptions.DatabaseThroughput.set -> void
+Orleans.Clustering.Cosmos.CosmosOptions.IsResourceCreationEnabled.get -> bool
+Orleans.Clustering.Cosmos.CosmosOptions.IsResourceCreationEnabled.set -> void
+Orleans.Clustering.Cosmos.CosmosOptions.OperationExecutor.get -> Orleans.Clustering.Cosmos.ICosmosOperationExecutor!
+Orleans.Clustering.Cosmos.CosmosOptions.OperationExecutor.set -> void
+Orleans.Clustering.Cosmos.CosmosOptionsValidator<TOptions>
+Orleans.Clustering.Cosmos.CosmosOptionsValidator<TOptions>.CosmosOptionsValidator(TOptions! options, string! name) -> void
+Orleans.Clustering.Cosmos.CosmosOptionsValidator<TOptions>.ValidateConfiguration() -> void
+Orleans.Clustering.Cosmos.ICosmosOperationExecutor
+Orleans.Clustering.Cosmos.ICosmosOperationExecutor.ExecuteOperation<TArg, TResult>(System.Func<TArg, System.Threading.Tasks.Task<TResult>!>! func, TArg arg) -> System.Threading.Tasks.Task<TResult>!
+Orleans.Hosting.HostingExtensions
+static Orleans.Hosting.HostingExtensions.UseCosmosClustering(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Clustering.Cosmos.CosmosClusteringOptions!>!>! configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Orleans.Hosting.HostingExtensions.UseCosmosClustering(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Orleans.Clustering.Cosmos.CosmosClusteringOptions!>! configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Orleans.Hosting.HostingExtensions.UseCosmosClustering(this Orleans.Hosting.ISiloBuilder! builder) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Hosting.HostingExtensions.UseCosmosClustering(this Orleans.Hosting.ISiloBuilder! builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Clustering.Cosmos.CosmosClusteringOptions!>!>! configureOptions) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Hosting.HostingExtensions.UseCosmosClustering(this Orleans.Hosting.ISiloBuilder! builder, System.Action<Orleans.Clustering.Cosmos.CosmosClusteringOptions!>! configureOptions) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Hosting.HostingExtensions.UseCosmosGatewayListProvider(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Clustering.Cosmos.CosmosClusteringOptions!>!>! configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Orleans.Hosting.HostingExtensions.UseCosmosGatewayListProvider(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Orleans.Clustering.Cosmos.CosmosClusteringOptions!>! configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Orleans.Hosting.HostingExtensions.UseCosmosGatewayListProvider(this Orleans.Hosting.IClientBuilder! builder) -> Orleans.Hosting.IClientBuilder!
+static Orleans.Hosting.HostingExtensions.UseCosmosGatewayListProvider(this Orleans.Hosting.IClientBuilder! builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Clustering.Cosmos.CosmosClusteringOptions!>!>! configureOptions) -> Orleans.Hosting.IClientBuilder!
+static Orleans.Hosting.HostingExtensions.UseCosmosGatewayListProvider(this Orleans.Hosting.IClientBuilder! builder, System.Action<Orleans.Clustering.Cosmos.CosmosClusteringOptions!>! configureOptions) -> Orleans.Hosting.IClientBuilder!

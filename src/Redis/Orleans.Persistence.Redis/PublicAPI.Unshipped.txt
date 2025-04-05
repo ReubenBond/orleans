@@ -1,0 +1,45 @@
+#nullable enable
+Orleans.Hosting.RedisGrainStorageServiceCollectionExtensions
+Orleans.Hosting.RedisSiloBuilderExtensions
+Orleans.Persistence.Redis.RedisStorageException
+Orleans.Persistence.Redis.RedisStorageException.RedisStorageException() -> void
+Orleans.Persistence.RedisGrainStorage
+Orleans.Persistence.RedisGrainStorageFactory
+Orleans.Persistence.RedisStorageOptions
+Orleans.Persistence.RedisStorageOptions.ConfigurationOptions.get -> StackExchange.Redis.ConfigurationOptions?
+Orleans.Persistence.RedisStorageOptions.ConfigurationOptions.set -> void
+Orleans.Persistence.RedisStorageOptions.CreateMultiplexer.get -> System.Func<Orleans.Persistence.RedisStorageOptions!, System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer!>!>!
+Orleans.Persistence.RedisStorageOptions.CreateMultiplexer.set -> void
+Orleans.Persistence.RedisStorageOptions.DeleteStateOnClear.get -> bool
+Orleans.Persistence.RedisStorageOptions.DeleteStateOnClear.set -> void
+Orleans.Persistence.RedisStorageOptions.EntryExpiry.get -> System.TimeSpan?
+Orleans.Persistence.RedisStorageOptions.EntryExpiry.set -> void
+Orleans.Persistence.RedisStorageOptions.GetStorageKey.get -> System.Func<string!, Orleans.Runtime.GrainId, StackExchange.Redis.RedisKey>?
+Orleans.Persistence.RedisStorageOptions.GetStorageKey.set -> void
+Orleans.Persistence.RedisStorageOptions.GrainStorageSerializer.get -> Orleans.Storage.IGrainStorageSerializer?
+Orleans.Persistence.RedisStorageOptions.GrainStorageSerializer.set -> void
+Orleans.Persistence.RedisStorageOptions.InitStage.get -> int
+Orleans.Persistence.RedisStorageOptions.InitStage.set -> void
+Orleans.Persistence.RedisStorageOptions.RedisStorageOptions() -> void
+Orleans.Persistence.RedisStorageOptionsExtensions
+static Orleans.Persistence.RedisStorageOptions.DefaultCreateMultiplexer(Orleans.Persistence.RedisStorageOptions! options) -> System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer!>!
+static Orleans.Persistence.RedisStorageOptionsExtensions.UseGetRedisKeyIgnoringGrainType(this Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.RedisStorageOptions!>! optionsBuilder) -> void
+~Orleans.Persistence.Redis.RedisStorageException.RedisStorageException(string message) -> void
+~Orleans.Persistence.Redis.RedisStorageException.RedisStorageException(string message, System.Exception inner) -> void
+~Orleans.Persistence.Redis.RedisStorageException.RedisStorageException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~Orleans.Persistence.RedisGrainStorage.ClearStateAsync<T>(string grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~Orleans.Persistence.RedisGrainStorage.Participate(Orleans.Runtime.ISiloLifecycle lifecycle) -> void
+~Orleans.Persistence.RedisGrainStorage.ReadStateAsync<T>(string grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~Orleans.Persistence.RedisGrainStorage.RedisGrainStorage(string name, Orleans.Persistence.RedisStorageOptions options, Orleans.Storage.IGrainStorageSerializer grainStorageSerializer, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions, Orleans.Serialization.Serializers.IActivatorProvider activatorProvider, Microsoft.Extensions.Logging.ILogger<Orleans.Persistence.RedisGrainStorage> logger) -> void
+~Orleans.Persistence.RedisGrainStorage.WriteStateAsync<T>(string grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~static Orleans.Hosting.RedisGrainStorageServiceCollectionExtensions.AddRedisGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.RedisStorageOptions>> configureOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.RedisGrainStorageServiceCollectionExtensions.AddRedisGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Orleans.Persistence.RedisStorageOptions> configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.RedisGrainStorageServiceCollectionExtensions.AddRedisGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.RedisStorageOptions>> configureOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.RedisGrainStorageServiceCollectionExtensions.AddRedisGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Orleans.Persistence.RedisStorageOptions> configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.RedisSiloBuilderExtensions.AddRedisGrainStorage(this Orleans.Hosting.ISiloBuilder builder, string name) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.RedisSiloBuilderExtensions.AddRedisGrainStorage(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.RedisStorageOptions>> configureOptionsBuilder) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.RedisSiloBuilderExtensions.AddRedisGrainStorage(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Persistence.RedisStorageOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.RedisSiloBuilderExtensions.AddRedisGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder builder) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.RedisSiloBuilderExtensions.AddRedisGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.RedisStorageOptions>> configureOptionsBuilder) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.RedisSiloBuilderExtensions.AddRedisGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Persistence.RedisStorageOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Persistence.RedisGrainStorageFactory.Create(System.IServiceProvider services, string name) -> Orleans.Persistence.RedisGrainStorage

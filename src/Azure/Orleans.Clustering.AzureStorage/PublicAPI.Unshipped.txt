@@ -1,0 +1,55 @@
+#nullable enable
+Orleans.Clustering.AzureStorage.AzureStorageClusteringOptions
+Orleans.Clustering.AzureStorage.AzureStorageClusteringOptions.AzureStorageClusteringOptions() -> void
+Orleans.Clustering.AzureStorage.AzureStorageClusteringOptionsValidator
+Orleans.Clustering.AzureStorage.AzureStorageGatewayOptions
+Orleans.Clustering.AzureStorage.AzureStorageGatewayOptions.AzureStorageGatewayOptions() -> void
+Orleans.Clustering.AzureStorage.AzureStorageGatewayOptionsValidator
+Orleans.Clustering.AzureStorage.AzureStorageOperationOptions
+Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.AzureStorageOperationOptions() -> void
+Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions
+Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions.AzureStoragePolicyOptions() -> void
+Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions.CreationTimeout.get -> System.TimeSpan
+Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions.CreationTimeout.set -> void
+Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions.MaxBulkUpdateRows.get -> int
+Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions.MaxBulkUpdateRows.set -> void
+Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions.MaxCreationRetries.get -> int
+Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions.MaxCreationRetries.set -> void
+Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions.MaxOperationRetries.get -> int
+Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions.MaxOperationRetries.set -> void
+Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions.OperationTimeout.get -> System.TimeSpan
+Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions.OperationTimeout.set -> void
+Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions.PauseBetweenCreationRetries.get -> System.TimeSpan
+Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions.PauseBetweenCreationRetries.set -> void
+Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions.PauseBetweenOperationRetries.get -> System.TimeSpan
+Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions.PauseBetweenOperationRetries.set -> void
+Orleans.Hosting.AzureTableClusteringExtensions
+virtual Orleans.Clustering.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.ValidateConfiguration() -> void
+~const Orleans.Clustering.AzureStorage.AzureStorageClusteringOptions.DEFAULT_TABLE_NAME = "OrleansSiloInstances" -> string
+~Orleans.Clustering.AzureStorage.AzureStorageClusteringOptionsValidator.AzureStorageClusteringOptionsValidator(Orleans.Clustering.AzureStorage.AzureStorageClusteringOptions options, string name) -> void
+~Orleans.Clustering.AzureStorage.AzureStorageGatewayOptionsValidator.AzureStorageGatewayOptionsValidator(Orleans.Clustering.AzureStorage.AzureStorageGatewayOptions options, string name) -> void
+~Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.ClientOptions.get -> Azure.Data.Tables.TableClientOptions
+~Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.ClientOptions.set -> void
+~Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(string connectionString) -> void
+~Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>> createClientCallback) -> void
+~Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri) -> void
+~Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.AzureSasCredential azureSasCredential) -> void
+~Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.Core.TokenCredential tokenCredential) -> void
+~Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.Data.Tables.TableSharedKeyCredential sharedKeyCredential) -> void
+~Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.StoragePolicyOptions.get -> Orleans.Clustering.AzureStorage.AzureStoragePolicyOptions
+~Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.TableServiceClient.get -> Azure.Data.Tables.TableServiceClient
+~Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.TableServiceClient.set -> void
+~Orleans.Clustering.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>
+~Orleans.Clustering.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.AzureStorageOperationOptionsValidator(TOptions options, string name = null) -> void
+~Orleans.Clustering.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.Name.get -> string
+~Orleans.Clustering.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.Options.get -> TOptions
+~override Orleans.Clustering.AzureStorage.AzureStorageClusteringOptions.TableName.get -> string
+~override Orleans.Clustering.AzureStorage.AzureStorageClusteringOptions.TableName.set -> void
+~override Orleans.Clustering.AzureStorage.AzureStorageGatewayOptions.TableName.get -> string
+~override Orleans.Clustering.AzureStorage.AzureStorageGatewayOptions.TableName.set -> void
+~static Orleans.Hosting.AzureTableClusteringExtensions.UseAzureStorageClustering(this Orleans.Hosting.IClientBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Clustering.AzureStorage.AzureStorageGatewayOptions>> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.AzureTableClusteringExtensions.UseAzureStorageClustering(this Orleans.Hosting.IClientBuilder builder, System.Action<Orleans.Clustering.AzureStorage.AzureStorageGatewayOptions> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.AzureTableClusteringExtensions.UseAzureStorageClustering(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Clustering.AzureStorage.AzureStorageClusteringOptions>> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AzureTableClusteringExtensions.UseAzureStorageClustering(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Clustering.AzureStorage.AzureStorageClusteringOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~virtual Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.TableName.get -> string
+~virtual Orleans.Clustering.AzureStorage.AzureStorageOperationOptions.TableName.set -> void

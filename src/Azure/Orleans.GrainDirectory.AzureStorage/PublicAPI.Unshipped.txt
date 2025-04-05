@@ -1,0 +1,60 @@
+#nullable enable
+Orleans.Configuration.AzureTableGrainDirectoryOptions
+Orleans.Configuration.AzureTableGrainDirectoryOptions.AzureTableGrainDirectoryOptions() -> void
+Orleans.Configuration.AzureTableGrainDirectoryOptionsValidator
+Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions
+Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.AzureStorageOperationOptions() -> void
+Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions
+Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions.AzureStoragePolicyOptions() -> void
+Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions.CreationTimeout.get -> System.TimeSpan
+Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions.CreationTimeout.set -> void
+Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions.MaxBulkUpdateRows.get -> int
+Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions.MaxBulkUpdateRows.set -> void
+Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions.MaxCreationRetries.get -> int
+Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions.MaxCreationRetries.set -> void
+Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions.MaxOperationRetries.get -> int
+Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions.MaxOperationRetries.set -> void
+Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions.OperationTimeout.get -> System.TimeSpan
+Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions.OperationTimeout.set -> void
+Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions.PauseBetweenCreationRetries.get -> System.TimeSpan
+Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions.PauseBetweenCreationRetries.set -> void
+Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions.PauseBetweenOperationRetries.get -> System.TimeSpan
+Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions.PauseBetweenOperationRetries.set -> void
+Orleans.GrainDirectory.AzureStorage.AzureTableGrainDirectory
+Orleans.GrainDirectory.AzureStorage.AzureTableGrainDirectory.AzureTableGrainDirectory(Orleans.Configuration.AzureTableGrainDirectoryOptions! directoryOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions!>! clusterOptions, Microsoft.Extensions.Logging.ILoggerFactory! loggerFactory) -> void
+Orleans.GrainDirectory.AzureStorage.AzureTableGrainDirectory.InitializeIfNeeded(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Orleans.GrainDirectory.AzureStorage.AzureTableGrainDirectory.Lookup(Orleans.Runtime.GrainId grainId) -> System.Threading.Tasks.Task<Orleans.Runtime.GrainAddress?>!
+Orleans.GrainDirectory.AzureStorage.AzureTableGrainDirectory.Participate(Orleans.Runtime.ISiloLifecycle! lifecycle) -> void
+Orleans.GrainDirectory.AzureStorage.AzureTableGrainDirectory.Register(Orleans.Runtime.GrainAddress! address) -> System.Threading.Tasks.Task<Orleans.Runtime.GrainAddress?>!
+Orleans.GrainDirectory.AzureStorage.AzureTableGrainDirectory.Register(Orleans.Runtime.GrainAddress! address, Orleans.Runtime.GrainAddress? previousAddress) -> System.Threading.Tasks.Task<Orleans.Runtime.GrainAddress?>!
+Orleans.GrainDirectory.AzureStorage.AzureTableGrainDirectory.Unregister(Orleans.Runtime.GrainAddress! address) -> System.Threading.Tasks.Task!
+Orleans.GrainDirectory.AzureStorage.AzureTableGrainDirectory.UnregisterMany(System.Collections.Generic.List<Orleans.Runtime.GrainAddress!>! addresses) -> System.Threading.Tasks.Task!
+Orleans.GrainDirectory.AzureStorage.AzureTableGrainDirectory.UnregisterSilos(System.Collections.Generic.List<Orleans.Runtime.SiloAddress!>! siloAddresses) -> System.Threading.Tasks.Task!
+Orleans.Hosting.AzureTableGrainDirectoryServiceCollectionExtensions
+Orleans.Hosting.AzureTableGrainDirectorySiloBuilderExtensions
+virtual Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.ValidateConfiguration() -> void
+~const Orleans.Configuration.AzureTableGrainDirectoryOptions.DEFAULT_TABLE_NAME = "GrainDirectory" -> string
+~Orleans.Configuration.AzureTableGrainDirectoryOptionsValidator.AzureTableGrainDirectoryOptionsValidator(Orleans.Configuration.AzureTableGrainDirectoryOptions options, string name) -> void
+~Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.ClientOptions.get -> Azure.Data.Tables.TableClientOptions
+~Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.ClientOptions.set -> void
+~Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(string connectionString) -> void
+~Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>> createClientCallback) -> void
+~Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri) -> void
+~Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.AzureSasCredential azureSasCredential) -> void
+~Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.Core.TokenCredential tokenCredential) -> void
+~Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.Data.Tables.TableSharedKeyCredential sharedKeyCredential) -> void
+~Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.StoragePolicyOptions.get -> Orleans.GrainDirectory.AzureStorage.AzureStoragePolicyOptions
+~Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.TableServiceClient.get -> Azure.Data.Tables.TableServiceClient
+~Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.TableServiceClient.set -> void
+~Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>
+~Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.AzureStorageOperationOptionsValidator(TOptions options, string name = null) -> void
+~Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.Name.get -> string
+~Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.Options.get -> TOptions
+~override Orleans.Configuration.AzureTableGrainDirectoryOptions.TableName.get -> string
+~override Orleans.Configuration.AzureTableGrainDirectoryOptions.TableName.set -> void
+~static Orleans.Hosting.AzureTableGrainDirectorySiloBuilderExtensions.AddAzureTableGrainDirectory(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureTableGrainDirectoryOptions>> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AzureTableGrainDirectorySiloBuilderExtensions.AddAzureTableGrainDirectory(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Configuration.AzureTableGrainDirectoryOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AzureTableGrainDirectorySiloBuilderExtensions.UseAzureTableGrainDirectoryAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureTableGrainDirectoryOptions>> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AzureTableGrainDirectorySiloBuilderExtensions.UseAzureTableGrainDirectoryAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Configuration.AzureTableGrainDirectoryOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~virtual Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.TableName.get -> string
+~virtual Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions.TableName.set -> void

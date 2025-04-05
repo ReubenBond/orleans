@@ -1,0 +1,18 @@
+#nullable enable
+Orleans.Clustering.Cassandra.Hosting.CassandraClusteringOptions
+Orleans.Clustering.Cassandra.Hosting.CassandraClusteringOptions.CassandraClusteringOptions() -> void
+Orleans.Clustering.Cassandra.Hosting.CassandraClusteringOptions.ConfigureClient(string! connectionString, string! keyspace = "orleans") -> void
+Orleans.Clustering.Cassandra.Hosting.CassandraClusteringOptions.ConfigureClient(System.Func<System.IServiceProvider!, System.Threading.Tasks.Task<Cassandra.ISession!>!>! configurationDelegate) -> void
+Orleans.Clustering.Cassandra.Hosting.CassandraClusteringOptions.InitializeRetryMaxDelay.get -> System.TimeSpan
+Orleans.Clustering.Cassandra.Hosting.CassandraClusteringOptions.InitializeRetryMaxDelay.set -> void
+Orleans.Clustering.Cassandra.Hosting.CassandraClusteringOptions.UseCassandraTtl.get -> bool
+Orleans.Clustering.Cassandra.Hosting.CassandraClusteringOptions.UseCassandraTtl.set -> void
+Orleans.Clustering.Cassandra.Hosting.CassandraMembershipHostingExtensions
+static Orleans.Clustering.Cassandra.Hosting.CassandraMembershipHostingExtensions.UseCassandraClustering(this Orleans.Hosting.IClientBuilder! builder) -> Orleans.Hosting.IClientBuilder!
+static Orleans.Clustering.Cassandra.Hosting.CassandraMembershipHostingExtensions.UseCassandraClustering(this Orleans.Hosting.IClientBuilder! builder, string! connectionString, string! keyspace = "orleans") -> Orleans.Hosting.IClientBuilder!
+static Orleans.Clustering.Cassandra.Hosting.CassandraMembershipHostingExtensions.UseCassandraClustering(this Orleans.Hosting.IClientBuilder! builder, System.Action<Orleans.Clustering.Cassandra.Hosting.CassandraClusteringOptions!>! configureOptions) -> Orleans.Hosting.IClientBuilder!
+static Orleans.Clustering.Cassandra.Hosting.CassandraMembershipHostingExtensions.UseCassandraClustering(this Orleans.Hosting.IClientBuilder! builder, System.Func<System.IServiceProvider!, System.Threading.Tasks.Task<Cassandra.ISession!>!>! sessionProvider) -> Orleans.Hosting.IClientBuilder!
+static Orleans.Clustering.Cassandra.Hosting.CassandraMembershipHostingExtensions.UseCassandraClustering(this Orleans.Hosting.ISiloBuilder! builder) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Clustering.Cassandra.Hosting.CassandraMembershipHostingExtensions.UseCassandraClustering(this Orleans.Hosting.ISiloBuilder! builder, string! connectionString, string! keyspace = "orleans") -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Clustering.Cassandra.Hosting.CassandraMembershipHostingExtensions.UseCassandraClustering(this Orleans.Hosting.ISiloBuilder! builder, System.Action<Orleans.Clustering.Cassandra.Hosting.CassandraClusteringOptions!>! configureOptions) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Clustering.Cassandra.Hosting.CassandraMembershipHostingExtensions.UseCassandraClustering(this Orleans.Hosting.ISiloBuilder! builder, System.Func<System.IServiceProvider!, System.Threading.Tasks.Task<Cassandra.ISession!>!>! sessionProvider) -> Orleans.Hosting.ISiloBuilder!

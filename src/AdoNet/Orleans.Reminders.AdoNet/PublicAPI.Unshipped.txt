@@ -1,0 +1,31 @@
+#nullable enable
+Orleans.Configuration.AdoNetReminderTableOptions
+Orleans.Configuration.AdoNetReminderTableOptions.AdoNetReminderTableOptions() -> void
+Orleans.Configuration.AdoNetReminderTableOptionsValidator
+Orleans.Configuration.AdoNetReminderTableOptionsValidator.ValidateConfiguration() -> void
+Orleans.Hosting.SiloBuilderReminderExtensions
+Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream
+override Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream.CanRead.get -> bool
+override Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream.CanSeek.get -> bool
+override Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream.CanTimeout.get -> bool
+override Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream.CanWrite.get -> bool
+override Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream.Dispose(bool disposing) -> void
+override Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream.Flush() -> void
+override Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream.Length.get -> long
+override Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream.Position.get -> long
+override Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream.Position.set -> void
+override Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream.Seek(long offset, System.IO.SeekOrigin origin) -> long
+override Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream.SetLength(long value) -> void
+~Orleans.Configuration.AdoNetReminderTableOptions.ConnectionString.get -> string
+~Orleans.Configuration.AdoNetReminderTableOptions.ConnectionString.set -> void
+~Orleans.Configuration.AdoNetReminderTableOptions.Invariant.get -> string
+~Orleans.Configuration.AdoNetReminderTableOptions.Invariant.set -> void
+~Orleans.Configuration.AdoNetReminderTableOptionsValidator.AdoNetReminderTableOptionsValidator(Microsoft.Extensions.Options.IOptions<Orleans.Configuration.AdoNetReminderTableOptions> options) -> void
+~Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream.OrleansRelationalDownloadStream(System.Data.Common.DbDataReader reader, int ordinal) -> void
+~override Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream.CopyToAsync(System.IO.Stream destination, int bufferSize, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task
+~override Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream.Read(byte[] buffer, int offset, int count) -> int
+~override Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream.ReadAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<int>
+~override Orleans.Reminders.AdoNet.Storage.OrleansRelationalDownloadStream.Write(byte[] buffer, int offset, int count) -> void
+~static Orleans.Hosting.SiloBuilderReminderExtensions.UseAdoNetReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AdoNetReminderTableOptions>> configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.SiloBuilderReminderExtensions.UseAdoNetReminderService(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AdoNetReminderTableOptions>> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.SiloBuilderReminderExtensions.UseAdoNetReminderService(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Configuration.AdoNetReminderTableOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder

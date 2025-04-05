@@ -1,0 +1,62 @@
+#nullable enable
+Orleans.Hosting.AzureStorageReminderServiceCollectionExtensions
+Orleans.Hosting.AzureStorageReminderSiloBuilderExtensions
+Orleans.Reminders.AzureStorage.AzureStorageOperationOptions
+Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.AzureStorageOperationOptions() -> void
+Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions
+Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions.AzureStoragePolicyOptions() -> void
+Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions.CreationTimeout.get -> System.TimeSpan
+Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions.CreationTimeout.set -> void
+Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions.MaxBulkUpdateRows.get -> int
+Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions.MaxBulkUpdateRows.set -> void
+Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions.MaxCreationRetries.get -> int
+Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions.MaxCreationRetries.set -> void
+Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions.MaxOperationRetries.get -> int
+Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions.MaxOperationRetries.set -> void
+Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions.OperationTimeout.get -> System.TimeSpan
+Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions.OperationTimeout.set -> void
+Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions.PauseBetweenCreationRetries.get -> System.TimeSpan
+Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions.PauseBetweenCreationRetries.set -> void
+Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions.PauseBetweenOperationRetries.get -> System.TimeSpan
+Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions.PauseBetweenOperationRetries.set -> void
+Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions
+Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions.AzureTableReminderStorageOptions() -> void
+Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptionsValidator
+Orleans.Runtime.ReminderService.AzureBasedReminderTable
+virtual Orleans.Reminders.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.ValidateConfiguration() -> void
+~const Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions.DEFAULT_TABLE_NAME = "OrleansReminders" -> string
+~Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.ClientOptions.get -> Azure.Data.Tables.TableClientOptions
+~Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.ClientOptions.set -> void
+~Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(string connectionString) -> void
+~Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>> createClientCallback) -> void
+~Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri) -> void
+~Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.AzureSasCredential azureSasCredential) -> void
+~Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.Core.TokenCredential tokenCredential) -> void
+~Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.Data.Tables.TableSharedKeyCredential sharedKeyCredential) -> void
+~Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.StoragePolicyOptions.get -> Orleans.Reminders.AzureStorage.AzureStoragePolicyOptions
+~Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.TableServiceClient.get -> Azure.Data.Tables.TableServiceClient
+~Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.TableServiceClient.set -> void
+~Orleans.Reminders.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>
+~Orleans.Reminders.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.AzureStorageOperationOptionsValidator(TOptions options, string name = null) -> void
+~Orleans.Reminders.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.Name.get -> string
+~Orleans.Reminders.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.Options.get -> TOptions
+~Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptionsValidator.AzureTableReminderStorageOptionsValidator(Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions options, string name) -> void
+~Orleans.Runtime.ReminderService.AzureBasedReminderTable.AzureBasedReminderTable(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Options.IOptions<Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions> storageOptions) -> void
+~Orleans.Runtime.ReminderService.AzureBasedReminderTable.ReadRow(Orleans.Runtime.GrainId grainId, string reminderName) -> System.Threading.Tasks.Task<Orleans.ReminderEntry>
+~Orleans.Runtime.ReminderService.AzureBasedReminderTable.ReadRows(Orleans.Runtime.GrainId grainId) -> System.Threading.Tasks.Task<Orleans.ReminderTableData>
+~Orleans.Runtime.ReminderService.AzureBasedReminderTable.ReadRows(uint begin, uint end) -> System.Threading.Tasks.Task<Orleans.ReminderTableData>
+~Orleans.Runtime.ReminderService.AzureBasedReminderTable.RemoveRow(Orleans.Runtime.GrainId grainId, string reminderName, string eTag) -> System.Threading.Tasks.Task<bool>
+~Orleans.Runtime.ReminderService.AzureBasedReminderTable.StartAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task
+~Orleans.Runtime.ReminderService.AzureBasedReminderTable.StopAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task
+~Orleans.Runtime.ReminderService.AzureBasedReminderTable.TestOnlyClearTable() -> System.Threading.Tasks.Task
+~Orleans.Runtime.ReminderService.AzureBasedReminderTable.UpsertRow(Orleans.ReminderEntry entry) -> System.Threading.Tasks.Task<string>
+~override Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions.TableName.get -> string
+~override Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions.TableName.set -> void
+~static Orleans.Hosting.AzureStorageReminderServiceCollectionExtensions.UseAzureTableReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string connectionString) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.AzureStorageReminderServiceCollectionExtensions.UseAzureTableReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions>> configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.AzureStorageReminderServiceCollectionExtensions.UseAzureTableReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions> configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.AzureStorageReminderSiloBuilderExtensions.UseAzureTableReminderService(this Orleans.Hosting.ISiloBuilder builder, string connectionString) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AzureStorageReminderSiloBuilderExtensions.UseAzureTableReminderService(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions>> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AzureStorageReminderSiloBuilderExtensions.UseAzureTableReminderService(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Reminders.AzureStorage.AzureTableReminderStorageOptions> configure) -> Orleans.Hosting.ISiloBuilder
+~virtual Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.TableName.get -> string
+~virtual Orleans.Reminders.AzureStorage.AzureStorageOperationOptions.TableName.set -> void

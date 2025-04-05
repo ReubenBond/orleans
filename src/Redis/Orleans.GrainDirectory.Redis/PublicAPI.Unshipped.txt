@@ -1,0 +1,27 @@
+#nullable enable
+Orleans.Configuration.RedisGrainDirectoryOptions
+Orleans.Configuration.RedisGrainDirectoryOptions.EntryExpiry.get -> System.TimeSpan?
+Orleans.Configuration.RedisGrainDirectoryOptions.EntryExpiry.set -> void
+Orleans.Configuration.RedisGrainDirectoryOptions.RedisGrainDirectoryOptions() -> void
+Orleans.Configuration.RedisGrainDirectoryOptionsValidator
+Orleans.Configuration.RedisGrainDirectoryOptionsValidator.ValidateConfiguration() -> void
+Orleans.GrainDirectory.Redis.RedisGrainDirectory
+Orleans.GrainDirectory.Redis.RedisGrainDirectory.Initialize(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+Orleans.GrainDirectory.Redis.RedisGrainDirectory.Lookup(Orleans.Runtime.GrainId grainId) -> System.Threading.Tasks.Task<Orleans.Runtime.GrainAddress?>!
+Orleans.GrainDirectory.Redis.RedisGrainDirectory.Participate(Orleans.Runtime.ISiloLifecycle! lifecycle) -> void
+Orleans.GrainDirectory.Redis.RedisGrainDirectory.RedisGrainDirectory(Orleans.Configuration.RedisGrainDirectoryOptions! directoryOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions!>! clusterOptions, Microsoft.Extensions.Logging.ILogger<Orleans.GrainDirectory.Redis.RedisGrainDirectory!>! logger) -> void
+Orleans.GrainDirectory.Redis.RedisGrainDirectory.Register(Orleans.Runtime.GrainAddress! address) -> System.Threading.Tasks.Task<Orleans.Runtime.GrainAddress?>!
+Orleans.GrainDirectory.Redis.RedisGrainDirectory.Register(Orleans.Runtime.GrainAddress! address, Orleans.Runtime.GrainAddress? previousAddress) -> System.Threading.Tasks.Task<Orleans.Runtime.GrainAddress?>!
+Orleans.GrainDirectory.Redis.RedisGrainDirectory.Unregister(Orleans.Runtime.GrainAddress! address) -> System.Threading.Tasks.Task!
+Orleans.GrainDirectory.Redis.RedisGrainDirectory.UnregisterSilos(System.Collections.Generic.List<Orleans.Runtime.SiloAddress!>! siloAddresses) -> System.Threading.Tasks.Task!
+Orleans.Hosting.RedisGrainDirectoryExtensions
+~Orleans.Configuration.RedisGrainDirectoryOptions.ConfigurationOptions.get -> StackExchange.Redis.ConfigurationOptions
+~Orleans.Configuration.RedisGrainDirectoryOptions.ConfigurationOptions.set -> void
+~Orleans.Configuration.RedisGrainDirectoryOptions.CreateMultiplexer.get -> System.Func<Orleans.Configuration.RedisGrainDirectoryOptions, System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer>>
+~Orleans.Configuration.RedisGrainDirectoryOptions.CreateMultiplexer.set -> void
+~Orleans.Configuration.RedisGrainDirectoryOptionsValidator.RedisGrainDirectoryOptionsValidator(Orleans.Configuration.RedisGrainDirectoryOptions options, string name) -> void
+~static Orleans.Configuration.RedisGrainDirectoryOptions.DefaultCreateMultiplexer(Orleans.Configuration.RedisGrainDirectoryOptions options) -> System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer>
+~static Orleans.Hosting.RedisGrainDirectoryExtensions.AddRedisGrainDirectory(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.RedisGrainDirectoryOptions>> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.RedisGrainDirectoryExtensions.AddRedisGrainDirectory(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Configuration.RedisGrainDirectoryOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.RedisGrainDirectoryExtensions.UseRedisGrainDirectoryAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.RedisGrainDirectoryOptions>> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.RedisGrainDirectoryExtensions.UseRedisGrainDirectoryAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Configuration.RedisGrainDirectoryOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder

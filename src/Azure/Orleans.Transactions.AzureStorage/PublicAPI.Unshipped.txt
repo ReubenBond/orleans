@@ -1,0 +1,61 @@
+#nullable enable
+const Orleans.Configuration.AzureTableTransactionalStateOptions.DEFAULT_INIT_STAGE = 10000 -> int
+Orleans.Configuration.AzureTableTransactionalStateOptions
+Orleans.Configuration.AzureTableTransactionalStateOptions.AzureTableTransactionalStateOptions() -> void
+Orleans.Configuration.AzureTableTransactionalStateOptions.InitStage.get -> int
+Orleans.Configuration.AzureTableTransactionalStateOptions.InitStage.set -> void
+Orleans.Configuration.AzureTableTransactionalStateOptionsValidator
+Orleans.Hosting.AzureTableTransactionServicecollectionExtensions
+Orleans.Hosting.AzureTableTransactionSiloBuilderExtensions
+Orleans.Transactions.AzureStorage.AzureStorageOperationOptions
+Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.AzureStorageOperationOptions() -> void
+Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions
+Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions.AzureStoragePolicyOptions() -> void
+Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions.CreationTimeout.get -> System.TimeSpan
+Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions.CreationTimeout.set -> void
+Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions.MaxBulkUpdateRows.get -> int
+Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions.MaxBulkUpdateRows.set -> void
+Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions.MaxCreationRetries.get -> int
+Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions.MaxCreationRetries.set -> void
+Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions.MaxOperationRetries.get -> int
+Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions.MaxOperationRetries.set -> void
+Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions.OperationTimeout.get -> System.TimeSpan
+Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions.OperationTimeout.set -> void
+Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions.PauseBetweenCreationRetries.get -> System.TimeSpan
+Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions.PauseBetweenCreationRetries.set -> void
+Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions.PauseBetweenOperationRetries.get -> System.TimeSpan
+Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions.PauseBetweenOperationRetries.set -> void
+Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorageFactory
+virtual Orleans.Transactions.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.ValidateConfiguration() -> void
+~Orleans.Configuration.AzureTableTransactionalStateOptionsValidator.AzureTableTransactionalStateOptionsValidator(Orleans.Configuration.AzureTableTransactionalStateOptions options, string name) -> void
+~Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.ClientOptions.get -> Azure.Data.Tables.TableClientOptions
+~Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.ClientOptions.set -> void
+~Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(string connectionString) -> void
+~Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>> createClientCallback) -> void
+~Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri) -> void
+~Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.AzureSasCredential azureSasCredential) -> void
+~Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.Core.TokenCredential tokenCredential) -> void
+~Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.Data.Tables.TableSharedKeyCredential sharedKeyCredential) -> void
+~Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.StoragePolicyOptions.get -> Orleans.Transactions.AzureStorage.AzureStoragePolicyOptions
+~Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.TableServiceClient.get -> Azure.Data.Tables.TableServiceClient
+~Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.TableServiceClient.set -> void
+~Orleans.Transactions.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>
+~Orleans.Transactions.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.AzureStorageOperationOptionsValidator(TOptions options, string name = null) -> void
+~Orleans.Transactions.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.Name.get -> string
+~Orleans.Transactions.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.Options.get -> TOptions
+~Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorage<TState>
+~Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorage<TState>.AzureTableTransactionalStateStorage(Azure.Data.Tables.TableClient table, string partition, Newtonsoft.Json.JsonSerializerSettings JsonSettings, Microsoft.Extensions.Logging.ILogger<Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorage<TState>> logger) -> void
+~Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorage<TState>.Load() -> System.Threading.Tasks.Task<Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<TState>>
+~Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorage<TState>.Store(string expectedETag, Orleans.Transactions.Abstractions.TransactionalStateMetaData metadata, System.Collections.Generic.List<Orleans.Transactions.Abstractions.PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter) -> System.Threading.Tasks.Task<string>
+~Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorageFactory.AzureTableTransactionalStateStorageFactory(string name, Orleans.Configuration.AzureTableTransactionalStateOptions options, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions, System.IServiceProvider services, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) -> void
+~Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorageFactory.Create<TState>(string stateName, Orleans.Runtime.IGrainContext context) -> Orleans.Transactions.Abstractions.ITransactionalStateStorage<TState>
+~Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorageFactory.Participate(Orleans.Runtime.ISiloLifecycle lifecycle) -> void
+~override Orleans.Configuration.AzureTableTransactionalStateOptions.TableName.get -> string
+~override Orleans.Configuration.AzureTableTransactionalStateOptions.TableName.set -> void
+~static Orleans.Hosting.AzureTableTransactionSiloBuilderExtensions.AddAzureTableTransactionalStateStorage(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureTableTransactionalStateOptions>> configureOptions = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AzureTableTransactionSiloBuilderExtensions.AddAzureTableTransactionalStateStorage(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Configuration.AzureTableTransactionalStateOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AzureTableTransactionSiloBuilderExtensions.AddAzureTableTransactionalStateStorageAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureTableTransactionalStateOptions>> configureOptions = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AzureTableTransactionSiloBuilderExtensions.AddAzureTableTransactionalStateStorageAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Configuration.AzureTableTransactionalStateOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Transactions.AzureStorage.AzureTableTransactionalStateStorageFactory.Create(System.IServiceProvider services, string name) -> Orleans.Transactions.Abstractions.ITransactionalStateStorageFactory
+~virtual Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.TableName.get -> string
+~virtual Orleans.Transactions.AzureStorage.AzureStorageOperationOptions.TableName.set -> void

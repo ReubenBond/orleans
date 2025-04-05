@@ -1,0 +1,357 @@
+#nullable enable
+const Orleans.Configuration.EventDataGeneratorStreamOptions.DefaultEventHubPartitionCount = 4 -> int
+const Orleans.Streaming.EventHubs.SlowConsumingPressureMonitor.DefaultFlowControlThreshold = 0.5 -> double
+Orleans.Configuration.AzureTableStreamCheckpointerOptions
+Orleans.Configuration.AzureTableStreamCheckpointerOptions.AzureTableStreamCheckpointerOptions() -> void
+Orleans.Configuration.AzureTableStreamCheckpointerOptions.PersistInterval.get -> System.TimeSpan
+Orleans.Configuration.AzureTableStreamCheckpointerOptions.PersistInterval.set -> void
+Orleans.Configuration.AzureTableStreamCheckpointerOptionsValidator
+Orleans.Configuration.EventDataGeneratorStreamOptions
+Orleans.Configuration.EventDataGeneratorStreamOptions.EventDataGeneratorStreamOptions() -> void
+Orleans.Configuration.EventDataGeneratorStreamOptions.EventHubPartitionCount -> int
+Orleans.Configuration.EventHubOptions
+Orleans.Configuration.EventHubOptions.CreateConnectionDelegate
+Orleans.Configuration.EventHubOptions.EventHubOptions() -> void
+Orleans.Configuration.EventHubOptionsValidator
+Orleans.Configuration.EventHubOptionsValidator.ValidateConfiguration() -> void
+Orleans.Configuration.EventHubReceiverOptions
+Orleans.Configuration.EventHubReceiverOptions.EventHubReceiverOptions() -> void
+Orleans.Configuration.EventHubReceiverOptions.PrefetchCount.get -> int?
+Orleans.Configuration.EventHubReceiverOptions.PrefetchCount.set -> void
+Orleans.Configuration.EventHubReceiverOptions.StartFromNow.get -> bool
+Orleans.Configuration.EventHubReceiverOptions.StartFromNow.set -> void
+Orleans.Configuration.EventHubStreamCachePressureOptions
+Orleans.Configuration.EventHubStreamCachePressureOptions.AveragingCachePressureMonitorFlowControlThreshold.get -> double?
+Orleans.Configuration.EventHubStreamCachePressureOptions.AveragingCachePressureMonitorFlowControlThreshold.set -> void
+Orleans.Configuration.EventHubStreamCachePressureOptions.EventHubStreamCachePressureOptions() -> void
+Orleans.Configuration.EventHubStreamCachePressureOptions.SlowConsumingMonitorFlowControlThreshold.get -> double?
+Orleans.Configuration.EventHubStreamCachePressureOptions.SlowConsumingMonitorFlowControlThreshold.set -> void
+Orleans.Configuration.EventHubStreamCachePressureOptions.SlowConsumingMonitorPressureWindowSize.get -> System.TimeSpan?
+Orleans.Configuration.EventHubStreamCachePressureOptions.SlowConsumingMonitorPressureWindowSize.set -> void
+Orleans.Configuration.StreamCheckpointerConfigurationValidator
+Orleans.Configuration.StreamCheckpointerConfigurationValidator.ValidateConfiguration() -> void
+Orleans.Hosting.ClientBuilderExtensions
+Orleans.Hosting.ClusterClientEventHubStreamConfigurator
+Orleans.Hosting.Developer.EventDataGeneratorConfiguratorExtensions
+Orleans.Hosting.Developer.EventDataGeneratorStreamConfigurator
+Orleans.Hosting.Developer.IEventDataGeneratorStreamConfigurator
+Orleans.Hosting.Developer.SiloBuilderExtensions
+Orleans.Hosting.EventHubStreamConfiguratorExtensions
+Orleans.Hosting.IClusterClientEventHubStreamConfigurator
+Orleans.Hosting.IEventHubStreamConfigurator
+Orleans.Hosting.ISiloEventHubStreamConfigurator
+Orleans.Hosting.SiloBuilderExtensions
+Orleans.Hosting.SiloEventHubStreamConfigurator
+Orleans.Hosting.SiloEventHubStreamConfiguratorExtensions
+Orleans.Streaming.EventHubs.AggregatedCachePressureMonitor
+Orleans.Streaming.EventHubs.AggregatedCachePressureMonitor.IsUnderPressure(System.DateTime utcNow) -> bool
+Orleans.Streaming.EventHubs.AggregatedCachePressureMonitor.RecordCachePressureContribution(double cachePressureContribution) -> void
+Orleans.Streaming.EventHubs.AveragingCachePressureMonitor
+Orleans.Streaming.EventHubs.AveragingCachePressureMonitor.IsUnderPressure(System.DateTime utcNow) -> bool
+Orleans.Streaming.EventHubs.AveragingCachePressureMonitor.RecordCachePressureContribution(double cachePressureContribution) -> void
+Orleans.Streaming.EventHubs.AzureStorageOperationOptions
+Orleans.Streaming.EventHubs.AzureStorageOperationOptions.AzureStorageOperationOptions() -> void
+Orleans.Streaming.EventHubs.AzureStoragePolicyOptions
+Orleans.Streaming.EventHubs.AzureStoragePolicyOptions.AzureStoragePolicyOptions() -> void
+Orleans.Streaming.EventHubs.AzureStoragePolicyOptions.CreationTimeout.get -> System.TimeSpan
+Orleans.Streaming.EventHubs.AzureStoragePolicyOptions.CreationTimeout.set -> void
+Orleans.Streaming.EventHubs.AzureStoragePolicyOptions.MaxBulkUpdateRows.get -> int
+Orleans.Streaming.EventHubs.AzureStoragePolicyOptions.MaxBulkUpdateRows.set -> void
+Orleans.Streaming.EventHubs.AzureStoragePolicyOptions.MaxCreationRetries.get -> int
+Orleans.Streaming.EventHubs.AzureStoragePolicyOptions.MaxCreationRetries.set -> void
+Orleans.Streaming.EventHubs.AzureStoragePolicyOptions.MaxOperationRetries.get -> int
+Orleans.Streaming.EventHubs.AzureStoragePolicyOptions.MaxOperationRetries.set -> void
+Orleans.Streaming.EventHubs.AzureStoragePolicyOptions.OperationTimeout.get -> System.TimeSpan
+Orleans.Streaming.EventHubs.AzureStoragePolicyOptions.OperationTimeout.set -> void
+Orleans.Streaming.EventHubs.AzureStoragePolicyOptions.PauseBetweenCreationRetries.get -> System.TimeSpan
+Orleans.Streaming.EventHubs.AzureStoragePolicyOptions.PauseBetweenCreationRetries.set -> void
+Orleans.Streaming.EventHubs.AzureStoragePolicyOptions.PauseBetweenOperationRetries.get -> System.TimeSpan
+Orleans.Streaming.EventHubs.AzureStoragePolicyOptions.PauseBetweenOperationRetries.set -> void
+Orleans.Streaming.EventHubs.DefaultEventHubReceiverMonitor
+Orleans.Streaming.EventHubs.EventDataExtensions
+Orleans.Streaming.EventHubs.EventHubAdapterFactory
+Orleans.Streaming.EventHubs.EventHubAdapterFactory.Direction.get -> Orleans.Streams.StreamProviderDirection
+Orleans.Streaming.EventHubs.EventHubAdapterFactory.Direction.set -> void
+Orleans.Streaming.EventHubs.EventHubAdapterFactory.IsRewindable.get -> bool
+Orleans.Streaming.EventHubs.EventHubBatchContainer
+Orleans.Streaming.EventHubs.EventHubBatchContainer.ImportRequestContext() -> bool
+Orleans.Streaming.EventHubs.EventHubBatchContainer.StreamId.get -> Orleans.Runtime.StreamId
+Orleans.Streaming.EventHubs.EventHubBlockPoolMonitorDimensions
+Orleans.Streaming.EventHubs.EventHubBlockPoolMonitorDimensions.EventHubBlockPoolMonitorDimensions() -> void
+Orleans.Streaming.EventHubs.EventHubCacheMonitorDimensions
+Orleans.Streaming.EventHubs.EventHubCacheMonitorDimensions.EventHubCacheMonitorDimensions() -> void
+Orleans.Streaming.EventHubs.EventHubCheckpointer
+Orleans.Streaming.EventHubs.EventHubCheckpointer.CheckpointExists.get -> bool
+Orleans.Streaming.EventHubs.EventHubCheckpointerFactory
+Orleans.Streaming.EventHubs.EventHubDataAdapter
+Orleans.Streaming.EventHubs.EventHubMessage
+Orleans.Streaming.EventHubs.EventHubMessage.DequeueTimeUtc.get -> System.DateTime
+Orleans.Streaming.EventHubs.EventHubMessage.EnqueueTimeUtc.get -> System.DateTime
+Orleans.Streaming.EventHubs.EventHubMessage.SequenceNumber.get -> long
+Orleans.Streaming.EventHubs.EventHubMessage.StreamId.get -> Orleans.Runtime.StreamId
+Orleans.Streaming.EventHubs.EventHubMonitorAggregationDimensions
+Orleans.Streaming.EventHubs.EventHubMonitorAggregationDimensions.EventHubMonitorAggregationDimensions() -> void
+Orleans.Streaming.EventHubs.EventHubPartitionSettings
+Orleans.Streaming.EventHubs.EventHubPartitionSettings.EventHubPartitionSettings() -> void
+Orleans.Streaming.EventHubs.EventHubQueueCache
+Orleans.Streaming.EventHubs.EventHubQueueCache.Dispose() -> void
+Orleans.Streaming.EventHubs.EventHubQueueCache.GetMaxAddCount() -> int
+Orleans.Streaming.EventHubs.EventHubQueueCache.SignalPurge() -> void
+Orleans.Streaming.EventHubs.EventHubQueueCacheFactory
+Orleans.Streaming.EventHubs.EventHubReceiverMonitorDimensions
+Orleans.Streaming.EventHubs.EventHubReceiverMonitorDimensions.EventHubReceiverMonitorDimensions() -> void
+Orleans.Streaming.EventHubs.EventHubSequenceToken
+Orleans.Streaming.EventHubs.EventHubSequenceToken.EventHubSequenceToken() -> void
+Orleans.Streaming.EventHubs.EventHubSequenceTokenV2
+Orleans.Streaming.EventHubs.EventHubSequenceTokenV2.EventHubSequenceTokenV2() -> void
+Orleans.Streaming.EventHubs.ICachePressureMonitor
+Orleans.Streaming.EventHubs.ICachePressureMonitor.IsUnderPressure(System.DateTime utcNow) -> bool
+Orleans.Streaming.EventHubs.ICachePressureMonitor.RecordCachePressureContribution(double cachePressureContribution) -> void
+Orleans.Streaming.EventHubs.IEventHubDataAdapter
+Orleans.Streaming.EventHubs.IEventHubPartitionLocation
+Orleans.Streaming.EventHubs.IEventHubPartitionLocation.SequenceNumber.get -> long
+Orleans.Streaming.EventHubs.IEventHubQueueCache
+Orleans.Streaming.EventHubs.IEventHubQueueCache.SignalPurge() -> void
+Orleans.Streaming.EventHubs.IEventHubQueueCacheFactory
+Orleans.Streaming.EventHubs.IEventHubReceiver
+Orleans.Streaming.EventHubs.SlowConsumingPressureMonitor
+Orleans.Streaming.EventHubs.SlowConsumingPressureMonitor.FlowControlThreshold.get -> double
+Orleans.Streaming.EventHubs.SlowConsumingPressureMonitor.FlowControlThreshold.set -> void
+Orleans.Streaming.EventHubs.SlowConsumingPressureMonitor.IsUnderPressure(System.DateTime utcNow) -> bool
+Orleans.Streaming.EventHubs.SlowConsumingPressureMonitor.PressureWindowSize.get -> System.TimeSpan
+Orleans.Streaming.EventHubs.SlowConsumingPressureMonitor.PressureWindowSize.set -> void
+Orleans.Streaming.EventHubs.SlowConsumingPressureMonitor.RecordCachePressureContribution(double cachePressureContribution) -> void
+Orleans.Streaming.EventHubs.StatisticMonitors.DefaultEventHubBlockPoolMonitor
+Orleans.Streaming.EventHubs.StatisticMonitors.DefaultEventHubCacheMonitor
+Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory
+Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.Commands
+Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.Commands.Randomly_Place_Stream_To_Queue = 20004 -> Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.Commands
+Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.Commands.Stop_Producing_On_Stream = 20005 -> Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.Commands
+Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.StreamRandomPlacementArg
+Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.StreamRandomPlacementArg.RandomNumber.get -> int
+Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.StreamRandomPlacementArg.RandomNumber.set -> void
+Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.StreamRandomPlacementArg.StreamId.get -> Orleans.Runtime.StreamId
+Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.StreamRandomPlacementArg.StreamId.set -> void
+Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.StreamRandomPlacementArg.StreamRandomPlacementArg(Orleans.Runtime.StreamId streamId, int randomNumber) -> void
+Orleans.Streaming.EventHubs.Testing.EventHubPartitionDataGenerator
+Orleans.Streaming.EventHubs.Testing.EventHubPartitionDataGenerator.AddDataGeneratorForStream(Orleans.Runtime.StreamId streamId) -> void
+Orleans.Streaming.EventHubs.Testing.EventHubPartitionDataGenerator.StopProducingOnStream(Orleans.Runtime.StreamId streamId) -> void
+Orleans.Streaming.EventHubs.Testing.EventHubPartitionGeneratorReceiver
+Orleans.Streaming.EventHubs.Testing.EventHubPartitionGeneratorReceiver.ConfigureDataGeneratorForStream(Orleans.Runtime.StreamId streamId) -> void
+Orleans.Streaming.EventHubs.Testing.EventHubPartitionGeneratorReceiver.StopProducingOnStream(Orleans.Runtime.StreamId streamId) -> void
+Orleans.Streaming.EventHubs.Testing.IDataGenerator<T>
+Orleans.Streaming.EventHubs.Testing.IIntCounter
+Orleans.Streaming.EventHubs.Testing.IIntCounter.Increment() -> void
+Orleans.Streaming.EventHubs.Testing.IIntCounter.Value.get -> int
+Orleans.Streaming.EventHubs.Testing.IStreamDataGeneratingController
+Orleans.Streaming.EventHubs.Testing.IStreamDataGeneratingController.AddDataGeneratorForStream(Orleans.Runtime.StreamId streamId) -> void
+Orleans.Streaming.EventHubs.Testing.IStreamDataGeneratingController.StopProducingOnStream(Orleans.Runtime.StreamId streamId) -> void
+Orleans.Streaming.EventHubs.Testing.IStreamDataGenerator<T>
+Orleans.Streaming.EventHubs.Testing.IStreamDataGenerator<T>.ShouldProduce.set -> void
+Orleans.Streaming.EventHubs.Testing.IStreamDataGenerator<T>.StreamId.get -> Orleans.Runtime.StreamId
+Orleans.Streaming.EventHubs.Testing.NoOpCheckpointer
+Orleans.Streaming.EventHubs.Testing.NoOpCheckpointer.CheckpointExists.get -> bool
+Orleans.Streaming.EventHubs.Testing.NoOpCheckpointer.NoOpCheckpointer() -> void
+Orleans.Streaming.EventHubs.Testing.NoOpCheckpointerFactory
+Orleans.Streaming.EventHubs.Testing.NoOpCheckpointerFactory.NoOpCheckpointerFactory() -> void
+Orleans.Streaming.EventHubs.Testing.SimpleStreamEventDataGenerator
+Orleans.Streaming.EventHubs.Testing.SimpleStreamEventDataGenerator.ShouldProduce.set -> void
+Orleans.Streaming.EventHubs.Testing.SimpleStreamEventDataGenerator.StreamId.get -> Orleans.Runtime.StreamId
+Orleans.Streaming.EventHubs.Testing.SimpleStreamEventDataGenerator.StreamId.set -> void
+override Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.Init() -> void
+override Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.InitEventHubClient() -> void
+static Orleans.Streaming.EventHubs.SlowConsumingPressureMonitor.DefaultPressureWindowSize -> System.TimeSpan
+static readonly Orleans.Configuration.AzureTableStreamCheckpointerOptions.DEFAULT_CHECKPOINT_PERSIST_INTERVAL -> System.TimeSpan
+virtual Orleans.Streaming.EventHubs.AzureStorageOperationOptionsValidator<TOptions>.ValidateConfiguration() -> void
+virtual Orleans.Streaming.EventHubs.EventHubAdapterFactory.Init() -> void
+virtual Orleans.Streaming.EventHubs.EventHubAdapterFactory.InitEventHubClient() -> void
+~const Orleans.Configuration.AzureTableStreamCheckpointerOptions.DEFAULT_TABLE_NAME = "Checkpoint" -> string
+~Orleans.Configuration.AzureTableStreamCheckpointerOptionsValidator.AzureTableStreamCheckpointerOptionsValidator(Orleans.Configuration.AzureTableStreamCheckpointerOptions options, string name) -> void
+~Orleans.Configuration.EventHubOptions.ConfigureEventHubConnection(Azure.Messaging.EventHubs.EventHubConnection connection, string consumerGroup) -> void
+~Orleans.Configuration.EventHubOptions.ConfigureEventHubConnection(Orleans.Configuration.EventHubOptions.CreateConnectionDelegate createConnection, string eventHubName, string consumerGroup) -> void
+~Orleans.Configuration.EventHubOptions.ConfigureEventHubConnection(string connectionString, string eventHubName, string consumerGroup) -> void
+~Orleans.Configuration.EventHubOptions.ConfigureEventHubConnection(string fullyQualifiedNamespace, string eventHubName, string consumerGroup, Azure.AzureNamedKeyCredential credential) -> void
+~Orleans.Configuration.EventHubOptions.ConfigureEventHubConnection(string fullyQualifiedNamespace, string eventHubName, string consumerGroup, Azure.AzureSasCredential credential) -> void
+~Orleans.Configuration.EventHubOptions.ConfigureEventHubConnection(string fullyQualifiedNamespace, string eventHubName, string consumerGroup, Azure.Core.TokenCredential credential) -> void
+~Orleans.Configuration.EventHubOptions.ConnectionOptions.get -> Azure.Messaging.EventHubs.EventHubConnectionOptions
+~Orleans.Configuration.EventHubOptions.ConnectionOptions.set -> void
+~Orleans.Configuration.EventHubOptionsValidator.EventHubOptionsValidator(Orleans.Configuration.EventHubOptions options, string name) -> void
+~Orleans.Configuration.StreamCheckpointerConfigurationValidator.StreamCheckpointerConfigurationValidator(System.IServiceProvider services, string name) -> void
+~Orleans.Hosting.ClusterClientEventHubStreamConfigurator.ClusterClientEventHubStreamConfigurator(string name, Orleans.Hosting.IClientBuilder builder) -> void
+~Orleans.Hosting.Developer.EventDataGeneratorStreamConfigurator.EventDataGeneratorStreamConfigurator(string name, System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>> configureServicesDelegate) -> void
+~Orleans.Hosting.SiloEventHubStreamConfigurator.SiloEventHubStreamConfigurator(string name, System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>> configureServicesDelegate) -> void
+~Orleans.Streaming.EventHubs.AggregatedCachePressureMonitor.AddCachePressureMonitor(Orleans.Streaming.EventHubs.ICachePressureMonitor monitor) -> void
+~Orleans.Streaming.EventHubs.AggregatedCachePressureMonitor.AggregatedCachePressureMonitor(Microsoft.Extensions.Logging.ILogger logger, Orleans.Providers.Streams.Common.ICacheMonitor monitor = null) -> void
+~Orleans.Streaming.EventHubs.AggregatedCachePressureMonitor.CacheMonitor.set -> void
+~Orleans.Streaming.EventHubs.AveragingCachePressureMonitor.AveragingCachePressureMonitor(double flowControlThreshold, Microsoft.Extensions.Logging.ILogger logger, Orleans.Providers.Streams.Common.ICacheMonitor monitor = null) -> void
+~Orleans.Streaming.EventHubs.AveragingCachePressureMonitor.AveragingCachePressureMonitor(Microsoft.Extensions.Logging.ILogger logger, Orleans.Providers.Streams.Common.ICacheMonitor monitor = null) -> void
+~Orleans.Streaming.EventHubs.AveragingCachePressureMonitor.CacheMonitor.set -> void
+~Orleans.Streaming.EventHubs.AzureStorageOperationOptions.ClientOptions.get -> Azure.Data.Tables.TableClientOptions
+~Orleans.Streaming.EventHubs.AzureStorageOperationOptions.ClientOptions.set -> void
+~Orleans.Streaming.EventHubs.AzureStorageOperationOptions.ConfigureTableServiceClient(string connectionString) -> void
+~Orleans.Streaming.EventHubs.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>> createClientCallback) -> void
+~Orleans.Streaming.EventHubs.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri) -> void
+~Orleans.Streaming.EventHubs.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.AzureSasCredential azureSasCredential) -> void
+~Orleans.Streaming.EventHubs.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.Core.TokenCredential tokenCredential) -> void
+~Orleans.Streaming.EventHubs.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.Data.Tables.TableSharedKeyCredential sharedKeyCredential) -> void
+~Orleans.Streaming.EventHubs.AzureStorageOperationOptions.StoragePolicyOptions.get -> Orleans.Streaming.EventHubs.AzureStoragePolicyOptions
+~Orleans.Streaming.EventHubs.AzureStorageOperationOptions.TableServiceClient.get -> Azure.Data.Tables.TableServiceClient
+~Orleans.Streaming.EventHubs.AzureStorageOperationOptions.TableServiceClient.set -> void
+~Orleans.Streaming.EventHubs.AzureStorageOperationOptionsValidator<TOptions>
+~Orleans.Streaming.EventHubs.AzureStorageOperationOptionsValidator<TOptions>.AzureStorageOperationOptionsValidator(TOptions options, string name = null) -> void
+~Orleans.Streaming.EventHubs.AzureStorageOperationOptionsValidator<TOptions>.Name.get -> string
+~Orleans.Streaming.EventHubs.AzureStorageOperationOptionsValidator<TOptions>.Options.get -> TOptions
+~Orleans.Streaming.EventHubs.DefaultEventHubReceiverMonitor.DefaultEventHubReceiverMonitor(Orleans.Streaming.EventHubs.EventHubReceiverMonitorDimensions dimensions) -> void
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.CacheFactory.get -> System.Func<string, Orleans.Streams.IStreamQueueCheckpointer<string>, Microsoft.Extensions.Logging.ILoggerFactory, Orleans.Streaming.EventHubs.IEventHubQueueCache>
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.CacheFactory.set -> void
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.CreateAdapter() -> System.Threading.Tasks.Task<Orleans.Streams.IQueueAdapter>
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.CreateQueueCache(Orleans.Streams.QueueId queueId) -> Orleans.Streams.IQueueCache
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.CreateReceiver(Orleans.Streams.QueueId queueId) -> Orleans.Streams.IQueueAdapterReceiver
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.EventHubAdapterFactory(string name, Orleans.Configuration.EventHubOptions ehOptions, Orleans.Configuration.EventHubReceiverOptions receiverOptions, Orleans.Configuration.EventHubStreamCachePressureOptions cacheOptions, Orleans.Configuration.StreamCacheEvictionOptions cacheEvictionOptions, Orleans.Configuration.StreamStatisticOptions statisticOptions, Orleans.Streaming.EventHubs.IEventHubDataAdapter dataAdapter, System.IServiceProvider serviceProvider, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Orleans.Statistics.IEnvironmentStatisticsProvider environmentStatisticsProvider) -> void
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.EventHubReceiverFactory -> System.Func<Orleans.Streaming.EventHubs.EventHubPartitionSettings, string, Microsoft.Extensions.Logging.ILogger, Orleans.Streaming.EventHubs.IEventHubReceiver>
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.GetDeliveryFailureHandler(Orleans.Streams.QueueId queueId) -> System.Threading.Tasks.Task<Orleans.Streams.IStreamFailureHandler>
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.GetQueueAdapterCache() -> Orleans.Streams.IQueueAdapterCache
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.GetStreamQueueMapper() -> Orleans.Streams.IStreamQueueMapper
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.logger -> Microsoft.Extensions.Logging.ILogger
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.Name.get -> string
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.QueueMapperFactory.get -> System.Func<string[], Orleans.Streams.HashRingBasedPartitionedStreamQueueMapper>
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.QueueMapperFactory.set -> void
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.ReceiverMonitorFactory.get -> System.Func<Orleans.Streaming.EventHubs.EventHubReceiverMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Orleans.Providers.Streams.Common.IQueueAdapterReceiverMonitor>
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.ReceiverMonitorFactory.set -> void
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.StreamFailureHandlerFactory.get -> System.Func<string, System.Threading.Tasks.Task<Orleans.Streams.IStreamFailureHandler>>
+~Orleans.Streaming.EventHubs.EventHubAdapterFactory.StreamFailureHandlerFactory.set -> void
+~Orleans.Streaming.EventHubs.EventHubBatchContainer.EventHubBatchContainer(Orleans.Streaming.EventHubs.EventHubMessage eventHubMessage, Orleans.Serialization.Serializer serializer) -> void
+~Orleans.Streaming.EventHubs.EventHubBatchContainer.GetEvents<T>() -> System.Collections.Generic.IEnumerable<System.Tuple<T, Orleans.Streams.StreamSequenceToken>>
+~Orleans.Streaming.EventHubs.EventHubBatchContainer.SequenceToken.get -> Orleans.Streams.StreamSequenceToken
+~Orleans.Streaming.EventHubs.EventHubBlockPoolMonitorDimensions.BlockPoolId.get -> string
+~Orleans.Streaming.EventHubs.EventHubBlockPoolMonitorDimensions.BlockPoolId.set -> void
+~Orleans.Streaming.EventHubs.EventHubBlockPoolMonitorDimensions.EventHubBlockPoolMonitorDimensions(Orleans.Streaming.EventHubs.EventHubMonitorAggregationDimensions dimensions, string blockPoolId) -> void
+~Orleans.Streaming.EventHubs.EventHubCacheMonitorDimensions.BlockPoolId.get -> string
+~Orleans.Streaming.EventHubs.EventHubCacheMonitorDimensions.BlockPoolId.set -> void
+~Orleans.Streaming.EventHubs.EventHubCacheMonitorDimensions.EventHubCacheMonitorDimensions(Orleans.Streaming.EventHubs.EventHubMonitorAggregationDimensions dimensions, string ehPartition, string blockPoolId) -> void
+~Orleans.Streaming.EventHubs.EventHubCheckpointer.Load() -> System.Threading.Tasks.Task<string>
+~Orleans.Streaming.EventHubs.EventHubCheckpointer.Update(string offset, System.DateTime utcNow) -> void
+~Orleans.Streaming.EventHubs.EventHubCheckpointerFactory.Create(string partition) -> System.Threading.Tasks.Task<Orleans.Streams.IStreamQueueCheckpointer<string>>
+~Orleans.Streaming.EventHubs.EventHubCheckpointerFactory.EventHubCheckpointerFactory(string providerName, Orleans.Configuration.AzureTableStreamCheckpointerOptions options, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) -> void
+~Orleans.Streaming.EventHubs.EventHubDataAdapter.EventHubDataAdapter(Orleans.Serialization.Serializer serializer) -> void
+~Orleans.Streaming.EventHubs.EventHubMessage.EventHubMessage(Orleans.Providers.Streams.Common.CachedMessage cachedMessage, Orleans.Serialization.Serializer serializer) -> void
+~Orleans.Streaming.EventHubs.EventHubMessage.EventHubMessage(Orleans.Runtime.StreamId streamId, string partitionKey, string offset, long sequenceNumber, System.DateTime enqueueTimeUtc, System.DateTime dequeueTimeUtc, System.Collections.Generic.IDictionary<string, object> properties, byte[] payload) -> void
+~Orleans.Streaming.EventHubs.EventHubMessage.Offset.get -> string
+~Orleans.Streaming.EventHubs.EventHubMessage.PartitionKey.get -> string
+~Orleans.Streaming.EventHubs.EventHubMessage.Payload.get -> byte[]
+~Orleans.Streaming.EventHubs.EventHubMessage.Properties.get -> System.Collections.Generic.IDictionary<string, object>
+~Orleans.Streaming.EventHubs.EventHubMonitorAggregationDimensions.EventHubMonitorAggregationDimensions(Orleans.Streaming.EventHubs.EventHubMonitorAggregationDimensions dimensions) -> void
+~Orleans.Streaming.EventHubs.EventHubMonitorAggregationDimensions.EventHubMonitorAggregationDimensions(string ehHubPath) -> void
+~Orleans.Streaming.EventHubs.EventHubMonitorAggregationDimensions.EventHubPath.get -> string
+~Orleans.Streaming.EventHubs.EventHubMonitorAggregationDimensions.EventHubPath.set -> void
+~Orleans.Streaming.EventHubs.EventHubPartitionSettings.Hub.get -> Orleans.Configuration.EventHubOptions
+~Orleans.Streaming.EventHubs.EventHubPartitionSettings.Hub.set -> void
+~Orleans.Streaming.EventHubs.EventHubPartitionSettings.Partition.get -> string
+~Orleans.Streaming.EventHubs.EventHubPartitionSettings.Partition.set -> void
+~Orleans.Streaming.EventHubs.EventHubPartitionSettings.ReceiverOptions.get -> Orleans.Configuration.EventHubReceiverOptions
+~Orleans.Streaming.EventHubs.EventHubPartitionSettings.ReceiverOptions.set -> void
+~Orleans.Streaming.EventHubs.EventHubQueueCache.Add(System.Collections.Generic.List<Azure.Messaging.EventHubs.EventData> messages, System.DateTime dequeueTimeUtc) -> System.Collections.Generic.List<Orleans.Streams.StreamPosition>
+~Orleans.Streaming.EventHubs.EventHubQueueCache.AddCachePressureMonitor(Orleans.Streaming.EventHubs.ICachePressureMonitor monitor) -> void
+~Orleans.Streaming.EventHubs.EventHubQueueCache.EventHubQueueCache(string partition, int defaultMaxAddCount, Orleans.Providers.Streams.Common.IObjectPool<Orleans.Providers.Streams.Common.FixedSizeBuffer> bufferPool, Orleans.Streaming.EventHubs.IEventHubDataAdapter dataAdapter, Orleans.Providers.Streams.Common.IEvictionStrategy evictionStrategy, Orleans.Streams.IStreamQueueCheckpointer<string> checkpointer, Microsoft.Extensions.Logging.ILogger logger, Orleans.Providers.Streams.Common.ICacheMonitor cacheMonitor, System.TimeSpan? cacheMonitorWriteInterval, System.TimeSpan? metadataMinTimeInCache) -> void
+~Orleans.Streaming.EventHubs.EventHubQueueCache.GetCursor(Orleans.Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken sequenceToken) -> object
+~Orleans.Streaming.EventHubs.EventHubQueueCache.Partition.get -> string
+~Orleans.Streaming.EventHubs.EventHubQueueCache.TryGetNextMessage(object cursorObj, out Orleans.Streams.IBatchContainer message) -> bool
+~Orleans.Streaming.EventHubs.EventHubQueueCacheFactory.BlockPoolMonitorFactory.get -> System.Func<Orleans.Streaming.EventHubs.EventHubBlockPoolMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Orleans.Providers.Streams.Common.IBlockPoolMonitor>
+~Orleans.Streaming.EventHubs.EventHubQueueCacheFactory.BlockPoolMonitorFactory.set -> void
+~Orleans.Streaming.EventHubs.EventHubQueueCacheFactory.CacheMonitorFactory.get -> System.Func<Orleans.Streaming.EventHubs.EventHubCacheMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Orleans.Providers.Streams.Common.ICacheMonitor>
+~Orleans.Streaming.EventHubs.EventHubQueueCacheFactory.CacheMonitorFactory.set -> void
+~Orleans.Streaming.EventHubs.EventHubQueueCacheFactory.CreateCache(string partition, Orleans.Streams.IStreamQueueCheckpointer<string> checkpointer, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) -> Orleans.Streaming.EventHubs.IEventHubQueueCache
+~Orleans.Streaming.EventHubs.EventHubQueueCacheFactory.EventHubQueueCacheFactory(Orleans.Configuration.EventHubStreamCachePressureOptions cacheOptions, Orleans.Configuration.StreamCacheEvictionOptions evictionOptions, Orleans.Configuration.StreamStatisticOptions statisticOptions, Orleans.Streaming.EventHubs.IEventHubDataAdapter dataAdater, Orleans.Streaming.EventHubs.EventHubMonitorAggregationDimensions sharedDimensions, System.Func<Orleans.Streaming.EventHubs.EventHubCacheMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Orleans.Providers.Streams.Common.ICacheMonitor> cacheMonitorFactory = null, System.Func<Orleans.Streaming.EventHubs.EventHubBlockPoolMonitorDimensions, Microsoft.Extensions.Logging.ILoggerFactory, Orleans.Providers.Streams.Common.IBlockPoolMonitor> blockPoolMonitorFactory = null) -> void
+~Orleans.Streaming.EventHubs.EventHubReceiverMonitorDimensions.EventHubPartition.get -> string
+~Orleans.Streaming.EventHubs.EventHubReceiverMonitorDimensions.EventHubPartition.set -> void
+~Orleans.Streaming.EventHubs.EventHubReceiverMonitorDimensions.EventHubReceiverMonitorDimensions(Orleans.Streaming.EventHubs.EventHubMonitorAggregationDimensions dimensions, string ehPartition) -> void
+~Orleans.Streaming.EventHubs.EventHubSequenceToken.EventHubOffset.get -> string
+~Orleans.Streaming.EventHubs.EventHubSequenceToken.EventHubSequenceToken(string eventHubOffset, long sequenceNumber, int eventIndex) -> void
+~Orleans.Streaming.EventHubs.EventHubSequenceTokenV2.EventHubSequenceTokenV2(string eventHubOffset, long sequenceNumber, int eventIndex) -> void
+~Orleans.Streaming.EventHubs.ICachePressureMonitor.CacheMonitor.set -> void
+~Orleans.Streaming.EventHubs.IEventHubDataAdapter.FromQueueMessage(Orleans.Streams.StreamPosition position, Azure.Messaging.EventHubs.EventData queueMessage, System.DateTime dequeueTime, System.Func<int, System.ArraySegment<byte>> getSegment) -> Orleans.Providers.Streams.Common.CachedMessage
+~Orleans.Streaming.EventHubs.IEventHubDataAdapter.GetOffset(Orleans.Providers.Streams.Common.CachedMessage cachedMessage) -> string
+~Orleans.Streaming.EventHubs.IEventHubDataAdapter.GetPartitionKey(Orleans.Runtime.StreamId streamId) -> string
+~Orleans.Streaming.EventHubs.IEventHubDataAdapter.GetStreamIdentity(Azure.Messaging.EventHubs.EventData queueMessage) -> Orleans.Runtime.StreamId
+~Orleans.Streaming.EventHubs.IEventHubDataAdapter.GetStreamPosition(string partition, Azure.Messaging.EventHubs.EventData queueMessage) -> Orleans.Streams.StreamPosition
+~Orleans.Streaming.EventHubs.IEventHubPartitionLocation.EventHubOffset.get -> string
+~Orleans.Streaming.EventHubs.IEventHubQueueCache.Add(System.Collections.Generic.List<Azure.Messaging.EventHubs.EventData> message, System.DateTime dequeueTimeUtc) -> System.Collections.Generic.List<Orleans.Streams.StreamPosition>
+~Orleans.Streaming.EventHubs.IEventHubQueueCache.AddCachePressureMonitor(Orleans.Streaming.EventHubs.ICachePressureMonitor monitor) -> void
+~Orleans.Streaming.EventHubs.IEventHubQueueCache.GetCursor(Orleans.Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken sequenceToken) -> object
+~Orleans.Streaming.EventHubs.IEventHubQueueCache.TryGetNextMessage(object cursorObj, out Orleans.Streams.IBatchContainer message) -> bool
+~Orleans.Streaming.EventHubs.IEventHubQueueCacheFactory.CreateCache(string partition, Orleans.Streams.IStreamQueueCheckpointer<string> checkpointer, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) -> Orleans.Streaming.EventHubs.IEventHubQueueCache
+~Orleans.Streaming.EventHubs.IEventHubReceiver.CloseAsync() -> System.Threading.Tasks.Task
+~Orleans.Streaming.EventHubs.IEventHubReceiver.ReceiveAsync(int maxCount, System.TimeSpan waitTime) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>>
+~Orleans.Streaming.EventHubs.SlowConsumingPressureMonitor.CacheMonitor.set -> void
+~Orleans.Streaming.EventHubs.SlowConsumingPressureMonitor.SlowConsumingPressureMonitor(double flowControlThreshold, Microsoft.Extensions.Logging.ILogger logger, Orleans.Providers.Streams.Common.ICacheMonitor monitor = null) -> void
+~Orleans.Streaming.EventHubs.SlowConsumingPressureMonitor.SlowConsumingPressureMonitor(double flowControlThreshold, System.TimeSpan pressureWindowSzie, Microsoft.Extensions.Logging.ILogger logger, Orleans.Providers.Streams.Common.ICacheMonitor monitor = null) -> void
+~Orleans.Streaming.EventHubs.SlowConsumingPressureMonitor.SlowConsumingPressureMonitor(Microsoft.Extensions.Logging.ILogger logger, Orleans.Providers.Streams.Common.ICacheMonitor monitor = null) -> void
+~Orleans.Streaming.EventHubs.SlowConsumingPressureMonitor.SlowConsumingPressureMonitor(System.TimeSpan pressureWindowSize, Microsoft.Extensions.Logging.ILogger logger, Orleans.Providers.Streams.Common.ICacheMonitor monitor = null) -> void
+~Orleans.Streaming.EventHubs.StatisticMonitors.DefaultEventHubBlockPoolMonitor.DefaultEventHubBlockPoolMonitor(Orleans.Streaming.EventHubs.EventHubBlockPoolMonitorDimensions dimensions) -> void
+~Orleans.Streaming.EventHubs.StatisticMonitors.DefaultEventHubCacheMonitor.DefaultEventHubCacheMonitor(Orleans.Streaming.EventHubs.EventHubCacheMonitorDimensions dimensions) -> void
+~Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.EventDataGeneratorAdapterFactory(string name, Orleans.Configuration.EventDataGeneratorStreamOptions options, Orleans.Configuration.EventHubOptions ehOptions, Orleans.Configuration.EventHubReceiverOptions receiverOptions, Orleans.Configuration.EventHubStreamCachePressureOptions cacheOptions, Orleans.Configuration.StreamCacheEvictionOptions evictionOptions, Orleans.Configuration.StreamStatisticOptions statisticOptions, Orleans.Streaming.EventHubs.IEventHubDataAdapter dataAdapter, System.IServiceProvider serviceProvider, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Orleans.Statistics.IEnvironmentStatisticsProvider environmentStatisticsProvider) -> void
+~Orleans.Streaming.EventHubs.Testing.EventHubPartitionDataGenerator.EventHubPartitionDataGenerator(Orleans.Configuration.EventDataGeneratorStreamOptions options, System.Func<Orleans.Runtime.StreamId, Orleans.Streaming.EventHubs.Testing.IStreamDataGenerator<Azure.Messaging.EventHubs.EventData>> generatorFactory, Microsoft.Extensions.Logging.ILogger logger) -> void
+~Orleans.Streaming.EventHubs.Testing.EventHubPartitionDataGenerator.TryReadEvents(int maxCount, out System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData> events) -> bool
+~Orleans.Streaming.EventHubs.Testing.EventHubPartitionGeneratorReceiver.CloseAsync() -> System.Threading.Tasks.Task
+~Orleans.Streaming.EventHubs.Testing.EventHubPartitionGeneratorReceiver.EventHubPartitionGeneratorReceiver(Orleans.Streaming.EventHubs.Testing.IDataGenerator<Azure.Messaging.EventHubs.EventData> generator) -> void
+~Orleans.Streaming.EventHubs.Testing.EventHubPartitionGeneratorReceiver.ReceiveAsync(int maxCount, System.TimeSpan waitTime) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData>>
+~Orleans.Streaming.EventHubs.Testing.IDataGenerator<T>.TryReadEvents(int maxCount, out System.Collections.Generic.IEnumerable<T> events) -> bool
+~Orleans.Streaming.EventHubs.Testing.IStreamDataGenerator<T>.SequenceNumberCounter.set -> void
+~Orleans.Streaming.EventHubs.Testing.NoOpCheckpointer.Load() -> System.Threading.Tasks.Task<string>
+~Orleans.Streaming.EventHubs.Testing.NoOpCheckpointer.Update(string offset, System.DateTime utcNow) -> void
+~Orleans.Streaming.EventHubs.Testing.NoOpCheckpointerFactory.Create(string partition) -> System.Threading.Tasks.Task<Orleans.Streams.IStreamQueueCheckpointer<string>>
+~Orleans.Streaming.EventHubs.Testing.SimpleStreamEventDataGenerator.SequenceNumberCounter.set -> void
+~Orleans.Streaming.EventHubs.Testing.SimpleStreamEventDataGenerator.SimpleStreamEventDataGenerator(Orleans.Runtime.StreamId streamId, Microsoft.Extensions.Logging.ILogger<Orleans.Streaming.EventHubs.Testing.SimpleStreamEventDataGenerator> logger, Orleans.Serialization.DeepCopier deepCopier, Orleans.Serialization.Serializer serializer) -> void
+~Orleans.Streaming.EventHubs.Testing.SimpleStreamEventDataGenerator.TryReadEvents(int maxCount, out System.Collections.Generic.IEnumerable<Azure.Messaging.EventHubs.EventData> events) -> bool
+~override Orleans.Configuration.AzureTableStreamCheckpointerOptions.TableName.get -> string
+~override Orleans.Configuration.AzureTableStreamCheckpointerOptions.TableName.set -> void
+~override Orleans.Streaming.EventHubs.EventHubSequenceToken.ToString() -> string
+~override Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.GetPartitionIdsAsync() -> System.Threading.Tasks.Task<string[]>
+~readonly Orleans.Streaming.EventHubs.EventHubAdapterFactory.dataAdapter -> Orleans.Streaming.EventHubs.IEventHubDataAdapter
+~readonly Orleans.Streaming.EventHubs.EventHubAdapterFactory.serviceProvider -> System.IServiceProvider
+~readonly Orleans.Streaming.EventHubs.EventHubQueueCache.cache -> Orleans.Providers.Streams.Common.PooledQueueCache
+~static Orleans.Hosting.ClientBuilderExtensions.AddEventHubStreams(this Orleans.Hosting.IClientBuilder builder, string name, System.Action<Orleans.Configuration.EventHubOptions> configureEventHub) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.AddEventHubStreams(this Orleans.Hosting.IClientBuilder builder, string name, System.Action<Orleans.Hosting.IClusterClientEventHubStreamConfigurator> configure) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.Developer.EventDataGeneratorConfiguratorExtensions.ConfigureCachePressuring(this Orleans.Hosting.Developer.IEventDataGeneratorStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.EventHubStreamCachePressureOptions>> configureOptions) -> void
+~static Orleans.Hosting.Developer.EventDataGeneratorConfiguratorExtensions.UseDataAdapter(this Orleans.Hosting.Developer.IEventDataGeneratorStreamConfigurator configurator, System.Func<System.IServiceProvider, string, Orleans.Streaming.EventHubs.IEventHubDataAdapter> factory) -> void
+~static Orleans.Hosting.Developer.SiloBuilderExtensions.AddEventDataGeneratorStreams(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Hosting.Developer.IEventDataGeneratorStreamConfigurator> configure) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.EventHubStreamConfiguratorExtensions.ConfigureEventHub(this Orleans.Hosting.IEventHubStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.EventHubOptions>> configureOptions) -> void
+~static Orleans.Hosting.EventHubStreamConfiguratorExtensions.UseDataAdapter(this Orleans.Hosting.IEventHubStreamConfigurator configurator, System.Func<System.IServiceProvider, string, Orleans.Streaming.EventHubs.IEventHubDataAdapter> factory) -> void
+~static Orleans.Hosting.SiloBuilderExtensions.AddEventHubStreams(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Configuration.EventHubOptions> configureEventHub, System.Action<Orleans.Configuration.AzureTableStreamCheckpointerOptions> configureDefaultCheckpointer) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.SiloBuilderExtensions.AddEventHubStreams(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Hosting.ISiloEventHubStreamConfigurator> configure) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.SiloEventHubStreamConfiguratorExtensions.ConfigureCachePressuring(this Orleans.Hosting.ISiloEventHubStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.EventHubStreamCachePressureOptions>> configureOptions) -> void
+~static Orleans.Hosting.SiloEventHubStreamConfiguratorExtensions.ConfigureCheckpointer<TOptions>(this Orleans.Hosting.ISiloEventHubStreamConfigurator configurator, System.Func<System.IServiceProvider, string, Orleans.Streams.IStreamQueueCheckpointerFactory> checkpointerFactoryBuilder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<TOptions>> configureOptions) -> void
+~static Orleans.Hosting.SiloEventHubStreamConfiguratorExtensions.ConfigurePartitionReceiver(this Orleans.Hosting.ISiloEventHubStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.EventHubReceiverOptions>> configureOptions) -> void
+~static Orleans.Hosting.SiloEventHubStreamConfiguratorExtensions.UseAzureTableCheckpointer(this Orleans.Hosting.ISiloEventHubStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureTableStreamCheckpointerOptions>> configureOptions) -> void
+~static Orleans.Streaming.EventHubs.EventDataExtensions.DeserializeProperties(this System.ArraySegment<byte> bytes, Orleans.Serialization.Serializer serializer) -> System.Collections.Generic.IDictionary<string, object>
+~static Orleans.Streaming.EventHubs.EventDataExtensions.GetStreamNamespaceProperty(this Azure.Messaging.EventHubs.EventData eventData) -> string
+~static Orleans.Streaming.EventHubs.EventDataExtensions.SerializeProperties(this Azure.Messaging.EventHubs.EventData eventData, Orleans.Serialization.Serializer serializer) -> byte[]
+~static Orleans.Streaming.EventHubs.EventDataExtensions.SetStreamNamespaceProperty(this Azure.Messaging.EventHubs.EventData eventData, string streamNamespace) -> void
+~static Orleans.Streaming.EventHubs.EventHubAdapterFactory.Create(System.IServiceProvider services, string name) -> Orleans.Streaming.EventHubs.EventHubAdapterFactory
+~static Orleans.Streaming.EventHubs.EventHubBatchContainer.ToEventData<T>(Orleans.Serialization.Serializer bodySerializer, Orleans.Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, System.Collections.Generic.Dictionary<string, object> requestContext) -> Azure.Messaging.EventHubs.EventData
+~static Orleans.Streaming.EventHubs.EventHubCheckpointer.Create(Orleans.Configuration.AzureTableStreamCheckpointerOptions options, string streamProviderName, string partition, string serviceId, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) -> System.Threading.Tasks.Task<Orleans.Streams.IStreamQueueCheckpointer<string>>
+~static Orleans.Streaming.EventHubs.EventHubCheckpointerFactory.CreateFactory(System.IServiceProvider services, string providerName) -> Orleans.Streams.IStreamQueueCheckpointerFactory
+~static Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.Create(System.IServiceProvider services, string name) -> Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory
+~static Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.GenerateEventHubPartitions(int partitionCount) -> string[]
+~static Orleans.Streaming.EventHubs.Testing.NoOpCheckpointer.Instance -> Orleans.Streaming.EventHubs.Testing.NoOpCheckpointer
+~static Orleans.Streaming.EventHubs.Testing.NoOpCheckpointerFactory.Instance -> Orleans.Streaming.EventHubs.Testing.NoOpCheckpointerFactory
+~static Orleans.Streaming.EventHubs.Testing.SimpleStreamEventDataGenerator.CreateFactory(System.IServiceProvider services) -> System.Func<Orleans.Runtime.StreamId, Orleans.Streaming.EventHubs.Testing.IStreamDataGenerator<Azure.Messaging.EventHubs.EventData>>
+~virtual Orleans.Streaming.EventHubs.AzureStorageOperationOptions.TableName.get -> string
+~virtual Orleans.Streaming.EventHubs.AzureStorageOperationOptions.TableName.set -> void
+~virtual Orleans.Streaming.EventHubs.EventHubAdapterFactory.CreateCacheFactory(Orleans.Configuration.EventHubStreamCachePressureOptions eventHubCacheOptions) -> Orleans.Streaming.EventHubs.IEventHubQueueCacheFactory
+~virtual Orleans.Streaming.EventHubs.EventHubAdapterFactory.GetPartitionIdsAsync() -> System.Threading.Tasks.Task<string[]>
+~virtual Orleans.Streaming.EventHubs.EventHubAdapterFactory.QueueMessageBatchAsync<T>(Orleans.Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken token, System.Collections.Generic.Dictionary<string, object> requestContext) -> System.Threading.Tasks.Task
+~virtual Orleans.Streaming.EventHubs.EventHubDataAdapter.EncodeMessageIntoSegment(Azure.Messaging.EventHubs.EventData queueMessage, System.Func<int, System.ArraySegment<byte>> getSegment) -> System.ArraySegment<byte>
+~virtual Orleans.Streaming.EventHubs.EventHubDataAdapter.FromQueueMessage(Orleans.Streams.StreamPosition streamPosition, Azure.Messaging.EventHubs.EventData queueMessage, System.DateTime dequeueTime, System.Func<int, System.ArraySegment<byte>> getSegment) -> Orleans.Providers.Streams.Common.CachedMessage
+~virtual Orleans.Streaming.EventHubs.EventHubDataAdapter.GetBatchContainer(Orleans.Streaming.EventHubs.EventHubMessage eventHubMessage) -> Orleans.Streams.IBatchContainer
+~virtual Orleans.Streaming.EventHubs.EventHubDataAdapter.GetBatchContainer(ref Orleans.Providers.Streams.Common.CachedMessage cachedMessage) -> Orleans.Streams.IBatchContainer
+~virtual Orleans.Streaming.EventHubs.EventHubDataAdapter.GetOffset(Orleans.Providers.Streams.Common.CachedMessage lastItemPurged) -> string
+~virtual Orleans.Streaming.EventHubs.EventHubDataAdapter.GetPartitionKey(Orleans.Runtime.StreamId streamId) -> string
+~virtual Orleans.Streaming.EventHubs.EventHubDataAdapter.GetSequenceToken(ref Orleans.Providers.Streams.Common.CachedMessage cachedMessage) -> Orleans.Streams.StreamSequenceToken
+~virtual Orleans.Streaming.EventHubs.EventHubDataAdapter.GetStreamIdentity(Azure.Messaging.EventHubs.EventData queueMessage) -> Orleans.Runtime.StreamId
+~virtual Orleans.Streaming.EventHubs.EventHubDataAdapter.GetStreamPosition(string partition, Azure.Messaging.EventHubs.EventData queueMessage) -> Orleans.Streams.StreamPosition
+~virtual Orleans.Streaming.EventHubs.EventHubDataAdapter.ToQueueMessage<T>(Orleans.Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken token, System.Collections.Generic.Dictionary<string, object> requestContext) -> Azure.Messaging.EventHubs.EventData
+~virtual Orleans.Streaming.EventHubs.EventHubQueueCacheFactory.AddCachePressureMonitors(Orleans.Streaming.EventHubs.IEventHubQueueCache cache, Orleans.Configuration.EventHubStreamCachePressureOptions providerOptions, Microsoft.Extensions.Logging.ILogger cacheLogger) -> void
+~virtual Orleans.Streaming.EventHubs.EventHubQueueCacheFactory.CreateBufferPool(Orleans.Configuration.StreamStatisticOptions statisticOptions, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Orleans.Streaming.EventHubs.EventHubMonitorAggregationDimensions sharedDimensions, out string blockPoolId) -> Orleans.Providers.Streams.Common.IObjectPool<Orleans.Providers.Streams.Common.FixedSizeBuffer>
+~virtual Orleans.Streaming.EventHubs.EventHubQueueCacheFactory.CreateCache(string partition, Orleans.Streaming.EventHubs.IEventHubDataAdapter dataAdatper, Orleans.Configuration.StreamStatisticOptions statisticOptions, Orleans.Configuration.StreamCacheEvictionOptions streamCacheEvictionOptions, Orleans.Streams.IStreamQueueCheckpointer<string> checkpointer, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Orleans.Providers.Streams.Common.IObjectPool<Orleans.Providers.Streams.Common.FixedSizeBuffer> bufferPool, string blockPoolId, Orleans.Providers.Streams.Common.TimePurgePredicate timePurge, Orleans.Streaming.EventHubs.EventHubMonitorAggregationDimensions sharedDimensions) -> Orleans.Streaming.EventHubs.IEventHubQueueCache
+~virtual Orleans.Streaming.EventHubs.Testing.EventDataGeneratorAdapterFactory.ExecuteCommand(int command, object arg) -> System.Threading.Tasks.Task<object>

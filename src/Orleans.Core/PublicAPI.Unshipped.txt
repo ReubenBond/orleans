@@ -1,0 +1,884 @@
+#nullable enable
+abstract Orleans.BatchWorker.Work() -> System.Threading.Tasks.Task!
+const Orleans.Configuration.ClientMessagingOptions.DEFAULT_CLIENT_SENDER_BUCKETS = 8192 -> int
+const Orleans.Configuration.ClientMessagingOptions.DEFAULT_PREFERRED_FAMILY = System.Net.Sockets.AddressFamily.InterNetwork -> System.Net.Sockets.AddressFamily
+const Orleans.Configuration.GatewayOptions.DEFAULT_PREFERED_GATEWAY_INDEX = -1 -> int
+const Orleans.Runtime.RangeFactory.RING_SIZE = 4294967296 -> long
+const Orleans.ServiceLifecycleStage.Active = 20000 -> int
+const Orleans.ServiceLifecycleStage.AfterRuntimeGrainServices = 8100 -> int
+const Orleans.ServiceLifecycleStage.ApplicationServices = 10000 -> int
+const Orleans.ServiceLifecycleStage.BecomeActive = 19999 -> int
+const Orleans.ServiceLifecycleStage.First = -2147483648 -> int
+const Orleans.ServiceLifecycleStage.Last = 2147483647 -> int
+const Orleans.ServiceLifecycleStage.RuntimeGrainServices = 8000 -> int
+const Orleans.ServiceLifecycleStage.RuntimeInitialize = 2000 -> int
+const Orleans.ServiceLifecycleStage.RuntimeServices = 4000 -> int
+const Orleans.ServiceLifecycleStage.RuntimeStorageServices = 6000 -> int
+Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions
+Orleans.AsyncSerialExecutor
+Orleans.AsyncSerialExecutor.AsyncSerialExecutor() -> void
+Orleans.AsyncSerialExecutor<TResult>
+Orleans.AsyncSerialExecutor<TResult>.AsyncSerialExecutor() -> void
+Orleans.BatchWorker
+Orleans.BatchWorker.BatchWorker() -> void
+Orleans.BatchWorker.CancellationToken.get -> System.Threading.CancellationToken
+Orleans.BatchWorker.CancellationToken.set -> void
+Orleans.BatchWorker.IsIdle() -> bool
+Orleans.BatchWorker.Notify() -> void
+Orleans.BatchWorker.Notify(System.DateTime utcTime) -> void
+Orleans.BatchWorker.NotifyAndWaitForWorkToBeServiced() -> System.Threading.Tasks.Task!
+Orleans.BatchWorker.WaitForCurrentWorkToBeServiced() -> System.Threading.Tasks.Task!
+Orleans.BatchWorkerFromDelegate
+Orleans.BatchWorkerFromDelegate.BatchWorkerFromDelegate(System.Func<System.Threading.Tasks.Task!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> void
+Orleans.CollectionAgeLimitAttribute
+Orleans.CollectionAgeLimitAttribute.AgeLimit.get -> System.TimeSpan
+Orleans.CollectionAgeLimitAttribute.AlwaysActive.get -> bool
+Orleans.CollectionAgeLimitAttribute.AlwaysActive.set -> void
+Orleans.CollectionAgeLimitAttribute.CollectionAgeLimitAttribute() -> void
+Orleans.CollectionAgeLimitAttribute.Days.get -> double
+Orleans.CollectionAgeLimitAttribute.Days.set -> void
+Orleans.CollectionAgeLimitAttribute.Hours.get -> double
+Orleans.CollectionAgeLimitAttribute.Hours.set -> void
+Orleans.CollectionAgeLimitAttribute.Minutes.get -> double
+Orleans.CollectionAgeLimitAttribute.Minutes.set -> void
+Orleans.Configuration.ClientConnectionOptions
+Orleans.Configuration.ClientConnectionOptions.ClientConnectionOptions() -> void
+Orleans.Configuration.ClientMessagingOptions
+Orleans.Configuration.ClientMessagingOptions.ClientMessagingOptions() -> void
+Orleans.Configuration.ClientMessagingOptions.ClientSenderBuckets.get -> int
+Orleans.Configuration.ClientMessagingOptions.ClientSenderBuckets.set -> void
+Orleans.Configuration.ClientMessagingOptions.PreferredFamily.get -> System.Net.Sockets.AddressFamily
+Orleans.Configuration.ClientMessagingOptions.PreferredFamily.set -> void
+Orleans.Configuration.ClusterMembershipOptions
+Orleans.Configuration.ClusterMembershipOptions.ClusterMembershipOptions() -> void
+Orleans.Configuration.ClusterMembershipOptions.DeathVoteExpirationTimeout.get -> System.TimeSpan
+Orleans.Configuration.ClusterMembershipOptions.DeathVoteExpirationTimeout.set -> void
+Orleans.Configuration.ClusterMembershipOptions.DefunctSiloCleanupPeriod.get -> System.TimeSpan?
+Orleans.Configuration.ClusterMembershipOptions.DefunctSiloCleanupPeriod.set -> void
+Orleans.Configuration.ClusterMembershipOptions.DefunctSiloExpiration.get -> System.TimeSpan
+Orleans.Configuration.ClusterMembershipOptions.DefunctSiloExpiration.set -> void
+Orleans.Configuration.ClusterMembershipOptions.EnableIndirectProbes.get -> bool
+Orleans.Configuration.ClusterMembershipOptions.EnableIndirectProbes.set -> void
+Orleans.Configuration.ClusterMembershipOptions.EvictWhenMaxJoinAttemptTimeExceeded.get -> bool
+Orleans.Configuration.ClusterMembershipOptions.EvictWhenMaxJoinAttemptTimeExceeded.set -> void
+Orleans.Configuration.ClusterMembershipOptions.ExtendProbeTimeoutDuringDegradation.get -> bool
+Orleans.Configuration.ClusterMembershipOptions.ExtendProbeTimeoutDuringDegradation.set -> void
+Orleans.Configuration.ClusterMembershipOptions.IAmAliveTablePublishTimeout.get -> System.TimeSpan
+Orleans.Configuration.ClusterMembershipOptions.IAmAliveTablePublishTimeout.set -> void
+Orleans.Configuration.ClusterMembershipOptions.LivenessEnabled.get -> bool
+Orleans.Configuration.ClusterMembershipOptions.LivenessEnabled.set -> void
+Orleans.Configuration.ClusterMembershipOptions.LocalHealthDegradationMonitoringPeriod.get -> System.TimeSpan
+Orleans.Configuration.ClusterMembershipOptions.LocalHealthDegradationMonitoringPeriod.set -> void
+Orleans.Configuration.ClusterMembershipOptions.MaxJoinAttemptTime.get -> System.TimeSpan
+Orleans.Configuration.ClusterMembershipOptions.MaxJoinAttemptTime.set -> void
+Orleans.Configuration.ClusterMembershipOptions.NumMissedProbesLimit.get -> int
+Orleans.Configuration.ClusterMembershipOptions.NumMissedProbesLimit.set -> void
+Orleans.Configuration.ClusterMembershipOptions.NumMissedTableIAmAliveLimit.get -> int
+Orleans.Configuration.ClusterMembershipOptions.NumMissedTableIAmAliveLimit.set -> void
+Orleans.Configuration.ClusterMembershipOptions.NumProbedSilos.get -> int
+Orleans.Configuration.ClusterMembershipOptions.NumProbedSilos.set -> void
+Orleans.Configuration.ClusterMembershipOptions.NumVotesForDeathDeclaration.get -> int
+Orleans.Configuration.ClusterMembershipOptions.NumVotesForDeathDeclaration.set -> void
+Orleans.Configuration.ClusterMembershipOptions.ProbeTimeout.get -> System.TimeSpan
+Orleans.Configuration.ClusterMembershipOptions.ProbeTimeout.set -> void
+Orleans.Configuration.ClusterMembershipOptions.TableRefreshTimeout.get -> System.TimeSpan
+Orleans.Configuration.ClusterMembershipOptions.TableRefreshTimeout.set -> void
+Orleans.Configuration.ClusterMembershipOptions.UseLivenessGossip.get -> bool
+Orleans.Configuration.ClusterMembershipOptions.UseLivenessGossip.set -> void
+Orleans.Configuration.ClusterOptions
+Orleans.Configuration.ClusterOptions.ClusterOptions() -> void
+Orleans.Configuration.ClusterOptionsValidator
+Orleans.Configuration.ClusterOptionsValidator.ValidateConfiguration() -> void
+Orleans.Configuration.ConnectionOptions
+Orleans.Configuration.ConnectionOptions.ConnectionOptions() -> void
+Orleans.Configuration.ConnectionOptions.ConnectionRetryDelay.get -> System.TimeSpan
+Orleans.Configuration.ConnectionOptions.ConnectionRetryDelay.set -> void
+Orleans.Configuration.ConnectionOptions.ConnectionsPerEndpoint.get -> int
+Orleans.Configuration.ConnectionOptions.ConnectionsPerEndpoint.set -> void
+Orleans.Configuration.ConnectionOptions.OpenConnectionTimeout.get -> System.TimeSpan
+Orleans.Configuration.ConnectionOptions.OpenConnectionTimeout.set -> void
+Orleans.Configuration.ConnectionOptions.ProtocolVersion.get -> Orleans.Runtime.Messaging.NetworkProtocolVersion
+Orleans.Configuration.ConnectionOptions.ProtocolVersion.set -> void
+Orleans.Configuration.GatewayOptions
+Orleans.Configuration.GatewayOptions.GatewayListRefreshPeriod.get -> System.TimeSpan
+Orleans.Configuration.GatewayOptions.GatewayListRefreshPeriod.set -> void
+Orleans.Configuration.GatewayOptions.GatewayOptions() -> void
+Orleans.Configuration.GatewayOptions.PreferredGatewayIndex.get -> int
+Orleans.Configuration.GatewayOptions.PreferredGatewayIndex.set -> void
+Orleans.Configuration.GrainTypeOptions
+Orleans.Configuration.GrainTypeOptions.GrainTypeOptions() -> void
+Orleans.Configuration.GrainTypeOptionsValidator
+Orleans.Configuration.GrainTypeOptionsValidator.ValidateConfiguration() -> void
+Orleans.Configuration.GrainVersioningOptions
+Orleans.Configuration.GrainVersioningOptions.GrainVersioningOptions() -> void
+Orleans.Configuration.Internal.ServiceCollectionExtensions
+Orleans.Configuration.LoadSheddingOptions
+Orleans.Configuration.LoadSheddingOptions.CpuThreshold.get -> int
+Orleans.Configuration.LoadSheddingOptions.CpuThreshold.set -> void
+Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled.get -> bool
+Orleans.Configuration.LoadSheddingOptions.LoadSheddingEnabled.set -> void
+Orleans.Configuration.LoadSheddingOptions.LoadSheddingLimit.get -> int
+Orleans.Configuration.LoadSheddingOptions.LoadSheddingLimit.set -> void
+Orleans.Configuration.LoadSheddingOptions.LoadSheddingOptions() -> void
+Orleans.Configuration.LoadSheddingOptions.MemoryThreshold.get -> int
+Orleans.Configuration.LoadSheddingOptions.MemoryThreshold.set -> void
+Orleans.Configuration.MessagingOptions
+Orleans.Configuration.MessagingOptions.CancelRequestOnTimeout.get -> bool
+Orleans.Configuration.MessagingOptions.CancelRequestOnTimeout.set -> void
+Orleans.Configuration.MessagingOptions.DropExpiredMessages.get -> bool
+Orleans.Configuration.MessagingOptions.DropExpiredMessages.set -> void
+Orleans.Configuration.MessagingOptions.MaxMessageBodySize.get -> int
+Orleans.Configuration.MessagingOptions.MaxMessageBodySize.set -> void
+Orleans.Configuration.MessagingOptions.MaxMessageHeaderSize.get -> int
+Orleans.Configuration.MessagingOptions.MaxMessageHeaderSize.set -> void
+Orleans.Configuration.MessagingOptions.MessagingOptions() -> void
+Orleans.Configuration.MessagingOptions.ResponseTimeout.get -> System.TimeSpan
+Orleans.Configuration.MessagingOptions.ResponseTimeout.set -> void
+Orleans.Configuration.MessagingOptions.ResponseTimeoutWithDebugger.get -> System.TimeSpan
+Orleans.Configuration.MessagingOptions.ResponseTimeoutWithDebugger.set -> void
+Orleans.Configuration.MessagingOptions.WaitForCancellationAcknowledgement.get -> bool
+Orleans.Configuration.MessagingOptions.WaitForCancellationAcknowledgement.set -> void
+Orleans.Configuration.OptionConfigureExtensionMethods
+Orleans.Configuration.Overrides.OptionsOverrides
+Orleans.Configuration.StaticGatewayListProviderOptions
+Orleans.Configuration.StaticGatewayListProviderOptions.StaticGatewayListProviderOptions() -> void
+Orleans.Configuration.TypeManagementOptions
+Orleans.Configuration.TypeManagementOptions.TypeManagementOptions() -> void
+Orleans.Configuration.TypeManagementOptions.TypeMapRefreshInterval.get -> System.TimeSpan
+Orleans.Configuration.TypeManagementOptions.TypeMapRefreshInterval.set -> void
+Orleans.ConnectionToClusterLostHandler
+Orleans.Factory<TInstance>
+Orleans.Factory<TParam1, TInstance>
+Orleans.Factory<TParam1, TParam2, TInstance>
+Orleans.Factory<TParam1, TParam2, TParam3, TInstance>
+Orleans.GatewayCountChangedEventArgs
+Orleans.GatewayCountChangedEventArgs.ConnectionRecovered.get -> bool
+Orleans.GatewayCountChangedEventArgs.GatewayCountChangedEventArgs(int currentNumberOfConnectedGateways, int previousNumberOfConnectedGateways) -> void
+Orleans.GatewayCountChangedEventArgs.NumberOfConnectedGateways.get -> int
+Orleans.GatewayCountChangedEventArgs.PreviousNumberOfConnectedGateways.get -> int
+Orleans.GatewayCountChangedHandler
+Orleans.GrainDirectory.IGrainLocator
+Orleans.GrainDirectory.IGrainLocator.InvalidateCache(Orleans.Runtime.GrainAddress! address) -> void
+Orleans.GrainDirectory.IGrainLocator.InvalidateCache(Orleans.Runtime.GrainId grainId) -> void
+Orleans.GrainDirectory.IGrainLocator.Lookup(Orleans.Runtime.GrainId grainId) -> System.Threading.Tasks.ValueTask<Orleans.Runtime.GrainAddress?>
+Orleans.GrainDirectory.IGrainLocator.Register(Orleans.Runtime.GrainAddress! address, Orleans.Runtime.GrainAddress? previousRegistration) -> System.Threading.Tasks.Task<Orleans.Runtime.GrainAddress!>!
+Orleans.GrainDirectory.IGrainLocator.TryLookupInCache(Orleans.Runtime.GrainId grainId, out Orleans.Runtime.GrainAddress? address) -> bool
+Orleans.GrainDirectory.IGrainLocator.Unregister(Orleans.Runtime.GrainAddress! address, Orleans.GrainDirectory.UnregistrationCause cause) -> System.Threading.Tasks.Task!
+Orleans.GrainDirectory.IGrainLocator.UpdateCache(Orleans.Runtime.GrainId grainId, Orleans.Runtime.SiloAddress! siloAddress) -> void
+Orleans.GrainDirectory.UnregistrationCause
+Orleans.GrainDirectory.UnregistrationCause.Force = 0 -> Orleans.GrainDirectory.UnregistrationCause
+Orleans.GrainDirectory.UnregistrationCause.NonexistentActivation = 1 -> Orleans.GrainDirectory.UnregistrationCause
+Orleans.GrainInterfaceTypeToGrainTypeResolver
+Orleans.GrainInterfaceTypeToGrainTypeResolver.GetGrainType(Orleans.Runtime.GrainInterfaceType interfaceType) -> Orleans.Runtime.GrainType
+Orleans.GrainInterfaceTypeToGrainTypeResolver.TryGetGrainType(Orleans.Runtime.GrainInterfaceType interfaceType, out Orleans.Runtime.GrainType result) -> bool
+Orleans.GrainReferences.GrainReferenceActivator
+Orleans.GrainReferences.IGrainReferenceActivator
+Orleans.GrainReferences.IGrainReferenceActivatorProvider
+Orleans.GrainState<T>
+Orleans.GrainState<T>.GrainState() -> void
+Orleans.GrainState<T>.GrainState(T state) -> void
+Orleans.GrainState<T>.RecordExists.get -> bool
+Orleans.GrainState<T>.RecordExists.set -> void
+Orleans.GrainState<T>.State.get -> T
+Orleans.GrainState<T>.State.set -> void
+Orleans.Hosting.ClientBuilder
+Orleans.Hosting.ClientBuilderExtensions
+Orleans.Hosting.ClientBuilderGrainCallFilterExtensions
+Orleans.Hosting.GrainCallFilterServiceCollectionExtensions
+Orleans.Hosting.IClientBuilder
+Orleans.Hosting.INamedServiceConfigurator
+Orleans.Hosting.NamedServiceConfigurator
+Orleans.Hosting.NamedServiceConfiguratorExtensions
+Orleans.IClientConnectionRetryFilter
+Orleans.IClusterClient
+Orleans.IClusterClientLifecycle
+Orleans.IClusterConnectionStatusObserver
+Orleans.IClusterConnectionStatusObserver.NotifyClusterConnectionLost() -> void
+Orleans.IClusterConnectionStatusObserver.NotifyGatewayCountChanged(int currentNumberOfGateways, int previousNumberOfGateways, bool connectionRecovered) -> void
+Orleans.IGrainState<T>
+Orleans.IGrainState<T>.RecordExists.get -> bool
+Orleans.IGrainState<T>.RecordExists.set -> void
+Orleans.IGrainState<T>.State.get -> T
+Orleans.IGrainState<T>.State.set -> void
+Orleans.IMembershipTable
+Orleans.IMembershipTableSystemTarget
+Orleans.Internal.AsyncExecutorWithRetries
+Orleans.Internal.FixedBackoff
+Orleans.Internal.FixedBackoff.FixedBackoff(System.TimeSpan delay) -> void
+Orleans.Internal.FixedBackoff.Next(int attempt) -> System.TimeSpan
+Orleans.Internal.IBackoffProvider
+Orleans.Internal.IBackoffProvider.Next(int attempt) -> System.TimeSpan
+Orleans.IOptionFormatter
+Orleans.IOptionFormatter<T>
+Orleans.IOptionFormatterResolver<T>
+Orleans.KeepAliveAttribute
+Orleans.KeepAliveAttribute.KeepAliveAttribute() -> void
+Orleans.LeaseProviders.AcquiredLease
+Orleans.LeaseProviders.AcquiredLease.Duration.get -> System.TimeSpan
+Orleans.LeaseProviders.AcquiredLease.StartTimeUtc.get -> System.DateTime
+Orleans.LeaseProviders.AcquireLeaseResult
+Orleans.LeaseProviders.AcquireLeaseResult.StatusCode.get -> Orleans.LeaseProviders.ResponseCode
+Orleans.LeaseProviders.ILeaseProvider
+Orleans.LeaseProviders.LeaseRequest
+Orleans.LeaseProviders.LeaseRequest.Duration.get -> System.TimeSpan
+Orleans.LeaseProviders.ResponseCode
+Orleans.LeaseProviders.ResponseCode.InvalidToken = 2 -> Orleans.LeaseProviders.ResponseCode
+Orleans.LeaseProviders.ResponseCode.LeaseNotAvailable = 1 -> Orleans.LeaseProviders.ResponseCode
+Orleans.LeaseProviders.ResponseCode.OK = 0 -> Orleans.LeaseProviders.ResponseCode
+Orleans.LeaseProviders.ResponseCode.TransientFailure = 3 -> Orleans.LeaseProviders.ResponseCode
+Orleans.LifecycleSubject
+Orleans.MembershipEntry
+Orleans.MembershipEntry.FaultZone.get -> int
+Orleans.MembershipEntry.FaultZone.set -> void
+Orleans.MembershipEntry.IAmAliveTime.get -> System.DateTime
+Orleans.MembershipEntry.IAmAliveTime.set -> void
+Orleans.MembershipEntry.MembershipEntry() -> void
+Orleans.MembershipEntry.ProxyPort.get -> int
+Orleans.MembershipEntry.ProxyPort.set -> void
+Orleans.MembershipEntry.StartTime.get -> System.DateTime
+Orleans.MembershipEntry.StartTime.set -> void
+Orleans.MembershipEntry.Status.get -> Orleans.Runtime.SiloStatus
+Orleans.MembershipEntry.Status.set -> void
+Orleans.MembershipEntry.UpdateZone.get -> int
+Orleans.MembershipEntry.UpdateZone.set -> void
+Orleans.MembershipTableData
+Orleans.Messaging.IGatewayListProvider
+Orleans.Messaging.IGatewayListProvider.IsUpdatable.get -> bool
+Orleans.Messaging.IGatewayListProvider.MaxStaleness.get -> System.TimeSpan
+Orleans.Messaging.StaticGatewayListProvider
+Orleans.Messaging.StaticGatewayListProvider.IsUpdatable.get -> bool
+Orleans.Messaging.StaticGatewayListProvider.MaxStaleness.get -> System.TimeSpan
+Orleans.Metadata.GrainBindings
+Orleans.Metadata.GrainBindings.GrainType.get -> Orleans.Runtime.GrainType
+Orleans.Metadata.GrainBindingsResolver
+Orleans.Metadata.GrainInterfaceTypeResolver
+Orleans.Metadata.GrainPropertiesResolver
+Orleans.Metadata.GrainTypeResolver
+Orleans.NamedOptionExtensions
+Orleans.Networking.Shared.SocketConnectionException
+Orleans.Networking.Shared.SocketConnectionOptions
+Orleans.Networking.Shared.SocketConnectionOptions.IOQueueCount.get -> int
+Orleans.Networking.Shared.SocketConnectionOptions.IOQueueCount.set -> void
+Orleans.Networking.Shared.SocketConnectionOptions.KeepAlive.get -> bool
+Orleans.Networking.Shared.SocketConnectionOptions.KeepAlive.set -> void
+Orleans.Networking.Shared.SocketConnectionOptions.KeepAliveIntervalSeconds.get -> int
+Orleans.Networking.Shared.SocketConnectionOptions.KeepAliveIntervalSeconds.set -> void
+Orleans.Networking.Shared.SocketConnectionOptions.KeepAliveRetryCount.get -> int
+Orleans.Networking.Shared.SocketConnectionOptions.KeepAliveRetryCount.set -> void
+Orleans.Networking.Shared.SocketConnectionOptions.KeepAliveTimeSeconds.get -> int
+Orleans.Networking.Shared.SocketConnectionOptions.KeepAliveTimeSeconds.set -> void
+Orleans.Networking.Shared.SocketConnectionOptions.NoDelay.get -> bool
+Orleans.Networking.Shared.SocketConnectionOptions.NoDelay.set -> void
+Orleans.Networking.Shared.SocketConnectionOptions.SocketConnectionOptions() -> void
+Orleans.OptionFormattingUtilities
+Orleans.OptionsLogger
+Orleans.OptionsLogger.LogOptions() -> void
+Orleans.Placement.IPlacementFilterDirector
+Orleans.Placement.IPlacementFilterDirector.Filter(Orleans.Placement.PlacementFilterStrategy! filterStrategy, Orleans.Placement.PlacementFilterContext context, System.Collections.Generic.IEnumerable<Orleans.Runtime.SiloAddress!>! silos) -> System.Collections.Generic.IEnumerable<Orleans.Runtime.SiloAddress!>!
+Orleans.Placement.PlacementFilterContext
+Orleans.Placement.PlacementFilterContext.GrainType.get -> Orleans.Runtime.GrainType
+Orleans.Placement.PlacementFilterContext.GrainType.init -> void
+Orleans.Placement.PlacementFilterContext.InterfaceType.get -> Orleans.Runtime.GrainInterfaceType
+Orleans.Placement.PlacementFilterContext.InterfaceType.init -> void
+Orleans.Placement.PlacementFilterContext.InterfaceVersion.get -> ushort
+Orleans.Placement.PlacementFilterContext.InterfaceVersion.init -> void
+Orleans.Placement.PlacementFilterContext.PlacementFilterContext() -> void
+Orleans.Placement.PlacementFilterContext.PlacementFilterContext(Orleans.Runtime.GrainType GrainType, Orleans.Runtime.GrainInterfaceType InterfaceType, ushort InterfaceVersion) -> void
+Orleans.Placement.PlacementFilterExtensions
+Orleans.Placement.Rebalancing.IActivationRebalancer
+Orleans.Placement.Rebalancing.IActivationRebalancer.GetRebalancingReport(bool force = false) -> System.Threading.Tasks.ValueTask<Orleans.Placement.Rebalancing.RebalancingReport>
+Orleans.Placement.Rebalancing.IActivationRebalancerReportListener
+Orleans.Placement.Rebalancing.IActivationRebalancerReportListener.OnReport(Orleans.Placement.Rebalancing.RebalancingReport report) -> void
+Orleans.Placement.Rebalancing.IFailedSessionBackoffProvider
+Orleans.Placement.Rebalancing.RebalancerStatus
+Orleans.Placement.Rebalancing.RebalancerStatus.Executing = 0 -> Orleans.Placement.Rebalancing.RebalancerStatus
+Orleans.Placement.Rebalancing.RebalancerStatus.Suspended = 1 -> Orleans.Placement.Rebalancing.RebalancerStatus
+Orleans.Placement.Rebalancing.RebalancingReport
+Orleans.Placement.Rebalancing.RebalancingReport.ClusterImbalance.get -> double
+Orleans.Placement.Rebalancing.RebalancingReport.ClusterImbalance.init -> void
+Orleans.Placement.Rebalancing.RebalancingReport.RebalancingReport() -> void
+Orleans.Placement.Rebalancing.RebalancingReport.Statistics.get -> System.Collections.Immutable.ImmutableArray<Orleans.Placement.Rebalancing.RebalancingStatistics>
+Orleans.Placement.Rebalancing.RebalancingReport.Statistics.init -> void
+Orleans.Placement.Rebalancing.RebalancingReport.Status.get -> Orleans.Placement.Rebalancing.RebalancerStatus
+Orleans.Placement.Rebalancing.RebalancingReport.Status.init -> void
+Orleans.Placement.Rebalancing.RebalancingReport.SuspensionDuration.get -> System.TimeSpan?
+Orleans.Placement.Rebalancing.RebalancingReport.SuspensionDuration.init -> void
+Orleans.Placement.Rebalancing.RebalancingStatistics
+Orleans.Placement.Rebalancing.RebalancingStatistics.AcquiredActivations.get -> ulong
+Orleans.Placement.Rebalancing.RebalancingStatistics.AcquiredActivations.init -> void
+Orleans.Placement.Rebalancing.RebalancingStatistics.DispersedActivations.get -> ulong
+Orleans.Placement.Rebalancing.RebalancingStatistics.DispersedActivations.init -> void
+Orleans.Placement.Rebalancing.RebalancingStatistics.RebalancingStatistics() -> void
+Orleans.Placement.Rebalancing.RebalancingStatistics.TimeStamp.get -> System.DateTime
+Orleans.Placement.Rebalancing.RebalancingStatistics.TimeStamp.init -> void
+Orleans.Placement.Repartitioning.CandidateConnectedVertex
+Orleans.Placement.Repartitioning.CandidateConnectedVertex.CandidateConnectedVertex() -> void
+Orleans.Placement.Repartitioning.CandidateConnectedVertex.CandidateConnectedVertex(Orleans.Runtime.GrainId id, long transferScore) -> void
+Orleans.Placement.Repartitioning.CandidateConnectedVertex.Equals(Orleans.Placement.Repartitioning.CandidateConnectedVertex other) -> bool
+Orleans.Placement.Repartitioning.CandidateConnectedVertex.Id.get -> Orleans.Runtime.GrainId
+Orleans.Placement.Repartitioning.CandidateConnectedVertex.TransferScore.get -> long
+Orleans.Placement.Repartitioning.EdgeVertex
+Orleans.Placement.Repartitioning.EdgeVertex.EdgeVertex() -> void
+Orleans.Placement.Repartitioning.EdgeVertex.Equals(Orleans.Placement.Repartitioning.EdgeVertex other) -> bool
+Orleans.Placement.Repartitioning.IImbalanceToleranceRule
+Orleans.Placement.Repartitioning.IImbalanceToleranceRule.IsSatisfiedBy(uint imbalance) -> bool
+Orleans.Providers.IControllable
+Orleans.Providers.IProviderRuntime
+Orleans.Providers.ProviderInitializationException
+Orleans.Providers.ProviderInitializationException.ProviderInitializationException() -> void
+Orleans.Providers.ProviderStateException
+Orleans.Providers.ProviderStateException.ProviderStateException() -> void
+Orleans.RedactAttribute
+Orleans.RedactAttribute.RedactAttribute() -> void
+Orleans.RedactConnectionStringAttribute
+Orleans.RedactConnectionStringAttribute.RedactConnectionStringAttribute() -> void
+Orleans.Runtime.ClientInstruments
+Orleans.Runtime.ClusterManifestUpdate
+Orleans.Runtime.ClusterManifestUpdate.ClusterManifestUpdate(Orleans.Metadata.MajorMinorVersion manifestVersion, System.Collections.Immutable.ImmutableDictionary<Orleans.Runtime.SiloAddress!, Orleans.Metadata.GrainManifest!>! siloManifests, bool includesAllActiveServers) -> void
+Orleans.Runtime.ClusterManifestUpdate.IncludesAllActiveServers.get -> bool
+Orleans.Runtime.ClusterManifestUpdate.SiloManifests.get -> System.Collections.Immutable.ImmutableDictionary<Orleans.Runtime.SiloAddress!, Orleans.Metadata.GrainManifest!>!
+Orleans.Runtime.ClusterManifestUpdate.Version.get -> Orleans.Metadata.MajorMinorVersion
+Orleans.Runtime.Configuration.ConfigUtilities
+Orleans.Runtime.DetailedGrainStatistic
+Orleans.Runtime.DetailedGrainStatistic.DetailedGrainStatistic() -> void
+Orleans.Runtime.DetailedGrainStatistic.GrainId.get -> Orleans.Runtime.GrainId
+Orleans.Runtime.DetailedGrainStatistic.GrainId.init -> void
+Orleans.Runtime.GenericGrainInterfaceType
+Orleans.Runtime.GenericGrainInterfaceType.Arity.get -> int
+Orleans.Runtime.GenericGrainInterfaceType.GenericGrainInterfaceType() -> void
+Orleans.Runtime.GenericGrainInterfaceType.GetGenericGrainType() -> Orleans.Runtime.GenericGrainInterfaceType
+Orleans.Runtime.GenericGrainInterfaceType.IsConstructed.get -> bool
+Orleans.Runtime.GenericGrainInterfaceType.Value.get -> Orleans.Runtime.GrainInterfaceType
+Orleans.Runtime.GenericGrainType
+Orleans.Runtime.GenericGrainType.Arity.get -> int
+Orleans.Runtime.GenericGrainType.Equals(Orleans.Runtime.GenericGrainType other) -> bool
+Orleans.Runtime.GenericGrainType.GenericGrainType() -> void
+Orleans.Runtime.GenericGrainType.GetUnconstructedGrainType() -> Orleans.Runtime.GenericGrainType
+Orleans.Runtime.GenericGrainType.GrainType.get -> Orleans.Runtime.GrainType
+Orleans.Runtime.GenericGrainType.IsConstructed.get -> bool
+Orleans.Runtime.GrainCallFrequency
+Orleans.Runtime.GrainCallFrequency.CallCount.get -> ulong
+Orleans.Runtime.GrainCallFrequency.CallCount.set -> void
+Orleans.Runtime.GrainCallFrequency.GrainCallFrequency() -> void
+Orleans.Runtime.GrainCallFrequency.SourceGrain.get -> Orleans.Runtime.GrainId
+Orleans.Runtime.GrainCallFrequency.SourceGrain.set -> void
+Orleans.Runtime.GrainCallFrequency.TargetGrain.get -> Orleans.Runtime.GrainId
+Orleans.Runtime.GrainCallFrequency.TargetGrain.set -> void
+Orleans.Runtime.IClusterManifestProvider
+Orleans.Runtime.IHealthCheckable
+Orleans.Runtime.ILocalSiloDetails
+Orleans.Runtime.IManagementGrain
+Orleans.Runtime.IndirectProbeResponse
+Orleans.Runtime.IndirectProbeResponse.IndirectProbeResponse() -> void
+Orleans.Runtime.IndirectProbeResponse.IntermediaryHealthScore.get -> int
+Orleans.Runtime.IndirectProbeResponse.IntermediaryHealthScore.init -> void
+Orleans.Runtime.IndirectProbeResponse.ProbeResponseTime.get -> System.TimeSpan
+Orleans.Runtime.IndirectProbeResponse.ProbeResponseTime.init -> void
+Orleans.Runtime.IndirectProbeResponse.Succeeded.get -> bool
+Orleans.Runtime.IndirectProbeResponse.Succeeded.init -> void
+Orleans.Runtime.Instruments
+Orleans.Runtime.Internal.ExecutionContextSuppressor
+Orleans.Runtime.Internal.ExecutionContextSuppressor.Dispose() -> void
+Orleans.Runtime.Internal.ExecutionContextSuppressor.ExecutionContextSuppressor() -> void
+Orleans.Runtime.IRingRange
+Orleans.Runtime.IRingRange.InRange(Orleans.Runtime.GrainId grainId) -> bool
+Orleans.Runtime.IRingRange.InRange(uint value) -> bool
+Orleans.Runtime.ISingleRange
+Orleans.Runtime.ISingleRange.Begin.get -> uint
+Orleans.Runtime.ISingleRange.End.get -> uint
+Orleans.Runtime.LifecycleParticipantExtensions
+Orleans.Runtime.Messaging.ConnectionFailedException
+Orleans.Runtime.Messaging.ConnectionFailedException.ConnectionFailedException() -> void
+Orleans.Runtime.Messaging.InvalidMessageFrameException
+Orleans.Runtime.Messaging.InvalidMessageFrameException.InvalidMessageFrameException() -> void
+Orleans.Runtime.Messaging.InvalidMessageFrameException.InvalidMessageFrameException(string! message) -> void
+Orleans.Runtime.Messaging.InvalidMessageFrameException.InvalidMessageFrameException(string! message, System.Exception! innerException) -> void
+Orleans.Runtime.Messaging.NetworkProtocolVersion
+Orleans.Runtime.Messaging.NetworkProtocolVersion.Version1 = 1 -> Orleans.Runtime.Messaging.NetworkProtocolVersion
+Orleans.Runtime.OnDeserializedCallbacks
+Orleans.Runtime.Placement.IPlacementContext
+Orleans.Runtime.Placement.IPlacementContext.LocalSiloStatus.get -> Orleans.Runtime.SiloStatus
+Orleans.Runtime.Placement.IPlacementDirector
+Orleans.Runtime.Placement.PlacementTarget
+Orleans.Runtime.Placement.PlacementTarget.GrainIdentity.get -> Orleans.Runtime.GrainId
+Orleans.Runtime.Placement.PlacementTarget.InterfaceType.get -> Orleans.Runtime.GrainInterfaceType
+Orleans.Runtime.Placement.PlacementTarget.InterfaceVersion.get -> ushort
+Orleans.Runtime.Placement.PlacementTarget.PlacementTarget() -> void
+Orleans.Runtime.RangeFactory
+Orleans.Runtime.RequestContextExtensions
+Orleans.Runtime.SiloRuntimeMetricsListener
+Orleans.Runtime.SiloRuntimeStatistics
+Orleans.Runtime.SiloRuntimeStatistics.ActivationCount.get -> int
+Orleans.Runtime.SiloRuntimeStatistics.AvailableMemory.get -> float?
+Orleans.Runtime.SiloRuntimeStatistics.ClientCount.get -> long
+Orleans.Runtime.SiloRuntimeStatistics.CpuUsage.get -> float?
+Orleans.Runtime.SiloRuntimeStatistics.DateTime.get -> System.DateTime
+Orleans.Runtime.SiloRuntimeStatistics.EnvironmentStatistics.get -> Orleans.Statistics.EnvironmentStatistics
+Orleans.Runtime.SiloRuntimeStatistics.IsOverloaded.get -> bool
+Orleans.Runtime.SiloRuntimeStatistics.MemoryUsage.get -> long?
+Orleans.Runtime.SiloRuntimeStatistics.ReceivedMessages.get -> long
+Orleans.Runtime.SiloRuntimeStatistics.RecentlyUsedActivationCount.get -> int
+Orleans.Runtime.SiloRuntimeStatistics.SentMessages.get -> long
+Orleans.Runtime.SiloRuntimeStatistics.TotalPhysicalMemory.get -> long?
+Orleans.Runtime.SiloStatus
+Orleans.Runtime.SiloStatus.Active = 3 -> Orleans.Runtime.SiloStatus
+Orleans.Runtime.SiloStatus.Created = 1 -> Orleans.Runtime.SiloStatus
+Orleans.Runtime.SiloStatus.Dead = 6 -> Orleans.Runtime.SiloStatus
+Orleans.Runtime.SiloStatus.Joining = 2 -> Orleans.Runtime.SiloStatus
+Orleans.Runtime.SiloStatus.None = 0 -> Orleans.Runtime.SiloStatus
+Orleans.Runtime.SiloStatus.ShuttingDown = 4 -> Orleans.Runtime.SiloStatus
+Orleans.Runtime.SiloStatus.Stopping = 5 -> Orleans.Runtime.SiloStatus
+Orleans.Runtime.SiloStatusExtensions
+Orleans.Runtime.SimpleGrainStatistic
+Orleans.Runtime.SimpleGrainStatistic.ActivationCount.get -> int
+Orleans.Runtime.SimpleGrainStatistic.ActivationCount.init -> void
+Orleans.Runtime.SimpleGrainStatistic.SimpleGrainStatistic() -> void
+Orleans.Serialization.ActivationIdConverter
+Orleans.Serialization.ActivationIdConverter.ActivationIdConverter() -> void
+Orleans.Serialization.ConfigureOrleansJsonSerializerOptions
+Orleans.Serialization.GrainIdConverter
+Orleans.Serialization.GrainIdConverter.GrainIdConverter() -> void
+Orleans.Serialization.GrainReferenceJsonConverter
+Orleans.Serialization.IPAddressConverter
+Orleans.Serialization.IPAddressConverter.IPAddressConverter() -> void
+Orleans.Serialization.IPEndPointConverter
+Orleans.Serialization.IPEndPointConverter.IPEndPointConverter() -> void
+Orleans.Serialization.MembershipVersionJsonConverter
+Orleans.Serialization.MembershipVersionJsonConverter.MembershipVersionJsonConverter() -> void
+Orleans.Serialization.OrleansJsonSerializationBinder
+Orleans.Serialization.OrleansJsonSerializer
+Orleans.Serialization.OrleansJsonSerializerOptions
+Orleans.Serialization.OrleansJsonSerializerOptions.OrleansJsonSerializerOptions() -> void
+Orleans.Serialization.OrleansJsonSerializerSettings
+Orleans.Serialization.SiloAddressJsonConverter
+Orleans.Serialization.SiloAddressJsonConverter.SiloAddressJsonConverter() -> void
+Orleans.Serialization.UniqueKeyConverter
+Orleans.Serialization.UniqueKeyConverter.UniqueKeyConverter() -> void
+Orleans.SerializerConfigurationValidator
+Orleans.ServiceLifecycleStage
+Orleans.Storage.BadProviderConfigException
+Orleans.Storage.BadProviderConfigException.BadProviderConfigException() -> void
+Orleans.Storage.GrainStorageHelpers
+Orleans.Storage.GrainStorageSerializer
+Orleans.Storage.GrainStorageSerializerExtensions
+Orleans.Storage.IGrainStorage
+Orleans.Storage.IGrainStorageSerializer
+Orleans.Storage.IMemoryStorageGrain
+Orleans.Storage.InconsistentStateException
+Orleans.Storage.InconsistentStateException.InconsistentStateException() -> void
+Orleans.Storage.IRestExceptionDecoder
+Orleans.Storage.IStorageProviderSerializerOptions
+Orleans.Storage.JsonGrainStorageSerializer
+Orleans.Storage.OrleansGrainStorageSerializer
+Orleans.TableVersion
+Orleans.TableVersion.Version.get -> int
+Orleans.Timers.Internal.ITimerManager
+Orleans.Utilities.ObserverManager<TIdentity, TObserver>
+Orleans.Utilities.ObserverManager<TIdentity, TObserver>.Clear() -> void
+Orleans.Utilities.ObserverManager<TIdentity, TObserver>.ClearExpired() -> void
+Orleans.Utilities.ObserverManager<TIdentity, TObserver>.Count.get -> int
+Orleans.Utilities.ObserverManager<TIdentity, TObserver>.ExpirationDuration.get -> System.TimeSpan
+Orleans.Utilities.ObserverManager<TIdentity, TObserver>.ExpirationDuration.set -> void
+Orleans.Utilities.ObserverManager<TIdentity, TObserver>.Subscribe(TIdentity id, TObserver observer) -> void
+Orleans.Utilities.ObserverManager<TIdentity, TObserver>.Unsubscribe(TIdentity id) -> void
+Orleans.Utilities.ObserverManager<TObserver>
+override Orleans.BatchWorkerFromDelegate.Work() -> System.Threading.Tasks.Task!
+override Orleans.Placement.Repartitioning.CandidateConnectedVertex.GetHashCode() -> int
+override Orleans.Placement.Repartitioning.EdgeVertex.GetHashCode() -> int
+override Orleans.Runtime.GenericGrainType.GetHashCode() -> int
+override Orleans.TableVersion.GetHashCode() -> int
+readonly Orleans.Placement.Repartitioning.EdgeVertex.Id -> Orleans.Runtime.GrainId
+readonly Orleans.Placement.Repartitioning.EdgeVertex.IsMigratable -> bool
+static Orleans.Placement.PlacementFilterExtensions.AddPlacementFilter<TFilter, TDirector>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.DependencyInjection.ServiceLifetime strategyLifetime) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Orleans.Placement.Repartitioning.CandidateConnectedVertex.operator !=(Orleans.Placement.Repartitioning.CandidateConnectedVertex left, Orleans.Placement.Repartitioning.CandidateConnectedVertex right) -> bool
+static Orleans.Placement.Repartitioning.CandidateConnectedVertex.operator ==(Orleans.Placement.Repartitioning.CandidateConnectedVertex left, Orleans.Placement.Repartitioning.CandidateConnectedVertex right) -> bool
+static Orleans.Placement.Repartitioning.EdgeVertex.operator !=(Orleans.Placement.Repartitioning.EdgeVertex left, Orleans.Placement.Repartitioning.EdgeVertex right) -> bool
+static Orleans.Placement.Repartitioning.EdgeVertex.operator ==(Orleans.Placement.Repartitioning.EdgeVertex left, Orleans.Placement.Repartitioning.EdgeVertex right) -> bool
+static Orleans.Runtime.GenericGrainInterfaceType.TryParse(Orleans.Runtime.GrainInterfaceType grainType, out Orleans.Runtime.GenericGrainInterfaceType result) -> bool
+static Orleans.Runtime.GenericGrainType.TryParse(Orleans.Runtime.GrainType grainType, out Orleans.Runtime.GenericGrainType result) -> bool
+static Orleans.Runtime.RangeFactory.CreateFullRange() -> Orleans.Runtime.IRingRange!
+static Orleans.Runtime.RangeFactory.CreateRange(System.Collections.Generic.List<Orleans.Runtime.IRingRange!>! inRanges) -> Orleans.Runtime.IRingRange!
+static Orleans.Runtime.RangeFactory.CreateRange(uint begin, uint end) -> Orleans.Runtime.IRingRange!
+static Orleans.Runtime.RangeFactory.GetSubRanges(Orleans.Runtime.IRingRange! range) -> System.Collections.Generic.IEnumerable<Orleans.Runtime.ISingleRange!>!
+static Orleans.Runtime.RequestContextExtensions.Export(Orleans.Serialization.DeepCopier! copier) -> System.Collections.Generic.Dictionary<string!, object!>?
+static Orleans.Runtime.RequestContextExtensions.Import(System.Collections.Generic.Dictionary<string!, object!>? contextData) -> void
+static Orleans.Runtime.SiloRuntimeMetricsListener.ConnectedClientCount.get -> long
+static Orleans.Runtime.SiloRuntimeMetricsListener.MessageReceivedTotal.get -> long
+static Orleans.Runtime.SiloRuntimeMetricsListener.MessageSentTotal.get -> long
+static Orleans.Runtime.SiloStatusExtensions.IsTerminating(this Orleans.Runtime.SiloStatus siloStatus) -> bool
+static Orleans.Storage.GrainStorageHelpers.GetGrainStorage(System.Type! grainType, System.IServiceProvider! services) -> Orleans.Storage.IGrainStorage!
+static readonly Orleans.CollectionAgeLimitAttribute.MinAgeLimit -> System.TimeSpan
+static readonly Orleans.Configuration.ConnectionOptions.DEFAULT_OPENCONNECTION_TIMEOUT -> System.TimeSpan
+static readonly Orleans.Configuration.TypeManagementOptions.DEFAULT_REFRESH_CLUSTER_INTERFACEMAP_TIME -> System.TimeSpan
+static readonly Orleans.Internal.AsyncExecutorWithRetries.INFINITE_RETRIES -> int
+virtual Orleans.LifecycleSubject.OnStartStageCompleted(int stage) -> void
+virtual Orleans.LifecycleSubject.OnStopStageCompleted(int stage) -> void
+virtual Orleans.LifecycleSubject.PerfMeasureOnStart(int stage, System.TimeSpan elapsed) -> void
+virtual Orleans.LifecycleSubject.PerfMeasureOnStop(int stage, System.TimeSpan elapsed) -> void
+~const Orleans.Configuration.ClusterOptions.DefaultClusterId = "default" -> string
+~const Orleans.Configuration.ClusterOptions.DefaultServiceId = "default" -> string
+~const Orleans.Runtime.Placement.IPlacementDirector.PlacementHintKey = "PlacementHintKey" -> string
+~const Orleans.Serialization.OrleansJsonSerializer.IndentJsonProperty = "IndentJSON" -> string
+~const Orleans.Serialization.OrleansJsonSerializer.TypeNameHandlingProperty = "TypeNameHandling" -> string
+~const Orleans.Serialization.OrleansJsonSerializer.UseFullAssemblyNamesProperty = "UseFullAssemblyNames" -> string
+~Orleans.AsyncSerialExecutor.AddNext(System.Func<System.Threading.Tasks.Task> func) -> System.Threading.Tasks.Task
+~Orleans.AsyncSerialExecutor<TResult>.AddNext(System.Func<System.Threading.Tasks.Task<TResult>> func) -> System.Threading.Tasks.Task<TResult>
+~Orleans.CollectionAgeLimitAttribute.CollectionAgeLimitAttribute(string inactivityPeriod) -> void
+~Orleans.CollectionAgeLimitAttribute.Populate(System.IServiceProvider services, System.Type grainClass, Orleans.Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) -> void
+~Orleans.Configuration.ClientConnectionOptions.ConfigureConnection(System.Action<Microsoft.AspNetCore.Connections.IConnectionBuilder> configure) -> void
+~Orleans.Configuration.ClientMessagingOptions.LocalAddress.get -> System.Net.IPAddress
+~Orleans.Configuration.ClientMessagingOptions.LocalAddress.set -> void
+~Orleans.Configuration.ClientMessagingOptions.NetworkInterfaceName.get -> string
+~Orleans.Configuration.ClientMessagingOptions.NetworkInterfaceName.set -> void
+~Orleans.Configuration.ClusterOptions.ClusterId.get -> string
+~Orleans.Configuration.ClusterOptions.ClusterId.set -> void
+~Orleans.Configuration.ClusterOptions.ServiceId.get -> string
+~Orleans.Configuration.ClusterOptions.ServiceId.set -> void
+~Orleans.Configuration.ClusterOptionsValidator.ClusterOptionsValidator(Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> options) -> void
+~Orleans.Configuration.GrainTypeOptions.Classes.get -> System.Collections.Generic.HashSet<System.Type>
+~Orleans.Configuration.GrainTypeOptions.Interfaces.get -> System.Collections.Generic.HashSet<System.Type>
+~Orleans.Configuration.GrainTypeOptionsValidator.GrainTypeOptionsValidator(Microsoft.Extensions.Options.IOptions<Orleans.Configuration.GrainTypeOptions> options, System.IServiceProvider serviceProvider) -> void
+~Orleans.Configuration.GrainVersioningOptions.DefaultCompatibilityStrategy.get -> string
+~Orleans.Configuration.GrainVersioningOptions.DefaultCompatibilityStrategy.set -> void
+~Orleans.Configuration.GrainVersioningOptions.DefaultVersionSelectorStrategy.get -> string
+~Orleans.Configuration.GrainVersioningOptions.DefaultVersionSelectorStrategy.set -> void
+~Orleans.Configuration.StaticGatewayListProviderOptions.Gateways.get -> System.Collections.Generic.List<System.Uri>
+~Orleans.Configuration.StaticGatewayListProviderOptions.Gateways.set -> void
+~Orleans.GrainInterfaceTypeToGrainTypeResolver.GetGrainType(Orleans.Runtime.GrainInterfaceType interfaceType, string prefix) -> Orleans.Runtime.GrainType
+~Orleans.GrainInterfaceTypeToGrainTypeResolver.GrainInterfaceTypeToGrainTypeResolver(Orleans.Runtime.IClusterManifestProvider clusterManifestProvider) -> void
+~Orleans.GrainReferences.GrainReferenceActivator.CreateReference(Orleans.Runtime.GrainId grainId, Orleans.Runtime.GrainInterfaceType interfaceType) -> Orleans.Runtime.GrainReference
+~Orleans.GrainReferences.GrainReferenceActivator.GrainReferenceActivator(System.IServiceProvider serviceProvider, System.Collections.Generic.IEnumerable<Orleans.GrainReferences.IGrainReferenceActivatorProvider> providers) -> void
+~Orleans.GrainReferences.IGrainReferenceActivator.CreateReference(Orleans.Runtime.GrainId grainId) -> Orleans.Runtime.GrainReference
+~Orleans.GrainReferences.IGrainReferenceActivatorProvider.TryGet(Orleans.Runtime.GrainType grainType, Orleans.Runtime.GrainInterfaceType interfaceType, out Orleans.GrainReferences.IGrainReferenceActivator activator) -> bool
+~Orleans.GrainState<T>.ETag.get -> string
+~Orleans.GrainState<T>.ETag.set -> void
+~Orleans.GrainState<T>.GrainState(T state, string eTag) -> void
+~Orleans.Hosting.ClientBuilder.ClientBuilder(Microsoft.Extensions.DependencyInjection.IServiceCollection services, Microsoft.Extensions.Configuration.IConfiguration configuration) -> void
+~Orleans.Hosting.ClientBuilder.Configuration.get -> Microsoft.Extensions.Configuration.IConfiguration
+~Orleans.Hosting.ClientBuilder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~Orleans.Hosting.IClientBuilder.Configuration.get -> Microsoft.Extensions.Configuration.IConfiguration
+~Orleans.Hosting.IClientBuilder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~Orleans.Hosting.INamedServiceConfigurator.ConfigureDelegate.get -> System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>>
+~Orleans.Hosting.INamedServiceConfigurator.Name.get -> string
+~Orleans.Hosting.NamedServiceConfigurator.ConfigureDelegate.get -> System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>>
+~Orleans.Hosting.NamedServiceConfigurator.Name.get -> string
+~Orleans.Hosting.NamedServiceConfigurator.NamedServiceConfigurator(string name, System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>> configureDelegate) -> void
+~Orleans.IClientConnectionRetryFilter.ShouldRetryConnectionAttempt(System.Exception exception, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<bool>
+~Orleans.IClusterClient.ServiceProvider.get -> System.IServiceProvider
+~Orleans.IGrainState<T>.ETag.get -> string
+~Orleans.IGrainState<T>.ETag.set -> void
+~Orleans.IMembershipTable.CleanupDefunctSiloEntries(System.DateTimeOffset beforeDate) -> System.Threading.Tasks.Task
+~Orleans.IMembershipTable.DeleteMembershipTableEntries(string clusterId) -> System.Threading.Tasks.Task
+~Orleans.IMembershipTable.InitializeMembershipTable(bool tryInitTableVersion) -> System.Threading.Tasks.Task
+~Orleans.IMembershipTable.InsertRow(Orleans.MembershipEntry entry, Orleans.TableVersion tableVersion) -> System.Threading.Tasks.Task<bool>
+~Orleans.IMembershipTable.ReadAll() -> System.Threading.Tasks.Task<Orleans.MembershipTableData>
+~Orleans.IMembershipTable.ReadRow(Orleans.Runtime.SiloAddress key) -> System.Threading.Tasks.Task<Orleans.MembershipTableData>
+~Orleans.IMembershipTable.UpdateIAmAlive(Orleans.MembershipEntry entry) -> System.Threading.Tasks.Task
+~Orleans.IMembershipTable.UpdateRow(Orleans.MembershipEntry entry, string etag, Orleans.TableVersion tableVersion) -> System.Threading.Tasks.Task<bool>
+~Orleans.IOptionFormatter.Format() -> System.Collections.Generic.IEnumerable<string>
+~Orleans.IOptionFormatter.Name.get -> string
+~Orleans.IOptionFormatterResolver<T>.Resolve(string name) -> Orleans.IOptionFormatter<T>
+~Orleans.KeepAliveAttribute.Populate(System.IServiceProvider services, System.Type grainClass, Orleans.Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) -> void
+~Orleans.LeaseProviders.AcquiredLease.AcquiredLease(string resourceKey) -> void
+~Orleans.LeaseProviders.AcquiredLease.AcquiredLease(string resourceKey, System.TimeSpan duration, string token, System.DateTime startTimeUtc) -> void
+~Orleans.LeaseProviders.AcquiredLease.ResourceKey.get -> string
+~Orleans.LeaseProviders.AcquiredLease.Token.get -> string
+~Orleans.LeaseProviders.AcquireLeaseResult.AcquiredLease.get -> Orleans.LeaseProviders.AcquiredLease
+~Orleans.LeaseProviders.AcquireLeaseResult.AcquireLeaseResult(Orleans.LeaseProviders.AcquiredLease acquiredLease, Orleans.LeaseProviders.ResponseCode statusCode, System.Exception failureException) -> void
+~Orleans.LeaseProviders.AcquireLeaseResult.FailureException.get -> System.Exception
+~Orleans.LeaseProviders.ILeaseProvider.Acquire(string category, Orleans.LeaseProviders.LeaseRequest[] leaseRequests) -> System.Threading.Tasks.Task<Orleans.LeaseProviders.AcquireLeaseResult[]>
+~Orleans.LeaseProviders.ILeaseProvider.Release(string category, Orleans.LeaseProviders.AcquiredLease[] aquiredLeases) -> System.Threading.Tasks.Task
+~Orleans.LeaseProviders.ILeaseProvider.Renew(string category, Orleans.LeaseProviders.AcquiredLease[] aquiredLeases) -> System.Threading.Tasks.Task<Orleans.LeaseProviders.AcquireLeaseResult[]>
+~Orleans.LeaseProviders.LeaseRequest.LeaseRequest(string resourceKey, System.TimeSpan duration) -> void
+~Orleans.LeaseProviders.LeaseRequest.ResourceKey.get -> string
+~Orleans.LifecycleSubject.LifecycleSubject(Microsoft.Extensions.Logging.ILogger logger) -> void
+~Orleans.MembershipEntry.AddOrUpdateSuspector(Orleans.Runtime.SiloAddress localSilo, System.DateTime voteTime, int maxVotes) -> void
+~Orleans.MembershipEntry.AddSuspector(Orleans.Runtime.SiloAddress suspectingSilo, System.DateTime suspectingTime) -> void
+~Orleans.MembershipEntry.HostName.get -> string
+~Orleans.MembershipEntry.HostName.set -> void
+~Orleans.MembershipEntry.RoleName.get -> string
+~Orleans.MembershipEntry.RoleName.set -> void
+~Orleans.MembershipEntry.SiloAddress.get -> Orleans.Runtime.SiloAddress
+~Orleans.MembershipEntry.SiloAddress.set -> void
+~Orleans.MembershipEntry.SiloName.get -> string
+~Orleans.MembershipEntry.SiloName.set -> void
+~Orleans.MembershipEntry.SuspectTimes.get -> System.Collections.Generic.List<System.Tuple<Orleans.Runtime.SiloAddress, System.DateTime>>
+~Orleans.MembershipEntry.SuspectTimes.set -> void
+~Orleans.MembershipEntry.ToFullString() -> string
+~Orleans.MembershipTableData.Members.get -> System.Collections.Generic.IReadOnlyList<System.Tuple<Orleans.MembershipEntry, string>>
+~Orleans.MembershipTableData.MembershipTableData(Orleans.TableVersion version) -> void
+~Orleans.MembershipTableData.MembershipTableData(System.Collections.Generic.List<System.Tuple<Orleans.MembershipEntry, string>> list, Orleans.TableVersion version) -> void
+~Orleans.MembershipTableData.MembershipTableData(System.Tuple<Orleans.MembershipEntry, string> tuple, Orleans.TableVersion version) -> void
+~Orleans.MembershipTableData.TryGet(Orleans.Runtime.SiloAddress silo) -> System.Tuple<Orleans.MembershipEntry, string>
+~Orleans.MembershipTableData.Version.get -> Orleans.TableVersion
+~Orleans.MembershipTableData.WithoutDuplicateDeads() -> Orleans.MembershipTableData
+~Orleans.Messaging.IGatewayListProvider.GetGateways() -> System.Threading.Tasks.Task<System.Collections.Generic.IList<System.Uri>>
+~Orleans.Messaging.IGatewayListProvider.InitializeGatewayListProvider() -> System.Threading.Tasks.Task
+~Orleans.Messaging.StaticGatewayListProvider.GetGateways() -> System.Threading.Tasks.Task<System.Collections.Generic.IList<System.Uri>>
+~Orleans.Messaging.StaticGatewayListProvider.InitializeGatewayListProvider() -> System.Threading.Tasks.Task
+~Orleans.Messaging.StaticGatewayListProvider.StaticGatewayListProvider(Microsoft.Extensions.Options.IOptions<Orleans.Configuration.StaticGatewayListProviderOptions> options, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.GatewayOptions> gatewayOptions) -> void
+~Orleans.Metadata.GrainBindings.Bindings.get -> System.Collections.Immutable.ImmutableArray<System.Collections.Immutable.ImmutableDictionary<string, string>>
+~Orleans.Metadata.GrainBindings.GrainBindings(Orleans.Runtime.GrainType grainType, System.Collections.Immutable.ImmutableArray<System.Collections.Immutable.ImmutableDictionary<string, string>> bindings) -> void
+~Orleans.Metadata.GrainBindingsResolver.GetAllBindings() -> (Orleans.Metadata.MajorMinorVersion Version, System.Collections.Immutable.ImmutableDictionary<Orleans.Runtime.GrainType, Orleans.Metadata.GrainBindings> Bindings)
+~Orleans.Metadata.GrainBindingsResolver.GetBindings(Orleans.Runtime.GrainType grainType) -> Orleans.Metadata.GrainBindings
+~Orleans.Metadata.GrainBindingsResolver.GrainBindingsResolver(Orleans.Runtime.IClusterManifestProvider clusterManifestProvider) -> void
+~Orleans.Metadata.GrainInterfaceTypeResolver.GetGrainInterfaceType(System.Type type) -> Orleans.Runtime.GrainInterfaceType
+~Orleans.Metadata.GrainInterfaceTypeResolver.GetGrainInterfaceTypeByConvention(System.Type type) -> Orleans.Runtime.GrainInterfaceType
+~Orleans.Metadata.GrainInterfaceTypeResolver.GrainInterfaceTypeResolver(System.Collections.Generic.IEnumerable<Orleans.Runtime.IGrainInterfaceTypeProvider> providers, Orleans.Serialization.TypeSystem.TypeConverter typeConverter) -> void
+~Orleans.Metadata.GrainPropertiesResolver.GetGrainProperties(Orleans.Runtime.GrainType grainType) -> Orleans.Metadata.GrainProperties
+~Orleans.Metadata.GrainPropertiesResolver.GrainPropertiesResolver(Orleans.Runtime.IClusterManifestProvider clusterManifestProvider) -> void
+~Orleans.Metadata.GrainPropertiesResolver.TryGetGrainProperties(Orleans.Runtime.GrainType grainType, out Orleans.Metadata.GrainProperties properties) -> bool
+~Orleans.Metadata.GrainTypeResolver.GetGrainType(System.Type type) -> Orleans.Runtime.GrainType
+~Orleans.Metadata.GrainTypeResolver.GrainTypeResolver(System.Collections.Generic.IEnumerable<Orleans.Metadata.IGrainTypeProvider> resolvers, Orleans.Serialization.TypeSystem.TypeConverter argumentFormatter) -> void
+~Orleans.Networking.Shared.SocketConnectionException.SocketConnectionException(string message) -> void
+~Orleans.Networking.Shared.SocketConnectionException.SocketConnectionException(string message, System.Exception innerException) -> void
+~Orleans.Networking.Shared.SocketConnectionException.SocketConnectionException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~Orleans.OptionsLogger.LogOption(Orleans.IOptionFormatter formatter) -> void
+~Orleans.OptionsLogger.LogOptions(System.Collections.Generic.IEnumerable<Orleans.IOptionFormatter> formatters) -> void
+~Orleans.OptionsLogger.OptionsLogger(Microsoft.Extensions.Logging.ILogger logger, System.IServiceProvider services) -> void
+~Orleans.Placement.Rebalancing.IActivationRebalancer.ResumeRebalancing() -> System.Threading.Tasks.Task
+~Orleans.Placement.Rebalancing.IActivationRebalancer.SubscribeToReports(Orleans.Placement.Rebalancing.IActivationRebalancerReportListener listener) -> void
+~Orleans.Placement.Rebalancing.IActivationRebalancer.SuspendRebalancing(System.TimeSpan? duration = null) -> System.Threading.Tasks.Task
+~Orleans.Placement.Rebalancing.IActivationRebalancer.UnsubscribeFromReports(Orleans.Placement.Rebalancing.IActivationRebalancerReportListener listener) -> void
+~Orleans.Placement.Rebalancing.RebalancingReport.Host.get -> Orleans.Runtime.SiloAddress
+~Orleans.Placement.Rebalancing.RebalancingReport.Host.init -> void
+~Orleans.Placement.Rebalancing.RebalancingStatistics.SiloAddress.get -> Orleans.Runtime.SiloAddress
+~Orleans.Placement.Rebalancing.RebalancingStatistics.SiloAddress.init -> void
+~Orleans.Placement.Repartitioning.EdgeVertex.EdgeVertex(Orleans.Runtime.GrainId id, Orleans.Runtime.SiloAddress silo, bool isMigratable) -> void
+~Orleans.Providers.IControllable.ExecuteCommand(int command, object arg) -> System.Threading.Tasks.Task<object>
+~Orleans.Providers.IProviderRuntime.BindExtension<TExtension, TExtensionInterface>(System.Func<TExtension> newExtensionFunc) -> (TExtension Extension, TExtensionInterface ExtensionReference)
+~Orleans.Providers.IProviderRuntime.GrainFactory.get -> Orleans.IGrainFactory
+~Orleans.Providers.IProviderRuntime.ServiceProvider.get -> System.IServiceProvider
+~Orleans.Providers.ProviderInitializationException.ProviderInitializationException(string message) -> void
+~Orleans.Providers.ProviderInitializationException.ProviderInitializationException(string message, System.Exception innerException) -> void
+~Orleans.Providers.ProviderStateException.ProviderStateException(string message) -> void
+~Orleans.Providers.ProviderStateException.ProviderStateException(string message, System.Exception innerException) -> void
+~Orleans.Runtime.DetailedGrainStatistic.GrainType.get -> string
+~Orleans.Runtime.DetailedGrainStatistic.GrainType.init -> void
+~Orleans.Runtime.DetailedGrainStatistic.SiloAddress.get -> Orleans.Runtime.SiloAddress
+~Orleans.Runtime.DetailedGrainStatistic.SiloAddress.init -> void
+~Orleans.Runtime.GenericGrainInterfaceType.Construct(Orleans.Serialization.TypeSystem.TypeConverter formatter, params System.Type[] typeArguments) -> Orleans.Runtime.GenericGrainInterfaceType
+~Orleans.Runtime.GenericGrainInterfaceType.GetArguments(Orleans.Serialization.TypeSystem.TypeConverter formatter) -> System.Type[]
+~Orleans.Runtime.GenericGrainType.Construct(Orleans.Serialization.TypeSystem.TypeConverter formatter, params System.Type[] typeArguments) -> Orleans.Runtime.GenericGrainType
+~Orleans.Runtime.GenericGrainType.GetArguments(Orleans.Serialization.TypeSystem.TypeConverter converter) -> System.Type[]
+~Orleans.Runtime.GrainCallFrequency.SourceHost.get -> Orleans.Runtime.SiloAddress
+~Orleans.Runtime.GrainCallFrequency.SourceHost.set -> void
+~Orleans.Runtime.GrainCallFrequency.TargetHost.get -> Orleans.Runtime.SiloAddress
+~Orleans.Runtime.GrainCallFrequency.TargetHost.set -> void
+~Orleans.Runtime.IClusterManifestProvider.Current.get -> Orleans.Metadata.ClusterManifest
+~Orleans.Runtime.IClusterManifestProvider.LocalGrainManifest.get -> Orleans.Metadata.GrainManifest
+~Orleans.Runtime.IClusterManifestProvider.Updates.get -> System.Collections.Generic.IAsyncEnumerable<Orleans.Metadata.ClusterManifest>
+~Orleans.Runtime.IHealthCheckable.CheckHealth(System.DateTime lastCheckTime, out string reason) -> bool
+~Orleans.Runtime.ILocalSiloDetails.ClusterId.get -> string
+~Orleans.Runtime.ILocalSiloDetails.DnsHostName.get -> string
+~Orleans.Runtime.ILocalSiloDetails.GatewayAddress.get -> Orleans.Runtime.SiloAddress
+~Orleans.Runtime.ILocalSiloDetails.Name.get -> string
+~Orleans.Runtime.ILocalSiloDetails.SiloAddress.get -> Orleans.Runtime.SiloAddress
+~Orleans.Runtime.IManagementGrain.ForceActivationCollection(Orleans.Runtime.SiloAddress[] hostsIds, System.TimeSpan ageLimit) -> System.Threading.Tasks.Task
+~Orleans.Runtime.IManagementGrain.ForceActivationCollection(System.TimeSpan ageLimit) -> System.Threading.Tasks.Task
+~Orleans.Runtime.IManagementGrain.ForceGarbageCollection(Orleans.Runtime.SiloAddress[] hostsIds) -> System.Threading.Tasks.Task
+~Orleans.Runtime.IManagementGrain.ForceRuntimeStatisticsCollection(Orleans.Runtime.SiloAddress[] siloAddresses) -> System.Threading.Tasks.Task
+~Orleans.Runtime.IManagementGrain.GetActivationAddress(Orleans.Runtime.IAddressable reference) -> System.Threading.Tasks.ValueTask<Orleans.Runtime.SiloAddress>
+~Orleans.Runtime.IManagementGrain.GetActiveGrains(Orleans.Runtime.GrainType type) -> System.Threading.Tasks.ValueTask<System.Collections.Generic.List<Orleans.Runtime.GrainId>>
+~Orleans.Runtime.IManagementGrain.GetDetailedGrainStatistics(string[] types = null, Orleans.Runtime.SiloAddress[] hostsIds = null) -> System.Threading.Tasks.Task<Orleans.Runtime.DetailedGrainStatistic[]>
+~Orleans.Runtime.IManagementGrain.GetDetailedHosts(bool onlyActive = false) -> System.Threading.Tasks.Task<Orleans.MembershipEntry[]>
+~Orleans.Runtime.IManagementGrain.GetGrainActivationCount(Orleans.Runtime.GrainReference grainReference) -> System.Threading.Tasks.Task<int>
+~Orleans.Runtime.IManagementGrain.GetGrainCallFrequencies(Orleans.Runtime.SiloAddress[] hostsIds = null) -> System.Threading.Tasks.Task<System.Collections.Generic.List<Orleans.Runtime.GrainCallFrequency>>
+~Orleans.Runtime.IManagementGrain.GetHosts(bool onlyActive = false) -> System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<Orleans.Runtime.SiloAddress, Orleans.Runtime.SiloStatus>>
+~Orleans.Runtime.IManagementGrain.GetRuntimeStatistics(Orleans.Runtime.SiloAddress[] hostsIds) -> System.Threading.Tasks.Task<Orleans.Runtime.SiloRuntimeStatistics[]>
+~Orleans.Runtime.IManagementGrain.GetSimpleGrainStatistics() -> System.Threading.Tasks.Task<Orleans.Runtime.SimpleGrainStatistic[]>
+~Orleans.Runtime.IManagementGrain.GetSimpleGrainStatistics(Orleans.Runtime.SiloAddress[] hostsIds) -> System.Threading.Tasks.Task<Orleans.Runtime.SimpleGrainStatistic[]>
+~Orleans.Runtime.IManagementGrain.GetTotalActivationCount() -> System.Threading.Tasks.Task<int>
+~Orleans.Runtime.IManagementGrain.ResetGrainCallFrequencies(Orleans.Runtime.SiloAddress[] hostsIds = null) -> System.Threading.Tasks.ValueTask
+~Orleans.Runtime.IManagementGrain.SendControlCommandToProvider<T>(string providerName, int command, object arg = null) -> System.Threading.Tasks.Task<object[]>
+~Orleans.Runtime.IndirectProbeResponse.FailureMessage.get -> string
+~Orleans.Runtime.IndirectProbeResponse.FailureMessage.init -> void
+~Orleans.Runtime.Messaging.ConnectionFailedException.ConnectionFailedException(string message) -> void
+~Orleans.Runtime.Messaging.ConnectionFailedException.ConnectionFailedException(string message, System.Exception innerException) -> void
+~Orleans.Runtime.Messaging.ConnectionFailedException.ConnectionFailedException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~Orleans.Runtime.OnDeserializedCallbacks.OnDeserialized(Orleans.Serialization.IOnDeserialized value) -> void
+~Orleans.Runtime.OnDeserializedCallbacks.OnDeserializedCallbacks(System.IServiceProvider serviceProvider) -> void
+~Orleans.Runtime.Placement.IPlacementContext.GetCompatibleSilos(Orleans.Runtime.Placement.PlacementTarget target) -> Orleans.Runtime.SiloAddress[]
+~Orleans.Runtime.Placement.IPlacementContext.GetCompatibleSilosWithVersions(Orleans.Runtime.Placement.PlacementTarget target) -> System.Collections.Generic.IReadOnlyDictionary<ushort, Orleans.Runtime.SiloAddress[]>
+~Orleans.Runtime.Placement.IPlacementContext.LocalSilo.get -> Orleans.Runtime.SiloAddress
+~Orleans.Runtime.Placement.IPlacementDirector.GetPlacementHint(System.Collections.Generic.Dictionary<string, object> requestContextData, Orleans.Runtime.SiloAddress[] compatibleSilos) -> Orleans.Runtime.SiloAddress
+~Orleans.Runtime.Placement.IPlacementDirector.OnAddActivation(Orleans.Runtime.PlacementStrategy strategy, Orleans.Runtime.Placement.PlacementTarget target, Orleans.Runtime.Placement.IPlacementContext context) -> System.Threading.Tasks.Task<Orleans.Runtime.SiloAddress>
+~Orleans.Runtime.Placement.PlacementTarget.PlacementTarget(Orleans.Runtime.GrainId grainIdentity, System.Collections.Generic.Dictionary<string, object> requestContextData, Orleans.Runtime.GrainInterfaceType interfaceType, ushort interfaceVersion) -> void
+~Orleans.Runtime.Placement.PlacementTarget.RequestContextData.get -> System.Collections.Generic.Dictionary<string, object>
+~Orleans.Runtime.SimpleGrainStatistic.GrainType.get -> string
+~Orleans.Runtime.SimpleGrainStatistic.GrainType.init -> void
+~Orleans.Runtime.SimpleGrainStatistic.SiloAddress.get -> Orleans.Runtime.SiloAddress
+~Orleans.Runtime.SimpleGrainStatistic.SiloAddress.init -> void
+~Orleans.Serialization.ConfigureOrleansJsonSerializerOptions.ConfigureOrleansJsonSerializerOptions(System.IServiceProvider serviceProvider) -> void
+~Orleans.Serialization.ConfigureOrleansJsonSerializerOptions.PostConfigure(string name, Orleans.Serialization.OrleansJsonSerializerOptions options) -> void
+~Orleans.Serialization.GrainReferenceJsonConverter.GrainReferenceJsonConverter(Orleans.GrainReferences.GrainReferenceActivator referenceActivator) -> void
+~Orleans.Serialization.OrleansJsonSerializationBinder.OrleansJsonSerializationBinder(Orleans.Serialization.TypeSystem.TypeResolver typeResolver) -> void
+~Orleans.Serialization.OrleansJsonSerializer.Deserialize(System.Type expectedType, string input) -> object
+~Orleans.Serialization.OrleansJsonSerializer.OrleansJsonSerializer(Microsoft.Extensions.Options.IOptions<Orleans.Serialization.OrleansJsonSerializerOptions> options) -> void
+~Orleans.Serialization.OrleansJsonSerializer.Serialize(object item, System.Type expectedType) -> string
+~Orleans.Serialization.OrleansJsonSerializerOptions.JsonSerializerSettings.get -> Newtonsoft.Json.JsonSerializerSettings
+~Orleans.Serialization.OrleansJsonSerializerOptions.JsonSerializerSettings.set -> void
+~Orleans.SerializerConfigurationValidator.SerializerConfigurationValidator(Orleans.Serialization.Serializers.ICodecProvider codecProvider, Microsoft.Extensions.Options.IOptions<Orleans.Serialization.Configuration.TypeManifestOptions> options, System.IServiceProvider serviceProvider) -> void
+~Orleans.Storage.BadProviderConfigException.BadProviderConfigException(string msg) -> void
+~Orleans.Storage.BadProviderConfigException.BadProviderConfigException(string msg, System.Exception exc) -> void
+~Orleans.Storage.DefaultStorageProviderSerializerOptionsConfigurator<TOptions>
+~Orleans.Storage.DefaultStorageProviderSerializerOptionsConfigurator<TOptions>.DefaultStorageProviderSerializerOptionsConfigurator(System.IServiceProvider serviceProvider) -> void
+~Orleans.Storage.DefaultStorageProviderSerializerOptionsConfigurator<TOptions>.PostConfigure(string name, TOptions options) -> void
+~Orleans.Storage.GrainStorageSerializer.Deserialize<T>(System.BinaryData input) -> T
+~Orleans.Storage.GrainStorageSerializer.GrainStorageSerializer(Orleans.Storage.IGrainStorageSerializer serializer, Orleans.Storage.IGrainStorageSerializer fallbackDeserializer) -> void
+~Orleans.Storage.GrainStorageSerializer.Serialize<T>(T input) -> System.BinaryData
+~Orleans.Storage.IGrainStorage.ClearStateAsync<T>(string stateName, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~Orleans.Storage.IGrainStorage.ReadStateAsync<T>(string stateName, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~Orleans.Storage.IGrainStorage.WriteStateAsync<T>(string stateName, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~Orleans.Storage.IGrainStorageSerializer.Deserialize<T>(System.BinaryData input) -> T
+~Orleans.Storage.IGrainStorageSerializer.Serialize<T>(T input) -> System.BinaryData
+~Orleans.Storage.IMemoryStorageGrain.DeleteStateAsync<T>(string grainStoreKey, string eTag) -> System.Threading.Tasks.Task
+~Orleans.Storage.IMemoryStorageGrain.ReadStateAsync<T>(string grainStoreKey) -> System.Threading.Tasks.Task<Orleans.IGrainState<T>>
+~Orleans.Storage.IMemoryStorageGrain.WriteStateAsync<T>(string grainStoreKey, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task<string>
+~Orleans.Storage.InconsistentStateException.CurrentEtag.get -> string
+~Orleans.Storage.InconsistentStateException.InconsistentStateException(string errorMsg, string storedEtag, string currentEtag) -> void
+~Orleans.Storage.InconsistentStateException.InconsistentStateException(string errorMsg, string storedEtag, string currentEtag, System.Exception storageException) -> void
+~Orleans.Storage.InconsistentStateException.InconsistentStateException(string message) -> void
+~Orleans.Storage.InconsistentStateException.InconsistentStateException(string message, System.Exception innerException) -> void
+~Orleans.Storage.InconsistentStateException.InconsistentStateException(string storedEtag, string currentEtag, System.Exception storageException) -> void
+~Orleans.Storage.InconsistentStateException.InconsistentStateException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~Orleans.Storage.InconsistentStateException.StoredEtag.get -> string
+~Orleans.Storage.IRestExceptionDecoder.DecodeException(System.Exception exception, out System.Net.HttpStatusCode httpStatusCode, out string restStatus, bool getExtendedErrors = false) -> bool
+~Orleans.Storage.IStorageProviderSerializerOptions.GrainStorageSerializer.get -> Orleans.Storage.IGrainStorageSerializer
+~Orleans.Storage.IStorageProviderSerializerOptions.GrainStorageSerializer.set -> void
+~Orleans.Storage.JsonGrainStorageSerializer.Deserialize<T>(System.BinaryData input) -> T
+~Orleans.Storage.JsonGrainStorageSerializer.JsonGrainStorageSerializer(Orleans.Serialization.OrleansJsonSerializer orleansJsonSerializer) -> void
+~Orleans.Storage.JsonGrainStorageSerializer.Serialize<T>(T value) -> System.BinaryData
+~Orleans.Storage.OrleansGrainStorageSerializer.Deserialize<T>(System.BinaryData input) -> T
+~Orleans.Storage.OrleansGrainStorageSerializer.OrleansGrainStorageSerializer(Orleans.Serialization.Serializer serializer) -> void
+~Orleans.Storage.OrleansGrainStorageSerializer.Serialize<T>(T value) -> System.BinaryData
+~Orleans.TableVersion.Equals(Orleans.TableVersion other) -> bool
+~Orleans.TableVersion.Next() -> Orleans.TableVersion
+~Orleans.TableVersion.TableVersion(int version, string eTag) -> void
+~Orleans.TableVersion.VersionEtag.get -> string
+~Orleans.Timers.Internal.ITimerManager.Delay(System.TimeSpan timeSpan, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>
+~Orleans.Utilities.ObserverManager<TIdentity, TObserver>.GetDateTime.get -> System.Func<System.DateTime>
+~Orleans.Utilities.ObserverManager<TIdentity, TObserver>.GetDateTime.set -> void
+~Orleans.Utilities.ObserverManager<TIdentity, TObserver>.GetEnumerator() -> System.Collections.Generic.IEnumerator<TObserver>
+~Orleans.Utilities.ObserverManager<TIdentity, TObserver>.Notify(System.Action<TObserver> notification, System.Func<TObserver, bool> predicate = null) -> void
+~Orleans.Utilities.ObserverManager<TIdentity, TObserver>.Notify(System.Func<TObserver, System.Threading.Tasks.Task> notification, System.Func<TObserver, bool> predicate = null) -> System.Threading.Tasks.Task
+~Orleans.Utilities.ObserverManager<TIdentity, TObserver>.ObserverManager(System.TimeSpan expiration, Microsoft.Extensions.Logging.ILogger log) -> void
+~Orleans.Utilities.ObserverManager<TIdentity, TObserver>.Observers.get -> System.Collections.Generic.IDictionary<TIdentity, TObserver>
+~Orleans.Utilities.ObserverManager<TObserver>.ObserverManager(System.TimeSpan expiration, Microsoft.Extensions.Logging.ILogger log) -> void
+~override Orleans.MembershipEntry.ToString() -> string
+~override Orleans.MembershipTableData.ToString() -> string
+~override Orleans.Placement.Repartitioning.CandidateConnectedVertex.Equals(object obj) -> bool
+~override Orleans.Placement.Repartitioning.CandidateConnectedVertex.ToString() -> string
+~override Orleans.Placement.Repartitioning.EdgeVertex.Equals(object obj) -> bool
+~override Orleans.Placement.Repartitioning.EdgeVertex.ToString() -> string
+~override Orleans.RedactConnectionStringAttribute.Redact(object value) -> string
+~override Orleans.Runtime.GenericGrainInterfaceType.ToString() -> string
+~override Orleans.Runtime.GenericGrainType.Equals(object obj) -> bool
+~override Orleans.Runtime.GenericGrainType.ToString() -> string
+~override Orleans.Runtime.IndirectProbeResponse.ToString() -> string
+~override Orleans.Runtime.OnDeserializedCallbacks.RuntimeClient.get -> object
+~override Orleans.Runtime.OnDeserializedCallbacks.ServiceProvider.get -> System.IServiceProvider
+~override Orleans.Runtime.SiloRuntimeStatistics.ToString() -> string
+~override Orleans.Runtime.SimpleGrainStatistic.ToString() -> string
+~override Orleans.Serialization.ActivationIdConverter.CanConvert(System.Type objectType) -> bool
+~override Orleans.Serialization.ActivationIdConverter.ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer) -> object
+~override Orleans.Serialization.ActivationIdConverter.WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer) -> void
+~override Orleans.Serialization.GrainIdConverter.CanConvert(System.Type objectType) -> bool
+~override Orleans.Serialization.GrainIdConverter.ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer) -> object
+~override Orleans.Serialization.GrainIdConverter.WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer) -> void
+~override Orleans.Serialization.GrainReferenceJsonConverter.CanConvert(System.Type objectType) -> bool
+~override Orleans.Serialization.GrainReferenceJsonConverter.ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer) -> object
+~override Orleans.Serialization.GrainReferenceJsonConverter.WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer) -> void
+~override Orleans.Serialization.IPAddressConverter.CanConvert(System.Type objectType) -> bool
+~override Orleans.Serialization.IPAddressConverter.ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer) -> object
+~override Orleans.Serialization.IPAddressConverter.WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer) -> void
+~override Orleans.Serialization.IPEndPointConverter.CanConvert(System.Type objectType) -> bool
+~override Orleans.Serialization.IPEndPointConverter.ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer) -> object
+~override Orleans.Serialization.IPEndPointConverter.WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer) -> void
+~override Orleans.Serialization.MembershipVersionJsonConverter.CanConvert(System.Type objectType) -> bool
+~override Orleans.Serialization.MembershipVersionJsonConverter.ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer) -> object
+~override Orleans.Serialization.MembershipVersionJsonConverter.WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer) -> void
+~override Orleans.Serialization.OrleansJsonSerializationBinder.BindToType(string assemblyName, string typeName) -> System.Type
+~override Orleans.Serialization.SiloAddressJsonConverter.CanConvert(System.Type objectType) -> bool
+~override Orleans.Serialization.SiloAddressJsonConverter.ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer) -> object
+~override Orleans.Serialization.SiloAddressJsonConverter.WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer) -> void
+~override Orleans.Serialization.UniqueKeyConverter.CanConvert(System.Type objectType) -> bool
+~override Orleans.Serialization.UniqueKeyConverter.ReadJson(Newtonsoft.Json.JsonReader reader, System.Type objectType, object existingValue, Newtonsoft.Json.JsonSerializer serializer) -> object
+~override Orleans.Serialization.UniqueKeyConverter.WriteJson(Newtonsoft.Json.JsonWriter writer, object value, Newtonsoft.Json.JsonSerializer serializer) -> void
+~override Orleans.Storage.InconsistentStateException.GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~override Orleans.Storage.InconsistentStateException.ToString() -> string
+~override Orleans.TableVersion.Equals(object obj) -> bool
+~override Orleans.TableVersion.ToString() -> string
+~readonly Orleans.LifecycleSubject.Logger -> Microsoft.Extensions.Logging.ILogger
+~readonly Orleans.Placement.Repartitioning.EdgeVertex.Silo -> Orleans.Runtime.SiloAddress
+~static Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.AddOrleansClient(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, Microsoft.Extensions.Configuration.IConfiguration configuration, System.Action<Orleans.Hosting.IClientBuilder> configureDelegate) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.AddOrleansClient(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Orleans.Hosting.IClientBuilder> configureDelegate) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient(this Microsoft.Extensions.Hosting.HostApplicationBuilder hostAppBuilder) -> Microsoft.Extensions.Hosting.HostApplicationBuilder
+~static Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient(this Microsoft.Extensions.Hosting.HostApplicationBuilder hostAppBuilder, System.Action<Orleans.Hosting.IClientBuilder> configureDelegate) -> Microsoft.Extensions.Hosting.HostApplicationBuilder
+~static Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient(this Microsoft.Extensions.Hosting.IHostApplicationBuilder hostAppBuilder) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder
+~static Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient(this Microsoft.Extensions.Hosting.IHostApplicationBuilder hostAppBuilder, System.Action<Orleans.Hosting.IClientBuilder> configureDelegate) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder
+~static Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient(this Microsoft.Extensions.Hosting.IHostBuilder hostBuilder) -> Microsoft.Extensions.Hosting.IHostBuilder
+~static Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient(this Microsoft.Extensions.Hosting.IHostBuilder hostBuilder, System.Action<Microsoft.Extensions.Hosting.HostBuilderContext, Orleans.Hosting.IClientBuilder> configureDelegate) -> Microsoft.Extensions.Hosting.IHostBuilder
+~static Microsoft.Extensions.Hosting.OrleansClientGenericHostExtensions.UseOrleansClient(this Microsoft.Extensions.Hosting.IHostBuilder hostBuilder, System.Action<Orleans.Hosting.IClientBuilder> configureDelegate) -> Microsoft.Extensions.Hosting.IHostBuilder
+~static Orleans.Configuration.Internal.ServiceCollectionExtensions.AddFromExisting(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Type service, System.Type implementation) -> void
+~static Orleans.Configuration.Internal.ServiceCollectionExtensions.AddFromExisting<TService, TImplementation>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) -> void
+~static Orleans.Configuration.Internal.ServiceCollectionExtensions.TryAddFromExisting<TService, TImplementation>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) -> void
+~static Orleans.Configuration.OptionConfigureExtensionMethods.ConfigureFormatter<TOptions, TOptionFormatter>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Configuration.OptionConfigureExtensionMethods.ConfigureFormatter<TOptions>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Configuration.OptionConfigureExtensionMethods.ConfigureFormatterResolver<TOptions, TOptionFormatterResolver>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Configuration.OptionConfigureExtensionMethods.ConfigureNamedOptionForLogging<TOptions>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Configuration.OptionConfigureExtensionMethods.TryConfigureFormatter<TOptions, TOptionFormatter>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Configuration.OptionConfigureExtensionMethods.TryConfigureFormatterResolver<TOptions, TOptionFormatterResolver>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Configuration.Overrides.OptionsOverrides.GetProviderClusterOptions(this System.IServiceProvider services, string providerName) -> Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions>
+~static Orleans.Hosting.ClientBuilderExtensions.AddActivityPropagation(this Orleans.Hosting.IClientBuilder builder) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.AddClusterConnectionLostHandler(this Orleans.Hosting.IClientBuilder builder, Orleans.ConnectionToClusterLostHandler handler) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.AddClusterConnectionLostHandler(this Orleans.Hosting.IClientBuilder builder, System.Func<System.IServiceProvider, Orleans.ConnectionToClusterLostHandler> handlerFactory) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.AddClusterConnectionStatusObserver<TObserver>(this Orleans.Hosting.IClientBuilder builder) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.AddClusterConnectionStatusObserver<TObserver>(this Orleans.Hosting.IClientBuilder builder, TObserver observer) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.AddGatewayCountChangedHandler(this Orleans.Hosting.IClientBuilder builder, Orleans.GatewayCountChangedHandler handler) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.AddGatewayCountChangedHandler(this Orleans.Hosting.IClientBuilder builder, System.Func<System.IServiceProvider, Orleans.GatewayCountChangedHandler> handlerFactory) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.Configure<TOptions>(this Orleans.Hosting.IClientBuilder builder, Microsoft.Extensions.Configuration.IConfiguration configuration) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.Configure<TOptions>(this Orleans.Hosting.IClientBuilder builder, System.Action<TOptions> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.ConfigureServices(this Orleans.Hosting.IClientBuilder builder, System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection> configureDelegate) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.UseConnectionRetryFilter(this Orleans.Hosting.IClientBuilder builder, Orleans.IClientConnectionRetryFilter connectionRetryFilter) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.UseConnectionRetryFilter(this Orleans.Hosting.IClientBuilder builder, System.Func<System.Exception, System.Threading.CancellationToken, System.Threading.Tasks.Task<bool>> connectionRetryFilter) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.UseConnectionRetryFilter<TConnectionRetryFilter>(this Orleans.Hosting.IClientBuilder builder) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.UseLocalhostClustering(this Orleans.Hosting.IClientBuilder builder, int gatewayPort = 30000, string serviceId = "dev", string clusterId = "dev") -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.UseLocalhostClustering(this Orleans.Hosting.IClientBuilder builder, int[] gatewayPorts, string serviceId = "dev", string clusterId = "dev") -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.UseStaticClustering(this Orleans.Hosting.IClientBuilder builder, params System.Net.IPEndPoint[] endpoints) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.UseStaticClustering(this Orleans.Hosting.IClientBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.StaticGatewayListProviderOptions>> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderExtensions.UseStaticClustering(this Orleans.Hosting.IClientBuilder builder, System.Action<Orleans.Configuration.StaticGatewayListProviderOptions> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderGrainCallFilterExtensions.AddIncomingGrainCallFilter(this Orleans.Hosting.IClientBuilder builder, Orleans.IIncomingGrainCallFilter filter) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderGrainCallFilterExtensions.AddIncomingGrainCallFilter(this Orleans.Hosting.IClientBuilder builder, Orleans.IncomingGrainCallFilterDelegate filter) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderGrainCallFilterExtensions.AddIncomingGrainCallFilter<TImplementation>(this Orleans.Hosting.IClientBuilder builder) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderGrainCallFilterExtensions.AddOutgoingGrainCallFilter(this Orleans.Hosting.IClientBuilder builder, Orleans.IOutgoingGrainCallFilter filter) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderGrainCallFilterExtensions.AddOutgoingGrainCallFilter(this Orleans.Hosting.IClientBuilder builder, Orleans.OutgoingGrainCallFilterDelegate filter) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderGrainCallFilterExtensions.AddOutgoingGrainCallFilter<TImplementation>(this Orleans.Hosting.IClientBuilder builder) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.GrainCallFilterServiceCollectionExtensions.AddGrainCallFilter(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, Orleans.GrainCallFilterDelegate filter) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.GrainCallFilterServiceCollectionExtensions.AddGrainCallFilter(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, Orleans.IIncomingGrainCallFilter filter) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.GrainCallFilterServiceCollectionExtensions.AddGrainCallFilter<TImplementation>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.NamedServiceConfiguratorExtensions.Configure<TOptions>(this Orleans.Hosting.INamedServiceConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<TOptions>> configureOptions) -> void
+~static Orleans.Hosting.NamedServiceConfiguratorExtensions.ConfigureComponent<TComponent>(this Orleans.Hosting.INamedServiceConfigurator configurator, System.Func<System.IServiceProvider, string, TComponent> factory) -> void
+~static Orleans.Hosting.NamedServiceConfiguratorExtensions.ConfigureComponent<TOptions, TComponent>(this Orleans.Hosting.INamedServiceConfigurator configurator, System.Func<System.IServiceProvider, string, TComponent> factory, System.Action<Microsoft.Extensions.Options.OptionsBuilder<TOptions>> configureOptions = null) -> void
+~static Orleans.Hosting.NamedServiceConfiguratorExtensions.ConfigureLifecycle<T>(this Orleans.Hosting.INamedServiceConfigurator configurator) -> void
+~static Orleans.Internal.AsyncExecutorWithRetries.ExecuteWithRetries(System.Func<int, System.Threading.Tasks.Task> action, int maxNumErrorTries, System.Func<System.Exception, int, bool> retryExceptionFilter, System.TimeSpan maxExecutionTime, Orleans.Internal.IBackoffProvider onErrorBackOff) -> System.Threading.Tasks.Task
+~static Orleans.Internal.AsyncExecutorWithRetries.ExecuteWithRetries<T>(System.Func<int, System.Threading.Tasks.Task<T>> function, int maxNumErrorTries, System.Func<System.Exception, int, bool> retryExceptionFilter, System.TimeSpan maxExecutionTime, Orleans.Internal.IBackoffProvider onErrorBackOff, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<T>
+~static Orleans.Internal.AsyncExecutorWithRetries.ExecuteWithRetries<T>(System.Func<int, System.Threading.Tasks.Task<T>> function, int maxNumSuccessTries, int maxNumErrorTries, System.Func<T, int, bool> retryValueFilter, System.Func<System.Exception, int, bool> retryExceptionFilter, System.TimeSpan maxExecutionTime = default(System.TimeSpan), Orleans.Internal.IBackoffProvider onSuccessBackOff = null, Orleans.Internal.IBackoffProvider onErrorBackOff = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<T>
+~static Orleans.LifecycleSubject.GetStageNames(System.Type type) -> System.Collections.Immutable.ImmutableDictionary<int, string>
+~static Orleans.NamedOptionExtensions.GetOptionsByName<TOption>(this System.IServiceProvider services, string name) -> TOption
+~static Orleans.OptionFormattingUtilities.Format(object key, object value, string formatting = null) -> string
+~static Orleans.OptionFormattingUtilities.Name<TOptions>(string name = null, string formatting = null) -> string
+~static Orleans.Runtime.Configuration.ConfigUtilities.RedactConnectionStringInfo(string connectionString) -> string
+~static Orleans.Runtime.LifecycleParticipantExtensions.ParticipateIn<TLifecycle>(this Orleans.ILifecycleParticipant<Orleans.ILifecycleObservable> participant) -> Orleans.ILifecycleParticipant<TLifecycle>
+~static Orleans.Serialization.OrleansJsonSerializerSettings.GetDefaultSerializerSettings(System.IServiceProvider services) -> Newtonsoft.Json.JsonSerializerSettings
+~static Orleans.Serialization.OrleansJsonSerializerSettings.UpdateSerializerSettings(Newtonsoft.Json.JsonSerializerSettings settings, bool useFullAssemblyNames, bool indentJson, Newtonsoft.Json.TypeNameHandling? typeNameHandling) -> Newtonsoft.Json.JsonSerializerSettings
+~static Orleans.Storage.GrainStorageSerializerExtensions.Deserialize<T>(this Orleans.Storage.IGrainStorageSerializer serializer, System.ReadOnlyMemory<byte> input) -> T
+~static Orleans.TableVersion.operator !=(Orleans.TableVersion left, Orleans.TableVersion right) -> bool
+~static Orleans.TableVersion.operator ==(Orleans.TableVersion left, Orleans.TableVersion right) -> bool
+~static readonly Orleans.Runtime.Instruments.Meter -> System.Diagnostics.Metrics.Meter
+~virtual Orleans.LifecycleSubject.CallObserverStopAsync(Orleans.ILifecycleObserver observer, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task
+~virtual Orleans.LifecycleSubject.GetStageName(int stage) -> string
+~virtual Orleans.LifecycleSubject.OnStart(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task
+~virtual Orleans.LifecycleSubject.OnStop(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task
+~virtual Orleans.LifecycleSubject.Subscribe(string observerName, int stage, Orleans.ILifecycleObserver observer) -> System.IDisposable
+~virtual Orleans.RedactAttribute.Redact(object value) -> string

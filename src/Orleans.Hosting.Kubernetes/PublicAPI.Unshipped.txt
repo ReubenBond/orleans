@@ -1,0 +1,27 @@
+#nullable enable
+Orleans.Hosting.Kubernetes.KubernetesClusterAgent
+Orleans.Hosting.Kubernetes.KubernetesHostingOptions
+Orleans.Hosting.Kubernetes.KubernetesHostingOptions.DeleteDefunctSiloPods.get -> bool
+Orleans.Hosting.Kubernetes.KubernetesHostingOptions.DeleteDefunctSiloPods.set -> void
+Orleans.Hosting.Kubernetes.KubernetesHostingOptions.KubernetesHostingOptions() -> void
+Orleans.Hosting.Kubernetes.KubernetesHostingOptions.MaxAgents.get -> int
+Orleans.Hosting.Kubernetes.KubernetesHostingOptions.MaxAgents.set -> void
+Orleans.Hosting.Kubernetes.KubernetesHostingOptions.MaxKubernetesApiRetryAttempts.get -> int
+Orleans.Hosting.Kubernetes.KubernetesHostingOptions.MaxKubernetesApiRetryAttempts.set -> void
+Orleans.Hosting.KubernetesHostingExtensions
+~const Orleans.Hosting.Kubernetes.KubernetesHostingOptions.ClusterIdEnvironmentVariable = "ORLEANS_CLUSTER_ID" -> string
+~const Orleans.Hosting.Kubernetes.KubernetesHostingOptions.ClusterIdLabel = "orleans/clusterId" -> string
+~const Orleans.Hosting.Kubernetes.KubernetesHostingOptions.PodIPEnvironmentVariable = "POD_IP" -> string
+~const Orleans.Hosting.Kubernetes.KubernetesHostingOptions.PodNameEnvironmentVariable = "POD_NAME" -> string
+~const Orleans.Hosting.Kubernetes.KubernetesHostingOptions.PodNamespaceEnvironmentVariable = "POD_NAMESPACE" -> string
+~const Orleans.Hosting.Kubernetes.KubernetesHostingOptions.ServiceIdEnvironmentVariable = "ORLEANS_SERVICE_ID" -> string
+~const Orleans.Hosting.Kubernetes.KubernetesHostingOptions.ServiceIdLabel = "orleans/serviceId" -> string
+~Orleans.Hosting.Kubernetes.KubernetesClusterAgent.KubernetesClusterAgent(Orleans.Runtime.IClusterMembershipService clusterMembershipService, Microsoft.Extensions.Logging.ILogger<Orleans.Hosting.Kubernetes.KubernetesClusterAgent> logger, Microsoft.Extensions.Options.IOptionsMonitor<Orleans.Hosting.Kubernetes.KubernetesHostingOptions> options, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions, Orleans.Runtime.ILocalSiloDetails localSiloDetails) -> void
+~Orleans.Hosting.Kubernetes.KubernetesClusterAgent.OnStop(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task
+~Orleans.Hosting.Kubernetes.KubernetesClusterAgent.Participate(Orleans.Runtime.ISiloLifecycle lifecycle) -> void
+~Orleans.Hosting.Kubernetes.KubernetesHostingOptions.GetClientConfiguration.get -> System.Func<k8s.KubernetesClientConfiguration>
+~Orleans.Hosting.Kubernetes.KubernetesHostingOptions.GetClientConfiguration.set -> void
+~static Orleans.Hosting.KubernetesHostingExtensions.UseKubernetesHosting(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.KubernetesHostingExtensions.UseKubernetesHosting(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Hosting.Kubernetes.KubernetesHostingOptions>> configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.KubernetesHostingExtensions.UseKubernetesHosting(this Orleans.Hosting.ISiloBuilder siloBuilder) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.KubernetesHostingExtensions.UseKubernetesHosting(this Orleans.Hosting.ISiloBuilder siloBuilder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Hosting.Kubernetes.KubernetesHostingOptions>> configureOptions) -> Orleans.Hosting.ISiloBuilder

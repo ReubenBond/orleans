@@ -1,0 +1,57 @@
+#nullable enable
+Orleans.Configuration.AdoNetStreamOptions
+Orleans.Configuration.AdoNetStreamOptions.AdoNetStreamOptions() -> void
+Orleans.Configuration.AdoNetStreamOptions.DeadLetterEvictionTimeout.get -> System.TimeSpan
+Orleans.Configuration.AdoNetStreamOptions.DeadLetterEvictionTimeout.set -> void
+Orleans.Configuration.AdoNetStreamOptions.EvictionBatchSize.get -> int
+Orleans.Configuration.AdoNetStreamOptions.EvictionBatchSize.set -> void
+Orleans.Configuration.AdoNetStreamOptions.EvictionInterval.get -> System.TimeSpan
+Orleans.Configuration.AdoNetStreamOptions.EvictionInterval.set -> void
+Orleans.Configuration.AdoNetStreamOptions.ExpiryTimeout.get -> System.TimeSpan
+Orleans.Configuration.AdoNetStreamOptions.ExpiryTimeout.set -> void
+Orleans.Configuration.AdoNetStreamOptions.InitializationTimeout.get -> System.TimeSpan
+Orleans.Configuration.AdoNetStreamOptions.InitializationTimeout.set -> void
+Orleans.Configuration.AdoNetStreamOptions.MaxAttempts.get -> int
+Orleans.Configuration.AdoNetStreamOptions.MaxAttempts.set -> void
+Orleans.Configuration.AdoNetStreamOptions.VisibilityTimeout.get -> System.TimeSpan
+Orleans.Configuration.AdoNetStreamOptions.VisibilityTimeout.set -> void
+Orleans.Configuration.AdoNetStreamOptionsValidator
+Orleans.Configuration.AdoNetStreamOptionsValidator.ValidateConfiguration() -> void
+Orleans.Hosting.ClusterClientAdoNetStreamConfigurator
+Orleans.Hosting.ClusterClientAdoNetStreamExtensions
+Orleans.Hosting.SiloAdoNetStreamConfigurator
+Orleans.Hosting.SiloBuilderAdoNetStreamExtensions
+Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream
+override Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream.CanRead.get -> bool
+override Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream.CanSeek.get -> bool
+override Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream.CanTimeout.get -> bool
+override Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream.CanWrite.get -> bool
+override Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream.Dispose(bool disposing) -> void
+override Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream.Flush() -> void
+override Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream.Length.get -> long
+override Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream.Position.get -> long
+override Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream.Position.set -> void
+override Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream.Seek(long offset, System.IO.SeekOrigin origin) -> long
+override Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream.SetLength(long value) -> void
+~Orleans.Configuration.AdoNetStreamOptions.ConnectionString.get -> string
+~Orleans.Configuration.AdoNetStreamOptions.ConnectionString.set -> void
+~Orleans.Configuration.AdoNetStreamOptions.Invariant.get -> string
+~Orleans.Configuration.AdoNetStreamOptions.Invariant.set -> void
+~Orleans.Configuration.AdoNetStreamOptionsValidator.AdoNetStreamOptionsValidator(Orleans.Configuration.AdoNetStreamOptions options, string name) -> void
+~Orleans.Hosting.ClusterClientAdoNetStreamConfigurator.ClusterClientAdoNetStreamConfigurator(string name, Orleans.Hosting.IClientBuilder clientBuilder) -> void
+~Orleans.Hosting.ClusterClientAdoNetStreamConfigurator.ConfigureAdoNet(System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AdoNetStreamOptions>> configureOptions) -> Orleans.Hosting.ClusterClientAdoNetStreamConfigurator
+~Orleans.Hosting.ClusterClientAdoNetStreamConfigurator.ConfigureCache(int cacheSize = 4096) -> Orleans.Hosting.ClusterClientAdoNetStreamConfigurator
+~Orleans.Hosting.ClusterClientAdoNetStreamConfigurator.ConfigurePartitioning(int partitions = 8) -> Orleans.Hosting.ClusterClientAdoNetStreamConfigurator
+~Orleans.Hosting.SiloAdoNetStreamConfigurator.ConfigureAdoNet(System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AdoNetStreamOptions>> configureOptions) -> Orleans.Hosting.SiloAdoNetStreamConfigurator
+~Orleans.Hosting.SiloAdoNetStreamConfigurator.ConfigureCache(int cacheSize = 4096) -> Orleans.Hosting.SiloAdoNetStreamConfigurator
+~Orleans.Hosting.SiloAdoNetStreamConfigurator.ConfigurePartitioning(int partitions = 8) -> Orleans.Hosting.SiloAdoNetStreamConfigurator
+~Orleans.Hosting.SiloAdoNetStreamConfigurator.SiloAdoNetStreamConfigurator(string name, System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>> configureDelegate) -> void
+~Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream.OrleansRelationalDownloadStream(System.Data.Common.DbDataReader reader, int ordinal) -> void
+~override Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream.CopyToAsync(System.IO.Stream destination, int bufferSize, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task
+~override Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream.Read(byte[] buffer, int offset, int count) -> int
+~override Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream.ReadAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<int>
+~override Orleans.Streaming.AdoNet.Storage.OrleansRelationalDownloadStream.Write(byte[] buffer, int offset, int count) -> void
+~static Orleans.Hosting.ClusterClientAdoNetStreamExtensions.AddAdoNetStreams(this Orleans.Hosting.IClientBuilder builder, string name, System.Action<Orleans.Configuration.AdoNetStreamOptions> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClusterClientAdoNetStreamExtensions.AddAdoNetStreams(this Orleans.Hosting.IClientBuilder builder, string name, System.Action<Orleans.Hosting.ClusterClientAdoNetStreamConfigurator> configure) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.SiloBuilderAdoNetStreamExtensions.AddAdoNetStreams(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Configuration.AdoNetStreamOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.SiloBuilderAdoNetStreamExtensions.AddAdoNetStreams(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Hosting.SiloAdoNetStreamConfigurator> configure) -> Orleans.Hosting.ISiloBuilder

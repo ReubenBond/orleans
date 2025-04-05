@@ -1,0 +1,54 @@
+#nullable enable
+Orleans.Configuration.ConsulClusteringOptions
+Orleans.Configuration.ConsulClusteringOptions.ConsulClusteringOptions() -> void
+Orleans.Hosting.ConsulUtilsHostingExtensions
+Orleans.Runtime.Host.ConsulSiloRegistration
+Orleans.Runtime.Host.ConsulSiloRegistration.ProxyPort.get -> int
+Orleans.Runtime.Host.ConsulSiloRegistration.ProxyPort.set -> void
+Orleans.Runtime.Host.ConsulSiloRegistration.StartTime.get -> System.DateTime
+Orleans.Runtime.Host.ConsulSiloRegistration.StartTime.set -> void
+Orleans.Runtime.Host.ConsulSiloRegistration.Status.get -> Orleans.Runtime.SiloStatus
+Orleans.Runtime.Host.ConsulSiloRegistration.Status.set -> void
+Orleans.Runtime.Host.SuspectingSilo
+Orleans.Runtime.Host.SuspectingSilo.SuspectingSilo() -> void
+Orleans.Runtime.Host.SuspectingSilo.Time.get -> System.DateTime
+Orleans.Runtime.Host.SuspectingSilo.Time.set -> void
+Orleans.Runtime.Membership.ConsulBasedMembershipTable
+Orleans.Runtime.Membership.ConsulGatewayListProvider
+Orleans.Runtime.Membership.ConsulGatewayListProvider.IsUpdatable.get -> bool
+Orleans.Runtime.Membership.ConsulGatewayListProvider.MaxStaleness.get -> System.TimeSpan
+virtual Orleans.Configuration.ConsulClusteringOptionsValidator<TOptions>.ValidateConfiguration() -> void
+~Orleans.Configuration.ConsulClusteringOptions.ConfigureConsulClient(System.Func<Consul.IConsulClient> createClientCallback) -> void
+~Orleans.Configuration.ConsulClusteringOptions.ConfigureConsulClient(System.Uri address, string aclClientToken = null) -> void
+~Orleans.Configuration.ConsulClusteringOptions.CreateClient.get -> System.Func<Consul.IConsulClient>
+~Orleans.Configuration.ConsulClusteringOptions.KvRootFolder.get -> string
+~Orleans.Configuration.ConsulClusteringOptions.KvRootFolder.set -> void
+~Orleans.Configuration.ConsulClusteringOptionsValidator<TOptions>
+~Orleans.Configuration.ConsulClusteringOptionsValidator<TOptions>.ConsulClusteringOptionsValidator(TOptions options, string name = null) -> void
+~Orleans.Configuration.ConsulClusteringOptionsValidator<TOptions>.Name.get -> string
+~Orleans.Configuration.ConsulClusteringOptionsValidator<TOptions>.Options.get -> TOptions
+~Orleans.Runtime.Host.ConsulSiloRegistration.Hostname.get -> string
+~Orleans.Runtime.Host.ConsulSiloRegistration.Hostname.set -> void
+~Orleans.Runtime.Host.ConsulSiloRegistration.SiloName.get -> string
+~Orleans.Runtime.Host.ConsulSiloRegistration.SiloName.set -> void
+~Orleans.Runtime.Host.ConsulSiloRegistration.SuspectingSilos.get -> System.Collections.Generic.List<Orleans.Runtime.Host.SuspectingSilo>
+~Orleans.Runtime.Host.ConsulSiloRegistration.SuspectingSilos.set -> void
+~Orleans.Runtime.Host.SuspectingSilo.Id.get -> string
+~Orleans.Runtime.Host.SuspectingSilo.Id.set -> void
+~Orleans.Runtime.Membership.ConsulBasedMembershipTable.CleanupDefunctSiloEntries(System.DateTimeOffset beforeDate) -> System.Threading.Tasks.Task
+~Orleans.Runtime.Membership.ConsulBasedMembershipTable.ConsulBasedMembershipTable(Microsoft.Extensions.Logging.ILogger<Orleans.Runtime.Membership.ConsulBasedMembershipTable> logger, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ConsulClusteringOptions> membershipTableOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions) -> void
+~Orleans.Runtime.Membership.ConsulBasedMembershipTable.DeleteMembershipTableEntries(string clusterId) -> System.Threading.Tasks.Task
+~Orleans.Runtime.Membership.ConsulBasedMembershipTable.InitializeMembershipTable(bool tryInitTableVersion) -> System.Threading.Tasks.Task
+~Orleans.Runtime.Membership.ConsulBasedMembershipTable.InsertRow(Orleans.MembershipEntry entry, Orleans.TableVersion tableVersion) -> System.Threading.Tasks.Task<bool>
+~Orleans.Runtime.Membership.ConsulBasedMembershipTable.ReadAll() -> System.Threading.Tasks.Task<Orleans.MembershipTableData>
+~Orleans.Runtime.Membership.ConsulBasedMembershipTable.ReadRow(Orleans.Runtime.SiloAddress siloAddress) -> System.Threading.Tasks.Task<Orleans.MembershipTableData>
+~Orleans.Runtime.Membership.ConsulBasedMembershipTable.UpdateIAmAlive(Orleans.MembershipEntry entry) -> System.Threading.Tasks.Task
+~Orleans.Runtime.Membership.ConsulBasedMembershipTable.UpdateRow(Orleans.MembershipEntry entry, string etag, Orleans.TableVersion tableVersion) -> System.Threading.Tasks.Task<bool>
+~Orleans.Runtime.Membership.ConsulGatewayListProvider.ConsulGatewayListProvider(Microsoft.Extensions.Logging.ILogger<Orleans.Runtime.Membership.ConsulGatewayListProvider> logger, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ConsulClusteringOptions> options, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.GatewayOptions> gatewayOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions) -> void
+~Orleans.Runtime.Membership.ConsulGatewayListProvider.GetGateways() -> System.Threading.Tasks.Task<System.Collections.Generic.IList<System.Uri>>
+~Orleans.Runtime.Membership.ConsulGatewayListProvider.InitializeGatewayListProvider() -> System.Threading.Tasks.Task
+~static Orleans.Hosting.ConsulUtilsHostingExtensions.UseConsulClientClustering(this Orleans.Hosting.IClientBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.ConsulClusteringOptions>> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ConsulUtilsHostingExtensions.UseConsulClientClustering(this Orleans.Hosting.IClientBuilder builder, System.Action<Orleans.Configuration.ConsulClusteringOptions> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ConsulUtilsHostingExtensions.UseConsulSiloClustering(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.ConsulClusteringOptions>> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.ConsulUtilsHostingExtensions.UseConsulSiloClustering(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Configuration.ConsulClusteringOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Runtime.Membership.ConsulBasedMembershipTable.ReadAll(Consul.IConsulClient consulClient, string clusterId, string kvRootFolder, Microsoft.Extensions.Logging.ILogger logger, string versionKey) -> System.Threading.Tasks.Task<Orleans.MembershipTableData>

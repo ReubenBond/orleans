@@ -1,0 +1,17 @@
+#nullable enable
+Orleans.Serialization.JsonCodec
+Orleans.Serialization.JsonCodecOptions
+Orleans.Serialization.JsonCodecOptions.JsonCodecOptions() -> void
+Orleans.Serialization.JsonCodecOptions.ReaderOptions.get -> System.Text.Json.JsonReaderOptions
+Orleans.Serialization.JsonCodecOptions.ReaderOptions.set -> void
+Orleans.Serialization.SerializationHostingExtensions
+~const Orleans.Serialization.JsonCodec.WellKnownAlias = "json" -> string
+~Orleans.Serialization.JsonCodec.JsonCodec(System.Collections.Generic.IEnumerable<Orleans.Serialization.Serializers.ICodecSelector> serializableTypeSelectors, System.Collections.Generic.IEnumerable<Orleans.Serialization.Serializers.ICopierSelector> copyableTypeSelectors, Microsoft.Extensions.Options.IOptions<Orleans.Serialization.JsonCodecOptions> options) -> void
+~Orleans.Serialization.JsonCodecOptions.IsCopyableType.get -> System.Func<System.Type, bool?>
+~Orleans.Serialization.JsonCodecOptions.IsCopyableType.set -> void
+~Orleans.Serialization.JsonCodecOptions.IsSerializableType.get -> System.Func<System.Type, bool?>
+~Orleans.Serialization.JsonCodecOptions.IsSerializableType.set -> void
+~Orleans.Serialization.JsonCodecOptions.SerializerOptions.get -> System.Text.Json.JsonSerializerOptions
+~Orleans.Serialization.JsonCodecOptions.SerializerOptions.set -> void
+~static Orleans.Serialization.SerializationHostingExtensions.AddJsonSerializer(this Orleans.Serialization.ISerializerBuilder serializerBuilder, System.Func<System.Type, bool> isSerializable, System.Func<System.Type, bool> isCopyable, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Serialization.JsonCodecOptions>> configureOptions = null) -> Orleans.Serialization.ISerializerBuilder
+~static Orleans.Serialization.SerializationHostingExtensions.AddJsonSerializer(this Orleans.Serialization.ISerializerBuilder serializerBuilder, System.Func<System.Type, bool> isSupported, System.Text.Json.JsonSerializerOptions jsonSerializerOptions = null) -> Orleans.Serialization.ISerializerBuilder

@@ -1,0 +1,55 @@
+#nullable enable
+Orleans.Clustering.DynamoDB.DynamoDBClientOptions
+Orleans.Clustering.DynamoDB.DynamoDBClientOptions.DynamoDBClientOptions() -> void
+Orleans.Clustering.DynamoDB.DynamoDBGatewayListProviderHelper
+Orleans.Clustering.DynamoDB.DynamoDBGatewayListProviderHelper.DynamoDBGatewayListProviderHelper() -> void
+Orleans.Clustering.DynamoDB.DynamoDBMembershipHelper
+Orleans.Clustering.DynamoDB.DynamoDBMembershipHelper.DynamoDBMembershipHelper() -> void
+Orleans.Configuration.DynamoDBClusteringOptions
+Orleans.Configuration.DynamoDBClusteringOptions.CreateIfNotExists.get -> bool
+Orleans.Configuration.DynamoDBClusteringOptions.CreateIfNotExists.set -> void
+Orleans.Configuration.DynamoDBClusteringOptions.DynamoDBClusteringOptions() -> void
+Orleans.Configuration.DynamoDBClusteringOptions.ReadCapacityUnits.get -> int
+Orleans.Configuration.DynamoDBClusteringOptions.ReadCapacityUnits.set -> void
+Orleans.Configuration.DynamoDBClusteringOptions.UpdateIfExists.get -> bool
+Orleans.Configuration.DynamoDBClusteringOptions.UpdateIfExists.set -> void
+Orleans.Configuration.DynamoDBClusteringOptions.UseProvisionedThroughput.get -> bool
+Orleans.Configuration.DynamoDBClusteringOptions.UseProvisionedThroughput.set -> void
+Orleans.Configuration.DynamoDBClusteringOptions.WriteCapacityUnits.get -> int
+Orleans.Configuration.DynamoDBClusteringOptions.WriteCapacityUnits.set -> void
+Orleans.Configuration.DynamoDBClusteringSiloOptions
+Orleans.Configuration.DynamoDBClusteringSiloOptions.DynamoDBClusteringSiloOptions() -> void
+Orleans.Configuration.DynamoDBGatewayOptions
+Orleans.Configuration.DynamoDBGatewayOptions.CreateIfNotExists.get -> bool
+Orleans.Configuration.DynamoDBGatewayOptions.CreateIfNotExists.set -> void
+Orleans.Configuration.DynamoDBGatewayOptions.DynamoDBGatewayOptions() -> void
+Orleans.Configuration.DynamoDBGatewayOptions.ReadCapacityUnits.get -> int
+Orleans.Configuration.DynamoDBGatewayOptions.ReadCapacityUnits.set -> void
+Orleans.Configuration.DynamoDBGatewayOptions.UpdateIfExists.get -> bool
+Orleans.Configuration.DynamoDBGatewayOptions.UpdateIfExists.set -> void
+Orleans.Configuration.DynamoDBGatewayOptions.UseProvisionedThroughput.get -> bool
+Orleans.Configuration.DynamoDBGatewayOptions.UseProvisionedThroughput.set -> void
+Orleans.Configuration.DynamoDBGatewayOptions.WriteCapacityUnits.get -> int
+Orleans.Configuration.DynamoDBGatewayOptions.WriteCapacityUnits.set -> void
+Orleans.Hosting.AwsUtilsHostingExtensions
+~Orleans.Clustering.DynamoDB.DynamoDBClientOptions.AccessKey.get -> string
+~Orleans.Clustering.DynamoDB.DynamoDBClientOptions.AccessKey.set -> void
+~Orleans.Clustering.DynamoDB.DynamoDBClientOptions.ProfileName.get -> string
+~Orleans.Clustering.DynamoDB.DynamoDBClientOptions.ProfileName.set -> void
+~Orleans.Clustering.DynamoDB.DynamoDBClientOptions.SecretKey.get -> string
+~Orleans.Clustering.DynamoDB.DynamoDBClientOptions.SecretKey.set -> void
+~Orleans.Clustering.DynamoDB.DynamoDBClientOptions.Service.get -> string
+~Orleans.Clustering.DynamoDB.DynamoDBClientOptions.Service.set -> void
+~Orleans.Clustering.DynamoDB.DynamoDBClientOptions.Token.get -> string
+~Orleans.Clustering.DynamoDB.DynamoDBClientOptions.Token.set -> void
+~Orleans.Configuration.DynamoDBClusteringOptions.TableName.get -> string
+~Orleans.Configuration.DynamoDBClusteringOptions.TableName.set -> void
+~Orleans.Configuration.DynamoDBClusteringSiloOptions.ConnectionString.get -> string
+~Orleans.Configuration.DynamoDBClusteringSiloOptions.ConnectionString.set -> void
+~Orleans.Configuration.DynamoDBGatewayOptions.TableName.get -> string
+~Orleans.Configuration.DynamoDBGatewayOptions.TableName.set -> void
+~static Orleans.Clustering.DynamoDB.DynamoDBMembershipHelper.ParseDataConnectionString(string dataConnectionString, Orleans.Configuration.DynamoDBClusteringOptions options) -> void
+~static Orleans.Hosting.AwsUtilsHostingExtensions.UseDynamoDBClustering(this Orleans.Hosting.IClientBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.DynamoDBGatewayOptions>> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.AwsUtilsHostingExtensions.UseDynamoDBClustering(this Orleans.Hosting.IClientBuilder builder, System.Action<Orleans.Configuration.DynamoDBGatewayOptions> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.AwsUtilsHostingExtensions.UseDynamoDBClustering(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.DynamoDBClusteringOptions>> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AwsUtilsHostingExtensions.UseDynamoDBClustering(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Configuration.DynamoDBClusteringOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder

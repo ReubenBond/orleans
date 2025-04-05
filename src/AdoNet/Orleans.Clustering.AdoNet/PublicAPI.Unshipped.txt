@@ -1,0 +1,57 @@
+#nullable enable
+Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream
+Orleans.Configuration.AdoNetClusteringClientOptions
+Orleans.Configuration.AdoNetClusteringClientOptions.AdoNetClusteringClientOptions() -> void
+Orleans.Configuration.AdoNetClusteringClientOptionsValidator
+Orleans.Configuration.AdoNetClusteringClientOptionsValidator.ValidateConfiguration() -> void
+Orleans.Configuration.AdoNetClusteringSiloOptions
+Orleans.Configuration.AdoNetClusteringSiloOptions.AdoNetClusteringSiloOptions() -> void
+Orleans.Configuration.AdoNetClusteringSiloOptionsValidator
+Orleans.Configuration.AdoNetClusteringSiloOptionsValidator.ValidateConfiguration() -> void
+Orleans.Hosting.AdoNetHostingExtensions
+Orleans.Runtime.Membership.AdoNetGatewayListProvider
+Orleans.Runtime.Membership.AdoNetGatewayListProvider.IsUpdatable.get -> bool
+Orleans.Runtime.Membership.AdoNetGatewayListProvider.MaxStaleness.get -> System.TimeSpan
+Orleans.Runtime.MembershipService.AdoNetClusteringTable
+override Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream.CanRead.get -> bool
+override Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream.CanSeek.get -> bool
+override Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream.CanTimeout.get -> bool
+override Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream.CanWrite.get -> bool
+override Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream.Dispose(bool disposing) -> void
+override Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream.Flush() -> void
+override Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream.Length.get -> long
+override Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream.Position.get -> long
+override Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream.Position.set -> void
+override Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream.Seek(long offset, System.IO.SeekOrigin origin) -> long
+override Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream.SetLength(long value) -> void
+~Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream.OrleansRelationalDownloadStream(System.Data.Common.DbDataReader reader, int ordinal) -> void
+~Orleans.Configuration.AdoNetClusteringClientOptions.ConnectionString.get -> string
+~Orleans.Configuration.AdoNetClusteringClientOptions.ConnectionString.set -> void
+~Orleans.Configuration.AdoNetClusteringClientOptions.Invariant.get -> string
+~Orleans.Configuration.AdoNetClusteringClientOptions.Invariant.set -> void
+~Orleans.Configuration.AdoNetClusteringClientOptionsValidator.AdoNetClusteringClientOptionsValidator(Microsoft.Extensions.Options.IOptions<Orleans.Configuration.AdoNetClusteringClientOptions> options) -> void
+~Orleans.Configuration.AdoNetClusteringSiloOptions.ConnectionString.get -> string
+~Orleans.Configuration.AdoNetClusteringSiloOptions.ConnectionString.set -> void
+~Orleans.Configuration.AdoNetClusteringSiloOptions.Invariant.get -> string
+~Orleans.Configuration.AdoNetClusteringSiloOptions.Invariant.set -> void
+~Orleans.Configuration.AdoNetClusteringSiloOptionsValidator.AdoNetClusteringSiloOptionsValidator(Microsoft.Extensions.Options.IOptions<Orleans.Configuration.AdoNetClusteringSiloOptions> options) -> void
+~Orleans.Runtime.Membership.AdoNetGatewayListProvider.AdoNetGatewayListProvider(Microsoft.Extensions.Logging.ILogger<Orleans.Runtime.Membership.AdoNetGatewayListProvider> logger, System.IServiceProvider serviceProvider, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.AdoNetClusteringClientOptions> options, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.GatewayOptions> gatewayOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions) -> void
+~Orleans.Runtime.Membership.AdoNetGatewayListProvider.GetGateways() -> System.Threading.Tasks.Task<System.Collections.Generic.IList<System.Uri>>
+~Orleans.Runtime.Membership.AdoNetGatewayListProvider.InitializeGatewayListProvider() -> System.Threading.Tasks.Task
+~Orleans.Runtime.MembershipService.AdoNetClusteringTable.AdoNetClusteringTable(System.IServiceProvider serviceProvider, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.AdoNetClusteringSiloOptions> clusteringOptions, Microsoft.Extensions.Logging.ILogger<Orleans.Runtime.MembershipService.AdoNetClusteringTable> logger) -> void
+~Orleans.Runtime.MembershipService.AdoNetClusteringTable.CleanupDefunctSiloEntries(System.DateTimeOffset beforeDate) -> System.Threading.Tasks.Task
+~Orleans.Runtime.MembershipService.AdoNetClusteringTable.DeleteMembershipTableEntries(string clusterId) -> System.Threading.Tasks.Task
+~Orleans.Runtime.MembershipService.AdoNetClusteringTable.InitializeMembershipTable(bool tryInitTableVersion) -> System.Threading.Tasks.Task
+~Orleans.Runtime.MembershipService.AdoNetClusteringTable.InsertRow(Orleans.MembershipEntry entry, Orleans.TableVersion tableVersion) -> System.Threading.Tasks.Task<bool>
+~Orleans.Runtime.MembershipService.AdoNetClusteringTable.ReadAll() -> System.Threading.Tasks.Task<Orleans.MembershipTableData>
+~Orleans.Runtime.MembershipService.AdoNetClusteringTable.ReadRow(Orleans.Runtime.SiloAddress key) -> System.Threading.Tasks.Task<Orleans.MembershipTableData>
+~Orleans.Runtime.MembershipService.AdoNetClusteringTable.UpdateIAmAlive(Orleans.MembershipEntry entry) -> System.Threading.Tasks.Task
+~Orleans.Runtime.MembershipService.AdoNetClusteringTable.UpdateRow(Orleans.MembershipEntry entry, string etag, Orleans.TableVersion tableVersion) -> System.Threading.Tasks.Task<bool>
+~override Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream.CopyToAsync(System.IO.Stream destination, int bufferSize, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task
+~override Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream.Read(byte[] buffer, int offset, int count) -> int
+~override Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream.ReadAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<int>
+~override Orleans.Clustering.AdoNet.Storage.OrleansRelationalDownloadStream.Write(byte[] buffer, int offset, int count) -> void
+~static Orleans.Hosting.AdoNetHostingExtensions.UseAdoNetClustering(this Orleans.Hosting.IClientBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AdoNetClusteringClientOptions>> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.AdoNetHostingExtensions.UseAdoNetClustering(this Orleans.Hosting.IClientBuilder builder, System.Action<Orleans.Configuration.AdoNetClusteringClientOptions> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.AdoNetHostingExtensions.UseAdoNetClustering(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AdoNetClusteringSiloOptions>> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AdoNetHostingExtensions.UseAdoNetClustering(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Configuration.AdoNetClusteringSiloOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder

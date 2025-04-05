@@ -1,0 +1,27 @@
+#nullable enable
+Microsoft.Extensions.Hosting.RedisClusteringIClientBuilderExtensions
+Microsoft.Extensions.Hosting.RedisClusteringISiloBuilderExtensions
+Orleans.Clustering.Redis.RedisClusteringException
+Orleans.Clustering.Redis.RedisClusteringException.RedisClusteringException() -> void
+Orleans.Clustering.Redis.RedisClusteringOptions
+Orleans.Clustering.Redis.RedisClusteringOptions.EntryExpiry.get -> System.TimeSpan?
+Orleans.Clustering.Redis.RedisClusteringOptions.EntryExpiry.set -> void
+Orleans.Clustering.Redis.RedisClusteringOptions.RedisClusteringOptions() -> void
+Orleans.Clustering.Redis.RedisClusteringOptionsValidator
+Orleans.Clustering.Redis.RedisClusteringOptionsValidator.ValidateConfiguration() -> void
+~Orleans.Clustering.Redis.RedisClusteringException.RedisClusteringException(string message) -> void
+~Orleans.Clustering.Redis.RedisClusteringException.RedisClusteringException(string message, System.Exception innerException) -> void
+~Orleans.Clustering.Redis.RedisClusteringException.RedisClusteringException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~Orleans.Clustering.Redis.RedisClusteringOptions.ConfigurationOptions.get -> StackExchange.Redis.ConfigurationOptions
+~Orleans.Clustering.Redis.RedisClusteringOptions.ConfigurationOptions.set -> void
+~Orleans.Clustering.Redis.RedisClusteringOptions.CreateMultiplexer.get -> System.Func<Orleans.Clustering.Redis.RedisClusteringOptions, System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer>>
+~Orleans.Clustering.Redis.RedisClusteringOptions.CreateMultiplexer.set -> void
+~Orleans.Clustering.Redis.RedisClusteringOptions.CreateRedisKey.get -> System.Func<Orleans.Configuration.ClusterOptions, StackExchange.Redis.RedisKey>
+~Orleans.Clustering.Redis.RedisClusteringOptions.CreateRedisKey.set -> void
+~Orleans.Clustering.Redis.RedisClusteringOptionsValidator.RedisClusteringOptionsValidator(Microsoft.Extensions.Options.IOptions<Orleans.Clustering.Redis.RedisClusteringOptions> options) -> void
+~static Microsoft.Extensions.Hosting.RedisClusteringIClientBuilderExtensions.UseRedisClustering(this Orleans.Hosting.IClientBuilder builder, string redisConnectionString) -> Orleans.Hosting.IClientBuilder
+~static Microsoft.Extensions.Hosting.RedisClusteringIClientBuilderExtensions.UseRedisClustering(this Orleans.Hosting.IClientBuilder builder, System.Action<Orleans.Clustering.Redis.RedisClusteringOptions> configuration) -> Orleans.Hosting.IClientBuilder
+~static Microsoft.Extensions.Hosting.RedisClusteringISiloBuilderExtensions.UseRedisClustering(this Orleans.Hosting.ISiloBuilder builder, string redisConnectionString) -> Orleans.Hosting.ISiloBuilder
+~static Microsoft.Extensions.Hosting.RedisClusteringISiloBuilderExtensions.UseRedisClustering(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Clustering.Redis.RedisClusteringOptions> configuration) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Clustering.Redis.RedisClusteringOptions.DefaultCreateMultiplexer(Orleans.Clustering.Redis.RedisClusteringOptions options) -> System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer>
+~static Orleans.Clustering.Redis.RedisClusteringOptions.DefaultCreateRedisKey(Orleans.Configuration.ClusterOptions clusterOptions) -> StackExchange.Redis.RedisKey

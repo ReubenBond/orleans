@@ -1,0 +1,106 @@
+#nullable enable
+Orleans.AliasAttribute
+Orleans.ApplicationPartAttribute
+Orleans.CompoundTypeAliasAttribute
+Orleans.DefaultInvokableBaseTypeAttribute
+Orleans.DefaultInvokeMethodNameAttribute
+Orleans.GenerateCodeForDeclaringAssemblyAttribute
+Orleans.GeneratedActivatorConstructorAttribute
+Orleans.GeneratedActivatorConstructorAttribute.GeneratedActivatorConstructorAttribute() -> void
+Orleans.GenerateFieldIds
+Orleans.GenerateFieldIds.None = 0 -> Orleans.GenerateFieldIds
+Orleans.GenerateFieldIds.PublicProperties = 1 -> Orleans.GenerateFieldIds
+Orleans.GenerateMethodSerializersAttribute
+Orleans.GenerateMethodSerializersAttribute.IsExtension.get -> bool
+Orleans.GenerateSerializerAttribute
+Orleans.GenerateSerializerAttribute.GenerateFieldIds.get -> Orleans.GenerateFieldIds
+Orleans.GenerateSerializerAttribute.GenerateFieldIds.init -> void
+Orleans.GenerateSerializerAttribute.GenerateSerializerAttribute() -> void
+Orleans.GenerateSerializerAttribute.IncludePrimaryConstructorParameters.get -> bool
+Orleans.GenerateSerializerAttribute.IncludePrimaryConstructorParameters.init -> void
+Orleans.GetCompletionSourceMethodNameAttribute
+Orleans.IConverter<TValue, TSurrogate>
+Orleans.IConverter<TValue, TSurrogate>.ConvertFromSurrogate(in TSurrogate surrogate) -> TValue
+Orleans.IConverter<TValue, TSurrogate>.ConvertToSurrogate(in TValue value) -> TSurrogate
+Orleans.IdAttribute
+Orleans.IdAttribute.Id.get -> uint
+Orleans.IdAttribute.IdAttribute(uint id) -> void
+Orleans.ImmutableAttribute
+Orleans.ImmutableAttribute.ImmutableAttribute() -> void
+Orleans.Invocation.ReturnValueProxyAttribute
+Orleans.InvokableBaseTypeAttribute
+Orleans.InvokableCustomInitializerAttribute
+Orleans.InvokableCustomInitializerAttribute.AttributeArgumentIndex.get -> int
+Orleans.InvokableCustomInitializerAttribute.AttributeArgumentIndex.init -> void
+Orleans.InvokableCustomInitializerAttribute.AttributeArgumentName.get -> int
+Orleans.InvokableCustomInitializerAttribute.AttributeArgumentName.init -> void
+Orleans.InvokeMethodNameAttribute
+Orleans.Metadata.FrameworkPartAttribute
+Orleans.Metadata.FrameworkPartAttribute.FrameworkPartAttribute() -> void
+Orleans.OmitDefaultMemberValuesAttribute
+Orleans.OmitDefaultMemberValuesAttribute.OmitDefaultMemberValuesAttribute() -> void
+Orleans.OrleansConstructorAttribute
+Orleans.OrleansConstructorAttribute.OrleansConstructorAttribute() -> void
+Orleans.RegisterActivatorAttribute
+Orleans.RegisterActivatorAttribute.RegisterActivatorAttribute() -> void
+Orleans.RegisterConverterAttribute
+Orleans.RegisterConverterAttribute.RegisterConverterAttribute() -> void
+Orleans.RegisterCopierAttribute
+Orleans.RegisterCopierAttribute.RegisterCopierAttribute() -> void
+Orleans.RegisterProviderAttribute
+Orleans.RegisterSerializerAttribute
+Orleans.RegisterSerializerAttribute.RegisterSerializerAttribute() -> void
+Orleans.ResponseTimeoutAttribute
+Orleans.ResponseTimeoutAttribute.Timeout.get -> System.TimeSpan?
+Orleans.ResponseTimeoutAttribute.Timeout.init -> void
+Orleans.SerializationCallbacksAttribute
+Orleans.SerializerTransparentAttribute
+Orleans.SerializerTransparentAttribute.SerializerTransparentAttribute() -> void
+Orleans.SuppressReferenceTrackingAttribute
+Orleans.SuppressReferenceTrackingAttribute.SuppressReferenceTrackingAttribute() -> void
+Orleans.UseActivatorAttribute
+Orleans.UseActivatorAttribute.UseActivatorAttribute() -> void
+~Orleans.AliasAttribute.Alias.get -> string
+~Orleans.AliasAttribute.AliasAttribute(string alias) -> void
+~Orleans.ApplicationPartAttribute.ApplicationPartAttribute(string assemblyName) -> void
+~Orleans.ApplicationPartAttribute.AssemblyName.get -> string
+~Orleans.CompoundTypeAliasAttribute.Components.get -> object[]
+~Orleans.CompoundTypeAliasAttribute.CompoundTypeAliasAttribute(params object[] components) -> void
+~Orleans.DefaultInvokableBaseTypeAttribute.DefaultInvokableBaseTypeAttribute(System.Type returnType, System.Type invokableBaseType) -> void
+~Orleans.DefaultInvokableBaseTypeAttribute.InvokableBaseType.get -> System.Type
+~Orleans.DefaultInvokableBaseTypeAttribute.ProxyInvokeMethodName.get -> string
+~Orleans.DefaultInvokableBaseTypeAttribute.ProxyInvokeMethodName.init -> void
+~Orleans.DefaultInvokableBaseTypeAttribute.ReturnType.get -> System.Type
+~Orleans.DefaultInvokeMethodNameAttribute.DefaultInvokeMethodNameAttribute(System.Type returnType, string methodName) -> void
+~Orleans.DefaultInvokeMethodNameAttribute.MethodName.get -> string
+~Orleans.DefaultInvokeMethodNameAttribute.ReturnType.get -> System.Type
+~Orleans.GenerateCodeForDeclaringAssemblyAttribute.GenerateCodeForDeclaringAssemblyAttribute(System.Type type) -> void
+~Orleans.GenerateCodeForDeclaringAssemblyAttribute.Type.get -> System.Type
+~Orleans.GenerateMethodSerializersAttribute.GenerateMethodSerializersAttribute(System.Type proxyBase, bool isExtension = false) -> void
+~Orleans.GenerateMethodSerializersAttribute.ProxyBase.get -> System.Type
+~Orleans.GetCompletionSourceMethodNameAttribute.GetCompletionSourceMethodNameAttribute(string methodName) -> void
+~Orleans.GetCompletionSourceMethodNameAttribute.MethodName.get -> string
+~Orleans.Invocation.ReturnValueProxyAttribute.InitializerMethodName.get -> string
+~Orleans.Invocation.ReturnValueProxyAttribute.ReturnValueProxyAttribute(string initializerMethodName) -> void
+~Orleans.InvokableBaseTypeAttribute.InvokableBaseType.get -> System.Type
+~Orleans.InvokableBaseTypeAttribute.InvokableBaseTypeAttribute(System.Type proxyBaseClass, System.Type returnType, System.Type invokableBaseType) -> void
+~Orleans.InvokableBaseTypeAttribute.ProxyBaseClass.get -> System.Type
+~Orleans.InvokableBaseTypeAttribute.ProxyInvokeMethodName.get -> string
+~Orleans.InvokableBaseTypeAttribute.ProxyInvokeMethodName.init -> void
+~Orleans.InvokableBaseTypeAttribute.ReturnType.get -> System.Type
+~Orleans.InvokableCustomInitializerAttribute.InvokableCustomInitializerAttribute(string methodName) -> void
+~Orleans.InvokableCustomInitializerAttribute.InvokableCustomInitializerAttribute(string methodName, object methodArgumentValue) -> void
+~Orleans.InvokableCustomInitializerAttribute.MethodArgumentValue.get -> object
+~Orleans.InvokableCustomInitializerAttribute.MethodName.get -> string
+~Orleans.InvokeMethodNameAttribute.InvokeMethodName.get -> string
+~Orleans.InvokeMethodNameAttribute.InvokeMethodNameAttribute(string invokeMethodName) -> void
+~Orleans.IPopulator<TValue, TSurrogate>
+~Orleans.IPopulator<TValue, TSurrogate>.Populate(in TSurrogate surrogate, TValue value) -> void
+~Orleans.RegisterProviderAttribute.Kind.get -> string
+~Orleans.RegisterProviderAttribute.Name.get -> string
+~Orleans.RegisterProviderAttribute.RegisterProviderAttribute(string name, string kind, string target, System.Type type) -> void
+~Orleans.RegisterProviderAttribute.Target.get -> string
+~Orleans.RegisterProviderAttribute.Type.get -> System.Type
+~Orleans.ResponseTimeoutAttribute.ResponseTimeoutAttribute(string timeout) -> void
+~Orleans.SerializationCallbacksAttribute.HookType.get -> System.Type
+~Orleans.SerializationCallbacksAttribute.SerializationCallbacksAttribute(System.Type hookType) -> void

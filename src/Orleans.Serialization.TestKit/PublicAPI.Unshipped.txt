@@ -1,0 +1,79 @@
+#nullable enable
+abstract Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.CreateValue() -> TValue
+abstract Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CreateValue() -> TValue
+Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.CanCopyCollectionViaSerializer() -> void
+Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.CanCopyCollectionViaUntypedSerializer() -> void
+Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.CanCopyTupleViaSerializer() -> void
+Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.CanCopyUntypedTupleViaSerializer() -> void
+Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.CopiedValuesAreEqual() -> void
+Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.ReferencesAreAddedToCopyContext() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CanRoundTripCollectionViaSerializer() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CanRoundTripDefaultValueViaCodec() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CanRoundTripTupleViaSerializer() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CanRoundTripViaObjectSerializer() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CanRoundTripViaSerializer() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CanRoundTripViaSerializer_Array() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CanRoundTripViaSerializer_Memory() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CanRoundTripViaSerializer_MemoryStream() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CanRoundTripViaSerializer_ReadByteByByte() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CanRoundTripViaSerializer_Span() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CanRoundTripViaSerializer_StreamPooled() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CanRoundTripWeaklyTypedCollectionViaSerializer() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CanSkipDefaultValue() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CanSkipValue() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CorrectlyAdvancesReferenceCounter() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CorrectlyAdvancesReferenceCounterStream() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CorrectlyHandlesBuffers() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.ProducesValidBitStream() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.RoundTrippedValuesEqual() -> void
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.RoundTripThroughCodec<T>(T original) -> T
+Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.WritersProduceSameResults() -> void
+Orleans.Serialization.TestKit.IOutputBuffer
+Orleans.Serialization.TestKit.IOutputBuffer.GetReadOnlySequence(int maxSegmentSize) -> System.Buffers.ReadOnlySequence<byte>
+Orleans.Serialization.TestKit.ReadOnlySequenceHelper
+Orleans.Serialization.TestKit.TestBufferWriterStruct
+Orleans.Serialization.TestKit.TestBufferWriterStruct.Advance(int bytes) -> void
+Orleans.Serialization.TestKit.TestBufferWriterStruct.GetMemory(int sizeHint = 0) -> System.Memory<byte>
+Orleans.Serialization.TestKit.TestBufferWriterStruct.GetReadOnlySequence(int maxSegmentSize) -> System.Buffers.ReadOnlySequence<byte>
+Orleans.Serialization.TestKit.TestBufferWriterStruct.GetSpan(int sizeHint) -> System.Span<byte>
+Orleans.Serialization.TestKit.TestBufferWriterStruct.TestBufferWriterStruct() -> void
+Orleans.Serialization.TestKit.TestMultiSegmentBufferWriter
+Orleans.Serialization.TestKit.TestMultiSegmentBufferWriter.Advance(int bytes) -> void
+Orleans.Serialization.TestKit.TestMultiSegmentBufferWriter.GetMemory(int sizeHint = 0) -> System.Memory<byte>
+Orleans.Serialization.TestKit.TestMultiSegmentBufferWriter.GetReadOnlySequence(int maxSegmentSize) -> System.Buffers.ReadOnlySequence<byte>
+Orleans.Serialization.TestKit.TestMultiSegmentBufferWriter.GetSpan(int sizeHint) -> System.Span<byte>
+Orleans.Serialization.TestKit.TestMultiSegmentBufferWriter.PeekAllBuffers() -> System.Buffers.ReadOnlySequence<byte>
+Orleans.Serialization.TestKit.TestMultiSegmentBufferWriter.TestMultiSegmentBufferWriter(int maxAllocationSize) -> void
+Orleans.Serialization.TestKit.ValueTypeFieldCodecTester<TField, TCodec>.DirectAccessValueSerializerRoundTrip() -> void
+Orleans.Serialization.TestKit.ValueTypeFieldCodecTester<TField, TCodec>.ValueSerializerRoundTrip() -> void
+virtual Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.Equals(TValue left, TValue right) -> bool
+virtual Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.IsImmutable.get -> bool
+virtual Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.IsPooled.get -> bool
+virtual Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.Equals(TValue left, TValue right) -> bool
+virtual Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.GetWriteCopy(TValue input) -> TValue
+~abstract Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.TestValues.get -> TValue[]
+~abstract Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.TestValues.get -> TValue[]
+~Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>
+~Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.CopierTester(Xunit.Abstractions.ITestOutputHelper output) -> void
+~Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.Random.get -> System.Random
+~Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.ServiceProvider.get -> System.IServiceProvider
+~Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>
+~Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.FieldCodecTester(Xunit.Abstractions.ITestOutputHelper output) -> void
+~Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.Random.get -> System.Random
+~Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.RoundTripThroughUntypedSerializer(object original, out string formattedBitStream) -> object
+~Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.ServiceProvider.get -> System.IServiceProvider
+~Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.SessionPool.get -> Orleans.Serialization.Session.SerializerSessionPool
+~Orleans.Serialization.TestKit.TestBufferWriterStruct.TestBufferWriterStruct(byte[] buffer) -> void
+~Orleans.Serialization.TestKit.ValueTypeFieldCodecTester<TField, TCodec>
+~Orleans.Serialization.TestKit.ValueTypeFieldCodecTester<TField, TCodec>.ValueTypeFieldCodecTester(Xunit.Abstractions.ITestOutputHelper output) -> void
+~static Orleans.Serialization.TestKit.ReadOnlySequenceHelper.Batch(this System.Collections.Generic.IEnumerable<byte> sequence, int batchSize) -> System.Collections.Generic.IEnumerable<byte[]>
+~static Orleans.Serialization.TestKit.ReadOnlySequenceHelper.CreateReadOnlySequence(params byte[][] buffers) -> System.Buffers.ReadOnlySequence<byte>
+~static Orleans.Serialization.TestKit.ReadOnlySequenceHelper.ToReadOnlySequence(this System.Collections.Generic.IEnumerable<byte[]> buffers) -> System.Buffers.ReadOnlySequence<byte>
+~static Orleans.Serialization.TestKit.ReadOnlySequenceHelper.ToReadOnlySequence(this System.Collections.Generic.IEnumerable<System.Memory<byte>> buffers) -> System.Buffers.ReadOnlySequence<byte>
+~virtual Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.Configure(Orleans.Serialization.ISerializerBuilder builder) -> void
+~virtual Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.CreateCopier() -> TCopier
+~virtual Orleans.Serialization.TestKit.CopierTester<TValue, TCopier>.ValueProvider.get -> System.Action<System.Action<TValue>>
+~virtual Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.Configure(Orleans.Serialization.ISerializerBuilder builder) -> void
+~virtual Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.CreateCodec() -> TCodec
+~virtual Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.MaxSegmentSizes.get -> int[]
+~virtual Orleans.Serialization.TestKit.FieldCodecTester<TValue, TCodec>.ValueProvider.get -> System.Action<System.Action<TValue>>

@@ -1,0 +1,72 @@
+#nullable enable
+const Orleans.BroadcastChannel.DefaultChannelIdMapper.Name = "default" -> string!
+Orleans.BroadcastChannel.BroadcastChannelOptions
+Orleans.BroadcastChannel.BroadcastChannelOptions.BroadcastChannelOptions() -> void
+Orleans.BroadcastChannel.BroadcastChannelOptions.FireAndForgetDelivery.get -> bool
+Orleans.BroadcastChannel.BroadcastChannelOptions.FireAndForgetDelivery.set -> void
+Orleans.BroadcastChannel.ChannelId
+Orleans.BroadcastChannel.ChannelId.ChannelId() -> void
+Orleans.BroadcastChannel.ChannelId.CompareTo(Orleans.BroadcastChannel.ChannelId other) -> int
+Orleans.BroadcastChannel.ChannelId.Equals(Orleans.BroadcastChannel.ChannelId other) -> bool
+Orleans.BroadcastChannel.ChannelId.FullKey.get -> System.ReadOnlyMemory<byte>
+Orleans.BroadcastChannel.ChannelId.GetKeyAsString() -> string!
+Orleans.BroadcastChannel.ChannelId.GetNamespace() -> string?
+Orleans.BroadcastChannel.ChannelId.GetObjectData(System.Runtime.Serialization.SerializationInfo! info, System.Runtime.Serialization.StreamingContext context) -> void
+Orleans.BroadcastChannel.ChannelId.Key.get -> System.ReadOnlyMemory<byte>
+Orleans.BroadcastChannel.ChannelId.Namespace.get -> System.ReadOnlyMemory<byte>
+Orleans.BroadcastChannel.ConstructorChannelNamespacePredicateProvider
+Orleans.BroadcastChannel.ConstructorChannelNamespacePredicateProvider.ConstructorChannelNamespacePredicateProvider() -> void
+Orleans.BroadcastChannel.DefaultChannelIdMapper
+Orleans.BroadcastChannel.DefaultChannelIdMapper.DefaultChannelIdMapper() -> void
+Orleans.BroadcastChannel.DefaultChannelIdMapper.GetGrainKeyId(Orleans.Metadata.GrainBindings! grainBindings, Orleans.BroadcastChannel.ChannelId streamId) -> Orleans.Runtime.IdSpan
+Orleans.BroadcastChannel.DefaultChannelNamespacePredicateProvider
+Orleans.BroadcastChannel.DefaultChannelNamespacePredicateProvider.DefaultChannelNamespacePredicateProvider() -> void
+Orleans.BroadcastChannel.IBroadcastChannelProvider
+Orleans.BroadcastChannel.IBroadcastChannelSubscription
+Orleans.BroadcastChannel.IBroadcastChannelSubscription.ChannelId.get -> Orleans.BroadcastChannel.ChannelId
+Orleans.BroadcastChannel.IBroadcastChannelWriter<T>
+Orleans.BroadcastChannel.IChannelIdMapper
+Orleans.BroadcastChannel.IChannelNamespacePredicate
+Orleans.BroadcastChannel.IChannelNamespacePredicateProvider
+Orleans.BroadcastChannel.IOnBroadcastChannelSubscribed
+Orleans.BroadcastChannel.RegexChannelNamespacePredicate
+Orleans.Hosting.ChannelHostingExtensions
+Orleans.ImplicitChannelSubscriptionAttribute
+Orleans.ImplicitChannelSubscriptionAttribute.ImplicitChannelSubscriptionAttribute() -> void
+Orleans.RegexImplicitChannelSubscriptionAttribute
+override Orleans.BroadcastChannel.ChannelId.Equals(object? obj) -> bool
+override Orleans.BroadcastChannel.ChannelId.GetHashCode() -> int
+override Orleans.BroadcastChannel.ChannelId.ToString() -> string!
+static Orleans.BroadcastChannel.ChannelId.Create(string! ns, string! key) -> Orleans.BroadcastChannel.ChannelId
+static Orleans.BroadcastChannel.ChannelId.Create(string! ns, System.Guid key) -> Orleans.BroadcastChannel.ChannelId
+static Orleans.BroadcastChannel.ChannelId.Create(System.ReadOnlySpan<byte> ns, System.ReadOnlySpan<byte> key) -> Orleans.BroadcastChannel.ChannelId
+static Orleans.BroadcastChannel.ChannelId.operator !=(Orleans.BroadcastChannel.ChannelId s1, Orleans.BroadcastChannel.ChannelId s2) -> bool
+static Orleans.BroadcastChannel.ChannelId.operator ==(Orleans.BroadcastChannel.ChannelId s1, Orleans.BroadcastChannel.ChannelId s2) -> bool
+~const Orleans.BroadcastChannel.ConstructorChannelNamespacePredicateProvider.Prefix = "ctor" -> string
+~Orleans.BroadcastChannel.ConstructorChannelNamespacePredicateProvider.TryGetPredicate(string predicatePattern, out Orleans.BroadcastChannel.IChannelNamespacePredicate predicate) -> bool
+~Orleans.BroadcastChannel.DefaultChannelNamespacePredicateProvider.TryGetPredicate(string predicatePattern, out Orleans.BroadcastChannel.IChannelNamespacePredicate predicate) -> bool
+~Orleans.BroadcastChannel.IBroadcastChannelProvider.GetChannelWriter<T>(Orleans.BroadcastChannel.ChannelId streamId) -> Orleans.BroadcastChannel.IBroadcastChannelWriter<T>
+~Orleans.BroadcastChannel.IBroadcastChannelSubscription.Attach<T>(System.Func<T, System.Threading.Tasks.Task> onPublished, System.Func<System.Exception, System.Threading.Tasks.Task> onError = null) -> System.Threading.Tasks.Task
+~Orleans.BroadcastChannel.IBroadcastChannelSubscription.ProviderName.get -> string
+~Orleans.BroadcastChannel.IBroadcastChannelWriter<T>.Publish(T item) -> System.Threading.Tasks.Task
+~Orleans.BroadcastChannel.IChannelIdMapper.GetGrainKeyId(Orleans.Metadata.GrainBindings grainBindings, Orleans.BroadcastChannel.ChannelId streamId) -> Orleans.Runtime.IdSpan
+~Orleans.BroadcastChannel.IChannelNamespacePredicate.IsMatch(string streamNamespace) -> bool
+~Orleans.BroadcastChannel.IChannelNamespacePredicate.PredicatePattern.get -> string
+~Orleans.BroadcastChannel.IChannelNamespacePredicateProvider.TryGetPredicate(string predicatePattern, out Orleans.BroadcastChannel.IChannelNamespacePredicate predicate) -> bool
+~Orleans.BroadcastChannel.IOnBroadcastChannelSubscribed.OnSubscribed(Orleans.BroadcastChannel.IBroadcastChannelSubscription streamSubscription) -> System.Threading.Tasks.Task
+~Orleans.BroadcastChannel.RegexChannelNamespacePredicate.IsMatch(string streamNameSpace) -> bool
+~Orleans.BroadcastChannel.RegexChannelNamespacePredicate.PredicatePattern.get -> string
+~Orleans.BroadcastChannel.RegexChannelNamespacePredicate.RegexChannelNamespacePredicate(string regex) -> void
+~Orleans.ImplicitChannelSubscriptionAttribute.ChannelIdMapper.get -> string
+~Orleans.ImplicitChannelSubscriptionAttribute.GetBindings(System.IServiceProvider services, System.Type grainClass, Orleans.Runtime.GrainType grainType) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.Dictionary<string, string>>
+~Orleans.ImplicitChannelSubscriptionAttribute.ImplicitChannelSubscriptionAttribute(Orleans.BroadcastChannel.IChannelNamespacePredicate predicate, string channelIdMapper = null) -> void
+~Orleans.ImplicitChannelSubscriptionAttribute.ImplicitChannelSubscriptionAttribute(string streamNamespace, string channelIdMapper = null) -> void
+~Orleans.ImplicitChannelSubscriptionAttribute.ImplicitChannelSubscriptionAttribute(System.Type predicateType, string channelIdMapper = null) -> void
+~Orleans.ImplicitChannelSubscriptionAttribute.Predicate.get -> Orleans.BroadcastChannel.IChannelNamespacePredicate
+~Orleans.RegexImplicitChannelSubscriptionAttribute.RegexImplicitChannelSubscriptionAttribute(string pattern) -> void
+~static Orleans.BroadcastChannel.ConstructorChannelNamespacePredicateProvider.FormatPattern(System.Type predicateType, string constructorArgument) -> string
+~static Orleans.Hosting.ChannelHostingExtensions.AddBroadcastChannel(this Orleans.Hosting.IClientBuilder this, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.BroadcastChannel.BroadcastChannelOptions>> configureOptions = null) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ChannelHostingExtensions.AddBroadcastChannel(this Orleans.Hosting.IClientBuilder this, string name, System.Action<Orleans.BroadcastChannel.BroadcastChannelOptions> configureOptions) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ChannelHostingExtensions.AddBroadcastChannel(this Orleans.Hosting.ISiloBuilder this, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.BroadcastChannel.BroadcastChannelOptions>> configureOptions = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.ChannelHostingExtensions.AddBroadcastChannel(this Orleans.Hosting.ISiloBuilder this, string name, System.Action<Orleans.BroadcastChannel.BroadcastChannelOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.ChannelHostingExtensions.GetBroadcastChannelProvider(this Orleans.IClusterClient this, string name) -> Orleans.BroadcastChannel.IBroadcastChannelProvider

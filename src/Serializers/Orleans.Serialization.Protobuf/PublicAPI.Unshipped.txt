@@ -1,0 +1,29 @@
+#nullable enable
+Orleans.Serialization.ByteStringCodec
+Orleans.Serialization.ByteStringCodec.ByteStringCodec() -> void
+Orleans.Serialization.ByteStringCopier
+Orleans.Serialization.ByteStringCopier.ByteStringCopier() -> void
+Orleans.Serialization.MapFieldCodec<TKey, TValue>
+Orleans.Serialization.MapFieldCopier<TKey, TValue>
+Orleans.Serialization.ProtobufCodec
+Orleans.Serialization.RepeatedFieldCodec<T>
+Orleans.Serialization.RepeatedFieldCopier<T>
+Orleans.Serialization.SerializationHostingExtensions
+~const Orleans.Serialization.ProtobufCodec.WellKnownAlias = "protobuf" -> string
+~Orleans.Serialization.ByteStringCopier.DeepCopy(Google.Protobuf.ByteString input, Orleans.Serialization.Cloning.CopyContext context) -> Google.Protobuf.ByteString
+~Orleans.Serialization.MapFieldCodec<TKey, TValue>.MapFieldCodec(Orleans.Serialization.Codecs.IFieldCodec<TKey> keyCodec, Orleans.Serialization.Codecs.IFieldCodec<TValue> valueCodec) -> void
+~Orleans.Serialization.MapFieldCodec<TKey, TValue>.ReadValue<TInput>(ref Orleans.Serialization.Buffers.Reader<TInput> reader, Orleans.Serialization.WireProtocol.Field field) -> Google.Protobuf.Collections.MapField<TKey, TValue>
+~Orleans.Serialization.MapFieldCodec<TKey, TValue>.WriteField<TBufferWriter>(ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Google.Protobuf.Collections.MapField<TKey, TValue> value) -> void
+~Orleans.Serialization.MapFieldCopier<TKey, TValue>.DeepCopy(Google.Protobuf.Collections.MapField<TKey, TValue> input, Google.Protobuf.Collections.MapField<TKey, TValue> output, Orleans.Serialization.Cloning.CopyContext context) -> void
+~Orleans.Serialization.MapFieldCopier<TKey, TValue>.DeepCopy(Google.Protobuf.Collections.MapField<TKey, TValue> input, Orleans.Serialization.Cloning.CopyContext context) -> Google.Protobuf.Collections.MapField<TKey, TValue>
+~Orleans.Serialization.MapFieldCopier<TKey, TValue>.MapFieldCopier(Orleans.Serialization.Cloning.IDeepCopier<TKey> keyCopier, Orleans.Serialization.Cloning.IDeepCopier<TValue> valueCopier) -> void
+~Orleans.Serialization.ProtobufCodec.DeepCopy(object input, Orleans.Serialization.Cloning.CopyContext context) -> object
+~Orleans.Serialization.ProtobufCodec.ProtobufCodec(System.Collections.Generic.IEnumerable<Orleans.Serialization.Serializers.ICodecSelector> serializableTypeSelectors, System.Collections.Generic.IEnumerable<Orleans.Serialization.Serializers.ICopierSelector> copyableTypeSelectors) -> void
+~Orleans.Serialization.RepeatedFieldCodec<T>.ReadValue<TInput>(ref Orleans.Serialization.Buffers.Reader<TInput> reader, Orleans.Serialization.WireProtocol.Field field) -> Google.Protobuf.Collections.RepeatedField<T>
+~Orleans.Serialization.RepeatedFieldCodec<T>.RepeatedFieldCodec(Orleans.Serialization.Codecs.IFieldCodec<T> fieldCodec) -> void
+~Orleans.Serialization.RepeatedFieldCodec<T>.WriteField<TBufferWriter>(ref Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Google.Protobuf.Collections.RepeatedField<T> value) -> void
+~Orleans.Serialization.RepeatedFieldCopier<T>.DeepCopy(Google.Protobuf.Collections.RepeatedField<T> input, Google.Protobuf.Collections.RepeatedField<T> output, Orleans.Serialization.Cloning.CopyContext context) -> void
+~Orleans.Serialization.RepeatedFieldCopier<T>.DeepCopy(Google.Protobuf.Collections.RepeatedField<T> input, Orleans.Serialization.Cloning.CopyContext context) -> Google.Protobuf.Collections.RepeatedField<T>
+~Orleans.Serialization.RepeatedFieldCopier<T>.RepeatedFieldCopier(Orleans.Serialization.Cloning.IDeepCopier<T> valueCopier) -> void
+~static Orleans.Serialization.SerializationHostingExtensions.AddProtobufSerializer(this Orleans.Serialization.ISerializerBuilder serializerBuilder) -> Orleans.Serialization.ISerializerBuilder
+~static Orleans.Serialization.SerializationHostingExtensions.AddProtobufSerializer(this Orleans.Serialization.ISerializerBuilder serializerBuilder, System.Func<System.Type, bool> isSerializable, System.Func<System.Type, bool> isCopyable) -> Orleans.Serialization.ISerializerBuilder

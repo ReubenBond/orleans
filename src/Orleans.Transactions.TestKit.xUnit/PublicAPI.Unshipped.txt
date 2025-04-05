@@ -1,0 +1,66 @@
+#nullable enable
+Orleans.Transactions.TestKit.xUnit.ConsistencyTransactionTestRunnerxUnit
+Orleans.Transactions.TestKit.xUnit.ControlledFaultInjectionTransactionTestRunnerxUnit
+Orleans.Transactions.TestKit.xUnit.DisabledTransactionsTestRunnerxUnit
+Orleans.Transactions.TestKit.xUnit.GoldenPathTransactionTestRunnerxUnit
+Orleans.Transactions.TestKit.xUnit.GrainFaultTransactionTestRunnerxUnit
+Orleans.Transactions.TestKit.xUnit.ScopedTransactionsTestRunnerxUnit
+Orleans.Transactions.TestKit.xUnit.TocFaultTransactionTestRunnerxUnit
+Orleans.Transactions.TestKit.xUnit.TocGoldenPathTestRunnerxUnit
+Orleans.Transactions.TestKit.xUnit.TransactionConcurrencyTestRunnerxUnit
+Orleans.Transactions.TestKit.xUnit.TransactionRecoveryTestsRunnerxUnit
+override Orleans.Transactions.TestKit.xUnit.ConsistencyTransactionTestRunnerxUnit.StorageAdaptorHasLimitedCommitSpace.get -> bool
+override Orleans.Transactions.TestKit.xUnit.ConsistencyTransactionTestRunnerxUnit.StorageErrorInjectionActive.get -> bool
+~Orleans.Transactions.TestKit.xUnit.ConsistencyTransactionTestRunnerxUnit.ConsistencyTransactionTestRunnerxUnit(Orleans.IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) -> void
+~Orleans.Transactions.TestKit.xUnit.ControlledFaultInjectionTransactionTestRunnerxUnit.ControlledFaultInjectionTransactionTestRunnerxUnit(Orleans.IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) -> void
+~Orleans.Transactions.TestKit.xUnit.DisabledTransactionsTestRunnerxUnit.DisabledTransactionsTestRunnerxUnit(Orleans.IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) -> void
+~Orleans.Transactions.TestKit.xUnit.GoldenPathTransactionTestRunnerxUnit.GoldenPathTransactionTestRunnerxUnit(Orleans.IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) -> void
+~Orleans.Transactions.TestKit.xUnit.GrainFaultTransactionTestRunnerxUnit.GrainFaultTransactionTestRunnerxUnit(Orleans.IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) -> void
+~Orleans.Transactions.TestKit.xUnit.ScopedTransactionsTestRunnerxUnit.ScopedTransactionsTestRunnerxUnit(Orleans.IGrainFactory grainFactory, Orleans.ITransactionClient transactionFrame, Xunit.Abstractions.ITestOutputHelper output) -> void
+~Orleans.Transactions.TestKit.xUnit.TocFaultTransactionTestRunnerxUnit.TocFaultTransactionTestRunnerxUnit(Orleans.IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) -> void
+~Orleans.Transactions.TestKit.xUnit.TocGoldenPathTestRunnerxUnit.TocGoldenPathTestRunnerxUnit(Orleans.IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) -> void
+~Orleans.Transactions.TestKit.xUnit.TransactionalStateStorageTestRunnerxUnit<TState>
+~Orleans.Transactions.TestKit.xUnit.TransactionalStateStorageTestRunnerxUnit<TState>.TransactionalStateStorageTestRunnerxUnit(System.Func<System.Threading.Tasks.Task<Orleans.Transactions.Abstractions.ITransactionalStateStorage<TState>>> stateStorageFactory, System.Func<int, TState> stateFactory, Orleans.IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper testOutput, System.Func<FluentAssertions.Equivalency.EquivalencyOptions<TState>, FluentAssertions.Equivalency.EquivalencyOptions<TState>> assertConfig = null) -> void
+~Orleans.Transactions.TestKit.xUnit.TransactionConcurrencyTestRunnerxUnit.TransactionConcurrencyTestRunnerxUnit(Orleans.IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) -> void
+~Orleans.Transactions.TestKit.xUnit.TransactionRecoveryTestsRunnerxUnit.TransactionRecoveryTestsRunnerxUnit(Orleans.TestingHost.TestCluster cluster, Xunit.Abstractions.ITestOutputHelper testOutput) -> void
+~override Orleans.Transactions.TestKit.xUnit.ConsistencyTransactionTestRunnerxUnit.RandomizedConsistency(int numGrains, int scale, bool avoidDeadlocks, bool avoidTimeouts, Orleans.Transactions.TestKit.Consistency.ReadWriteDetermination readwrite) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.ControlledFaultInjectionTransactionTestRunnerxUnit.MultiGrainWriteTransaction_FaultInjection(Orleans.Transactions.TestKit.TransactionFaultInjectPhase injectionPhase, Orleans.Transactions.TestKit.FaultInjectionType injectionType) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.ControlledFaultInjectionTransactionTestRunnerxUnit.SingleGrainReadTransaction() -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.ControlledFaultInjectionTransactionTestRunnerxUnit.SingleGrainWriteTransaction() -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.DisabledTransactionsTestRunnerxUnit.MultiTransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName) -> void
+~override Orleans.Transactions.TestKit.xUnit.DisabledTransactionsTestRunnerxUnit.TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName) -> void
+~override Orleans.Transactions.TestKit.xUnit.GoldenPathTransactionTestRunnerxUnit.MultiGrainReadWriteTransaction(string grainStates, int grainCount) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.GoldenPathTransactionTestRunnerxUnit.MultiGrainWriteTransaction(string grainStates, int grainCount) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.GoldenPathTransactionTestRunnerxUnit.MultiWriteToSingleGrainTransaction(string grainStates) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.GoldenPathTransactionTestRunnerxUnit.RepeatGrainReadWriteTransaction(string grainStates, int grainCount) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.GoldenPathTransactionTestRunnerxUnit.RWRWTest(string grainStates, int grainCount) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.GoldenPathTransactionTestRunnerxUnit.SingleGrainReadTransaction(string grainStates) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.GoldenPathTransactionTestRunnerxUnit.SingleGrainWriteTransaction(string grainStates) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.GoldenPathTransactionTestRunnerxUnit.WRWRTest(string grainStates, int grainCount) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.GrainFaultTransactionTestRunnerxUnit.AbortTransactionExceptionInnerExceptionOnlyContainsOneRootCauseException(string grainStates) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.GrainFaultTransactionTestRunnerxUnit.AbortTransactionOnExceptions(string grainStates) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.GrainFaultTransactionTestRunnerxUnit.AbortTransactionOnOrphanCalls(string grainStates) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.GrainFaultTransactionTestRunnerxUnit.MultiGrainAbortTransactionOnExceptions(string grainStates) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.ScopedTransactionsTestRunnerxUnit.CreateNestedTransactionScopeAndSetValueAndInnerFailAndAssert(string grainStates) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.ScopedTransactionsTestRunnerxUnit.CreateTransactionScopeAndSetValue(string grainStates) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.ScopedTransactionsTestRunnerxUnit.CreateTransactionScopeAndSetValueAndAssert(string grainStates) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.ScopedTransactionsTestRunnerxUnit.CreateTransactionScopeAndSetValueWithFailure(string grainStates) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TocFaultTransactionTestRunnerxUnit.MultiGrainWriteTransactionWithCommitException(string grainStates, int grainCount) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TocFaultTransactionTestRunnerxUnit.MultiGrainWriteTransactionWithCommitFailure(string grainStates, int grainCount) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TocGoldenPathTestRunnerxUnit.MultiGrainWriteTransaction(string grainStates, int grainCount) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TransactionalStateStorageTestRunnerxUnit<TState>.CancelMany(int count) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TransactionalStateStorageTestRunnerxUnit<TState>.CancelOne() -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TransactionalStateStorageTestRunnerxUnit<TState>.ConfirmMany(int count, bool useTwoSteps) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TransactionalStateStorageTestRunnerxUnit<TState>.ConfirmOne(bool useTwoSteps) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TransactionalStateStorageTestRunnerxUnit<TState>.ConfirmOneAndCancelOne(bool useTwoSteps, bool reverseOrder) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TransactionalStateStorageTestRunnerxUnit<TState>.FirstTime_Load_ShouldReturnEmptyLoadResponse() -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TransactionalStateStorageTestRunnerxUnit<TState>.GrowingBatch() -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TransactionalStateStorageTestRunnerxUnit<TState>.PrepareMany(int count) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TransactionalStateStorageTestRunnerxUnit<TState>.ReplaceMany(int count) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TransactionalStateStorageTestRunnerxUnit<TState>.ReplaceOne() -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TransactionalStateStorageTestRunnerxUnit<TState>.ShrinkingBatch() -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TransactionConcurrencyTestRunnerxUnit.SingleSharedGrainTest(string grainStates) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TransactionConcurrencyTestRunnerxUnit.TransactionChainTest(string grainStates) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TransactionConcurrencyTestRunnerxUnit.TransactionTreeTest(string grainStates) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TransactionRecoveryTestsRunnerxUnit.TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent) -> System.Threading.Tasks.Task
+~override Orleans.Transactions.TestKit.xUnit.TransactionRecoveryTestsRunnerxUnit.TransactionWillRecoverAfterRandomSiloUnGracefulShutdown(string transactionTestGrainClassName, int concurrent) -> System.Threading.Tasks.Task

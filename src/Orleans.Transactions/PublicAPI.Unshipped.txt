@@ -1,0 +1,420 @@
+#nullable enable
+abstract Orleans.TransactionRequest.InvokeInner() -> System.Threading.Tasks.ValueTask
+abstract Orleans.TransactionRequest<TResult>.InvokeInner() -> System.Threading.Tasks.ValueTask<TResult>
+const Orleans.Configuration.TransactionalStateOptions.DefaultConfirmationRetryLimit = 3 -> int
+const Orleans.Configuration.TransactionalStateOptions.DefaultMaxLockGroupSize = 20 -> int
+const Orleans.Transactions.TransactionRateLoadSheddingOptions.DEFAULT_LIMIT = 700 -> double
+Orleans.Configuration.TransactionalStateOptions
+Orleans.Configuration.TransactionalStateOptions.ConfirmationRetryDelay.get -> System.TimeSpan
+Orleans.Configuration.TransactionalStateOptions.ConfirmationRetryDelay.set -> void
+Orleans.Configuration.TransactionalStateOptions.LockAcquireTimeout.get -> System.TimeSpan
+Orleans.Configuration.TransactionalStateOptions.LockAcquireTimeout.set -> void
+Orleans.Configuration.TransactionalStateOptions.LockTimeout.get -> System.TimeSpan
+Orleans.Configuration.TransactionalStateOptions.LockTimeout.set -> void
+Orleans.Configuration.TransactionalStateOptions.MaxLockGroupSize.get -> int
+Orleans.Configuration.TransactionalStateOptions.MaxLockGroupSize.set -> void
+Orleans.Configuration.TransactionalStateOptions.PrepareTimeout.get -> System.TimeSpan
+Orleans.Configuration.TransactionalStateOptions.PrepareTimeout.set -> void
+Orleans.Configuration.TransactionalStateOptions.RemoteTransactionPingFrequency.get -> System.TimeSpan
+Orleans.Configuration.TransactionalStateOptions.RemoteTransactionPingFrequency.set -> void
+Orleans.Configuration.TransactionalStateOptions.TransactionalStateOptions() -> void
+Orleans.Hosting.ClientBuilderExtensions
+Orleans.Hosting.SiloBuilderExtensions
+Orleans.Hosting.TransactionsServiceCollectionExtensions
+Orleans.ITransactionClient
+Orleans.TransactionAttribute
+Orleans.TransactionAttribute.ReadOnly.get -> bool
+Orleans.TransactionAttribute.ReadOnly.set -> void
+Orleans.TransactionAttribute.Requirement.get -> Orleans.TransactionOption
+Orleans.TransactionAttribute.TransactionAttribute(Orleans.TransactionOption requirement) -> void
+Orleans.TransactionAttribute.TransactionAttribute(Orleans.TransactionOptionAlias alias) -> void
+Orleans.TransactionOption
+Orleans.TransactionOption.Create = 2 -> Orleans.TransactionOption
+Orleans.TransactionOption.CreateOrJoin = 1 -> Orleans.TransactionOption
+Orleans.TransactionOption.Join = 3 -> Orleans.TransactionOption
+Orleans.TransactionOption.NotAllowed = 5 -> Orleans.TransactionOption
+Orleans.TransactionOption.Supported = 4 -> Orleans.TransactionOption
+Orleans.TransactionOption.Suppress = 0 -> Orleans.TransactionOption
+Orleans.TransactionOptionAlias
+Orleans.TransactionOptionAlias.Mandatory = 3 -> Orleans.TransactionOptionAlias
+Orleans.TransactionOptionAlias.Never = 5 -> Orleans.TransactionOptionAlias
+Orleans.TransactionOptionAlias.Required = 1 -> Orleans.TransactionOptionAlias
+Orleans.TransactionOptionAlias.RequiresNew = 2 -> Orleans.TransactionOptionAlias
+Orleans.TransactionOptionAlias.Suppress = 4 -> Orleans.TransactionOptionAlias
+Orleans.TransactionRequest
+Orleans.TransactionRequest<TResult>
+Orleans.TransactionRequestBase
+Orleans.TransactionRequestBase.IsAmbientTransactionSuppressed.get -> bool
+Orleans.TransactionRequestBase.IsTransactionRequired.get -> bool
+Orleans.TransactionRequestBase.SetTransactionOptions(Orleans.TransactionOption txOption) -> void
+Orleans.TransactionRequestBase.SetTransactionOptions(Orleans.TransactionOptionAlias txOption) -> void
+Orleans.TransactionRequestBase.TransactionOption.get -> Orleans.TransactionOption
+Orleans.TransactionRequestBase.TransactionOption.set -> void
+Orleans.TransactionResponse
+Orleans.TransactionResponse.TransactionResponse() -> void
+Orleans.Transactions.Abstractions.AccessCounter
+Orleans.Transactions.Abstractions.AccessCounter.AccessCounter() -> void
+Orleans.Transactions.Abstractions.AccessCounter.Reads -> int
+Orleans.Transactions.Abstractions.AccessCounter.Writes -> int
+Orleans.Transactions.Abstractions.CommitRecord
+Orleans.Transactions.Abstractions.CommitRecord.CommitRecord() -> void
+Orleans.Transactions.Abstractions.CommitRecord.Timestamp.get -> System.DateTime
+Orleans.Transactions.Abstractions.CommitRecord.Timestamp.set -> void
+Orleans.Transactions.Abstractions.INamedTransactionalStateStorageFactory
+Orleans.Transactions.Abstractions.ITransactionAgentStatistics
+Orleans.Transactions.Abstractions.ITransactionAgentStatistics.TrackTransactionFailed() -> void
+Orleans.Transactions.Abstractions.ITransactionAgentStatistics.TrackTransactionStarted() -> void
+Orleans.Transactions.Abstractions.ITransactionAgentStatistics.TrackTransactionSucceeded() -> void
+Orleans.Transactions.Abstractions.ITransactionAgentStatistics.TrackTransactionThrottled() -> void
+Orleans.Transactions.Abstractions.ITransactionAgentStatistics.TransactionsFailed.get -> long
+Orleans.Transactions.Abstractions.ITransactionAgentStatistics.TransactionsStarted.get -> long
+Orleans.Transactions.Abstractions.ITransactionAgentStatistics.TransactionsSucceeded.get -> long
+Orleans.Transactions.Abstractions.ITransactionAgentStatistics.TransactionsThrottled.get -> long
+Orleans.Transactions.Abstractions.ITransactionalResource
+Orleans.Transactions.Abstractions.ITransactionalResourceExtension
+Orleans.Transactions.Abstractions.ITransactionalStateConfiguration
+Orleans.Transactions.Abstractions.ITransactionalStateFactory
+Orleans.Transactions.Abstractions.ITransactionalStateStorageFactory
+Orleans.Transactions.Abstractions.ITransactionCommitterConfiguration
+Orleans.Transactions.Abstractions.ITransactionCommitterFactory
+Orleans.Transactions.Abstractions.ITransactionDataCopier<TData>
+Orleans.Transactions.Abstractions.ITransactionDataCopier<TData>.DeepCopy(TData original) -> TData
+Orleans.Transactions.Abstractions.ITransactionManager
+Orleans.Transactions.Abstractions.ITransactionManagerExtension
+Orleans.Transactions.Abstractions.PendingTransactionState<TState>.PendingTransactionState() -> void
+Orleans.Transactions.Abstractions.PendingTransactionState<TState>.SequenceId.get -> long
+Orleans.Transactions.Abstractions.PendingTransactionState<TState>.SequenceId.set -> void
+Orleans.Transactions.Abstractions.PendingTransactionState<TState>.TimeStamp.get -> System.DateTime
+Orleans.Transactions.Abstractions.PendingTransactionState<TState>.TimeStamp.set -> void
+Orleans.Transactions.Abstractions.PendingTransactionState<TState>.TransactionManager.get -> Orleans.Transactions.ParticipantId
+Orleans.Transactions.Abstractions.PendingTransactionState<TState>.TransactionManager.set -> void
+Orleans.Transactions.Abstractions.TransactionalStateAttribute
+Orleans.Transactions.Abstractions.TransactionalStateConfiguration
+Orleans.Transactions.Abstractions.TransactionalStateConfiguration.SupportedRoles.get -> Orleans.Transactions.ParticipantId.Role
+Orleans.Transactions.Abstractions.TransactionalStateExtensions
+Orleans.Transactions.Abstractions.TransactionalStateMetaData
+Orleans.Transactions.Abstractions.TransactionalStateMetaData.TimeStamp.get -> System.DateTime
+Orleans.Transactions.Abstractions.TransactionalStateMetaData.TimeStamp.set -> void
+Orleans.Transactions.Abstractions.TransactionalStateMetaData.TransactionalStateMetaData() -> void
+Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<TState>.CommittedSequenceId.get -> long
+Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<TState>.CommittedSequenceId.set -> void
+Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<TState>.TransactionalStorageLoadResponse() -> void
+Orleans.Transactions.Abstractions.TransactionCommitterAttribute
+Orleans.Transactions.CausalClock
+Orleans.Transactions.CausalClock.Merge(System.DateTime timestamp) -> System.DateTime
+Orleans.Transactions.CausalClock.MergeUtcNow(System.DateTime timestamp) -> System.DateTime
+Orleans.Transactions.CausalClock.UtcNow() -> System.DateTime
+Orleans.Transactions.Clock
+Orleans.Transactions.Clock.Clock() -> void
+Orleans.Transactions.Clock.UtcNow() -> System.DateTime
+Orleans.Transactions.DefaultTransactionDataCopier<TData>
+Orleans.Transactions.DefaultTransactionDataCopier<TData>.DeepCopy(TData original) -> TData
+Orleans.Transactions.IClock
+Orleans.Transactions.IClock.UtcNow() -> System.DateTime
+Orleans.Transactions.ITransactionAgent
+Orleans.Transactions.ITransactionalStateStorageEvents<TState>.Cancel(long sequenceNumber) -> void
+Orleans.Transactions.ITransactionalStateStorageEvents<TState>.Collect(System.Guid transactionId) -> void
+Orleans.Transactions.ITransactionalStateStorageEvents<TState>.Confirm(long sequenceNumber) -> void
+Orleans.Transactions.ITransactionalStateStorageEvents<TState>.Read(System.DateTime timestamp) -> void
+Orleans.Transactions.ITransactionOverloadDetector
+Orleans.Transactions.ITransactionOverloadDetector.IsOverloaded() -> bool
+Orleans.Transactions.NamedTransactionalStateStorageFactory
+Orleans.Transactions.OrleansBrokenTransactionLockException
+Orleans.Transactions.OrleansCascadingAbortException
+Orleans.Transactions.OrleansOrphanCallException
+Orleans.Transactions.OrleansReadOnlyViolatedException
+Orleans.Transactions.OrleansStartTransactionFailedException
+Orleans.Transactions.OrleansTransactionAbortedException
+Orleans.Transactions.OrleansTransactionException
+Orleans.Transactions.OrleansTransactionException.OrleansTransactionException() -> void
+Orleans.Transactions.OrleansTransactionInDoubtException
+Orleans.Transactions.OrleansTransactionLockUpgradeException
+Orleans.Transactions.OrleansTransactionOverloadException
+Orleans.Transactions.OrleansTransactionOverloadException.OrleansTransactionOverloadException() -> void
+Orleans.Transactions.OrleansTransactionPrepareTimeoutException
+Orleans.Transactions.OrleansTransactionsDisabledException
+Orleans.Transactions.OrleansTransactionsDisabledException.OrleansTransactionsDisabledException() -> void
+Orleans.Transactions.OrleansTransactionServiceNotAvailableException
+Orleans.Transactions.OrleansTransactionServiceNotAvailableException.OrleansTransactionServiceNotAvailableException() -> void
+Orleans.Transactions.OrleansTransactionTransientFailureException
+Orleans.Transactions.ParticipantId
+Orleans.Transactions.ParticipantId.IdComparer
+Orleans.Transactions.ParticipantId.IdComparer.Equals(Orleans.Transactions.ParticipantId x, Orleans.Transactions.ParticipantId y) -> bool
+Orleans.Transactions.ParticipantId.IdComparer.GetHashCode(Orleans.Transactions.ParticipantId obj) -> int
+Orleans.Transactions.ParticipantId.IdComparer.IdComparer() -> void
+Orleans.Transactions.ParticipantId.ParticipantId() -> void
+Orleans.Transactions.ParticipantId.Role
+Orleans.Transactions.ParticipantId.Role.Manager = 2 -> Orleans.Transactions.ParticipantId.Role
+Orleans.Transactions.ParticipantId.Role.PriorityManager = 4 -> Orleans.Transactions.ParticipantId.Role
+Orleans.Transactions.ParticipantId.Role.Resource = 1 -> Orleans.Transactions.ParticipantId.Role
+Orleans.Transactions.ParticipantId.SupportedRoles.get -> Orleans.Transactions.ParticipantId.Role
+Orleans.Transactions.ParticipantRoleExtensions
+Orleans.Transactions.TransactionAgentStatistics
+Orleans.Transactions.TransactionAgentStatistics.TrackTransactionFailed() -> void
+Orleans.Transactions.TransactionAgentStatistics.TrackTransactionStarted() -> void
+Orleans.Transactions.TransactionAgentStatistics.TrackTransactionSucceeded() -> void
+Orleans.Transactions.TransactionAgentStatistics.TrackTransactionThrottled() -> void
+Orleans.Transactions.TransactionAgentStatistics.TransactionAgentStatistics() -> void
+Orleans.Transactions.TransactionAgentStatistics.TransactionsFailed.get -> long
+Orleans.Transactions.TransactionAgentStatistics.TransactionsStarted.get -> long
+Orleans.Transactions.TransactionAgentStatistics.TransactionsSucceeded.get -> long
+Orleans.Transactions.TransactionAgentStatistics.TransactionsThrottled.get -> long
+Orleans.Transactions.TransactionalResourceExtension
+Orleans.Transactions.TransactionalStateAttributeMapper
+Orleans.Transactions.TransactionalStateAttributeMapper.TransactionalStateAttributeMapper() -> void
+Orleans.Transactions.TransactionalStateAttributeMapper<TAttribute>.TransactionalStateAttributeMapper() -> void
+Orleans.Transactions.TransactionalStateFactory
+Orleans.Transactions.TransactionalStateRecord<TState>
+Orleans.Transactions.TransactionalStateRecord<TState>.CommittedSequenceId.get -> long
+Orleans.Transactions.TransactionalStateRecord<TState>.CommittedSequenceId.set -> void
+Orleans.Transactions.TransactionalStateRecord<TState>.CommittedState.get -> TState!
+Orleans.Transactions.TransactionalStateRecord<TState>.CommittedState.set -> void
+Orleans.Transactions.TransactionalStateRecord<TState>.Metadata.get -> Orleans.Transactions.Abstractions.TransactionalStateMetaData!
+Orleans.Transactions.TransactionalStateRecord<TState>.Metadata.set -> void
+Orleans.Transactions.TransactionalStateRecord<TState>.PendingStates.get -> System.Collections.Generic.List<Orleans.Transactions.Abstractions.PendingTransactionState<TState!>!>!
+Orleans.Transactions.TransactionalStateRecord<TState>.PendingStates.set -> void
+Orleans.Transactions.TransactionalStateRecord<TState>.TransactionalStateRecord() -> void
+Orleans.Transactions.TransactionalStatus
+Orleans.Transactions.TransactionalStatus.AssertionFailed = 10 -> Orleans.Transactions.TransactionalStatus
+Orleans.Transactions.TransactionalStatus.BrokenLock = 3 -> Orleans.Transactions.TransactionalStatus
+Orleans.Transactions.TransactionalStatus.CascadingAbort = 2 -> Orleans.Transactions.TransactionalStatus
+Orleans.Transactions.TransactionalStatus.CommitFailure = 11 -> Orleans.Transactions.TransactionalStatus
+Orleans.Transactions.TransactionalStatus.LockValidationFailed = 4 -> Orleans.Transactions.TransactionalStatus
+Orleans.Transactions.TransactionalStatus.Ok = 0 -> Orleans.Transactions.TransactionalStatus
+Orleans.Transactions.TransactionalStatus.ParticipantResponseTimeout = 5 -> Orleans.Transactions.TransactionalStatus
+Orleans.Transactions.TransactionalStatus.PrepareTimeout = 1 -> Orleans.Transactions.TransactionalStatus
+Orleans.Transactions.TransactionalStatus.PresumedAbort = 8 -> Orleans.Transactions.TransactionalStatus
+Orleans.Transactions.TransactionalStatus.StorageConflict = 7 -> Orleans.Transactions.TransactionalStatus
+Orleans.Transactions.TransactionalStatus.TMResponseTimeout = 6 -> Orleans.Transactions.TransactionalStatus
+Orleans.Transactions.TransactionalStatus.UnknownException = 9 -> Orleans.Transactions.TransactionalStatus
+Orleans.Transactions.TransactionalStatusExtensions
+Orleans.Transactions.TransactionCommitter<TService>.OperationState
+Orleans.Transactions.TransactionCommitter<TService>.OperationState.OperationState() -> void
+Orleans.Transactions.TransactionCommitterFactory
+Orleans.Transactions.TransactionContext
+Orleans.Transactions.TransactionInfo
+Orleans.Transactions.TransactionInfo.IsReadOnly.get -> bool
+Orleans.Transactions.TransactionInfo.PendingCalls -> int
+Orleans.Transactions.TransactionInfo.Priority.get -> System.DateTime
+Orleans.Transactions.TransactionInfo.Priority.set -> void
+Orleans.Transactions.TransactionInfo.ReconcilePending() -> void
+Orleans.Transactions.TransactionInfo.RecordRead(Orleans.Transactions.ParticipantId id, System.DateTime minTime) -> void
+Orleans.Transactions.TransactionInfo.RecordWrite(Orleans.Transactions.ParticipantId id, System.DateTime minTime) -> void
+Orleans.Transactions.TransactionInfo.TimeStamp.get -> System.DateTime
+Orleans.Transactions.TransactionInfo.TimeStamp.set -> void
+Orleans.Transactions.TransactionInfo.TransactionId.get -> System.Guid
+Orleans.Transactions.TransactionInfo.TransactionInfo() -> void
+Orleans.Transactions.TransactionInfo.TransactionInfo(System.Guid id, System.DateTime timeStamp, System.DateTime priority, bool readOnly = false) -> void
+Orleans.Transactions.TransactionInfo.TryToCommit.get -> bool
+Orleans.Transactions.TransactionManagerExtension
+Orleans.Transactions.TransactionOverloadDetector
+Orleans.Transactions.TransactionOverloadDetector.IsOverloaded() -> bool
+Orleans.Transactions.TransactionRateLoadSheddingOptions
+Orleans.Transactions.TransactionRateLoadSheddingOptions.Enabled.get -> bool
+Orleans.Transactions.TransactionRateLoadSheddingOptions.Enabled.set -> void
+Orleans.Transactions.TransactionRateLoadSheddingOptions.Limit.get -> double
+Orleans.Transactions.TransactionRateLoadSheddingOptions.Limit.set -> void
+Orleans.Transactions.TransactionRateLoadSheddingOptions.TransactionRateLoadSheddingOptions() -> void
+Orleans.TransactionTaskRequest
+Orleans.TransactionTaskRequest<TResult>
+override Orleans.TransactionRequestBase.Dispose() -> void
+override Orleans.TransactionResponse.Dispose() -> void
+override Orleans.TransactionResponse.GetResult<T>() -> T
+static Orleans.Configuration.TransactionalStateOptions.ConfirmationRetryLimit.get -> int
+static Orleans.Configuration.TransactionalStateOptions.ConfirmationRetryLimit.set -> void
+static Orleans.Configuration.TransactionalStateOptions.DefaultLockAcquireTimeout.get -> System.TimeSpan
+static Orleans.Configuration.TransactionalStateOptions.DefaultLockTimeout -> System.TimeSpan
+static Orleans.Configuration.TransactionalStateOptions.DefaultPrepareTimeout.get -> System.TimeSpan
+static Orleans.Configuration.TransactionalStateOptions.DefaultRemoteTransactionPingFrequency -> System.TimeSpan
+static Orleans.Transactions.Abstractions.AccessCounter.operator +(Orleans.Transactions.Abstractions.AccessCounter c1, Orleans.Transactions.Abstractions.AccessCounter c2) -> Orleans.Transactions.Abstractions.AccessCounter
+static Orleans.Transactions.ParticipantRoleExtensions.IsManager(this Orleans.Transactions.ParticipantId participant) -> bool
+static Orleans.Transactions.ParticipantRoleExtensions.IsPriorityManager(this Orleans.Transactions.ParticipantId participant) -> bool
+static Orleans.Transactions.ParticipantRoleExtensions.IsResource(this Orleans.Transactions.ParticipantId participant) -> bool
+static Orleans.Transactions.ParticipantRoleExtensions.SupportsRoles(this Orleans.Transactions.ParticipantId participant, Orleans.Transactions.ParticipantId.Role role) -> bool
+static Orleans.Transactions.TransactionalStatusExtensions.DefinitelyAborted(this Orleans.Transactions.TransactionalStatus status) -> bool
+~abstract Orleans.TransactionRequestBase.BaseInvoke() -> System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response>
+~abstract Orleans.Transactions.TransactionalStateAttributeMapper<TAttribute>.AttributeToConfig(TAttribute attribute) -> Orleans.Transactions.Abstractions.TransactionalStateConfiguration
+~abstract Orleans.TransactionTaskRequest.InvokeInner() -> System.Threading.Tasks.Task
+~abstract Orleans.TransactionTaskRequest<TResult>.InvokeInner() -> System.Threading.Tasks.Task<TResult>
+~Orleans.ITransactionClient.RunTransaction(Orleans.TransactionOption transactionOption, System.Func<System.Threading.Tasks.Task<bool>> transactionDelegate) -> System.Threading.Tasks.Task
+~Orleans.ITransactionClient.RunTransaction(Orleans.TransactionOption transactionOption, System.Func<System.Threading.Tasks.Task> transactionDelegate) -> System.Threading.Tasks.Task
+~Orleans.TransactionRequest.TransactionRequest(Orleans.Serialization.Serializer<Orleans.Transactions.OrleansTransactionAbortedException> exceptionSerializer, System.IServiceProvider serviceProvider) -> void
+~Orleans.TransactionRequest<TResult>.TransactionRequest(Orleans.Serialization.Serializer<Orleans.Transactions.OrleansTransactionAbortedException> exceptionSerializer, System.IServiceProvider serviceProvider) -> void
+~Orleans.TransactionRequestBase.TransactionInfo.get -> Orleans.Transactions.TransactionInfo
+~Orleans.TransactionRequestBase.TransactionInfo.set -> void
+~Orleans.TransactionRequestBase.TransactionRequestBase(Orleans.Serialization.Serializer<Orleans.Transactions.OrleansTransactionAbortedException> exceptionSerializer, System.IServiceProvider serviceProvider) -> void
+~Orleans.TransactionResponse.GetException() -> System.Exception
+~Orleans.TransactionResponse.InnerResponse.get -> Orleans.Serialization.Invocation.Response
+~Orleans.TransactionResponse.TransactionInfo.get -> Orleans.Transactions.TransactionInfo
+~Orleans.TransactionResponse.TransactionInfo.set -> void
+~Orleans.Transactions.Abstractions.CommitRecord.WriteParticipants.get -> System.Collections.Generic.List<Orleans.Transactions.ParticipantId>
+~Orleans.Transactions.Abstractions.CommitRecord.WriteParticipants.set -> void
+~Orleans.Transactions.Abstractions.INamedTransactionalStateStorageFactory.Create<TState>(string storageName, string stateName) -> Orleans.Transactions.Abstractions.ITransactionalStateStorage<TState>
+~Orleans.Transactions.Abstractions.ITransactionalResource.Abort(System.Guid transactionId) -> System.Threading.Tasks.Task
+~Orleans.Transactions.Abstractions.ITransactionalResource.Cancel(System.Guid transactionId, System.DateTime timeStamp, Orleans.Transactions.TransactionalStatus status) -> System.Threading.Tasks.Task
+~Orleans.Transactions.Abstractions.ITransactionalResource.CommitReadOnly(System.Guid transactionId, Orleans.Transactions.Abstractions.AccessCounter accessCount, System.DateTime timeStamp) -> System.Threading.Tasks.Task<Orleans.Transactions.TransactionalStatus>
+~Orleans.Transactions.Abstractions.ITransactionalResource.Confirm(System.Guid transactionId, System.DateTime timeStamp) -> System.Threading.Tasks.Task
+~Orleans.Transactions.Abstractions.ITransactionalResource.Prepare(System.Guid transactionId, Orleans.Transactions.Abstractions.AccessCounter accessCount, System.DateTime timeStamp, Orleans.Transactions.ParticipantId transactionManager) -> System.Threading.Tasks.Task
+~Orleans.Transactions.Abstractions.ITransactionalResourceExtension.Abort(string resourceId, System.Guid transactionId) -> System.Threading.Tasks.Task
+~Orleans.Transactions.Abstractions.ITransactionalResourceExtension.Cancel(string resourceId, System.Guid transactionId, System.DateTime timeStamp, Orleans.Transactions.TransactionalStatus status) -> System.Threading.Tasks.Task
+~Orleans.Transactions.Abstractions.ITransactionalResourceExtension.CommitReadOnly(string resourceId, System.Guid transactionId, Orleans.Transactions.Abstractions.AccessCounter accessCount, System.DateTime timeStamp) -> System.Threading.Tasks.Task<Orleans.Transactions.TransactionalStatus>
+~Orleans.Transactions.Abstractions.ITransactionalResourceExtension.Confirm(string resourceId, System.Guid transactionId, System.DateTime timeStamp) -> System.Threading.Tasks.Task
+~Orleans.Transactions.Abstractions.ITransactionalResourceExtension.Prepare(string resourceId, System.Guid transactionId, Orleans.Transactions.Abstractions.AccessCounter accessCount, System.DateTime timeStamp, Orleans.Transactions.ParticipantId transactionManager) -> System.Threading.Tasks.Task
+~Orleans.Transactions.Abstractions.ITransactionalState<TState>
+~Orleans.Transactions.Abstractions.ITransactionalState<TState>.PerformRead<TResult>(System.Func<TState, TResult> readFunction) -> System.Threading.Tasks.Task<TResult>
+~Orleans.Transactions.Abstractions.ITransactionalState<TState>.PerformUpdate<TResult>(System.Func<TState, TResult> updateFunction) -> System.Threading.Tasks.Task<TResult>
+~Orleans.Transactions.Abstractions.ITransactionalStateConfiguration.StateName.get -> string
+~Orleans.Transactions.Abstractions.ITransactionalStateConfiguration.StorageName.get -> string
+~Orleans.Transactions.Abstractions.ITransactionalStateFactory.Create<TState>(Orleans.Transactions.Abstractions.TransactionalStateConfiguration config) -> Orleans.Transactions.Abstractions.ITransactionalState<TState>
+~Orleans.Transactions.Abstractions.ITransactionalStateStorage<TState>
+~Orleans.Transactions.Abstractions.ITransactionalStateStorage<TState>.Load() -> System.Threading.Tasks.Task<Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<TState>>
+~Orleans.Transactions.Abstractions.ITransactionalStateStorage<TState>.Store(string expectedETag, Orleans.Transactions.Abstractions.TransactionalStateMetaData metadata, System.Collections.Generic.List<Orleans.Transactions.Abstractions.PendingTransactionState<TState>> statesToPrepare, long? commitUpTo, long? abortAfter) -> System.Threading.Tasks.Task<string>
+~Orleans.Transactions.Abstractions.ITransactionalStateStorageFactory.Create<TState>(string stateName, Orleans.Runtime.IGrainContext context) -> Orleans.Transactions.Abstractions.ITransactionalStateStorage<TState>
+~Orleans.Transactions.Abstractions.ITransactionCommitOperation<TService>
+~Orleans.Transactions.Abstractions.ITransactionCommitOperation<TService>.Commit(System.Guid transactionId, TService service) -> System.Threading.Tasks.Task<bool>
+~Orleans.Transactions.Abstractions.ITransactionCommitter<TService>
+~Orleans.Transactions.Abstractions.ITransactionCommitter<TService>.OnCommit(Orleans.Transactions.Abstractions.ITransactionCommitOperation<TService> operation) -> System.Threading.Tasks.Task
+~Orleans.Transactions.Abstractions.ITransactionCommitterConfiguration.ServiceName.get -> string
+~Orleans.Transactions.Abstractions.ITransactionCommitterConfiguration.StorageName.get -> string
+~Orleans.Transactions.Abstractions.ITransactionCommitterFactory.Create<TService>(Orleans.Transactions.Abstractions.ITransactionCommitterConfiguration config) -> Orleans.Transactions.Abstractions.ITransactionCommitter<TService>
+~Orleans.Transactions.Abstractions.ITransactionManager.Ping(System.Guid transactionId, System.DateTime timeStamp, Orleans.Transactions.ParticipantId resource) -> System.Threading.Tasks.Task
+~Orleans.Transactions.Abstractions.ITransactionManager.PrepareAndCommit(System.Guid transactionId, Orleans.Transactions.Abstractions.AccessCounter accessCount, System.DateTime timeStamp, System.Collections.Generic.List<Orleans.Transactions.ParticipantId> writerResources, int totalParticipants) -> System.Threading.Tasks.Task<Orleans.Transactions.TransactionalStatus>
+~Orleans.Transactions.Abstractions.ITransactionManager.Prepared(System.Guid transactionId, System.DateTime timeStamp, Orleans.Transactions.ParticipantId resource, Orleans.Transactions.TransactionalStatus status) -> System.Threading.Tasks.Task
+~Orleans.Transactions.Abstractions.ITransactionManagerExtension.Ping(string resourceId, System.Guid transactionId, System.DateTime timeStamp, Orleans.Transactions.ParticipantId resource) -> System.Threading.Tasks.Task
+~Orleans.Transactions.Abstractions.ITransactionManagerExtension.PrepareAndCommit(string resourceId, System.Guid transactionId, Orleans.Transactions.Abstractions.AccessCounter accessCount, System.DateTime timeStamp, System.Collections.Generic.List<Orleans.Transactions.ParticipantId> writeResources, int totalParticipants) -> System.Threading.Tasks.Task<Orleans.Transactions.TransactionalStatus>
+~Orleans.Transactions.Abstractions.ITransactionManagerExtension.Prepared(string resourceId, System.Guid transactionId, System.DateTime timestamp, Orleans.Transactions.ParticipantId resource, Orleans.Transactions.TransactionalStatus status) -> System.Threading.Tasks.Task
+~Orleans.Transactions.Abstractions.PendingTransactionState<TState>
+~Orleans.Transactions.Abstractions.PendingTransactionState<TState>.State.get -> TState
+~Orleans.Transactions.Abstractions.PendingTransactionState<TState>.State.set -> void
+~Orleans.Transactions.Abstractions.PendingTransactionState<TState>.TransactionId.get -> string
+~Orleans.Transactions.Abstractions.PendingTransactionState<TState>.TransactionId.set -> void
+~Orleans.Transactions.Abstractions.TransactionalStateAttribute.StateName.get -> string
+~Orleans.Transactions.Abstractions.TransactionalStateAttribute.StorageName.get -> string
+~Orleans.Transactions.Abstractions.TransactionalStateAttribute.TransactionalStateAttribute(string stateName, string storageName = null) -> void
+~Orleans.Transactions.Abstractions.TransactionalStateConfiguration.StateName.get -> string
+~Orleans.Transactions.Abstractions.TransactionalStateConfiguration.StorageName.get -> string
+~Orleans.Transactions.Abstractions.TransactionalStateConfiguration.TransactionalStateConfiguration(Orleans.Transactions.Abstractions.ITransactionalStateConfiguration config, Orleans.Transactions.ParticipantId.Role supportedRoles = Orleans.Transactions.ParticipantId.Role.Resource | Orleans.Transactions.ParticipantId.Role.Manager) -> void
+~Orleans.Transactions.Abstractions.TransactionalStateMetaData.CommitRecords.get -> System.Collections.Generic.Dictionary<System.Guid, Orleans.Transactions.Abstractions.CommitRecord>
+~Orleans.Transactions.Abstractions.TransactionalStateMetaData.CommitRecords.set -> void
+~Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<TState>
+~Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<TState>.CommittedState.get -> TState
+~Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<TState>.CommittedState.set -> void
+~Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<TState>.ETag.get -> string
+~Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<TState>.ETag.set -> void
+~Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<TState>.Metadata.get -> Orleans.Transactions.Abstractions.TransactionalStateMetaData
+~Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<TState>.Metadata.set -> void
+~Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<TState>.PendingStates.get -> System.Collections.Generic.IReadOnlyList<Orleans.Transactions.Abstractions.PendingTransactionState<TState>>
+~Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<TState>.PendingStates.set -> void
+~Orleans.Transactions.Abstractions.TransactionalStorageLoadResponse<TState>.TransactionalStorageLoadResponse(string etag, TState committedState, long committedSequenceId, Orleans.Transactions.Abstractions.TransactionalStateMetaData metadata, System.Collections.Generic.IReadOnlyList<Orleans.Transactions.Abstractions.PendingTransactionState<TState>> pendingStates) -> void
+~Orleans.Transactions.Abstractions.TransactionCommitterAttribute.ServiceName.get -> string
+~Orleans.Transactions.Abstractions.TransactionCommitterAttribute.StorageName.get -> string
+~Orleans.Transactions.Abstractions.TransactionCommitterAttribute.TransactionCommitterAttribute(string serviceName, string storageName = null) -> void
+~Orleans.Transactions.CausalClock.CausalClock(Orleans.Transactions.IClock clock) -> void
+~Orleans.Transactions.DefaultTransactionDataCopier<TData>.DefaultTransactionDataCopier(Orleans.Serialization.DeepCopier<TData> deepCopier) -> void
+~Orleans.Transactions.ITransactionAgent.Abort(Orleans.Transactions.TransactionInfo transactionInfo) -> System.Threading.Tasks.Task
+~Orleans.Transactions.ITransactionAgent.Resolve(Orleans.Transactions.TransactionInfo transactionInfo) -> System.Threading.Tasks.Task<(Orleans.Transactions.TransactionalStatus Status, System.Exception exception)>
+~Orleans.Transactions.ITransactionAgent.StartTransaction(bool readOnly, System.TimeSpan timeout) -> System.Threading.Tasks.Task<Orleans.Transactions.TransactionInfo>
+~Orleans.Transactions.ITransactionalStateStorageEvents<TState>
+~Orleans.Transactions.ITransactionalStateStorageEvents<TState>.Commit(System.Guid transactionId, System.DateTime timestamp, System.Collections.Generic.List<Orleans.Transactions.ParticipantId> writeResources) -> void
+~Orleans.Transactions.ITransactionalStateStorageEvents<TState>.Prepare(long sequenceNumber, System.Guid transactionId, System.DateTime timestamp, Orleans.Transactions.ParticipantId transactionManager, TState state) -> void
+~Orleans.Transactions.NamedTransactionalStateStorageFactory.Create<TState>(string storageName, string stateName) -> Orleans.Transactions.Abstractions.ITransactionalStateStorage<TState>
+~Orleans.Transactions.NamedTransactionalStateStorageFactory.NamedTransactionalStateStorageFactory(Orleans.Runtime.IGrainContextAccessor contextAccessor) -> void
+~Orleans.Transactions.NamedTransactionalStateStorageFactory.NamedTransactionalStateStorageFactory(Orleans.Runtime.IGrainContextAccessor contextAccessor, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) -> void
+~Orleans.Transactions.OrleansBrokenTransactionLockException.OrleansBrokenTransactionLockException(string transactionId, string situation) -> void
+~Orleans.Transactions.OrleansBrokenTransactionLockException.OrleansBrokenTransactionLockException(string transactionId, string situation, System.Exception innerException) -> void
+~Orleans.Transactions.OrleansCascadingAbortException.DependentTransactionId.get -> string
+~Orleans.Transactions.OrleansCascadingAbortException.OrleansCascadingAbortException(string transactionId) -> void
+~Orleans.Transactions.OrleansCascadingAbortException.OrleansCascadingAbortException(string transactionId, string dependentId) -> void
+~Orleans.Transactions.OrleansCascadingAbortException.OrleansCascadingAbortException(string transactionId, System.Exception innerException) -> void
+~Orleans.Transactions.OrleansOrphanCallException.OrleansOrphanCallException(string transactionId, int pendingCalls) -> void
+~Orleans.Transactions.OrleansReadOnlyViolatedException.OrleansReadOnlyViolatedException(string transactionId) -> void
+~Orleans.Transactions.OrleansStartTransactionFailedException.OrleansStartTransactionFailedException(System.Exception innerException) -> void
+~Orleans.Transactions.OrleansTransactionAbortedException.OrleansTransactionAbortedException(string transactionId, string msg) -> void
+~Orleans.Transactions.OrleansTransactionAbortedException.OrleansTransactionAbortedException(string transactionId, string msg, System.Exception innerException) -> void
+~Orleans.Transactions.OrleansTransactionAbortedException.OrleansTransactionAbortedException(string transactionId, System.Exception innerException) -> void
+~Orleans.Transactions.OrleansTransactionAbortedException.OrleansTransactionAbortedException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~Orleans.Transactions.OrleansTransactionAbortedException.TransactionId.get -> string
+~Orleans.Transactions.OrleansTransactionException.OrleansTransactionException(string message) -> void
+~Orleans.Transactions.OrleansTransactionException.OrleansTransactionException(string message, System.Exception innerException) -> void
+~Orleans.Transactions.OrleansTransactionException.OrleansTransactionException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~Orleans.Transactions.OrleansTransactionInDoubtException.OrleansTransactionInDoubtException(string transactionId) -> void
+~Orleans.Transactions.OrleansTransactionInDoubtException.OrleansTransactionInDoubtException(string transactionId, string msg, System.Exception innerException) -> void
+~Orleans.Transactions.OrleansTransactionInDoubtException.OrleansTransactionInDoubtException(string transactionId, System.Exception exc) -> void
+~Orleans.Transactions.OrleansTransactionInDoubtException.TransactionId.get -> string
+~Orleans.Transactions.OrleansTransactionLockUpgradeException.OrleansTransactionLockUpgradeException(string transactionId) -> void
+~Orleans.Transactions.OrleansTransactionPrepareTimeoutException.OrleansTransactionPrepareTimeoutException(string transactionId, System.Exception innerException) -> void
+~Orleans.Transactions.OrleansTransactionTransientFailureException.OrleansTransactionTransientFailureException(string transactionId, string msg) -> void
+~Orleans.Transactions.OrleansTransactionTransientFailureException.OrleansTransactionTransientFailureException(string transactionId, string msg, System.Exception innerException) -> void
+~Orleans.Transactions.OrleansTransactionTransientFailureException.OrleansTransactionTransientFailureException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~Orleans.Transactions.ParticipantId.Name.get -> string
+~Orleans.Transactions.ParticipantId.ParticipantId(string name, Orleans.Runtime.GrainReference reference, Orleans.Transactions.ParticipantId.Role supportedRoles) -> void
+~Orleans.Transactions.ParticipantId.Reference.get -> Orleans.Runtime.GrainReference
+~Orleans.Transactions.TransactionalResourceExtension.Abort(string resourceId, System.Guid transactionId) -> System.Threading.Tasks.Task
+~Orleans.Transactions.TransactionalResourceExtension.Cancel(string resourceId, System.Guid transactionId, System.DateTime timeStamp, Orleans.Transactions.TransactionalStatus status) -> System.Threading.Tasks.Task
+~Orleans.Transactions.TransactionalResourceExtension.CommitReadOnly(string resourceId, System.Guid transactionId, Orleans.Transactions.Abstractions.AccessCounter accessCount, System.DateTime timeStamp) -> System.Threading.Tasks.Task<Orleans.Transactions.TransactionalStatus>
+~Orleans.Transactions.TransactionalResourceExtension.Confirm(string resourceId, System.Guid transactionId, System.DateTime timeStamp) -> System.Threading.Tasks.Task
+~Orleans.Transactions.TransactionalResourceExtension.Prepare(string resourceId, System.Guid transactionId, Orleans.Transactions.Abstractions.AccessCounter accessCount, System.DateTime timeStamp, Orleans.Transactions.ParticipantId transactionManager) -> System.Threading.Tasks.Task
+~Orleans.Transactions.TransactionalResourceExtension.TransactionalResourceExtension(Orleans.Runtime.IGrainContextAccessor contextAccessor) -> void
+~Orleans.Transactions.TransactionalState<TState>
+~Orleans.Transactions.TransactionalState<TState>.CurrentTransactionId.get -> string
+~Orleans.Transactions.TransactionalState<TState>.Participate(Orleans.Runtime.IGrainLifecycle lifecycle) -> void
+~Orleans.Transactions.TransactionalState<TState>.PerformRead<TResult>(System.Func<TState, TResult> operation) -> System.Threading.Tasks.Task<TResult>
+~Orleans.Transactions.TransactionalState<TState>.PerformUpdate<TResult>(System.Func<TState, TResult> updateAction) -> System.Threading.Tasks.Task<TResult>
+~Orleans.Transactions.TransactionalState<TState>.TransactionalState(Orleans.Transactions.Abstractions.TransactionalStateConfiguration transactionalStateConfiguration, Orleans.Runtime.IGrainContextAccessor contextAccessor, Orleans.Transactions.Abstractions.ITransactionDataCopier<TState> copier, Orleans.Runtime.IGrainRuntime grainRuntime, Microsoft.Extensions.Logging.ILogger<Orleans.Transactions.TransactionalState<TState>> logger) -> void
+~Orleans.Transactions.TransactionalStateAttributeMapper<TAttribute>
+~Orleans.Transactions.TransactionalStateAttributeMapper<TAttribute>.GetFactory(System.Reflection.ParameterInfo parameter, TAttribute attribute) -> Orleans.Factory<Orleans.Runtime.IGrainContext, object>
+~Orleans.Transactions.TransactionalStateFactory.Create<TState>(Orleans.Transactions.Abstractions.TransactionalStateConfiguration config) -> Orleans.Transactions.Abstractions.ITransactionalState<TState>
+~Orleans.Transactions.TransactionalStateFactory.TransactionalStateFactory(Orleans.Runtime.IGrainContextAccessor contextAccessor) -> void
+~Orleans.Transactions.TransactionCommitter<TService>
+~Orleans.Transactions.TransactionCommitter<TService>.OnCommit(Orleans.Transactions.Abstractions.ITransactionCommitOperation<TService> operation) -> System.Threading.Tasks.Task
+~Orleans.Transactions.TransactionCommitter<TService>.OperationState.Operation.get -> Orleans.Transactions.Abstractions.ITransactionCommitOperation<TService>
+~Orleans.Transactions.TransactionCommitter<TService>.OperationState.Operation.set -> void
+~Orleans.Transactions.TransactionCommitter<TService>.Participate(Orleans.Runtime.IGrainLifecycle lifecycle) -> void
+~Orleans.Transactions.TransactionCommitter<TService>.TransactionCommitter(Orleans.Transactions.Abstractions.ITransactionCommitterConfiguration config, Orleans.Runtime.IGrainContextAccessor contextAccessor, Orleans.Transactions.Abstractions.ITransactionDataCopier<Orleans.Transactions.TransactionCommitter<TService>.OperationState> copier, Orleans.Runtime.IGrainRuntime grainRuntime, Microsoft.Extensions.Logging.ILogger<Orleans.Transactions.TransactionCommitter<TService>> logger) -> void
+~Orleans.Transactions.TransactionCommitterFactory.Create<TService>(Orleans.Transactions.Abstractions.ITransactionCommitterConfiguration config) -> Orleans.Transactions.Abstractions.ITransactionCommitter<TService>
+~Orleans.Transactions.TransactionCommitterFactory.TransactionCommitterFactory(Orleans.Runtime.IGrainContextAccessor contextAccessor) -> void
+~Orleans.Transactions.TransactionInfo.Fork() -> Orleans.Transactions.TransactionInfo
+~Orleans.Transactions.TransactionInfo.Id.get -> string
+~Orleans.Transactions.TransactionInfo.Join(Orleans.Transactions.TransactionInfo x) -> void
+~Orleans.Transactions.TransactionInfo.MustAbort(Orleans.Serialization.Serializer<Orleans.Transactions.OrleansTransactionAbortedException> serializer) -> Orleans.Transactions.OrleansTransactionAbortedException
+~Orleans.Transactions.TransactionInfo.OriginalException.get -> byte[]
+~Orleans.Transactions.TransactionInfo.OriginalException.set -> void
+~Orleans.Transactions.TransactionInfo.Participants.get -> System.Collections.Generic.Dictionary<Orleans.Transactions.ParticipantId, Orleans.Transactions.Abstractions.AccessCounter>
+~Orleans.Transactions.TransactionInfo.RecordException(System.Exception e, Orleans.Serialization.Serializer<Orleans.Transactions.OrleansTransactionAbortedException> sm) -> void
+~Orleans.Transactions.TransactionInfo.TransactionInfo(Orleans.Transactions.TransactionInfo other) -> void
+~Orleans.Transactions.TransactionManagerExtension.Ping(string resourceId, System.Guid transactionId, System.DateTime timeStamp, Orleans.Transactions.ParticipantId resource) -> System.Threading.Tasks.Task
+~Orleans.Transactions.TransactionManagerExtension.PrepareAndCommit(string resourceId, System.Guid transactionId, Orleans.Transactions.Abstractions.AccessCounter accessCount, System.DateTime timeStamp, System.Collections.Generic.List<Orleans.Transactions.ParticipantId> writeResources, int totalResources) -> System.Threading.Tasks.Task<Orleans.Transactions.TransactionalStatus>
+~Orleans.Transactions.TransactionManagerExtension.Prepared(string resourceId, System.Guid transactionId, System.DateTime timestamp, Orleans.Transactions.ParticipantId resource, Orleans.Transactions.TransactionalStatus status) -> System.Threading.Tasks.Task
+~Orleans.Transactions.TransactionManagerExtension.TransactionManagerExtension(Orleans.Runtime.IGrainContextAccessor contextAccessor) -> void
+~Orleans.Transactions.TransactionOverloadDetector.TransactionOverloadDetector(Orleans.Transactions.Abstractions.ITransactionAgentStatistics statistics, Microsoft.Extensions.Options.IOptions<Orleans.Transactions.TransactionRateLoadSheddingOptions> options) -> void
+~Orleans.TransactionTaskRequest.TransactionTaskRequest(Orleans.Serialization.Serializer<Orleans.Transactions.OrleansTransactionAbortedException> exceptionSerializer, System.IServiceProvider serviceProvider) -> void
+~Orleans.TransactionTaskRequest<TResult>.TransactionTaskRequest(Orleans.Serialization.Serializer<Orleans.Transactions.OrleansTransactionAbortedException> exceptionSerializer, System.IServiceProvider serviceProvider) -> void
+~override Orleans.TransactionRequestBase.Invoke() -> System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response>
+~override Orleans.TransactionResponse.Exception.get -> System.Exception
+~override Orleans.TransactionResponse.Exception.set -> void
+~override Orleans.TransactionResponse.Result.get -> object
+~override Orleans.TransactionResponse.Result.set -> void
+~override Orleans.Transactions.OrleansCascadingAbortException.GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~override Orleans.Transactions.OrleansTransactionAbortedException.GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~override Orleans.Transactions.OrleansTransactionInDoubtException.GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~override Orleans.Transactions.ParticipantId.ToString() -> string
+~override Orleans.Transactions.TransactionalStateAttributeMapper.AttributeToConfig(Orleans.Transactions.Abstractions.TransactionalStateAttribute attribute) -> Orleans.Transactions.Abstractions.TransactionalStateConfiguration
+~override Orleans.Transactions.TransactionInfo.ToString() -> string
+~override sealed Orleans.TransactionRequest.BaseInvoke() -> System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response>
+~override sealed Orleans.TransactionRequest<TResult>.BaseInvoke() -> System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response>
+~override sealed Orleans.TransactionTaskRequest.BaseInvoke() -> System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response>
+~override sealed Orleans.TransactionTaskRequest<TResult>.BaseInvoke() -> System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response>
+~static Orleans.Hosting.ClientBuilderExtensions.UseTransactions(this Orleans.Hosting.IClientBuilder builder) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.SiloBuilderExtensions.UseTransactions(this Orleans.Hosting.ISiloBuilder builder) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.TransactionResponse.Create(Orleans.Serialization.Invocation.Response response, Orleans.Transactions.TransactionInfo transactionInfo) -> Orleans.TransactionResponse
+~static Orleans.Transactions.Abstractions.TransactionalStateExtensions.PerformUpdate<TState>(this Orleans.Transactions.Abstractions.ITransactionalState<TState> transactionalState, System.Action<TState> updateAction) -> System.Threading.Tasks.Task
+~static Orleans.Transactions.ParticipantRoleExtensions.SelectManagers(this System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<Orleans.Transactions.ParticipantId, Orleans.Transactions.Abstractions.AccessCounter>> participants) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<Orleans.Transactions.ParticipantId, Orleans.Transactions.Abstractions.AccessCounter>>
+~static Orleans.Transactions.ParticipantRoleExtensions.SelectPriorityManagers(this System.Collections.Generic.IEnumerable<Orleans.Transactions.ParticipantId> participants) -> System.Collections.Generic.IEnumerable<Orleans.Transactions.ParticipantId>
+~static Orleans.Transactions.ParticipantRoleExtensions.SelectResources(this System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<Orleans.Transactions.ParticipantId, Orleans.Transactions.Abstractions.AccessCounter>> participants) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<Orleans.Transactions.ParticipantId, Orleans.Transactions.Abstractions.AccessCounter>>
+~static Orleans.Transactions.TransactionAgentStatistics.Copy(Orleans.Transactions.Abstractions.ITransactionAgentStatistics initialStatistics) -> Orleans.Transactions.Abstractions.ITransactionAgentStatistics
+~static Orleans.Transactions.TransactionalStateFactory.GetJsonSerializerSettings(System.IServiceProvider serviceProvider) -> Newtonsoft.Json.JsonSerializerSettings
+~static Orleans.Transactions.TransactionalStatusExtensions.ConvertToUserException(this Orleans.Transactions.TransactionalStatus status, string transactionId, System.Exception exception) -> Orleans.Transactions.OrleansTransactionException
+~static Orleans.Transactions.TransactionContext.CurrentTransactionId.get -> string
+~static Orleans.Transactions.TransactionContext.GetRequiredTransactionInfo() -> Orleans.Transactions.TransactionInfo
+~static Orleans.Transactions.TransactionContext.GetTransactionInfo() -> Orleans.Transactions.TransactionInfo
+~static readonly Orleans.Transactions.ParticipantId.Comparer -> System.Collections.Generic.IEqualityComparer<Orleans.Transactions.ParticipantId>

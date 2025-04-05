@@ -1,0 +1,126 @@
+#nullable enable
+const Orleans.Configuration.AzureBlobStorageOptions.DEFAULT_INIT_STAGE = 10000 -> int
+const Orleans.Configuration.AzureTableStorageOptions.DEFAULT_INIT_STAGE = 10000 -> int
+Orleans.Configuration.AzureBlobStorageOptions
+Orleans.Configuration.AzureBlobStorageOptions.AzureBlobStorageOptions() -> void
+Orleans.Configuration.AzureBlobStorageOptions.DeleteStateOnClear.get -> bool
+Orleans.Configuration.AzureBlobStorageOptions.DeleteStateOnClear.set -> void
+Orleans.Configuration.AzureBlobStorageOptions.InitStage.get -> int
+Orleans.Configuration.AzureBlobStorageOptions.InitStage.set -> void
+Orleans.Configuration.AzureBlobStorageOptionsValidator
+Orleans.Configuration.AzureBlobStorageOptionsValidator.ValidateConfiguration() -> void
+Orleans.Configuration.AzureTableGrainStorageOptionsValidator
+Orleans.Configuration.AzureTableStorageOptions
+Orleans.Configuration.AzureTableStorageOptions.AzureTableStorageOptions() -> void
+Orleans.Configuration.AzureTableStorageOptions.DeleteStateOnClear.get -> bool
+Orleans.Configuration.AzureTableStorageOptions.DeleteStateOnClear.set -> void
+Orleans.Configuration.AzureTableStorageOptions.InitStage.get -> int
+Orleans.Configuration.AzureTableStorageOptions.InitStage.set -> void
+Orleans.Configuration.AzureTableStorageOptions.UseStringFormat.get -> bool
+Orleans.Configuration.AzureTableStorageOptions.UseStringFormat.set -> void
+Orleans.Hosting.AzureBlobGrainStorageServiceCollectionExtensions
+Orleans.Hosting.AzureBlobSiloBuilderExtensions
+Orleans.Hosting.AzureTableSiloBuilderExtensions
+Orleans.Persistence.AzureStorage.AzureStorageOperationOptions
+Orleans.Persistence.AzureStorage.AzureStorageOperationOptions.AzureStorageOperationOptions() -> void
+Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions
+Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions.AzureStoragePolicyOptions() -> void
+Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions.CreationTimeout.get -> System.TimeSpan
+Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions.CreationTimeout.set -> void
+Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions.MaxBulkUpdateRows.get -> int
+Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions.MaxBulkUpdateRows.set -> void
+Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions.MaxCreationRetries.get -> int
+Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions.MaxCreationRetries.set -> void
+Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions.MaxOperationRetries.get -> int
+Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions.MaxOperationRetries.set -> void
+Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions.OperationTimeout.get -> System.TimeSpan
+Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions.OperationTimeout.set -> void
+Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions.PauseBetweenCreationRetries.get -> System.TimeSpan
+Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions.PauseBetweenCreationRetries.set -> void
+Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions.PauseBetweenOperationRetries.get -> System.TimeSpan
+Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions.PauseBetweenOperationRetries.set -> void
+Orleans.Storage.AzureBlobGrainStorage
+Orleans.Storage.AzureBlobGrainStorage.AzureBlobGrainStorage(string! name, Orleans.Configuration.AzureBlobStorageOptions! options, Orleans.Storage.IBlobContainerFactory! blobContainerFactory, Orleans.Serialization.Serializers.IActivatorProvider! activatorProvider, Microsoft.Extensions.Logging.ILogger<Orleans.Storage.AzureBlobGrainStorage!>! logger) -> void
+Orleans.Storage.AzureBlobGrainStorage.ClearStateAsync<T>(string! grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
+Orleans.Storage.AzureBlobGrainStorage.Participate(Orleans.Runtime.ISiloLifecycle! lifecycle) -> void
+Orleans.Storage.AzureBlobGrainStorage.ReadStateAsync<T>(string! grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
+Orleans.Storage.AzureBlobGrainStorage.WriteStateAsync<T>(string! grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
+Orleans.Storage.AzureBlobGrainStorageFactory
+Orleans.Storage.AzureTableGrainStorage
+Orleans.Storage.AzureTableGrainStorage.AzureTableGrainStorage(string! name, Orleans.Configuration.AzureTableStorageOptions! options, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions!>! clusterOptions, Microsoft.Extensions.Logging.ILogger<Orleans.Storage.AzureTableGrainStorage!>! logger, Orleans.Serialization.Serializers.IActivatorProvider! activatorProvider) -> void
+Orleans.Storage.AzureTableGrainStorage.ClearStateAsync<T>(string! grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
+Orleans.Storage.AzureTableGrainStorage.DecodeException(System.Exception! e, out System.Net.HttpStatusCode httpStatusCode, out string! restStatus, bool getRESTErrors = false) -> bool
+Orleans.Storage.AzureTableGrainStorage.Participate(Orleans.Runtime.ISiloLifecycle! lifecycle) -> void
+Orleans.Storage.AzureTableGrainStorage.ReadStateAsync<T>(string! grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
+Orleans.Storage.AzureTableGrainStorage.WriteStateAsync<T>(string! grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
+Orleans.Storage.AzureTableGrainStorageFactory
+Orleans.Storage.IBlobContainerFactory
+Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException
+Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException.TableStorageUpdateConditionNotSatisfiedException() -> void
+static Orleans.Storage.AzureBlobGrainStorageFactory.Create(System.IServiceProvider! services, string! name) -> Orleans.Storage.AzureBlobGrainStorage!
+static Orleans.Storage.AzureTableGrainStorageFactory.Create(System.IServiceProvider! services, string! name) -> Orleans.Storage.AzureTableGrainStorage!
+virtual Orleans.Persistence.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.ValidateConfiguration() -> void
+~const Orleans.Configuration.AzureBlobStorageOptions.DEFAULT_CONTAINER_NAME = "grainstate" -> string
+~const Orleans.Configuration.AzureTableStorageOptions.DEFAULT_TABLE_NAME = "OrleansGrainState" -> string
+~Orleans.Configuration.AzureBlobStorageOptions.BlobServiceClient.get -> Azure.Storage.Blobs.BlobServiceClient
+~Orleans.Configuration.AzureBlobStorageOptions.BlobServiceClient.set -> void
+~Orleans.Configuration.AzureBlobStorageOptions.BuildContainerFactory.get -> System.Func<System.IServiceProvider, Orleans.Configuration.AzureBlobStorageOptions, Orleans.Storage.IBlobContainerFactory>
+~Orleans.Configuration.AzureBlobStorageOptions.BuildContainerFactory.set -> void
+~Orleans.Configuration.AzureBlobStorageOptions.ClientOptions.get -> Azure.Storage.Blobs.BlobClientOptions
+~Orleans.Configuration.AzureBlobStorageOptions.ClientOptions.set -> void
+~Orleans.Configuration.AzureBlobStorageOptions.ConfigureBlobServiceClient(string connectionString) -> void
+~Orleans.Configuration.AzureBlobStorageOptions.ConfigureBlobServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Storage.Blobs.BlobServiceClient>> createClientCallback) -> void
+~Orleans.Configuration.AzureBlobStorageOptions.ConfigureBlobServiceClient(System.Uri serviceUri) -> void
+~Orleans.Configuration.AzureBlobStorageOptions.ConfigureBlobServiceClient(System.Uri serviceUri, Azure.AzureSasCredential azureSasCredential) -> void
+~Orleans.Configuration.AzureBlobStorageOptions.ConfigureBlobServiceClient(System.Uri serviceUri, Azure.Core.TokenCredential tokenCredential) -> void
+~Orleans.Configuration.AzureBlobStorageOptions.ConfigureBlobServiceClient(System.Uri serviceUri, Azure.Storage.StorageSharedKeyCredential sharedKeyCredential) -> void
+~Orleans.Configuration.AzureBlobStorageOptions.ContainerName.get -> string
+~Orleans.Configuration.AzureBlobStorageOptions.ContainerName.set -> void
+~Orleans.Configuration.AzureBlobStorageOptions.GrainStorageSerializer.get -> Orleans.Storage.IGrainStorageSerializer
+~Orleans.Configuration.AzureBlobStorageOptions.GrainStorageSerializer.set -> void
+~Orleans.Configuration.AzureBlobStorageOptionsValidator.AzureBlobStorageOptionsValidator(Orleans.Configuration.AzureBlobStorageOptions options, string name) -> void
+~Orleans.Configuration.AzureTableGrainStorageOptionsValidator.AzureTableGrainStorageOptionsValidator(Orleans.Configuration.AzureTableStorageOptions options, string name) -> void
+~Orleans.Configuration.AzureTableStorageOptions.GrainStorageSerializer.get -> Orleans.Storage.IGrainStorageSerializer
+~Orleans.Configuration.AzureTableStorageOptions.GrainStorageSerializer.set -> void
+~Orleans.Persistence.AzureStorage.AzureStorageOperationOptions.ClientOptions.get -> Azure.Data.Tables.TableClientOptions
+~Orleans.Persistence.AzureStorage.AzureStorageOperationOptions.ClientOptions.set -> void
+~Orleans.Persistence.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(string connectionString) -> void
+~Orleans.Persistence.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Data.Tables.TableServiceClient>> createClientCallback) -> void
+~Orleans.Persistence.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri) -> void
+~Orleans.Persistence.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.AzureSasCredential azureSasCredential) -> void
+~Orleans.Persistence.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.Core.TokenCredential tokenCredential) -> void
+~Orleans.Persistence.AzureStorage.AzureStorageOperationOptions.ConfigureTableServiceClient(System.Uri serviceUri, Azure.Data.Tables.TableSharedKeyCredential sharedKeyCredential) -> void
+~Orleans.Persistence.AzureStorage.AzureStorageOperationOptions.StoragePolicyOptions.get -> Orleans.Persistence.AzureStorage.AzureStoragePolicyOptions
+~Orleans.Persistence.AzureStorage.AzureStorageOperationOptions.TableServiceClient.get -> Azure.Data.Tables.TableServiceClient
+~Orleans.Persistence.AzureStorage.AzureStorageOperationOptions.TableServiceClient.set -> void
+~Orleans.Persistence.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>
+~Orleans.Persistence.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.AzureStorageOperationOptionsValidator(TOptions options, string name = null) -> void
+~Orleans.Persistence.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.Name.get -> string
+~Orleans.Persistence.AzureStorage.AzureStorageOperationOptionsValidator<TOptions>.Options.get -> TOptions
+~Orleans.Storage.IBlobContainerFactory.GetBlobContainerClient(Orleans.Runtime.GrainId grainId) -> Azure.Storage.Blobs.BlobContainerClient
+~Orleans.Storage.IBlobContainerFactory.InitializeAsync(Azure.Storage.Blobs.BlobServiceClient client) -> System.Threading.Tasks.Task
+~Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException.GrainId.get -> string
+~Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException.GrainType.get -> string
+~Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException.TableName.get -> string
+~Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException.TableStorageUpdateConditionNotSatisfiedException(string errorMsg, string grainType, string grainId, string tableName, string storedEtag, string currentEtag, System.Exception storageException) -> void
+~Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException.TableStorageUpdateConditionNotSatisfiedException(string grainType, string grainId, string tableName, string storedEtag, string currentEtag, System.Exception storageException) -> void
+~Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException.TableStorageUpdateConditionNotSatisfiedException(string msg) -> void
+~Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException.TableStorageUpdateConditionNotSatisfiedException(string msg, System.Exception exc) -> void
+~Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException.TableStorageUpdateConditionNotSatisfiedException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~override Orleans.Configuration.AzureTableStorageOptions.TableName.get -> string
+~override Orleans.Configuration.AzureTableStorageOptions.TableName.set -> void
+~override Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException.GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~static Orleans.Hosting.AzureBlobGrainStorageServiceCollectionExtensions.AddAzureBlobGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureBlobStorageOptions>> configureOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.AzureBlobGrainStorageServiceCollectionExtensions.AddAzureBlobGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Orleans.Configuration.AzureBlobStorageOptions> configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.AzureBlobGrainStorageServiceCollectionExtensions.AddAzureBlobGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureBlobStorageOptions>> configureOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.AzureBlobGrainStorageServiceCollectionExtensions.AddAzureBlobGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Orleans.Configuration.AzureBlobStorageOptions> configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.AzureBlobSiloBuilderExtensions.AddAzureBlobGrainStorage(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureBlobStorageOptions>> configureOptions = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AzureBlobSiloBuilderExtensions.AddAzureBlobGrainStorage(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Configuration.AzureBlobStorageOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AzureBlobSiloBuilderExtensions.AddAzureBlobGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureBlobStorageOptions>> configureOptions = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AzureBlobSiloBuilderExtensions.AddAzureBlobGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Configuration.AzureBlobStorageOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AzureTableSiloBuilderExtensions.AddAzureTableGrainStorage(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureTableStorageOptions>> configureOptions = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AzureTableSiloBuilderExtensions.AddAzureTableGrainStorage(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Configuration.AzureTableStorageOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AzureTableSiloBuilderExtensions.AddAzureTableGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.AzureTableStorageOptions>> configureOptions = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.AzureTableSiloBuilderExtensions.AddAzureTableGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Configuration.AzureTableStorageOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~virtual Orleans.Persistence.AzureStorage.AzureStorageOperationOptions.TableName.get -> string
+~virtual Orleans.Persistence.AzureStorage.AzureStorageOperationOptions.TableName.set -> void

@@ -1,0 +1,76 @@
+#nullable enable
+Orleans.CodeGenerator.CodeGenerator
+Orleans.CodeGenerator.CodeGeneratorOptions
+Orleans.CodeGenerator.CodeGeneratorOptions.CodeGeneratorOptions() -> void
+Orleans.CodeGenerator.CodeGeneratorOptions.GenerateCompatibilityInvokers.get -> bool
+Orleans.CodeGenerator.CodeGeneratorOptions.GenerateCompatibilityInvokers.set -> void
+Orleans.CodeGenerator.CodeGeneratorOptions.GenerateFieldIds.get -> Orleans.CodeGenerator.Model.GenerateFieldIds
+Orleans.CodeGenerator.CodeGeneratorOptions.GenerateFieldIds.set -> void
+Orleans.CodeGenerator.Diagnostics.CanNotGenerateImplicitFieldIdsDiagnostic
+Orleans.CodeGenerator.Diagnostics.GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembly_Diagnostic
+Orleans.CodeGenerator.Diagnostics.InaccessibleSerializableTypeDiagnostic
+Orleans.CodeGenerator.Diagnostics.InaccessibleSetterDiagnostic
+Orleans.CodeGenerator.Diagnostics.IncorrectProxyBaseClassSpecificationDiagnostic
+Orleans.CodeGenerator.Diagnostics.InvalidRpcMethodReturnTypeDiagnostic
+Orleans.CodeGenerator.Diagnostics.MultipleCancellationTokenParametersDiagnostic
+Orleans.CodeGenerator.Diagnostics.RpcInterfacePropertyDiagnostic
+Orleans.CodeGenerator.Diagnostics.UnhandledCodeGenerationExceptionDiagnostic
+Orleans.CodeGenerator.Model.GenerateFieldIds
+Orleans.CodeGenerator.Model.GenerateFieldIds.None = 0 -> Orleans.CodeGenerator.Model.GenerateFieldIds
+Orleans.CodeGenerator.Model.GenerateFieldIds.PublicProperties = 1 -> Orleans.CodeGenerator.Model.GenerateFieldIds
+Orleans.CodeGenerator.OrleansGeneratorDiagnosticAnalysisException
+Orleans.CodeGenerator.OrleansSerializationSourceGenerator
+Orleans.CodeGenerator.OrleansSerializationSourceGenerator.Execute(Microsoft.CodeAnalysis.GeneratorExecutionContext context) -> void
+Orleans.CodeGenerator.OrleansSerializationSourceGenerator.Initialize(Microsoft.CodeAnalysis.GeneratorInitializationContext context) -> void
+Orleans.CodeGenerator.OrleansSerializationSourceGenerator.OrleansSerializationSourceGenerator() -> void
+Orleans.CodeGenerator.PropertyUtility
+static Orleans.CodeGenerator.PropertyUtility.GetCanonicalName(string! name) -> string!
+static Orleans.CodeGenerator.PropertyUtility.GetMatchingField(Microsoft.CodeAnalysis.IPropertySymbol! property) -> Microsoft.CodeAnalysis.IFieldSymbol?
+static Orleans.CodeGenerator.PropertyUtility.GetMatchingField(Microsoft.CodeAnalysis.IPropertySymbol! property, System.Collections.Generic.IEnumerable<Microsoft.CodeAnalysis.ISymbol!>! memberSymbols) -> Microsoft.CodeAnalysis.IFieldSymbol?
+static Orleans.CodeGenerator.PropertyUtility.GetMatchingPrimaryConstructorParameter(Microsoft.CodeAnalysis.IPropertySymbol! property, System.Collections.Generic.IEnumerable<Microsoft.CodeAnalysis.IParameterSymbol!>! constructorParameters) -> Microsoft.CodeAnalysis.IParameterSymbol?
+static Orleans.CodeGenerator.PropertyUtility.GetMatchingProperty(Microsoft.CodeAnalysis.IFieldSymbol! field) -> Microsoft.CodeAnalysis.IPropertySymbol?
+static Orleans.CodeGenerator.PropertyUtility.GetMatchingProperty(Microsoft.CodeAnalysis.IFieldSymbol! field, System.Collections.Generic.IEnumerable<Microsoft.CodeAnalysis.ISymbol!>! memberSymbols) -> Microsoft.CodeAnalysis.IPropertySymbol?
+static Orleans.CodeGenerator.PropertyUtility.IsCompilerGenerated(this Microsoft.CodeAnalysis.IPropertySymbol? property) -> bool
+static Orleans.CodeGenerator.PropertyUtility.IsCompilerGenerated(this Microsoft.CodeAnalysis.ISymbol? symbol) -> bool
+~const Orleans.CodeGenerator.Diagnostics.CanNotGenerateImplicitFieldIdsDiagnostic.Category = "Usage" -> string
+~const Orleans.CodeGenerator.Diagnostics.CanNotGenerateImplicitFieldIdsDiagnostic.DiagnosticId = "ORLEANS0106" -> string
+~const Orleans.CodeGenerator.Diagnostics.CanNotGenerateImplicitFieldIdsDiagnostic.MessageFormat = "Could not generate implicit field identifiers for the type {0}: {reason}" -> string
+~const Orleans.CodeGenerator.Diagnostics.CanNotGenerateImplicitFieldIdsDiagnostic.Title = "Implicit field identifiers could not be generated" -> string
+~const Orleans.CodeGenerator.Diagnostics.GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembly_Diagnostic.Category = "Usage" -> string
+~const Orleans.CodeGenerator.Diagnostics.GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembly_Diagnostic.DiagnosticId = "ORLEANS0108" -> string
+~const Orleans.CodeGenerator.Diagnostics.GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembly_Diagnostic.MessageFormat = "The type {0} provided as an argument to {1} does not have a declaring assembly" -> string
+~const Orleans.CodeGenerator.Diagnostics.GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembly_Diagnostic.Title = "Types passed to GenerateCodeForDeclaringAssemblyAttribute must have a declaring assembly" -> string
+~const Orleans.CodeGenerator.Diagnostics.InaccessibleSerializableTypeDiagnostic.Category = "Usage" -> string
+~const Orleans.CodeGenerator.Diagnostics.InaccessibleSerializableTypeDiagnostic.Descsription = "Source generation requires that all types marked as serializable are accessible from generated code. Either make the type public or make it internal and ensure that internals are visible to the generated code." -> string
+~const Orleans.CodeGenerator.Diagnostics.InaccessibleSerializableTypeDiagnostic.MessageFormat = "The type {0} is marked as being serializable but it is inaccessible from generated code" -> string
+~const Orleans.CodeGenerator.Diagnostics.InaccessibleSerializableTypeDiagnostic.RuleId = "ORLEANS0107" -> string
+~const Orleans.CodeGenerator.Diagnostics.InaccessibleSerializableTypeDiagnostic.Title = "Serializable type must be accessible from generated code" -> string
+~const Orleans.CodeGenerator.Diagnostics.InaccessibleSetterDiagnostic.RuleId = "ORLEANS0101" -> string
+~const Orleans.CodeGenerator.Diagnostics.IncorrectProxyBaseClassSpecificationDiagnostic.RuleId = "ORLEANS0104" -> string
+~const Orleans.CodeGenerator.Diagnostics.InvalidRpcMethodReturnTypeDiagnostic.RuleId = "ORLEANS0102" -> string
+~const Orleans.CodeGenerator.Diagnostics.MultipleCancellationTokenParametersDiagnostic.Category = "Usage" -> string
+~const Orleans.CodeGenerator.Diagnostics.MultipleCancellationTokenParametersDiagnostic.DiagnosticId = "ORLEANS0109" -> string
+~const Orleans.CodeGenerator.Diagnostics.MultipleCancellationTokenParametersDiagnostic.MessageFormat = "The type {0} contains method {1} which has multiple CancellationToken parameters. Only a single CancellationToken parameter is supported." -> string
+~const Orleans.CodeGenerator.Diagnostics.MultipleCancellationTokenParametersDiagnostic.Title = "Grain method has multiple parameters of type CancellationToken" -> string
+~const Orleans.CodeGenerator.Diagnostics.RpcInterfacePropertyDiagnostic.Category = "Usage" -> string
+~const Orleans.CodeGenerator.Diagnostics.RpcInterfacePropertyDiagnostic.DiagnosticId = "ORLEANS0105" -> string
+~const Orleans.CodeGenerator.Diagnostics.RpcInterfacePropertyDiagnostic.MessageFormat = "The interface {0} contains a property {1}. RPC interfaces must not contain properties." -> string
+~const Orleans.CodeGenerator.Diagnostics.RpcInterfacePropertyDiagnostic.Title = "RPC interfaces must not contain properties" -> string
+~const Orleans.CodeGenerator.Diagnostics.UnhandledCodeGenerationExceptionDiagnostic.RuleId = "ORLEANS0103" -> string
+~Orleans.CodeGenerator.CodeGenerator.AddMember(string ns, Microsoft.CodeAnalysis.CSharp.Syntax.MemberDeclarationSyntax member) -> void
+~Orleans.CodeGenerator.CodeGenerator.CodeGenerator(Microsoft.CodeAnalysis.Compilation compilation, Orleans.CodeGenerator.CodeGeneratorOptions options) -> void
+~Orleans.CodeGenerator.CodeGenerator.Compilation.get -> Microsoft.CodeAnalysis.Compilation
+~Orleans.CodeGenerator.CodeGenerator.GenerateCode(System.Threading.CancellationToken cancellationToken) -> Microsoft.CodeAnalysis.CSharp.Syntax.CompilationUnitSyntax
+~Orleans.CodeGenerator.CodeGenerator.GetAlias(Microsoft.CodeAnalysis.ISymbol symbol) -> string
+~Orleans.CodeGenerator.CodeGenerator.GetId(Microsoft.CodeAnalysis.ISymbol memberSymbol) -> uint?
+~Orleans.CodeGenerator.CodeGenerator.Options.get -> Orleans.CodeGenerator.CodeGeneratorOptions
+~Orleans.CodeGenerator.CodeGeneratorOptions.AliasAttributes.get -> System.Collections.Generic.List<string>
+~Orleans.CodeGenerator.CodeGeneratorOptions.ConstructorAttributes.get -> System.Collections.Generic.List<string>
+~Orleans.CodeGenerator.CodeGeneratorOptions.GenerateSerializerAttributes.get -> System.Collections.Generic.List<string>
+~Orleans.CodeGenerator.CodeGeneratorOptions.IdAttributes.get -> System.Collections.Generic.List<string>
+~Orleans.CodeGenerator.CodeGeneratorOptions.ImmutableAttributes.get -> System.Collections.Generic.List<string>
+~Orleans.CodeGenerator.OrleansGeneratorDiagnosticAnalysisException.Diagnostic.get -> Microsoft.CodeAnalysis.Diagnostic
+~Orleans.CodeGenerator.OrleansGeneratorDiagnosticAnalysisException.OrleansGeneratorDiagnosticAnalysisException(Microsoft.CodeAnalysis.Diagnostic diagnostic) -> void
+~static Orleans.CodeGenerator.CodeGenerator.GetGeneratedNamespaceName(Microsoft.CodeAnalysis.ITypeSymbol type) -> string
+~static Orleans.CodeGenerator.Diagnostics.InaccessibleSetterDiagnostic.CreateDiagnostic(Microsoft.CodeAnalysis.Location location, string identifier) -> Microsoft.CodeAnalysis.Diagnostic
+~static Orleans.CodeGenerator.Diagnostics.InvalidRpcMethodReturnTypeDiagnostic.CreateDiagnostic(Microsoft.CodeAnalysis.Location location, string returnType, string methodIdentifier, string supportedReturnTypeList) -> Microsoft.CodeAnalysis.Diagnostic

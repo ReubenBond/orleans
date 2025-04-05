@@ -1,0 +1,78 @@
+#nullable enable
+const Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.DEFAULT_INIT_STAGE = 10000 -> int
+Orleans.Hosting.HostingExtensions
+Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException
+Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException.Collection.get -> string!
+Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException.CosmosConditionNotSatisfiedException() -> void
+Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException.CosmosConditionNotSatisfiedException(string! errorMsg, string! grainType, Orleans.Runtime.GrainId grainId, string! collection, string! storedEtag, string! currentEtag) -> void
+Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException.CosmosConditionNotSatisfiedException(string! grainType, Orleans.Runtime.GrainId grainId, string! collection, string! storedEtag, string! currentEtag) -> void
+Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException.CosmosConditionNotSatisfiedException(string! msg) -> void
+Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException.CosmosConditionNotSatisfiedException(string! msg, System.Exception! exc) -> void
+Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException.CosmosConditionNotSatisfiedException(System.Runtime.Serialization.SerializationInfo! info, System.Runtime.Serialization.StreamingContext context) -> void
+Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException.GrainId.get -> string!
+Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException.GrainType.get -> string!
+Orleans.Persistence.Cosmos.CosmosGrainStorage
+Orleans.Persistence.Cosmos.CosmosGrainStorage.ClearStateAsync<T>(string! grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
+Orleans.Persistence.Cosmos.CosmosGrainStorage.CosmosGrainStorage(string! name, Orleans.Persistence.Cosmos.CosmosGrainStorageOptions! options, Microsoft.Extensions.Logging.ILoggerFactory! loggerFactory, System.IServiceProvider! serviceProvider, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions!>! clusterOptions, Orleans.Persistence.Cosmos.IPartitionKeyProvider! partitionKeyProvider, Orleans.Serialization.Serializers.IActivatorProvider! activatorProvider) -> void
+Orleans.Persistence.Cosmos.CosmosGrainStorage.Participate(Orleans.Runtime.ISiloLifecycle! lifecycle) -> void
+Orleans.Persistence.Cosmos.CosmosGrainStorage.ReadStateAsync<T>(string! grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
+Orleans.Persistence.Cosmos.CosmosGrainStorage.WriteStateAsync<T>(string! grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
+Orleans.Persistence.Cosmos.CosmosGrainStorageOptions
+Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.CosmosGrainStorageOptions() -> void
+Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.DeleteStateOnClear.get -> bool
+Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.DeleteStateOnClear.set -> void
+Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.InitStage.get -> int
+Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.InitStage.set -> void
+Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.PartitionKeyPath.get -> string!
+Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.PartitionKeyPath.set -> void
+Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.StateFieldsToIndex.get -> System.Collections.Generic.List<string!>!
+Orleans.Persistence.Cosmos.CosmosGrainStorageOptions.StateFieldsToIndex.set -> void
+Orleans.Persistence.Cosmos.CosmosOptions
+Orleans.Persistence.Cosmos.CosmosOptions.CleanResourcesOnInitialization.get -> bool
+Orleans.Persistence.Cosmos.CosmosOptions.CleanResourcesOnInitialization.set -> void
+Orleans.Persistence.Cosmos.CosmosOptions.ClientOptions.get -> Microsoft.Azure.Cosmos.CosmosClientOptions!
+Orleans.Persistence.Cosmos.CosmosOptions.ClientOptions.set -> void
+Orleans.Persistence.Cosmos.CosmosOptions.ConfigureCosmosClient(string! accountEndpoint, Azure.AzureKeyCredential! authKeyOrResourceTokenCredential) -> void
+Orleans.Persistence.Cosmos.CosmosOptions.ConfigureCosmosClient(string! accountEndpoint, Azure.Core.TokenCredential! tokenCredential) -> void
+Orleans.Persistence.Cosmos.CosmosOptions.ConfigureCosmosClient(string! accountEndpoint, string! authKeyOrResourceToken) -> void
+Orleans.Persistence.Cosmos.CosmosOptions.ConfigureCosmosClient(string! connectionString) -> void
+Orleans.Persistence.Cosmos.CosmosOptions.ConfigureCosmosClient(System.Func<System.IServiceProvider!, System.Threading.Tasks.ValueTask<Microsoft.Azure.Cosmos.CosmosClient!>>! createClient) -> void
+Orleans.Persistence.Cosmos.CosmosOptions.ContainerName.get -> string!
+Orleans.Persistence.Cosmos.CosmosOptions.ContainerName.set -> void
+Orleans.Persistence.Cosmos.CosmosOptions.ContainerThroughputProperties.get -> Microsoft.Azure.Cosmos.ThroughputProperties?
+Orleans.Persistence.Cosmos.CosmosOptions.ContainerThroughputProperties.set -> void
+Orleans.Persistence.Cosmos.CosmosOptions.CosmosOptions() -> void
+Orleans.Persistence.Cosmos.CosmosOptions.DatabaseName.get -> string!
+Orleans.Persistence.Cosmos.CosmosOptions.DatabaseName.set -> void
+Orleans.Persistence.Cosmos.CosmosOptions.DatabaseThroughput.get -> int?
+Orleans.Persistence.Cosmos.CosmosOptions.DatabaseThroughput.set -> void
+Orleans.Persistence.Cosmos.CosmosOptions.IsResourceCreationEnabled.get -> bool
+Orleans.Persistence.Cosmos.CosmosOptions.IsResourceCreationEnabled.set -> void
+Orleans.Persistence.Cosmos.CosmosOptions.OperationExecutor.get -> Orleans.Persistence.Cosmos.ICosmosOperationExecutor!
+Orleans.Persistence.Cosmos.CosmosOptions.OperationExecutor.set -> void
+Orleans.Persistence.Cosmos.CosmosOptionsValidator<TOptions>
+Orleans.Persistence.Cosmos.CosmosOptionsValidator<TOptions>.CosmosOptionsValidator(TOptions! options, string! name) -> void
+Orleans.Persistence.Cosmos.CosmosOptionsValidator<TOptions>.ValidateConfiguration() -> void
+Orleans.Persistence.Cosmos.CosmosStorageFactory
+Orleans.Persistence.Cosmos.ICosmosOperationExecutor
+Orleans.Persistence.Cosmos.ICosmosOperationExecutor.ExecuteOperation<TArg, TResult>(System.Func<TArg, System.Threading.Tasks.Task<TResult>!>! func, TArg arg) -> System.Threading.Tasks.Task<TResult>!
+Orleans.Persistence.Cosmos.IPartitionKeyProvider
+Orleans.Persistence.Cosmos.IPartitionKeyProvider.GetPartitionKey(string! grainType, Orleans.Runtime.GrainId grainId) -> System.Threading.Tasks.ValueTask<string!>
+override Orleans.Persistence.Cosmos.CosmosConditionNotSatisfiedException.GetObjectData(System.Runtime.Serialization.SerializationInfo! info, System.Runtime.Serialization.StreamingContext context) -> void
+static Orleans.Hosting.HostingExtensions.AddCosmosGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.Cosmos.CosmosGrainStorageOptions!>!>? configureOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Orleans.Hosting.HostingExtensions.AddCosmosGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name, System.Action<Orleans.Persistence.Cosmos.CosmosGrainStorageOptions!>! configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Orleans.Hosting.HostingExtensions.AddCosmosGrainStorage(this Orleans.Hosting.ISiloBuilder! builder, string! name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.Cosmos.CosmosGrainStorageOptions!>!>? configureOptions = null) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Hosting.HostingExtensions.AddCosmosGrainStorage(this Orleans.Hosting.ISiloBuilder! builder, string! name, System.Action<Orleans.Persistence.Cosmos.CosmosGrainStorageOptions!>! configureOptions) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Hosting.HostingExtensions.AddCosmosGrainStorage(this Orleans.Hosting.ISiloBuilder! builder, string! name, System.Action<Orleans.Persistence.Cosmos.CosmosGrainStorageOptions!>! configureOptions, System.Type! customPartitionKeyProviderType) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Hosting.HostingExtensions.AddCosmosGrainStorage(this Orleans.Hosting.ISiloBuilder! builder, string! name, System.Type! customPartitionKeyProviderType, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.Cosmos.CosmosGrainStorageOptions!>!>? configureOptions = null) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Hosting.HostingExtensions.AddCosmosGrainStorage<TPartitionKeyProvider>(this Orleans.Hosting.ISiloBuilder! builder, string! name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.Cosmos.CosmosGrainStorageOptions!>!>? configureOptions = null) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Hosting.HostingExtensions.AddCosmosGrainStorage<TPartitionKeyProvider>(this Orleans.Hosting.ISiloBuilder! builder, string! name, System.Action<Orleans.Persistence.Cosmos.CosmosGrainStorageOptions!>! configureOptions) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Hosting.HostingExtensions.AddCosmosGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.Cosmos.CosmosGrainStorageOptions!>!>? configureOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Orleans.Hosting.HostingExtensions.AddCosmosGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Orleans.Persistence.Cosmos.CosmosGrainStorageOptions!>! configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Orleans.Hosting.HostingExtensions.AddCosmosGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder! builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.Cosmos.CosmosGrainStorageOptions!>!>? configureOptions = null) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Hosting.HostingExtensions.AddCosmosGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder! builder, System.Action<Orleans.Persistence.Cosmos.CosmosGrainStorageOptions!>! configureOptions) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Hosting.HostingExtensions.AddCosmosGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder! builder, System.Action<Orleans.Persistence.Cosmos.CosmosGrainStorageOptions!>! configureOptions, System.Type! customPartitionKeyProviderType) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Hosting.HostingExtensions.AddCosmosGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder! builder, System.Type! customPartitionKeyProviderType, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.Cosmos.CosmosGrainStorageOptions!>!>? configureOptions = null) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Hosting.HostingExtensions.AddCosmosGrainStorageAsDefault<TPartitionKeyProvider>(this Orleans.Hosting.ISiloBuilder! builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Persistence.Cosmos.CosmosGrainStorageOptions!>!>? configureOptions = null) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Hosting.HostingExtensions.AddCosmosGrainStorageAsDefault<TPartitionKeyProvider>(this Orleans.Hosting.ISiloBuilder! builder, System.Action<Orleans.Persistence.Cosmos.CosmosGrainStorageOptions!>! configureOptions) -> Orleans.Hosting.ISiloBuilder!
+static Orleans.Persistence.Cosmos.CosmosStorageFactory.Create(System.IServiceProvider! services, string! name) -> Orleans.Persistence.Cosmos.CosmosGrainStorage!

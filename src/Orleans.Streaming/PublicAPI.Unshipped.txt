@@ -1,0 +1,913 @@
+#nullable enable
+abstract Orleans.Streams.StreamSequenceToken.EventIndex.get -> int
+abstract Orleans.Streams.StreamSequenceToken.EventIndex.set -> void
+abstract Orleans.Streams.StreamSequenceToken.SequenceNumber.get -> long
+abstract Orleans.Streams.StreamSequenceToken.SequenceNumber.set -> void
+abstract Orleans.Streams.StreamSubscriptionHandle<T>.HandleId.get -> System.Guid
+abstract Orleans.Streams.StreamSubscriptionHandle<T>.StreamId.get -> Orleans.Runtime.StreamId
+const Orleans.Configuration.HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES = 8 -> int
+const Orleans.Configuration.SimpleQueueCacheOptions.DEFAULT_CACHE_SIZE = 4096 -> int
+const Orleans.Configuration.StreamLifecycleOptions.DEFAULT_INIT_STAGE = 10000 -> int
+const Orleans.Configuration.StreamLifecycleOptions.DEFAULT_STARTUP_STATE = Orleans.Configuration.StreamLifecycleOptions.RunState.AgentsStarted -> Orleans.Configuration.StreamLifecycleOptions.RunState
+const Orleans.Configuration.StreamLifecycleOptions.DEFAULT_START_STAGE = 20000 -> int
+const Orleans.Configuration.StreamPubSubOptions.DEFAULT_STREAM_PUBSUB_TYPE = Orleans.Streams.StreamPubSubType.ExplicitGrainBasedAndImplicit -> Orleans.Streams.StreamPubSubType
+const Orleans.Hosting.SimpleGeneratorOptions.DEFAULT_EVENTS_IN_STREAM = 100 -> int
+const Orleans.Streams.DefaultStreamIdMapper.Name = "default" -> string!
+const Orleans.Streams.QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG = -1 -> int
+Orleans.ClientStreamingExtensions
+Orleans.Configuration.DeploymentBasedQueueBalancerOptions
+Orleans.Configuration.DeploymentBasedQueueBalancerOptions.DeploymentBasedQueueBalancerOptions() -> void
+Orleans.Configuration.DeploymentBasedQueueBalancerOptions.IsFixed.get -> bool
+Orleans.Configuration.DeploymentBasedQueueBalancerOptions.IsFixed.set -> void
+Orleans.Configuration.DeploymentBasedQueueBalancerOptions.SiloMaturityPeriod.get -> System.TimeSpan
+Orleans.Configuration.DeploymentBasedQueueBalancerOptions.SiloMaturityPeriod.set -> void
+Orleans.Configuration.HashRingStreamQueueMapperOptions
+Orleans.Configuration.HashRingStreamQueueMapperOptions.HashRingStreamQueueMapperOptions() -> void
+Orleans.Configuration.HashRingStreamQueueMapperOptions.TotalQueueCount.get -> int
+Orleans.Configuration.HashRingStreamQueueMapperOptions.TotalQueueCount.set -> void
+Orleans.Configuration.LeaseBasedQueueBalancerOptions
+Orleans.Configuration.LeaseBasedQueueBalancerOptions.LeaseAcquisitionPeriod.get -> System.TimeSpan
+Orleans.Configuration.LeaseBasedQueueBalancerOptions.LeaseAcquisitionPeriod.set -> void
+Orleans.Configuration.LeaseBasedQueueBalancerOptions.LeaseAquisitionPeriod.get -> System.TimeSpan
+Orleans.Configuration.LeaseBasedQueueBalancerOptions.LeaseAquisitionPeriod.set -> void
+Orleans.Configuration.LeaseBasedQueueBalancerOptions.LeaseBasedQueueBalancerOptions() -> void
+Orleans.Configuration.LeaseBasedQueueBalancerOptions.LeaseLength.get -> System.TimeSpan
+Orleans.Configuration.LeaseBasedQueueBalancerOptions.LeaseLength.set -> void
+Orleans.Configuration.LeaseBasedQueueBalancerOptions.LeaseRenewPeriod.get -> System.TimeSpan
+Orleans.Configuration.LeaseBasedQueueBalancerOptions.LeaseRenewPeriod.set -> void
+Orleans.Configuration.SimpleQueueCacheOptions
+Orleans.Configuration.SimpleQueueCacheOptions.CacheSize.get -> int
+Orleans.Configuration.SimpleQueueCacheOptions.CacheSize.set -> void
+Orleans.Configuration.SimpleQueueCacheOptions.SimpleQueueCacheOptions() -> void
+Orleans.Configuration.SimpleQueueCacheOptionsValidator
+Orleans.Configuration.SimpleQueueCacheOptionsValidator.ValidateConfiguration() -> void
+Orleans.Configuration.StreamCacheEvictionOptions
+Orleans.Configuration.StreamCacheEvictionOptions.DataMaxAgeInCache.get -> System.TimeSpan
+Orleans.Configuration.StreamCacheEvictionOptions.DataMaxAgeInCache.set -> void
+Orleans.Configuration.StreamCacheEvictionOptions.DataMinTimeInCache.get -> System.TimeSpan
+Orleans.Configuration.StreamCacheEvictionOptions.DataMinTimeInCache.set -> void
+Orleans.Configuration.StreamCacheEvictionOptions.MetadataMinTimeInCache.get -> System.TimeSpan?
+Orleans.Configuration.StreamCacheEvictionOptions.MetadataMinTimeInCache.set -> void
+Orleans.Configuration.StreamCacheEvictionOptions.StreamCacheEvictionOptions() -> void
+Orleans.Configuration.StreamLifecycleOptions
+Orleans.Configuration.StreamLifecycleOptions.InitStage.get -> int
+Orleans.Configuration.StreamLifecycleOptions.InitStage.set -> void
+Orleans.Configuration.StreamLifecycleOptions.RunState
+Orleans.Configuration.StreamLifecycleOptions.RunState.AgentsStarted = 2 -> Orleans.Configuration.StreamLifecycleOptions.RunState
+Orleans.Configuration.StreamLifecycleOptions.RunState.AgentsStopped = 3 -> Orleans.Configuration.StreamLifecycleOptions.RunState
+Orleans.Configuration.StreamLifecycleOptions.RunState.Initialized = 1 -> Orleans.Configuration.StreamLifecycleOptions.RunState
+Orleans.Configuration.StreamLifecycleOptions.RunState.None = 0 -> Orleans.Configuration.StreamLifecycleOptions.RunState
+Orleans.Configuration.StreamLifecycleOptions.StartStage.get -> int
+Orleans.Configuration.StreamLifecycleOptions.StartStage.set -> void
+Orleans.Configuration.StreamLifecycleOptions.StartupState.get -> Orleans.Configuration.StreamLifecycleOptions.RunState
+Orleans.Configuration.StreamLifecycleOptions.StartupState.set -> void
+Orleans.Configuration.StreamLifecycleOptions.StreamLifecycleOptions() -> void
+Orleans.Configuration.StreamPubSubOptions
+Orleans.Configuration.StreamPubSubOptions.PubSubType.get -> Orleans.Streams.StreamPubSubType
+Orleans.Configuration.StreamPubSubOptions.PubSubType.set -> void
+Orleans.Configuration.StreamPubSubOptions.StreamPubSubOptions() -> void
+Orleans.Configuration.StreamPullingAgentOptions
+Orleans.Configuration.StreamPullingAgentOptions.BatchContainerBatchSize.get -> int
+Orleans.Configuration.StreamPullingAgentOptions.BatchContainerBatchSize.set -> void
+Orleans.Configuration.StreamPullingAgentOptions.GetQueueMsgsTimerPeriod.get -> System.TimeSpan
+Orleans.Configuration.StreamPullingAgentOptions.GetQueueMsgsTimerPeriod.set -> void
+Orleans.Configuration.StreamPullingAgentOptions.InitQueueTimeout.get -> System.TimeSpan
+Orleans.Configuration.StreamPullingAgentOptions.InitQueueTimeout.set -> void
+Orleans.Configuration.StreamPullingAgentOptions.MaxEventDeliveryTime.get -> System.TimeSpan
+Orleans.Configuration.StreamPullingAgentOptions.MaxEventDeliveryTime.set -> void
+Orleans.Configuration.StreamPullingAgentOptions.StreamInactivityPeriod.get -> System.TimeSpan
+Orleans.Configuration.StreamPullingAgentOptions.StreamInactivityPeriod.set -> void
+Orleans.Configuration.StreamPullingAgentOptions.StreamPullingAgentOptions() -> void
+Orleans.Configuration.StreamStatisticOptions
+Orleans.Configuration.StreamStatisticOptions.StatisticMonitorWriteInterval.get -> System.TimeSpan
+Orleans.Configuration.StreamStatisticOptions.StatisticMonitorWriteInterval.set -> void
+Orleans.Configuration.StreamStatisticOptions.StreamStatisticOptions() -> void
+Orleans.GrainStreamingExtensions
+Orleans.Hosting.ClientBuilderStreamingExtensions
+Orleans.Hosting.ClusterClientPersistentStreamConfigurator
+Orleans.Hosting.ClusterClientPersistentStreamConfiguratorExtensions
+Orleans.Hosting.IClusterClientMemoryStreamConfigurator
+Orleans.Hosting.IClusterClientPersistentStreamConfigurator
+Orleans.Hosting.IMemoryStreamConfigurator
+Orleans.Hosting.IPersistentStreamConfigurator
+Orleans.Hosting.ISiloMemoryStreamConfigurator
+Orleans.Hosting.ISiloPersistentStreamConfigurator
+Orleans.Hosting.ISiloRecoverableStreamConfigurator
+Orleans.Hosting.MemoryStreamConfiguratorExtensions
+Orleans.Hosting.PersistentStreamConfiguratorExtensions
+Orleans.Hosting.PersistentStreamStorageConfigurationValidator
+Orleans.Hosting.PersistentStreamStorageConfigurationValidator.ValidateConfiguration() -> void
+Orleans.Hosting.SiloBuilderMemoryStreamExtensions
+Orleans.Hosting.SiloBuilderStreamingExtensions
+Orleans.Hosting.SiloPersistentStreamConfigurator
+Orleans.Hosting.SiloPersistentStreamConfiguratorExtension
+Orleans.Hosting.SiloPersistentStreamConfiguratorExtensions
+Orleans.Hosting.SiloRecoverableStreamConfigurator
+Orleans.Hosting.SiloRecoverableStreamConfiguratorExtensions
+Orleans.Hosting.SimpleGeneratorOptions
+Orleans.Hosting.SimpleGeneratorOptions.EventsInStream.get -> int
+Orleans.Hosting.SimpleGeneratorOptions.EventsInStream.set -> void
+Orleans.Hosting.SimpleGeneratorOptions.SimpleGeneratorOptions() -> void
+Orleans.Hosting.StaticClusterDeploymentOptions
+Orleans.Hosting.StaticClusterDeploymentOptions.StaticClusterDeploymentOptions() -> void
+Orleans.Hosting.StreamingServiceCollectionExtensions
+Orleans.ImplicitStreamSubscriptionAttribute
+Orleans.ImplicitStreamSubscriptionAttribute.ImplicitStreamSubscriptionAttribute() -> void
+Orleans.Providers.DefaultMemoryMessageBodySerializer
+Orleans.Providers.IMemoryMessageBodySerializer
+Orleans.Providers.IMemoryStreamQueueGrain
+Orleans.Providers.MemoryAdapterFactory<TSerializer>.Direction.get -> Orleans.Streams.StreamProviderDirection
+Orleans.Providers.MemoryAdapterFactory<TSerializer>.Init() -> void
+Orleans.Providers.MemoryAdapterFactory<TSerializer>.IsRewindable.get -> bool
+Orleans.Providers.MemoryMessageBody
+Orleans.Providers.MemoryMessageData
+Orleans.Providers.MemoryMessageData.DequeueTimeUtc -> System.DateTime
+Orleans.Providers.MemoryMessageData.EnqueueTimeUtc -> System.DateTime
+Orleans.Providers.MemoryMessageData.MemoryMessageData() -> void
+Orleans.Providers.MemoryMessageData.Payload -> System.ArraySegment<byte>
+Orleans.Providers.MemoryMessageData.SequenceNumber -> long
+Orleans.Providers.MemoryMessageData.StreamId -> Orleans.Runtime.StreamId
+Orleans.Providers.MemoryPooledCache<TSerializer>.GetMaxAddCount() -> int
+Orleans.Providers.MemoryPooledCache<TSerializer>.IsUnderPressure() -> bool
+Orleans.Providers.MemoryStreamQueueGrain
+Orleans.Providers.MemoryStreamQueueGrain.MemoryStreamQueueGrain() -> void
+Orleans.Providers.Streams.Common.BlockPoolMonitorDimensions
+Orleans.Providers.Streams.Common.CachedMessage
+Orleans.Providers.Streams.Common.CachedMessage.CachedMessage() -> void
+Orleans.Providers.Streams.Common.CachedMessage.DequeueTimeUtc -> System.DateTime
+Orleans.Providers.Streams.Common.CachedMessage.EnqueueTimeUtc -> System.DateTime
+Orleans.Providers.Streams.Common.CachedMessage.EventIndex -> int
+Orleans.Providers.Streams.Common.CachedMessage.Segment -> System.ArraySegment<byte>
+Orleans.Providers.Streams.Common.CachedMessage.SequenceNumber -> long
+Orleans.Providers.Streams.Common.CachedMessage.StreamId -> Orleans.Runtime.StreamId
+Orleans.Providers.Streams.Common.CachedMessageBlock
+Orleans.Providers.Streams.Common.CachedMessageBlock.Add(Orleans.Providers.Streams.Common.CachedMessage message) -> void
+Orleans.Providers.Streams.Common.CachedMessageBlock.CachedMessageBlock(int blockSize = 16384) -> void
+Orleans.Providers.Streams.Common.CachedMessageBlock.HasCapacity.get -> bool
+Orleans.Providers.Streams.Common.CachedMessageBlock.IsEmpty.get -> bool
+Orleans.Providers.Streams.Common.CachedMessageBlock.ItemCount.get -> int
+Orleans.Providers.Streams.Common.CachedMessageBlock.NewestMessage.get -> Orleans.Providers.Streams.Common.CachedMessage
+Orleans.Providers.Streams.Common.CachedMessageBlock.NewestMessageIndex.get -> int
+Orleans.Providers.Streams.Common.CachedMessageBlock.OldestMessage.get -> Orleans.Providers.Streams.Common.CachedMessage
+Orleans.Providers.Streams.Common.CachedMessageBlock.OldestMessageIndex.get -> int
+Orleans.Providers.Streams.Common.CachedMessageBlock.Remove() -> bool
+Orleans.Providers.Streams.Common.CachedMessageBlock.this[int index].get -> Orleans.Providers.Streams.Common.CachedMessage
+Orleans.Providers.Streams.Common.CachedMessageExtensions
+Orleans.Providers.Streams.Common.CacheMonitorDimensions
+Orleans.Providers.Streams.Common.ChronologicalEvictionStrategy
+Orleans.Providers.Streams.Common.ChronologicalEvictionStrategy.PerformPurge(System.DateTime nowUtc) -> void
+Orleans.Providers.Streams.Common.DefaultBlockPoolMonitor
+Orleans.Providers.Streams.Common.DefaultBlockPoolMonitor.Report(long totalMemoryInByte, long availableMemoryInByte, long claimedMemoryInByte) -> void
+Orleans.Providers.Streams.Common.DefaultBlockPoolMonitor.TrackMemoryAllocated(long allocatedMemoryInByte) -> void
+Orleans.Providers.Streams.Common.DefaultBlockPoolMonitor.TrackMemoryReleased(long releasedMemoryInByte) -> void
+Orleans.Providers.Streams.Common.DefaultCacheMonitor
+Orleans.Providers.Streams.Common.DefaultCacheMonitor.ReportCacheSize(long totalCacheSizeInByte) -> void
+Orleans.Providers.Streams.Common.DefaultCacheMonitor.ReportMessageStatistics(System.DateTime? oldestMessageEnqueueTimeUtc, System.DateTime? oldestMessageDequeueTimeUtc, System.DateTime? newestMessageEnqueueTimeUtc, long totalMessageCount) -> void
+Orleans.Providers.Streams.Common.DefaultCacheMonitor.TrackMemoryAllocated(int memoryInByte) -> void
+Orleans.Providers.Streams.Common.DefaultCacheMonitor.TrackMemoryReleased(int memoryInByte) -> void
+Orleans.Providers.Streams.Common.DefaultCacheMonitor.TrackMessagesAdded(long messageAdded) -> void
+Orleans.Providers.Streams.Common.DefaultCacheMonitor.TrackMessagesPurged(long messagePurged) -> void
+Orleans.Providers.Streams.Common.DefaultQueueAdapterReceiverMonitor
+Orleans.Providers.Streams.Common.DefaultQueueAdapterReceiverMonitor.TrackMessagesReceived(long count, System.DateTime? oldestMessageEnqueueTimeUtc, System.DateTime? newestMessageEnqueueTimeUtc) -> void
+Orleans.Providers.Streams.Common.EventSequenceToken
+Orleans.Providers.Streams.Common.EventSequenceToken.EventSequenceToken() -> void
+Orleans.Providers.Streams.Common.EventSequenceToken.EventSequenceToken(long sequenceNumber) -> void
+Orleans.Providers.Streams.Common.EventSequenceToken.EventSequenceToken(long sequenceNumber, int eventIndex) -> void
+Orleans.Providers.Streams.Common.EventSequenceTokenV2
+Orleans.Providers.Streams.Common.EventSequenceTokenV2.EventSequenceTokenV2() -> void
+Orleans.Providers.Streams.Common.EventSequenceTokenV2.EventSequenceTokenV2(long seqNumber) -> void
+Orleans.Providers.Streams.Common.EventSequenceTokenV2.EventSequenceTokenV2(long seqNumber, int eventInd) -> void
+Orleans.Providers.Streams.Common.FixedSizeBuffer
+Orleans.Providers.Streams.Common.FixedSizeBuffer.FixedSizeBuffer(int blockSizeInByte) -> void
+Orleans.Providers.Streams.Common.FixedSizeBuffer.TryGetSegment(int size, out System.ArraySegment<byte> value) -> bool
+Orleans.Providers.Streams.Common.IBlockPoolMonitor
+Orleans.Providers.Streams.Common.IBlockPoolMonitor.Report(long totalSizeInByte, long availableMemoryInByte, long claimedMemoryInByte) -> void
+Orleans.Providers.Streams.Common.IBlockPoolMonitor.TrackMemoryAllocated(long allocatedMemoryInBytes) -> void
+Orleans.Providers.Streams.Common.IBlockPoolMonitor.TrackMemoryReleased(long releasedMemoryInBytes) -> void
+Orleans.Providers.Streams.Common.ICacheDataAdapter
+Orleans.Providers.Streams.Common.ICacheMonitor
+Orleans.Providers.Streams.Common.ICacheMonitor.ReportCacheSize(long totalCacheSizeInBytes) -> void
+Orleans.Providers.Streams.Common.ICacheMonitor.ReportMessageStatistics(System.DateTime? oldestMessageEnqueueTimeUtc, System.DateTime? oldestMessageDequeueTimeUtc, System.DateTime? newestMessageEnqueueTimeUtc, long totalMessageCount) -> void
+Orleans.Providers.Streams.Common.ICacheMonitor.TrackMemoryAllocated(int memoryInBytes) -> void
+Orleans.Providers.Streams.Common.ICacheMonitor.TrackMemoryReleased(int memoryInBytes) -> void
+Orleans.Providers.Streams.Common.ICacheMonitor.TrackMessagesAdded(long messagesAdded) -> void
+Orleans.Providers.Streams.Common.ICacheMonitor.TrackMessagesPurged(long messagesPurged) -> void
+Orleans.Providers.Streams.Common.IEvictionStrategy
+Orleans.Providers.Streams.Common.IEvictionStrategy.PerformPurge(System.DateTime utcNow) -> void
+Orleans.Providers.Streams.Common.IObjectPool<T>.Allocate() -> T
+Orleans.Providers.Streams.Common.IObjectPool<T>.Free(T resource) -> void
+Orleans.Providers.Streams.Common.IObjectPoolMonitor
+Orleans.Providers.Streams.Common.IObjectPoolMonitor.Report(long totalObjects, long availableObjects, long claimedObjects) -> void
+Orleans.Providers.Streams.Common.IObjectPoolMonitor.TrackObjectAllocated() -> void
+Orleans.Providers.Streams.Common.IObjectPoolMonitor.TrackObjectReleased() -> void
+Orleans.Providers.Streams.Common.IPurgeObservable
+Orleans.Providers.Streams.Common.IPurgeObservable.IsEmpty.get -> bool
+Orleans.Providers.Streams.Common.IPurgeObservable.ItemCount.get -> int
+Orleans.Providers.Streams.Common.IPurgeObservable.Newest.get -> Orleans.Providers.Streams.Common.CachedMessage?
+Orleans.Providers.Streams.Common.IPurgeObservable.Oldest.get -> Orleans.Providers.Streams.Common.CachedMessage?
+Orleans.Providers.Streams.Common.IPurgeObservable.RemoveOldestMessage() -> void
+Orleans.Providers.Streams.Common.IQueueAdapterReceiverMonitor
+Orleans.Providers.Streams.Common.IQueueAdapterReceiverMonitor.TrackMessagesReceived(long count, System.DateTime? oldestMessageEnqueueTimeUtc, System.DateTime? newestMessageEnqueueTimeUtc) -> void
+Orleans.Providers.Streams.Common.ObjectPoolMonitorBridge
+Orleans.Providers.Streams.Common.ObjectPoolMonitorBridge.Report(long totalObjects, long availableObjects, long claimedObjects) -> void
+Orleans.Providers.Streams.Common.ObjectPoolMonitorBridge.TrackObjectAllocated() -> void
+Orleans.Providers.Streams.Common.ObjectPoolMonitorBridge.TrackObjectReleased() -> void
+Orleans.Providers.Streams.Common.PersistentStreamProvider
+Orleans.Providers.Streams.Common.PersistentStreamProvider.IsRewindable.get -> bool
+Orleans.Providers.Streams.Common.PersistentStreamProviderCommand
+Orleans.Providers.Streams.Common.PersistentStreamProviderCommand.AdapterCommandEndRange = 19999 -> Orleans.Providers.Streams.Common.PersistentStreamProviderCommand
+Orleans.Providers.Streams.Common.PersistentStreamProviderCommand.AdapterCommandStartRange = 10000 -> Orleans.Providers.Streams.Common.PersistentStreamProviderCommand
+Orleans.Providers.Streams.Common.PersistentStreamProviderCommand.AdapterFactoryCommandEndRange = 29999 -> Orleans.Providers.Streams.Common.PersistentStreamProviderCommand
+Orleans.Providers.Streams.Common.PersistentStreamProviderCommand.AdapterFactoryCommandStartRange = 20000 -> Orleans.Providers.Streams.Common.PersistentStreamProviderCommand
+Orleans.Providers.Streams.Common.PersistentStreamProviderCommand.GetAgentsState = 3 -> Orleans.Providers.Streams.Common.PersistentStreamProviderCommand
+Orleans.Providers.Streams.Common.PersistentStreamProviderCommand.GetNumberRunningAgents = 4 -> Orleans.Providers.Streams.Common.PersistentStreamProviderCommand
+Orleans.Providers.Streams.Common.PersistentStreamProviderCommand.None = 0 -> Orleans.Providers.Streams.Common.PersistentStreamProviderCommand
+Orleans.Providers.Streams.Common.PersistentStreamProviderCommand.StartAgents = 1 -> Orleans.Providers.Streams.Common.PersistentStreamProviderCommand
+Orleans.Providers.Streams.Common.PersistentStreamProviderCommand.StopAgents = 2 -> Orleans.Providers.Streams.Common.PersistentStreamProviderCommand
+Orleans.Providers.Streams.Common.PooledQueueCache
+Orleans.Providers.Streams.Common.PooledQueueCache.IsEmpty.get -> bool
+Orleans.Providers.Streams.Common.PooledQueueCache.ItemCount.get -> int
+Orleans.Providers.Streams.Common.PooledQueueCache.Newest.get -> Orleans.Providers.Streams.Common.CachedMessage?
+Orleans.Providers.Streams.Common.PooledQueueCache.Oldest.get -> Orleans.Providers.Streams.Common.CachedMessage?
+Orleans.Providers.Streams.Common.PooledQueueCache.RemoveOldestMessage() -> void
+Orleans.Providers.Streams.Common.PooledResource<T>.Dispose() -> void
+Orleans.Providers.Streams.Common.PooledResource<T>.PooledResource() -> void
+Orleans.Providers.Streams.Common.ReceiverMonitorDimensions
+Orleans.Providers.Streams.Common.ReceiverMonitorDimensions.ReceiverMonitorDimensions() -> void
+Orleans.Providers.Streams.Common.SegmentBuilder
+Orleans.Providers.Streams.Common.SimpleQueueAdapterCache
+Orleans.Providers.Streams.Common.SimpleQueueCache
+Orleans.Providers.Streams.Common.SimpleQueueCache.GetMaxAddCount() -> int
+Orleans.Providers.Streams.Common.SimpleQueueCache.Size.get -> int
+Orleans.Providers.Streams.Common.SimpleQueueCacheCursor
+Orleans.Providers.Streams.Common.SimpleQueueCacheCursor.Dispose() -> void
+Orleans.Providers.Streams.Common.SimpleQueueCacheCursor.RecordDeliveryFailure() -> void
+Orleans.Providers.Streams.Common.TimePurgePredicate
+Orleans.Providers.Streams.Common.TimePurgePredicate.TimePurgePredicate(System.TimeSpan minTimeInCache, System.TimeSpan maxRelativeMessageAge) -> void
+Orleans.Providers.Streams.Generator.GeneratedBatchContainer
+Orleans.Providers.Streams.Generator.GeneratedBatchContainer.EnqueueTimeUtc.get -> System.DateTime
+Orleans.Providers.Streams.Generator.GeneratedBatchContainer.ImportRequestContext() -> bool
+Orleans.Providers.Streams.Generator.GeneratedBatchContainer.StreamId.get -> Orleans.Runtime.StreamId
+Orleans.Providers.Streams.Generator.GeneratedEvent
+Orleans.Providers.Streams.Generator.GeneratedEvent.EventType.get -> Orleans.Providers.Streams.Generator.GeneratedEvent.GeneratedEventType
+Orleans.Providers.Streams.Generator.GeneratedEvent.EventType.set -> void
+Orleans.Providers.Streams.Generator.GeneratedEvent.GeneratedEvent() -> void
+Orleans.Providers.Streams.Generator.GeneratedEvent.GeneratedEventType
+Orleans.Providers.Streams.Generator.GeneratedEvent.GeneratedEventType.Fill = 0 -> Orleans.Providers.Streams.Generator.GeneratedEvent.GeneratedEventType
+Orleans.Providers.Streams.Generator.GeneratedEvent.GeneratedEventType.Report = 1 -> Orleans.Providers.Streams.Generator.GeneratedEvent.GeneratedEventType
+Orleans.Providers.Streams.Generator.GeneratorAdapterFactory
+Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.Direction.get -> Orleans.Streams.StreamProviderDirection
+Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.Init() -> void
+Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.IsRewindable.get -> bool
+Orleans.Providers.Streams.Generator.GeneratorPooledCache
+Orleans.Providers.Streams.Generator.GeneratorPooledCache.GetMaxAddCount() -> int
+Orleans.Providers.Streams.Generator.GeneratorPooledCache.IsUnderPressure() -> bool
+Orleans.Providers.Streams.Generator.IStreamGenerator
+Orleans.Providers.Streams.Generator.IStreamGeneratorConfig
+Orleans.Providers.Streams.Generator.StreamGeneratorCommand
+Orleans.Providers.Streams.Generator.StreamGeneratorCommand.Configure = 20000 -> Orleans.Providers.Streams.Generator.StreamGeneratorCommand
+Orleans.RegexImplicitStreamSubscriptionAttribute
+Orleans.Runtime.Providers.IMessageDeliveryBackoffProvider
+Orleans.Runtime.Providers.IQueueReaderBackoffProvider
+Orleans.Runtime.QualifiedStreamId
+Orleans.Runtime.QualifiedStreamId.CompareTo(Orleans.Runtime.QualifiedStreamId other) -> int
+Orleans.Runtime.QualifiedStreamId.Equals(Orleans.Runtime.QualifiedStreamId other) -> bool
+Orleans.Runtime.QualifiedStreamId.GetObjectData(System.Runtime.Serialization.SerializationInfo! info, System.Runtime.Serialization.StreamingContext context) -> void
+Orleans.Runtime.QualifiedStreamId.QualifiedStreamId() -> void
+Orleans.Runtime.QualifiedStreamId.QualifiedStreamId(string! providerName, Orleans.Runtime.StreamId streamId) -> void
+Orleans.Runtime.StreamId
+Orleans.Runtime.StreamId.CompareTo(Orleans.Runtime.StreamId other) -> int
+Orleans.Runtime.StreamId.Equals(Orleans.Runtime.StreamId other) -> bool
+Orleans.Runtime.StreamId.FullKey.get -> System.ReadOnlyMemory<byte>
+Orleans.Runtime.StreamId.GetKeyAsString() -> string!
+Orleans.Runtime.StreamId.GetNamespace() -> string?
+Orleans.Runtime.StreamId.GetObjectData(System.Runtime.Serialization.SerializationInfo! info, System.Runtime.Serialization.StreamingContext context) -> void
+Orleans.Runtime.StreamId.Key.get -> System.ReadOnlyMemory<byte>
+Orleans.Runtime.StreamId.Namespace.get -> System.ReadOnlyMemory<byte>
+Orleans.Runtime.StreamId.StreamId() -> void
+Orleans.Streams.AggregatedQueueFlowController
+Orleans.Streams.AggregatedQueueFlowController.AggregatedQueueFlowController(int defaultMaxAddCount) -> void
+Orleans.Streams.AggregatedQueueFlowController.GetMaxAddCount() -> int
+Orleans.Streams.AsyncBatchObservableExtensions
+Orleans.Streams.AsyncObservableExtensions
+Orleans.Streams.BatchContainerBatch
+Orleans.Streams.BatchContainerBatch.ImportRequestContext() -> bool
+Orleans.Streams.BatchContainerBatch.StreamId.get -> Orleans.Runtime.StreamId
+Orleans.Streams.CacheFullException
+Orleans.Streams.CacheFullException.CacheFullException() -> void
+Orleans.Streams.ConstructorStreamNamespacePredicateProvider
+Orleans.Streams.ConstructorStreamNamespacePredicateProvider.ConstructorStreamNamespacePredicateProvider() -> void
+Orleans.Streams.Core.IStreamSubscriptionHandleFactory
+Orleans.Streams.Core.IStreamSubscriptionHandleFactory.StreamId.get -> Orleans.Runtime.StreamId
+Orleans.Streams.Core.IStreamSubscriptionManager
+Orleans.Streams.Core.IStreamSubscriptionManagerAdmin
+Orleans.Streams.Core.IStreamSubscriptionManagerRetriever
+Orleans.Streams.Core.IStreamSubscriptionObserver
+Orleans.Streams.Core.StreamSubscription
+Orleans.Streams.Core.StreamSubscription.GrainId.get -> Orleans.Runtime.GrainId
+Orleans.Streams.Core.StreamSubscription.StreamId.get -> Orleans.Runtime.StreamId
+Orleans.Streams.Core.StreamSubscription.SubscriptionId.get -> System.Guid
+Orleans.Streams.Core.StreamSubscriptionManagerType
+Orleans.Streams.DataNotAvailableException
+Orleans.Streams.DataNotAvailableException.DataNotAvailableException() -> void
+Orleans.Streams.DefaultStreamIdMapper
+Orleans.Streams.DefaultStreamIdMapper.DefaultStreamIdMapper() -> void
+Orleans.Streams.DefaultStreamIdMapper.GetGrainKeyId(Orleans.Metadata.GrainBindings! grainBindings, Orleans.Runtime.StreamId streamId) -> Orleans.Runtime.IdSpan
+Orleans.Streams.DefaultStreamNamespacePredicateProvider
+Orleans.Streams.DefaultStreamNamespacePredicateProvider.DefaultStreamNamespacePredicateProvider() -> void
+Orleans.Streams.DeploymentBasedQueueBalancer
+Orleans.Streams.FaultedSubscriptionException
+Orleans.Streams.FaultedSubscriptionException.FaultedSubscriptionException() -> void
+Orleans.Streams.Filtering.IStreamFilter
+Orleans.Streams.HashRingBasedPartitionedStreamQueueMapper
+Orleans.Streams.HashRingBasedStreamQueueMapper
+Orleans.Streams.HashRingBasedStreamQueueMapper.GetQueueForStream(Orleans.Runtime.StreamId streamId) -> Orleans.Streams.QueueId
+Orleans.Streams.IAsyncBatchObservable<T>
+Orleans.Streams.IAsyncBatchObservable<T>.SubscribeAsync(Orleans.Streams.IAsyncBatchObserver<T>! observer) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>!>!
+Orleans.Streams.IAsyncBatchObservable<T>.SubscribeAsync(Orleans.Streams.IAsyncBatchObserver<T>! observer, Orleans.Streams.StreamSequenceToken? token) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>!>!
+Orleans.Streams.IAsyncBatchObserver<T>
+Orleans.Streams.IAsyncBatchProducer<T>
+Orleans.Streams.IAsyncObservable<T>
+Orleans.Streams.IAsyncObservable<T>.SubscribeAsync(Orleans.Streams.IAsyncObserver<T>! observer) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>!>!
+Orleans.Streams.IAsyncObservable<T>.SubscribeAsync(Orleans.Streams.IAsyncObserver<T>! observer, Orleans.Streams.StreamSequenceToken? token, string? filterData = null) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>!>!
+Orleans.Streams.IAsyncObserver<T>
+Orleans.Streams.IAsyncObserver<T>.OnCompletedAsync() -> System.Threading.Tasks.Task!
+Orleans.Streams.IAsyncObserver<T>.OnErrorAsync(System.Exception! ex) -> System.Threading.Tasks.Task!
+Orleans.Streams.IAsyncObserver<T>.OnNextAsync(T item, Orleans.Streams.StreamSequenceToken? token = null) -> System.Threading.Tasks.Task!
+Orleans.Streams.IAsyncStream
+Orleans.Streams.IAsyncStream.IsRewindable.get -> bool
+Orleans.Streams.IAsyncStream.StreamId.get -> Orleans.Runtime.StreamId
+Orleans.Streams.IAsyncStream<T>
+Orleans.Streams.IBatchContainer
+Orleans.Streams.IBatchContainer.ImportRequestContext() -> bool
+Orleans.Streams.IBatchContainer.StreamId.get -> Orleans.Runtime.StreamId
+Orleans.Streams.IBatchContainerBatch
+Orleans.Streams.IConsistentRingStreamQueueMapper
+Orleans.Streams.IDeploymentConfiguration
+Orleans.Streams.ImplicitConsumerGrainExtensions
+Orleans.Streams.IQueueAdapter
+Orleans.Streams.IQueueAdapter.Direction.get -> Orleans.Streams.StreamProviderDirection
+Orleans.Streams.IQueueAdapter.IsRewindable.get -> bool
+Orleans.Streams.IQueueAdapterCache
+Orleans.Streams.IQueueAdapterFactory
+Orleans.Streams.IQueueAdapterReceiver
+Orleans.Streams.IQueueCache
+Orleans.Streams.IQueueCache.IsUnderPressure() -> bool
+Orleans.Streams.IQueueCacheCursor
+Orleans.Streams.IQueueCacheCursor.MoveNext() -> bool
+Orleans.Streams.IQueueCacheCursor.RecordDeliveryFailure() -> void
+Orleans.Streams.IQueueDataAdapter<TQueueMessage, TMessageBatch>
+Orleans.Streams.IQueueDataAdapter<TQueueMessage, TMessageBatch>.FromQueueMessage(TQueueMessage queueMessage, long sequenceId) -> TMessageBatch
+Orleans.Streams.IQueueDataAdapter<TQueueMessage>
+Orleans.Streams.IQueueFlowController
+Orleans.Streams.IQueueFlowController.GetMaxAddCount() -> int
+Orleans.Streams.IStreamFailureHandler
+Orleans.Streams.IStreamFailureHandler.ShouldFaultSubsriptionOnError.get -> bool
+Orleans.Streams.IStreamIdentity
+Orleans.Streams.IStreamIdentity.Guid.get -> System.Guid
+Orleans.Streams.IStreamIdMapper
+Orleans.Streams.IStreamNamespacePredicate
+Orleans.Streams.IStreamNamespacePredicateProvider
+Orleans.Streams.IStreamProvider
+Orleans.Streams.IStreamProvider.IsRewindable.get -> bool
+Orleans.Streams.IStreamPubSub
+Orleans.Streams.IStreamQueueBalanceListener
+Orleans.Streams.IStreamQueueBalancer
+Orleans.Streams.IStreamQueueCheckpointer<TCheckpoint>
+Orleans.Streams.IStreamQueueCheckpointer<TCheckpoint>.CheckpointExists.get -> bool
+Orleans.Streams.IStreamQueueCheckpointer<TCheckpoint>.Update(TCheckpoint offset, System.DateTime utcNow) -> void
+Orleans.Streams.IStreamQueueCheckpointerFactory
+Orleans.Streams.IStreamQueueMapper
+Orleans.Streams.IStreamQueueMapper.GetQueueForStream(Orleans.Runtime.StreamId streamId) -> Orleans.Streams.QueueId
+Orleans.Streams.LeaseBasedQueueBalancer
+Orleans.Streams.LoadShedQueueFlowController
+Orleans.Streams.LoadShedQueueFlowController.GetMaxAddCount() -> int
+Orleans.Streams.NoOpStreamDeliveryFailureHandler
+Orleans.Streams.NoOpStreamDeliveryFailureHandler.NoOpStreamDeliveryFailureHandler() -> void
+Orleans.Streams.NoOpStreamDeliveryFailureHandler.NoOpStreamDeliveryFailureHandler(bool faultOnError) -> void
+Orleans.Streams.NoOpStreamDeliveryFailureHandler.ShouldFaultSubsriptionOnError.get -> bool
+Orleans.Streams.ProviderStartException
+Orleans.Streams.ProviderStartException.ProviderStartException() -> void
+Orleans.Streams.PubSub.StreamSubscriptionManagerExtensions
+Orleans.Streams.PubSubSubscriptionState
+Orleans.Streams.PubSubSubscriptionState.Consumer -> Orleans.Runtime.GrainId
+Orleans.Streams.PubSubSubscriptionState.Fault() -> void
+Orleans.Streams.PubSubSubscriptionState.IsFaulted.get -> bool
+Orleans.Streams.PubSubSubscriptionState.state -> Orleans.Streams.PubSubSubscriptionState.SubscriptionStates
+Orleans.Streams.PubSubSubscriptionState.Stream -> Orleans.Runtime.QualifiedStreamId
+Orleans.Streams.PubSubSubscriptionState.SubscriptionStates
+Orleans.Streams.PubSubSubscriptionState.SubscriptionStates.Active = 0 -> Orleans.Streams.PubSubSubscriptionState.SubscriptionStates
+Orleans.Streams.PubSubSubscriptionState.SubscriptionStates.Faulted = 1 -> Orleans.Streams.PubSubSubscriptionState.SubscriptionStates
+Orleans.Streams.QueueAdapterConstants
+Orleans.Streams.QueueAdapterExtensions
+Orleans.Streams.QueueBalancerBase
+Orleans.Streams.QueueBalancerBase.Cancellation.get -> System.Threading.CancellationToken
+Orleans.Streams.QueueCacheMissException
+Orleans.Streams.QueueCacheMissException.QueueCacheMissException() -> void
+Orleans.Streams.QueueId
+Orleans.Streams.QueueId.CompareTo(Orleans.Streams.QueueId other) -> int
+Orleans.Streams.QueueId.Equals(Orleans.Streams.QueueId other) -> bool
+Orleans.Streams.QueueId.GetNumericId() -> uint
+Orleans.Streams.QueueId.GetStringNamePrefix() -> string!
+Orleans.Streams.QueueId.GetUniformHashCode() -> uint
+Orleans.Streams.QueueId.IsDefault.get -> bool
+Orleans.Streams.QueueId.QueueId() -> void
+Orleans.Streams.QueueId.ToStringWithHashCode() -> string!
+Orleans.Streams.RegexStreamNamespacePredicate
+Orleans.Streams.SequentialItem<T>
+Orleans.Streams.SequentialItem<T>.Item.get -> T
+Orleans.Streams.StreamEventDeliveryFailureException
+Orleans.Streams.StreamEventDeliveryFailureException.StreamEventDeliveryFailureException() -> void
+Orleans.Streams.StreamIdentity
+Orleans.Streams.StreamIdentity.Guid.get -> System.Guid
+Orleans.Streams.StreamPosition
+Orleans.Streams.StreamPosition.StreamId.get -> Orleans.Runtime.StreamId
+Orleans.Streams.StreamProviderDirection
+Orleans.Streams.StreamProviderDirection.None = 0 -> Orleans.Streams.StreamProviderDirection
+Orleans.Streams.StreamProviderDirection.ReadOnly = 1 -> Orleans.Streams.StreamProviderDirection
+Orleans.Streams.StreamProviderDirection.ReadWrite = 3 -> Orleans.Streams.StreamProviderDirection
+Orleans.Streams.StreamProviderDirection.WriteOnly = 2 -> Orleans.Streams.StreamProviderDirection
+Orleans.Streams.StreamProviderExtensions
+Orleans.Streams.StreamPubSubType
+Orleans.Streams.StreamPubSubType.ExplicitGrainBasedAndImplicit = 0 -> Orleans.Streams.StreamPubSubType
+Orleans.Streams.StreamPubSubType.ExplicitGrainBasedOnly = 1 -> Orleans.Streams.StreamPubSubType
+Orleans.Streams.StreamPubSubType.ImplicitOnly = 2 -> Orleans.Streams.StreamPubSubType
+Orleans.Streams.StreamSequenceToken
+Orleans.Streams.StreamSequenceToken.StreamSequenceToken() -> void
+Orleans.Streams.StreamSequenceTokenUtilities
+Orleans.Streams.StreamSubscriptionHandle<T>
+Orleans.Streams.StreamSubscriptionHandle<T>.StreamSubscriptionHandle() -> void
+Orleans.Streams.StreamSubscriptionHandleExtensions
+Orleans.Streams.StreamSubscriptionHandlerFactory
+Orleans.Streams.StreamSubscriptionHandlerFactory.StreamId.get -> Orleans.Runtime.StreamId
+override Orleans.Providers.Streams.Common.CachedMessageBlock.OnResetState() -> void
+override Orleans.Providers.Streams.Common.EventSequenceToken.EventIndex.get -> int
+override Orleans.Providers.Streams.Common.EventSequenceToken.EventIndex.set -> void
+override Orleans.Providers.Streams.Common.EventSequenceToken.GetHashCode() -> int
+override Orleans.Providers.Streams.Common.EventSequenceToken.SequenceNumber.get -> long
+override Orleans.Providers.Streams.Common.EventSequenceToken.SequenceNumber.set -> void
+override Orleans.Providers.Streams.Common.EventSequenceTokenV2.EventIndex.get -> int
+override Orleans.Providers.Streams.Common.EventSequenceTokenV2.EventIndex.set -> void
+override Orleans.Providers.Streams.Common.EventSequenceTokenV2.GetHashCode() -> int
+override Orleans.Providers.Streams.Common.EventSequenceTokenV2.SequenceNumber.get -> long
+override Orleans.Providers.Streams.Common.EventSequenceTokenV2.SequenceNumber.set -> void
+override Orleans.Providers.Streams.Common.FixedSizeBuffer.OnResetState() -> void
+override Orleans.Runtime.QualifiedStreamId.Equals(object? obj) -> bool
+override Orleans.Runtime.QualifiedStreamId.GetHashCode() -> int
+override Orleans.Runtime.QualifiedStreamId.ToString() -> string!
+override Orleans.Runtime.StreamId.Equals(object? obj) -> bool
+override Orleans.Runtime.StreamId.GetHashCode() -> int
+override Orleans.Runtime.StreamId.ToString() -> string!
+override Orleans.Streams.PubSubSubscriptionState.GetHashCode() -> int
+override Orleans.Streams.QueueId.Equals(object? obj) -> bool
+override Orleans.Streams.QueueId.GetHashCode() -> int
+override Orleans.Streams.QueueId.ToString() -> string!
+override Orleans.Streams.StreamIdentity.GetHashCode() -> int
+readonly Orleans.Providers.Streams.Common.FixedSizeBuffer.SizeInByte -> int
+readonly Orleans.Runtime.QualifiedStreamId.ProviderName -> string!
+readonly Orleans.Runtime.QualifiedStreamId.StreamId -> Orleans.Runtime.StreamId
+static Orleans.Providers.Streams.Common.CachedMessageExtensions.CompareStreamId(this ref Orleans.Providers.Streams.Common.CachedMessage cachedMessage, Orleans.Runtime.StreamId streamId) -> bool
+static Orleans.Providers.Streams.Common.SegmentBuilder.Append(System.ArraySegment<byte> segment, ref int writerOffset, System.ReadOnlySpan<byte> bytes) -> void
+static Orleans.Providers.Streams.Common.SegmentBuilder.CalculateAppendSize(System.ReadOnlySpan<byte> memory) -> int
+static Orleans.Providers.Streams.Common.SegmentBuilder.ReadNextBytes(System.ArraySegment<byte> segment, ref int readerOffset) -> System.ArraySegment<byte>
+static Orleans.Runtime.QualifiedStreamId.implicit operator Orleans.Runtime.StreamId(Orleans.Runtime.QualifiedStreamId internalStreamId) -> Orleans.Runtime.StreamId
+static Orleans.Runtime.QualifiedStreamId.operator !=(Orleans.Runtime.QualifiedStreamId s1, Orleans.Runtime.QualifiedStreamId s2) -> bool
+static Orleans.Runtime.QualifiedStreamId.operator ==(Orleans.Runtime.QualifiedStreamId s1, Orleans.Runtime.QualifiedStreamId s2) -> bool
+static Orleans.Runtime.StreamId.Create(Orleans.Streams.IStreamIdentity! streamIdentity) -> Orleans.Runtime.StreamId
+static Orleans.Runtime.StreamId.Create(string! ns, long key) -> Orleans.Runtime.StreamId
+static Orleans.Runtime.StreamId.Create(string! ns, string! key) -> Orleans.Runtime.StreamId
+static Orleans.Runtime.StreamId.Create(string! ns, System.Guid key) -> Orleans.Runtime.StreamId
+static Orleans.Runtime.StreamId.Create(System.ReadOnlySpan<byte> ns, System.ReadOnlySpan<byte> key) -> Orleans.Runtime.StreamId
+static Orleans.Runtime.StreamId.operator !=(Orleans.Runtime.StreamId s1, Orleans.Runtime.StreamId s2) -> bool
+static Orleans.Runtime.StreamId.operator ==(Orleans.Runtime.StreamId s1, Orleans.Runtime.StreamId s2) -> bool
+static Orleans.Runtime.StreamId.Parse(System.ReadOnlySpan<byte> value) -> Orleans.Runtime.StreamId
+static Orleans.Streams.QueueId.GetQueueId(string! queueName, uint queueId, uint hash) -> Orleans.Streams.QueueId
+static Orleans.Streams.QueueId.operator !=(Orleans.Streams.QueueId left, Orleans.Streams.QueueId right) -> bool
+static Orleans.Streams.QueueId.operator ==(Orleans.Streams.QueueId left, Orleans.Streams.QueueId right) -> bool
+static readonly Orleans.Configuration.DeploymentBasedQueueBalancerOptions.DEFAULT_SILO_MATURITY_PERIOD -> System.TimeSpan
+static readonly Orleans.Configuration.LeaseBasedQueueBalancerOptions.DefaultLeaseLength -> System.TimeSpan
+static readonly Orleans.Configuration.LeaseBasedQueueBalancerOptions.DefaultLeaseRenewPeriod -> System.TimeSpan
+static readonly Orleans.Configuration.LeaseBasedQueueBalancerOptions.DefaultMinLeaseAcquisitionPeriod -> System.TimeSpan
+static readonly Orleans.Configuration.LeaseBasedQueueBalancerOptions.DefaultMinLeaseAquisitionPeriod -> System.TimeSpan
+static readonly Orleans.Configuration.StreamCacheEvictionOptions.DefaultDataMaxAgeInCache -> System.TimeSpan
+static readonly Orleans.Configuration.StreamCacheEvictionOptions.DefaultDataMinTimeInCache -> System.TimeSpan
+static readonly Orleans.Configuration.StreamCacheEvictionOptions.DefaultMetadataMinTimeInCache -> System.TimeSpan
+static readonly Orleans.Configuration.StreamPullingAgentOptions.DEFAULT_BATCH_CONTAINER_BATCH_SIZE -> int
+static readonly Orleans.Configuration.StreamPullingAgentOptions.DEFAULT_GET_QUEUE_MESSAGES_TIMER_PERIOD -> System.TimeSpan
+static readonly Orleans.Configuration.StreamPullingAgentOptions.DEFAULT_INIT_QUEUE_TIMEOUT -> System.TimeSpan
+static readonly Orleans.Configuration.StreamPullingAgentOptions.DEFAULT_MAX_EVENT_DELIVERY_TIME -> System.TimeSpan
+static readonly Orleans.Configuration.StreamPullingAgentOptions.DEFAULT_STREAM_INACTIVITY_PERIOD -> System.TimeSpan
+static readonly Orleans.Configuration.StreamStatisticOptions.DefaultStatisticMonitorWriteInterval -> System.TimeSpan
+virtual Orleans.Providers.Streams.Common.ChronologicalEvictionStrategy.ShouldPurge(ref Orleans.Providers.Streams.Common.CachedMessage cachedMessage, ref Orleans.Providers.Streams.Common.CachedMessage newestCachedMessage, System.DateTime nowUtc) -> bool
+virtual Orleans.Providers.Streams.Common.PooledResource<T>.OnResetState() -> void
+virtual Orleans.Providers.Streams.Common.PooledResource<T>.SignalPurge() -> void
+virtual Orleans.Providers.Streams.Common.SimpleQueueCache.IsUnderPressure() -> bool
+virtual Orleans.Providers.Streams.Common.SimpleQueueCacheCursor.Dispose(bool disposing) -> void
+virtual Orleans.Providers.Streams.Common.SimpleQueueCacheCursor.MoveNext() -> bool
+virtual Orleans.Providers.Streams.Common.TimePurgePredicate.ShouldPurgeFromTime(System.TimeSpan timeInCache, System.TimeSpan relativeAge) -> bool
+~abstract Orleans.Streams.QueueBalancerBase.GetMyQueues() -> System.Collections.Generic.IEnumerable<Orleans.Streams.QueueId>
+~abstract Orleans.Streams.QueueBalancerBase.OnClusterMembershipChange(System.Collections.Generic.HashSet<Orleans.Runtime.SiloAddress> activeSilos) -> void
+~abstract Orleans.Streams.StreamSequenceToken.CompareTo(Orleans.Streams.StreamSequenceToken other) -> int
+~abstract Orleans.Streams.StreamSequenceToken.Equals(Orleans.Streams.StreamSequenceToken other) -> bool
+~abstract Orleans.Streams.StreamSubscriptionHandle<T>.Equals(Orleans.Streams.StreamSubscriptionHandle<T> other) -> bool
+~abstract Orleans.Streams.StreamSubscriptionHandle<T>.ProviderName.get -> string
+~abstract Orleans.Streams.StreamSubscriptionHandle<T>.ResumeAsync(Orleans.Streams.IAsyncBatchObserver<T> observer, Orleans.Streams.StreamSequenceToken token = null) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~abstract Orleans.Streams.StreamSubscriptionHandle<T>.ResumeAsync(Orleans.Streams.IAsyncObserver<T> observer, Orleans.Streams.StreamSequenceToken token = null) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~abstract Orleans.Streams.StreamSubscriptionHandle<T>.UnsubscribeAsync() -> System.Threading.Tasks.Task
+~const Orleans.Configuration.LeaseBasedQueueBalancerOptions.DefaultLeaseCategory = "QueueBalancer" -> string
+~const Orleans.Providers.Streams.Common.SimpleQueueAdapterCache.CacheSizePropertyName = "CacheSize" -> string
+~const Orleans.Streams.ConstructorStreamNamespacePredicateProvider.Prefix = "ctor" -> string
+~const Orleans.Streams.Core.StreamSubscriptionManagerType.ExplicitSubscribeOnly = "ExplicitSubscribeOnly" -> string
+~Orleans.Configuration.LeaseBasedQueueBalancerOptions.LeaseCategory.get -> string
+~Orleans.Configuration.LeaseBasedQueueBalancerOptions.LeaseCategory.set -> void
+~Orleans.Hosting.ClusterClientMemoryStreamConfigurator<TSerializer>
+~Orleans.Hosting.ClusterClientMemoryStreamConfigurator<TSerializer>.ClusterClientMemoryStreamConfigurator(string name, Orleans.Hosting.IClientBuilder builder) -> void
+~Orleans.Hosting.ClusterClientPersistentStreamConfigurator.ClusterClientPersistentStreamConfigurator(string name, Orleans.Hosting.IClientBuilder clientBuilder, System.Func<System.IServiceProvider, string, Orleans.Streams.IQueueAdapterFactory> adapterFactory) -> void
+~Orleans.Hosting.SiloMemoryStreamConfigurator<TSerializer>
+~Orleans.Hosting.SiloMemoryStreamConfigurator<TSerializer>.SiloMemoryStreamConfigurator(string name, System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>> configureServicesDelegate) -> void
+~Orleans.Hosting.SiloPersistentStreamConfigurator.SiloPersistentStreamConfigurator(string name, System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>> configureDelegate, System.Func<System.IServiceProvider, string, Orleans.Streams.IQueueAdapterFactory> adapterFactory) -> void
+~Orleans.Hosting.SiloRecoverableStreamConfigurator.SiloRecoverableStreamConfigurator(string name, System.Action<System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection>> configureDelegate, System.Func<System.IServiceProvider, string, Orleans.Streams.IQueueAdapterFactory> adapterFactory) -> void
+~Orleans.Hosting.SimpleGeneratorOptions.StreamGeneratorType.get -> System.Type
+~Orleans.Hosting.SimpleGeneratorOptions.StreamNamespace.get -> string
+~Orleans.Hosting.SimpleGeneratorOptions.StreamNamespace.set -> void
+~Orleans.Hosting.StaticClusterDeploymentOptions.SiloNames.get -> System.Collections.Generic.IList<string>
+~Orleans.Hosting.StaticClusterDeploymentOptions.SiloNames.set -> void
+~Orleans.ImplicitStreamSubscriptionAttribute.GetBindings(System.IServiceProvider services, System.Type grainClass, Orleans.Runtime.GrainType grainType) -> System.Collections.Generic.IEnumerable<System.Collections.Generic.Dictionary<string, string>>
+~Orleans.ImplicitStreamSubscriptionAttribute.ImplicitStreamSubscriptionAttribute(Orleans.Streams.IStreamNamespacePredicate predicate, string streamIdMapper = null) -> void
+~Orleans.ImplicitStreamSubscriptionAttribute.ImplicitStreamSubscriptionAttribute(string streamNamespace, string streamIdMapper = null) -> void
+~Orleans.ImplicitStreamSubscriptionAttribute.ImplicitStreamSubscriptionAttribute(System.Type predicateType, string streamIdMapper = null) -> void
+~Orleans.ImplicitStreamSubscriptionAttribute.Predicate.get -> Orleans.Streams.IStreamNamespacePredicate
+~Orleans.ImplicitStreamSubscriptionAttribute.StreamIdMapper.get -> string
+~Orleans.ImplicitStreamSubscriptionAttribute.StreamIdMapper.init -> void
+~Orleans.Providers.DefaultMemoryMessageBodySerializer.DefaultMemoryMessageBodySerializer(Orleans.Serialization.Serializer<Orleans.Providers.MemoryMessageBody> serializer) -> void
+~Orleans.Providers.DefaultMemoryMessageBodySerializer.Deserialize(System.ArraySegment<byte> bodyBytes) -> Orleans.Providers.MemoryMessageBody
+~Orleans.Providers.DefaultMemoryMessageBodySerializer.Serialize(Orleans.Providers.MemoryMessageBody body) -> System.ArraySegment<byte>
+~Orleans.Providers.IMemoryMessageBodySerializer.Deserialize(System.ArraySegment<byte> bodyBytes) -> Orleans.Providers.MemoryMessageBody
+~Orleans.Providers.IMemoryMessageBodySerializer.Serialize(Orleans.Providers.MemoryMessageBody body) -> System.ArraySegment<byte>
+~Orleans.Providers.IMemoryStreamQueueGrain.Dequeue(int maxCount) -> System.Threading.Tasks.Task<System.Collections.Generic.List<Orleans.Providers.MemoryMessageData>>
+~Orleans.Providers.IMemoryStreamQueueGrain.Enqueue(Orleans.Providers.MemoryMessageData data) -> System.Threading.Tasks.Task
+~Orleans.Providers.MemoryAdapterFactory<TSerializer>
+~Orleans.Providers.MemoryAdapterFactory<TSerializer>.BlockPoolMonitorFactory -> System.Func<Orleans.Providers.Streams.Common.BlockPoolMonitorDimensions, Orleans.Providers.Streams.Common.IBlockPoolMonitor>
+~Orleans.Providers.MemoryAdapterFactory<TSerializer>.CacheMonitorFactory -> System.Func<Orleans.Providers.Streams.Common.CacheMonitorDimensions, Orleans.Providers.Streams.Common.ICacheMonitor>
+~Orleans.Providers.MemoryAdapterFactory<TSerializer>.CreateAdapter() -> System.Threading.Tasks.Task<Orleans.Streams.IQueueAdapter>
+~Orleans.Providers.MemoryAdapterFactory<TSerializer>.CreateQueueCache(Orleans.Streams.QueueId queueId) -> Orleans.Streams.IQueueCache
+~Orleans.Providers.MemoryAdapterFactory<TSerializer>.CreateReceiver(Orleans.Streams.QueueId queueId) -> Orleans.Streams.IQueueAdapterReceiver
+~Orleans.Providers.MemoryAdapterFactory<TSerializer>.GetDeliveryFailureHandler(Orleans.Streams.QueueId queueId) -> System.Threading.Tasks.Task<Orleans.Streams.IStreamFailureHandler>
+~Orleans.Providers.MemoryAdapterFactory<TSerializer>.GetQueueAdapterCache() -> Orleans.Streams.IQueueAdapterCache
+~Orleans.Providers.MemoryAdapterFactory<TSerializer>.GetStreamQueueMapper() -> Orleans.Streams.IStreamQueueMapper
+~Orleans.Providers.MemoryAdapterFactory<TSerializer>.MemoryAdapterFactory(string providerName, Orleans.Configuration.StreamCacheEvictionOptions cacheOptions, Orleans.Configuration.StreamStatisticOptions statisticOptions, Orleans.Configuration.HashRingStreamQueueMapperOptions queueMapperOptions, System.IServiceProvider serviceProvider, Orleans.IGrainFactory grainFactory, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) -> void
+~Orleans.Providers.MemoryAdapterFactory<TSerializer>.Name.get -> string
+~Orleans.Providers.MemoryAdapterFactory<TSerializer>.QueueMessageBatchAsync<T>(Orleans.Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken token, System.Collections.Generic.Dictionary<string, object> requestContext) -> System.Threading.Tasks.Task
+~Orleans.Providers.MemoryAdapterFactory<TSerializer>.ReceiverMonitorFactory -> System.Func<Orleans.Providers.Streams.Common.ReceiverMonitorDimensions, Orleans.Providers.Streams.Common.IQueueAdapterReceiverMonitor>
+~Orleans.Providers.MemoryAdapterFactory<TSerializer>.StreamFailureHandlerFactory.get -> System.Func<string, System.Threading.Tasks.Task<Orleans.Streams.IStreamFailureHandler>>
+~Orleans.Providers.MemoryAdapterFactory<TSerializer>.StreamFailureHandlerFactory.set -> void
+~Orleans.Providers.MemoryMessageBody.Events.get -> System.Collections.Generic.List<object>
+~Orleans.Providers.MemoryMessageBody.MemoryMessageBody(System.Collections.Generic.IEnumerable<object> events, System.Collections.Generic.Dictionary<string, object> requestContext) -> void
+~Orleans.Providers.MemoryMessageBody.RequestContext.get -> System.Collections.Generic.Dictionary<string, object>
+~Orleans.Providers.MemoryPooledCache<TSerializer>
+~Orleans.Providers.MemoryPooledCache<TSerializer>.AddToCache(System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> messages) -> void
+~Orleans.Providers.MemoryPooledCache<TSerializer>.GetBatchContainer(ref Orleans.Providers.Streams.Common.CachedMessage cachedMessage) -> Orleans.Streams.IBatchContainer
+~Orleans.Providers.MemoryPooledCache<TSerializer>.GetCacheCursor(Orleans.Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken token) -> Orleans.Streams.IQueueCacheCursor
+~Orleans.Providers.MemoryPooledCache<TSerializer>.GetSequenceToken(ref Orleans.Providers.Streams.Common.CachedMessage cachedMessage) -> Orleans.Streams.StreamSequenceToken
+~Orleans.Providers.MemoryPooledCache<TSerializer>.MemoryPooledCache(Orleans.Providers.Streams.Common.IObjectPool<Orleans.Providers.Streams.Common.FixedSizeBuffer> bufferPool, Orleans.Providers.Streams.Common.TimePurgePredicate purgePredicate, Microsoft.Extensions.Logging.ILogger logger, TSerializer serializer, Orleans.Providers.Streams.Common.ICacheMonitor cacheMonitor, System.TimeSpan? monitorWriteInterval, System.TimeSpan? purgeMetadataInterval) -> void
+~Orleans.Providers.MemoryPooledCache<TSerializer>.TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) -> bool
+~Orleans.Providers.MemoryStreamQueueGrain.Dequeue(int maxCount) -> System.Threading.Tasks.Task<System.Collections.Generic.List<Orleans.Providers.MemoryMessageData>>
+~Orleans.Providers.MemoryStreamQueueGrain.Enqueue(Orleans.Providers.MemoryMessageData data) -> System.Threading.Tasks.Task
+~Orleans.Providers.Streams.Common.BlockPoolMonitorDimensions.BlockPoolId.get -> string
+~Orleans.Providers.Streams.Common.BlockPoolMonitorDimensions.BlockPoolId.set -> void
+~Orleans.Providers.Streams.Common.BlockPoolMonitorDimensions.BlockPoolMonitorDimensions(string blockPoolId) -> void
+~Orleans.Providers.Streams.Common.CachedMessageBlock.GetIndexOfFirstMessageLessThanOrEqualTo(Orleans.Streams.StreamSequenceToken token) -> int
+~Orleans.Providers.Streams.Common.CachedMessageBlock.GetNewestSequenceToken(Orleans.Providers.Streams.Common.ICacheDataAdapter dataAdapter) -> Orleans.Streams.StreamSequenceToken
+~Orleans.Providers.Streams.Common.CachedMessageBlock.GetOldestSequenceToken(Orleans.Providers.Streams.Common.ICacheDataAdapter dataAdapter) -> Orleans.Streams.StreamSequenceToken
+~Orleans.Providers.Streams.Common.CachedMessageBlock.GetSequenceToken(int index, Orleans.Providers.Streams.Common.ICacheDataAdapter dataAdapter) -> Orleans.Streams.StreamSequenceToken
+~Orleans.Providers.Streams.Common.CachedMessageBlock.Node.get -> System.Collections.Generic.LinkedListNode<Orleans.Providers.Streams.Common.CachedMessageBlock>
+~Orleans.Providers.Streams.Common.CachedMessageBlock.TryFindFirstMessage(Orleans.Runtime.StreamId streamId, Orleans.Providers.Streams.Common.ICacheDataAdapter dataAdapter, out int index) -> bool
+~Orleans.Providers.Streams.Common.CachedMessageBlock.TryFindNextMessage(int start, Orleans.Runtime.StreamId streamId, Orleans.Providers.Streams.Common.ICacheDataAdapter dataAdapter, out int index) -> bool
+~Orleans.Providers.Streams.Common.CacheMonitorDimensions.BlockPoolId.get -> string
+~Orleans.Providers.Streams.Common.CacheMonitorDimensions.BlockPoolId.set -> void
+~Orleans.Providers.Streams.Common.CacheMonitorDimensions.CacheMonitorDimensions(string queueId, string blockPoolId) -> void
+~Orleans.Providers.Streams.Common.ChronologicalEvictionStrategy.ChronologicalEvictionStrategy(Microsoft.Extensions.Logging.ILogger logger, Orleans.Providers.Streams.Common.TimePurgePredicate timePurage, Orleans.Providers.Streams.Common.ICacheMonitor cacheMonitor, System.TimeSpan? monitorWriteInterval) -> void
+~Orleans.Providers.Streams.Common.ChronologicalEvictionStrategy.OnBlockAllocated(Orleans.Providers.Streams.Common.FixedSizeBuffer newBlock) -> void
+~Orleans.Providers.Streams.Common.ChronologicalEvictionStrategy.OnPurged.get -> System.Action<Orleans.Providers.Streams.Common.CachedMessage?, Orleans.Providers.Streams.Common.CachedMessage?>
+~Orleans.Providers.Streams.Common.ChronologicalEvictionStrategy.OnPurged.set -> void
+~Orleans.Providers.Streams.Common.ChronologicalEvictionStrategy.PurgeObservable.set -> void
+~Orleans.Providers.Streams.Common.DefaultBlockPoolMonitor.DefaultBlockPoolMonitor(Orleans.Providers.Streams.Common.BlockPoolMonitorDimensions dimensions) -> void
+~Orleans.Providers.Streams.Common.DefaultBlockPoolMonitor.DefaultBlockPoolMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions) -> void
+~Orleans.Providers.Streams.Common.DefaultBlockPoolMonitor._dimensions -> System.Collections.Generic.KeyValuePair<string, object>[]
+~Orleans.Providers.Streams.Common.DefaultCacheMonitor.DefaultCacheMonitor(Orleans.Providers.Streams.Common.CacheMonitorDimensions dimensions) -> void
+~Orleans.Providers.Streams.Common.DefaultCacheMonitor.DefaultCacheMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions) -> void
+~Orleans.Providers.Streams.Common.DefaultCacheMonitor.TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure, double? flowControlThreshold) -> void
+~Orleans.Providers.Streams.Common.DefaultQueueAdapterReceiverMonitor.DefaultQueueAdapterReceiverMonitor(Orleans.Providers.Streams.Common.ReceiverMonitorDimensions dimensions) -> void
+~Orleans.Providers.Streams.Common.DefaultQueueAdapterReceiverMonitor.DefaultQueueAdapterReceiverMonitor(System.Collections.Generic.KeyValuePair<string, object>[] dimensions) -> void
+~Orleans.Providers.Streams.Common.DefaultQueueAdapterReceiverMonitor.TrackInitialization(bool success, System.TimeSpan callTime, System.Exception exception) -> void
+~Orleans.Providers.Streams.Common.DefaultQueueAdapterReceiverMonitor.TrackRead(bool success, System.TimeSpan callTime, System.Exception exception) -> void
+~Orleans.Providers.Streams.Common.DefaultQueueAdapterReceiverMonitor.TrackShutdown(bool success, System.TimeSpan callTime, System.Exception exception) -> void
+~Orleans.Providers.Streams.Common.EventSequenceToken.CreateSequenceTokenForEvent(int eventInd) -> Orleans.Providers.Streams.Common.EventSequenceToken
+~Orleans.Providers.Streams.Common.EventSequenceTokenV2.CreateSequenceTokenForEvent(int eventInd) -> Orleans.Providers.Streams.Common.EventSequenceTokenV2
+~Orleans.Providers.Streams.Common.FixedSizeBuffer.Id.get -> object
+~Orleans.Providers.Streams.Common.ICacheDataAdapter.GetBatchContainer(ref Orleans.Providers.Streams.Common.CachedMessage cachedMessage) -> Orleans.Streams.IBatchContainer
+~Orleans.Providers.Streams.Common.ICacheDataAdapter.GetSequenceToken(ref Orleans.Providers.Streams.Common.CachedMessage cachedMessage) -> Orleans.Streams.StreamSequenceToken
+~Orleans.Providers.Streams.Common.ICacheMonitor.TrackCachePressureMonitorStatusChange(string pressureMonitorType, bool underPressure, double? cachePressureContributionCount, double? currentPressure, double? flowControlThreshold) -> void
+~Orleans.Providers.Streams.Common.IEvictionStrategy.OnBlockAllocated(Orleans.Providers.Streams.Common.FixedSizeBuffer newBlock) -> void
+~Orleans.Providers.Streams.Common.IEvictionStrategy.OnPurged.get -> System.Action<Orleans.Providers.Streams.Common.CachedMessage?, Orleans.Providers.Streams.Common.CachedMessage?>
+~Orleans.Providers.Streams.Common.IEvictionStrategy.OnPurged.set -> void
+~Orleans.Providers.Streams.Common.IEvictionStrategy.PurgeObservable.set -> void
+~Orleans.Providers.Streams.Common.IObjectPool<T>
+~Orleans.Providers.Streams.Common.IQueueAdapterReceiverMonitor.TrackInitialization(bool success, System.TimeSpan callTime, System.Exception exception) -> void
+~Orleans.Providers.Streams.Common.IQueueAdapterReceiverMonitor.TrackRead(bool success, System.TimeSpan callTime, System.Exception exception) -> void
+~Orleans.Providers.Streams.Common.IQueueAdapterReceiverMonitor.TrackShutdown(bool success, System.TimeSpan callTime, System.Exception exception) -> void
+~Orleans.Providers.Streams.Common.ObjectPool<T>
+~Orleans.Providers.Streams.Common.ObjectPool<T>.ObjectPool(System.Func<T> factoryFunc, Orleans.Providers.Streams.Common.IObjectPoolMonitor monitor = null, System.TimeSpan? monitorWriteInterval = null) -> void
+~Orleans.Providers.Streams.Common.ObjectPoolMonitorBridge.ObjectPoolMonitorBridge(Orleans.Providers.Streams.Common.IBlockPoolMonitor blockPoolMonitor, int blockSizeInBytes) -> void
+~Orleans.Providers.Streams.Common.PersistentStreamProvider.ExecuteCommand(int command, object arg) -> System.Threading.Tasks.Task<object>
+~Orleans.Providers.Streams.Common.PersistentStreamProvider.GetStream<T>(Orleans.Runtime.StreamId streamId) -> Orleans.Streams.IAsyncStream<T>
+~Orleans.Providers.Streams.Common.PersistentStreamProvider.GetStreamSubscriptionManager() -> Orleans.Streams.Core.IStreamSubscriptionManager
+~Orleans.Providers.Streams.Common.PersistentStreamProvider.Name.get -> string
+~Orleans.Providers.Streams.Common.PersistentStreamProvider.Participate(Orleans.ILifecycleObservable lifecycle) -> void
+~Orleans.Providers.Streams.Common.PersistentStreamProvider.PersistentStreamProvider(string name, Orleans.Configuration.StreamPubSubOptions pubsubOptions, Orleans.Configuration.StreamLifecycleOptions lifeCycleOptions, Orleans.Providers.IProviderRuntime runtime, Orleans.Serialization.DeepCopier deepCopier, Microsoft.Extensions.Logging.ILogger<Orleans.Providers.Streams.Common.PersistentStreamProvider> logger) -> void
+~Orleans.Providers.Streams.Common.PooledQueueCache.Add(System.Collections.Generic.List<Orleans.Providers.Streams.Common.CachedMessage> messages, System.DateTime dequeueTime) -> void
+~Orleans.Providers.Streams.Common.PooledQueueCache.GetCursor(Orleans.Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken sequenceToken) -> object
+~Orleans.Providers.Streams.Common.PooledQueueCache.PooledQueueCache(Orleans.Providers.Streams.Common.ICacheDataAdapter cacheDataAdapter, Microsoft.Extensions.Logging.ILogger logger, Orleans.Providers.Streams.Common.ICacheMonitor cacheMonitor, System.TimeSpan? cacheMonitorWriteInterval, System.TimeSpan? purgeMetadataInterval = null) -> void
+~Orleans.Providers.Streams.Common.PooledQueueCache.TryGetNextMessage(object cursorObj, out Orleans.Streams.IBatchContainer message) -> bool
+~Orleans.Providers.Streams.Common.PooledResource<T>
+~Orleans.Providers.Streams.Common.PooledResource<T>.Pool.set -> void
+~Orleans.Providers.Streams.Common.ReceiverMonitorDimensions.QueueId.get -> string
+~Orleans.Providers.Streams.Common.ReceiverMonitorDimensions.QueueId.set -> void
+~Orleans.Providers.Streams.Common.ReceiverMonitorDimensions.ReceiverMonitorDimensions(string queueId) -> void
+~Orleans.Providers.Streams.Common.SimpleQueueAdapterCache.CreateQueueCache(Orleans.Streams.QueueId queueId) -> Orleans.Streams.IQueueCache
+~Orleans.Providers.Streams.Common.SimpleQueueAdapterCache.SimpleQueueAdapterCache(Orleans.Configuration.SimpleQueueCacheOptions options, string providerName, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) -> void
+~Orleans.Providers.Streams.Common.SimpleQueueCache.SimpleQueueCache(int cacheSize, Microsoft.Extensions.Logging.ILogger logger) -> void
+~Orleans.Providers.Streams.Common.SimpleQueueCacheCursor.SimpleQueueCacheCursor(Orleans.Providers.Streams.Common.SimpleQueueCache cache, Orleans.Runtime.StreamId streamId, Microsoft.Extensions.Logging.ILogger logger) -> void
+~Orleans.Providers.Streams.Generator.GeneratedBatchContainer.GeneratedBatchContainer(Orleans.Runtime.StreamId streamId, object payload, Orleans.Providers.Streams.Common.EventSequenceTokenV2 token) -> void
+~Orleans.Providers.Streams.Generator.GeneratedBatchContainer.GetEvents<T>() -> System.Collections.Generic.IEnumerable<System.Tuple<T, Orleans.Streams.StreamSequenceToken>>
+~Orleans.Providers.Streams.Generator.GeneratedBatchContainer.Payload.get -> object
+~Orleans.Providers.Streams.Generator.GeneratedBatchContainer.RealToken.get -> Orleans.Providers.Streams.Common.EventSequenceTokenV2
+~Orleans.Providers.Streams.Generator.GeneratedBatchContainer.SequenceToken.get -> Orleans.Streams.StreamSequenceToken
+~Orleans.Providers.Streams.Generator.GeneratedEvent.Payload.get -> int[]
+~Orleans.Providers.Streams.Generator.GeneratedEvent.Payload.set -> void
+~Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.BlockPoolMonitorFactory -> System.Func<Orleans.Providers.Streams.Common.BlockPoolMonitorDimensions, Orleans.Providers.Streams.Common.IBlockPoolMonitor>
+~Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.CacheMonitorFactory -> System.Func<Orleans.Providers.Streams.Common.CacheMonitorDimensions, Orleans.Providers.Streams.Common.ICacheMonitor>
+~Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.CreateAdapter() -> System.Threading.Tasks.Task<Orleans.Streams.IQueueAdapter>
+~Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.CreateQueueCache(Orleans.Streams.QueueId queueId) -> Orleans.Streams.IQueueCache
+~Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.CreateReceiver(Orleans.Streams.QueueId queueId) -> Orleans.Streams.IQueueAdapterReceiver
+~Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.ExecuteCommand(int command, object arg) -> System.Threading.Tasks.Task<object>
+~Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.GeneratorAdapterFactory(string providerName, Orleans.Configuration.HashRingStreamQueueMapperOptions queueMapperOptions, Orleans.Configuration.StreamStatisticOptions statisticOptions, System.IServiceProvider serviceProvider, Orleans.Serialization.Serializer serializer, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) -> void
+~Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.GetDeliveryFailureHandler(Orleans.Streams.QueueId queueId) -> System.Threading.Tasks.Task<Orleans.Streams.IStreamFailureHandler>
+~Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.GetQueueAdapterCache() -> Orleans.Streams.IQueueAdapterCache
+~Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.GetStreamQueueMapper() -> Orleans.Streams.IStreamQueueMapper
+~Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.Name.get -> string
+~Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.QueueMessageBatchAsync<T>(Orleans.Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken token, System.Collections.Generic.Dictionary<string, object> requestContext) -> System.Threading.Tasks.Task
+~Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.ReceiverMonitorFactory -> System.Func<Orleans.Providers.Streams.Common.ReceiverMonitorDimensions, Orleans.Providers.Streams.Common.IQueueAdapterReceiverMonitor>
+~Orleans.Providers.Streams.Generator.GeneratorPooledCache.AddToCache(System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> messages) -> void
+~Orleans.Providers.Streams.Generator.GeneratorPooledCache.GeneratorPooledCache(Orleans.Providers.Streams.Common.IObjectPool<Orleans.Providers.Streams.Common.FixedSizeBuffer> bufferPool, Microsoft.Extensions.Logging.ILogger logger, Orleans.Serialization.Serializer serializer, Orleans.Providers.Streams.Common.ICacheMonitor cacheMonitor, System.TimeSpan? monitorWriteInterval) -> void
+~Orleans.Providers.Streams.Generator.GeneratorPooledCache.GetBatchContainer(ref Orleans.Providers.Streams.Common.CachedMessage cachedMessage) -> Orleans.Streams.IBatchContainer
+~Orleans.Providers.Streams.Generator.GeneratorPooledCache.GetCacheCursor(Orleans.Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken token) -> Orleans.Streams.IQueueCacheCursor
+~Orleans.Providers.Streams.Generator.GeneratorPooledCache.GetSequenceToken(ref Orleans.Providers.Streams.Common.CachedMessage cachedMessage) -> Orleans.Streams.StreamSequenceToken
+~Orleans.Providers.Streams.Generator.GeneratorPooledCache.TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) -> bool
+~Orleans.Providers.Streams.Generator.IStreamGenerator.Configure(System.IServiceProvider serviceProvider, Orleans.Providers.Streams.Generator.IStreamGeneratorConfig generatorConfig) -> void
+~Orleans.Providers.Streams.Generator.IStreamGenerator.TryReadEvents(System.DateTime utcNow, int maxCount, out System.Collections.Generic.List<Orleans.Streams.IBatchContainer> events) -> bool
+~Orleans.Providers.Streams.Generator.IStreamGeneratorConfig.StreamGeneratorType.get -> System.Type
+~Orleans.RegexImplicitStreamSubscriptionAttribute.RegexImplicitStreamSubscriptionAttribute(string pattern) -> void
+~Orleans.Streams.BatchContainerBatch.BatchContainerBatch(System.Collections.Generic.List<Orleans.Streams.IBatchContainer> batchContainers) -> void
+~Orleans.Streams.BatchContainerBatch.BatchContainers.get -> System.Collections.Generic.List<Orleans.Streams.IBatchContainer>
+~Orleans.Streams.BatchContainerBatch.GetEvents<T>() -> System.Collections.Generic.IEnumerable<System.Tuple<T, Orleans.Streams.StreamSequenceToken>>
+~Orleans.Streams.BatchContainerBatch.SequenceToken.get -> Orleans.Streams.StreamSequenceToken
+~Orleans.Streams.CacheFullException.CacheFullException(string message) -> void
+~Orleans.Streams.CacheFullException.CacheFullException(string message, System.Exception inner) -> void
+~Orleans.Streams.ConstructorStreamNamespacePredicateProvider.TryGetPredicate(string predicatePattern, out Orleans.Streams.IStreamNamespacePredicate predicate) -> bool
+~Orleans.Streams.Core.IStreamSubscriptionHandleFactory.Create<T>() -> Orleans.Streams.StreamSubscriptionHandle<T>
+~Orleans.Streams.Core.IStreamSubscriptionHandleFactory.ProviderName.get -> string
+~Orleans.Streams.Core.IStreamSubscriptionHandleFactory.SubscriptionId.get -> Orleans.Runtime.GuidId
+~Orleans.Streams.Core.IStreamSubscriptionManager.AddSubscription(string streamProviderName, Orleans.Runtime.StreamId streamId, Orleans.Runtime.GrainReference grainRef) -> System.Threading.Tasks.Task<Orleans.Streams.Core.StreamSubscription>
+~Orleans.Streams.Core.IStreamSubscriptionManager.GetSubscriptions(string streamProviderName, Orleans.Runtime.StreamId streamId) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<Orleans.Streams.Core.StreamSubscription>>
+~Orleans.Streams.Core.IStreamSubscriptionManager.RemoveSubscription(string streamProviderName, Orleans.Runtime.StreamId streamId, System.Guid subscriptionId) -> System.Threading.Tasks.Task
+~Orleans.Streams.Core.IStreamSubscriptionManagerAdmin.GetStreamSubscriptionManager(string managerType) -> Orleans.Streams.Core.IStreamSubscriptionManager
+~Orleans.Streams.Core.IStreamSubscriptionManagerRetriever.GetStreamSubscriptionManager() -> Orleans.Streams.Core.IStreamSubscriptionManager
+~Orleans.Streams.Core.IStreamSubscriptionObserver.OnSubscribed(Orleans.Streams.Core.IStreamSubscriptionHandleFactory handleFactory) -> System.Threading.Tasks.Task
+~Orleans.Streams.Core.StreamSubscription.StreamProviderName.get -> string
+~Orleans.Streams.Core.StreamSubscription.StreamSubscription(System.Guid subscriptionId, string streamProviderName, Orleans.Runtime.StreamId streamId, Orleans.Runtime.GrainId grainId) -> void
+~Orleans.Streams.DataNotAvailableException.DataNotAvailableException(string message) -> void
+~Orleans.Streams.DataNotAvailableException.DataNotAvailableException(string message, System.Exception inner) -> void
+~Orleans.Streams.DataNotAvailableException.DataNotAvailableException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~Orleans.Streams.DefaultStreamNamespacePredicateProvider.TryGetPredicate(string predicatePattern, out Orleans.Streams.IStreamNamespacePredicate predicate) -> bool
+~Orleans.Streams.DeploymentBasedQueueBalancer.DeploymentBasedQueueBalancer(Orleans.Runtime.ISiloStatusOracle siloStatusOracle, Orleans.Streams.IDeploymentConfiguration deploymentConfig, Orleans.Configuration.DeploymentBasedQueueBalancerOptions options, System.IServiceProvider services, Microsoft.Extensions.Logging.ILogger<Orleans.Streams.DeploymentBasedQueueBalancer> logger) -> void
+~Orleans.Streams.FaultedSubscriptionException.FaultedSubscriptionException(string message) -> void
+~Orleans.Streams.FaultedSubscriptionException.FaultedSubscriptionException(string message, System.Exception innerException) -> void
+~Orleans.Streams.Filtering.IStreamFilter.ShouldDeliver(Orleans.Runtime.StreamId streamId, object item, string filterData) -> bool
+~Orleans.Streams.HashRingBasedPartitionedStreamQueueMapper.HashRingBasedPartitionedStreamQueueMapper(System.Collections.Generic.IReadOnlyList<string> partitionIds, string queueNamePrefix) -> void
+~Orleans.Streams.HashRingBasedPartitionedStreamQueueMapper.QueueToPartition(Orleans.Streams.QueueId queue) -> string
+~Orleans.Streams.HashRingBasedStreamQueueMapper.GetAllQueues() -> System.Collections.Generic.IEnumerable<Orleans.Streams.QueueId>
+~Orleans.Streams.HashRingBasedStreamQueueMapper.GetQueuesForRange(Orleans.Runtime.IRingRange range) -> System.Collections.Generic.IEnumerable<Orleans.Streams.QueueId>
+~Orleans.Streams.HashRingBasedStreamQueueMapper.HashRingBasedStreamQueueMapper(Orleans.Configuration.HashRingStreamQueueMapperOptions options, string queueNamePrefix) -> void
+~Orleans.Streams.IAsyncBatchObserver<T>.OnCompletedAsync() -> System.Threading.Tasks.Task
+~Orleans.Streams.IAsyncBatchObserver<T>.OnErrorAsync(System.Exception ex) -> System.Threading.Tasks.Task
+~Orleans.Streams.IAsyncBatchObserver<T>.OnNextAsync(System.Collections.Generic.IList<Orleans.Streams.SequentialItem<T>> items) -> System.Threading.Tasks.Task
+~Orleans.Streams.IAsyncBatchProducer<T>.OnNextBatchAsync(System.Collections.Generic.IEnumerable<T> batch, Orleans.Streams.StreamSequenceToken token = null) -> System.Threading.Tasks.Task
+~Orleans.Streams.IAsyncStream.ProviderName.get -> string
+~Orleans.Streams.IAsyncStream<T>.GetAllSubscriptionHandles() -> System.Threading.Tasks.Task<System.Collections.Generic.IList<Orleans.Streams.StreamSubscriptionHandle<T>>>
+~Orleans.Streams.IBatchContainer.GetEvents<T>() -> System.Collections.Generic.IEnumerable<System.Tuple<T, Orleans.Streams.StreamSequenceToken>>
+~Orleans.Streams.IBatchContainer.SequenceToken.get -> Orleans.Streams.StreamSequenceToken
+~Orleans.Streams.IBatchContainerBatch.BatchContainers.get -> System.Collections.Generic.List<Orleans.Streams.IBatchContainer>
+~Orleans.Streams.IConsistentRingStreamQueueMapper.GetQueuesForRange(Orleans.Runtime.IRingRange range) -> System.Collections.Generic.IEnumerable<Orleans.Streams.QueueId>
+~Orleans.Streams.IDeploymentConfiguration.GetAllSiloNames() -> System.Collections.Generic.IList<string>
+~Orleans.Streams.IQueueAdapter.CreateReceiver(Orleans.Streams.QueueId queueId) -> Orleans.Streams.IQueueAdapterReceiver
+~Orleans.Streams.IQueueAdapter.Name.get -> string
+~Orleans.Streams.IQueueAdapter.QueueMessageBatchAsync<T>(Orleans.Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken token, System.Collections.Generic.Dictionary<string, object> requestContext) -> System.Threading.Tasks.Task
+~Orleans.Streams.IQueueAdapterCache.CreateQueueCache(Orleans.Streams.QueueId queueId) -> Orleans.Streams.IQueueCache
+~Orleans.Streams.IQueueAdapterFactory.CreateAdapter() -> System.Threading.Tasks.Task<Orleans.Streams.IQueueAdapter>
+~Orleans.Streams.IQueueAdapterFactory.GetDeliveryFailureHandler(Orleans.Streams.QueueId queueId) -> System.Threading.Tasks.Task<Orleans.Streams.IStreamFailureHandler>
+~Orleans.Streams.IQueueAdapterFactory.GetQueueAdapterCache() -> Orleans.Streams.IQueueAdapterCache
+~Orleans.Streams.IQueueAdapterFactory.GetStreamQueueMapper() -> Orleans.Streams.IStreamQueueMapper
+~Orleans.Streams.IQueueAdapterReceiver.GetQueueMessagesAsync(int maxCount) -> System.Threading.Tasks.Task<System.Collections.Generic.IList<Orleans.Streams.IBatchContainer>>
+~Orleans.Streams.IQueueAdapterReceiver.Initialize(System.TimeSpan timeout) -> System.Threading.Tasks.Task
+~Orleans.Streams.IQueueAdapterReceiver.MessagesDeliveredAsync(System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> messages) -> System.Threading.Tasks.Task
+~Orleans.Streams.IQueueAdapterReceiver.Shutdown(System.TimeSpan timeout) -> System.Threading.Tasks.Task
+~Orleans.Streams.IQueueCache.AddToCache(System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> messages) -> void
+~Orleans.Streams.IQueueCache.GetCacheCursor(Orleans.Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken token) -> Orleans.Streams.IQueueCacheCursor
+~Orleans.Streams.IQueueCache.TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) -> bool
+~Orleans.Streams.IQueueCacheCursor.GetCurrent(out System.Exception exception) -> Orleans.Streams.IBatchContainer
+~Orleans.Streams.IQueueCacheCursor.Refresh(Orleans.Streams.StreamSequenceToken token) -> void
+~Orleans.Streams.IQueueDataAdapter<TQueueMessage>.ToQueueMessage<T>(Orleans.Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Orleans.Streams.StreamSequenceToken token, System.Collections.Generic.Dictionary<string, object> requestContext) -> TQueueMessage
+~Orleans.Streams.IStreamFailureHandler.OnDeliveryFailure(Orleans.Runtime.GuidId subscriptionId, string streamProviderName, Orleans.Runtime.StreamId streamIdentity, Orleans.Streams.StreamSequenceToken sequenceToken) -> System.Threading.Tasks.Task
+~Orleans.Streams.IStreamFailureHandler.OnSubscriptionFailure(Orleans.Runtime.GuidId subscriptionId, string streamProviderName, Orleans.Runtime.StreamId streamIdentity, Orleans.Streams.StreamSequenceToken sequenceToken) -> System.Threading.Tasks.Task
+~Orleans.Streams.IStreamIdentity.Namespace.get -> string
+~Orleans.Streams.IStreamIdMapper.GetGrainKeyId(Orleans.Metadata.GrainBindings grainBindings, Orleans.Runtime.StreamId streamId) -> Orleans.Runtime.IdSpan
+~Orleans.Streams.IStreamNamespacePredicate.IsMatch(string streamNamespace) -> bool
+~Orleans.Streams.IStreamNamespacePredicate.PredicatePattern.get -> string
+~Orleans.Streams.IStreamNamespacePredicateProvider.TryGetPredicate(string predicatePattern, out Orleans.Streams.IStreamNamespacePredicate predicate) -> bool
+~Orleans.Streams.IStreamProvider.GetStream<T>(Orleans.Runtime.StreamId streamId) -> Orleans.Streams.IAsyncStream<T>
+~Orleans.Streams.IStreamProvider.Name.get -> string
+~Orleans.Streams.IStreamPubSub.ConsumerCount(Orleans.Runtime.QualifiedStreamId streamId) -> System.Threading.Tasks.Task<int>
+~Orleans.Streams.IStreamPubSub.CreateSubscriptionId(Orleans.Runtime.QualifiedStreamId streamId, Orleans.Runtime.GrainId streamConsumer) -> Orleans.Runtime.GuidId
+~Orleans.Streams.IStreamPubSub.FaultSubscription(Orleans.Runtime.QualifiedStreamId streamId, Orleans.Runtime.GuidId subscriptionId) -> System.Threading.Tasks.Task<bool>
+~Orleans.Streams.IStreamPubSub.GetAllSubscriptions(Orleans.Runtime.QualifiedStreamId streamId, Orleans.Runtime.GrainId streamConsumer = default(Orleans.Runtime.GrainId)) -> System.Threading.Tasks.Task<System.Collections.Generic.List<Orleans.Streams.Core.StreamSubscription>>
+~Orleans.Streams.IStreamPubSub.ProducerCount(Orleans.Runtime.QualifiedStreamId streamId) -> System.Threading.Tasks.Task<int>
+~Orleans.Streams.IStreamPubSub.RegisterConsumer(Orleans.Runtime.GuidId subscriptionId, Orleans.Runtime.QualifiedStreamId streamId, Orleans.Runtime.GrainId streamConsumer, string filterData) -> System.Threading.Tasks.Task
+~Orleans.Streams.IStreamPubSub.RegisterProducer(Orleans.Runtime.QualifiedStreamId streamId, Orleans.Runtime.GrainId streamProducer) -> System.Threading.Tasks.Task<System.Collections.Generic.ISet<Orleans.Streams.PubSubSubscriptionState>>
+~Orleans.Streams.IStreamPubSub.UnregisterConsumer(Orleans.Runtime.GuidId subscriptionId, Orleans.Runtime.QualifiedStreamId streamId) -> System.Threading.Tasks.Task
+~Orleans.Streams.IStreamPubSub.UnregisterProducer(Orleans.Runtime.QualifiedStreamId streamId, Orleans.Runtime.GrainId streamProducer) -> System.Threading.Tasks.Task
+~Orleans.Streams.IStreamQueueBalanceListener.QueueDistributionChangeNotification() -> System.Threading.Tasks.Task
+~Orleans.Streams.IStreamQueueBalancer.GetMyQueues() -> System.Collections.Generic.IEnumerable<Orleans.Streams.QueueId>
+~Orleans.Streams.IStreamQueueBalancer.Initialize(Orleans.Streams.IStreamQueueMapper queueMapper) -> System.Threading.Tasks.Task
+~Orleans.Streams.IStreamQueueBalancer.Shutdown() -> System.Threading.Tasks.Task
+~Orleans.Streams.IStreamQueueBalancer.SubscribeToQueueDistributionChangeEvents(Orleans.Streams.IStreamQueueBalanceListener observer) -> bool
+~Orleans.Streams.IStreamQueueBalancer.UnSubscribeFromQueueDistributionChangeEvents(Orleans.Streams.IStreamQueueBalanceListener observer) -> bool
+~Orleans.Streams.IStreamQueueCheckpointer<TCheckpoint>.Load() -> System.Threading.Tasks.Task<TCheckpoint>
+~Orleans.Streams.IStreamQueueCheckpointerFactory.Create(string partition) -> System.Threading.Tasks.Task<Orleans.Streams.IStreamQueueCheckpointer<string>>
+~Orleans.Streams.IStreamQueueMapper.GetAllQueues() -> System.Collections.Generic.IEnumerable<Orleans.Streams.QueueId>
+~Orleans.Streams.LeaseBasedQueueBalancer.LeaseBasedQueueBalancer(string name, Orleans.Configuration.LeaseBasedQueueBalancerOptions options, Orleans.LeaseProviders.ILeaseProvider leaseProvider, System.IServiceProvider services, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, System.TimeProvider timeProvider) -> void
+~Orleans.Streams.NoOpStreamDeliveryFailureHandler.OnDeliveryFailure(Orleans.Runtime.GuidId subscriptionId, string streamProviderName, Orleans.Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken sequenceToken) -> System.Threading.Tasks.Task
+~Orleans.Streams.NoOpStreamDeliveryFailureHandler.OnSubscriptionFailure(Orleans.Runtime.GuidId subscriptionId, string streamProviderName, Orleans.Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken sequenceToken) -> System.Threading.Tasks.Task
+~Orleans.Streams.ProviderStartException.ProviderStartException(string message) -> void
+~Orleans.Streams.ProviderStartException.ProviderStartException(string message, System.Exception innerException) -> void
+~Orleans.Streams.PubSubSubscriptionState.AddFilter(string filterData) -> void
+~Orleans.Streams.PubSubSubscriptionState.Equals(Orleans.Runtime.GuidId subscriptionId) -> bool
+~Orleans.Streams.PubSubSubscriptionState.Equals(Orleans.Streams.PubSubSubscriptionState other) -> bool
+~Orleans.Streams.PubSubSubscriptionState.FilterData -> string
+~Orleans.Streams.PubSubSubscriptionState.PubSubSubscriptionState(Orleans.Runtime.GuidId subscriptionId, Orleans.Runtime.QualifiedStreamId streamId, Orleans.Runtime.GrainId streamConsumer) -> void
+~Orleans.Streams.PubSubSubscriptionState.SubscriptionId -> Orleans.Runtime.GuidId
+~Orleans.Streams.QueueBalancerBase.Logger.get -> Microsoft.Extensions.Logging.ILogger
+~Orleans.Streams.QueueBalancerBase.NotifyListeners() -> System.Threading.Tasks.Task
+~Orleans.Streams.QueueBalancerBase.QueueBalancerBase(System.IServiceProvider sp, Microsoft.Extensions.Logging.ILogger logger) -> void
+~Orleans.Streams.QueueBalancerBase.SiloAddress.get -> Orleans.Runtime.SiloAddress
+~Orleans.Streams.QueueBalancerBase.SubscribeToQueueDistributionChangeEvents(Orleans.Streams.IStreamQueueBalanceListener observer) -> bool
+~Orleans.Streams.QueueBalancerBase.UnSubscribeFromQueueDistributionChangeEvents(Orleans.Streams.IStreamQueueBalanceListener observer) -> bool
+~Orleans.Streams.QueueCacheMissException.High.get -> string
+~Orleans.Streams.QueueCacheMissException.Low.get -> string
+~Orleans.Streams.QueueCacheMissException.QueueCacheMissException(Orleans.Streams.StreamSequenceToken requested, Orleans.Streams.StreamSequenceToken low, Orleans.Streams.StreamSequenceToken high) -> void
+~Orleans.Streams.QueueCacheMissException.QueueCacheMissException(string message) -> void
+~Orleans.Streams.QueueCacheMissException.QueueCacheMissException(string message, System.Exception innerException) -> void
+~Orleans.Streams.QueueCacheMissException.QueueCacheMissException(string requested, string low, string high) -> void
+~Orleans.Streams.QueueCacheMissException.Requested.get -> string
+~Orleans.Streams.RegexStreamNamespacePredicate.IsMatch(string streamNameSpace) -> bool
+~Orleans.Streams.RegexStreamNamespacePredicate.PredicatePattern.get -> string
+~Orleans.Streams.RegexStreamNamespacePredicate.RegexStreamNamespacePredicate(string regex) -> void
+~Orleans.Streams.SequentialItem<T>.SequentialItem(T item, Orleans.Streams.StreamSequenceToken token) -> void
+~Orleans.Streams.SequentialItem<T>.Token.get -> Orleans.Streams.StreamSequenceToken
+~Orleans.Streams.StreamEventDeliveryFailureException.StreamEventDeliveryFailureException(string message) -> void
+~Orleans.Streams.StreamEventDeliveryFailureException.StreamEventDeliveryFailureException(string message, System.Exception innerException) -> void
+~Orleans.Streams.StreamEventDeliveryFailureException.StreamEventDeliveryFailureException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~Orleans.Streams.StreamIdentity.Namespace.get -> string
+~Orleans.Streams.StreamIdentity.StreamIdentity(System.Guid streamGuid, string streamNamespace) -> void
+~Orleans.Streams.StreamPosition.SequenceToken.get -> Orleans.Streams.StreamSequenceToken
+~Orleans.Streams.StreamPosition.StreamPosition(Orleans.Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken sequenceToken) -> void
+~Orleans.Streams.StreamSubscriptionHandlerFactory.Create<T>() -> Orleans.Streams.StreamSubscriptionHandle<T>
+~Orleans.Streams.StreamSubscriptionHandlerFactory.ProviderName.get -> string
+~Orleans.Streams.StreamSubscriptionHandlerFactory.StreamSubscriptionHandlerFactory(Orleans.Streams.IStreamProvider streamProvider, Orleans.Runtime.StreamId streamId, string providerName, Orleans.Runtime.GuidId subscriptionId) -> void
+~Orleans.Streams.StreamSubscriptionHandlerFactory.SubscriptionId.get -> Orleans.Runtime.GuidId
+~override Orleans.Providers.Streams.Common.EventSequenceToken.CompareTo(Orleans.Streams.StreamSequenceToken other) -> int
+~override Orleans.Providers.Streams.Common.EventSequenceToken.Equals(object obj) -> bool
+~override Orleans.Providers.Streams.Common.EventSequenceToken.Equals(Orleans.Streams.StreamSequenceToken other) -> bool
+~override Orleans.Providers.Streams.Common.EventSequenceToken.ToString() -> string
+~override Orleans.Providers.Streams.Common.EventSequenceTokenV2.CompareTo(Orleans.Streams.StreamSequenceToken other) -> int
+~override Orleans.Providers.Streams.Common.EventSequenceTokenV2.Equals(object obj) -> bool
+~override Orleans.Providers.Streams.Common.EventSequenceTokenV2.Equals(Orleans.Streams.StreamSequenceToken other) -> bool
+~override Orleans.Providers.Streams.Common.EventSequenceTokenV2.ToString() -> string
+~override Orleans.Providers.Streams.Common.SimpleQueueCacheCursor.ToString() -> string
+~override Orleans.Streams.DeploymentBasedQueueBalancer.GetMyQueues() -> System.Collections.Generic.IEnumerable<Orleans.Streams.QueueId>
+~override Orleans.Streams.DeploymentBasedQueueBalancer.Initialize(Orleans.Streams.IStreamQueueMapper queueMapper) -> System.Threading.Tasks.Task
+~override Orleans.Streams.DeploymentBasedQueueBalancer.OnClusterMembershipChange(System.Collections.Generic.HashSet<Orleans.Runtime.SiloAddress> activeSilos) -> void
+~override Orleans.Streams.HashRingBasedStreamQueueMapper.ToString() -> string
+~override Orleans.Streams.LeaseBasedQueueBalancer.GetMyQueues() -> System.Collections.Generic.IEnumerable<Orleans.Streams.QueueId>
+~override Orleans.Streams.LeaseBasedQueueBalancer.Initialize(Orleans.Streams.IStreamQueueMapper queueMapper) -> System.Threading.Tasks.Task
+~override Orleans.Streams.LeaseBasedQueueBalancer.OnClusterMembershipChange(System.Collections.Generic.HashSet<Orleans.Runtime.SiloAddress> activeSilos) -> void
+~override Orleans.Streams.LeaseBasedQueueBalancer.Shutdown() -> System.Threading.Tasks.Task
+~override Orleans.Streams.PubSubSubscriptionState.Equals(object obj) -> bool
+~override Orleans.Streams.PubSubSubscriptionState.ToString() -> string
+~override Orleans.Streams.QueueCacheMissException.GetObjectData(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~override Orleans.Streams.StreamIdentity.Equals(object obj) -> bool
+~readonly Orleans.Providers.Streams.Common.ChronologicalEvictionStrategy.inUseBuffers -> System.Collections.Generic.Queue<Orleans.Providers.Streams.Common.FixedSizeBuffer>
+~static Orleans.ClientStreamingExtensions.GetStreamProvider(this Orleans.IClusterClient client, string name) -> Orleans.Streams.IStreamProvider
+~static Orleans.Configuration.SimpleQueueCacheOptionsValidator.Create(System.IServiceProvider services, string name) -> Orleans.IConfigurationValidator
+~static Orleans.GrainStreamingExtensions.GetStreamProvider(this Orleans.Grain grain, string name) -> Orleans.Streams.IStreamProvider
+~static Orleans.GrainStreamingExtensions.GetStreamProvider(this Orleans.IGrainBase grain, string name) -> Orleans.Streams.IStreamProvider
+~static Orleans.Hosting.ClientBuilderStreamingExtensions.AddMemoryStreams(this Orleans.Hosting.IClientBuilder builder, string name, System.Action<Orleans.Hosting.IClusterClientMemoryStreamConfigurator> configure = null) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderStreamingExtensions.AddMemoryStreams<TSerializer>(this Orleans.Hosting.IClientBuilder builder, string name, System.Action<Orleans.Hosting.IClusterClientMemoryStreamConfigurator> configure = null) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderStreamingExtensions.AddPersistentStreams(this Orleans.Hosting.IClientBuilder builder, string name, System.Func<System.IServiceProvider, string, Orleans.Streams.IQueueAdapterFactory> adapterFactory, System.Action<Orleans.Hosting.IClusterClientPersistentStreamConfigurator> configureStream) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClientBuilderStreamingExtensions.AddStreaming(this Orleans.Hosting.IClientBuilder builder) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.ClusterClientPersistentStreamConfiguratorExtensions.ConfigureLifecycle(this Orleans.Hosting.IClusterClientPersistentStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.StreamLifecycleOptions>> configureOptions) -> void
+~static Orleans.Hosting.MemoryStreamConfiguratorExtensions.ConfigurePartitioning(this Orleans.Hosting.IMemoryStreamConfigurator configurator, int numOfQueues = 8) -> void
+~static Orleans.Hosting.PersistentStreamConfiguratorExtensions.ConfigureStreamPubSub(this Orleans.Hosting.IPersistentStreamConfigurator configurator, Orleans.Streams.StreamPubSubType pubsubType = Orleans.Streams.StreamPubSubType.ExplicitGrainBasedAndImplicit) -> void
+~static Orleans.Hosting.PersistentStreamStorageConfigurationValidator.Create(System.IServiceProvider services, string name) -> Orleans.IConfigurationValidator
+~static Orleans.Hosting.SiloBuilderMemoryStreamExtensions.AddMemoryStreams(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Hosting.ISiloMemoryStreamConfigurator> configure = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.SiloBuilderMemoryStreamExtensions.AddMemoryStreams<TSerializer>(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Hosting.ISiloMemoryStreamConfigurator> configure = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.SiloBuilderStreamingExtensions.AddPersistentStreams(this Orleans.Hosting.ISiloBuilder builder, string name, System.Func<System.IServiceProvider, string, Orleans.Streams.IQueueAdapterFactory> adapterFactory, System.Action<Orleans.Hosting.ISiloPersistentStreamConfigurator> configureStream) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.SiloBuilderStreamingExtensions.AddStreamFilter<T>(this Orleans.Hosting.IClientBuilder builder, string name) -> Orleans.Hosting.IClientBuilder
+~static Orleans.Hosting.SiloBuilderStreamingExtensions.AddStreamFilter<T>(this Orleans.Hosting.ISiloBuilder builder, string name) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.SiloBuilderStreamingExtensions.AddStreaming(this Orleans.Hosting.ISiloBuilder builder) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.SiloPersistentStreamConfiguratorExtension.UseConsistentRingQueueBalancer(this Orleans.Hosting.ISiloPersistentStreamConfigurator configurator) -> void
+~static Orleans.Hosting.SiloPersistentStreamConfiguratorExtension.UseDynamicClusterConfigDeploymentBalancer(this Orleans.Hosting.ISiloPersistentStreamConfigurator configurator, System.TimeSpan? siloMaturityPeriod = null) -> void
+~static Orleans.Hosting.SiloPersistentStreamConfiguratorExtension.UseLeaseBasedQueueBalancer(this Orleans.Hosting.ISiloPersistentStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.LeaseBasedQueueBalancerOptions>> configureOptions = null) -> void
+~static Orleans.Hosting.SiloPersistentStreamConfiguratorExtension.UseStaticClusterConfigDeploymentBalancer(this Orleans.Hosting.ISiloPersistentStreamConfigurator configurator, System.TimeSpan? siloMaturityPeriod = null) -> void
+~static Orleans.Hosting.SiloPersistentStreamConfiguratorExtensions.ConfigureBackoffProvider(this Orleans.Hosting.ISiloPersistentStreamConfigurator configurator, System.Func<System.IServiceProvider, string, Orleans.Runtime.Providers.IMessageDeliveryBackoffProvider> factory) -> void
+~static Orleans.Hosting.SiloPersistentStreamConfiguratorExtensions.ConfigureBackoffProvider(this Orleans.Hosting.ISiloPersistentStreamConfigurator configurator, System.Func<System.IServiceProvider, string, Orleans.Runtime.Providers.IQueueReaderBackoffProvider> factory) -> void
+~static Orleans.Hosting.SiloPersistentStreamConfiguratorExtensions.ConfigureLifecycle(this Orleans.Hosting.ISiloPersistentStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.StreamLifecycleOptions>> configureOptions) -> void
+~static Orleans.Hosting.SiloPersistentStreamConfiguratorExtensions.ConfigurePartitionBalancing(this Orleans.Hosting.ISiloPersistentStreamConfigurator configurator, System.Func<System.IServiceProvider, string, Orleans.Streams.IStreamQueueBalancer> factory) -> void
+~static Orleans.Hosting.SiloPersistentStreamConfiguratorExtensions.ConfigurePartitionBalancing<TOptions>(this Orleans.Hosting.ISiloPersistentStreamConfigurator configurator, System.Func<System.IServiceProvider, string, Orleans.Streams.IStreamQueueBalancer> factory, System.Action<Microsoft.Extensions.Options.OptionsBuilder<TOptions>> configureOptions) -> void
+~static Orleans.Hosting.SiloPersistentStreamConfiguratorExtensions.ConfigurePullingAgent(this Orleans.Hosting.ISiloPersistentStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.StreamPullingAgentOptions>> configureOptions = null) -> void
+~static Orleans.Hosting.SiloRecoverableStreamConfiguratorExtensions.ConfigureCacheEviction(this Orleans.Hosting.ISiloRecoverableStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.StreamCacheEvictionOptions>> configureOptions) -> void
+~static Orleans.Hosting.SiloRecoverableStreamConfiguratorExtensions.ConfigureStatistics(this Orleans.Hosting.ISiloRecoverableStreamConfigurator configurator, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.StreamStatisticOptions>> configureOptions) -> void
+~static Orleans.Hosting.StreamingServiceCollectionExtensions.AddClientStreaming(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) -> void
+~static Orleans.Hosting.StreamingServiceCollectionExtensions.AddSiloStreaming(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) -> void
+~static Orleans.Hosting.StreamingServiceCollectionExtensions.AddStreamFilter<T>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Providers.MemoryAdapterFactory<TSerializer>.Create(System.IServiceProvider services, string name) -> Orleans.Providers.MemoryAdapterFactory<TSerializer>
+~static Orleans.Providers.Streams.Common.CachedMessageExtensions.Compare(this ref Orleans.Providers.Streams.Common.CachedMessage cachedMessage, Orleans.Streams.StreamSequenceToken token) -> int
+~static Orleans.Providers.Streams.Common.PersistentStreamProvider.Create(System.IServiceProvider services, string name) -> Orleans.Streams.IStreamProvider
+~static Orleans.Providers.Streams.Common.PersistentStreamProvider.ParticipateIn<TLifecycle>(System.IServiceProvider serviceProvider, string name) -> Orleans.ILifecycleParticipant<TLifecycle>
+~static Orleans.Providers.Streams.Common.SegmentBuilder.Append(System.ArraySegment<byte> segment, ref int writerOffset, string str) -> void
+~static Orleans.Providers.Streams.Common.SegmentBuilder.CalculateAppendSize(string str) -> int
+~static Orleans.Providers.Streams.Common.SegmentBuilder.ReadNextString(System.ArraySegment<byte> segment, ref int readerOffset) -> string
+~static Orleans.Providers.Streams.Generator.GeneratorAdapterFactory.Create(System.IServiceProvider services, string name) -> Orleans.Providers.Streams.Generator.GeneratorAdapterFactory
+~static Orleans.Streams.AsyncBatchObservableExtensions.SubscribeAsync<T>(this Orleans.Streams.IAsyncBatchObservable<T> obs, System.Func<System.Collections.Generic.IList<Orleans.Streams.SequentialItem<T>>, System.Threading.Tasks.Task> onNextAsync) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.AsyncBatchObservableExtensions.SubscribeAsync<T>(this Orleans.Streams.IAsyncBatchObservable<T> obs, System.Func<System.Collections.Generic.IList<Orleans.Streams.SequentialItem<T>>, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Exception, System.Threading.Tasks.Task> onErrorAsync) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.AsyncBatchObservableExtensions.SubscribeAsync<T>(this Orleans.Streams.IAsyncBatchObservable<T> obs, System.Func<System.Collections.Generic.IList<Orleans.Streams.SequentialItem<T>>, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Exception, System.Threading.Tasks.Task> onErrorAsync, System.Func<System.Threading.Tasks.Task> onCompletedAsync) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.AsyncBatchObservableExtensions.SubscribeAsync<T>(this Orleans.Streams.IAsyncBatchObservable<T> obs, System.Func<System.Collections.Generic.IList<Orleans.Streams.SequentialItem<T>>, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Threading.Tasks.Task> onCompletedAsync) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.AsyncObservableExtensions.SubscribeAsync<T>(this Orleans.Streams.IAsyncObservable<T> obs, System.Func<T, Orleans.Streams.StreamSequenceToken, System.Threading.Tasks.Task> onNextAsync) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.AsyncObservableExtensions.SubscribeAsync<T>(this Orleans.Streams.IAsyncObservable<T> obs, System.Func<T, Orleans.Streams.StreamSequenceToken, System.Threading.Tasks.Task> onNextAsync, Orleans.Streams.StreamSequenceToken token) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.AsyncObservableExtensions.SubscribeAsync<T>(this Orleans.Streams.IAsyncObservable<T> obs, System.Func<T, Orleans.Streams.StreamSequenceToken, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Exception, System.Threading.Tasks.Task> onErrorAsync) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.AsyncObservableExtensions.SubscribeAsync<T>(this Orleans.Streams.IAsyncObservable<T> obs, System.Func<T, Orleans.Streams.StreamSequenceToken, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Exception, System.Threading.Tasks.Task> onErrorAsync, Orleans.Streams.StreamSequenceToken token) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.AsyncObservableExtensions.SubscribeAsync<T>(this Orleans.Streams.IAsyncObservable<T> obs, System.Func<T, Orleans.Streams.StreamSequenceToken, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Exception, System.Threading.Tasks.Task> onErrorAsync, System.Func<System.Threading.Tasks.Task> onCompletedAsync) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.AsyncObservableExtensions.SubscribeAsync<T>(this Orleans.Streams.IAsyncObservable<T> obs, System.Func<T, Orleans.Streams.StreamSequenceToken, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Exception, System.Threading.Tasks.Task> onErrorAsync, System.Func<System.Threading.Tasks.Task> onCompletedAsync, Orleans.Streams.StreamSequenceToken token) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.AsyncObservableExtensions.SubscribeAsync<T>(this Orleans.Streams.IAsyncObservable<T> obs, System.Func<T, Orleans.Streams.StreamSequenceToken, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Threading.Tasks.Task> onCompletedAsync) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.AsyncObservableExtensions.SubscribeAsync<T>(this Orleans.Streams.IAsyncObservable<T> obs, System.Func<T, Orleans.Streams.StreamSequenceToken, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Threading.Tasks.Task> onCompletedAsync, Orleans.Streams.StreamSequenceToken token) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.ConstructorStreamNamespacePredicateProvider.FormatPattern(System.Type predicateType, string constructorArgument) -> string
+~static Orleans.Streams.DeploymentBasedQueueBalancer.Create(System.IServiceProvider services, string name, Orleans.Streams.IDeploymentConfiguration deploymentConfiguration) -> Orleans.Streams.IStreamQueueBalancer
+~static Orleans.Streams.ImplicitConsumerGrainExtensions.GetImplicitStreamIdentity(this Orleans.IGrainWithGuidCompoundKey grain) -> Orleans.Streams.StreamIdentity
+~static Orleans.Streams.LeaseBasedQueueBalancer.Create(System.IServiceProvider services, string name) -> Orleans.Streams.IStreamQueueBalancer
+~static Orleans.Streams.LoadShedQueueFlowController.CreateAsPercentageOfCPU(int loadSheddingLimit, Orleans.Configuration.LoadSheddingOptions options, Orleans.Statistics.IEnvironmentStatisticsProvider environmentStatisticsProvider) -> Orleans.Streams.IQueueFlowController
+~static Orleans.Streams.LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(Orleans.Configuration.LoadSheddingOptions options, Orleans.Statistics.IEnvironmentStatisticsProvider environmentStatisticsProvider, int percentOfSiloSheddingLimit = 95) -> Orleans.Streams.IQueueFlowController
+~static Orleans.Streams.PubSub.StreamSubscriptionManagerExtensions.AddSubscription<TGrainInterface>(this Orleans.Streams.Core.IStreamSubscriptionManager manager, Orleans.IGrainFactory grainFactory, Orleans.Runtime.StreamId streamId, string streamProviderName, long primaryKey, string grainClassNamePrefix = null) -> System.Threading.Tasks.Task<Orleans.Streams.Core.StreamSubscription>
+~static Orleans.Streams.PubSub.StreamSubscriptionManagerExtensions.AddSubscription<TGrainInterface>(this Orleans.Streams.Core.IStreamSubscriptionManager manager, Orleans.IGrainFactory grainFactory, Orleans.Runtime.StreamId streamId, string streamProviderName, long primaryKey, string keyExtension, string grainClassNamePrefix = null) -> System.Threading.Tasks.Task<Orleans.Streams.Core.StreamSubscription>
+~static Orleans.Streams.PubSub.StreamSubscriptionManagerExtensions.AddSubscription<TGrainInterface>(this Orleans.Streams.Core.IStreamSubscriptionManager manager, Orleans.IGrainFactory grainFactory, Orleans.Runtime.StreamId streamId, string streamProviderName, Orleans.Runtime.GrainId grainId) -> System.Threading.Tasks.Task<Orleans.Streams.Core.StreamSubscription>
+~static Orleans.Streams.PubSub.StreamSubscriptionManagerExtensions.AddSubscription<TGrainInterface>(this Orleans.Streams.Core.IStreamSubscriptionManager manager, Orleans.IGrainFactory grainFactory, Orleans.Runtime.StreamId streamId, string streamProviderName, string primaryKey, string grainClassNamePrefix = null) -> System.Threading.Tasks.Task<Orleans.Streams.Core.StreamSubscription>
+~static Orleans.Streams.PubSub.StreamSubscriptionManagerExtensions.AddSubscription<TGrainInterface>(this Orleans.Streams.Core.IStreamSubscriptionManager manager, Orleans.IGrainFactory grainFactory, Orleans.Runtime.StreamId streamId, string streamProviderName, System.Guid primaryKey, string grainClassNamePrefix = null) -> System.Threading.Tasks.Task<Orleans.Streams.Core.StreamSubscription>
+~static Orleans.Streams.PubSub.StreamSubscriptionManagerExtensions.AddSubscription<TGrainInterface>(this Orleans.Streams.Core.IStreamSubscriptionManager manager, Orleans.IGrainFactory grainFactory, Orleans.Runtime.StreamId streamId, string streamProviderName, System.Guid primaryKey, string keyExtension, string grainClassNamePrefix = null) -> System.Threading.Tasks.Task<Orleans.Streams.Core.StreamSubscription>
+~static Orleans.Streams.PubSub.StreamSubscriptionManagerExtensions.TryGetStreamSubscriptionManager(this Orleans.Streams.IStreamProvider streamProvider, out Orleans.Streams.Core.IStreamSubscriptionManager manager) -> bool
+~static Orleans.Streams.PubSubSubscriptionState.operator !=(Orleans.Streams.PubSubSubscriptionState left, Orleans.Streams.PubSubSubscriptionState right) -> bool
+~static Orleans.Streams.PubSubSubscriptionState.operator ==(Orleans.Streams.PubSubSubscriptionState left, Orleans.Streams.PubSubSubscriptionState right) -> bool
+~static Orleans.Streams.QueueAdapterExtensions.QueueMessageAsync<T>(this Orleans.Streams.IQueueAdapter adapter, Orleans.Runtime.StreamId streamId, T evt, Orleans.Streams.StreamSequenceToken token, System.Collections.Generic.Dictionary<string, object> requestContext) -> System.Threading.Tasks.Task
+~static Orleans.Streams.StreamProviderExtensions.GetStream<T>(this Orleans.Streams.IStreamProvider streamProvider, long id) -> Orleans.Streams.IAsyncStream<T>
+~static Orleans.Streams.StreamProviderExtensions.GetStream<T>(this Orleans.Streams.IStreamProvider streamProvider, string id) -> Orleans.Streams.IAsyncStream<T>
+~static Orleans.Streams.StreamProviderExtensions.GetStream<T>(this Orleans.Streams.IStreamProvider streamProvider, string ns, long id) -> Orleans.Streams.IAsyncStream<T>
+~static Orleans.Streams.StreamProviderExtensions.GetStream<T>(this Orleans.Streams.IStreamProvider streamProvider, string ns, string id) -> Orleans.Streams.IAsyncStream<T>
+~static Orleans.Streams.StreamProviderExtensions.GetStream<T>(this Orleans.Streams.IStreamProvider streamProvider, string ns, System.Guid id) -> Orleans.Streams.IAsyncStream<T>
+~static Orleans.Streams.StreamProviderExtensions.GetStream<T>(this Orleans.Streams.IStreamProvider streamProvider, System.Guid id) -> Orleans.Streams.IAsyncStream<T>
+~static Orleans.Streams.StreamSequenceTokenUtilities.Newer(this Orleans.Streams.StreamSequenceToken me, Orleans.Streams.StreamSequenceToken other) -> bool
+~static Orleans.Streams.StreamSequenceTokenUtilities.Older(this Orleans.Streams.StreamSequenceToken me, Orleans.Streams.StreamSequenceToken other) -> bool
+~static Orleans.Streams.StreamSubscriptionHandleExtensions.ResumeAsync<T>(this Orleans.Streams.StreamSubscriptionHandle<T> handle, System.Func<System.Collections.Generic.IList<Orleans.Streams.SequentialItem<T>>, System.Threading.Tasks.Task> onNextAsync, Orleans.Streams.StreamSequenceToken token = null) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.StreamSubscriptionHandleExtensions.ResumeAsync<T>(this Orleans.Streams.StreamSubscriptionHandle<T> handle, System.Func<System.Collections.Generic.IList<Orleans.Streams.SequentialItem<T>>, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Exception, System.Threading.Tasks.Task> onErrorAsync, Orleans.Streams.StreamSequenceToken token = null) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.StreamSubscriptionHandleExtensions.ResumeAsync<T>(this Orleans.Streams.StreamSubscriptionHandle<T> handle, System.Func<System.Collections.Generic.IList<Orleans.Streams.SequentialItem<T>>, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Exception, System.Threading.Tasks.Task> onErrorAsync, System.Func<System.Threading.Tasks.Task> onCompletedAsync, Orleans.Streams.StreamSequenceToken token = null) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.StreamSubscriptionHandleExtensions.ResumeAsync<T>(this Orleans.Streams.StreamSubscriptionHandle<T> handle, System.Func<System.Collections.Generic.IList<Orleans.Streams.SequentialItem<T>>, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Threading.Tasks.Task> onCompletedAsync, Orleans.Streams.StreamSequenceToken token = null) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.StreamSubscriptionHandleExtensions.ResumeAsync<T>(this Orleans.Streams.StreamSubscriptionHandle<T> handle, System.Func<T, Orleans.Streams.StreamSequenceToken, System.Threading.Tasks.Task> onNextAsync, Orleans.Streams.StreamSequenceToken token = null) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.StreamSubscriptionHandleExtensions.ResumeAsync<T>(this Orleans.Streams.StreamSubscriptionHandle<T> handle, System.Func<T, Orleans.Streams.StreamSequenceToken, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Exception, System.Threading.Tasks.Task> onErrorAsync, Orleans.Streams.StreamSequenceToken token = null) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.StreamSubscriptionHandleExtensions.ResumeAsync<T>(this Orleans.Streams.StreamSubscriptionHandle<T> handle, System.Func<T, Orleans.Streams.StreamSequenceToken, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Exception, System.Threading.Tasks.Task> onErrorAsync, System.Func<System.Threading.Tasks.Task> onCompletedAsync, Orleans.Streams.StreamSequenceToken token = null) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~static Orleans.Streams.StreamSubscriptionHandleExtensions.ResumeAsync<T>(this Orleans.Streams.StreamSubscriptionHandle<T> handle, System.Func<T, Orleans.Streams.StreamSequenceToken, System.Threading.Tasks.Task> onNextAsync, System.Func<System.Threading.Tasks.Task> onCompletedAsync, Orleans.Streams.StreamSequenceToken token = null) -> System.Threading.Tasks.Task<Orleans.Streams.StreamSubscriptionHandle<T>>
+~virtual Orleans.Providers.Streams.Common.ObjectPool<T>.Allocate() -> T
+~virtual Orleans.Providers.Streams.Common.ObjectPool<T>.Free(T resource) -> void
+~virtual Orleans.Providers.Streams.Common.SimpleQueueCache.AddToCache(System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> msgs) -> void
+~virtual Orleans.Providers.Streams.Common.SimpleQueueCache.GetCacheCursor(Orleans.Runtime.StreamId streamId, Orleans.Streams.StreamSequenceToken token) -> Orleans.Streams.IQueueCacheCursor
+~virtual Orleans.Providers.Streams.Common.SimpleQueueCache.TryPurgeFromCache(out System.Collections.Generic.IList<Orleans.Streams.IBatchContainer> purgedItems) -> bool
+~virtual Orleans.Providers.Streams.Common.SimpleQueueCacheCursor.GetCurrent(out System.Exception exception) -> Orleans.Streams.IBatchContainer
+~virtual Orleans.Providers.Streams.Common.SimpleQueueCacheCursor.Refresh(Orleans.Streams.StreamSequenceToken sequenceToken) -> void
+~virtual Orleans.Streams.QueueBalancerBase.Initialize(Orleans.Streams.IStreamQueueMapper queueMapper) -> System.Threading.Tasks.Task
+~virtual Orleans.Streams.QueueBalancerBase.Shutdown() -> System.Threading.Tasks.Task

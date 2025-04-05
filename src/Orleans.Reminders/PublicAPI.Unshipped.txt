@@ -1,0 +1,114 @@
+#nullable enable
+Orleans.GrainReminderExtensions
+Orleans.Hosting.ReminderOptions
+Orleans.Hosting.ReminderOptions.InitializationTimeout.get -> System.TimeSpan
+Orleans.Hosting.ReminderOptions.InitializationTimeout.set -> void
+Orleans.Hosting.ReminderOptions.MinimumReminderPeriod.get -> System.TimeSpan
+Orleans.Hosting.ReminderOptions.MinimumReminderPeriod.set -> void
+Orleans.Hosting.ReminderOptions.RefreshReminderListPeriod.get -> System.TimeSpan
+Orleans.Hosting.ReminderOptions.RefreshReminderListPeriod.set -> void
+Orleans.Hosting.ReminderOptions.ReminderOptions() -> void
+Orleans.Hosting.SiloBuilderReminderExtensions
+Orleans.Hosting.SiloBuilderReminderMemoryExtensions
+Orleans.IRemindable
+Orleans.IReminderService
+Orleans.IReminderTable
+Orleans.ReminderEntry
+Orleans.ReminderEntry.GrainId.get -> Orleans.Runtime.GrainId
+Orleans.ReminderEntry.GrainId.set -> void
+Orleans.ReminderEntry.Period.get -> System.TimeSpan
+Orleans.ReminderEntry.Period.set -> void
+Orleans.ReminderEntry.ReminderEntry() -> void
+Orleans.ReminderEntry.StartAt.get -> System.DateTime
+Orleans.ReminderEntry.StartAt.set -> void
+Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.ReminderServiceBase = 102900 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_Factory1 = 102919 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_FailedToReadTableAndStartTimer = 102920 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_FastReminderInterval = 102939 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_GetReminder = 102932 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_GetReminders = 102933 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_GrainBasedTable1 = 102918 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_GrainBasedTable2 = 102924 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_LocalStop = 102935 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_NotResponsible = 102910 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_Not_Started = 102916 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_RangeChanged = 102934 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_RegisterOrUpdate = 102928 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_Register_AlreadyRegistered = 102907 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_Register_InvalidPeriod = 102908 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_Register_NotRemindable = 102909 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_Register_TableError = 102905 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_RemoveFromTable = 102931 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_ServiceInitialLoadFailed = 102938 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_ServiceInitialLoadFailing = 102937 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_ServiceStarted = 102926 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_ServiceStarting = 102925 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_ServiceStopping = 102927 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_Started = 102936 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_Stop = 102930 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_TableGrainInit1 = 102921 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_TableGrainInit2 = 102922 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_TableGrainInit3 = 102923 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_Table_Insert = 102913 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_Table_Remove = 102914 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_Tick_Delivery_Error = 102915 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_Unregister = 102929 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_UnregisterGrain_TableError = 102917 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_Unregister_NotFoundLocally = 102911 -> Orleans.Reminders.RSErrorCode
+Orleans.Reminders.RSErrorCode.RS_Unregister_TableError = 102912 -> Orleans.Reminders.RSErrorCode
+Orleans.ReminderTableData
+Orleans.ReminderTableData.ReminderTableData() -> void
+Orleans.Runtime.IGrainReminder
+Orleans.Runtime.ReminderException
+Orleans.Runtime.TickStatus
+Orleans.Runtime.TickStatus.CurrentTickTime.get -> System.DateTime
+Orleans.Runtime.TickStatus.FirstTickTime.get -> System.DateTime
+Orleans.Runtime.TickStatus.Period.get -> System.TimeSpan
+Orleans.Runtime.TickStatus.TickStatus() -> void
+Orleans.Runtime.TickStatus.TickStatus(System.DateTime firstTickTime, System.TimeSpan period, System.DateTime timeStamp) -> void
+Orleans.Timers.IReminderRegistry
+static Orleans.GrainReminderExtensions.GetReminder(this Orleans.Grain! grain, string! reminderName) -> System.Threading.Tasks.Task<Orleans.Runtime.IGrainReminder?>!
+static Orleans.GrainReminderExtensions.GetReminder(this Orleans.IGrainBase! grain, string! reminderName) -> System.Threading.Tasks.Task<Orleans.Runtime.IGrainReminder?>!
+static Orleans.GrainReminderExtensions.GetReminders(this Orleans.Grain! grain) -> System.Threading.Tasks.Task<System.Collections.Generic.List<Orleans.Runtime.IGrainReminder!>!>!
+static Orleans.GrainReminderExtensions.GetReminders(this Orleans.IGrainBase! grain) -> System.Threading.Tasks.Task<System.Collections.Generic.List<Orleans.Runtime.IGrainReminder!>!>!
+static Orleans.GrainReminderExtensions.RegisterOrUpdateReminder(this Orleans.Grain! grain, string! reminderName, System.TimeSpan dueTime, System.TimeSpan period) -> System.Threading.Tasks.Task<Orleans.Runtime.IGrainReminder!>!
+static Orleans.GrainReminderExtensions.RegisterOrUpdateReminder(this Orleans.IGrainBase! grain, string! reminderName, System.TimeSpan dueTime, System.TimeSpan period) -> System.Threading.Tasks.Task<Orleans.Runtime.IGrainReminder!>!
+static Orleans.GrainReminderExtensions.UnregisterReminder(this Orleans.Grain! grain, Orleans.Runtime.IGrainReminder! reminder) -> System.Threading.Tasks.Task!
+static Orleans.GrainReminderExtensions.UnregisterReminder(this Orleans.IGrainBase! grain, Orleans.Runtime.IGrainReminder! reminder) -> System.Threading.Tasks.Task!
+~Orleans.IRemindable.ReceiveReminder(string reminderName, Orleans.Runtime.TickStatus status) -> System.Threading.Tasks.Task
+~Orleans.IReminderService.GetReminder(Orleans.Runtime.GrainId grainId, string reminderName) -> System.Threading.Tasks.Task<Orleans.Runtime.IGrainReminder>
+~Orleans.IReminderService.GetReminders(Orleans.Runtime.GrainId grainId) -> System.Threading.Tasks.Task<System.Collections.Generic.List<Orleans.Runtime.IGrainReminder>>
+~Orleans.IReminderService.RegisterOrUpdateReminder(Orleans.Runtime.GrainId grainId, string reminderName, System.TimeSpan dueTime, System.TimeSpan period) -> System.Threading.Tasks.Task<Orleans.Runtime.IGrainReminder>
+~Orleans.IReminderService.Start() -> System.Threading.Tasks.Task
+~Orleans.IReminderService.Stop() -> System.Threading.Tasks.Task
+~Orleans.IReminderService.UnregisterReminder(Orleans.Runtime.IGrainReminder reminder) -> System.Threading.Tasks.Task
+~Orleans.IReminderTable.Init() -> System.Threading.Tasks.Task
+~Orleans.IReminderTable.ReadRow(Orleans.Runtime.GrainId grainId, string reminderName) -> System.Threading.Tasks.Task<Orleans.ReminderEntry>
+~Orleans.IReminderTable.ReadRows(Orleans.Runtime.GrainId grainId) -> System.Threading.Tasks.Task<Orleans.ReminderTableData>
+~Orleans.IReminderTable.ReadRows(uint begin, uint end) -> System.Threading.Tasks.Task<Orleans.ReminderTableData>
+~Orleans.IReminderTable.RemoveRow(Orleans.Runtime.GrainId grainId, string reminderName, string eTag) -> System.Threading.Tasks.Task<bool>
+~Orleans.IReminderTable.StartAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task
+~Orleans.IReminderTable.StopAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task
+~Orleans.IReminderTable.TestOnlyClearTable() -> System.Threading.Tasks.Task
+~Orleans.IReminderTable.UpsertRow(Orleans.ReminderEntry entry) -> System.Threading.Tasks.Task<string>
+~Orleans.ReminderEntry.ETag.get -> string
+~Orleans.ReminderEntry.ETag.set -> void
+~Orleans.ReminderEntry.ReminderName.get -> string
+~Orleans.ReminderEntry.ReminderName.set -> void
+~Orleans.ReminderTableData.Reminders.get -> System.Collections.Generic.IList<Orleans.ReminderEntry>
+~Orleans.ReminderTableData.ReminderTableData(Orleans.ReminderEntry entry) -> void
+~Orleans.ReminderTableData.ReminderTableData(System.Collections.Generic.IEnumerable<Orleans.ReminderEntry> list) -> void
+~Orleans.Runtime.IGrainReminder.ReminderName.get -> string
+~Orleans.Runtime.ReminderException.ReminderException(string message) -> void
+~Orleans.Runtime.ReminderException.ReminderException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) -> void
+~Orleans.Timers.IReminderRegistry.GetReminder(Orleans.Runtime.GrainId callingGrainId, string reminderName) -> System.Threading.Tasks.Task<Orleans.Runtime.IGrainReminder>
+~Orleans.Timers.IReminderRegistry.GetReminders(Orleans.Runtime.GrainId callingGrainId) -> System.Threading.Tasks.Task<System.Collections.Generic.List<Orleans.Runtime.IGrainReminder>>
+~Orleans.Timers.IReminderRegistry.RegisterOrUpdateReminder(Orleans.Runtime.GrainId callingGrainId, string reminderName, System.TimeSpan dueTime, System.TimeSpan period) -> System.Threading.Tasks.Task<Orleans.Runtime.IGrainReminder>
+~Orleans.Timers.IReminderRegistry.UnregisterReminder(Orleans.Runtime.GrainId callingGrainId, Orleans.Runtime.IGrainReminder reminder) -> System.Threading.Tasks.Task
+~override Orleans.ReminderEntry.ToString() -> string
+~override Orleans.ReminderTableData.ToString() -> string
+~override Orleans.Runtime.TickStatus.ToString() -> string
+~static Orleans.Hosting.SiloBuilderReminderExtensions.AddReminders(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) -> void
+~static Orleans.Hosting.SiloBuilderReminderExtensions.AddReminders(this Orleans.Hosting.ISiloBuilder builder) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.SiloBuilderReminderMemoryExtensions.UseInMemoryReminderService(this Orleans.Hosting.ISiloBuilder builder) -> Orleans.Hosting.ISiloBuilder

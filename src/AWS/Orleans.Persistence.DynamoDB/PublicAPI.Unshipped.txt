@@ -1,0 +1,61 @@
+#nullable enable
+const Orleans.Configuration.DynamoDBStorageOptions.DEFAULT_INIT_STAGE = 10000 -> int
+Orleans.Configuration.DynamoDBGrainStorageOptionsValidator
+Orleans.Configuration.DynamoDBGrainStorageOptionsValidator.ValidateConfiguration() -> void
+Orleans.Configuration.DynamoDBStorageOptions
+Orleans.Configuration.DynamoDBStorageOptions.CreateIfNotExists.get -> bool
+Orleans.Configuration.DynamoDBStorageOptions.CreateIfNotExists.set -> void
+Orleans.Configuration.DynamoDBStorageOptions.DeleteStateOnClear.get -> bool
+Orleans.Configuration.DynamoDBStorageOptions.DeleteStateOnClear.set -> void
+Orleans.Configuration.DynamoDBStorageOptions.DynamoDBStorageOptions() -> void
+Orleans.Configuration.DynamoDBStorageOptions.InitStage.get -> int
+Orleans.Configuration.DynamoDBStorageOptions.InitStage.set -> void
+Orleans.Configuration.DynamoDBStorageOptions.ReadCapacityUnits.get -> int
+Orleans.Configuration.DynamoDBStorageOptions.ReadCapacityUnits.set -> void
+Orleans.Configuration.DynamoDBStorageOptions.TimeToLive.get -> System.TimeSpan?
+Orleans.Configuration.DynamoDBStorageOptions.TimeToLive.set -> void
+Orleans.Configuration.DynamoDBStorageOptions.UpdateIfExists.get -> bool
+Orleans.Configuration.DynamoDBStorageOptions.UpdateIfExists.set -> void
+Orleans.Configuration.DynamoDBStorageOptions.UseProvisionedThroughput.get -> bool
+Orleans.Configuration.DynamoDBStorageOptions.UseProvisionedThroughput.set -> void
+Orleans.Configuration.DynamoDBStorageOptions.WriteCapacityUnits.get -> int
+Orleans.Configuration.DynamoDBStorageOptions.WriteCapacityUnits.set -> void
+Orleans.Hosting.DynamoDBGrainStorageServiceCollectionExtensions
+Orleans.Hosting.DynamoDBGrainStorageSiloBuilderExtensions
+Orleans.Persistence.DynamoDB.DynamoDBClientOptions
+Orleans.Persistence.DynamoDB.DynamoDBClientOptions.DynamoDBClientOptions() -> void
+Orleans.Storage.DynamoDBGrainStorage
+Orleans.Storage.DynamoDBGrainStorageFactory
+~Orleans.Configuration.DynamoDBGrainStorageOptionsValidator.DynamoDBGrainStorageOptionsValidator(Orleans.Configuration.DynamoDBStorageOptions options, string name) -> void
+~Orleans.Configuration.DynamoDBStorageOptions.GrainStorageSerializer.get -> Orleans.Storage.IGrainStorageSerializer
+~Orleans.Configuration.DynamoDBStorageOptions.GrainStorageSerializer.set -> void
+~Orleans.Configuration.DynamoDBStorageOptions.ServiceId.get -> string
+~Orleans.Configuration.DynamoDBStorageOptions.ServiceId.set -> void
+~Orleans.Configuration.DynamoDBStorageOptions.TableName.get -> string
+~Orleans.Configuration.DynamoDBStorageOptions.TableName.set -> void
+~Orleans.Persistence.DynamoDB.DynamoDBClientOptions.AccessKey.get -> string
+~Orleans.Persistence.DynamoDB.DynamoDBClientOptions.AccessKey.set -> void
+~Orleans.Persistence.DynamoDB.DynamoDBClientOptions.ProfileName.get -> string
+~Orleans.Persistence.DynamoDB.DynamoDBClientOptions.ProfileName.set -> void
+~Orleans.Persistence.DynamoDB.DynamoDBClientOptions.SecretKey.get -> string
+~Orleans.Persistence.DynamoDB.DynamoDBClientOptions.SecretKey.set -> void
+~Orleans.Persistence.DynamoDB.DynamoDBClientOptions.Service.get -> string
+~Orleans.Persistence.DynamoDB.DynamoDBClientOptions.Service.set -> void
+~Orleans.Persistence.DynamoDB.DynamoDBClientOptions.Token.get -> string
+~Orleans.Persistence.DynamoDB.DynamoDBClientOptions.Token.set -> void
+~Orleans.Storage.DynamoDBGrainStorage.ClearStateAsync<T>(string grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~Orleans.Storage.DynamoDBGrainStorage.Close(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task
+~Orleans.Storage.DynamoDBGrainStorage.DynamoDBGrainStorage(string name, Orleans.Configuration.DynamoDBStorageOptions options, Orleans.Serialization.Serializers.IActivatorProvider activatorProvider, Microsoft.Extensions.Logging.ILogger<Orleans.Storage.DynamoDBGrainStorage> logger) -> void
+~Orleans.Storage.DynamoDBGrainStorage.Init(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task
+~Orleans.Storage.DynamoDBGrainStorage.Participate(Orleans.Runtime.ISiloLifecycle lifecycle) -> void
+~Orleans.Storage.DynamoDBGrainStorage.ReadStateAsync<T>(string grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~Orleans.Storage.DynamoDBGrainStorage.WriteStateAsync<T>(string grainType, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T> grainState) -> System.Threading.Tasks.Task
+~static Orleans.Hosting.DynamoDBGrainStorageServiceCollectionExtensions.AddDynamoDBGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.DynamoDBStorageOptions>> configureOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.DynamoDBGrainStorageServiceCollectionExtensions.AddDynamoDBGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Orleans.Configuration.DynamoDBStorageOptions> configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.DynamoDBGrainStorageServiceCollectionExtensions.AddDynamoDBGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.DynamoDBStorageOptions>> configureOptions = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.DynamoDBGrainStorageServiceCollectionExtensions.AddDynamoDBGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Orleans.Configuration.DynamoDBStorageOptions> configureOptions) -> Microsoft.Extensions.DependencyInjection.IServiceCollection
+~static Orleans.Hosting.DynamoDBGrainStorageSiloBuilderExtensions.AddDynamoDBGrainStorage(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.DynamoDBStorageOptions>> configureOptions = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.DynamoDBGrainStorageSiloBuilderExtensions.AddDynamoDBGrainStorage(this Orleans.Hosting.ISiloBuilder builder, string name, System.Action<Orleans.Configuration.DynamoDBStorageOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.DynamoDBGrainStorageSiloBuilderExtensions.AddDynamoDBGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Orleans.Configuration.DynamoDBStorageOptions>> configureOptions = null) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Hosting.DynamoDBGrainStorageSiloBuilderExtensions.AddDynamoDBGrainStorageAsDefault(this Orleans.Hosting.ISiloBuilder builder, System.Action<Orleans.Configuration.DynamoDBStorageOptions> configureOptions) -> Orleans.Hosting.ISiloBuilder
+~static Orleans.Storage.DynamoDBGrainStorageFactory.Create(System.IServiceProvider services, string name) -> Orleans.Storage.DynamoDBGrainStorage
