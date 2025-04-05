@@ -4,6 +4,7 @@
 using System.Net;
 using System.Diagnostics;
 using Orleans.Reminders.Cosmos.Models;
+using System.Globalization;
 
 namespace Orleans.Reminders.Cosmos;
 
@@ -159,8 +160,8 @@ internal class CosmosReminderTable : IReminderTable
                 exc,
                 "Failure reading reminders for service {Service} for range {Begin} to {End}",
                 _clusterOptions.ServiceId,
-                begin.ToString("X"),
-                end.ToString("X"));
+                begin.ToString("X", CultureInfo.InvariantCulture),
+                end.ToString("X", CultureInfo.InvariantCulture));
             WrappedException.CreateAndRethrow(exc);
             throw;
         }
@@ -366,7 +367,7 @@ internal class CosmosReminderTable : IReminderTable
     {
         return new ReminderEntry
         {
-            GrainId = GrainId.Parse(entity.GrainId),
+            GrainId = GrainId.Parse(entity.GrainId, CultureInfo.InvariantCulture),
             ReminderName = entity.Name,
             Period = entity.Period,
             StartAt = entity.StartAt.UtcDateTime,

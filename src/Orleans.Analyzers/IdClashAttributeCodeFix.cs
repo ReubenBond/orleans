@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Collections.Immutable;
 using System.Composition;
+using System.Globalization;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.Analyzers;
@@ -38,7 +39,7 @@ public class IdClashAttributeCodeFix : CodeFixProvider
                         .DescendantNodes()
                         .OfType<AttributeSyntax>()
                         .Where(a => a.IsAttribute(Constants.IdAttributeName))
-                        .Select(a => int.Parse(a.ArgumentList.Arguments.Single().ToString()))
+                        .Select(a => int.Parse(a.ArgumentList.Arguments.Single().ToString(), CultureInfo.InvariantCulture))
                         .Max() + 1;
 
                     var newAttribute = attribute.ReplaceNode(

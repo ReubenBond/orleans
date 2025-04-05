@@ -1,6 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Globalization;
 using System.Net;
 using Cassandra;
 using Microsoft.Extensions.DependencyInjection;
@@ -746,7 +747,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
 
         var readAll = await membershipTable.ReadAll();
 
-        _testOutputHelper.WriteLine(readAll.Version.Version.ToString());
+        _testOutputHelper.WriteLine(readAll.Version.Version.ToString(CultureInfo.InvariantCulture));
         foreach (var row in readAll.Members)
         {
             var entry = row.Item1;
@@ -765,7 +766,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
 
         readAll = await membershipTable.ReadAll();
 
-        _testOutputHelper.WriteLine(readAll.Version.Version.ToString());
+        _testOutputHelper.WriteLine(readAll.Version.Version.ToString(CultureInfo.InvariantCulture));
         foreach (var row in readAll.Members)
         {
             var entry = row.Item1;
@@ -799,7 +800,7 @@ public sealed class CassandraClusteringTableTests : IClassFixture<CassandraConta
 
         readAll = await membershipTable.ReadAll();
 
-        _testOutputHelper.WriteLine(readAll.Version.Version.ToString());
+        _testOutputHelper.WriteLine(readAll.Version.Version.ToString(CultureInfo.InvariantCulture));
         foreach (var row in readAll.Members)
         {
             var entry = row.Item1;

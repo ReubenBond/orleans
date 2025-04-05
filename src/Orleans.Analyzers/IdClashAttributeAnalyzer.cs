@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
+using System.Globalization;
 
 namespace Orleans.Analyzers;
 
@@ -81,7 +82,7 @@ public class IdClashAttributeAnalyzer : DiagnosticAnalyzer
                 {
                     var builder = ImmutableDictionary.CreateBuilder<string, string>();
 
-                    builder.Add("IdValue", bag.Value.ToString());
+                    builder.Add("IdValue", bag.Value.ToString(CultureInfo.InvariantCulture));
 
                     context.ReportDiagnostic(Diagnostic.Create(
                        descriptor: Rule,

@@ -127,7 +127,7 @@ public static class RuntimeTypeNameFormatter
             // Append the component
             if (component is string s)
             {
-                builder.Append($"\"{s}\"");
+                builder.Append(Invariant($"\"{s}\""));
             }
             else if (component is Type t)
             {
@@ -155,7 +155,7 @@ public static class RuntimeTypeNameFormatter
                 true => type.GenericTypeArguments.Length,
                 false => type.GetTypeInfo().GenericTypeParameters.Length
             };
-            builder.Append($"`{parameterCount}");
+            builder.Append(Invariant($"`{parameterCount}"));
         }
     }
 

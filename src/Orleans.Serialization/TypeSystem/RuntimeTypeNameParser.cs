@@ -1,6 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Globalization;
 using System.Text;
 
 namespace Orleans.Serialization.TypeSystem;
@@ -99,9 +100,9 @@ public static class RuntimeTypeNameParser
             {
                 var aritySlice = input.Input[genericArityStart..input.Index];
 #if NETCOREAPP3_1_OR_GREATER
-                arity = int.Parse(aritySlice);
+                arity = int.Parse(aritySlice, CultureInfo.InvariantCulture);
 #else
-                arity = int.Parse(aritySlice.ToString());
+                arity = int.Parse(aritySlice.ToString(), CultureInfo.InvariantCulture);
 #endif
                 input.TotalGenericArity += arity;
                 if (input.TotalGenericArity > MaxAllowedGenericArity)
@@ -232,9 +233,9 @@ public static class RuntimeTypeNameParser
             // equal to the sum of specified arity values. For example, "C`1+N`2" has an arity of 3.
             var aritySlice = s.Input[genericArityStart..s.Index];
 #if NETCOREAPP3_1_OR_GREATER
-            var arity = int.Parse(aritySlice);
+            var arity = int.Parse(aritySlice, CultureInfo.InvariantCulture);
 #else
-            var arity = int.Parse(aritySlice.ToString());
+            var arity = int.Parse(aritySlice.ToString(), CultureInfo.InvariantCulture);
 #endif
             s.TotalGenericArity += arity;
             if (s.TotalGenericArity > MaxAllowedGenericArity)

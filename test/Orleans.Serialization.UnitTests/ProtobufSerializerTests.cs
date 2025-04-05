@@ -3,6 +3,7 @@
 
 #nullable enable
 using System;
+using System.Globalization;
 using System.Linq;
 using Google.Protobuf;
 using Google.Protobuf.Collections;
@@ -164,7 +165,7 @@ public class MapFieldCodecTests : FieldCodecTester<MapField<string, int>, MapFie
         var result = new MapField<string, int>();
         for (var i = 0; i < Random.Next(17) + 5; i++)
         {
-            result[Random.Next().ToString()] = Random.Next();
+            result[Random.Next().ToString(CultureInfo.InvariantCulture)] = Random.Next();
         }
 
         return result;
@@ -186,7 +187,7 @@ public class MapFieldCopierTests : CopierTester<MapField<string, int>, MapFieldC
         var result = new MapField<string, int>();
         for (var i = 0; i < Random.Next(17) + 5; i++)
         {
-            result[Random.Next().ToString()] = Random.Next();
+            result[Random.Next().ToString(CultureInfo.InvariantCulture)] = Random.Next();
         }
 
         return result;

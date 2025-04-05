@@ -1,6 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Globalization;
 using DashboardToy.Frontend.Data;
 using Microsoft.AspNetCore.Mvc;
 using Orleans.Configuration;
@@ -76,7 +77,7 @@ public class LoaderGrain : Grain, ILoaderGrain
     public async ValueTask AddForest()
     {
         var forest = _numForests++;
-        var loadGrain = GrainFactory.GetGrain<IFanOutGrain>(0, forest.ToString());
+        var loadGrain = GrainFactory.GetGrain<IFanOutGrain>(0, forest.ToString(CultureInfo.InvariantCulture));
         await loadGrain.Ping();
     }
 

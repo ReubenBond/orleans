@@ -1,6 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Orleans.Analyzers;
 using Xunit;
@@ -45,7 +46,7 @@ public class GrainInterfacePropertyDiagnosticAnalyzerTest : DiagnosticAnalyzerTe
         var diagnostic = diagnostics.First();
         Assert.Equal(DiagnosticId, diagnostic.Id);
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
-        Assert.Equal(MessageFormat, diagnostic.GetMessage());
+        Assert.Equal(MessageFormat, diagnostic.GetMessage(CultureInfo.InvariantCulture));
     }
 
     [Fact]
@@ -66,7 +67,7 @@ public class GrainInterfacePropertyDiagnosticAnalyzerTest : DiagnosticAnalyzerTe
         var diagnostic = diagnostics.First();
         Assert.Equal(DiagnosticId, diagnostic.Id);
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
-        Assert.Equal(MessageFormat, diagnostic.GetMessage());
+        Assert.Equal(MessageFormat, diagnostic.GetMessage(CultureInfo.InvariantCulture));
     }
 
     [Fact]
@@ -87,7 +88,7 @@ public class GrainInterfacePropertyDiagnosticAnalyzerTest : DiagnosticAnalyzerTe
         var diagnostic = diagnostics.First();
         Assert.Equal(DiagnosticId, diagnostic.Id);
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
-        Assert.Equal(MessageFormat, diagnostic.GetMessage());
+        Assert.Equal(MessageFormat, diagnostic.GetMessage(CultureInfo.InvariantCulture));
     }
 
     [Fact]

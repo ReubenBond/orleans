@@ -92,7 +92,7 @@ internal sealed class InvokableMethodDescription : IEquatable<InvokableMethodDes
 
             if (SymbolEqualityComparer.Default.Equals(methodAttr.AttributeClass, CodeGenerator.LibraryTypes.ResponseTimeoutAttribute))
             {
-                ResponseTimeoutTicks = TimeSpan.Parse((string)methodAttr.ConstructorArguments[0].Value).Ticks;
+                ResponseTimeoutTicks = TimeSpan.Parse((string)methodAttr.ConstructorArguments[0].Value, CultureInfo.InvariantCulture).Ticks;
             }
         }
 

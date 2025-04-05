@@ -3,6 +3,7 @@
 
 #nullable enable
 using System.Diagnostics;
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using TestExtensions;
@@ -30,7 +31,7 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
             foreach (var value in Enumerable.Range(0, 5))
             {
                 await Task.Delay(200);
-                await grain.OnNext(value.ToString());
+                await grain.OnNext(value.ToString(CultureInfo.InvariantCulture));
             }
 
             await grain.Complete();
@@ -135,7 +136,7 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
 
         foreach (var value in Enumerable.Range(0, 50))
         {
-            await grain.OnNext(value.ToString());
+            await grain.OnNext(value.ToString(CultureInfo.InvariantCulture));
         }
 
         await grain.Complete();
@@ -166,7 +167,7 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
 
         foreach (var value in Enumerable.Range(0, 50))
         {
-            await grain.OnNext(value.ToString());
+            await grain.OnNext(value.ToString(CultureInfo.InvariantCulture));
         }
 
         await grain.Complete();
@@ -197,7 +198,7 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
 
         foreach (var value in Enumerable.Range(0, 50))
         {
-            await grain.OnNext(value.ToString());
+            await grain.OnNext(value.ToString(CultureInfo.InvariantCulture));
         }
 
         await grain.Complete();
@@ -233,7 +234,7 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
             foreach (var value in Enumerable.Range(0, 5))
             {
                 await Task.Delay(200);
-                await grain.OnNext(value.ToString());
+                await grain.OnNext(value.ToString(CultureInfo.InvariantCulture));
             }
 
             await grain.Complete();
@@ -278,7 +279,7 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
             foreach (var value in Enumerable.Range(0, 5))
             {
                 await Task.Delay(2000);
-                await grain.OnNext(value.ToString());
+                await grain.OnNext(value.ToString(CultureInfo.InvariantCulture));
             }
 
             await grain.Complete();
@@ -315,7 +316,7 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
         {
             foreach (var value in Enumerable.Range(0, 5))
             {
-                await grain.OnNext(value.ToString());
+                await grain.OnNext(value.ToString(CultureInfo.InvariantCulture));
             }
 
             await grain.Complete();
@@ -356,7 +357,7 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
         {
             foreach (var value in Enumerable.Range(0, 5))
             {
-                await grain.OnNext(value.ToString());
+                await grain.OnNext(value.ToString(CultureInfo.InvariantCulture));
             }
 
             await grain.Complete();
@@ -407,7 +408,7 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
             foreach (var value in Enumerable.Range(0, 2))
             {
                 await Task.Delay(200);
-                await grain.OnNext(value.ToString());
+                await grain.OnNext(value.ToString(CultureInfo.InvariantCulture));
             }
 
             await grain.Deactivate();

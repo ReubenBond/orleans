@@ -16,6 +16,7 @@ using Xunit;
 using System.Linq;
 using UnitTests.SerializerExternalModels;
 using Orleans;
+using System.Globalization;
 
 [assembly: GenerateCodeForDeclaringAssembly(typeof(Person2ExternalStruct))]
 #if NET6_0_OR_GREATER
@@ -501,7 +502,7 @@ public class GeneratedSerializerTests : IDisposable
         var largeCollection = new List<string>(200);
         for (int i = 0; i < 200; i++)
         {
-            largeCollection.Add(i.ToString());
+            largeCollection.Add(i.ToString(CultureInfo.InvariantCulture));
         }
 
         var original = new ClassWithLargeCollectionAndUri

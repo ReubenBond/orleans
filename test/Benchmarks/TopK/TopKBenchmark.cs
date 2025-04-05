@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
@@ -48,7 +49,7 @@ public class TopKBenchmark
         var grains = new GrainId[Pop];
         for (var i = 0; i < Pop; i++)
         {
-            grains[i] = GrainId.Create("grain", i.ToString());
+            grains[i] = GrainId.Create("grain", i.ToString(CultureInfo.InvariantCulture));
         }
 
         var grainEdges = new Edge[Pop];

@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 #nullable enable
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using TestExtensions;
@@ -32,7 +33,7 @@ public abstract class GrainDirectoryTests<TGrainDirectory> where TGrainDirectory
         var expected = new GrainAddress
         {
             ActivationId = ActivationId.NewId(),
-            GrainId = GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N")),
+            GrainId = GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N"), CultureInfo.InvariantCulture),
             SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
             MembershipVersion = new MembershipVersion(51)
         };
@@ -52,7 +53,7 @@ public abstract class GrainDirectoryTests<TGrainDirectory> where TGrainDirectory
         var expected = new GrainAddress
         {
             ActivationId = ActivationId.NewId(),
-            GrainId = GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N")),
+            GrainId = GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N"), CultureInfo.InvariantCulture),
             SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
             MembershipVersion = new MembershipVersion(51)
         };
@@ -89,7 +90,7 @@ public abstract class GrainDirectoryTests<TGrainDirectory> where TGrainDirectory
         var initial = new GrainAddress
         {
             ActivationId = ActivationId.NewId(),
-            GrainId = GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N")),
+            GrainId = GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N"), CultureInfo.InvariantCulture),
             SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
             MembershipVersion = new MembershipVersion(51)
         };
@@ -128,7 +129,7 @@ public abstract class GrainDirectoryTests<TGrainDirectory> where TGrainDirectory
         var expected = new GrainAddress
         {
             ActivationId = ActivationId.NewId(),
-            GrainId = GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N")),
+            GrainId = GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N"), CultureInfo.InvariantCulture),
             SiloAddress = SiloAddress.FromParsableString("10.0.23.12:1000@5678"),
             MembershipVersion = new MembershipVersion(51)
         };
@@ -149,6 +150,6 @@ public abstract class GrainDirectoryTests<TGrainDirectory> where TGrainDirectory
     [SkippableFact]
     public async Task LookupNotFound()
     {
-        Assert.Null(await GrainDirectory.Lookup(GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N"))));
+        Assert.Null(await GrainDirectory.Lookup(GrainId.Parse("user/somerandomuser_" + Guid.NewGuid().ToString("N"), CultureInfo.InvariantCulture)));
     }
 }

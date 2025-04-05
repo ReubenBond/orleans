@@ -1,6 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Globalization;
 using System.Runtime.Serialization;
 using Orleans.Storage;
 
@@ -91,7 +92,7 @@ public class CosmosConditionNotSatisfiedException : InconsistentStateException
         GrainId grainId,
         string collection,
         string storedEtag,
-        string currentEtag) => string.Format(DefaultMessageFormat, grainType, grainId, collection, storedEtag, currentEtag);
+        string currentEtag) => string.Format(CultureInfo.InvariantCulture, DefaultMessageFormat, grainType, grainId, collection, storedEtag, currentEtag);
 
     /// <summary>
     /// Exception thrown when a Cosmos DB exception is thrown due to update conditions not being satisfied.

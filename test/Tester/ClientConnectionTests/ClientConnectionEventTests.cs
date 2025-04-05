@@ -1,6 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.TestingHost;
@@ -28,7 +29,7 @@ public class ClientConnectionEventTests
         for (int i = 0; i < 100; i++)
         {
             var grain = cluster.Client.GetGrain<ITestGrain>(i);
-            await grain.SetLabel(i.ToString());
+            await grain.SetLabel(i.ToString(CultureInfo.InvariantCulture));
         }
 
         await cluster.StopAllSilosAsync();

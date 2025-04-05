@@ -34,11 +34,11 @@ public class FrequencyFilterTests
         {
             if (error == 0)
             {
-                sb.AppendLine($"{key.Key,3}: {count}");
+                sb.AppendLine(Invariant($"{key.Key,3}: {count}"));
             }
             else
             {
-                sb.AppendLine($"{key.Key,3}: {count} ε{error}");
+                sb.AppendLine(Invariant($"{key.Key,3}: {count} ε{error}"));
             }
         }
 
