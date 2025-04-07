@@ -4,14 +4,14 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Streams;
-using Orleans.Streaming.EventHubs.Testing;
-using Azure.Messaging.EventHubs;
 using Orleans.Statistics;
+using Orleans.Streaming.EventHubs.Testing;
+using Orleans.Streams;
 
 namespace Orleans.Streaming.EventHubs
 {

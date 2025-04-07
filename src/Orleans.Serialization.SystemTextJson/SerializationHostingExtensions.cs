@@ -1,10 +1,10 @@
+using System;
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Utilities.Internal;
-using System;
-using System.Text.Json;
 
 namespace Orleans.Serialization;
 

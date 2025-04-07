@@ -1,8 +1,8 @@
 using System;
-using Orleans.Storage;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Providers;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Providers;
+using Orleans.Storage;
 
 namespace Orleans.Runtime.Hosting
 {

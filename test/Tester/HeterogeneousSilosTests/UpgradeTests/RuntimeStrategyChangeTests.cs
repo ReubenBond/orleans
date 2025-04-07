@@ -1,8 +1,8 @@
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Metadata;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 using TestVersionGrainInterfaces;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Tester.HeterogeneousSilosTests.UpgradeTests

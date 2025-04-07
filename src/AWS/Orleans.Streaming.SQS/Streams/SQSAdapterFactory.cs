@@ -3,12 +3,12 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Providers.Streams.Common;
-using Orleans.Streams;
-using Orleans.Configuration;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Configuration.Overrides;
+using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
+using Orleans.Streams;
 
 namespace OrleansAWSUtils.Streams
 {

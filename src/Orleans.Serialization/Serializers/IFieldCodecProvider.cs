@@ -1,6 +1,6 @@
 #nullable enable
-using Orleans.Serialization.Codecs;
 using System;
+using Orleans.Serialization.Codecs;
 
 namespace Orleans.Serialization.Serializers
 {

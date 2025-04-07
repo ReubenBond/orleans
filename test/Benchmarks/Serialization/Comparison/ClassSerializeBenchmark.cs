@@ -1,18 +1,18 @@
+using System.Text;
+using System.Text.Json;
 using BenchmarkDotNet.Attributes;
 using Benchmarks.Models;
 using Benchmarks.Utilities;
-using Orleans.Serialization;
-using Orleans.Serialization.Session;
+using Google.Protobuf;
+using Hyperion;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
-using System.Text;
-using System.Text.Json;
+using Orleans.Serialization;
+using Orleans.Serialization.Session;
 using Xunit;
+using ZeroFormatter;
 using SerializerSession = Orleans.Serialization.Session.SerializerSession;
 using Utf8JsonNS = Utf8Json;
-using Hyperion;
-using ZeroFormatter;
-using Google.Protobuf;
 
 namespace Benchmarks.Comparison
 {

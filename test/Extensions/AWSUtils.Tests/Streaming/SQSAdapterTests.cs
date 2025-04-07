@@ -1,17 +1,17 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
+using OrleansAWSUtils.Storage;
 using OrleansAWSUtils.Streams;
-using AWSUtils.Tests.StorageTests;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
-using OrleansAWSUtils.Storage;
-using Orleans.Configuration;
 
 namespace AWSUtils.Tests.Streaming
 {

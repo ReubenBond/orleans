@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime.ConsistentRing;
-using Orleans.Storage;
 using Orleans.Statistics;
+using Orleans.Storage;
 
 namespace Orleans.Runtime.TestHooks
 {

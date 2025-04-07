@@ -1,10 +1,10 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
-using Microsoft.CodeAnalysis;
 using System;
 using System.Collections.Generic;
-using Orleans.CodeGenerator.Diagnostics;
-using System.Linq;
 using System.Diagnostics;
+using System.Linq;
+using Microsoft.CodeAnalysis;
+using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.SyntaxGeneration;
 
 namespace Orleans.CodeGenerator
 {

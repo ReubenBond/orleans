@@ -1,8 +1,3 @@
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Session;
-using Orleans.Serialization.Utilities;
-using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -11,8 +6,13 @@ using System.IO;
 using System.IO.Pipelines;
 using System.Linq;
 using System.Text;
-using Xunit;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
+using Orleans.Serialization.Session;
+using Orleans.Serialization.Utilities;
+using Xunit;
 using Xunit.Abstractions;
 
 namespace Orleans.Serialization.TestKit

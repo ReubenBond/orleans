@@ -1,10 +1,10 @@
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting.Developer;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace ServiceBus.Tests
 {

@@ -1,6 +1,6 @@
-using TestGrainInterfaces;
-using Orleans.Providers;
 using Orleans.EventSourcing;
+using Orleans.Providers;
+using TestGrainInterfaces;
 
 namespace TestGrains
 {

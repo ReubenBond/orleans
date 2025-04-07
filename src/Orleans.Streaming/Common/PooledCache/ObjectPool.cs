@@ -1,7 +1,7 @@
 
 using System;
-using System.Threading;
 using System.Collections.Concurrent;
+using System.Threading;
 
 namespace Orleans.Providers.Streams.Common
 {

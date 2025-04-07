@@ -1,10 +1,10 @@
+using System;
 using Azure;
 using Azure.Core;
 using Azure.Messaging.EventHubs;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Streams;
-using System;
 
 namespace Orleans.Configuration
 {

@@ -1,8 +1,8 @@
 using System;
-using Cassandra;
-using Orleans.Runtime;
 using System.Linq;
 using System.Threading.Tasks;
+using Cassandra;
+using Orleans.Runtime;
 
 namespace Orleans.Clustering.Cassandra;
 

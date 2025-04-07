@@ -1,10 +1,10 @@
 using System;
 using System.Net;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Orleans.Runtime;
 using Orleans.GrainReferences;
-using Microsoft.Extensions.Options;
+using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {

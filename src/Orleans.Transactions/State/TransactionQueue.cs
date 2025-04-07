@@ -4,11 +4,11 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Runtime;
-using Orleans.Transactions.Abstractions;
-using Orleans.Storage;
 using Orleans.Configuration;
+using Orleans.Runtime;
+using Orleans.Storage;
 using Orleans.Timers.Internal;
+using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.State
 {

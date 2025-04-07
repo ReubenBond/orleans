@@ -1,8 +1,8 @@
-using Orleans.Storage;
-using Orleans.Configuration;
 using System;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Storage;
 
 namespace Orleans.EventSourcing.CustomStorage
 {

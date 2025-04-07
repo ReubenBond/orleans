@@ -1,18 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Configuration;
-using RunState = Orleans.Configuration.StreamLifecycleOptions.RunState;
-using Orleans.Internal;
-using System.Threading;
-using Orleans.Streams.Filtering;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime.Scheduler;
-using System.Diagnostics.Metrics;
+using Orleans.Streams.Filtering;
+using RunState = Orleans.Configuration.StreamLifecycleOptions.RunState;
 
 namespace Orleans.Streams
 {

@@ -1,11 +1,11 @@
-using Orleans.Serialization.Cloning;
-using Orleans.Serialization.Invocation;
-using Orleans.Serialization.Serializers;
-using Orleans.Serialization.UnitTests;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Serializers;
+using Orleans.Serialization.UnitTests;
 
 public interface IHasNoNamespace : IMyInvokableBaseType 
 {

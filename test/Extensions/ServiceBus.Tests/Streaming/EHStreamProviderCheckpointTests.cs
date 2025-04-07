@@ -1,19 +1,19 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+using Tester;
+using Tester.AzureUtils;
 using TestExtensions;
 using TestGrainInterfaces;
 using TestGrains;
 using UnitTests.Grains;
 using Xunit;
-using Orleans.Configuration;
-using Tester;
-using Tester.AzureUtils;
 
 namespace ServiceBus.Tests.StreamingTests
 {

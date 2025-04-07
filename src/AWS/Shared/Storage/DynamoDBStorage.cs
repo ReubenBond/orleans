@@ -1,15 +1,15 @@
-using Amazon.DynamoDBv2;
-using Amazon.DynamoDBv2.Model;
-using Amazon.Runtime;
-using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.Model;
+using Amazon.Runtime;
 using Amazon.Runtime.CredentialManagement;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 
 #if CLUSTERING_DYNAMODB
 namespace Orleans.Clustering.DynamoDB

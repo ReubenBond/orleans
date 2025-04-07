@@ -1,12 +1,12 @@
 using System;
 using System.Threading.Tasks;
-using Orleans.Runtime.ConsistentRing;
-using Orleans.Streams;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
-using Orleans.Streams.Filtering;
 using Orleans.Internal;
+using Orleans.Runtime.ConsistentRing;
+using Orleans.Streams;
+using Orleans.Streams.Filtering;
 
 namespace Orleans.Runtime.Providers
 {

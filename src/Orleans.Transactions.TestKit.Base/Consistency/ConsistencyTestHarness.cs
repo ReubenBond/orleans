@@ -1,10 +1,10 @@
-using Orleans.Runtime;
-using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Orleans.Runtime;
+using Orleans.TestingHost;
 
 namespace Orleans.Transactions.TestKit.Consistency
 {

@@ -1,8 +1,8 @@
 using System;
-using System.Linq;
 using System.Collections.Concurrent;
-using System.Threading.Tasks;
+using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Orleans.Placement.Repartitioning;
 
 namespace Orleans.Runtime.Placement.Repartitioning;

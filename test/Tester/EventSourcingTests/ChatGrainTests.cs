@@ -1,8 +1,8 @@
+using System.Xml.Linq;
 using TestGrainInterfaces;
+using TestGrains;
 using Xunit;
 using Assert = Xunit.Assert;
-using System.Xml.Linq;
-using TestGrains;
 
 namespace Tester.EventSourcingTests
 {

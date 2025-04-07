@@ -2,9 +2,9 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
 using Orleans.Streams;
 using OrleansAWSUtils.Storage;
-using Orleans.Configuration;
 
 namespace OrleansAWSUtils.Streams
 {

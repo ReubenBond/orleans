@@ -1,11 +1,11 @@
 
 using System;
 using System.Collections.Generic;
-using Orleans.Providers.Streams.Common;
-using Orleans.Streams;
 using System.Linq;
 using Microsoft.Extensions.Logging;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
+using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Generator
 {

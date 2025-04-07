@@ -1,19 +1,18 @@
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
 using System.Reflection;
-using TestExtensions;
-using Xunit;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-
-using Orleans.Serialization;
+using Orleans.Configuration;
+using Orleans.Metadata;
 using Orleans.Runtime;
+using Orleans.Serialization;
+using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
 using Orleans.Streaming.EventHubs;
-using Microsoft.Extensions.Options;
-using Orleans.Serialization.Configuration;
-using Orleans.Metadata;
+using TestExtensions;
+using Xunit;
 
 namespace UnitTests.Serialization
 {

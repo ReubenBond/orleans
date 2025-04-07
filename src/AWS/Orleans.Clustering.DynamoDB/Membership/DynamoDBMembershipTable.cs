@@ -1,10 +1,3 @@
-using Amazon.DynamoDBv2;
-using Amazon.DynamoDBv2.Model;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.Runtime;
-using Orleans.Runtime.MembershipService;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -12,6 +5,13 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using Amazon.DynamoDBv2;
+using Amazon.DynamoDBv2.Model;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Runtime;
+using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Clustering.DynamoDB
 {

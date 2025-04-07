@@ -1,8 +1,8 @@
 using System;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime.Host;
+using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
+using Orleans.Runtime.Host;
 using Orleans.Streams;
 
 namespace Orleans.Hosting

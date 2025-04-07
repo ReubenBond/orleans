@@ -1,10 +1,10 @@
-using Orleans.Serialization.Configuration;
-using Orleans.Serialization.Serializers;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Serialization.Configuration;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Serialization
 {

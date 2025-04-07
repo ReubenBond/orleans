@@ -1,7 +1,7 @@
 using System.Collections.Generic;
-using Microsoft.Extensions.Logging;
-using System.Threading;
 using System.Collections.Immutable;
+using System.Threading;
+using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.MembershipService
 {

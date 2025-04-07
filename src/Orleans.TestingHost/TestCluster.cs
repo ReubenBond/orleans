@@ -3,21 +3,21 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime;
-using Orleans.TestingHost.Utils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
-using Orleans.Configuration;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Runtime;
+using Orleans.Statistics;
 using Orleans.TestingHost.InMemoryTransport;
 using Orleans.TestingHost.UnixSocketTransport;
-using System.Net;
-using Orleans.Statistics;
+using Orleans.TestingHost.Utils;
 
 namespace Orleans.TestingHost
 {

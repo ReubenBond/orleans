@@ -1,10 +1,10 @@
 using System.Net;
-using Orleans.Concurrency;
-using Orleans.Runtime;
-using UnitTests.GrainInterfaces;
-using Orleans.Runtime.Configuration;
 using Microsoft.Extensions.Logging;
+using Orleans.Concurrency;
 using Orleans.Internal;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {

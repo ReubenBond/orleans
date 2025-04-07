@@ -3,9 +3,9 @@ using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Messaging;
 using Orleans.Runtime;
-using Orleans.Internal;
 using Xunit;
 using Xunit.Abstractions;
 

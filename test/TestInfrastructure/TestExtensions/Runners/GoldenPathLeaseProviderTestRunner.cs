@@ -1,6 +1,6 @@
-﻿using Xunit;
+﻿using Orleans.LeaseProviders;
+using Xunit;
 using Xunit.Abstractions;
-using Orleans.LeaseProviders;
 
 namespace TestExtensions.Runners
 {

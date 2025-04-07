@@ -1,6 +1,6 @@
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
-using System.Runtime.CompilerServices;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains.ProgrammaticSubscribe

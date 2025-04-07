@@ -1,9 +1,9 @@
+using Azure.Messaging.EventHubs;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streams;
-using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
-using Azure.Messaging.EventHubs;
 
 namespace ServiceBus.Tests.EvictionStrategyTests
 {

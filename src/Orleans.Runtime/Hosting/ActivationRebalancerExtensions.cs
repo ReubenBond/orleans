@@ -1,9 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.Runtime;
-using System.Diagnostics.CodeAnalysis;
 using Orleans.Configuration.Internal;
 using Orleans.Placement.Rebalancing;
+using Orleans.Runtime;
 using Orleans.Runtime.Placement.Rebalancing;
 
 namespace Orleans.Hosting;

@@ -1,12 +1,12 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Runtime.Membership;
-using Orleans.Configuration;
+using Tester.ZooKeeperUtils;
 using TestExtensions;
 using Xunit;
-using Tester.ZooKeeperUtils;
 
 namespace UnitTests.MembershipTests
 {

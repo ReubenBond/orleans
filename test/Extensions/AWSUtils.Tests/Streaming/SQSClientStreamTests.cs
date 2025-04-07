@@ -1,14 +1,14 @@
 using AWSUtils.Tests.StorageTests;
-using Orleans.TestingHost;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Orleans.Configuration;
+using Orleans.TestingHost;
+using OrleansAWSUtils.Streams;
 using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
-using OrleansAWSUtils.Streams;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
 
 namespace AWSUtils.Tests.Streaming
 {

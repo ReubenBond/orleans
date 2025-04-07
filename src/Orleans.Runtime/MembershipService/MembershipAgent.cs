@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
-using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
-using System.Threading.Tasks;
-using System.Threading;
-using Microsoft.Extensions.Options;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Internal;
 
 namespace Orleans.Runtime.MembershipService

@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
-using Microsoft.Extensions.Logging;
 
 namespace UnitTests.StorageTests
 {

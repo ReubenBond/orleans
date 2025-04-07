@@ -1,8 +1,8 @@
 using System;
+using System.Net;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using Orleans.Runtime;
-using System.Net;
 
 namespace Orleans.Storage
 {

@@ -1,7 +1,7 @@
-using Orleans.Messaging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Messaging;
 using Orleans.Runtime.Membership;
 using TestExtensions;
 using UnitTests;

@@ -1,6 +1,6 @@
-using Orleans.Configuration;
 using System;
 using System.Linq;
+using Orleans.Configuration;
 
 namespace Orleans.Clustering.DynamoDB
 {

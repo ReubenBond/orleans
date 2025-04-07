@@ -1,5 +1,5 @@
-using Orleans.EventSourcing.Common;
 using System;
+using Orleans.EventSourcing.Common;
 
 namespace Orleans.EventSourcing.StateStorage
 {

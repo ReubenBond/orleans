@@ -1,9 +1,9 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
-using UnitTests.GrainInterfaces;
-using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using System.Runtime.CompilerServices;
+using Orleans.Runtime;
+using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
 {

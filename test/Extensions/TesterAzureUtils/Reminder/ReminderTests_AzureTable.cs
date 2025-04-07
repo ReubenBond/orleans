@@ -1,10 +1,10 @@
+using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
-using Xunit;
-using Microsoft.Extensions.Logging;
 using UnitTests.TimerTests;
-using Orleans.Internal;
+using Xunit;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable

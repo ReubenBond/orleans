@@ -1,5 +1,5 @@
-using Orleans.Runtime;
 using System.Collections.Generic;
+using Orleans.Runtime;
 
 namespace Orleans.Streaming.EventHubs.Testing
 {

@@ -2,8 +2,8 @@ using System;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Providers.Streams.Common;
-using Orleans.Streams;
 using Orleans.Streaming.EventHubs.StatisticMonitors;
+using Orleans.Streams;
 
 namespace Orleans.Streaming.EventHubs
 {

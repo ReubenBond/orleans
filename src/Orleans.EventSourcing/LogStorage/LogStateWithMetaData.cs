@@ -1,6 +1,6 @@
-using Orleans.EventSourcing.Common;
 using System;
 using System.Collections.Generic;
+using Orleans.EventSourcing.Common;
 
 namespace Orleans.EventSourcing.LogStorage
 {

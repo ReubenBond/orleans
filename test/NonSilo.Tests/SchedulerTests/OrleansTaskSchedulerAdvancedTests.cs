@@ -1,11 +1,11 @@
 using System.Diagnostics;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
-using Orleans.Internal;
 using Xunit;
 using Xunit.Abstractions;
-using System.Threading.Tasks;
 
 namespace UnitTests.SchedulerTests
 {

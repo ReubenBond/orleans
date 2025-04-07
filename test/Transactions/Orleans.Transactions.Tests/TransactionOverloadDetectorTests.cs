@@ -1,8 +1,8 @@
 ﻿using System.Diagnostics;
 using Microsoft.Extensions.Options;
-using Xunit.Abstractions;
-using Xunit;
 using Orleans.Transactions.Abstractions;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Tests
 {

@@ -1,8 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
+using Xunit;
 
 namespace Tester.StreamingTests
 {

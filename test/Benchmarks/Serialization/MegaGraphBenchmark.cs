@@ -1,12 +1,12 @@
-using BenchmarkDotNet.Attributes;
-using Benchmarks.Utilities;
-using Orleans.Serialization;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Session;
-using Microsoft.Extensions.DependencyInjection;
 using System.Buffers;
 using System.Globalization;
 using System.IO.Pipelines;
+using BenchmarkDotNet.Attributes;
+using Benchmarks.Utilities;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Session;
 using Xunit;
 using SerializerSession = Orleans.Serialization.Session.SerializerSession;
 

@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers;
 using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Tester.StreamingTests.PlugableQueueBalancerTests
 {

@@ -1,9 +1,9 @@
 using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
-using Orleans.Runtime;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
+using Orleans.Runtime;
 using Orleans.Serialization.Serializers;
 
 namespace Orleans.Storage

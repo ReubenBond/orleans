@@ -1,9 +1,9 @@
 using System.Globalization;
 using Orleans;
 using Orleans.Runtime;
+using Tester;
 using TestExtensions;
 using Xunit;
-using Tester;
 
 namespace UnitTests.General
 {

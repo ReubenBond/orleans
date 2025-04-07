@@ -1,11 +1,11 @@
 using Orleans.Configuration;
-using Orleans.TestingHost;
 using Orleans.Internal;
+using Orleans.Runtime;
+using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
-using Xunit;
-using Orleans.Runtime;
 using UnitTests.Grains;
+using Xunit;
 
 namespace UnitTests.StuckGrainTests
 {

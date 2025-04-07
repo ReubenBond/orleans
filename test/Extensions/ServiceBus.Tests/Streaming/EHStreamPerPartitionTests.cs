@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -6,8 +8,6 @@ using ServiceBus.Tests.TestStreamProviders.EventHub;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace ServiceBus.Tests.StreamingTests
 {

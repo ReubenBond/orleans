@@ -1,15 +1,15 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Orleans.Configuration;
-using Orleans.Runtime.MembershipService;
-using Xunit;
-using NSubstitute;
-using Orleans.Runtime;
-using Orleans;
-using Xunit.Abstractions;
-using TestExtensions;
-using System.Collections.Concurrent;
 using NonSilo.Tests.Utilities;
+using NSubstitute;
+using Orleans;
+using Orleans.Configuration;
+using Orleans.Runtime;
+using Orleans.Runtime.MembershipService;
+using TestExtensions;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace NonSilo.Tests.Membership
 {

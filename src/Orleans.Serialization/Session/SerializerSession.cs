@@ -1,6 +1,6 @@
+using System;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
-using System;
 
 namespace Orleans.Serialization.Session
 {

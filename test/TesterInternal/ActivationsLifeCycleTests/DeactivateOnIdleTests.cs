@@ -1,3 +1,8 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -5,11 +10,6 @@ using UnitTests.GrainInterfaces;
 using UnitTests.TestHelper;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Internal;
-using Orleans.Configuration;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {

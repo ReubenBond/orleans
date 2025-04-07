@@ -1,6 +1,6 @@
+using System.Xml.Linq;
 using Orleans.EventSourcing;
 using Orleans.Providers;
-using System.Xml.Linq;
 using TestGrainInterfaces;
 
 namespace TestGrains

@@ -2,13 +2,17 @@
 //#define DELETE_AFTER_TEST
 
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Providers;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Runtime;
+using Orleans.Serialization.TypeSystem;
 using Orleans.TestingHost;
 using Tester;
+using Tester.AzureUtils;
 using Tester.AzureUtils.Streaming;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -16,10 +20,6 @@ using UnitTests.Grains;
 using UnitTests.StreamingTests;
 using Xunit;
 using Xunit.Abstractions;
-using Tester.AzureUtils;
-using Orleans.Serialization.TypeSystem;
-using Microsoft.Extensions.Logging;
-using Orleans.Providers;
 
 // ReSharper disable ConvertToConstant.Local
 // ReSharper disable CheckNamespace

@@ -1,3 +1,6 @@
+using System;
+using System.Buffers;
+using System.IO;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Cloning;
@@ -5,9 +8,6 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
-using System;
-using System.Buffers;
-using System.IO;
 
 namespace Orleans.Serialization
 {

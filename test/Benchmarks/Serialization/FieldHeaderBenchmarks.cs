@@ -1,10 +1,10 @@
 using BenchmarkDotNet.Attributes;
 using Benchmarks.Utilities;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.WireProtocol;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Benchmarks
 {

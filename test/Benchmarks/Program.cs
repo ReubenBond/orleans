@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using BenchmarkDotNet.Running;
+using Benchmarks.GrainStorage;
 using Benchmarks.MapReduce;
 using Benchmarks.Ping;
 using Benchmarks.Transactions;
-using Benchmarks.GrainStorage;
 
 namespace Benchmarks
 {

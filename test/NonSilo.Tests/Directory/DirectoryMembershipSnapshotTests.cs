@@ -1,8 +1,8 @@
 using System.Collections.Immutable;
-using Orleans.Runtime.GrainDirectory;
 using CsCheck;
-using Xunit;
 using Orleans.Configuration;
+using Orleans.Runtime.GrainDirectory;
+using Xunit;
 
 namespace NonSilo.Tests.Directory;
 

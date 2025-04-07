@@ -3,8 +3,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.SyntaxGeneration;
-using static Orleans.CodeGenerator.SerializerGenerator;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using static Orleans.CodeGenerator.SerializerGenerator;
 
 namespace Orleans.CodeGenerator
 {

@@ -1,17 +1,17 @@
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Orleans.Configuration;
+using Orleans.Configuration.Internal;
 using Orleans.Messaging;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
-using Orleans.Configuration.Internal;
-using Microsoft.Extensions.Hosting;
-using Orleans.Runtime.Messaging;
 
 namespace Tester
 {

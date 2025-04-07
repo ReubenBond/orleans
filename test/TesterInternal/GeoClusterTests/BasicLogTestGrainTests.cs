@@ -1,13 +1,12 @@
-using Microsoft.Extensions.Options;
-using Xunit;
-using Orleans.TestingHost;
-using UnitTests.GrainInterfaces;
-using TestExtensions;
-using Tester;
-
-using Orleans.Configuration;
 using Azure.Data.Tables;
 using Azure.Identity;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.TestingHost;
+using Tester;
+using TestExtensions;
+using UnitTests.GrainInterfaces;
+using Xunit;
 
 namespace Tests.GeoClusterTests
 {

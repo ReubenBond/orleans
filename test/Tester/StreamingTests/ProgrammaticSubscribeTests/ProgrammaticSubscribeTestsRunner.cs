@@ -1,13 +1,13 @@
-using Orleans.Runtime;
-using Orleans.TestingHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 using Orleans.Streams.Core;
-using TestExtensions;
-using Xunit;
-using UnitTests.GrainInterfaces;
+using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+using TestExtensions;
+using UnitTests.GrainInterfaces;
 using UnitTests.Grains.ProgrammaticSubscribe;
+using Xunit;
 
 namespace Tester.StreamingTests
 {

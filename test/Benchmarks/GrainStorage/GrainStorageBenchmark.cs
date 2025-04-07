@@ -1,7 +1,7 @@
 using System.Diagnostics;
+using BenchmarkGrainInterfaces.GrainStorage;
 using Orleans.TestingHost;
 using TestExtensions;
-using BenchmarkGrainInterfaces.GrainStorage;
 
 namespace Benchmarks.GrainStorage
 {

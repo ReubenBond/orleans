@@ -1,7 +1,7 @@
 using System.Runtime.Serialization;
+using Microsoft.Extensions.Logging;
 using Orleans.Providers;
 using Orleans.Runtime;
-using Microsoft.Extensions.Logging;
 using Orleans.Serialization;
 
 namespace UnitTests.StorageTests

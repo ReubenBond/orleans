@@ -1,11 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Orleans.Configuration;
 
 namespace Tester.CustomPlacementTests
 {
