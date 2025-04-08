@@ -505,7 +505,10 @@ jobs:
         --blame-hang-timeout 10m
         --logger "trx;LogFileName=test_results_${{ matrix.suite }}_${{ matrix.framework }}.trx"
         --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
-        -- -parallel none -noshadow
+        --
+        -parallel none
+        -noshadow
+        RunConfiguration.CollectSourceInformation=true
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v4

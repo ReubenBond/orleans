@@ -163,11 +163,12 @@ namespace Orleans.Hosting
             }
 
             // Distributed Grain Directory
-            services.TryAddSingleton<DirectoryMembershipService>();
-            if (!services.Contains(DirectoryDescriptor))
+            services.AddGrainDirectory<DistributedGrainDirectory>(name, (sp, name) => sp.GetRequiredService<DistributedGrainDirectory>());
+
+            if (name == GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY))
             {
-                services.Add(DirectoryDescriptor);
-                services.AddGrainDirectory<DistributedGrainDirectory>(name, (sp, name) => sp.GetRequiredService<DistributedGrainDirectory>());
+                // Register the default grain directory as a singleton.
+                services.AddSingleton<DistributedGrainDirectory>();
             }
 
             return siloBuilder;

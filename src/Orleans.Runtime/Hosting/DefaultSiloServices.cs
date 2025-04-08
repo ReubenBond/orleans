@@ -140,6 +140,10 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, CachedGrainLocator>();
             services.AddSingleton<ClientGrainLocator>();
 
+            services.AddSingleton<DirectoryMembershipService>();
+            services.AddSingleton<DistributedGrainDirectory>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DistributedGrainDirectory>();
+
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
             services.TryAddSingleton(FactoryUtility.Create<MessageCenter, Gateway>);
