@@ -19,8 +19,11 @@ namespace Orleans.Runtime
         // Waiting indicates that a waiter is present and waiting for the event to be signaled.
         private const uint WaitingFlag = 1 << 1;
 
-        // ResetMask is used to clear both status flags.
-        private const uint ResetMask = ~SignaledFlag & ~WaitingFlag;
+        // Disposed indicates that the event has been canceled.
+        private const uint Cancelled = 1 << 2;
+
+        // ResetMask is used to clear both signaled & waiting status flags.
+        private const uint ResetSignalMask = ~SignaledFlag & ~WaitingFlag;
 
         private ManualResetValueTaskSourceCore<bool> _waitSource;
         private volatile uint _status;
@@ -41,8 +44,8 @@ namespace Orleans.Runtime
             _waitSource.GetResult(token);
             _waitSource.Reset();
 
-            // Reset the status.
-            ResetStatus();
+            // Reset the signal status.
+            ResetSignalStatus();
         }
 
         /// <summary>
@@ -72,6 +75,26 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
+        /// Dispose the event.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Cancel()
+        {
+            // Set the signaled and disposed flags.
+            var status = Interlocked.Or(ref _status, SignaledFlag | Cancelled);
+
+            // If there was a waiter and the signaled flag was unset, wake the waiter now.
+            if ((status & SignaledFlag) != SignaledFlag && (status & WaitingFlag) == WaitingFlag)
+            {
+                // Note that in this assert we are checking the volatile _status field.
+                // This is a sanity check to ensure that the signaling conditions are true:
+                // that "Signaled" and "Waiting" flags are both set.
+                Debug.Assert((_status & (SignaledFlag | WaitingFlag)) == (SignaledFlag | WaitingFlag));
+                _waitSource.SetException(new OperationCanceledException());
+            }
+        }
+
+        /// <summary>
         /// Wait for the event to be signaled.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -92,7 +115,7 @@ namespace Orleans.Runtime
                 // Reset just the status because the _waitSource has not been set.
                 // We know that _waitSource has not been set because _waitSource is only set when
                 // Signal() observes that the "Waiting" flag had been set but not the "Signaled" flag.
-                ResetStatus();
+                ResetSignalStatus();
                 return default;
             }
 
@@ -103,11 +126,11 @@ namespace Orleans.Runtime
         /// Called when a waiter handles the event signal.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ResetStatus()
+        private void ResetSignalStatus()
         {
             // The event is being handled, so clear the "Signaled" flag now.
             // The waiter is no longer waiting, so clear the "Waiting" flag, too.
-            var status = Interlocked.And(ref _status, ResetMask);
+            var status = Interlocked.And(ref _status, ResetSignalMask);
 
             // If both the "Waiting" and "Signaled" flags were not already set, something has gone catastrophically wrong.
             Debug.Assert((status & (WaitingFlag | SignaledFlag)) == (WaitingFlag | SignaledFlag));
