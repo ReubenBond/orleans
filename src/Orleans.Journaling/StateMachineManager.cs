@@ -86,21 +86,22 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
 
     private async Task WorkLoop()
     {
-        using var cancellationRegistration = _shutdownCancellation.Token.Register(state => ((StateMachineManager)state!)._workSignal.Signal(), this);
-        await Task.Yield();
+        var cancellationToken = _shutdownCancellation.Token;
+        using var cancellationRegistration = cancellationToken.Register(state => ((StateMachineManager)state!)._workSignal.Signal(), this);
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
         var needsRecovery = true;
         while (true)
         {
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 await _workSignal.WaitAsync().ConfigureAwait(false);
-                _shutdownCancellation.Token.ThrowIfCancellationRequested();
 
                 while (true)
                 {
                     if (needsRecovery)
                     {
-                        await RecoverAsync().ConfigureAwait(false);
+                        await RecoverAsync(cancellationToken).ConfigureAwait(false);
                         needsRecovery = false;
                     }
 
@@ -167,11 +168,11 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
                             {
                                 if (isSnapshot)
                                 {
-                                    await _storage.ReplaceAsync(logSegment, _shutdownCancellation.Token).ConfigureAwait(false);
+                                    await _storage.ReplaceAsync(logSegment, cancellationToken).ConfigureAwait(false);
                                 }
                                 else
                                 {
-                                    await _storage.AppendAsync(logSegment, _shutdownCancellation.Token).ConfigureAwait(false);
+                                    await _storage.AppendAsync(logSegment, cancellationToken).ConfigureAwait(false);
                                 }
 
                                 // Notify all state machines that the operation completed.
@@ -187,7 +188,7 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
                         else if (workItem.Type is WorkItemType.DeleteState)
                         {
                             // Clear storage.
-                            await _storage.DeleteAsync(_shutdownCancellation.Token).ConfigureAwait(false);
+                            await _storage.DeleteAsync(cancellationToken).ConfigureAwait(false);
 
                             lock (_lock)
                             {
@@ -250,7 +251,10 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
             catch (Exception exception)
             {
                 needsRecovery = true;
-                _logger.LogError(exception, "Error processing work items.");
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    _logger.LogError(exception, "Error processing work items.");
+                }
             }
         }
     }
@@ -282,11 +286,12 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
         await task;
     }
 
-    private async Task RecoverAsync()
+    private async Task RecoverAsync(CancellationToken cancellationToken)
     {
         _stateMachineIds.ResetVolatileState();
-        await foreach (var segment in _storage.ReadAsync(_shutdownCancellation.Token))
+        await foreach (var segment in _storage.ReadAsync(cancellationToken))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 foreach (var entry in segment.Entries)
@@ -373,7 +378,8 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
     async Task ILifecycleObserver.OnStop(CancellationToken cancellationToken)
     {
         _shutdownCancellation.Cancel();
-        await _workLoop.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+        _workSignal.Signal();
+        await _workLoop.WaitAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
     }
 
     void IDisposable.Dispose()

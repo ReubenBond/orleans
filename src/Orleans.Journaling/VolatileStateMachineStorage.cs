@@ -1,7 +1,14 @@
 using Orleans.Serialization.Buffers;
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.Journaling;
+
+public sealed class VolatileStateMachineStorageProvider : IStateMachineStorageProvider
+{
+    private readonly ConcurrentDictionary<GrainId, VolatileStateMachineStorage> _storage = new();
+    public IStateMachineStorage Create(IGrainContext grainContext) => _storage.GetOrAdd(grainContext.GrainId, _ => new VolatileStateMachineStorage());
+}
 
 /// <summary>
 /// An in-memory, volatile implementation of <see cref="IStateMachineStorage"/> for non-durable use cases, such as development and testing.

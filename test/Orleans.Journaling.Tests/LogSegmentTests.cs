@@ -2,24 +2,75 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration.Internal;
 using Orleans.Serialization;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
+using TestExtensions;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
 
-public class LogSegmentTests
+public sealed class AzureStorageLogSegmentTests : LogSegmentTests
 {
-    private readonly ServiceProvider _serviceProvider;
+    public AzureStorageLogSegmentTests()
+    {
+        JournalingAzureStorageTestConfiguration.CheckPreconditionsOrThrow();
+    }
 
-    public LogSegmentTests()
+    protected override void ConfigureServices(IServiceCollection services)
+    {
+        services.Configure<AzureAppendBlobStateMachineStorageOptions>(options => JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options));
+        services.AddSingleton<AzureAppendBlobStateMachineStorageProvider>();
+        services.AddFromExisting<IStateMachineStorageProvider, AzureAppendBlobStateMachineStorageProvider>();
+        services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureAppendBlobStateMachineStorageProvider>();
+    }
+}
+
+public sealed class InMemoryLogSegmentTests : LogSegmentTests
+{
+    protected override void ConfigureServices(IServiceCollection services)
+    {
+        services.AddSingleton<IStateMachineStorageProvider, VolatileStateMachineStorageProvider>();
+    }
+}
+
+public abstract class LogSegmentTests : IAsyncLifetime
+{
+    private IServiceProvider _serviceProvider = null!;
+    private SiloLifecycleSubject? _siloLifecycle;
+    private IStateMachineStorageProvider _storageProvider = null!;
+
+    public virtual async Task InitializeAsync()
     {
         var services = new ServiceCollection();
         services.AddSerializer();
         services.AddLogging();
+        ConfigureServices(services);
         _serviceProvider = services.BuildServiceProvider();
+        _siloLifecycle = new SiloLifecycleSubject(_serviceProvider.GetRequiredService<ILogger<SiloLifecycleSubject>>());
+        _storageProvider = _serviceProvider.GetRequiredService<IStateMachineStorageProvider>();
+        var participants = _serviceProvider.GetServices<ILifecycleParticipant<ISiloLifecycle>>();
+        foreach (var participant in participants)
+        {
+            participant.Participate(_siloLifecycle);
+        }
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        await _siloLifecycle.OnStart(cts.Token);
     }
+
+    public async Task DisposeAsync()
+    {
+        if (_siloLifecycle is not null)
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+            await _siloLifecycle.OnStop(cts.Token);
+        }
+    }
+
+    protected abstract void ConfigureServices(IServiceCollection services);
 
     /*
     [Fact]
@@ -61,15 +112,11 @@ public class LogSegmentTests
     [Fact]
     public async Task DurableListTest()
     {
-        var blobServiceClient = new BlobServiceClient("fixme");
-        var container = blobServiceClient.GetBlobContainerClient("graindb");
-        await container.CreateIfNotExistsAsync();
-        var blobClient = container.GetAppendBlobClient("my-grain");
-        var storage = new AzureAppendBlobLogStorage(blobClient, null!);
-
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
-        //var storage = new InMemoryStateMachineStorage();
+        var grainContext = new TestGrainContext(GrainId.Create("test-grain", Guid.NewGuid().ToString()));
+        var storage = _storageProvider.Create(grainContext);
+
         var manager = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), sessionPool);
         var list = new DurableList<string>("fooey", manager, codecProvider.GetCodec<string>(), sessionPool);
         await manager.InitializeAsync(CancellationToken.None);
@@ -103,15 +150,11 @@ public class LogSegmentTests
     [Fact]
     public async Task DurableList_Snapshot_Test()
     {
-        var blobServiceClient = new BlobServiceClient("fixme");
-        var container = blobServiceClient.GetBlobContainerClient("graindb");
-        await container.CreateIfNotExistsAsync();
-        var blobClient = container.GetAppendBlobClient("my-grain");
-        var storage = new AzureAppendBlobLogStorage(blobClient, null!);
-
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
-        //var storage = new InMemoryStateMachineStorage();
+        var grainContext = new TestGrainContext(GrainId.Create("test-grain", Guid.NewGuid().ToString()));
+        var storage = _storageProvider.Create(grainContext);
+
         var manager = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), sessionPool);
         var list = new DurableList<string>("fooey", manager, codecProvider.GetCodec<string>(), sessionPool);
         await manager.InitializeAsync(CancellationToken.None);
@@ -144,5 +187,28 @@ public class LogSegmentTests
         var recreatedList = newList.ToList();
         Assert.Equal(originalList, recreatedList);
         await Task.CompletedTask;
+    }
+
+    internal sealed class TestGrainContext(GrainId grainId) : IGrainContext
+    {
+        public GrainReference GrainReference => throw new NotImplementedException();
+        public GrainId GrainId => grainId;
+        public object? GrainInstance  => throw new NotImplementedException();
+        public ActivationId ActivationId  => throw new NotImplementedException();
+        public GrainAddress Address  => throw new NotImplementedException();
+        public IServiceProvider ActivationServices  => throw new NotImplementedException();
+        public IGrainLifecycle ObservableLifecycle  => throw new NotImplementedException();
+        public IWorkItemScheduler Scheduler  => throw new NotImplementedException();
+        public Task Deactivated  => throw new NotImplementedException();
+
+        public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public bool Equals(IGrainContext? other) => throw new NotImplementedException();
+        public TComponent? GetComponent<TComponent>() where TComponent : class => throw new NotImplementedException();
+        public TTarget? GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
+        public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public void ReceiveMessage(object message) => throw new NotImplementedException();
+        public void Rehydrate(IRehydrationContext context) => throw new NotImplementedException();
+        public void SetComponent<TComponent>(TComponent? value) where TComponent : class => throw new NotImplementedException();
     }
 }

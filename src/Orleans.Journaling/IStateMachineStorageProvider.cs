@@ -1,4 +1,4 @@
-﻿namespace Orleans.Journaling;
+namespace Orleans.Journaling;
 
 public interface IStateMachineStorageProvider
 {

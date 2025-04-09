@@ -106,11 +106,9 @@ namespace Orleans.Serialization.Codecs
         void OnCopied(T original, T result);
     }
 
-    internal sealed class UntypedCodecWrapper<TField> : IFieldCodec<TField>, IServiceHolder<IFieldCodec<TField>>
+    internal sealed class UntypedCodecWrapper<TField> : IFieldCodec<TField>
     {
         private readonly IFieldCodec _codec;
-
-        public IFieldCodec<TField> Value { get; }
 
         public UntypedCodecWrapper(IFieldCodec codec) => _codec = codec;
 
