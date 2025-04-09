@@ -87,13 +87,13 @@ public class MyGrain : Orleans.Grain, IMyGrain
             return Verify.VerifyAnalyzerAsync(code);
         }
 
+        private static void ModifyAge(ref int age) { age = 99; }
+        private static void GetAge(out int age) { age = 99; } // Example, might not make sense logically but tests syntax
+
         [Fact]
         public Task ShouldWarn_When_PassingAsRefArgument()
         {
-            var testMethod = @"
-    private void ModifyAge(ref int age) { age = 99; }
-";
-            var code = Preamble + testMethod + @"
+            var code = Preamble + @"
         // Bad: Passing property as ref argument
         ModifyAge(ref [| _state.Value |].Age);
 " + Postamble;
@@ -104,10 +104,7 @@ public class MyGrain : Orleans.Grain, IMyGrain
          [Fact]
         public Task ShouldWarn_When_PassingAsOutArgument()
         {
-            var testMethod = @"
-    private void GetAge(out int age) { age = 99; } // Example, might not make sense logically but tests syntax
-";
-            var code = Preamble + testMethod + @"
+            var code = Preamble + @"
         // Bad: Passing property as out argument
         GetAge(out [| _state.Value |].Age);
 " + Postamble;
