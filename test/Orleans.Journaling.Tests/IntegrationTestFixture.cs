@@ -16,15 +16,11 @@ public class IntegrationTestFixture : IAsyncLifetime
     public IntegrationTestFixture()
     {
         var builder = new InProcessTestClusterBuilder();
-        var states = new ConcurrentDictionary<GrainId, VolatileStateMachineStorage>();
+        var storageProvider = new VolatileStateMachineStorageProvider();
         builder.ConfigureSilo((options, siloBuilder) =>
         {
             siloBuilder.AddStateMachineStorage();
-            siloBuilder.Services.AddScoped<IStateMachineStorage>(sp =>
-            {
-                var grainId = sp.GetRequiredService<IGrainContext>().GrainId;
-                return states.GetOrAdd(grainId, _ => new VolatileStateMachineStorage());
-            });
+            siloBuilder.Services.AddSingleton<IStateMachineStorageProvider>(storageProvider);
         });
         ConfigureTestCluster(builder);
         Cluster = builder.Build();

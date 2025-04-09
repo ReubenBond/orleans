@@ -8,6 +8,8 @@ public class TestMultiCollectionGrain(
     [FromKeyedServices("queue")] IDurableQueue<int> queue,
     [FromKeyedServices("set")] IDurableSet<string> set) : DurableGrain, ITestMultiCollectionGrain
 {
+    private readonly Guid _activationId = Guid.NewGuid();
+
     // Dictionary operations
     public async Task AddToDictionary(string key, int value)
     {
@@ -99,4 +101,6 @@ public class TestMultiCollectionGrain(
     {
         return await Task.FromResult(set.Count);
     }
+
+    public Task<Guid> GetActivationId() => Task.FromResult(_activationId);
 }

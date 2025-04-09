@@ -21,7 +21,9 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal(42, await grain.GetCounter());
 
         // Force deactivation and get a new reference
+        var idBefore = await grain.GetActivationId();
         await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        Assert.NotEqual(idBefore, await grain.GetActivationId());
 
         // Assert - State should be recovered
         Assert.Equal("Test Name", await grain.GetName());
@@ -71,7 +73,9 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal(3, retrievedItems.Count);
 
         // Force deactivation and get a new reference
+        var idBefore = await grain.GetActivationId();
         await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        Assert.NotEqual(idBefore, await grain.GetActivationId());
 
         // Assert - Complex state should be recovered
         retrievedPerson = await grain.GetPerson();
@@ -111,7 +115,9 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal(2, await grain.GetSetCount());
 
         // Force deactivation and get a new reference
+        var idBefore = await grain.GetActivationId();
         await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        Assert.NotEqual(idBefore, await grain.GetActivationId());
 
         // Assert - All collections should be recovered
         Assert.Equal(2, await grain.GetDictionaryCount());
@@ -157,7 +163,9 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal(2, await grain.GetSetCount());
 
         // Force deactivation and get a new reference
+        var idBefore = await grain.GetActivationId();
         await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        Assert.NotEqual(idBefore, await grain.GetActivationId());
 
         // Assert - Modified state should be recovered
         Assert.Equal(2, await grain.GetDictionaryCount());
@@ -192,7 +200,9 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         var initialState = await grain.GetValues();
 
         // Deactivate the grain forcefully
+        var idBefore = await grain.GetActivationId();
         await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        Assert.NotEqual(idBefore, await grain.GetActivationId());
 
         // Get the values from the grain (which will be reactivated)
         var newState = await grain.GetValues();
@@ -229,8 +239,9 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal(2, await grain.GetSetCount());
 
         // Deactivate the grain forcefully
+        var idBefore = await grain.GetActivationId();
         await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
-        await Task.Delay(500);
+        Assert.NotEqual(idBefore, await grain.GetActivationId());
 
         // Assert - Check values after reactivation
         Assert.Equal(1, await grain.GetDictionaryValue("key1"));
@@ -254,8 +265,9 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal(1, await grain.GetSetCount());
 
         // Deactivate the grain again
+        idBefore = await grain.GetActivationId();
         await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
-        await Task.Delay(500);
+        Assert.NotEqual(idBefore, await grain.GetActivationId());
 
         // Assert - Check values after second reactivation
         Assert.Equal(1, await grain.GetDictionaryCount());
@@ -294,7 +306,9 @@ public class DurableGrainTests(IntegrationTestFixture fixture) : IClassFixture<I
         Assert.Equal(100, await grain.GetSetCount());
 
         // Deactivate the grain forcefully
+        var idBefore = await grain.GetActivationId();
         await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        Assert.NotEqual(idBefore, await grain.GetActivationId());
 
         // Assert - Check random values after reactivation
         for (int i = 0; i < 10; i++)

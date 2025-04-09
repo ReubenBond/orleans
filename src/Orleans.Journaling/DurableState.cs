@@ -9,7 +9,7 @@ using Orleans.Serialization.Session;
 namespace Orleans.Journaling;
 
 [DebuggerDisplay("{Value}")]
-internal sealed class PersistentState<T> : IPersistentState<T>, IDurableStateMachine
+internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachine
 {
     private const byte VersionByte = 0;
     private readonly SerializerSessionPool _serializerSessionPool;
@@ -17,10 +17,8 @@ internal sealed class PersistentState<T> : IPersistentState<T>, IDurableStateMac
     private readonly IStateMachineManager _manager;
     private T? _value;
     private ulong _version;
-    private bool _isDirty;
-    private bool _hasRecord;
 
-    public PersistentState([ServiceKey] string key, IStateMachineManager manager, IFieldCodec<T> codec, SerializerSessionPool serializerSessionPool)
+    public DurableState([ServiceKey] string key, IStateMachineManager manager, IFieldCodec<T> codec, SerializerSessionPool serializerSessionPool)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -29,40 +27,26 @@ internal sealed class PersistentState<T> : IPersistentState<T>, IDurableStateMac
         _manager = manager;
     }
 
-    public T? Value
+    public Action? OnPersisted { get; set; }
+    T IStorage<T>.State
     {
         get => _value ??= Activator.CreateInstance<T>();
-        set
-        {
-            _value = value;
-            OnModified();
-        }
+        set => _value = value;
     }
 
-    public Action? OnPersisted { get; set; }
-    T IStorage<T>.State { get => Value!; set => Value = value; }
     string IStorage.Etag => $"{_version}";
-    bool IStorage.RecordExists => _hasRecord;
+    bool IStorage.RecordExists => _version > 0;
 
     private void OnValuePersisted()
     {
-        _hasRecord = true;
-        OnPersisted?.Invoke();
-    }
-
-    public void OnModified()
-    {
-        _isDirty = true;
         ++_version;
+        OnPersisted?.Invoke();
     }
 
     void IDurableStateMachine.OnRecoveryCompleted() => OnValuePersisted();
     void IDurableStateMachine.OnWriteCompleted() => OnValuePersisted();
 
-    void IDurableStateMachine.Reset(IStateMachineLogWriter storage)
-    {
-        _value = default;
-    }
+    void IDurableStateMachine.Reset(IStateMachineLogWriter storage) => _value = default;
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
@@ -77,6 +61,9 @@ internal sealed class PersistentState<T> : IPersistentState<T>, IDurableStateMac
         var commandType = (CommandType)reader.ReadVarUInt32();
         switch (commandType)
         {
+            case CommandType.ClearValue:
+                ClearValue(ref reader);
+                break;
             case CommandType.SetValue:
                 SetValue(ref reader);
                 break;
@@ -89,18 +76,16 @@ internal sealed class PersistentState<T> : IPersistentState<T>, IDurableStateMac
             var field = reader.ReadFieldHeader();
             _value = _codec.ReadValue(ref reader, field);
             _version = reader.ReadVarUInt64();
-            _hasRecord = true;
+        }
+
+        void ClearValue(ref Reader<ReadOnlySequenceInput> reader)
+        {
+            _value = default;
+            _version = 0;
         }
     }
 
-    void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter)
-    {
-        if (_isDirty)
-        {
-            WriteState(logWriter);
-            _isDirty = false;
-        }
-    }
+    void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter) => WriteState(logWriter);
 
     void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter) => WriteState(snapshotWriter);
 
@@ -123,24 +108,19 @@ internal sealed class PersistentState<T> : IPersistentState<T>, IDurableStateMac
     Task IStorage.ClearStateAsync() => ((IStorage)this).ClearStateAsync(CancellationToken.None);
     async Task IStorage.ClearStateAsync(CancellationToken cancellationToken)
     {
-        Value = default;
+        _value = default;
+        _version = 0;
         await _manager.WriteStateAsync(cancellationToken);
     }
 
     Task IStorage.WriteStateAsync() => ((IStorage)this).WriteStateAsync(CancellationToken.None);
-    async Task IStorage.WriteStateAsync(CancellationToken cancellationToken)
-    {
-        await _manager.WriteStateAsync(cancellationToken);
-    }
-
+    async Task IStorage.WriteStateAsync(CancellationToken cancellationToken) => await _manager.WriteStateAsync(cancellationToken);
     Task IStorage.ReadStateAsync() => ((IStorage)this).ReadStateAsync(CancellationToken.None);
-    Task IStorage.ReadStateAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
-    }
+    Task IStorage.ReadStateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     private enum CommandType
     {
         SetValue,
+        ClearValue,
     }
 }

@@ -14,6 +14,7 @@ public sealed class TestDurableGrainState
 public class TestDurableGrain(
     [FromKeyedServices("state")] IPersistentState<TestDurableGrainState> state) : DurableGrain, ITestDurableGrain
 {
+    private readonly Guid _activationId = Guid.NewGuid();
     public Task<string> GetName() => Task.FromResult(state.State.Name);
     public Task<int> GetCounter() => Task.FromResult(state.State.Counter);
 
@@ -23,12 +24,15 @@ public class TestDurableGrain(
         state.State.Counter = counter;
         await WriteStateAsync();
     }
+
+    public Task<Guid> GetActivationId() => Task.FromResult(_activationId);
 }
 
 public class TestDurableGrainWithComplexState(
     [FromKeyedServices("person")] IDurableValue<TestPerson> person,
     [FromKeyedServices("list")] IDurableList<string> list) : DurableGrain, ITestDurableGrainWithComplexState
 {
+    private readonly Guid _activationId = Guid.NewGuid();
     private readonly IDurableValue<TestPerson> _person = person;
     private readonly IDurableList<string> _list = list;
 
@@ -42,10 +46,13 @@ public class TestDurableGrainWithComplexState(
         _list.AddRange(items);
         await WriteStateAsync();
     }
+
+    public Task<Guid> GetActivationId() => Task.FromResult(_activationId);
 }
 
 public interface ITestDurableGrain : IGrainWithGuidKey
 {
+    Task<Guid> GetActivationId();
     Task SetTestValues(string name, int counter);
     Task<string> GetName();
     Task<int> GetCounter();
@@ -53,6 +60,7 @@ public interface ITestDurableGrain : IGrainWithGuidKey
 
 public interface ITestDurableGrainWithComplexState : IGrainWithGuidKey
 {
+    Task<Guid> GetActivationId();
     Task SetTestValues(TestPerson person, List<string> items);
     Task<TestPerson> GetPerson();
     Task<IReadOnlyList<string>> GetItems();

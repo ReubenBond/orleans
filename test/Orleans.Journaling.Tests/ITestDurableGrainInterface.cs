@@ -5,6 +5,7 @@ namespace Orleans.Journaling.Tests;
 /// </summary>
 public interface ITestDurableGrainInterface : IGrainWithGuidKey
 {
+    Task<Guid> GetActivationId();
     Task SetValues(string name, int counter);
     Task<(string Name, int Counter)> GetValues();
 }

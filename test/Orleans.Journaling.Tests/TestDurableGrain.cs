@@ -2,18 +2,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Journaling.Tests;
 
-public class DurableValueTestGrain : DurableGrain, ITestDurableGrainInterface
+public class DurableValueTestGrain(
+    [FromKeyedServices("name")] IDurableValue<string> name,
+    [FromKeyedServices("counter")] IDurableValue<int> counter) : DurableGrain, ITestDurableGrainInterface
 {
-    private readonly IDurableValue<string> _name;
-    private readonly IDurableValue<int> _counter;
-
-    public DurableValueTestGrain(
-        [FromKeyedServices("name")] IDurableValue<string> name,
-        [FromKeyedServices("counter")] IDurableValue<int> counter)
-    {
-        _name = name;
-        _counter = counter;
-    }
+    private readonly Guid _activationId = Guid.NewGuid();
+    private readonly IDurableValue<string> _name = name;
+    private readonly IDurableValue<int> _counter = counter;
 
     public Task SetValues(string name, int counter)
     {
@@ -22,8 +17,7 @@ public class DurableValueTestGrain : DurableGrain, ITestDurableGrainInterface
         return WriteStateAsync().AsTask();
     }
 
-    public Task<(string Name, int Counter)> GetValues()
-    {
-        return Task.FromResult((_name.Value!, _counter.Value!));
-    }
+    public Task<(string Name, int Counter)> GetValues() => Task.FromResult((_name.Value!, _counter.Value!));
+
+    public Task<Guid> GetActivationId() => Task.FromResult(_activationId);
 }

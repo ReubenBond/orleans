@@ -72,46 +72,10 @@ public abstract class LogSegmentTests : IAsyncLifetime
 
     protected abstract void ConfigureServices(IServiceCollection services);
 
-    /*
-    [Fact]
-    public void AppendedSegmentsAreEnumerable()
-    {
-        var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
-        using var segment = new LogSegment();
-        var expectedBuffers = new List<(uint Id, byte[] Data)>();
-        for (var i = 0; i < 100; i++)
-        {
-            var buf = new byte[i * 100];
-            Array.Fill(buf, (byte)i);
-
-            for (var id = 0U; id < 5; id++)
-            {
-                var streamId = new StateMachineId(id);
-                expectedBuffers.Add((id, buf));
-                segment.AppendEntry(0, streamId, buf);
-            }
-        }
-
-        var entries = new List<LogSegment.Entry>();
-        foreach (var entry in segment.GetEntryEnumerator(0))
-        {
-            entries.Add(entry);
-        }
-
-        Assert.Equal(expectedBuffers.Count, entries.Count);
-        for (var i = 0; i < expectedBuffers.Count; i++)
-        {
-            var (expectedId, expectedData) = expectedBuffers[i];
-            var (actualId, actualData) = entries[i];
-            Assert.Equal(expectedId, actualId.Value);
-            Assert.Equal(expectedData, actualData.ToArray());
-        }
-    }
-    */
-
     [Fact]
     public async Task DurableListTest()
     {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
         var grainContext = new TestGrainContext(GrainId.Create("test-grain", Guid.NewGuid().ToString()));
@@ -119,7 +83,7 @@ public abstract class LogSegmentTests : IAsyncLifetime
 
         var manager = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), sessionPool);
         var list = new DurableList<string>("fooey", manager, codecProvider.GetCodec<string>(), sessionPool);
-        await manager.InitializeAsync(CancellationToken.None);
+        await manager.InitializeAsync(cts.Token);
 
         // NOTE TO SELF: when we register the state machine, we need a signal which indicates when the state machine is ready to be used.
         // In practice, we are waiting for OnActivateAsync
@@ -127,29 +91,23 @@ public abstract class LogSegmentTests : IAsyncLifetime
         {
             list.Add(i.ToString());
         }
-        //Assert.Equal(10, list.Count);
+        Assert.Equal(10, list.Count);
 
-        await manager.WriteStateAsync(CancellationToken.None);
-
-        // TODO: make sure that OnRecoveryCompleted is not called before recovery has completed!
-
-        // TODO: throw in state machine if trying to mutate before recovery has completed
-
-        // TODO: throw in state machine MANAGER if trying to append log entries before recovery has completed
+        await manager.WriteStateAsync(cts.Token);
 
         var newManager = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), sessionPool);
         var newList = new DurableList<string>("fooey", newManager, codecProvider.GetCodec<string>(), sessionPool);
-        await newManager.InitializeAsync(CancellationToken.None);
+        await newManager.InitializeAsync(cts.Token);
 
         var originalList = list.ToList();
         var recreatedList = newList.ToList();
         Assert.Equal(originalList, recreatedList);
-        await Task.CompletedTask;
     }
 
     [Fact]
     public async Task DurableList_Snapshot_Test()
     {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
         var grainContext = new TestGrainContext(GrainId.Create("test-grain", Guid.NewGuid().ToString()));
@@ -157,10 +115,8 @@ public abstract class LogSegmentTests : IAsyncLifetime
 
         var manager = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), sessionPool);
         var list = new DurableList<string>("fooey", manager, codecProvider.GetCodec<string>(), sessionPool);
-        await manager.InitializeAsync(CancellationToken.None);
+        await manager.InitializeAsync(cts.Token);
 
-        // NOTE TO SELF: when we register the state machine, we need a signal which indicates when the state machine is ready to be used.
-        // In practice, we are waiting for OnActivateAsync
         list.Clear();
         for (var c = 0; c < 15; ++c)
         {
@@ -168,25 +124,17 @@ public abstract class LogSegmentTests : IAsyncLifetime
             {
                 list.Add(i.ToString());
             }
-            //Assert.Equal(10, list.Count);
 
-            await manager.WriteStateAsync(CancellationToken.None);
+            await manager.WriteStateAsync(cts.Token);
         }
-
-        // TODO: make sure that OnRecoveryCompleted is not called before recovery has completed!
-
-        // TODO: throw in state machine if trying to mutate before recovery has completed
-
-        // TODO: throw in state machine MANAGER if trying to append log entries before recovery has completed
 
         var newManager = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), sessionPool);
         var newList = new DurableList<string>("fooey", newManager, codecProvider.GetCodec<string>(), sessionPool);
-        await newManager.InitializeAsync(CancellationToken.None);
+        await newManager.InitializeAsync(cts.Token);
 
         var originalList = list.ToList();
         var recreatedList = newList.ToList();
         Assert.Equal(originalList, recreatedList);
-        await Task.CompletedTask;
     }
 
     internal sealed class TestGrainContext(GrainId grainId) : IGrainContext

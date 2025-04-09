@@ -5,6 +5,8 @@ namespace Orleans.Journaling.Tests;
 /// </summary>
 public interface ITestMultiCollectionGrain : IGrainWithGuidKey
 {
+    Task<Guid> GetActivationId();
+
     // Dictionary operations
     Task AddToDictionary(string key, int value);
     Task RemoveFromDictionary(string key);

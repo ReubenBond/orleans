@@ -94,8 +94,8 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
         {
             try
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 await _workSignal.WaitAsync().ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
 
                 while (true)
                 {
@@ -251,10 +251,12 @@ internal sealed class StateMachineManager : IStateMachineManager, ILifecyclePart
             catch (Exception exception)
             {
                 needsRecovery = true;
-                if (!cancellationToken.IsCancellationRequested)
+                if (cancellationToken.IsCancellationRequested)
                 {
-                    _logger.LogError(exception, "Error processing work items.");
+                    return;
                 }
+
+                _logger.LogError(exception, "Error processing work items.");
             }
         }
     }
