@@ -3,7 +3,7 @@ namespace Orleans.Journaling.Tests;
 /// <summary>
 /// Interface for the test multi-collection grain
 /// </summary>
-public interface ITestMultiCollectionGrainInterface : IGrainWithGuidKey
+public interface ITestMultiCollectionGrain : IGrainWithGuidKey
 {
     // Dictionary operations
     Task AddToDictionary(string key, int value);

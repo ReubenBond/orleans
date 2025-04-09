@@ -31,7 +31,7 @@ internal sealed class PersistentState<T> : IPersistentState<T>, IDurableStateMac
 
     public T? Value
     {
-        get => _value;
+        get => _value ??= Activator.CreateInstance<T>();
         set
         {
             _value = value;

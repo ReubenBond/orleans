@@ -9,9 +9,11 @@ public class DurableListTests : StateMachineTestBase
     public async Task DurableList_BasicOperations_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var list = new DurableList<string>("testList", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Act - Add items
         list.Add("one");
@@ -46,28 +48,22 @@ public class DurableListTests : StateMachineTestBase
     public async Task DurableList_Persistence_Test()
     {
         // Arrange
-        var storage = CreateInMemoryStorage();
-        var logger = LoggerFactory.CreateLogger<StateMachineManager>();
-        
-        // First manager and list
-        var manager1 = new StateMachineManager(storage, logger, SessionPool);
-        await manager1.InitializeAsync(CancellationToken.None);
-        
+        var sut = CreateTestSystem();
         var codec = CodecProvider.GetCodec<string>();
-        var list1 = new DurableList<string>("testList", manager1, codec, SessionPool);
+        var list1 = new DurableList<string>("testList", sut.Manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Act - Add items and persist
         list1.Add("one");
         list1.Add("two");
         list1.Add("three");
-        await manager1.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
         
         // Create a new manager with the same storage
-        var manager2 = new StateMachineManager(storage, logger, SessionPool);
-        await manager2.InitializeAsync(CancellationToken.None);
-        
-        var list2 = new DurableList<string>("testList", manager2, codec, SessionPool);
-        
+        var sut2 = CreateTestSystem(storage: sut.Storage);  
+        var list2 = new DurableList<string>("testList", sut2.Manager, codec, SessionPool);
+        await sut2.Lifecycle.OnStart();
+
         // Assert - List should be recovered
         Assert.Equal(3, list2.Count);
         Assert.Equal("one", list2[0]);
@@ -79,9 +75,11 @@ public class DurableListTests : StateMachineTestBase
     public async Task DurableList_ComplexValues_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<TestPerson>();
         var list = new DurableList<TestPerson>("personList", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Act
         var person1 = new TestPerson { Id = 1, Name = "John", Age = 30 };
@@ -108,9 +106,11 @@ public class DurableListTests : StateMachineTestBase
     public async Task DurableList_Clear_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var list = new DurableList<string>("clearList", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Add items
         list.Add("one");
@@ -131,9 +131,11 @@ public class DurableListTests : StateMachineTestBase
     public async Task DurableList_Contains_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var list = new DurableList<string>("containsList", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Add items
         list.Add("one");
@@ -157,9 +159,11 @@ public class DurableListTests : StateMachineTestBase
     public async Task DurableList_InsertAndRemove_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var list = new DurableList<string>("insertList", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Add initial items
         list.Add("one");
@@ -191,9 +195,11 @@ public class DurableListTests : StateMachineTestBase
     public async Task DurableList_Enumeration_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var list = new DurableList<string>("enumList", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Add items
         var expectedItems = new List<string> { "one", "two", "three" };
@@ -216,9 +222,11 @@ public class DurableListTests : StateMachineTestBase
     public async Task DurableList_LargeNumberOfOperations_Test()
     {
         // Arrange
-        var (manager, storage) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
         var list = new DurableList<int>("largeList", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Act - Add many items
         const int itemCount = 1000;
@@ -254,11 +262,9 @@ public class DurableListTests : StateMachineTestBase
         }
         
         // Create a new manager with the same storage to test recovery of large list
-        var logger = LoggerFactory.CreateLogger<StateMachineManager>();
-        var manager2 = new StateMachineManager(storage, logger, SessionPool);
-        await manager2.InitializeAsync(CancellationToken.None);
-        
-        var list2 = new DurableList<int>("largeList", manager2, codec, SessionPool);
+        var sut2 = CreateTestSystem(storage: sut.Storage);
+        var list2 = new DurableList<int>("largeList", sut2.Manager, codec, SessionPool);
+        await sut2.Lifecycle.OnStart();
         
         // Assert - Large list is correctly recovered
         Assert.Equal(itemCount, list2.Count);

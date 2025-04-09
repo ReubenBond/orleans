@@ -9,11 +9,13 @@ public class DurableDictionaryTests : StateMachineTestBase
     public async Task DurableDictionary_BasicOperations_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
-        var dictionary = new DurableDictionary<string, int>("testDict", manager, keyCodec, valueCodec, SessionPool);
-        
+        var dictionary = new DurableDictionary<string, int>("testDict", sut.Manager, keyCodec, valueCodec, SessionPool);
+        await sut.Lifecycle.OnStart();
+
         // Act - Add items
         dictionary.Add("one", 1);
         dictionary.Add("two", 2);
@@ -47,28 +49,22 @@ public class DurableDictionaryTests : StateMachineTestBase
     public async Task DurableDictionary_Persistence_Test()
     {
         // Arrange
-        var storage = CreateInMemoryStorage();
-        var logger = LoggerFactory.CreateLogger<StateMachineManager>();
-        
-        // First manager and dictionary
-        var manager1 = new StateMachineManager(storage, logger, SessionPool);
-        await manager1.InitializeAsync(CancellationToken.None);
-        
+        var sut = CreateTestSystem();
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
-        var dictionary1 = new DurableDictionary<string, int>("testDict", manager1, keyCodec, valueCodec, SessionPool);
+        var dictionary1 = new DurableDictionary<string, int>("testDict", sut.Manager, keyCodec, valueCodec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Act - Add items and persist
         dictionary1.Add("one", 1);
         dictionary1.Add("two", 2);
         dictionary1.Add("three", 3);
-        await manager1.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
         
         // Create a new manager with the same storage
-        var manager2 = new StateMachineManager(storage, logger, SessionPool);
-        await manager2.InitializeAsync(CancellationToken.None);
-        
-        var dictionary2 = new DurableDictionary<string, int>("testDict", manager2, keyCodec, valueCodec, SessionPool);
+        var sut2 = CreateTestSystem(storage: sut.Storage);
+        var dictionary2 = new DurableDictionary<string, int>("testDict", sut2.Manager, keyCodec, valueCodec, SessionPool);
+        await sut2.Lifecycle.OnStart();
         
         // Assert - Dictionary should be recovered
         Assert.Equal(3, dictionary2.Count);
@@ -81,10 +77,12 @@ public class DurableDictionaryTests : StateMachineTestBase
     public async Task DurableDictionary_ComplexKeys_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var keyCodec = CodecProvider.GetCodec<TestKey>();
         var valueCodec = CodecProvider.GetCodec<string>();
         var dictionary = new DurableDictionary<TestKey, string>("complexDict", manager, keyCodec, valueCodec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Act
         var key1 = new TestKey { Id = 1, Name = "Key1" };
@@ -104,10 +102,12 @@ public class DurableDictionaryTests : StateMachineTestBase
     public async Task DurableDictionary_ComplexValues_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<TestPerson>();
         var dictionary = new DurableDictionary<string, TestPerson>("peopleDict", manager, keyCodec, valueCodec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Act
         var person1 = new TestPerson { Id = 1, Name = "John", Age = 30 };
@@ -134,10 +134,12 @@ public class DurableDictionaryTests : StateMachineTestBase
     public async Task DurableDictionary_Clear_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
         var dictionary = new DurableDictionary<string, int>("clearDict", manager, keyCodec, valueCodec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Add items
         dictionary.Add("one", 1);
@@ -151,17 +153,18 @@ public class DurableDictionaryTests : StateMachineTestBase
         
         // Assert
         Assert.Empty(dictionary);
-        Assert.Empty(dictionary);
     }
     
     [Fact]
     public async Task DurableDictionary_Enumeration_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
         var dictionary = new DurableDictionary<string, int>("enumDict", manager, keyCodec, valueCodec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Add items
         var expectedPairs = new Dictionary<string, int>
@@ -188,22 +191,11 @@ public class DurableDictionaryTests : StateMachineTestBase
     }
 }
 
-public class TestKey
+[GenerateSerializer]
+public record class TestKey
 {
+    [Id(0)]
     public int Id { get; set; }
+    [Id(1)]
     public string? Name { get; set; }
-    
-    public override bool Equals(object? obj)
-    {
-        if (obj is TestKey other)
-        {
-            return Id == other.Id && Name == other.Name;
-        }
-        return false;
-    }
-    
-    public override int GetHashCode()
-    {
-        return HashCode.Combine(Id, Name);
-    }
 }

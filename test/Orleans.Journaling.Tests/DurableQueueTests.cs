@@ -9,9 +9,11 @@ public class DurableQueueTests : StateMachineTestBase
     public async Task DurableQueue_BasicOperations_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var queue = new DurableQueue<string>("testQueue", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Act - Enqueue items
         queue.Enqueue("one");
@@ -58,35 +60,29 @@ public class DurableQueueTests : StateMachineTestBase
     public async Task DurableQueue_Persistence_Test()
     {
         // Arrange
-        var storage = CreateInMemoryStorage();
-        var logger = LoggerFactory.CreateLogger<StateMachineManager>();
-        
-        // First manager and queue
-        var manager1 = new StateMachineManager(storage, logger, SessionPool);
-        await manager1.InitializeAsync(CancellationToken.None);
-        
+        var sut = CreateTestSystem();
         var codec = CodecProvider.GetCodec<string>();
-        var queue1 = new DurableQueue<string>("testQueue", manager1, codec, SessionPool);
+        var queue1 = new DurableQueue<string>("testQueue", sut.Manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Act - Enqueue items and persist
         queue1.Enqueue("one");
         queue1.Enqueue("two");
         queue1.Enqueue("three");
-        await manager1.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
         
         // Create a new manager with the same storage
-        var manager2 = new StateMachineManager(storage, logger, SessionPool);
-        await manager2.InitializeAsync(CancellationToken.None);
-        
-        var queue2 = new DurableQueue<string>("testQueue", manager2, codec, SessionPool);
-        
+        var sut2 = CreateTestSystem(storage: sut.Storage);
+        var queue2 = new DurableQueue<string>("testQueue", sut2.Manager, codec, SessionPool);
+        await sut2.Lifecycle.OnStart();
+
         // Assert - Queue should be recovered
         Assert.Equal(3, queue2.Count);
         Assert.Equal("one", queue2.Peek());
         
         // Act - Dequeue from recovered queue
         var dequeued = queue2.Dequeue();
-        await manager2.WriteStateAsync(CancellationToken.None);
+        await sut2.Manager.WriteStateAsync(CancellationToken.None);
         
         // Assert
         Assert.Equal("one", dequeued);
@@ -97,9 +93,11 @@ public class DurableQueueTests : StateMachineTestBase
     public async Task DurableQueue_ComplexValues_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<TestPerson>();
         var queue = new DurableQueue<TestPerson>("personQueue", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Act
         var person1 = new TestPerson { Id = 1, Name = "John", Age = 30 };
@@ -128,9 +126,11 @@ public class DurableQueueTests : StateMachineTestBase
     public async Task DurableQueue_Clear_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var queue = new DurableQueue<string>("clearQueue", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Add items
         queue.Enqueue("one");
@@ -151,10 +151,12 @@ public class DurableQueueTests : StateMachineTestBase
     public async Task DurableQueue_EmptyQueueOperations_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var queue = new DurableQueue<string>("emptyQueue", manager, codec, SessionPool);
         await manager.WriteStateAsync(CancellationToken.None);
+        await sut.Lifecycle.OnStart();
         
         // Assert
         Assert.Empty(queue);
@@ -168,9 +170,11 @@ public class DurableQueueTests : StateMachineTestBase
     public async Task DurableQueue_Enumeration_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var queue = new DurableQueue<string>("enumQueue", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Add items
         var expectedItems = new List<string> { "one", "two", "three" };
@@ -193,9 +197,11 @@ public class DurableQueueTests : StateMachineTestBase
     public async Task DurableQueue_LargeNumberOfOperations_Test()
     {
         // Arrange
-        var (manager, storage) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
         var queue = new DurableQueue<int>("largeQueue", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Act - Enqueue many items
         const int itemCount = 1000;
@@ -211,11 +217,9 @@ public class DurableQueueTests : StateMachineTestBase
         Assert.Equal(0, queue.Peek());
         
         // Create a new manager with the same storage to test recovery
-        var logger = LoggerFactory.CreateLogger<StateMachineManager>();
-        var manager2 = new StateMachineManager(storage, logger, SessionPool);
-        await manager2.InitializeAsync(CancellationToken.None);
-        
-        var queue2 = new DurableQueue<int>("largeQueue", manager2, codec, SessionPool);
+        var sut2 = CreateTestSystem(storage: sut.Storage);
+        var queue2 = new DurableQueue<int>("largeQueue", sut2.Manager, codec, SessionPool);
+        await sut2.Lifecycle.OnStart();
         
         // Assert - Large queue is correctly recovered
         Assert.Equal(itemCount, queue2.Count);
@@ -227,7 +231,7 @@ public class DurableQueueTests : StateMachineTestBase
             Assert.Equal(i, item);
         }
         
-        await manager2.WriteStateAsync(CancellationToken.None);
+        await sut2.Manager.WriteStateAsync(CancellationToken.None);
         Assert.Empty(queue2);
     }
     
@@ -235,9 +239,11 @@ public class DurableQueueTests : StateMachineTestBase
     public async Task DurableQueue_Concurrent_EnqueueDequeue_Test()
     {
         // Arrange
-        var (manager, storage) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
         var queue = new DurableQueue<int>("concurrentQueue", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Act - Simulate a queue with concurrent operations
         const int batchSize = 100;
@@ -267,11 +273,9 @@ public class DurableQueueTests : StateMachineTestBase
         Assert.Equal(batchSize + batchSize / 2, queue.Count); // Should have 150 items
         
         // Create a new manager with the same storage to test recovery
-        var logger = LoggerFactory.CreateLogger<StateMachineManager>();
-        var manager2 = new StateMachineManager(storage, logger, SessionPool);
-        await manager2.InitializeAsync(CancellationToken.None);
-        
-        var queue2 = new DurableQueue<int>("concurrentQueue", manager2, codec, SessionPool);
+        var sut2 = CreateTestSystem(storage: sut.Storage);
+        var queue2 = new DurableQueue<int>("concurrentQueue", sut2.Manager, codec, SessionPool);
+        await sut2.Lifecycle.OnStart();
         
         // Assert - Queue should be recovered with correct state and ordering
         Assert.Equal(batchSize + batchSize / 2, queue2.Count);
@@ -290,7 +294,7 @@ public class DurableQueueTests : StateMachineTestBase
             Assert.Equal(i, item);
         }
         
-        await manager2.WriteStateAsync(CancellationToken.None);
+        await sut2.Manager.WriteStateAsync(CancellationToken.None);
         Assert.Empty(queue2);
     }
 }

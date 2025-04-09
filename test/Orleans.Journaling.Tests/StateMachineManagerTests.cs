@@ -9,13 +9,15 @@ public class StateMachineManagerTests : StateMachineTestBase
     public async Task StateMachineManager_RegisterStateMachine_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
 
         // Act - Register state machines
         var dictionary = new DurableDictionary<string, int>("dict1", manager, CodecProvider.GetCodec<string>(), codec, SessionPool);
         var list = new DurableList<string>("list1", manager, CodecProvider.GetCodec<string>(), SessionPool);
         var queue = new DurableQueue<int>("queue1", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
 
         // Add some data
         dictionary.Add("key1", 1);
@@ -35,30 +37,25 @@ public class StateMachineManagerTests : StateMachineTestBase
     public async Task StateMachineManager_StateRecovery_Test()
     {
         // Arrange
-        var storage = CreateInMemoryStorage();
-        var logger = LoggerFactory.CreateLogger<StateMachineManager>();
-
-        // First manager
-        var manager1 = new StateMachineManager(storage, logger, SessionPool);
-        await manager1.InitializeAsync(CancellationToken.None);
+        var sut = CreateTestSystem();
 
         // Create and populate state machines
-        var dictionary = new DurableDictionary<string, int>("dict1", manager1, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
-        var list = new DurableList<string>("list1", manager1, CodecProvider.GetCodec<string>(), SessionPool);
+        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+        var list = new DurableList<string>("list1", sut.Manager, CodecProvider.GetCodec<string>(), SessionPool);
+        await sut.Lifecycle.OnStart();
 
         dictionary.Add("key1", 1);
         dictionary.Add("key2", 2);
         list.Add("item1");
         list.Add("item2");
 
-        await manager1.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
 
         // Act - Create new manager with same storage
-        var manager2 = new StateMachineManager(storage, logger, SessionPool);
-        await manager2.InitializeAsync(CancellationToken.None);
-
-        var recoveredDict = new DurableDictionary<string, int>("dict1", manager2, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
-        var recoveredList = new DurableList<string>("list1", manager2, CodecProvider.GetCodec<string>(), SessionPool);
+        var sut2 = CreateTestSystem(storage: sut.Storage);
+        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+        var recoveredList = new DurableList<string>("list1", sut2.Manager, CodecProvider.GetCodec<string>(), SessionPool);
+        await sut2.Lifecycle.OnStart();
 
         // Assert - State should be recovered
         Assert.Equal(2, recoveredDict.Count);
@@ -74,8 +71,10 @@ public class StateMachineManagerTests : StateMachineTestBase
     public async Task StateMachineManager_MultipleWriteStates_Test()
     {
         // Arrange
-        var (manager, storage) = await CreateManagerAsync();
-        var dictionary = new DurableDictionary<string, int>("dict1", manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
+        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+        await sut.Lifecycle.OnStart();
 
         // Act - Multiple operations with WriteState in between
         dictionary.Add("key1", 1);
@@ -96,11 +95,9 @@ public class StateMachineManagerTests : StateMachineTestBase
         Assert.False(dictionary.ContainsKey("key2"));
 
         // Create new manager to verify recovery
-        var logger = LoggerFactory.CreateLogger<StateMachineManager>();
-        var manager2 = new StateMachineManager(storage, logger, SessionPool);
-        await manager2.InitializeAsync(CancellationToken.None);
-
-        var recoveredDict = new DurableDictionary<string, int>("dict1", manager2, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+        var sut2 = CreateTestSystem(storage: sut.Storage);
+        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+        await sut2.Lifecycle.OnStart();
 
         // Assert - Recovery should have final state
         Assert.Single(recoveredDict);
@@ -112,12 +109,14 @@ public class StateMachineManagerTests : StateMachineTestBase
     public async Task StateMachineManager_MultipleStateMachines_Test()
     {
         // Arrange
-        var (manager, storage) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
 
         // Create multiple state machines with different types
         var intDict = new DurableDictionary<int, string>("intDict", manager, CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<string>(), SessionPool);
         var stringList = new DurableList<string>("stringList", manager, CodecProvider.GetCodec<string>(), SessionPool);
         var personValue = new DurableValue<TestPerson>("personValue", manager, CodecProvider.GetCodec<TestPerson>(), SessionPool);
+        await sut.Lifecycle.OnStart();
 
         // Act - Populate all state machines
         intDict.Add(1, "one");
@@ -142,13 +141,11 @@ public class StateMachineManagerTests : StateMachineTestBase
         Assert.Equal("Test Person", personValue.Value.Name);
 
         // Create new manager to verify recovery of multiple state machines
-        var logger = LoggerFactory.CreateLogger<StateMachineManager>();
-        var manager2 = new StateMachineManager(storage, logger, SessionPool);
-        await manager2.InitializeAsync(CancellationToken.None);
-
-        var recoveredIntDict = new DurableDictionary<int, string>("intDict", manager2, CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<string>(), SessionPool);
-        var recoveredStringList = new DurableList<string>("stringList", manager2, CodecProvider.GetCodec<string>(), SessionPool);
-        var recoveredPersonValue = new DurableValue<TestPerson>("personValue", manager2, CodecProvider.GetCodec<TestPerson>(), SessionPool);
+        var sut2 = CreateTestSystem(storage: sut.Storage);
+        var recoveredIntDict = new DurableDictionary<int, string>("intDict", sut2.Manager, CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<string>(), SessionPool);
+        var recoveredStringList = new DurableList<string>("stringList", sut2.Manager, CodecProvider.GetCodec<string>(), SessionPool);
+        var recoveredPersonValue = new DurableValue<TestPerson>("personValue", sut2.Manager, CodecProvider.GetCodec<TestPerson>(), SessionPool);
+        await sut2.Lifecycle.OnStart();
 
         // Assert - All should be recovered with correct values
         Assert.Equal(2, recoveredIntDict.Count);
@@ -166,9 +163,11 @@ public class StateMachineManagerTests : StateMachineTestBase
     public async Task StateMachineManager_Concurrency_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var dict1 = new DurableDictionary<string, int>("dict1", manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
         var dict2 = new DurableDictionary<string, int>("dict2", manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+        await sut.Lifecycle.OnStart();
 
         // Act - Simulate concurrent operations on different state machines
         dict1.Add("key1", 1);
@@ -194,13 +193,9 @@ public class StateMachineManagerTests : StateMachineTestBase
     public async Task StateMachineManager_LargeStateRecovery_Test()
     {
         // Arrange
-        var storage = CreateInMemoryStorage();
-        var logger = LoggerFactory.CreateLogger<StateMachineManager>();
-
-        var manager1 = new StateMachineManager(storage, logger, SessionPool);
-        await manager1.InitializeAsync(CancellationToken.None);
-
-        var largeDict = new DurableDictionary<int, string>("largeDict", manager1, CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<string>(), SessionPool);
+        var sut = CreateTestSystem();
+        var largeDict = new DurableDictionary<int, string>("largeDict", sut.Manager, CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<string>(), SessionPool);
+        await sut.Lifecycle.OnStart();
 
         // Act - Add many items
         const int itemCount = 1000;
@@ -209,13 +204,12 @@ public class StateMachineManagerTests : StateMachineTestBase
             largeDict.Add(i, $"Value {i}");
         }
 
-        await manager1.WriteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
 
         // Create new manager for recovery
-        var manager2 = new StateMachineManager(storage, logger, SessionPool);
-        await manager2.InitializeAsync(CancellationToken.None);
-
-        var recoveredDict = new DurableDictionary<int, string>("largeDict", manager2, CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<string>(), SessionPool);
+        var sut2 = CreateTestSystem(storage: sut.Storage);
+        var recoveredDict = new DurableDictionary<int, string>("largeDict", sut2.Manager, CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<string>(), SessionPool);
+        await sut2.Lifecycle.OnStart();
 
         // Assert - All items should be recovered
         Assert.Equal(itemCount, recoveredDict.Count);

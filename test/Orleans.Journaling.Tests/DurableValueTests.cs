@@ -9,9 +9,11 @@ public class DurableValueTests : StateMachineTestBase
     public async Task DurableValue_BasicOperations_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var durableValue = new DurableValue<string>("testValue", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
 
         // Act - Set initial value
         durableValue.Value = "Hello World";
@@ -31,26 +33,20 @@ public class DurableValueTests : StateMachineTestBase
     [Fact]
     public async Task DurableValue_Persistence_Test()
     {
-        // Arrange
-        var storage = CreateInMemoryStorage();
-        var logger = LoggerFactory.CreateLogger<StateMachineManager>();
-
-        // First manager and value
-        var manager1 = new StateMachineManager(storage, logger, SessionPool);
-        await manager1.InitializeAsync(CancellationToken.None);
-
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
-        var durableValue1 = new DurableValue<int>("counter", manager1, codec, SessionPool);
+        var durableValue = new DurableValue<int>("counter", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
 
         // Act - Modify and persist
-        durableValue1.Value = 42;
-        await manager1.WriteStateAsync(CancellationToken.None);
+        durableValue.Value = 42;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
 
         // Create a new manager with the same storage
-        var manager2 = new StateMachineManager(storage, logger, SessionPool);
-        await manager2.InitializeAsync(CancellationToken.None);
-
-        var durableValue2 = new DurableValue<int>("counter", manager2, codec, SessionPool);
+        var sut2 = CreateTestSystem(storage: sut.Storage);
+        var durableValue2 = new DurableValue<int>("counter", sut2.Manager, codec, SessionPool);
+        await sut2.Lifecycle.OnStart();
 
         // Assert - Value should be recovered
         Assert.Equal(42, durableValue2.Value);
@@ -60,9 +56,11 @@ public class DurableValueTests : StateMachineTestBase
     public async Task DurableValue_NullValue_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string?>();
         var durableValue = new DurableValue<string?>("nullableValue", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
 
         // Act - Set to null
         durableValue.Value = null;
@@ -90,9 +88,11 @@ public class DurableValueTests : StateMachineTestBase
     public async Task DurableValue_ComplexType_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<TestPerson>();
         var durableValue = new DurableValue<TestPerson>("person", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
 
         // Act
         var person = new TestPerson { Id = 1, Name = "John Doe", Age = 30 };

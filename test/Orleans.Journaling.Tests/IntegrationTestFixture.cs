@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 using Xunit;
@@ -7,18 +8,23 @@ namespace Orleans.Journaling.Tests;
 /// <summary>
 /// Base class for journaling tests with common setup using InProcessTestCluster
 /// </summary>
-public abstract class IntegrationTestBase : IAsyncLifetime
+public class IntegrationTestFixture : IAsyncLifetime
 {
-    protected InProcessTestCluster Cluster { get; }
-    protected IClusterClient Client => Cluster.Client;
+    public InProcessTestCluster Cluster { get; }
+    public IClusterClient Client => Cluster.Client;
 
-    public IntegrationTestBase()
+    public IntegrationTestFixture()
     {
         var builder = new InProcessTestClusterBuilder();
+        var states = new ConcurrentDictionary<GrainId, VolatileStateMachineStorage>();
         builder.ConfigureSilo((options, siloBuilder) =>
         {
             siloBuilder.AddStateMachineStorage();
-            siloBuilder.Services.AddScoped<IStateMachineStorage, VolatileStateMachineStorage>();
+            siloBuilder.Services.AddScoped<IStateMachineStorage>(sp =>
+            {
+                var grainId = sp.GetRequiredService<IGrainContext>().GrainId;
+                return states.GetOrAdd(grainId, _ => new VolatileStateMachineStorage());
+            });
         });
         ConfigureTestCluster(builder);
         Cluster = builder.Build();

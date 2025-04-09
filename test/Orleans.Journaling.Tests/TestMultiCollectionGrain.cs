@@ -6,7 +6,7 @@ public class TestMultiCollectionGrain(
     [FromKeyedServices("dictionary")] IDurableDictionary<string, int> dictionary,
     [FromKeyedServices("list")] IDurableList<string> list,
     [FromKeyedServices("queue")] IDurableQueue<int> queue,
-    [FromKeyedServices("set")] IDurableSet<string> set) : DurableGrain, ITestMultiCollectionGrainInterface
+    [FromKeyedServices("set")] IDurableSet<string> set) : DurableGrain, ITestMultiCollectionGrain
 {
     // Dictionary operations
     public async Task AddToDictionary(string key, int value)

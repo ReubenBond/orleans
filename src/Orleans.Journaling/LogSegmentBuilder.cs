@@ -1,6 +1,7 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Diagnostics;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
 
 namespace Orleans.Journaling;
 
@@ -10,7 +11,7 @@ namespace Orleans.Journaling;
 public sealed partial class LogExtentBuilder(ArcBufferWriter buffer) : IDisposable, IBufferWriter<byte>
 {
     private readonly List<uint> _entryLengths = [];
-    private readonly byte[] _scratch = new byte[8];  
+    private readonly byte[] _scratch = new byte[8];
     private readonly ArcBufferWriter _buffer = buffer;
 
     public LogExtentBuilder() : this(new())
@@ -21,8 +22,9 @@ public sealed partial class LogExtentBuilder(ArcBufferWriter buffer) : IDisposab
 
     public byte[] ToArray()
     {
-        using var slice = _buffer.PeekSlice(_buffer.Length);
-        return slice.ToArray();
+        using var memoryStream = new PooledBufferStream();
+        CopyTo(memoryStream, 4096);
+        return memoryStream.ToArray();
     }
 
     public StateMachineStorageWriter CreateLogWriter(StateMachineId id) => new(id, this);
@@ -94,7 +96,7 @@ public sealed partial class LogExtentBuilder(ArcBufferWriter buffer) : IDisposab
         var currentSegment = ReadOnlyMemory<byte>.Empty;
         foreach (var entryLength in _entryLengths)
         {
-            await destination.WriteAsync(WriteLength(entryLength), cancellationToken);
+            await destination.WriteAsync(GetLengthBytes(_scratch, entryLength), cancellationToken);
 
             var remainingEntryLength = entryLength;
             while (remainingEntryLength > 0)
@@ -116,12 +118,43 @@ public sealed partial class LogExtentBuilder(ArcBufferWriter buffer) : IDisposab
                 currentSegment = currentSegment[(int)copyLen..];
             }
         }
+    }
 
-        ReadOnlyMemory<byte> WriteLength(uint length)
+    public void CopyTo(Stream destination, int bufferSize)
+    {
+        using var buffer = _buffer.PeekSlice(_buffer.Length);
+        var segments = buffer.MemorySegments;
+        var currentSegment = ReadOnlyMemory<byte>.Empty;
+        foreach (var entryLength in _entryLengths)
         {
-            var writer = Writer.Create(_scratch, null);
-            writer.WriteVarUInt32(length);
-            return new ReadOnlyMemory<byte>(_scratch, 0, writer.Position);
+            destination.Write(GetLengthBytes(_scratch, entryLength).Span);
+
+            var remainingEntryLength = entryLength;
+            while (remainingEntryLength > 0)
+            {
+                // Move to the next memory segment if necessary.
+                if (currentSegment.Length == 0)
+                {
+                    var hasNext = segments.MoveNext();
+                    Debug.Assert(hasNext);
+                    currentSegment = segments.Current;
+                    continue;
+                }
+
+                var copyLen = Math.Min((uint)bufferSize, Math.Min(remainingEntryLength, (uint)currentSegment.Length));
+
+                destination.Write(currentSegment[..(int)copyLen].Span);
+
+                remainingEntryLength -= copyLen;
+                currentSegment = currentSegment[(int)copyLen..];
+            }
         }
+    }
+
+    private static ReadOnlyMemory<byte> GetLengthBytes(byte[] scratch, uint length)
+    {
+        var writer = Writer.Create(scratch, null);
+        writer.WriteVarUInt32(length);
+        return new ReadOnlyMemory<byte>(scratch, 0, writer.Position);
     }
 }

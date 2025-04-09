@@ -9,9 +9,11 @@ public class DurableSetTests : StateMachineTestBase
     public async Task DurableSet_BasicOperations_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var set = new DurableSet<string>("testSet", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Act - Add items
         bool added1 = set.Add("one");
@@ -47,29 +49,23 @@ public class DurableSetTests : StateMachineTestBase
     [Fact]
     public async Task DurableSet_Persistence_Test()
     {
-        // Arrange
-        var storage = CreateInMemoryStorage();
-        var logger = LoggerFactory.CreateLogger<StateMachineManager>();
-        
         // First manager and set
-        var manager1 = new StateMachineManager(storage, logger, SessionPool);
-        await manager1.InitializeAsync(CancellationToken.None);
-        
+        var sut = CreateTestSystem();
         var codec = CodecProvider.GetCodec<string>();
-        var set1 = new DurableSet<string>("testSet", manager1, codec, SessionPool);
+        var set1 = new DurableSet<string>("testSet", sut.Manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Act - Add items and persist
         set1.Add("one");
         set1.Add("two");
         set1.Add("three");
-        await manager1.WriteStateAsync(CancellationToken.None);
-        
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
         // Create a new manager with the same storage
-        var manager2 = new StateMachineManager(storage, logger, SessionPool);
-        await manager2.InitializeAsync(CancellationToken.None);
-        
-        var set2 = new DurableSet<string>("testSet", manager2, codec, SessionPool);
-        
+        var sut2 = CreateTestSystem(storage: sut.Storage);
+        var set2 = new DurableSet<string>("testSet", sut2.Manager, codec, SessionPool);
+        await sut2.Lifecycle.OnStart();
+
         // Assert - Set should be recovered
         Assert.Equal(3, set2.Count);
         Assert.Contains("one", set2);
@@ -81,9 +77,11 @@ public class DurableSetTests : StateMachineTestBase
     public async Task DurableSet_ComplexValues_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<TestPerson>();
         var set = new DurableSet<TestPerson>("personSet", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Act
         var person1 = new TestPerson { Id = 1, Name = "John", Age = 30 };
@@ -105,9 +103,11 @@ public class DurableSetTests : StateMachineTestBase
     public async Task DurableSet_Clear_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var set = new DurableSet<string>("clearSet", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Add items
         set.Add("one");
@@ -128,9 +128,11 @@ public class DurableSetTests : StateMachineTestBase
     public async Task DurableSet_Enumeration_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
         var set = new DurableSet<string>("enumSet", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Add items
         var expectedItems = new HashSet<string> { "one", "two", "three" };
@@ -153,9 +155,11 @@ public class DurableSetTests : StateMachineTestBase
     public async Task DurableSet_LargeNumberOfItems_Test()
     {
         // Arrange
-        var (manager, storage) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
         var set = new DurableSet<int>("largeSet", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Act - Add many items
         const int itemCount = 1000;
@@ -174,13 +178,11 @@ public class DurableSetTests : StateMachineTestBase
         
         // Assert
         Assert.Equal(itemCount, set.Count);
-        
+
         // Create a new manager with the same storage to test recovery
-        var logger = LoggerFactory.CreateLogger<StateMachineManager>();
-        var manager2 = new StateMachineManager(storage, logger, SessionPool);
-        await manager2.InitializeAsync(CancellationToken.None);
-        
-        var set2 = new DurableSet<int>("largeSet", manager2, codec, SessionPool);
+        var sut2 = CreateTestSystem(storage: sut.Storage);
+        var set2 = new DurableSet<int>("largeSet", sut2.Manager, codec, SessionPool);
+        await sut2.Lifecycle.OnStart();
         
         // Assert - Large set is correctly recovered
         Assert.Equal(itemCount, set2.Count);
@@ -194,10 +196,12 @@ public class DurableSetTests : StateMachineTestBase
     public async Task DurableSet_SetOperations_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
         var set1 = new DurableSet<int>("set1", manager, codec, SessionPool);
         var set2 = new DurableSet<int>("set2", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Populate set1 with even numbers from 0 to 10
         for (int i = 0; i <= 10; i += 2)
@@ -237,9 +241,11 @@ public class DurableSetTests : StateMachineTestBase
     public async Task DurableSet_ExceptWith_Test()
     {
         // Arrange
-        var (manager, _) = await CreateManagerAsync();
+        var sut = CreateTestSystem();
+        var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
         var set = new DurableSet<int>("exceptSet", manager, codec, SessionPool);
+        await sut.Lifecycle.OnStart();
         
         // Add numbers from 0 to 9
         for (int i = 0; i < 10; i++)
