@@ -232,6 +232,33 @@ namespace Orleans.Analyzers {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Modifying the state obtained from IDurableValue&lt;T&gt;.Value directly is not allowed. Assign a new value instead..
+        /// </summary>
+        internal static string IDurableValueModificationDescription {
+            get {
+                return ResourceManager.GetString("IDurableValueModificationDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Do not modify the value obtained from IDurableValue&lt;T&gt;.Value directly. Assign a new value to IDurableValue&lt;T&gt;.Value instead..
+        /// </summary>
+        internal static string IDurableValueModificationMessageFormat {
+            get {
+                return ResourceManager.GetString("IDurableValueModificationMessageFormat", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Do not modify IDurableValue&lt;T&gt;.Value directly.
+        /// </summary>
+        internal static string IDurableValueModificationTitle {
+            get {
+                return ResourceManager.GetString("IDurableValueModificationTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Remove attribute [{0}].
         /// </summary>
         internal static string IncorrectAttributeUseMessageFormat {
