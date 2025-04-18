@@ -3,12 +3,13 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
-using System.Collections.Immutable;
 using System.Reflection;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Testing;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Testing;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 using Xunit;
@@ -18,11 +19,13 @@ namespace Analyzers.Tests
     public abstract class DiagnosticAnalyzerTestBase<TDiagnosticAnalyzer>
         where TDiagnosticAnalyzer : DiagnosticAnalyzer, new()
     {
-        private static readonly string[] Usings = new[] {
+        private static readonly string[] Usings =
+        [
             "System",
             "System.Threading.Tasks",
-            "Orleans"
-        };
+            "Orleans",
+            "Orleans.Journaling"
+        ];
 
         public static IEnumerable<object[]> GrainInterfaces =>
             new List<object[]>
@@ -43,7 +46,7 @@ namespace Analyzers.Tests
             Assert.Empty(diagnostics);
         }
 
-        protected virtual async Task<(Diagnostic[], string)> GetDiagnosticsAsync(string source, params string[] extraUsings)
+        protected virtual async Task<(Diagnostic[] Diagnostics, string SourceText)> GetDiagnosticsAsync(string source, params string[] extraUsings)
         {
             var sb = new StringBuilder();
             foreach (var @using in Usings.Concat(extraUsings))
@@ -68,7 +71,7 @@ namespace Analyzers.Tests
                     .WithOptions(
                         compilation.Options.WithSpecificDiagnosticOptions(
                             analyzer.SupportedDiagnostics.ToDictionary(d => d.Id, d => ReportDiagnostic.Default)))
-                    .WithAnalyzers(ImmutableArray.Create(analyzer));
+                    .WithAnalyzers([analyzer]);
 
             var diagnostics = await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync();
 
@@ -85,12 +88,13 @@ namespace Analyzers.Tests
             var assemblies = new[]
             {
                 typeof(Task).Assembly,
-                typeof(Orleans.IGrain).Assembly,
-                typeof(Orleans.Grain).Assembly,
+                typeof(IGrain).Assembly,
+                typeof(Orleans.Journaling.IDurableValue<>).Assembly,
+                typeof(Grain).Assembly,
                 typeof(Attribute).Assembly,
                 typeof(int).Assembly,
                 typeof(object).Assembly,
-            }; 
+            };
 
             var metadataReferences = assemblies
                 .SelectMany(x => x.GetReferencedAssemblies().Select(Assembly.Load))

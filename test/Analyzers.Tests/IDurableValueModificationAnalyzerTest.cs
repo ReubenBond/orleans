@@ -1,15 +1,17 @@
+using System.Linq;
 using System.Threading.Tasks;
-using Analyzers.Tests;
+using Microsoft.CodeAnalysis;
+using Orleans.Analyzers;
 using Xunit;
 
-using Verify = Microsoft.CodeAnalysis.CSharp.Testing.CSharpAnalyzerVerifier<Orleans.Analyzers.IDurableValueModificationAnalyzer, Microsoft.CodeAnalysis.Testing.DefaultVerifier>;
-
-namespace Orleans.Analyzers.Tests
+namespace Analyzers.Tests
 {
+    [TestCategory("BVT"), TestCategory("Analyzer")]
     public class IDurableValueModificationAnalyzerTest : DiagnosticAnalyzerTestBase<IDurableValueModificationAnalyzer>
     {
         private const string Preamble = @"
 using Orleans.Runtime;
+using Orleans.Journaling;
 using System.Threading.Tasks;
 
 public class TestPerson
@@ -44,98 +46,142 @@ public class MyGrain : Orleans.Grain, IMyGrain
 ";
 
         [Fact]
-        public Task ShouldWarn_When_ModifyingPropertyDirectly()
+        public async Task ShouldWarn_When_ModifyingPropertyDirectly()
         {
             var code = Preamble + @"
         // Bad: Modifying property directly
-        [| _state.Value |].Age = 2;
+        _state.Value.Age = 2;
 " + Postamble;
+            
+            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
 
-            return Verify.VerifyAnalyzerAsync(code);
+            Assert.NotEmpty(diagnostics);
+            Assert.Single(diagnostics);
+
+            var diagnostic = diagnostics.First();
+            Assert.Equal(IDurableValueModificationAnalyzer.RuleId, diagnostic.Id);
+            Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
         }
 
         [Fact]
-        public Task ShouldWarn_When_CallingMutatingMethod()
+        public async Task ShouldWarn_When_CallingMutatingMethod()
         {
             var code = Preamble + @"
         // Bad: Calling mutating method
-        [| _state.Value |].Scores.Add(100);
+        _state.Value.Scores.Add(100);
 " + Postamble;
 
-            return Verify.VerifyAnalyzerAsync(code);
+            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+
+            Assert.NotEmpty(diagnostics);
+            Assert.Single(diagnostics);
+
+            var diagnostic = diagnostics.First();
+            Assert.Equal(IDurableValueModificationAnalyzer.RuleId, diagnostic.Id);
+            Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
         }
 
         [Fact]
-        public Task ShouldWarn_When_UsingIncrementOperator()
+        public async Task ShouldWarn_When_UsingIncrementOperator()
         {
             var code = Preamble + @"
         // Bad: Using increment operator
-        [| _state.Value |].Age++;
+        _state.Value.Age++;
 " + Postamble;
 
-            return Verify.VerifyAnalyzerAsync(code);
+            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+
+            Assert.NotEmpty(diagnostics);
+            Assert.Single(diagnostics);
+
+            var diagnostic = diagnostics.First();
+            Assert.Equal(IDurableValueModificationAnalyzer.RuleId, diagnostic.Id);
+            Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
         }
 
         [Fact]
-        public Task ShouldWarn_When_UsingDecrementOperator()
+        public async Task ShouldWarn_When_UsingDecrementOperator()
         {
             var code = Preamble + @"
         // Bad: Using decrement operator
-        --[| _state.Value |].Age;
+        --_state.Value.Age;
 " + Postamble;
 
-            return Verify.VerifyAnalyzerAsync(code);
+            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+
+            Assert.NotEmpty(diagnostics);
+            Assert.Single(diagnostics);
+
+            var diagnostic = diagnostics.First();
+            Assert.Equal(IDurableValueModificationAnalyzer.RuleId, diagnostic.Id);
+            Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
         }
 
         private static void ModifyAge(ref int age) { age = 99; }
         private static void GetAge(out int age) { age = 99; } // Example, might not make sense logically but tests syntax
 
         [Fact]
-        public Task ShouldWarn_When_PassingAsRefArgument()
+        public async Task ShouldWarn_When_PassingAsRefArgument()
         {
             var code = Preamble + @"
         // Bad: Passing property as ref argument
-        ModifyAge(ref [| _state.Value |].Age);
+        ModifyAge(ref _state.Value.Age);
 " + Postamble;
 
-            return Verify.VerifyAnalyzerAsync(code);
-        }
+            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
 
-         [Fact]
-        public Task ShouldWarn_When_PassingAsOutArgument()
-        {
-            var code = Preamble + @"
-        // Bad: Passing property as out argument
-        GetAge(out [| _state.Value |].Age);
-" + Postamble;
+            Assert.NotEmpty(diagnostics);
+            Assert.Single(diagnostics);
 
-            return Verify.VerifyAnalyzerAsync(code);
+            var diagnostic = diagnostics.First();
+            Assert.Equal(IDurableValueModificationAnalyzer.RuleId, diagnostic.Id);
+            Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
         }
 
         [Fact]
-        public Task ShouldNotWarn_When_AssigningNewValue()
+        public async Task ShouldWarn_When_PassingAsOutArgument()
+        {
+            var code = Preamble + @"
+        // Bad: Passing property as out argument
+        GetAge(out _state.Value.Age);
+" + Postamble;
+
+            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+
+            Assert.NotEmpty(diagnostics);
+            Assert.Single(diagnostics);
+
+            var diagnostic = diagnostics.First();
+            Assert.Equal(IDurableValueModificationAnalyzer.RuleId, diagnostic.Id);
+            Assert.Equal(DiagnosticSeverity.Warning, diagnostic.Severity);
+        }
+
+        [Fact]
+        public async Task ShouldNotWarn_When_AssigningNewValue()
         {
             var code = Preamble + @"
         // Good: Assigning a new value
         _state.Value = new TestPerson { Age = 2 };
 " + Postamble;
 
-            return Verify.VerifyAnalyzerAsync(code);
+            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+            Assert.Empty(diagnostics);
         }
 
         [Fact]
-        public Task ShouldNotWarn_When_UsingWithExpression()
+        public async Task ShouldNotWarn_When_UsingWithExpression()
         {
             var code = Preamble + @"
         // Good: Using 'with' expression
         _state.Value = _state.Value with { Age = 3 };
 " + Postamble;
 
-            return Verify.VerifyAnalyzerAsync(code);
+            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+            Assert.Empty(diagnostics);
         }
 
         [Fact]
-        public Task ShouldNotWarn_When_ReadingValue()
+        public async Task ShouldNotWarn_When_ReadingValue()
         {
             var code = Preamble + @"
         // Good: Reading the value
@@ -144,32 +190,36 @@ public class MyGrain : Orleans.Grain, IMyGrain
         if (_state.Value.Age > 10) { }
 " + Postamble;
 
-            return Verify.VerifyAnalyzerAsync(code);
+            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+            Assert.Empty(diagnostics);
         }
 
-         [Fact]
-        public Task ShouldNotWarn_When_CallingNonMutatingMethod()
+        [Fact]
+        public async Task ShouldNotWarn_When_CallingNonMutatingMethod()
         {
-             // Assuming ToString() is non-mutating for this test
+            // Assuming ToString() is non-mutating for this test
             var code = Preamble + @"
         // Good: Calling non-mutating method
         var name = _state.Value.ToString();
 " + Postamble;
 
-            return Verify.VerifyAnalyzerAsync(code);
+            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+            Assert.Empty(diagnostics);
         }
 
         [Fact]
-        public Task ShouldNotWarn_When_AccessingValueOnNonDurableValueType()
+        public async Task ShouldNotWarn_When_AccessingValueOnNonDurableValueType()
         {
             // Test case where a type happens to have a 'Value' property but isn't IDurableValue<T>
             var setup = @"
+using Orleans;
+using Orleans.Runtime;
 using System.Threading.Tasks;
 
 public class TestPerson { public int Age { get; set; } }
 public class NotDurable { public TestPerson Value { get; set; } } // Not IDurableValue<T>
 
-public interface IMyGrain : Orleans.IGrainWithGuidKey { Task TestMethod(); }
+public interface IMyGrain : IGrainWithGuidKey { Task TestMethod(); } // Removed Orleans. prefix as using is added
 
 public class MyGrain : Orleans.Grain, IMyGrain
 {
@@ -183,7 +233,8 @@ public class MyGrain : Orleans.Grain, IMyGrain
     }
 }
 ";
-            return Verify.VerifyAnalyzerAsync(code);
+            var (diagnostics, _) = await this.GetDiagnosticsAsync(code, new string[0]);
+            Assert.Empty(diagnostics);
         }
     }
 }

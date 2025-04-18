@@ -80,7 +80,7 @@ namespace Orleans.Analyzers
             // Check if the type is IDurableValue<T>
             if (accessedType is INamedTypeSymbol namedTypeSymbol &&
                 namedTypeSymbol.IsGenericType &&
-                namedTypeSymbol.ConstructedFrom.ToDisplayString() == "Orleans.Runtime.IDurableValue<T>")
+                namedTypeSymbol.ConstructedFrom.ToDisplayString() == "Orleans.Journaling.IDurableValue<T>")
             {
                 // Now check the context of this 'Value' access.
                 // We want to warn if it's part of a further member access or invocation on the left side of an assignment.
