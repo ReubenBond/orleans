@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime.GrainDirectory;
 
 namespace Orleans.Runtime.Placement;
 
@@ -17,19 +18,24 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
     private readonly SiloAddress _localSilo;
     private readonly NormalizedWeights _weights;
     private readonly float _localSiloPreferenceMargin;
+    private readonly float _directoryPartitionPreferenceMargin;
     private readonly ConcurrentDictionary<SiloAddress, ResourceStatistics> _siloStatistics = [];
     private readonly Task<SiloAddress> _cachedLocalSilo;
+    private readonly DirectoryMembershipService _directoryMembershipService;
 
     public ResourceOptimizedPlacementDirector(
         ILocalSiloDetails localSiloDetails,
         DeploymentLoadPublisher deploymentLoadPublisher,
-        IOptions<ResourceOptimizedPlacementOptions> options)
+        IOptions<ResourceOptimizedPlacementOptions> options,
+        DirectoryMembershipService directoryMembershipService)
     {
         _localSilo = localSiloDetails.SiloAddress;
         _cachedLocalSilo = Task.FromResult(_localSilo);
         _weights = NormalizeWeights(options.Value);
         _localSiloPreferenceMargin = (float)options.Value.LocalSiloPreferenceMargin / 100;
+        _directoryPartitionPreferenceMargin = (float)options.Value.DirectoryPartitionSiloPreferenceMargin / 100;
         deploymentLoadPublisher.SubscribeToStatisticsChangeEvents(this);
+        _directoryMembershipService = directoryMembershipService;
     }
 
     private static NormalizedWeights NormalizeWeights(ResourceOptimizedPlacementOptions input)
@@ -69,38 +75,52 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
             return Task.FromResult(compatibleSilos[Random.Shared.Next(compatibleSilos.Length)]);
         }
 
+        // Find the silo which owns the grain's directory entry.
+        // This is a good second pick after the local silo because we can at potentially save a remote
+        // call to the directory during activation. External clients will choose the corresponding
+        // gateway to route to when they have no prior knowledge of grain placement.
+        var directoryMembershipSnapshot = _directoryMembershipService.CurrentView;
+        directoryMembershipSnapshot.TryGetOwner(target.GrainIdentity, out var directorySilo, out _);
+
         // It is good practice not to allocate more than 1[KB] on the stack
         // but the size of ValueTuple<int, ResourceStatistics> = 24 bytes, by increasing
         // the limit to 4[KB] we can stackalloc for up to 4096 / 24 ~= 170 silos in a cluster.
-        (int Index, float Score, float? LocalSiloScore) pick;
+        (int Index, float Score, float? LocalSiloScore, float? DirectorySiloScore) pick;
         int compatibleSilosCount = compatibleSilos.Length;
         if (compatibleSilosCount * Unsafe.SizeOf<(int, ResourceStatistics)>() <= FourKiloByte)
         {
-            pick = MakePick(stackalloc (int, ResourceStatistics)[compatibleSilosCount]);
+            pick = MakePick(stackalloc (int, ResourceStatistics)[compatibleSilosCount], directorySilo);
         }
         else
         {
             var relevantSilos = ArrayPool<(int, ResourceStatistics)>.Shared.Rent(compatibleSilosCount);
-            pick = MakePick(relevantSilos.AsSpan());
+            pick = MakePick(relevantSilos.AsSpan(), directorySilo);
             ArrayPool<(int, ResourceStatistics)>.Shared.Return(relevantSilos);
         }
 
         var localSiloScore = pick.LocalSiloScore;
-        if (!localSiloScore.HasValue || context.LocalSiloStatus != SiloStatus.Active || localSiloScore.Value - _localSiloPreferenceMargin > pick.Score)
+        if (localSiloScore.HasValue && context.LocalSiloStatus == SiloStatus.Active && localSiloScore.Value - _localSiloPreferenceMargin <= pick.Score)
         {
-            var bestCandidate = compatibleSilos[pick.Index];
-            return Task.FromResult(bestCandidate);
+            return _cachedLocalSilo;
         }
 
-        return _cachedLocalSilo;
+        var directorySiloScore = pick.DirectorySiloScore;
+        if (directorySilo is not null && directorySiloScore.HasValue && directorySiloScore.Value - _directoryPartitionPreferenceMargin <= pick.Score)
+        {
+            return Task.FromResult(directorySilo);
+        }
 
-        (int PickIndex, float PickScore, float? LocalSiloScore) MakePick(scoped Span<(int, ResourceStatistics)> relevantSilos)
+        var bestCandidate = compatibleSilos[pick.Index];
+        return Task.FromResult(bestCandidate);
+
+        (int PickIndex, float PickScore, float? LocalSiloScore, float? DirectorySiloScore) MakePick(scoped Span<(int, ResourceStatistics)> relevantSilos, SiloAddress? directorySilo)
         {
             // Get all compatible silos which aren't overloaded
             int relevantSilosCount = 0;
             float maxMaxAvailableMemory = 0;
             int maxActivationCount = 0;
             ResourceStatistics? localSiloStatistics = null;
+            ResourceStatistics? directorySiloStatistics = null;
             for (var i = 0; i < compatibleSilos.Length; ++i)
             {
                 var silo = compatibleSilos[i];
@@ -121,9 +141,9 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                         maxActivationCount = stats.ActivationCount;
                     }
 
-                    if (silo.Equals(_localSilo))
+                    if (silo.Equals(directorySilo))
                     {
-                        localSiloStatistics = stats;
+                        directorySiloStatistics = stats;
                     }
                 }
             }
@@ -161,7 +181,14 @@ internal sealed class ResourceOptimizedPlacementDirector : IPlacementDirector, I
                 localSiloScore = CalculateScore(in localStats, maxMaxAvailableMemory, maxActivationCount);
             }
 
-            return (pick.Index, pick.Score, localSiloScore);
+            float? directorySiloScore = null;
+            if (directorySiloStatistics.HasValue && !directorySiloStatistics.Value.IsOverloaded)
+            {
+                var directoryStats = directorySiloStatistics.Value;
+                directorySiloScore = CalculateScore(in directoryStats, maxMaxAvailableMemory, maxActivationCount);
+            }
+
+            return (pick.Index, pick.Score, localSiloScore, directorySiloScore);
         }
 
         // Variant of the Modern Fisher-Yates shuffle which stops after shuffling the first `prefixLength` elements,

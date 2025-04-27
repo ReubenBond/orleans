@@ -7,7 +7,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Microsoft.CodeAnalysis;
 using Orleans.Configuration;
 using Orleans.Runtime.Utilities;
 
@@ -28,22 +27,16 @@ internal sealed class DirectoryMembershipSnapshot
 
     internal DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, Func<SiloAddress, int, uint[]> getRingBoundaries)
     {
-        var sortedActiveMembers = ImmutableArray.CreateBuilder<SiloAddress>(snapshot.Members.Count(static m => m.Value.Status == SiloStatus.Active));
-        foreach (var member in snapshot.Members)
-        {
-            // Only active members are part of directory membership.
-            if (member.Value.Status == SiloStatus.Active)
-            {
-                sortedActiveMembers.Add(member.Key);
-            }
-        }
+        ClusterMembershipSnapshot = snapshot;
+        Version = snapshot.Version;
+        Members = ExtractAndSortMembers(snapshot);
+        _rangesByMember = new RingRangeCollection[Members.Length];
 
-        sortedActiveMembers.Sort(static (left, right) => left.CompareTo(right));
-        var hashIndexPairs = ImmutableArray.CreateBuilder<(uint Hash, int MemberIndex, int PartitionIndex)>(PartitionsPerSilo * sortedActiveMembers.Count);
+        var hashIndexPairs = ImmutableArray.CreateBuilder<(uint Hash, int MemberIndex, int PartitionIndex)>(PartitionsPerSilo * Members.Length);
         var memberPartitions = ImmutableArray.CreateBuilder<ImmutableArray<IGrainDirectoryPartition>>();
-        for (var memberIndex = 0; memberIndex < sortedActiveMembers.Count; memberIndex++)
+        for (var memberIndex = 0; memberIndex < Members.Length; memberIndex++)
         {
-            var activeMember = sortedActiveMembers[memberIndex];
+            var activeMember = Members[memberIndex];
             var hashCodes = getRingBoundaries(activeMember, PartitionsPerSilo).ToList();
             hashCodes.Sort();
             Debug.Assert(hashCodes.Count == PartitionsPerSilo);
@@ -94,8 +87,8 @@ internal sealed class DirectoryMembershipSnapshot
             builder.Add(range);
         }
 
-        var rangesByMemberPartition = ImmutableArray.CreateBuilder<ImmutableArray<RingRange>>(sortedActiveMembers.Count);
-        for (var i = 0; i < sortedActiveMembers.Count; i++)
+        var rangesByMemberPartition = ImmutableArray.CreateBuilder<ImmutableArray<RingRange>>(Members.Length);
+        for (var i = 0; i < Members.Length; i++)
         {
             rangesByMemberPartition.Add(rangesByMemberPartitionBuilders[i].ToImmutable());
         }
@@ -119,17 +112,28 @@ internal sealed class DirectoryMembershipSnapshot
         }
 
         _ringBoundaries = hashIndexPairs.ToImmutable();
+    }
 
-        Members = sortedActiveMembers.ToImmutable();
+    private static ImmutableArray<SiloAddress> ExtractAndSortMembers(ClusterMembershipSnapshot snapshot)
+    {
+        var sortedActiveMembers = ImmutableArray.CreateBuilder<SiloAddress>(snapshot.Members.Count(static m => m.Value.Status == SiloStatus.Active));
+        foreach (var member in snapshot.Members)
+        {
+            // Only active members are part of directory membership.
+            if (member.Value.Status == SiloStatus.Active)
+            {
+                sortedActiveMembers.Add(member.Key);
+            }
+        }
 
-        _rangesByMember = new RingRangeCollection[Members.Length];
-        ClusterMembershipSnapshot = snapshot;
+        sortedActiveMembers.Sort(static (left, right) => left.CompareTo(right));
+        return sortedActiveMembers.ToImmutable();
     }
 
     public static DirectoryMembershipSnapshot Default { get; } = new DirectoryMembershipSnapshot(
         new ClusterMembershipSnapshot(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, MembershipVersion.MinValue), null!);
-
-    public MembershipVersion Version => ClusterMembershipSnapshot.Version;
+    public ClusterMembershipSnapshot ClusterMembershipSnapshot { get; }
+    public MembershipVersion Version { get; }
 
     public ImmutableArray<SiloAddress> Members { get; }
 
@@ -191,8 +195,6 @@ internal sealed class DirectoryMembershipSnapshot
     }
 
     public RangeCollection RangeOwners => new(this);
-
-    public ClusterMembershipSnapshot ClusterMembershipSnapshot { get; }
 
     private (RingRange Range, int MemberIndex, int PartitionIndex) GetRangeInfo(int index)
     {

@@ -2,7 +2,6 @@ using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.State;
 
@@ -21,9 +20,8 @@ namespace Orleans.Transactions.TOC
             ITransactionalStateStorage<TransactionCommitter<TService>.OperationState> storage,
             IClock clock,
             ILogger logger,
-            ITimerManager timerManager,
             IActivationLifetime activationLifetime)
-            : base(options, resource, deactivate, storage, clock, logger, timerManager, activationLifetime)
+            : base(options, resource, deactivate, storage, clock, logger, activationLifetime)
         {
             this.service = service;
         }

@@ -28,7 +28,6 @@ using System;
 using System.Reflection;
 using System.Linq;
 using Microsoft.Extensions.Options;
-using Orleans.Timers.Internal;
 using Microsoft.AspNetCore.Connections;
 using Orleans.Networking.Shared;
 using Orleans.Configuration.Internal;
@@ -359,8 +358,6 @@ namespace Orleans.Hosting
             services.AddTransient<IConfigurationValidator, GrainCollectionOptionsValidator>();
 
             services.AddTransient<IConfigurationValidator, LoadSheddingValidator>();
-
-            services.TryAddSingleton<ITimerManager, TimerManagerImpl>();
 
             // persistent state facet support
             services.TryAddSingleton<IGrainStorageSerializer, JsonGrainStorageSerializer>();

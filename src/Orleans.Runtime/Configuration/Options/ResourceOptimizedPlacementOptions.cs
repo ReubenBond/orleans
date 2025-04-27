@@ -97,7 +97,28 @@ public sealed class ResourceOptimizedPlacementOptions
     /// <summary>
     /// The default value of <see cref="LocalSiloPreferenceMargin"/>.
     /// </summary>
-    public const int DEFAULT_LOCAL_SILO_PREFERENCE_MARGIN = 5;
+    public const int DEFAULT_LOCAL_SILO_PREFERENCE_MARGIN = 10;
+
+    /// <summary>
+    /// The specified margin for which: if two silos (one of them hosting the directory partition for the current pending activation), have a utilization score that should be considered "the same" within this margin.
+    /// <list type="bullet">
+    /// <item><description>When this value is 0, then the policy will always favor the silo with the lower resource utilization, even if that silo is remote to the current pending activation.</description></item>
+    /// <item><description>When this value is 100, then the policy will always favor the directory silo, regardless of its relative utilization score. This policy essentially becomes equivalent to <see cref="HashBasedPlacement"/>.</description></item>
+    /// </list>
+    /// </summary>
+    /// <remarks>
+    /// <i>
+    /// <para>This applies after <see cref="LocalSiloPreferenceMargin"/>.</para>
+    /// <para>Do favor a lower value for this e.g: 5-10</para>
+    /// <para>Valid range is [0-100]</para>
+    /// </i>
+    /// </remarks>
+    public int DirectoryPartitionSiloPreferenceMargin { get; set; } = DEFAULT_DIRECTORY_SILO_PREFERENCE_MARGIN;
+
+    /// <summary>
+    /// The default value of <see cref="DirectoryPartitionSiloPreferenceMargin"/>.
+    /// </summary>
+    public const int DEFAULT_DIRECTORY_SILO_PREFERENCE_MARGIN = 10;
 }
 
 internal sealed class ResourceOptimizedPlacementOptionsValidator

@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
+using Orleans.Membership;
 using Orleans.Metadata;
 using Orleans.Placement.Repartitioning;
 using Orleans.Providers;
@@ -418,19 +421,16 @@ namespace Orleans.Runtime.Management
         }
 
         [LoggerMessage(
-            EventId = 0,
             Level = LogLevel.Information,
             Message = "Forcing garbage collection on {SiloAddresses}")]
         private partial void LogInformationForceGarbageCollection(SiloAddressesLogValue siloAddresses);
 
         [LoggerMessage(
-            EventId = 0,
             Level = LogLevel.Information,
             Message = "Forcing runtime statistics collection on {SiloAddresses}")]
         private partial void LogInformationForceRuntimeStatisticsCollection(SiloAddressesLogValue siloAddresses);
 
         [LoggerMessage(
-            EventId = 0,
             Level = LogLevel.Debug,
             Message = "GetRuntimeStatistics on {SiloAddresses}")]
         private partial void LogDebugGetRuntimeStatistics(SiloAddressesLogValue siloAddresses);
@@ -441,7 +441,6 @@ namespace Orleans.Runtime.Management
         }
 
         [LoggerMessage(
-            EventId = 0,
             Level = LogLevel.Debug,
             Message = "Executing {Action} against {SiloAddresses}"
         )]

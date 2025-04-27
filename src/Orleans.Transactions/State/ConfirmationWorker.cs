@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.State
@@ -18,7 +17,6 @@ namespace Orleans.Transactions.State
         private readonly BatchWorker storageWorker;
         private readonly Func<StorageBatch<TState>> getStorageBatch;
         private readonly ILogger logger;
-        private readonly ITimerManager timerManager;
         private readonly IActivationLifetime activationLifetime;
         private readonly HashSet<Guid> pending;
 
@@ -28,7 +26,6 @@ namespace Orleans.Transactions.State
             BatchWorker storageWorker,
             Func<StorageBatch<TState>> getStorageBatch,
             ILogger logger,
-            ITimerManager timerManager,
             IActivationLifetime activationLifetime)
         {
             this.options = options.Value;
@@ -36,7 +33,6 @@ namespace Orleans.Transactions.State
             this.storageWorker = storageWorker;
             this.getStorageBatch = getStorageBatch;
             this.logger = logger;
-            this.timerManager = timerManager;
             this.activationLifetime = activationLifetime;
             this.pending = new HashSet<Guid>();
         }
@@ -91,7 +87,7 @@ namespace Orleans.Transactions.State
                         if (!confirmed)
                         {
                             hasPendingConfirmations = true;
-                            await this.timerManager.Delay(this.options.ConfirmationRetryDelay, ct);
+                            await Task.Delay(this.options.ConfirmationRetryDelay, ct);
                             break;
                         }
                     }
@@ -109,7 +105,7 @@ namespace Orleans.Transactions.State
                 {
                     if (await TryCollect(transactionId)) break;
 
-                    await this.timerManager.Delay(this.options.ConfirmationRetryDelay, ct);
+                    await Task.Delay(this.options.ConfirmationRetryDelay, ct);
                 }
             }
         }

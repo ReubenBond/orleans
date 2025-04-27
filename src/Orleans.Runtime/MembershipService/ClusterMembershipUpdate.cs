@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using Orleans.Membership;
 
 namespace Orleans.Runtime
 {
