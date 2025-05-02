@@ -5,27 +5,27 @@ using Orleans.Runtime;
 
 namespace Orleans.Storage
 {
+/// <summary>
+/// Common interface for grain state serializers.
+/// </summary>
+public interface IGrainStorageSerializer
+{
     /// <summary>
-    /// Common interface for grain state serializers.
+    /// Serializes the object input.
     /// </summary>
-    public interface IGrainStorageSerializer
-    {
-        /// <summary>
-        /// Serializes the object input.
-        /// </summary>
-        /// <param name="input">The object to serialize.</param>
-        /// <typeparam name="T">The input type.</typeparam>
-        /// <returns>The serialized input.</returns>
-        BinaryData Serialize<T>(T input);
+    /// <param name="input">The object to serialize.</param>
+    /// <typeparam name="T">The input type.</typeparam>
+    /// <returns>The serialized input.</returns>
+    BinaryData Serialize<T>(T input);
 
-        /// <summary>
-        /// Deserializes the provided data.
-        /// </summary>
-        /// <param name="input">The data to deserialize.</param>
-        /// <typeparam name="T">The output type.</typeparam>
-        /// <returns>The deserialized object.</returns>
-        T Deserialize<T>(BinaryData input);
-    }
+    /// <summary>
+    /// Deserializes the provided data.
+    /// </summary>
+    /// <param name="input">The data to deserialize.</param>
+    /// <typeparam name="T">The output type.</typeparam>
+    /// <returns>The deserialized object.</returns>
+    T Deserialize<T>(BinaryData input);
+}
 
     /// <summary>
     /// Extensions for <see cref="IGrainStorageSerializer"/>.

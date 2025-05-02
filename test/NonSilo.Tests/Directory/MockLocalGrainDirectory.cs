@@ -98,11 +98,6 @@ namespace UnitTests.Directory
             throw new NotImplementedException();
         }
 
-        public void SetSiloRemovedCatalogCallback(Action<ILocalGrainDirectory, SiloAddress, SiloStatus> catalogOnSiloRemoved)
-        {
-            throw new NotImplementedException();
-        }
-
         public void Start()
         {
             throw new NotImplementedException();
