@@ -12,8 +12,8 @@ namespace Orleans.Configuration
         /// <summary>
         /// The number of missed "I am alive" updates  in the table from a silo that causes warning to be logged. Does not impact the liveness protocol.
         /// </summary>
-        public int NumMissedTableIAmAliveLimit { get; set; } = DEFAULT_LIVENESS_NUM_TABLE_I_AM_ALIVE_LIMIT;
-        public const int DEFAULT_LIVENESS_NUM_TABLE_I_AM_ALIVE_LIMIT = 2;
+        /// <seealso cref="IAmAliveTablePublishTimeout"/>
+        public int NumMissedTableIAmAliveLimit { get; set; } = 3;
 
         /// <summary>
         /// Global switch to disable silo liveness protocol (should be used only for testing).
@@ -44,18 +44,20 @@ namespace Orleans.Configuration
         public TimeSpan DeathVoteExpirationTimeout { get; set; } = DEFAULT_LIVENESS_DEATH_VOTE_EXPIRATION_TIMEOUT;
         public static readonly TimeSpan DEFAULT_LIVENESS_DEATH_VOTE_EXPIRATION_TIMEOUT = TimeSpan.FromSeconds(120);
 
-        /// <summary>
-        /// The number of seconds to periodically write in the membership table that this silo is alive. Used only for diagnostics.
-        /// </summary>
-        public TimeSpan IAmAliveTablePublishTimeout { get; set; } = DEFAULT_LIVENESS_I_AM_ALIVE_TABLE_PUBLISH_TIMEOUT;
-        public static readonly TimeSpan DEFAULT_LIVENESS_I_AM_ALIVE_TABLE_PUBLISH_TIMEOUT = TimeSpan.FromMinutes(5);
+        /// <remarks>
+        /// These heartbeats are largely for diagnostic purposes, however they are also used to ignore entries
+        /// in the membership table in the event of a total cluster reset. This value multiplied by <see cref="NumMissedTableIAmAliveLimit"/>
+        /// is used to skip hosts in the membership table when performing an initial connectivity check upon startup.
+        /// </remarks>
+        /// <value>Publish an update every 30 seconds by default.</value>
+        public TimeSpan IAmAliveTablePublishTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
         /// <summary>
         /// The number of seconds to attempt to join a cluster of silos before giving up.
         /// </summary>
         public TimeSpan MaxJoinAttemptTime { get; set; } = DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME;
         public static readonly TimeSpan DEFAULT_LIVENESS_MAX_JOIN_ATTEMPT_TIME = TimeSpan.FromMinutes(5); // 5 min
-                
+
         /// <summary>
         /// Whether new silo that joins the cluster has to validate the initial connectivity with all other Active silos.
         /// </summary>
