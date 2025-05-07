@@ -6,15 +6,11 @@ namespace System.Distributed.DurableTasks;
 /// <summary>
 /// Async method builder for methods which return <see cref="DurableTask"/>.
 /// </summary>
-public readonly struct DurableTaskMethodBuilder
+public struct DurableTaskMethodBuilder
 {
-    private readonly DurableTaskMethodInvocation _taskSource;
-    public readonly DurableTask Task => _taskSource;
+    private UntypedDurableTaskMethodInvocation _taskSource;
 
-    public DurableTaskMethodBuilder()
-    {
-        _taskSource = new();
-    }
+    public readonly DurableTask Task => _taskSource;
 
     public static DurableTaskMethodBuilder Create() => new();
 
@@ -22,23 +18,25 @@ public readonly struct DurableTaskMethodBuilder
         where TStateMachine : IAsyncStateMachine
     {
         // Box the state machine and do not start it.
-        // Instead, the state machine will be started once the resulting task is awaited (not when the method is called directly).
-        _taskSource.SetStateMachine(stateMachine);
+        // Instead, the state machine will be started once the resulting task is awaited (not when the method is called directly)
+        var taskSource = new UntypedDurableTaskMethodInvocation<TStateMachine>();
+        _taskSource = taskSource;
+        taskSource.SetStateMachine(stateMachine);
     }
 
-    public void SetStateMachine(IAsyncStateMachine stateMachine) => SetStateMachineCore(stateMachine);
+    public readonly void SetStateMachine(IAsyncStateMachine stateMachine) => SetStateMachineCore(stateMachine);
 
-    public void SetException(Exception exception)
+    public readonly void SetException(Exception exception)
     {
         _taskSource.SetException(exception);
     }
 
-    public void SetResult()
+    public readonly void SetResult()
     {
         _taskSource.SetResult();
     }
 
-    public void AwaitOnCompleted<TAwaiter, TStateMachine>(
+    public readonly void AwaitOnCompleted<TAwaiter, TStateMachine>(
         ref TAwaiter awaiter, ref TStateMachine stateMachine)
         where TAwaiter : INotifyCompletion
         where TStateMachine : IAsyncStateMachine
@@ -46,7 +44,7 @@ public readonly struct DurableTaskMethodBuilder
         awaiter.OnCompleted(stateMachine.MoveNext);
     }
 
-    public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(
+    public readonly void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(
         ref TAwaiter awaiter, ref TStateMachine stateMachine)
         where TAwaiter : ICriticalNotifyCompletion
         where TStateMachine : IAsyncStateMachine
@@ -68,15 +66,11 @@ public readonly struct DurableTaskMethodBuilder
 /// <summary>
 /// Async method builder for methods which return <see cref="DurableTask{TResult}"/>.
 /// </summary>
-public readonly struct DurableTaskMethodBuilder<TResult>
+public struct DurableTaskMethodBuilder<TResult>
 {
-    private readonly DurableTaskMethodInvocation<TResult> _taskSource;
-    public readonly DurableTask<TResult> Task => _taskSource;
+    private DurableTaskMethodInvocation<TResult> _taskSource;
 
-    public DurableTaskMethodBuilder()
-    {
-        _taskSource = new();
-    }
+    public readonly DurableTask<TResult> Task => _taskSource;
 
     public static DurableTaskMethodBuilder<TResult> Create() => new();
 
@@ -85,22 +79,24 @@ public readonly struct DurableTaskMethodBuilder<TResult>
     {
         // Box the state machine and do not start it.
         // Instead, the state machine will be started once the resulting task is awaited (not when the method is called directly)
-        _taskSource.SetStateMachine(stateMachine);
+        var taskSource = new DurableTaskMethodInvocation<TResult, TStateMachine>();
+        _taskSource = taskSource;
+        taskSource.SetStateMachine(stateMachine);
     }
 
-    public void SetStateMachine(IAsyncStateMachine stateMachine) => DurableTaskMethodBuilder.SetStateMachineCore(stateMachine);
+    public readonly void SetStateMachine(IAsyncStateMachine stateMachine) => DurableTaskMethodBuilder.SetStateMachineCore(stateMachine);
 
-    public void SetException(Exception exception)
+    public readonly void SetException(Exception exception)
     {
         _taskSource.SetException(exception);
     }
 
-    public void SetResult(TResult result)
+    public readonly void SetResult(TResult result)
     {
         _taskSource.SetResult(result);
     }
 
-    public void AwaitOnCompleted<TAwaiter, TStateMachine>(
+    public readonly void AwaitOnCompleted<TAwaiter, TStateMachine>(
         ref TAwaiter awaiter, ref TStateMachine stateMachine)
         where TAwaiter : INotifyCompletion
         where TStateMachine : IAsyncStateMachine
@@ -108,7 +104,7 @@ public readonly struct DurableTaskMethodBuilder<TResult>
         awaiter.OnCompleted(stateMachine.MoveNext);
     }
 
-    public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(
+    public readonly void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(
         ref TAwaiter awaiter, ref TStateMachine stateMachine)
         where TAwaiter : ICriticalNotifyCompletion
         where TStateMachine : IAsyncStateMachine
