@@ -67,11 +67,11 @@ public class Program
 
         await app.StartAsync();
 
-        await HumanInTheLoop.RunAsync(app.Services);
-        //await SumOfSquares.RunAsync(app.Services);
-        //await Bank.RunAsync(app.Services);
-        //await HelloWorld.RunAsync(app.Services);
-        //await CancelWorld.RunAsync(app.Services);
+        //await HumanInTheLoop.RunAsync(app.Services);
+        await SumOfSquares.RunAsync(app.Services);
+        await Bank.RunAsync(app.Services);
+        await HelloWorld.RunAsync(app.Services);
+        await CancelWorld.RunAsync(app.Services);
 
         /*
         var client = host.Services.GetRequiredService<IClusterClient>();
