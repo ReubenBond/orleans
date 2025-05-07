@@ -4,7 +4,7 @@ using System.Threading.Tasks.Sources;
 
 namespace System.Distributed.DurableTasks;
 
-internal abstract class UntypedDurableTaskMethodInvocation : DurableTask
+internal abstract class VoidDurableTaskMethodInvocation : DurableTask
 {
     public abstract void SetResult();
     public abstract void SetException(Exception exception);
@@ -13,11 +13,10 @@ internal abstract class UntypedDurableTaskMethodInvocation : DurableTask
 /// <summary>
 /// Represents a locally-executing <see cref="DurableTask"/> method.
 /// </summary>
-internal sealed class UntypedDurableTaskMethodInvocation<TStateMachine> : UntypedDurableTaskMethodInvocation, IValueTaskSource<DurableTaskResponse>
+internal sealed class VoidDurableTaskMethodInvocation<TStateMachine> : VoidDurableTaskMethodInvocation, IValueTaskSource<DurableTaskResponse>
     where TStateMachine : IAsyncStateMachine
 {
     private ManualResetValueTaskSourceCore<DurableTaskResponse> _completion;
-    private DurableExecutionContext? _executionContext;
 
 #pragma warning disable IDE0044 // Add readonly modifier
     private TStateMachine? _stateMachine;
@@ -25,12 +24,12 @@ internal sealed class UntypedDurableTaskMethodInvocation<TStateMachine> : Untype
 
     public void SetStateMachine(TStateMachine stateMachine) => _stateMachine = stateMachine;
 
-    private void StartInvocation()
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
     {
         Debug.Assert(_stateMachine is not null, "State machine should not be null at this point.");
+        ArgumentNullException.ThrowIfNull(executionContext);
 
-        // TODO: is this the best & most efficient way to propagate the context? It seems like it would be costly to do this for every await point.
-        DurableExecutionContext.SetCurrentContext(_executionContext, out var previousContext);
+        DurableExecutionContext.SetCurrentContext(executionContext, out var previousContext);
         try
         {
             _stateMachine.MoveNext();
@@ -39,12 +38,7 @@ internal sealed class UntypedDurableTaskMethodInvocation<TStateMachine> : Untype
         {
             DurableExecutionContext.SetCurrentContext(previousContext);
         }
-    }
 
-    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
-    {
-        _executionContext = executionContext;
-        StartInvocation();
         return new(this, _completion.Version);
     }
 
@@ -71,20 +65,19 @@ internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : Dura
     where TStateMachine : IAsyncStateMachine
 {
     private ManualResetValueTaskSourceCore<DurableTaskResponse> _completion;
-    private DurableExecutionContext? _executionContext;
 
 #pragma warning disable IDE0044 // Add readonly modifier
     private TStateMachine? _stateMachine;
 #pragma warning restore IDE0044 // Add readonly modifier
 
     public void SetStateMachine(TStateMachine stateMachine) => _stateMachine = stateMachine;
-    private void StartInvocation()
+
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
     {
         Debug.Assert(_stateMachine is not null, "State machine should not be null at this point.");
+        ArgumentNullException.ThrowIfNull(executionContext);
 
-        // TODO: is this the best & most efficient way to propagate the context? It seems like it would be costly to do this for every await point.
-        // Maybe a cheaper alternative would be to use a thread-local in addition to the async-local? Possibly ask Toub about ExecutionContext APIs, etc...
-        DurableExecutionContext.SetCurrentContext(_executionContext, out var previousContext);
+        DurableExecutionContext.SetCurrentContext(executionContext, out var previousContext);
         try
         {
             _stateMachine.MoveNext();
@@ -93,12 +86,7 @@ internal sealed class DurableTaskMethodInvocation<TResult, TStateMachine> : Dura
         {
             DurableExecutionContext.SetCurrentContext(previousContext);
         }
-    }
 
-    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
-    {
-        _executionContext = executionContext;
-        StartInvocation();
         return new(this, _completion.Version);
     }
 

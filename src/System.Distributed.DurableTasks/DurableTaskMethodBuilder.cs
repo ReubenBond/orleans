@@ -8,7 +8,7 @@ namespace System.Distributed.DurableTasks;
 /// </summary>
 public struct DurableTaskMethodBuilder
 {
-    private UntypedDurableTaskMethodInvocation _taskSource;
+    private VoidDurableTaskMethodInvocation _taskSource;
 
     public readonly DurableTask Task => _taskSource;
 
@@ -19,7 +19,9 @@ public struct DurableTaskMethodBuilder
     {
         // Box the state machine and do not start it.
         // Instead, the state machine will be started once the resulting task is awaited (not when the method is called directly)
-        var taskSource = new UntypedDurableTaskMethodInvocation<TStateMachine>();
+        // The sequence of operations here is significant: since the DurableTaskMethodBuilder is held as a field on the state machine,
+        // we must perform any necessary mutations to the builder before copying it into the box.
+        var taskSource = new VoidDurableTaskMethodInvocation<TStateMachine>();
         _taskSource = taskSource;
         taskSource.SetStateMachine(stateMachine);
     }
@@ -79,6 +81,8 @@ public struct DurableTaskMethodBuilder<TResult>
     {
         // Box the state machine and do not start it.
         // Instead, the state machine will be started once the resulting task is awaited (not when the method is called directly)
+        // The sequence of operations here is significant: since the DurableTaskMethodBuilder is held as a field on the state machine,
+        // we must perform any necessary mutations to the builder before copying it into the box.
         var taskSource = new DurableTaskMethodInvocation<TResult, TStateMachine>();
         _taskSource = taskSource;
         taskSource.SetStateMachine(stateMachine);
