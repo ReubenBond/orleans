@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using FluentAssertions;
 using Orleans.Caching;
 using Orleans.Caching.Internal;
@@ -25,7 +26,7 @@ public sealed class ConcurrentLruCacheSoakTests
         this.testOutputHelper = testOutputHelper;
     }
 
-    [Fact]
+    [Fact(Skip = "https://github.com/dotnet/runtime/issues/116180")]
     public async Task WhenSoakConcurrentGetCacheEndsInConsistentState()
     {
         for (var i = 0; i < 10; i++)
@@ -47,7 +48,7 @@ public sealed class ConcurrentLruCacheSoakTests
         }
     }
 
-    [Fact]
+    [Fact(Skip = "https://github.com/dotnet/runtime/issues/116180")]
     public async Task WhenSoakConcurrentGetWithArgCacheEndsInConsistentState()
     {
         for (var i = 0; i < 10; i++)
@@ -70,7 +71,7 @@ public sealed class ConcurrentLruCacheSoakTests
         }
     }
 
-    [Fact]
+    [Fact(Skip = "https://github.com/dotnet/runtime/issues/116180")]
     public async Task WhenSoakConcurrentGetAndRemoveCacheEndsInConsistentState()
     {
         for (var i = 0; i < 10; i++)
@@ -91,7 +92,7 @@ public sealed class ConcurrentLruCacheSoakTests
         }
     }
 
-    [Fact]
+    [Fact(Skip = "https://github.com/dotnet/runtime/issues/116180")]
     public async Task WhenSoakConcurrentGetAndRemoveKvpCacheEndsInConsistentState()
     {
         for (var i = 0; i < 10; i++)
@@ -112,7 +113,7 @@ public sealed class ConcurrentLruCacheSoakTests
         }
     }
 
-    [Fact]
+    [Fact(Skip = "https://github.com/dotnet/runtime/issues/116180")]
     public async Task WhenSoakConcurrentGetAndUpdateCacheEndsInConsistentState()
     {
         for (var i = 0; i < 10; i++)
@@ -133,7 +134,7 @@ public sealed class ConcurrentLruCacheSoakTests
         }
     }
 
-    [Fact]
+    [Fact(Skip = "https://github.com/dotnet/runtime/issues/116180")]
     public async Task WhenSoakConcurrentGetAndAddCacheEndsInConsistentState()
     {
         for (var i = 0; i < 10; i++)
@@ -154,7 +155,7 @@ public sealed class ConcurrentLruCacheSoakTests
         }
     }
 
-    [Fact]
+    [Fact(Skip = "https://github.com/dotnet/runtime/issues/116180")]
     public async Task WhenSoakConcurrentGetAndUpdateValueTypeCacheEndsInConsistentState()
     {
         var lruVT = new ConcurrentLruCache<int, Guid>(Capacity, EqualityComparer<int>.Default);
@@ -178,7 +179,7 @@ public sealed class ConcurrentLruCacheSoakTests
         }
     }
 
-    [Fact]
+    [Fact(Skip = "https://github.com/dotnet/runtime/issues/116180")]
     public async Task WhenAddingCacheSizeItemsNothingIsEvicted()
     {
         const int size = 1024;
@@ -196,7 +197,7 @@ public sealed class ConcurrentLruCacheSoakTests
         cache.Metrics.Evicted.Should().Be(0);
     }
 
-    [Fact]
+    [Fact(Skip = "https://github.com/dotnet/runtime/issues/116180")]
     public async Task WhenConcurrentUpdateAndRemoveKvp()
     {
         var tcs = new TaskCompletionSource<int>();
@@ -221,7 +222,7 @@ public sealed class ConcurrentLruCacheSoakTests
         await removal;
     }
 
-    [Theory]
+    [Theory(Skip = "https://github.com/dotnet/runtime/issues/116180")]
     [Repeat(10)]
     public async Task WhenConcurrentGetAndClearCacheEndsInConsistentState(int iteration)
     {
@@ -245,7 +246,7 @@ public sealed class ConcurrentLruCacheSoakTests
         RunIntegrityCheck();
     }
 
-    [Theory]
+    [Theory(Skip = "https://github.com/dotnet/runtime/issues/116180")]
     [Repeat(10)]
     public async Task WhenConcurrentGetAndClearDuringWarmupCacheEndsInConsistentState(int iteration)
     {
@@ -273,7 +274,7 @@ public sealed class ConcurrentLruCacheSoakTests
     // This test will run forever if there is a live lock.
     // Since the cache bookkeeping has some overhead, it is harder to provoke
     // spinning inside the reader thread compared to LruItemSoakTests.DetectTornStruct.
-    [Theory]
+    [Theory(Skip = "https://github.com/dotnet/runtime/issues/116180")]
     [Repeat(10)]
     public async Task WhenValueIsBigStructNoLiveLock(int _)
     {
