@@ -131,12 +131,21 @@ public abstract class AsyncEnumerableRequest<T> : RequestBase, IAsyncEnumerable<
     [field: NonSerialized]
     internal GrainReference? TargetGrain { get; private set; }
 
+    // Do not rename: this name is used by generated code.
+    [NonSerialized]
+    protected CancellationTokenSource? _cts;
+
+    internal CancellationTokenSource? CancellationTokenSource { get => _cts; set => _cts = value; }
+
     /// <inheritdoc/>
     [Id(0)]
     public int MaxBatchSize { get; set; } = 100;
 
     /// <inheritdoc/>
-    public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default) => new AsyncEnumeratorProxy<T>(this, cancellationToken);
+    public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+    {
+        return new AsyncEnumeratorProxy<T>(this, cancellationToken);
+    }
 
     // Called upon creation in generated code by the creating grain reference by virtue of the [ReturnValueProxy(nameof(InitializeRequest))] attribute on this class.
     public IAsyncEnumerable<T> InitializeRequest(GrainReference targetGrainReference)

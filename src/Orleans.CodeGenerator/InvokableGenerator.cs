@@ -32,7 +32,7 @@ namespace Orleans.CodeGenerator
 
             var baseClassType = GetBaseClassType(invokableMethodInfo);
             var fieldDescriptions = GetFieldDescriptions(invokableMethodInfo);
-            var fields = GetFieldDeclarations(invokableMethodInfo, fieldDescriptions);
+            var fields = GetFieldDeclarations(invokableMethodInfo, fieldDescriptions, baseClassType);
             var (ctor, ctorArgs) = GenerateConstructor(generatedClassName, invokableMethodInfo, baseClassType);
             var accessibility = GetAccessibility(method);
             var compoundTypeAliases = GetCompoundTypeAliasAttributeArguments(invokableMethodInfo, invokableMethodInfo.Key);
@@ -666,9 +666,10 @@ namespace Orleans.CodeGenerator
 
         private MemberDeclarationSyntax[] GetFieldDeclarations(
             InvokableMethodDescription method,
-            List<InvokerFieldDescription> fieldDescriptions)
+            List<InvokerFieldDescription> fieldDescriptions,
+            INamedTypeSymbol baseClassType)
         {
-            return fieldDescriptions.Select(GetFieldDeclaration).ToArray();
+            return fieldDescriptions.Select(GetFieldDeclaration).Where(f => f is not null).ToArray();
 
             MemberDeclarationSyntax GetFieldDeclaration(InvokerFieldDescription description)
             {
@@ -696,6 +697,12 @@ namespace Orleans.CodeGenerator
                 }
                 else
                 {
+                    if (baseClassType.MemberNames.Contains(description.FieldName))
+                    {
+                        // Skip fields that conflict with base class members, assume they are already defined in the base class.
+                        return null;
+                    }
+
                     field = FieldDeclaration(
                         VariableDeclaration(
                             description.FieldType.ToTypeSyntax(method.TypeParameterSubstitutions),

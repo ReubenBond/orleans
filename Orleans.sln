@@ -272,6 +272,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActivationSheddingToy", "pl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActivationRebalancing.AppHost", "playground\ActivationRebalancing\ActivationRebalancing.AppHost\ActivationRebalancing.AppHost.csproj", "{7D8A2688-7117-492B-8357-0DFC0EDCF012}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloWorld", "playground\HelloWorld\HelloWorld.csproj", "{B1C91549-C03E-4999-AE24-CEC9AD071F8F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -714,6 +716,10 @@ Global
 		{7D8A2688-7117-492B-8357-0DFC0EDCF012}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7D8A2688-7117-492B-8357-0DFC0EDCF012}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7D8A2688-7117-492B-8357-0DFC0EDCF012}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B1C91549-C03E-4999-AE24-CEC9AD071F8F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B1C91549-C03E-4999-AE24-CEC9AD071F8F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B1C91549-C03E-4999-AE24-CEC9AD071F8F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B1C91549-C03E-4999-AE24-CEC9AD071F8F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -845,6 +851,7 @@ Global
 		{AE0BB9EA-FC9C-428A-B8F1-501798CA4B50} = {A6573187-FD0D-4DF7-91D1-03E07E470C0A}
 		{67697CD2-ABA6-4DC8-BCDA-CE31632CA31E} = {A41DE3D1-F8AA-4234-BE6F-3C9646A1507A}
 		{7D8A2688-7117-492B-8357-0DFC0EDCF012} = {B0DC8B8D-29CD-4CA3-A874-471F75595829}
+		{B1C91549-C03E-4999-AE24-CEC9AD071F8F} = {A41DE3D1-F8AA-4234-BE6F-3C9646A1507A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {7BFB3429-B5BB-4DB1-95B4-67D77A864952}
