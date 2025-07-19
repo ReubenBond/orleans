@@ -117,13 +117,23 @@ internal sealed partial class AsyncEnumerableGrainExtension : IAsyncEnumerableGr
         request.SetTarget(GrainContext);
 
         // Take the CancellationTokenSource from the request.
-        var typedRequest = (AsyncEnumerableRequest<T>)request;
-        var cts = typedRequest.CancellationTokenSource;
+        CancellationTokenSource cts;
+        var typedRequest = request as AsyncEnumerableRequest<T>;
+        cts = typedRequest?.CancellationTokenSource ?? CancellationTokenSource.CreateLinkedTokenSource(request.GetCancellationToken());
+        if (typedRequest is not null)
+        {
+            // If the CancellationTokenSource was null, set it now.
+            typedRequest.CancellationTokenSource = cts;
+        }
+
         var enumerable = request.InvokeImplementation();
         var enumerator = enumerable.GetAsyncEnumerator(cts.Token);
 
         // Set the request's CancellationTokenSource to null, as it is now owned by the enumerator.
-        typedRequest.CancellationTokenSource = null;
+        if (typedRequest is not null)
+        {
+            typedRequest.CancellationTokenSource = null;
+        }
 
         entry.Enumerator = enumerator;
         entry.MaxBatchSize = request.MaxBatchSize;

@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
+using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -613,6 +614,464 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
         });
 
         Assert.Equal(2, values.Count);
+    }
+
+    /// <summary>
+    /// Tests basic generator-based async enumerable functionality.
+    /// Verifies that GetValuesWithGenerator produces continuous values until cancelled.
+    /// </summary>
+    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    public async Task ObservableGrain_AsyncEnumerable_Generator_BasicFunctionality()
+    {
+        var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
+
+        var values = new List<int>();
+        using var cts = new CancellationTokenSource();
+
+        await foreach (var entry in grain.GetValuesWithGenerator(cts.Token))
+        {
+            values.Add(entry);
+            Logger.LogInformation("Generator produced: {Entry}", entry);
+
+            // Stop after collecting 10 values
+            if (values.Count >= 10)
+            {
+                break;
+            }
+        }
+
+        Assert.Equal(10, values.Count);
+        Assert.Equal(Enumerable.Range(0, 10), values);
+
+        // Check that the enumerator is disposed
+        var grainCalls = await grain.GetIncomingCalls();
+        Assert.Contains(grainCalls, c => c.InterfaceName.Contains(nameof(IAsyncEnumerableGrainExtension)) && c.MethodName.Contains(nameof(IAsyncDisposable.DisposeAsync)));
+    }
+
+    /// <summary>
+    /// Tests generator cancellation through CancellationToken.
+    /// Verifies that the generator stops producing values when cancelled.
+    /// </summary>
+    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    public async Task ObservableGrain_AsyncEnumerable_Generator_Cancellation()
+    {
+        var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
+
+        var values = new List<int>();
+        using var cts = new CancellationTokenSource();
+
+        try
+        {
+            await foreach (var entry in grain.GetValuesWithGenerator(cts.Token))
+            {
+                values.Add(entry);
+                Logger.LogInformation("Generator produced: {Entry}", entry);
+
+                // Cancel after 5 values
+                if (values.Count == 5)
+                {
+                    cts.Cancel();
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+
+        Assert.Equal(5, values.Count);
+        Assert.Equal(Enumerable.Range(0, 5), values);
+
+        // Check that the enumerator is disposed
+        var grainCalls = await grain.GetIncomingCalls();
+        Assert.Contains(grainCalls, c => c.InterfaceName.Contains(nameof(IAsyncEnumerableGrainExtension)) && c.MethodName.Contains(nameof(IAsyncDisposable.DisposeAsync)));
+    }
+
+    /// <summary>
+    /// Tests WaitForGeneratorCancellation method functionality.
+    /// Verifies that the method completes when the generator is cancelled.
+    /// </summary>
+    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    public async Task ObservableGrain_AsyncEnumerable_Generator_WaitForCancellation()
+    {
+        var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
+
+        var values = new List<int>();
+        using var cts = new CancellationTokenSource();
+        using var waitCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var valuesProduced = new TaskCompletionSource();
+
+        var enumeratorTask = Task.Run(async () =>
+        {
+            try
+            {
+                await foreach (var entry in grain.GetValuesWithGenerator(cts.Token))
+                {
+                    values.Add(entry);
+                    Logger.LogInformation("Generator produced: {Entry}", entry);
+
+                    // Signal that we've produced some values
+                    if (values.Count == 3)
+                    {
+                        valuesProduced.TrySetResult();
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected
+            }
+        });
+
+        // Wait for some values to be produced
+        await valuesProduced.Task;
+        Assert.True(values.Count > 0);
+
+        // Cancel the generator
+        cts.Cancel();
+
+        // Wait for generator cancellation to complete
+        await grain.WaitForGeneratorCancellation(waitCts.Token);
+
+        // Ensure the enumerator task completes
+        await enumeratorTask;
+
+        Assert.True(values.Count > 0);
+        Assert.Equal(Enumerable.Range(0, values.Count), values);
+
+        // Check that the enumerator is disposed
+        var grainCalls = await grain.GetIncomingCalls();
+        Assert.Contains(grainCalls, c => c.InterfaceName.Contains(nameof(IAsyncEnumerableGrainExtension)) && c.MethodName.Contains(nameof(IAsyncDisposable.DisposeAsync)));
+    }
+
+    /// <summary>
+    /// Tests generator behavior with WithBatchSize.
+    /// Verifies that batching works correctly with generator-based async enumerables.
+    /// </summary>
+    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    public async Task ObservableGrain_AsyncEnumerable_Generator_WithBatchSize()
+    {
+        var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
+
+        var values = new List<int>();
+        using var cts = new CancellationTokenSource();
+
+        try
+        {
+            await foreach (var entry in grain.GetValuesWithGenerator(cts.Token).WithBatchSize(5))
+            {
+                values.Add(entry);
+                Logger.LogInformation("Generator produced: {Entry}", entry);
+
+                // Cancel after 15 values to test multiple batches
+                if (values.Count == 15)
+                {
+                    cts.Cancel();
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+
+        Assert.Equal(15, values.Count);
+        Assert.Equal(Enumerable.Range(0, 15), values);
+
+        var grainCalls = await grain.GetIncomingCalls();
+        var moveNextCallCount = grainCalls.Count(element =>
+            element.InterfaceName.Contains(nameof(IAsyncEnumerableGrainExtension))
+            && (element.MethodName.Contains(nameof(IAsyncEnumerableGrainExtension.MoveNext)) || element.MethodName.Contains(nameof(IAsyncEnumerableGrainExtension.StartEnumeration))));
+
+        // With batch size of 5, we should have fewer calls than total values
+        Assert.True(moveNextCallCount < values.Count);
+
+        // Check that the enumerator is disposed
+        Assert.Contains(grainCalls, c => c.InterfaceName.Contains(nameof(IAsyncEnumerableGrainExtension)) && c.MethodName.Contains(nameof(IAsyncDisposable.DisposeAsync)));
+    }
+
+    /// <summary>
+    /// Tests generator behavior with WithCancellation extension.
+    /// Verifies that the WithCancellation extension works correctly with generators.
+    /// </summary>
+    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    public async Task ObservableGrain_AsyncEnumerable_Generator_WithCancellation()
+    {
+        var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
+
+        var values = new List<int>();
+        using var cts = new CancellationTokenSource();
+
+        try
+        {
+            await foreach (var entry in grain.GetValuesWithGenerator().WithCancellation(cts.Token))
+            {
+                values.Add(entry);
+                Logger.LogInformation("Generator produced: {Entry}", entry);
+
+                // Cancel after 8 values
+                if (values.Count == 8)
+                {
+                    cts.Cancel();
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+
+        Assert.Equal(8, values.Count);
+        Assert.Equal(Enumerable.Range(0, 8), values);
+
+        // Check that the enumerator is disposed
+        var grainCalls = await grain.GetIncomingCalls();
+        Assert.Contains(grainCalls, c => c.InterfaceName.Contains(nameof(IAsyncEnumerableGrainExtension)) && c.MethodName.Contains(nameof(IAsyncDisposable.DisposeAsync)));
+    }
+
+    /// <summary>
+    /// Tests generator behavior with slow consumer.
+    /// Verifies that the generator continues producing values even when consumer is slow.
+    /// </summary>
+    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    public async Task ObservableGrain_AsyncEnumerable_Generator_SlowConsumer()
+    {
+        var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
+
+        var values = new List<int>();
+        using var cts = new CancellationTokenSource();
+
+        try
+        {
+            await foreach (var entry in grain.GetValuesWithGenerator(cts.Token).WithBatchSize(1))
+            {
+                values.Add(entry);
+                Logger.LogInformation("Generator produced: {Entry}", entry);
+
+                // Stop after 3 values
+                if (values.Count == 3)
+                {
+                    cts.Cancel();
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+
+        Assert.Equal(3, values.Count);
+        Assert.Equal(Enumerable.Range(0, 3), values);
+
+        // Check that the enumerator is disposed
+        var grainCalls = await grain.GetIncomingCalls();
+        Assert.Contains(grainCalls, c => c.InterfaceName.Contains(nameof(IAsyncEnumerableGrainExtension)) && c.MethodName.Contains(nameof(IAsyncDisposable.DisposeAsync)));
+    }
+
+    /// <summary>
+    /// Tests generator behavior with preemptive cancellation.
+    /// Verifies that cancelling before enumeration starts prevents the generator from starting.
+    /// </summary>
+    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    public async Task ObservableGrain_AsyncEnumerable_Generator_PreemptiveCancellation()
+    {
+        var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
+
+        var values = new List<int>();
+        using var cts = new CancellationTokenSource();
+
+        // Cancel before enumeration starts
+        cts.Cancel();
+
+        try
+        {
+            await foreach (var entry in grain.GetValuesWithGenerator(cts.Token))
+            {
+                values.Add(entry);
+                Logger.LogInformation("Generator produced: {Entry}", entry);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected
+        }
+
+        Assert.Empty(values);
+
+        // Check that the enumerator was not started since it was cancelled preemptively
+        var grainCalls = await grain.GetIncomingCalls();
+        Assert.DoesNotContain(grainCalls, c => c.InterfaceName.Contains(nameof(IAsyncEnumerableGrainExtension)) && c.MethodName.Contains(nameof(IAsyncEnumerableGrainExtension.StartEnumeration)));
+        Assert.DoesNotContain(grainCalls, c => c.InterfaceName.Contains(nameof(IAsyncEnumerableGrainExtension)) && c.MethodName.Contains(nameof(IAsyncEnumerableGrainExtension.DisposeAsync)));
+    }
+
+    /// <summary>
+    /// Tests generator behavior with grain deactivation.
+    /// Verifies that deactivating the grain properly terminates the generator.
+    /// </summary>
+    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    public async Task ObservableGrain_AsyncEnumerable_Generator_Deactivation()
+    {
+        var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
+
+        var values = new List<int>();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var valuesProduced = new TaskCompletionSource();
+
+        var deactivationTask = Task.Run(async () =>
+        {
+            // Wait for some values to be produced
+            await valuesProduced.Task;
+            await grain.Deactivate();
+        });
+
+        await Assert.ThrowsAsync<EnumerationAbortedException>(async () =>
+        {
+            await foreach (var entry in grain.GetValuesWithGenerator(cts.Token))
+            {
+                values.Add(entry);
+                Logger.LogInformation("Generator produced: {Entry}", entry);
+
+                // Signal that we've produced some values
+                if (values.Count == 3)
+                {
+                    valuesProduced.TrySetResult();
+                }
+            }
+        });
+
+        await deactivationTask;
+
+        Assert.True(values.Count > 0);
+        Assert.Equal(Enumerable.Range(0, values.Count), values);
+    }
+
+    /// <summary>
+    /// Tests concurrent generator enumeration.
+    /// Verifies that multiple concurrent enumerations of the same generator work correctly.
+    /// </summary>
+    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    public async Task ObservableGrain_AsyncEnumerable_Generator_ConcurrentEnumeration()
+    {
+        var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
+
+        using var cts = new CancellationTokenSource();
+        var values1 = new List<int>();
+        var values2 = new List<int>();
+
+        var task1 = Task.Run(async () =>
+        {
+            try
+            {
+                await foreach (var entry in grain.GetValuesWithGenerator(cts.Token))
+                {
+                    values1.Add(entry);
+                    Logger.LogInformation("Generator 1 produced: {Entry}", entry);
+
+                    if (values1.Count == 5)
+                    {
+                        break;
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected
+            }
+        });
+
+        var task2 = Task.Run(async () =>
+        {
+            try
+            {
+                await foreach (var entry in grain.GetValuesWithGenerator(cts.Token))
+                {
+                    values2.Add(entry);
+                    Logger.LogInformation("Generator 2 produced: {Entry}", entry);
+
+                    if (values2.Count == 7)
+                    {
+                        break;
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected
+            }
+        });
+
+        await Task.WhenAll(task1, task2);
+
+        Assert.Equal(5, values1.Count);
+        Assert.Equal(7, values2.Count);
+
+        // Both should start from 0 since they're separate enumerations
+        Assert.Equal(Enumerable.Range(0, 5), values1);
+        Assert.Equal(Enumerable.Range(0, 7), values2);
+
+        // Check that enumerators are disposed
+        var grainCalls = await grain.GetIncomingCalls();
+        var disposeCallCount = grainCalls.Count(c => c.InterfaceName.Contains(nameof(IAsyncEnumerableGrainExtension)) && c.MethodName.Contains(nameof(IAsyncDisposable.DisposeAsync)));
+        Assert.Equal(2, disposeCallCount); // Two separate enumerations
+    }
+
+    /// <summary>
+    /// Tests WaitForGeneratorCancellation timeout behavior.
+    /// Verifies that WaitForGeneratorCancellation respects the provided CancellationToken.
+    /// </summary>
+    [Fact, TestCategory("BVT"), TestCategory("Observable")]
+    public async Task ObservableGrain_AsyncEnumerable_Generator_WaitForCancellation_Timeout()
+    {
+        var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
+
+        using var shortTimeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+        // Start generator without cancelling it
+        var values = new List<int>();
+        var generatorStarted = new TaskCompletionSource();
+        var enumeratorTask = Task.Run(async () =>
+        {
+            try
+            {
+                await foreach (var entry in grain.GetValuesWithGenerator())
+                {
+                    values.Add(entry);
+                    Logger.LogInformation("Generator produced: {Entry}", entry);
+
+                    if (values.Count == 1)
+                    {
+                        generatorStarted.TrySetResult();
+                    }
+
+                    if (values.Count >= 20)
+                    {
+                        break;
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected
+            }
+        });
+
+        // Wait for the generator to start producing values
+        await generatorStarted.Task;
+
+        // WaitForGeneratorCancellation should timeout since generator is not cancelled
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+        {
+            await grain.WaitForGeneratorCancellation(shortTimeout.Token);
+        });
+
+        // Clean up
+        await enumeratorTask;
+
+        Assert.True(values.Count > 0);
+
+        // Check that the enumerator is disposed
+        var grainCalls = await grain.GetIncomingCalls();
+        Assert.Contains(grainCalls, c => c.InterfaceName.Contains(nameof(IAsyncEnumerableGrainExtension)) && c.MethodName.Contains(nameof(IAsyncDisposable.DisposeAsync)));
     }
 
     /// <summary>

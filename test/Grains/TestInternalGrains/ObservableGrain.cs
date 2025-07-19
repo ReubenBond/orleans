@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
+using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains
@@ -8,7 +9,9 @@ namespace UnitTests.Grains
     {
         private readonly List<(string InterfaceName, string MethodName)> _localCalls = new();
         private readonly Channel<string> _updates = Channel.CreateUnbounded<string>();
+        private readonly TaskCompletionSource _generatorCancellation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public Task WaitForGeneratorCancellation(CancellationToken cancellationToken) => _generatorCancellation.Task.WaitAsync(cancellationToken);
         public IAsyncEnumerable<string> GetValues(CancellationToken cancellationToken) => _updates.Reader.ReadAllAsync(cancellationToken);
 
         public async IAsyncEnumerable<int> GetValuesWithError(int errorIndex, bool waitAfterYield, string errorMessage, [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -58,6 +61,36 @@ namespace UnitTests.Grains
         {
             _localCalls.Add((context.InterfaceName, context.MethodName));
             return context.Invoke();
+        }
+
+        public IAsyncEnumerable<int> GetValuesWithGenerator(CancellationToken cancellationToken = default)
+        {
+            var channel = Channel.CreateUnbounded<int>();
+
+            // For the WithBatchSize test, we need to write some initial values so that batching works.
+            for (var i = 0; i < 5; i++)
+            {
+                channel.Writer.TryWrite(i);
+            }
+
+            Task.Factory.StartNew(async () =>
+            {
+                try
+                {
+                    var i = 5;
+                    while (!cancellationToken.IsCancellationRequested)
+                    {
+                        channel.Writer.TryWrite(i++);
+                        await Task.Delay(100, cancellationToken);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    _generatorCancellation.TrySetResult();
+                }
+            }).Ignore();
+
+            return channel.Reader.ReadAllAsync(cancellationToken);
         }
     }
 }

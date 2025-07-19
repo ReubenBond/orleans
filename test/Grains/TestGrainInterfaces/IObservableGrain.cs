@@ -12,6 +12,9 @@ namespace UnitTests.GrainInterfaces
         IAsyncEnumerable<string> GetValues(CancellationToken cancellationToken = default);
         IAsyncEnumerable<int> GetValuesWithError(int errorIndex, bool waitAfterYield, string errorMessage, CancellationToken cancellationToken = default);
 
+        IAsyncEnumerable<int> GetValuesWithGenerator(CancellationToken cancellationToken = default);
+        Task WaitForGeneratorCancellation(CancellationToken cancellationToken);
+
         ValueTask<List<(string InterfaceName, string MethodName)>> GetIncomingCalls();
     }
 }
