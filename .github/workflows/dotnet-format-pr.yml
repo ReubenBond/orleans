@@ -18,17 +18,17 @@ jobs:
   dotnet-format:
     name: Run dotnet-format
     runs-on: ubuntu-latest
-    
+
     # Only run on PR comments that contain the trigger phrase
     if: |
-      github.event_name == 'workflow_dispatch' || 
-      (github.event_name == 'issue_comment' && 
-       github.event.issue.pull_request && 
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
        contains(github.event.comment.body, '/format') &&
-       (github.event.comment.author_association == 'MEMBER' || 
-        github.event.comment.author_association == 'OWNER' || 
+       (github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'OWNER' ||
         github.event.comment.author_association == 'COLLABORATOR'))
-    
+
     steps:
       - name: React to comment
         if: github.event_name == 'issue_comment'
@@ -70,20 +70,20 @@ jobs:
         id: find-projects
         run: |
           # Find all solution files first
-          solutions=$(find ./dotnet -name "*.sln" -o -name "*.slnx" 2>/dev/null | tr '\n' ' ' | sed 's/[[:space:]]*$//')
-          
+          solutions=$(find ./ -name "*.sln" -o -name "*.slnx" 2>/dev/null | tr '\n' ' ' | sed 's/[[:space:]]*$//')
+
           if [[ -n "$solutions" ]]; then
             echo "projects=$solutions" >> $GITHUB_OUTPUT
             echo "Found solutions: $solutions"
           else
             # Fallback to individual projects (excluding test projects for performance)
-            projects=$(find ./dotnet -name "*.csproj" 2>/dev/null | grep -v -E "(Test|Tests)" | tr '\n' ' ' | sed 's/[[:space:]]*$//')
+            projects=$(find ./ -name "*.csproj" 2>/dev/null | grep -v -E "(Test|Tests)" | tr '\n' ' ' | sed 's/[[:space:]]*$//')
             if [[ -n "$projects" ]]; then
               echo "projects=$projects" >> $GITHUB_OUTPUT
               echo "Found projects: $projects"
             else
               echo "projects=" >> $GITHUB_OUTPUT
-              echo "No .NET projects found in ./dotnet directory"
+              echo "No .NET projects found in ./ directory"
             fi
           fi
 
@@ -136,40 +136,40 @@ jobs:
         run: |
           # Generate individual file diffs in a structured format
           mkdir -p file_diffs
-          
+
           # Get list of changed files
           git diff --name-only > changed_files.txt
-          
+
           # For each changed file, save the formatted version and basic diff info
           file_counter=0
           while IFS= read -r file; do
             if [[ -f "$file" ]]; then
               echo "Processing diff for: $file"
-              
+
               # Use counter to avoid filename collisions
               file_counter=$((file_counter + 1))
               safe_name="file_${file_counter}_$(basename "$file" | tr '/' '_')"
-              
+
               # Save a simple diff for line counting
               git diff "$file" > "file_diffs/${safe_name}.diff"
-              
+
               # Save the original (before formatting) content
               git show HEAD:"$file" > "file_diffs/${safe_name}.orig" 2>/dev/null || touch "file_diffs/${safe_name}.orig"
-              
+
               # Get the full content of the new (formatted) file
               cp "$file" "file_diffs/${safe_name}.new"
-              
+
               # Store the original file path for reference
               echo "$file" > "file_diffs/${safe_name}.path"
             fi
           done < changed_files.txt
-          
+
           # Create a summary
           echo "Changed files:" > diff_summary.txt
           cat changed_files.txt >> diff_summary.txt
           echo "" >> diff_summary.txt
           echo "Total files changed: $(wc -l < changed_files.txt)" >> diff_summary.txt
-          
+
           {
             echo 'DIFF_SUMMARY<<EOF'
             cat diff_summary.txt
@@ -194,7 +194,7 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            
+
             // First, post a summary comment
             const diffSummary = `${{ steps.diff.outputs.DIFF_SUMMARY }}`;
             await github.rest.issues.createComment({
@@ -205,59 +205,59 @@ jobs:
                     `I'll post suggestions on the changed lines that you can apply directly using GitHub's suggestion feature.\n\n` +
                     `💡 *Tip: You can also run \`dotnet format\` locally or download the \`formatting-patch\` artifact.*`
             });
-            
+
             // Get PR details for creating review comments
             const pr = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.issue.number
             });
-            
+
             // Read the list of changed files
             const changedFiles = fs.readFileSync('changed_files.txt', 'utf8').trim().split('\n').filter(f => f);
-            
+
             // Parse diff files and create suggestions
             const reviewComments = [];
-            
+
             // Build a mapping of files to their safe names
             const fileMapping = new Map();
             for (let i = 0; i < changedFiles.length; i++) {
               const filePath = changedFiles[i];
               if (!filePath.trim()) continue;
-              
+
               const fileCounter = i + 1;
               const safeName = `file_${fileCounter}_${path.basename(filePath).replace(/\//g, '_')}`;
               fileMapping.set(filePath, safeName);
             }
-            
+
             for (const filePath of changedFiles) {
               if (!filePath.trim()) continue;
-              
+
               try {
                 // Read the safe name for this file
                 const safeName = fileMapping.get(filePath);
                 const origPath = `file_diffs/${safeName}.orig`;
                 const newPath = `file_diffs/${safeName}.new`;
                 const diffPath = `file_diffs/${safeName}.diff`;
-                
+
                 if (!fs.existsSync(origPath) || !fs.existsSync(newPath)) continue;
-                
+
                 // Read the original and new file contents
                 const origContent = fs.readFileSync(origPath, 'utf8');
                 const newContent = fs.readFileSync(newPath, 'utf8');
                 const diffContent = fs.readFileSync(diffPath, 'utf8');
-                
+
                 // Split into lines for processing
                 const origLines = origContent.split('\n');
                 const newLines = newContent.split('\n');
-                
+
                 // Parse the diff to find change regions
                 const diffLines = diffContent.split('\n');
                 const changeRegions = [];
-                
+
                 for (let i = 0; i < diffLines.length; i++) {
                   const line = diffLines[i];
-                  
+
                   // Look for hunk headers like @@ -1,10 +1,12 @@
                   const hunkMatch = line.match(/^@@ -(\d+),?(\d+)? \+(\d+),?(\d+)? @@/);
                   if (hunkMatch) {
@@ -265,13 +265,13 @@ jobs:
                     const oldCount = parseInt(hunkMatch[2] || '1');
                     const newStartLine = parseInt(hunkMatch[3]);
                     const newCount = parseInt(hunkMatch[4] || '1');
-                    
+
                     // Collect all lines in this hunk
                     let j = i + 1;
                     let hasChanges = false;
                     let firstChangeOffset = -1;
                     let lastChangeOffset = -1;
-                    
+
                     while (j < diffLines.length && !diffLines[j].startsWith('@@')) {
                       if (diffLines[j].startsWith('-') || diffLines[j].startsWith('+')) {
                         hasChanges = true;
@@ -282,37 +282,37 @@ jobs:
                       }
                       j++;
                     }
-                    
+
                     if (hasChanges) {
                       // Calculate the actual range of changes in the original file
                       let contextLinesBefore = 0;
                       let contextLinesAfter = 0;
                       let changeStartLine = startLine;
                       let changeEndLine = startLine + oldCount - 1;
-                      
+
                       // Count context lines before first change
                       for (let k = i + 1; k < i + 1 + firstChangeOffset; k++) {
                         if (diffLines[k] && diffLines[k].startsWith(' ')) {
                           contextLinesBefore++;
                         }
                       }
-                      
+
                       // Count lines after last change
                       for (let k = i + 1 + lastChangeOffset + 1; k < j; k++) {
                         if (diffLines[k] && diffLines[k].startsWith(' ')) {
                           contextLinesAfter++;
                         }
                       }
-                      
+
                       // Adjust the range to exclude pure context lines
                       changeStartLine += contextLinesBefore;
                       changeEndLine -= contextLinesAfter;
-                      
+
                       // Make sure we have valid line numbers
                       if (changeEndLine < changeStartLine) {
                         changeEndLine = changeStartLine;
                       }
-                      
+
                       changeRegions.push({
                         startLine: changeStartLine,
                         endLine: changeEndLine,
@@ -322,51 +322,51 @@ jobs:
                     }
                   }
                 }
-                
+
                 // Create suggestions for each change region
                 for (const region of changeRegions) {
                   // For GitHub suggestions, we need to provide the complete content
                   // that should replace the lines in the range [startLine, endLine]
-                  
+
                   // Extract the new content for this region
                   const suggestionLines = [];
                   const newStartIdx = region.newStartLine - 1;
                   const newEndIdx = region.newEndLine - 1;
-                  
+
                   for (let idx = newStartIdx; idx <= newEndIdx && idx < newLines.length; idx++) {
                     suggestionLines.push(newLines[idx]);
                   }
-                  
+
                   // GitHub's suggestion format requires the content without a trailing newline
                   // unless the original selection ended with a newline
                   let suggestionContent = suggestionLines.join('\n');
-                  
+
                   // Check if we need a trailing newline
                   const origEndIdx = region.endLine - 1;
-                  if (origEndIdx < origLines.length - 1 || 
+                  if (origEndIdx < origLines.length - 1 ||
                       (origEndIdx === origLines.length - 1 && origContent.endsWith('\n'))) {
                     suggestionContent += '\n';
                   }
-                  
+
                   console.log(`Creating suggestion for ${filePath} lines ${region.startLine}-${region.endLine}:`);
                   console.log(`  Original line count: ${region.endLine - region.startLine + 1}`);
                   console.log(`  New line count: ${suggestionLines.length}`);
                   console.log(`  Suggestion content length: ${suggestionContent.length} characters`);
-                  
+
                   const commentObj = {
                     path: filePath,
                     body: `\`\`\`suggestion\n${suggestionContent}\`\`\``,
                     line: region.endLine
                   };
-                  
+
                   // Add start_line for multi-line suggestions
                   if (region.startLine !== region.endLine) {
                     commentObj.start_line = region.startLine;
                   }
-                  
+
                   reviewComments.push(commentObj);
                 }
-                
+
                 // If no changes were parsed (fallback for edge cases)
                 if (reviewComments.filter(c => c.path === filePath).length === 0) {
                   console.log(`Warning: No suggestions created for ${filePath}, using fallback`);
@@ -390,7 +390,7 @@ jobs:
                 });
               }
             }
-            
+
             // Submit the review with suggestions
             if (reviewComments.length > 0) {
               try {
