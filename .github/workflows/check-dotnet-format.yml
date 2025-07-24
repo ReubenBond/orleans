@@ -31,13 +31,6 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-          sparse-checkout: |
-            .
-            .github
-            dotnet
 
       - name: Get changed files
         id: changed-files
