@@ -16,9 +16,12 @@ builder.Services.Configure<GrainCollectionOptions>(options =>
 {
     options.EnableActivationSheddingOnMemoryPressure = true;
     options.MemoryUsageLimitPercentage = 80;
-    options.MemoryUsageTargetPercentage = 50;
-});
+        options.MemoryUsageTargetPercentage = 50;
+    });
 
 builder.Services.AddHostedService<ActivationSheddingToyHostedService>();
 await builder.Build().RunAsync();
+
+
+
 
