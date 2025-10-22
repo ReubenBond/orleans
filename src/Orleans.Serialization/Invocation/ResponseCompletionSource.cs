@@ -8,9 +8,9 @@ namespace Orleans.Serialization.Invocation
     /// <summary>
     /// A fulfillable promise.
     /// </summary>
-    public sealed class ResponseCompletionSource : IResponseCompletionSource, IValueTaskSource<Response>, IValueTaskSource
-    {
-        private ManualResetValueTaskSourceCore<Response> _core;
+public sealed class ResponseCompletionSource : IResponseCompletionSource, IValueTaskSource<Response>, IValueTaskSource
+{
+    private ManualResetValueTaskSourceCore<Response> _core = new() { RunContinuationsAsynchronously = true };
 
         /// <summary>
         /// Returns this instance as a <see cref="ValueTask{Response}"/>.
@@ -113,7 +113,7 @@ namespace Orleans.Serialization.Invocation
     /// <typeparam name="TResult">The underlying result type.</typeparam>
     public sealed class ResponseCompletionSource<TResult> : IResponseCompletionSource, IValueTaskSource<TResult>, IValueTaskSource
     {
-        private ManualResetValueTaskSourceCore<TResult> _core;
+        private ManualResetValueTaskSourceCore<TResult> _core = new() { RunContinuationsAsynchronously = true };
 
         /// <summary>
         /// Returns this instance as a <see cref="ValueTask{Response}"/>.
