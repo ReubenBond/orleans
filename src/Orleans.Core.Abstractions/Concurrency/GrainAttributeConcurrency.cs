@@ -107,8 +107,8 @@ namespace Orleans.Concurrency
     /// that want to control request interleaving via supplied method callback.
     /// </summary>
     /// <remarks>
-    /// The callback method name should point to a public static function declared on the same class
-    /// and having the following signature: <c>public static bool MayInterleave(IInvokable req)</c>
+    /// The callback method name should point to a public static or instance method declared on the same class
+    /// and having the following signature: <c>bool MayInterleave(IInvokable req)</c>
     /// </remarks>
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class MayInterleaveAttribute : Attribute, IGrainPropertiesProviderAttribute
@@ -117,8 +117,8 @@ namespace Orleans.Concurrency
         /// Initializes a new instance of the <see cref="MayInterleaveAttribute"/> class.
         /// </summary>
         /// <param name="callbackMethodName">
-        /// The callback method name. This should resolve to a method with the 
-        /// following signature: <c>public static bool NameOfMethod(IInvokable req)</c>
+        /// The callback method name. This must resolve to a public static or instance method with the 
+        /// following signature: <c>bool NameOfMethod(IInvokable req)</c>
         /// </param>
         public MayInterleaveAttribute(string callbackMethodName)
         {
