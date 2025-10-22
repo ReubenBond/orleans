@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -123,23 +124,29 @@ namespace Orleans.Runtime
                     _serviceProvider,
                     _sharedComponents);
 
-                RuntimeContext.SetExecutionContext(context, out var originalContext);
+                // Invoke the constructor from the grain's TaskScheduler.
+                var task = new Task(() =>
+                {
+                    RuntimeContext.SetExecutionContext(context, out var originalContext);
 
-                try
-                {
-                    // Instantiate the grain itself
-                    var instance = _grainActivator.CreateInstance(context);
-                    context.SetGrainInstance(instance);
-                }
-                catch (Exception exception)
-                {
-                    LogErrorFailedToConstructGrain(_grainLogger, exception, activationAddress.GrainId);
-                    throw;
-                }
-                finally
-                {
-                    RuntimeContext.ResetExecutionContext(originalContext);
-                }
+                    try
+                    {
+                        // Instantiate the grain itself
+                        var instance = _grainActivator.CreateInstance(context);
+                        context.SetGrainInstance(instance);
+                    }
+                    catch (Exception exception)
+                    {
+                        LogErrorFailedToConstructGrain(_grainLogger, exception, activationAddress.GrainId);
+                        throw;
+                    }
+                    finally
+                    {
+                        RuntimeContext.ResetExecutionContext(originalContext);
+                    }
+                });
+                var workItemGroup = (WorkItemGroup)context.Scheduler;
+                task.RunSynchronously(workItemGroup.TaskScheduler);
 
                 return context;
             }
