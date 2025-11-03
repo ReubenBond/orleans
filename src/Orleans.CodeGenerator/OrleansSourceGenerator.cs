@@ -18,21 +18,15 @@ namespace Orleans.CodeGenerator
         {
             try
             {
-                // Check if this is a design-time build or running in Visual Studio background services
-                var isDesignTimeBuild = !Debugger.IsAttached &&
-                    context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_designtimebuild", out var designTimeBuildValue)
-                    && string.Equals("true", designTimeBuildValue, StringComparison.OrdinalIgnoreCase);
-
-                var processName = Process.GetCurrentProcess().ProcessName.ToLowerInvariant();
-                var isVisualStudioProcess = processName.Contains("devenv") || processName.Contains("servicehub");
-
-                // For performance: Skip expensive code generation in VS design-time builds
-                // BUT: Always generate during actual compilation builds (BuildingProject=true)
-                // This ensures incremental builds work while keeping IDE responsive
-                if ((isVisualStudioProcess || isDesignTimeBuild) && !IsRealCompilationBuild(context))
+                // For performance: Skip expensive code generation during design-time builds.
+                // Per https://github.com/dotnet/project-system/blob/main/docs/design-time-builds.md:
+                // - SDK-style projects set DesignTimeBuild=true during design-time builds
+                // - Legacy projects use BuildingProject (it's != 'true' during design-time builds)
+                // - DesignTimeBuild is typically empty ('') in normal builds, so we check == 'true'
+                if (IsDesignTimeBuild(context))
                 {
-                    // Emit a marker to indicate generation was skipped for this design-time build
-                    // Real compilation builds will always generate fresh code
+                    // Skip code generation during design-time builds to keep IDE responsive.
+                    // Normal builds (dotnet build, msbuild, CI/CD) will generate code.
                     return;
                 }
 
@@ -111,35 +105,31 @@ namespace Orleans.CodeGenerator
         }
 
         /// <summary>
-        /// Determines if this is a real compilation build (not a design-time/IntelliSense build).
-        /// Real builds include: dotnet build, msbuild, CI/CD builds, and explicit VS builds.
+        /// Determines whether the current build is a design-time build.
+        /// Per https://github.com/dotnet/project-system/blob/main/docs/design-time-builds.md:
+        /// - SDK-style projects (CPS-based) set DesignTimeBuild=true during design-time builds
+        /// - Legacy .NET Framework projects use BuildingProject (it's != 'true' during design-time builds)
+        /// - DesignTimeBuild is typically empty ('') in normal builds
         /// </summary>
-        private static bool IsRealCompilationBuild(GeneratorExecutionContext context)
+        private static bool IsDesignTimeBuild(GeneratorExecutionContext context)
         {
-            // Check if BuildingProject is true - this indicates a real build operation
-            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.buildingproject", out var buildingProject)
-                && string.Equals("true", buildingProject, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            // Check if we're in a CI/CD environment
-            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.continuousintegrationbuild", out var isCi)
-                && string.Equals("true", isCi, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            // Check if design-time build is explicitly false
+            // Check for SDK-style project design-time build (DesignTimeBuild == 'true')
             if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_designtimebuild", out var designTimeBuild)
-                && string.Equals("false", designTimeBuild, StringComparison.OrdinalIgnoreCase))
+                && string.Equals("true", designTimeBuild, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
 
-            // Default to assuming it's a real build if we can't determine otherwise
-            // This ensures we generate code when in doubt
-            return !context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_designtimebuild", out _);
+            // Check for legacy project design-time build (BuildingProject != 'true')
+            // In normal builds, BuildingProject is 'true'. During design-time builds, it's not set or is empty.
+            if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.buildingproject", out var buildingProject)
+                && !string.Equals("true", buildingProject, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            // If neither property indicates a design-time build, assume it's a normal build
+            return false;
         }
     }
 }
