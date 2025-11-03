@@ -10,6 +10,8 @@
     <CompilerVisibleProperty Include="Orleans_GenerateSerializerAttributes" />
     <CompilerVisibleProperty Include="Orleans_ConstructorAttributes" />
     <CompilerVisibleProperty Include="OrleansGenerateCompatibilityInvokers" />
+    <CompilerVisibleProperty Include="BuildingProject" />
+    <CompilerVisibleProperty Include="ContinuousIntegrationBuild" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -20,6 +22,11 @@
     <Orleans_AliasAttributes>$(OrleansAliasAttributes)</Orleans_AliasAttributes>
     <Orleans_GenerateSerializerAttributes>$(OrleansGenerateSerializerAttributes)</Orleans_GenerateSerializerAttributes>
     <Orleans_ConstructorAttributes>$(OrleansConstructorAttributes)</Orleans_ConstructorAttributes>
+
+    <!-- Optionally enable persistent output of generated files for debugging/inspection -->
+    <!-- Set OrleansEmitCompilerGeneratedFiles=true in your project to enable this -->
+    <EmitCompilerGeneratedFiles Condition="'$(OrleansEmitCompilerGeneratedFiles)' == 'true'">true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath Condition="'$(OrleansEmitCompilerGeneratedFiles)' == 'true' and '$(CompilerGeneratedFilesOutputPath)' == ''">$(IntermediateOutputPath)generated</CompilerGeneratedFilesOutputPath>
   </PropertyGroup>
 
 </Project>
