@@ -45,7 +45,7 @@ namespace Orleans.Serialization.Invocation
         /// </summary>
         /// <param name="index">The argument index.</param>
         /// <param name="value">The argument value</param>
-        void SetArgument(int index, object value);
+        void SetArgument(int index, object? value);
 
         /// <summary>
         /// Gets the method name.
@@ -65,12 +65,12 @@ namespace Orleans.Serialization.Invocation
         /// <summary>
         /// Gets the method info object, which may be <see langword="null"/>.
         /// </summary>
-        MethodInfo GetMethod();
+        MethodInfo? GetMethod();
 
         /// <summary>
         /// Gets the interface type.
         /// </summary>
-        Type GetInterfaceType();
+        Type? GetInterfaceType();
 
         /// <summary>
         /// Gets the default response timeout.

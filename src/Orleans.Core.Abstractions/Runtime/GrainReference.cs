@@ -571,7 +571,7 @@ namespace Orleans.Runtime
         public virtual object GetArgument(int index) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
 
         /// <inheritdoc/>
-        public virtual void SetArgument(int index, object value) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
+        public virtual void SetArgument(int index, object? value) => throw new ArgumentOutOfRangeException(message: "The request has zero arguments", null);
 
         /// <inheritdoc/>
         public abstract void Dispose();

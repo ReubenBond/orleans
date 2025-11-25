@@ -1,9 +1,7 @@
-using System;
-using System.Collections.Generic;
+#nullable enable
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
-using System.Threading.Tasks;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 
@@ -49,13 +47,13 @@ namespace Orleans.Runtime
 
         public IInvokable Request => request;
 
-        public object Grain => grainContext.GrainInstance;
+        public object? Grain => grainContext.GrainInstance;
 
-        public MethodInfo InterfaceMethod => request.GetMethod();
+        public MethodInfo? InterfaceMethod => request.GetMethod();
 
-        public MethodInfo ImplementationMethod => GetMethodEntry().ImplementationMethod;
+        public MethodInfo? ImplementationMethod => GetMethodEntry().ImplementationMethod;
 
-        public object Result
+        public object? Result
         {
             get => Response switch
             {
@@ -65,7 +63,7 @@ namespace Orleans.Runtime
             set => Response = Response.FromResult(value);
         }
 
-        public Response Response { get; set; }
+        public Response? Response { get; set; }
 
         public GrainId? SourceId => message.SendingGrain is { IsDefault: false } source ? source : null;
 
@@ -157,11 +155,14 @@ namespace Orleans.Runtime
             throw new InvalidOperationException($"{nameof(GrainMethodInvoker)}.{nameof(Invoke)}() invoked a broken filter: {filterName}.");
         }
 
-
-        private (MethodInfo ImplementationMethod, MethodInfo InterfaceMethod) GetMethodEntry()
+        private (MethodInfo? ImplementationMethod, MethodInfo? InterfaceMethod) GetMethodEntry()
         {
             var interfaceType = this.request.GetInterfaceType();
-            var implementationType = this.request.GetTarget().GetType();
+            var implementationType = this.request.GetTarget()?.GetType();
+            if (implementationType is null || interfaceType is null)
+            {
+                return default;
+            }
 
             // Get or create the implementation map for this object.
             var implementationMap = interfaceToImplementationMapping.GetOrCreate(
@@ -170,19 +171,18 @@ namespace Orleans.Runtime
 
             // Get the method info for the method being invoked.
             var method = request.GetMethod();
-            if (method.IsConstructedGenericMethod)
+            if (method is { IsConstructedGenericMethod: true })
             {
                 if (implementationMap.TryGetValue(method.GetGenericMethodDefinition(), out var entry))
                 {
                     return entry.GetConstructedGenericMethod(method);
                 }
             }
-            else if (implementationMap.TryGetValue(method, out var entry))
+            else if (method is not null && implementationMap.TryGetValue(method, out var entry))
             {
                 return (entry.ImplementationMethod, entry.InterfaceMethod);
             }
 
-            Debug.Assert(false, "Method entry not found");
             return default;
         }
     }

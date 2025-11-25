@@ -39,7 +39,7 @@ namespace Orleans
         /// <summary>
         /// Gets the grain being invoked.
         /// </summary>
-        object Grain { get; }
+        object? Grain { get; }
 
         /// <summary>
         /// Gets the identity of the source, if available.
@@ -69,13 +69,13 @@ namespace Orleans
         /// <summary>
         /// Gets the <see cref="MethodInfo"/> for the interface method being invoked.
         /// </summary>
-        MethodInfo InterfaceMethod { get; }
+        MethodInfo? InterfaceMethod { get; }
 
         /// <summary>
         /// Gets or sets the result.
         /// </summary>
         object? Result { get; set; }
-       
+
         /// <summary>
         /// Gets or sets the response.
         /// </summary>
@@ -103,7 +103,7 @@ namespace Orleans
         /// <summary>
         /// Gets the <see cref="MethodInfo"/> for the implementation method being invoked.
         /// </summary>
-        MethodInfo ImplementationMethod { get; }
+        MethodInfo? ImplementationMethod { get; }
     }
 
     /// <summary>
