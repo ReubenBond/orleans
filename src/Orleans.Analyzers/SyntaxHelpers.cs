@@ -201,6 +201,42 @@ namespace Orleans.Analyzers
             return false;
         }
 
+        public static bool IsGrainClass(this INamedTypeSymbol typeSymbol)
+        {
+            if (typeSymbol is null || typeSymbol.TypeKind != TypeKind.Class)
+            {
+                return false;
+            }
+
+            // Check if the type implements IGrainBase interface
+            foreach (var interfaceSymbol in typeSymbol.AllInterfaces)
+            {
+                if (Constants.IGrainBaseFullyQualifiedName.Equals(interfaceSymbol.ToDisplayString(NullableFlowState.None), StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            // Check if the type inherits from Grain
+            var current = typeSymbol.BaseType;
+            while (current is not null)
+            {
+                // Handle generic grain classes like Grain<TState>
+                var displayName = current.IsGenericType && current.TypeParameters.Length == 1 && current.BaseType is { } baseBase
+                    ? baseBase.ToDisplayString(NullableFlowState.None)
+                    : current.ToDisplayString(NullableFlowState.None);
+
+                if (Constants.GrainBaseFullyQualifiedName.Equals(displayName, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                current = current.BaseType;
+            }
+
+            return false;
+        }
+
         public static AttributeArgumentBag<T> GetArgumentBag<T>(this AttributeSyntax attribute, SemanticModel semanticModel)
         {
             if (attribute is null)
