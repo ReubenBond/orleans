@@ -68,6 +68,13 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     internal CancellationToken OnStoppedToken => _stoppedCts.Token;
     internal ClusterMembershipSnapshot ClusterMembershipSnapshot => _membershipService.CurrentView.ClusterMembershipSnapshot;
 
+    /// <summary>
+    /// Gets the filtered directory members - only silos that have the DistributedGrainDirectory capability.
+    /// This should be used for recovery operations instead of <see cref="ClusterMembershipSnapshot"/>.Members
+    /// to avoid calling IGrainDirectoryClient on silos that don't have DistributedGrainDirectory registered.
+    /// </summary>
+    internal ImmutableArray<SiloAddress> DirectoryMembers => _membershipService.CurrentView.Members;
+
     // The recovery membership value is used to avoid a race between concurrent registration & recovery operations which could lead to lost registrations.
     // This could occur when a new activation is created and begins registering itself with a host which crashes. Concurrently, the new owner initiates
     // recovery and asks all silos for their activations. When this silo processes this request, it will have the activation in its internal

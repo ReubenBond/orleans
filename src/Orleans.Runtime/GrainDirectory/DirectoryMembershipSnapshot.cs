@@ -22,17 +22,29 @@ internal sealed class DirectoryMembershipSnapshot
     private readonly ImmutableArray<ImmutableArray<IGrainDirectoryPartition>> _partitionsByMember;
     private readonly ImmutableArray<ImmutableArray<RingRange>> _rangesByMemberPartition;
 
-    public DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory) : this(snapshot, grainFactory, static (silo, count) => silo.GetUniformHashCodes(count))
+    public DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory) : this(snapshot, grainFactory, static (silo, count) => silo.GetUniformHashCodes(count), static _ => true)
     {
     }
 
-    internal DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, Func<SiloAddress, int, uint[]> getRingBoundaries)
+    /// <summary>
+    /// Creates a new <see cref="DirectoryMembershipSnapshot"/> with filtered membership.
+    /// Only silos for which <paramref name="memberFilter"/> returns <c>true</c> are included in the directory membership ring.
+    /// </summary>
+    /// <param name="snapshot">The cluster membership snapshot.</param>
+    /// <param name="grainFactory">The grain factory for creating partition references.</param>
+    /// <param name="memberFilter">A predicate that returns <c>true</c> if the silo should be included in the directory membership.</param>
+    public DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, Func<SiloAddress, bool> memberFilter) 
+        : this(snapshot, grainFactory, static (silo, count) => silo.GetUniformHashCodes(count), memberFilter)
+    {
+    }
+
+    internal DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, Func<SiloAddress, int, uint[]> getRingBoundaries, Func<SiloAddress, bool> memberFilter)
     {
         var sortedActiveMembers = ImmutableArray.CreateBuilder<SiloAddress>(snapshot.Members.Count(static m => m.Value.Status == SiloStatus.Active));
         foreach (var member in snapshot.Members)
         {
-            // Only active members are part of directory membership.
-            if (member.Value.Status == SiloStatus.Active)
+            // Only active members that pass the filter are part of directory membership.
+            if (member.Value.Status == SiloStatus.Active && memberFilter(member.Key))
             {
                 sortedActiveMembers.Add(member.Key);
             }

@@ -44,6 +44,7 @@ using Orleans.Serialization.Internal;
 using Orleans.Core;
 using Orleans.Placement.Repartitioning;
 using Orleans.Runtime.Placement.Filtering;
+using Orleans.Runtime.MembershipService.SiloMetadata;
 
 namespace Orleans.Hosting
 {
@@ -140,6 +141,19 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, CachedGrainLocator>();
             services.AddSingleton<ClientGrainLocator>();
 
+            // Distributed Grain Directory - registered on all silos so IGrainDirectoryClient is available for recovery queries
+            // during rolling upgrades from LocalGrainDirectory to DistributedGrainDirectory
+            services.TryAddSingleton<DirectoryMembershipService>();
+            services.TryAddSingleton<DistributedGrainDirectory>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DistributedGrainDirectory>();
+
+            // Silo Metadata - registered on all silos so metadata can be fetched during rolling upgrades
+            // The SiloMetadataSystemTarget must be available on all silos so that NEW silos (using DistributedGrainDirectory)
+            // can fetch metadata from OLD silos to determine their grain directory capability
+            services.AddOptions<SiloMetadata>();
+            services.TryAddSingleton<SiloMetadataSystemTarget>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloMetadataSystemTarget>();
+
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();
             services.TryAddSingleton(FactoryUtility.Create<MessageCenter, Gateway>);
@@ -194,7 +208,8 @@ namespace Orleans.Hosting
 
             services.TryAddSingleton<MessageFactory>();
 
-            services.TryAddSingleton(FactoryUtility.Create<LocalGrainDirectoryPartition>);
+            services.TryAddSingleton<LocalGrainDirectoryPartition>();
+            services.TryAddSingleton<ILocalGrainDirectoryPartition>(sp => sp.GetRequiredService<LocalGrainDirectoryPartition>());
 
             // Placement
             services.AddSingleton<IConfigurationValidator, ActivationCountBasedPlacementOptionsValidator>();

@@ -585,19 +585,15 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
     private async IAsyncEnumerable<List<GrainAddress>> GetRegisteredActivations(DirectoryMembershipSnapshot current, RingRange range, bool isValidation)
     {
-        // Membership is guaranteed to be at least as recent as the current view.
-        var clusterMembershipSnapshot = _owner.ClusterMembershipSnapshot;
-        Debug.Assert(clusterMembershipSnapshot.Version >= current.Version);
+        // Use the filtered directory members (silos with DistributedGrainDirectory capability) instead of all cluster members.
+        // This is important during rolling upgrades where OLD silos don't have IGrainDirectoryClient registered.
+        // Calling RecoverRegisteredActivations on OLD silos would fail and cause retries/timeouts.
+        var directoryMembers = _owner.DirectoryMembers;
 
         var tasks = new List<Task<List<GrainAddress>>>();
-        foreach (var member in clusterMembershipSnapshot.Members.Values)
+        foreach (var member in directoryMembers)
         {
-            if (member.Status is not (SiloStatus.Active or SiloStatus.Joining or SiloStatus.ShuttingDown))
-            {
-                continue;
-            }
-
-            tasks.Add(GetRegisteredActivationsFromClusterMember(current.Version, range, member.SiloAddress, isValidation));
+            tasks.Add(GetRegisteredActivationsFromClusterMember(current.Version, range, member, isValidation));
         }
 
         await Task.WhenAll(tasks).WaitAsync(ShutdownToken).SuppressThrowing();

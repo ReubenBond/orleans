@@ -220,3 +220,6 @@ src/SetupTestScriptOutput.txt
 
 # code coverage
 *.cobertura.xml
+
+# Agent task tracking
+/tasks/

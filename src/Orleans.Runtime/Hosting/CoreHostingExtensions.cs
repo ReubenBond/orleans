@@ -21,7 +21,6 @@ namespace Orleans.Hosting
     /// </summary>
     public static class CoreHostingExtensions
     {
-        private static readonly ServiceDescriptor DirectoryDescriptor = ServiceDescriptor.Singleton<DistributedGrainDirectory, DistributedGrainDirectory>();
 
         /// <summary>
         /// Add <see cref="Activity.Current"/> propagation through grain calls.
@@ -162,13 +161,10 @@ namespace Orleans.Hosting
                 name = GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY;
             }
 
-            // Distributed Grain Directory
-            services.TryAddSingleton<DirectoryMembershipService>();
-            if (!services.Contains(DirectoryDescriptor))
-            {
-                services.Add(DirectoryDescriptor);
-                services.AddGrainDirectory<DistributedGrainDirectory>(name, (sp, name) => sp.GetRequiredService<DistributedGrainDirectory>());
-            }
+            // Distributed Grain Directory - DirectoryMembershipService and DistributedGrainDirectory
+            // are already registered in DefaultSiloServices for all silos.
+            // Here we just register it as a named grain directory.
+            services.AddGrainDirectory<DistributedGrainDirectory>(name, (sp, name) => sp.GetRequiredService<DistributedGrainDirectory>());
 
             return siloBuilder;
         }
