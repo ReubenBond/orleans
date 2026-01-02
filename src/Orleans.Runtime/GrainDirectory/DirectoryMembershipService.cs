@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,6 +16,13 @@ namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed partial class DirectoryMembershipService : IAsyncDisposable
 {
+    /// <summary>
+    /// Threshold after which we log a warning about waiting for manifest.
+    /// This is for diagnostics only - we will continue waiting indefinitely
+    /// because all silos must have identical membership views.
+    /// </summary>
+    private static readonly TimeSpan ManifestWaitWarningThreshold = TimeSpan.FromSeconds(5);
+
     private readonly IClusterMembershipService _clusterMembershipService;
     private readonly IInternalGrainFactory _grainFactory;
     private readonly IClusterManifestProvider _clusterManifestProvider;
@@ -87,6 +95,10 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
 
                 ClusterMembershipSnapshot? currentMembership = null;
                 ClusterManifest currentManifest = _clusterManifestProvider.Current;
+                
+                // Track when we started waiting for manifest completeness (for warning logs only)
+                Stopwatch? manifestWaitStopwatch = null;
+                bool warnedAboutDelay = false;
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -103,6 +115,10 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
 
                         currentMembership = membershipEnumerator.Current;
                         membershipMoveNext = membershipEnumerator.MoveNextAsync().AsTask();
+                        
+                        // Reset wait tracking on new membership (silos may have changed)
+                        manifestWaitStopwatch = null;
+                        warnedAboutDelay = false;
                     }
                     else // completedTask == manifestMoveNext
                     {
@@ -125,19 +141,35 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
                             .Select(m => m.SiloAddress)
                             .ToList();
 
-                        var allSilosInManifest = activeSilos.All(silo => currentManifest.Silos.ContainsKey(silo));
+                        var missingSilos = activeSilos.Where(s => !currentManifest.Silos.ContainsKey(s)).ToList();
+                        var allSilosInManifest = missingSilos.Count == 0;
 
                         if (allSilosInManifest)
                         {
                             // Manifest is complete, publish the view
                             PublishView(currentMembership, currentManifest);
+                            manifestWaitStopwatch = null;
+                            warnedAboutDelay = false;
                         }
                         else
                         {
-                            // Manifest is incomplete - log and wait for more updates
-                            // The view will be published when manifest catches up or silos leave
-                            var missingSilos = activeSilos.Where(s => !currentManifest.Silos.ContainsKey(s)).ToList();
-                            LogDebugWaitingForManifest(currentMembership.Version, missingSilos.Count);
+                            // Manifest is incomplete - we MUST wait for it to complete.
+                            // All silos must have identical membership views for consistency.
+                            // Track how long we've been waiting for diagnostic purposes only.
+                            manifestWaitStopwatch ??= Stopwatch.StartNew();
+                            var elapsed = manifestWaitStopwatch.Elapsed;
+
+                            if (elapsed >= ManifestWaitWarningThreshold && !warnedAboutDelay)
+                            {
+                                // Log a warning that we're still waiting (diagnostics only)
+                                LogWarningWaitingForManifest(currentMembership.Version, missingSilos.Count, elapsed, missingSilos);
+                                warnedAboutDelay = true;
+                            }
+                            else if (!warnedAboutDelay)
+                            {
+                                // Debug log - waiting for manifest
+                                LogDebugWaitingForManifest(currentMembership.Version, missingSilos.Count);
+                            }
                         }
                     }
                 }
@@ -167,14 +199,33 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
 
     private void PublishView(ClusterMembershipSnapshot membership, ClusterManifest manifest)
     {
+        // Pre-compute whether any silo has the distributed capability (for performance)
+        var anyHasCapability = HasAnyDistributedGrainDirectoryCapability(manifest);
+        
         var view = new DirectoryMembershipSnapshot(
             membership,
             _grainFactory,
-            siloAddress => HasDistributedGrainDirectoryCapability(siloAddress, manifest));
+            siloAddress => HasDistributedGrainDirectoryCapability(siloAddress, manifest, anyHasCapability));
 
         var activeCount = membership.Members.Count(m => m.Value.Status == SiloStatus.Active);
         LogDebugMembershipUpdate(view.Version, view.Members.Length, activeCount);
         _viewUpdates.Publish(view);
+    }
+
+    /// <summary>
+    /// Checks if any silo in the cluster has the distributed grain directory capability.
+    /// </summary>
+    private static bool HasAnyDistributedGrainDirectoryCapability(ClusterManifest manifest)
+    {
+        foreach (var siloManifest in manifest.Silos.Values)
+        {
+            if (siloManifest.Properties.TryGetValue(GrainDirectoryCapability.MetadataKey, out var cap)
+                && cap == GrainDirectoryCapability.Distributed)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// <summary>
@@ -189,20 +240,11 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     /// 
     /// This approach ensures that the DistributedGrainDirectory membership is correct during migration.
     /// </remarks>
-    private static bool HasDistributedGrainDirectoryCapability(SiloAddress siloAddress, ClusterManifest manifest)
+    /// <param name="siloAddress">The silo to check.</param>
+    /// <param name="manifest">The cluster manifest.</param>
+    /// <param name="anyHasCapability">Pre-computed flag indicating if any silo has the capability.</param>
+    private static bool HasDistributedGrainDirectoryCapability(SiloAddress siloAddress, ClusterManifest manifest, bool anyHasCapability)
     {
-        // Check if ANY silo in the cluster has the distributed grain directory capability
-        bool anyHasCapability = false;
-        foreach (var siloManifest in manifest.Silos.Values)
-        {
-            if (siloManifest.Properties.TryGetValue(GrainDirectoryCapability.MetadataKey, out var cap)
-                && cap == GrainDirectoryCapability.Distributed)
-            {
-                anyHasCapability = true;
-                break;
-            }
-        }
-
         if (!anyHasCapability)
         {
             // No silos have the capability - this is an all-OLD-silos cluster.
@@ -239,6 +281,12 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         Message = "Waiting for cluster manifest to include {MissingSiloCount} active silos before publishing directory membership version {Version}."
     )]
     private partial void LogDebugWaitingForManifest(MembershipVersion version, int missingSiloCount);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Still waiting for cluster manifest to include {MissingSiloCount} active silos after {Elapsed}. Directory membership version {Version} is delayed until manifest is complete. Missing silos: {MissingSilos}. This may indicate a silo startup issue or network problem."
+    )]
+    private partial void LogWarningWaitingForManifest(MembershipVersion version, int missingSiloCount, TimeSpan elapsed, List<SiloAddress> missingSilos);
 
     [LoggerMessage(
         Level = LogLevel.Error,

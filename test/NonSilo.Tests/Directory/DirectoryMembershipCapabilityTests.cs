@@ -468,6 +468,148 @@ public sealed class DirectoryMembershipServiceTests
         Assert.Contains(Silo2, service.AllActiveMembers);
     }
 
+    /// <summary>
+    /// Verifies that rapid membership changes are handled correctly.
+    /// When silos join and leave quickly, the service should still produce consistent views.
+    /// </summary>
+    [Fact]
+    public async Task Service_HandlesRapidMembershipChanges_Correctly()
+    {
+        // Arrange
+        var membershipService = new MockClusterMembershipService();
+        var manifestProvider = new MockClusterManifestProvider();
+
+        // Start with Silo1 active
+        membershipService.UpdateSiloStatus(Silo1, SiloStatus.Active, "silo1");
+        manifestProvider.UpdateManifest(
+            ImmutableDictionary<SiloAddress, GrainManifest>.Empty
+                .Add(Silo1, CreateManifest(hasDistributedCapability: false)));
+
+        await using var service = CreateService(membershipService, manifestProvider);
+
+        // Wait for initial view
+        await WaitForCondition(() => service.CurrentView.Version > MembershipVersion.MinValue, TimeSpan.FromSeconds(5));
+        Assert.Single(service.CurrentView.Members);
+
+        // Act: Rapid changes - add Silo2, then immediately add Silo3
+        membershipService.UpdateSiloStatus(Silo2, SiloStatus.Active, "silo2");
+        membershipService.UpdateSiloStatus(Silo3, SiloStatus.Active, "silo3");
+        
+        // View should NOT be published yet (Silo2 and Silo3 not in manifest)
+        await Task.Delay(50);
+        var versionAfterRapidChanges = service.CurrentView.Version;
+
+        // Add both to manifest at once
+        manifestProvider.UpdateManifest(
+            ImmutableDictionary<SiloAddress, GrainManifest>.Empty
+                .Add(Silo1, CreateManifest(hasDistributedCapability: false))
+                .Add(Silo2, CreateManifest(hasDistributedCapability: false))
+                .Add(Silo3, CreateManifest(hasDistributedCapability: false)));
+
+        // Assert: View should now have all 3 silos
+        await WaitForCondition(() => service.CurrentView.Version > versionAfterRapidChanges, TimeSpan.FromSeconds(5));
+        Assert.Equal(3, service.CurrentView.Members.Length);
+    }
+
+    /// <summary>
+    /// Verifies that the service correctly handles transition from all-OLD to mixed cluster.
+    /// </summary>
+    [Fact]
+    public async Task Service_TransitionsFromAllOldToMixed_Correctly()
+    {
+        // Arrange: Start with all OLD silos
+        var membershipService = new MockClusterMembershipService();
+        var manifestProvider = new MockClusterManifestProvider();
+
+        membershipService.UpdateSiloStatus(Silo1, SiloStatus.Active, "silo1");
+        membershipService.UpdateSiloStatus(Silo2, SiloStatus.Active, "silo2");
+        manifestProvider.UpdateManifest(
+            ImmutableDictionary<SiloAddress, GrainManifest>.Empty
+                .Add(Silo1, CreateManifest(hasDistributedCapability: false))
+                .Add(Silo2, CreateManifest(hasDistributedCapability: false)));
+
+        await using var service = CreateService(membershipService, manifestProvider);
+
+        // Wait for initial view - all OLD silos should be included
+        await WaitForCondition(() => service.CurrentView.Version > MembershipVersion.MinValue, TimeSpan.FromSeconds(5));
+        Assert.Equal(2, service.CurrentView.Members.Length);
+        var initialVersion = service.CurrentView.Version;
+
+        // Act: Add a NEW silo (with capability)
+        membershipService.UpdateSiloStatus(Silo3, SiloStatus.Active, "silo3");
+        manifestProvider.UpdateManifest(
+            ImmutableDictionary<SiloAddress, GrainManifest>.Empty
+                .Add(Silo1, CreateManifest(hasDistributedCapability: false))
+                .Add(Silo2, CreateManifest(hasDistributedCapability: false))
+                .Add(Silo3, CreateManifest(hasDistributedCapability: true))); // NEW silo
+
+        // Assert: Only the NEW silo should now be in filtered members
+        await WaitForCondition(() => service.CurrentView.Version > initialVersion, TimeSpan.FromSeconds(5));
+        Assert.Single(service.CurrentView.Members);
+        Assert.Contains(Silo3, service.CurrentView.Members);
+
+        // AllActiveMembers should still include all 3
+        Assert.Equal(3, service.AllActiveMembers.Length);
+    }
+
+    /// <summary>
+    /// Verifies that the service correctly handles transition from mixed to all-NEW cluster.
+    /// </summary>
+    [Fact]
+    public async Task Service_TransitionsFromMixedToAllNew_Correctly()
+    {
+        // Arrange: Start with mixed cluster (1 OLD, 1 NEW)
+        var membershipService = new MockClusterMembershipService();
+        var manifestProvider = new MockClusterManifestProvider();
+
+        membershipService.UpdateSiloStatus(Silo1, SiloStatus.Active, "silo1");
+        membershipService.UpdateSiloStatus(Silo2, SiloStatus.Active, "silo2");
+        manifestProvider.UpdateManifest(
+            ImmutableDictionary<SiloAddress, GrainManifest>.Empty
+                .Add(Silo1, CreateManifest(hasDistributedCapability: false)) // OLD
+                .Add(Silo2, CreateManifest(hasDistributedCapability: true))); // NEW
+
+        await using var service = CreateService(membershipService, manifestProvider);
+
+        // Wait for initial view - only NEW silo should be included
+        await WaitForCondition(() => service.CurrentView.Version > MembershipVersion.MinValue, TimeSpan.FromSeconds(5));
+        Assert.Single(service.CurrentView.Members);
+        Assert.Contains(Silo2, service.CurrentView.Members);
+        var initialVersion = service.CurrentView.Version;
+
+        // Act: OLD silo leaves, add another NEW silo
+        membershipService.UpdateSiloStatus(Silo1, SiloStatus.Dead, "silo1");
+        membershipService.UpdateSiloStatus(Silo3, SiloStatus.Active, "silo3");
+        manifestProvider.UpdateManifest(
+            ImmutableDictionary<SiloAddress, GrainManifest>.Empty
+                .Add(Silo1, CreateManifest(hasDistributedCapability: false)) // Still in manifest but Dead
+                .Add(Silo2, CreateManifest(hasDistributedCapability: true))
+                .Add(Silo3, CreateManifest(hasDistributedCapability: true))); // NEW silo
+
+        // Assert: Both NEW silos should be in filtered members
+        await WaitForCondition(() => service.CurrentView.Version > initialVersion, TimeSpan.FromSeconds(5));
+        Assert.Equal(2, service.CurrentView.Members.Length);
+        Assert.Contains(Silo2, service.CurrentView.Members);
+        Assert.Contains(Silo3, service.CurrentView.Members);
+        Assert.DoesNotContain(Silo1, service.CurrentView.Members);
+    }
+
+    /// <summary>
+    /// Verifies that AllActiveMembers returns empty array when no silos are active.
+    /// </summary>
+    [Fact]
+    public async Task Service_AllActiveMembers_EmptyWhenNoActiveSilos()
+    {
+        // Arrange
+        var membershipService = new MockClusterMembershipService();
+        var manifestProvider = new MockClusterManifestProvider();
+
+        await using var service = CreateService(membershipService, manifestProvider);
+
+        // Assert: AllActiveMembers should be empty
+        Assert.Empty(service.AllActiveMembers);
+    }
+
     private static DirectoryMembershipService CreateService(
         MockClusterMembershipService membershipService,
         MockClusterManifestProvider manifestProvider)
