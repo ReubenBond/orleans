@@ -330,7 +330,7 @@ namespace Orleans.Runtime
                         var activationData = activation.Value;
                         var placementStrategy = activationData.GetComponent<PlacementStrategy>();
                         var isUsingGrainDirectory = placementStrategy is { IsUsingGrainDirectory: true };
-                        if (!isUsingGrainDirectory || !grainDirectoryResolver.IsUsingDefaultDirectory(activationData.GrainId.Type)) continue;
+                        if (!isUsingGrainDirectory || !grainDirectoryResolver.IsUsingDhtGrainDirectory(activationData.GrainId.Type)) continue;
                         if (!updatedSilo.Equals(directory.GetPrimaryForGrain(activationData.GrainId))) continue;
 
                         activationsToShutdown.Add(activationData);
