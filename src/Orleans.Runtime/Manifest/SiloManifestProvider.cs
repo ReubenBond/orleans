@@ -16,6 +16,7 @@ namespace Orleans.Metadata
         public SiloManifestProvider(
             IEnumerable<IGrainPropertiesProvider> grainPropertiesProviders,
             IEnumerable<IGrainInterfacePropertiesProvider> grainInterfacePropertiesProviders,
+            IEnumerable<ISiloPropertiesProvider> siloPropertiesProviders,
             IOptions<GrainTypeOptions> grainTypeOptions,
             GrainTypeResolver typeProvider,
             GrainInterfaceTypeResolver interfaceIdProvider,
@@ -23,7 +24,8 @@ namespace Orleans.Metadata
         {
             var (grainProperties, grainTypes) = CreateGrainManifest(grainPropertiesProviders, grainTypeOptions, typeProvider);
             var interfaces = CreateInterfaceManifest(grainInterfacePropertiesProviders, grainTypeOptions, interfaceIdProvider);
-            this.SiloManifest = new GrainManifest(grainProperties, interfaces);
+            var siloProperties = CreateSiloProperties(siloPropertiesProviders);
+            this.SiloManifest = new GrainManifest(grainProperties, interfaces, siloProperties);
             this.GrainTypeMap = new GrainClassMap(typeConverter, grainTypes);
         }
 
@@ -89,6 +91,18 @@ namespace Orleans.Metadata
             }
 
             return (propertiesMap.ToImmutable(), typeMap.ToImmutable());
+        }
+
+        private static ImmutableDictionary<string, string> CreateSiloProperties(
+            IEnumerable<ISiloPropertiesProvider> siloPropertiesProviders)
+        {
+            var properties = new Dictionary<string, string>();
+            foreach (var provider in siloPropertiesProviders)
+            {
+                provider.Populate(properties);
+            }
+
+            return properties.ToImmutableDictionary();
         }
     }
 }

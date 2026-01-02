@@ -44,7 +44,6 @@ using Orleans.Serialization.Internal;
 using Orleans.Core;
 using Orleans.Placement.Repartitioning;
 using Orleans.Runtime.Placement.Filtering;
-using Orleans.Runtime.MembershipService.SiloMetadata;
 
 namespace Orleans.Hosting
 {
@@ -146,13 +145,6 @@ namespace Orleans.Hosting
             services.TryAddSingleton<DirectoryMembershipService>();
             services.TryAddSingleton<DistributedGrainDirectory>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DistributedGrainDirectory>();
-
-            // Silo Metadata - registered on all silos so metadata can be fetched during rolling upgrades
-            // The SiloMetadataSystemTarget must be available on all silos so that NEW silos (using DistributedGrainDirectory)
-            // can fetch metadata from OLD silos to determine their grain directory capability
-            services.AddOptions<SiloMetadata>();
-            services.TryAddSingleton<SiloMetadataSystemTarget>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloMetadataSystemTarget>();
 
             services.TryAddSingleton<MessageCenter>();
             services.TryAddFromExisting<IMessageCenter, MessageCenter>();

@@ -5,8 +5,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration.Internal;
 using Orleans.GrainDirectory;
 using Orleans.Hosting;
+using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
-using Orleans.Runtime.MembershipService.SiloMetadata;
 
 namespace Orleans.Runtime.Hosting;
 
@@ -23,7 +23,7 @@ public static class DistributedGrainDirectorySiloBuilderExtensions
     /// <para>
     /// During rolling upgrades, this method configures the silo to:
     /// <list type="bullet">
-    /// <item>Advertise the <see cref="GrainDirectoryCapability.Distributed"/> capability via silo metadata</item>
+    /// <item>Advertise the <see cref="GrainDirectoryCapability.Distributed"/> capability via the cluster manifest</item>
     /// <item>Use <see cref="DelegatingGrainDirectoryPartition"/> which stores grain registrations locally
     /// (for DHT compatibility with OLD silos) and asynchronously replicates to <see cref="DistributedGrainDirectory"/></item>
     /// </list>
@@ -66,23 +66,24 @@ public static class DistributedGrainDirectorySiloBuilderExtensions
             services.AddSingleton<DelegatingGrainDirectoryPartition>();
             services.AddSingleton<ILocalGrainDirectoryPartition>(sp => sp.GetRequiredService<DelegatingGrainDirectoryPartition>());
 
-            // Advertise the DistributedGrainDirectory capability via silo metadata
+            // Advertise the DistributedGrainDirectory capability via the cluster manifest (GrainManifest.Properties)
             // This allows DirectoryMembershipService to filter membership for DistributedGrainDirectory coordination
-            services.AddOptionsWithValidateOnStart<SiloMetadata>()
-                .Configure(m => m.AddMetadata(new Dictionary<string, string>
-                {
-                    [GrainDirectoryCapability.MetadataKey] = GrainDirectoryCapability.Distributed
-                }));
-
-            // Ensure silo metadata infrastructure is registered
-            services.TryAddSingleton<SiloMetadataSystemTarget>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloMetadataSystemTarget>();
-            services.TryAddSingleton<SiloMetadataCache>();
-            services.TryAddSingleton<ISiloMetadataCache>(sp => sp.GetRequiredService<SiloMetadataCache>());
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloMetadataCache>();
-            services.TryAddSingleton<ISiloMetadataClient, SiloMetadataClient>();
+            services.AddSingleton<ISiloPropertiesProvider, DistributedGrainDirectoryCapabilityProvider>();
         });
 
         return builder;
+    }
+}
+
+/// <summary>
+/// Provides the <see cref="GrainDirectoryCapability.Distributed"/> capability as a silo property.
+/// This property is included in the <see cref="GrainManifest.Properties"/> and propagated via the cluster manifest.
+/// </summary>
+internal sealed class DistributedGrainDirectoryCapabilityProvider : ISiloPropertiesProvider
+{
+    /// <inheritdoc />
+    public void Populate(Dictionary<string, string> properties)
+    {
+        properties[GrainDirectoryCapability.MetadataKey] = GrainDirectoryCapability.Distributed;
     }
 }

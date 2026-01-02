@@ -1,11 +1,26 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using Orleans.Runtime;
 
 namespace Orleans.Metadata
 {
     /// <summary>
-    /// Information about available grains.
+    /// Provides silo-level properties for the <see cref="GrainManifest"/>.
+    /// </summary>
+    public interface ISiloPropertiesProvider
+    {
+        /// <summary>
+        /// Adds silo-level properties to <paramref name="properties"/>.
+        /// </summary>
+        /// <param name="properties">
+        /// The properties collection which calls to this method should populate.
+        /// </param>
+        void Populate(Dictionary<string, string> properties);
+    }
+
+    /// <summary>
+    /// Information about available grains and silo properties.
     /// </summary>
     [Serializable, GenerateSerializer, Immutable]
     public sealed class GrainManifest
@@ -22,9 +37,30 @@ namespace Orleans.Metadata
         public GrainManifest(
             ImmutableDictionary<GrainType, GrainProperties> grains,
             ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties> interfaces)
+            : this(grains, interfaces, ImmutableDictionary<string, string>.Empty)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="GrainManifest"/> class.
+        /// </summary>
+        /// <param name="grains">
+        /// The grain properties.
+        /// </param>
+        /// <param name="interfaces">
+        /// The interface properties.
+        /// </param>
+        /// <param name="properties">
+        /// The silo-level properties.
+        /// </param>
+        public GrainManifest(
+            ImmutableDictionary<GrainType, GrainProperties> grains,
+            ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties> interfaces,
+            ImmutableDictionary<string, string> properties)
         {
             this.Interfaces = interfaces;
             this.Grains = grains;
+            this.Properties = properties;
         }
 
         /// <summary>
@@ -38,5 +74,11 @@ namespace Orleans.Metadata
         /// </summary>
         [Id(1)]
         public ImmutableDictionary<GrainType, GrainProperties> Grains { get; }
+
+        /// <summary>
+        /// Gets the silo-level properties, such as capabilities and metadata.
+        /// </summary>
+        [Id(2)]
+        public ImmutableDictionary<string, string> Properties { get; }
     }
 }
