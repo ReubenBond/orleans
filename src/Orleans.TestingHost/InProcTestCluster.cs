@@ -623,7 +623,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 
                 if (Options.UseTestClusterMembership)
                 {
-                    services.AddSingleton<IMembershipTable>(_membershipTable);
+                    siloBuilder.Services.AddSingleton<IMembershipTable>(_membershipTable);
                     siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (_, _) => _grainDirectory);
                 }
 
