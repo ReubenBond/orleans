@@ -15,6 +15,7 @@ namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed partial class DirectoryMembershipService : IAsyncDisposable
 {
+    private readonly IClusterMembershipService _clusterMembershipService;
     private readonly IInternalGrainFactory _grainFactory;
     private readonly IClusterManifestProvider _clusterManifestProvider;
     private readonly ILogger _logger;
@@ -25,8 +26,6 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     public DirectoryMembershipSnapshot CurrentView { get; private set; } = DirectoryMembershipSnapshot.Default;
 
     public IAsyncEnumerable<DirectoryMembershipSnapshot> ViewUpdates => _viewUpdates;
-
-    public ClusterMembershipService ClusterMembershipService { get; }
 
     /// <summary>
     /// Gets all active silos in the cluster, regardless of their grain directory capability.
@@ -39,7 +38,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
 
     public async ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version, CancellationToken cancellationToken)
     {
-        _ = ClusterMembershipService.Refresh(version, cancellationToken);
+        _ = _clusterMembershipService.Refresh(version, cancellationToken);
         if (CurrentView.Version <= version)
         {
             await foreach (var view in _viewUpdates.WithCancellation(cancellationToken))
@@ -55,7 +54,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     }
 
     public DirectoryMembershipService(
-        ClusterMembershipService clusterMembershipService,
+        IClusterMembershipService clusterMembershipService,
         IInternalGrainFactory grainFactory,
         ILogger<DirectoryMembershipService> logger,
         IClusterManifestProvider clusterManifestProvider)
@@ -64,7 +63,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
             DirectoryMembershipSnapshot.Default,
             (previous, proposed) => proposed.Version >= previous.Version,
             update => CurrentView = update);
-        ClusterMembershipService = clusterMembershipService;
+        _clusterMembershipService = clusterMembershipService;
         _grainFactory = grainFactory;
         _logger = logger;
         _clusterManifestProvider = clusterManifestProvider;
@@ -76,30 +75,106 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     {
         try
         {
-            while (!_shutdownCts.IsCancellationRequested)
+            var cancellationToken = _shutdownCts.Token;
+            var membershipEnumerator = _clusterMembershipService.MembershipUpdates.GetAsyncEnumerator(cancellationToken);
+            var manifestEnumerator = _clusterManifestProvider.Updates.GetAsyncEnumerator(cancellationToken);
+
+            try
             {
-                try
+                // Start both enumerators
+                var membershipMoveNext = membershipEnumerator.MoveNextAsync().AsTask();
+                var manifestMoveNext = manifestEnumerator.MoveNextAsync().AsTask();
+
+                ClusterMembershipSnapshot? currentMembership = null;
+                ClusterManifest currentManifest = _clusterManifestProvider.Current;
+
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    await foreach (var update in ClusterMembershipService.MembershipUpdates.WithCancellation(_shutdownCts.Token))
+                    // Wait for either a membership update or a manifest update
+                    var completedTask = await Task.WhenAny(membershipMoveNext, manifestMoveNext);
+
+                    if (completedTask == membershipMoveNext)
                     {
-                        var view = new DirectoryMembershipSnapshot(update, _grainFactory, HasDistributedGrainDirectoryCapability);
-                        LogDebugMembershipUpdate(view.Version, view.Members.Length, update.Members.Count(m => m.Value.Status == SiloStatus.Active));
-                        _viewUpdates.Publish(view);
+                        if (!await membershipMoveNext)
+                        {
+                            // Membership stream ended
+                            break;
+                        }
+
+                        currentMembership = membershipEnumerator.Current;
+                        membershipMoveNext = membershipEnumerator.MoveNextAsync().AsTask();
+                    }
+                    else // completedTask == manifestMoveNext
+                    {
+                        if (!await manifestMoveNext)
+                        {
+                            // Manifest stream ended
+                            break;
+                        }
+
+                        currentManifest = manifestEnumerator.Current;
+                        manifestMoveNext = manifestEnumerator.MoveNextAsync().AsTask();
+                    }
+
+                    // If we have a membership snapshot, check if manifest is complete
+                    if (currentMembership is not null)
+                    {
+                        // Check if all active silos are in the manifest
+                        var activeSilos = currentMembership.Members.Values
+                            .Where(m => m.Status == SiloStatus.Active)
+                            .Select(m => m.SiloAddress)
+                            .ToList();
+
+                        var allSilosInManifest = activeSilos.All(silo => currentManifest.Silos.ContainsKey(silo));
+
+                        if (allSilosInManifest)
+                        {
+                            // Manifest is complete, publish the view
+                            PublishView(currentMembership, currentManifest);
+                        }
+                        else
+                        {
+                            // Manifest is incomplete - log and wait for more updates
+                            // The view will be published when manifest catches up or silos leave
+                            var missingSilos = activeSilos.Where(s => !currentManifest.Silos.ContainsKey(s)).ToList();
+                            LogDebugWaitingForManifest(currentMembership.Version, missingSilos.Count);
+                        }
                     }
                 }
-                catch (Exception exception)
-                {
-                    if (!_shutdownCts.IsCancellationRequested)
-                    {
-                        LogErrorProcessingMembershipUpdates(exception);
-                    }
-                }
+            }
+            finally
+            {
+                await membershipEnumerator.DisposeAsync();
+                await manifestEnumerator.DisposeAsync();
+            }
+        }
+        catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+        {
+            // Expected during shutdown
+        }
+        catch (Exception exception)
+        {
+            if (!_shutdownCts.IsCancellationRequested)
+            {
+                LogErrorProcessingMembershipUpdates(exception);
             }
         }
         finally
         {
             _viewUpdates.Dispose();
         }
+    }
+
+    private void PublishView(ClusterMembershipSnapshot membership, ClusterManifest manifest)
+    {
+        var view = new DirectoryMembershipSnapshot(
+            membership,
+            _grainFactory,
+            siloAddress => HasDistributedGrainDirectoryCapability(siloAddress, manifest));
+
+        var activeCount = membership.Members.Count(m => m.Value.Status == SiloStatus.Active);
+        LogDebugMembershipUpdate(view.Version, view.Members.Length, activeCount);
+        _viewUpdates.Publish(view);
     }
 
     /// <summary>
@@ -114,10 +189,8 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     /// 
     /// This approach ensures that the DistributedGrainDirectory membership is correct during migration.
     /// </remarks>
-    private bool HasDistributedGrainDirectoryCapability(SiloAddress siloAddress)
+    private static bool HasDistributedGrainDirectoryCapability(SiloAddress siloAddress, ClusterManifest manifest)
     {
-        var manifest = _clusterManifestProvider.Current;
-        
         // Check if ANY silo in the cluster has the distributed grain directory capability
         bool anyHasCapability = false;
         foreach (var siloManifest in manifest.Silos.Values)
@@ -160,6 +233,12 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         Message = "Directory membership updated to version {Version} with {FilteredMemberCount} filtered members out of {TotalActiveMemberCount} total active members."
     )]
     private partial void LogDebugMembershipUpdate(MembershipVersion version, int filteredMemberCount, int totalActiveMemberCount);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Waiting for cluster manifest to include {MissingSiloCount} active silos before publishing directory membership version {Version}."
+    )]
+    private partial void LogDebugWaitingForManifest(MembershipVersion version, int missingSiloCount);
 
     [LoggerMessage(
         Level = LogLevel.Error,
