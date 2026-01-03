@@ -218,12 +218,6 @@ namespace Orleans.Runtime.GrainDirectory
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = "DelegatingGrainDirectoryPartition.AddSingleActivation: address={Address}, previousAddress={PreviousAddress}"
-        )]
-        private partial void LogTraceAddSingleActivation(GrainAddress address, GrainAddress? previousAddress);
-
-        [LoggerMessage(
-            Level = LogLevel.Trace,
             Message = "DelegatingGrainDirectoryPartition.RemoveActivation: grain={GrainId}, activation={ActivationId}, cause={Cause}"
         )]
         private partial void LogTraceRemoveActivation(GrainId grainId, ActivationId activationId, UnregistrationCause cause);

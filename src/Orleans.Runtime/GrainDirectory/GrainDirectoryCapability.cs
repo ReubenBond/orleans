@@ -5,7 +5,7 @@ namespace Orleans.Runtime.GrainDirectory;
 /// Grain directory capabilities that a silo can advertise via silo metadata.
 /// Used to coordinate rolling upgrades from LocalGrainDirectory to DistributedGrainDirectory.
 /// </summary>
-public static class GrainDirectoryCapability
+internal static class GrainDirectoryCapability
 {
     /// <summary>
     /// Metadata key for grain directory capability.

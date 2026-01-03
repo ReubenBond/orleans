@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration.Internal;
@@ -50,6 +51,7 @@ public static class DistributedGrainDirectorySiloBuilderExtensions
     /// </remarks>
     /// <param name="builder">The silo builder.</param>
     /// <returns>The silo builder for method chaining.</returns>
+    [Experimental("ORLEANSEXP003")]
     public static ISiloBuilder UseDistributedGrainDirectory(this ISiloBuilder builder)
     {
         builder.ConfigureServices(services =>
