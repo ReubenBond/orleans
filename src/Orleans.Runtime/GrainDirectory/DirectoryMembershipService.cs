@@ -199,28 +199,37 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
 
     private void PublishView(ClusterMembershipSnapshot membership, ClusterManifest manifest)
     {
-        // Pre-compute whether any silo has the distributed capability (for performance)
-        var anyHasCapability = HasAnyDistributedGrainDirectoryCapability(manifest);
+        // Get active silos for capability checking
+        var activeSilos = membership.Members.Values
+            .Where(m => m.Status == SiloStatus.Active)
+            .Select(m => m.SiloAddress)
+            .ToList();
+
+        // Pre-compute whether any ACTIVE silo has the distributed capability (for performance)
+        // Important: Only consider active silos, not dead ones still in manifest
+        var anyActiveHasCapability = HasAnyActiveDistributedGrainDirectoryCapability(activeSilos, manifest);
         
         var view = new DirectoryMembershipSnapshot(
             membership,
             _grainFactory,
-            siloAddress => HasDistributedGrainDirectoryCapability(siloAddress, manifest, anyHasCapability));
+            siloAddress => HasDistributedGrainDirectoryCapability(siloAddress, manifest, anyActiveHasCapability));
 
-        var activeCount = membership.Members.Count(m => m.Value.Status == SiloStatus.Active);
+        var activeCount = activeSilos.Count;
         LogDebugMembershipUpdate(view.Version, view.Members.Length, activeCount);
         _viewUpdates.Publish(view);
     }
 
     /// <summary>
-    /// Checks if any silo in the cluster has the distributed grain directory capability.
+    /// Checks if any ACTIVE silo in the cluster has the distributed grain directory capability.
+    /// Only considers active silos because dead silos should not affect capability filtering.
     /// </summary>
-    private static bool HasAnyDistributedGrainDirectoryCapability(ClusterManifest manifest)
+    private static bool HasAnyActiveDistributedGrainDirectoryCapability(List<SiloAddress> activeSilos, ClusterManifest manifest)
     {
-        foreach (var siloManifest in manifest.Silos.Values)
+        foreach (var siloAddress in activeSilos)
         {
-            if (siloManifest.Properties.TryGetValue(GrainDirectoryCapability.MetadataKey, out var cap)
-                && cap == GrainDirectoryCapability.Distributed)
+            if (manifest.Silos.TryGetValue(siloAddress, out var siloManifest) &&
+                siloManifest.Properties.TryGetValue(GrainDirectoryCapability.MetadataKey, out var cap) &&
+                cap == GrainDirectoryCapability.Distributed)
             {
                 return true;
             }
