@@ -1,5 +1,3 @@
-using Orleans.Hosting;
-
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddKeyedRedisClient("orleans-redis");

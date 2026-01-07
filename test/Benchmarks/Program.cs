@@ -96,7 +96,7 @@ internal class Program
         ["ConcurrentPing"] = _ =>
         {
             {
-                Console.WriteLine("## Client to Silo ##");
+Console.WriteLine("## Client to Silo ##");
                 var test = new PingBenchmark(numSilos: 1, startClient: true);
                 test.PingConcurrent().GetAwaiter().GetResult();
                 test.Shutdown().GetAwaiter().GetResult();

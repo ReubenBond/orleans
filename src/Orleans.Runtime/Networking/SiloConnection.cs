@@ -106,15 +106,15 @@ namespace Orleans.Runtime.Messaging
             // information, so a null target silo is OK.
             if (msg.TargetSilo == null || msg.TargetSilo.Matches(this.LocalSiloAddress))
             {
-                messageCenter.ReceiveMessage(msg);
+                messageCenter.ReceiveMessage(msg, targetCache: null);
                 return;
             }
 
             if (!msg.TargetSilo.Endpoint.Equals(this.LocalSiloAddress.Endpoint))
             {
                 // If the message is for some other silo altogether, then we need to forward it.
-                LogTraceForwardingMessage(this.Log, msg.Id, msg.SendingSilo!, msg.TargetSilo);
-                messageCenter.SendMessage(msg);
+LogTraceForwardingMessage(this.Log, msg.Id, msg.SendingSilo!, msg.TargetSilo);
+                messageCenter.SendMessage(msg, receiverCache: null);
                 return;
             }
 
@@ -295,7 +295,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 ++msg.RetryCount;
-                this.messageCenter.SendMessage(msg);
+                this.messageCenter.SendMessage(msg, receiverCache: null);
             }
             else
             {

@@ -135,6 +135,7 @@ namespace Orleans.Runtime
                 message.SendingSilo = MySilo;
 
             IGrainContext sendingActivation = RuntimeContext.Current;
+            message.MessageReceiver = sendingActivation ?? HostedClient;
 
             if (sendingActivation == null)
             {
@@ -182,7 +183,15 @@ namespace Orleans.Runtime
             }
 
             this.messagingTrace.OnSendRequest(message);
-            this.MessageCenter.AddressAndSendMessage(message);
+
+            if (target.MessageReceiver is IMessageReceiver receiver)
+            {
+                receiver.ReceiveMessage(message, target);
+            }
+            else
+            {
+                this.MessageCenter.AddressAndSendMessage(message, targetCache: target);
+            }
         }
 
         public void SendResponse(Message request, Response response)
@@ -376,8 +385,8 @@ namespace Orleans.Runtime
                 if (!message.TargetSilo.Matches(this.MySilo))
                 {
                     // gatewayed message - gateway back to sender
-                    LogTraceNoCallbackForRejection(this.logger, message);
-                    this.MessageCenter.AddressAndSendMessage(message);
+LogTraceNoCallbackForRejection(this.logger, message);
+                    this.MessageCenter.AddressAndSendMessage(message, targetCache: null);
                     return;
                 }
 

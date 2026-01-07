@@ -36,7 +36,7 @@ public class PingBenchmark : IDisposable
 
                 if (i == 0 && grainsOnSecondariesOnly)
                 {
-                    siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
+siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
                 }
             });
 

@@ -4,7 +4,7 @@ using Orleans.Core.Internal;
 
 namespace ActivationRepartitioning.Frontend.Data;
 
-public class ClusterDiagnosticsService(IGrainFactory grainFactory)
+public class ClusterDiagnosticsGrain(IGrainFactory grainFactory) : IClusterDiagnosticsGrain
 {
     private readonly Dictionary<SiloAddress, int> _hostKeys = [];
     private readonly Dictionary<SiloAddress, HostDetails> _hostDetails = [];
@@ -103,7 +103,7 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
         }
     }
 
-    internal async ValueTask ResetAsync()
+    public async ValueTask ResetAsync()
     {
         var fanoutType = grainFactory.GetGrain<IFanOutGrain>(0, "0").GetGrainId().Type;
         foreach (var activation in await _managementGrain.GetDetailedGrainStatistics())
@@ -130,7 +130,7 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
     {
         lock (this)
         {
-            ref var key = ref CollectionsMarshal.GetValueRefOrAddDefault(_grainDetails, grainId, out var exists);
+ref var key = ref CollectionsMarshal.GetValueRefOrAddDefault(_grainDetails, grainId, out var exists);
             if (!exists)
             {
                 key = new(_grainDetails.Count - 1, hostKey);
@@ -164,9 +164,17 @@ public class ClusterDiagnosticsService(IGrainFactory grainFactory)
     }
 }
 
+[GenerateSerializer]
 public record class CallGraph(List<GraphNode> GrainIds, List<HostNode> HostIds, List<GraphEdge> Edges, int MaxEdgeValue, int MaxActivationCount);
 
+[GenerateSerializer]
 public record struct HostNode(string Name, int ActivationCount);
+
+[GenerateSerializer]
 public record struct GraphNode(string Name, string Key, int Host, double Weight);
+
+[GenerateSerializer]
 public record struct Key(int Source, int Target);
+
+[GenerateSerializer]
 public record struct GraphEdge(int Source, int Target, double Weight);

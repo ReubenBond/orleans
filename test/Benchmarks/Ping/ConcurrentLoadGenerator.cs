@@ -99,7 +99,7 @@ public sealed class ConcurrentLoadGenerator<TState>
                 blocks.Add(block);
             }
 
-            if (this._logIntermediateResults && blocks.Count >= nextReportBlockCount)
+if (this._logIntermediateResults && blocks.Count >= nextReportBlockCount)
             {
                 nextReportBlockCount += blocksPerReport;
                 Console.WriteLine("    " + PrintReport(0));

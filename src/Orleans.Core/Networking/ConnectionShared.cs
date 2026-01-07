@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using Orleans.Placement.Repartitioning;
 
@@ -13,7 +14,7 @@ namespace Orleans.Runtime.Messaging
         public MessageFactory MessageFactory { get; } = messageFactory;
         public IServiceProvider ServiceProvider { get; } = serviceProvider;
         public NetworkingTrace NetworkingTrace { get; } = networkingTrace;
-        public IMessageStatisticsSink MessageStatisticsSink { get; } = messageStatisticsSink;
+        public Action<Message>? MessageStatisticsSink { get; } = messageStatisticsSink.GetMessageObserver();
         public MessagingTrace MessagingTrace { get; } = messagingTrace;
     }
 }

@@ -44,6 +44,7 @@ namespace Orleans
 
         private readonly SharedCallbackData sharedCallbackData;
         private readonly PeriodicTimer callbackTimer;
+        private readonly ConcurrentDictionary<GrainId, SiloAddress> _grainMappingCache = new();
         private Task callbackTimerTask;
 
         public GrainAddress CurrentActivationAddress
@@ -248,7 +249,7 @@ namespace Orleans
             OrleansOutsideRuntimeClientEvent.Log.SendResponse(message);
             message.BodyObject = response;
 
-            MessageCenter.SendMessage(message);
+            MessageCenter.SendMessage(message, receiverCache: request);
         }
 
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource context, InvokeMethodOptions options)
@@ -271,6 +272,10 @@ namespace Orleans
                 // If the silo isn't be supplied, it will be filled in by the sender to be the gateway silo
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
             }
+            else if (_grainMappingCache.TryGetValue(targetGrainId, out var cachedSilo))
+            {
+                message.TargetSilo = cachedSilo;
+            }
 
             if (this.clientMessagingOptions.DropExpiredMessages && message.IsExpirableMessage())
             {
@@ -291,7 +296,7 @@ namespace Orleans
             }
 
             LogSendingMessage(logger, message);
-            MessageCenter.SendMessage(message);
+            MessageCenter.SendMessage(message, receiverCache: target);
         }
 
         public void ReceiveResponse(Message response)
@@ -339,10 +344,8 @@ namespace Orleans
             var found = callbacks.TryRemove(response.Id, out callbackData);
             if (found)
             {
-                // We need to import the RequestContext here as well.
-                // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
-                // RequestContextExtensions.Import(response.RequestContextData);
                 callbackData.DoCallback(response);
+                _grainMappingCache[response.SendingGrain] = response.SendingSilo;
             }
             else
             {

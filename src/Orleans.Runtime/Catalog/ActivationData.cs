@@ -14,6 +14,7 @@ using Orleans.Configuration;
 using Orleans.Core.Internal;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
+using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
@@ -38,7 +39,8 @@ internal sealed partial class ActivationData :
     IGrainCallCancellationExtension,
     ICallChainReentrantGrainContext,
     IAsyncDisposable,
-    IDisposable
+    IDisposable,
+    IMessageReceiver
 {
     private const string GrainAddressMigrationContextKey = "sys.addr";
     private readonly GrainTypeSharedContext _shared;
@@ -291,6 +293,10 @@ internal sealed partial class ActivationData :
         else if (_extras is { } components && components.TryGetValue(componentType, out var resultObj))
         {
             result = resultObj;
+        }
+else if (_shared.GetComponent(componentType) is { } sharedComponent)
+        {
+            result = sharedComponent;
         }
         else if (ActivationServices.GetService(componentType) is { } component)
         {
@@ -631,7 +637,7 @@ internal sealed partial class ActivationData :
         }
     }
 
-    public void AnalyzeWorkload(DateTime now, IMessageCenter messageCenter, MessageFactory messageFactory, SiloMessagingOptions options)
+    public void AnalyzeWorkload(DateTime now, MessageCenter messageCenter, MessageFactory messageFactory, SiloMessagingOptions options)
     {
         var slowRunningRequestDuration = options.RequestProcessingWarningTime;
         var longQueueTimeDuration = options.RequestQueueDelayWarningTime;
@@ -667,7 +673,7 @@ internal sealed partial class ActivationData :
                     }
 
                     var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, diagnostics);
-                    messageCenter.SendMessage(response);
+                    messageCenter.SendMessage(response, receiverCache: null);
                 }
             }
 
@@ -692,7 +698,7 @@ internal sealed partial class ActivationData :
                     };
 
                     var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, messageDiagnostics);
-                    messageCenter.SendMessage(response);
+                    messageCenter.SendMessage(response, receiverCache: null);
                 }
             }
 
@@ -716,7 +722,7 @@ internal sealed partial class ActivationData :
                     };
 
                     var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: false, isWaiting: true, messageDiagnostics);
-                    messageCenter.SendMessage(response);
+                    messageCenter.SendMessage(response, receiverCache: null);
                 }
 
                 queueLength++;
@@ -1349,24 +1355,24 @@ internal sealed partial class ActivationData :
 
     private void ReceiveResponse(Message message)
     {
-        lock (this)
+        var state = State;
+        if (state is ActivationState.Invalid)
         {
-            if (State == ActivationState.Invalid)
-            {
-                _shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveInvalidActivation(message, State);
+            _shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveInvalidActivation(message, State);
 
-                // Always process responses
-                _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
-                return;
-            }
-
-            MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
+            // Always process responses
             _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
+            return;
         }
+
+        MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
+        _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
     }
 
     private void ReceiveRequest(Message message)
     {
+        _shared.IncomingRequestObserver?.Invoke(message);
+
         var overloadException = CheckOverloaded();
         if (overloadException != null && !message.IsLocalOnly)
         {
@@ -1896,7 +1902,7 @@ internal sealed partial class ActivationData :
         return tracker.IsReentrantSectionActive(reentrancyId);
     }
 
-    ValueTask IGrainCallCancellationExtension.CancelRequestAsync(GrainId senderGrainId, CorrelationId messageId)
+ValueTask IGrainCallCancellationExtension.CancelRequestAsync(GrainId senderGrainId, CorrelationId messageId)
         => this.RunOrQueueTask(static state => state.self.CancelRequestAsyncCore(state.senderGrainId, state.messageId), (self: this, senderGrainId, messageId));
 
     private ValueTask CancelRequestAsyncCore(GrainId senderGrainId, CorrelationId messageId)
@@ -1989,6 +1995,15 @@ internal sealed partial class ActivationData :
     )]
     private static partial void LogErrorCancellationCallbackFailed(ILogger logger, Exception exception);
 
+    public void ReceiveMessage(Message message, IMessageReceiverCache cache)
+    {
+        if (!IsValid)
+        {
+            cache.MessageReceiver = null;
+        }
+
+        ReceiveMessage(message);
+    }
     #endregion
 
     /// <summary>
