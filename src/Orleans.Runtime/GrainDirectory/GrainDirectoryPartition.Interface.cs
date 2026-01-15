@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -10,7 +11,7 @@ namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed partial class GrainDirectoryPartition
 {
-    async ValueTask<DirectoryResult<GrainAddress>> IGrainDirectoryPartition.RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration)
+    async ValueTask<DirectoryResult<GrainAddress>> IGrainDirectoryPartition.RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(address);
         LogRegisterAsync(version, address, currentRegistration);
@@ -26,7 +27,7 @@ internal sealed partial class GrainDirectoryPartition
         return DirectoryResult.FromResult(RegisterCore(address, currentRegistration), version);
     }
 
-    async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryPartition.LookupAsync(MembershipVersion version, GrainId grainId)
+    async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryPartition.LookupAsync(MembershipVersion version, GrainId grainId, CancellationToken cancellationToken)
     {
         LogLookupAsync(version, grainId);
 
@@ -40,7 +41,7 @@ internal sealed partial class GrainDirectoryPartition
         return DirectoryResult.FromResult(LookupCore(grainId), version);
     }
 
-    async ValueTask<DirectoryResult<bool>> IGrainDirectoryPartition.DeregisterAsync(MembershipVersion version, GrainAddress address)
+    async ValueTask<DirectoryResult<bool>> IGrainDirectoryPartition.DeregisterAsync(MembershipVersion version, GrainAddress address, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(address);
         LogDeregisterAsync(version, address);

@@ -433,7 +433,7 @@ public sealed class GrainDirectoryMigrationTests(ITestOutputHelper output) : IAs
                 {
                     var replica = client.GetSystemTarget<IGrainDirectoryTestHooks>(
                         GrainDirectoryPartition.CreateGrainId(address, partitionIndex).GrainId);
-                    await replica.CheckIntegrityAsync();
+                    await replica.CheckIntegrityAsync(CancellationToken.None);
                 }
                 catch (Exception ex)
                 {

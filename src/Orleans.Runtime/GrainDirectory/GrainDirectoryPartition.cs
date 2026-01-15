@@ -83,7 +83,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         return CurrentView;
     }
 
-    async ValueTask<GrainDirectoryPartitionSnapshot?> IGrainDirectoryPartition.GetSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range)
+    async ValueTask<GrainDirectoryPartitionSnapshot?> IGrainDirectoryPartition.GetSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range, CancellationToken cancellationToken)
     {
         LogTraceGetSnapshotAsync(_logger, version, rangeVersion, range);
 
@@ -118,7 +118,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         return null;
     }
 
-    ValueTask<bool> IGrainDirectoryPartition.AcknowledgeSnapshotTransferAsync(SiloAddress silo, int partitionIndex, MembershipVersion rangeVersion)
+    ValueTask<bool> IGrainDirectoryPartition.AcknowledgeSnapshotTransferAsync(SiloAddress silo, int partitionIndex, MembershipVersion rangeVersion, CancellationToken cancellationToken)
     {
         RemoveSnapshotTransferPartner(
             (silo, partitionIndex, rangeVersion),
@@ -512,7 +512,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             var partition = GetPartitionReference(previousOwner, partitionIndex);
 
             // Alternatively, the previous owner could push the snapshot. The pull-based approach is used here because it is simpler.
-            var snapshot = await partition.GetSnapshotAsync(current.Version, previousVersion, addedRange).AsTask().WaitAsync(ShutdownToken);
+            var snapshot = await partition.GetSnapshotAsync(current.Version, previousVersion, addedRange, ShutdownToken).AsTask().WaitAsync(ShutdownToken);
 
             if (snapshot is null)
             {
@@ -523,7 +523,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             // The acknowledgement step lets the previous owner know that the snapshot has been received so that it can proceed.
             InvokeOnClusterMember(
                 previousOwner,
-                async () => await partition.AcknowledgeSnapshotTransferAsync(_id, _partitionIndex, previousVersion),
+                async () => await partition.AcknowledgeSnapshotTransferAsync(_id, _partitionIndex, previousVersion, ShutdownToken),
                 false,
                 nameof(IGrainDirectoryPartition.AcknowledgeSnapshotTransferAsync)).Ignore();
 
@@ -623,11 +623,11 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                     Immutable<List<GrainAddress>> result = default;
                     if (isValidation)
                     {
-                        result = await client.GetRegisteredActivations(version, range, isValidation: true);
+                        result = await client.GetRegisteredActivations(version, range, isValidation: true, ShutdownToken);
                     }
                     else
                     {
-                        result = await client.RecoverRegisteredActivations(version, range, _id, _partitionIndex);
+                        result = await client.RecoverRegisteredActivations(version, range, _id, _partitionIndex, ShutdownToken);
                     }
 
                     return result;
@@ -677,7 +677,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         return defaultValue;
     }
 
-    async ValueTask IGrainDirectoryTestHooks.CheckIntegrityAsync()
+    async ValueTask IGrainDirectoryTestHooks.CheckIntegrityAsync(CancellationToken cancellationToken)
     {
         GrainRuntime.CheckRuntimeContext(this);
         var current = CurrentView;

@@ -103,29 +103,55 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
     public async Task<GrainAddress?> Lookup(GrainId grainId) => await InvokeAsync(
         grainId,
-        static (partition, version, grainId, cancellationToken) => partition.LookupAsync(version, grainId),
+        static (partition, version, grainId, cancellationToken) => partition.LookupAsync(version, grainId, cancellationToken),
         grainId,
         CancellationToken.None);
 
+    public async Task<GrainAddress?> Lookup(GrainId grainId, CancellationToken cancellationToken) => await InvokeAsync(
+        grainId,
+        static (partition, version, grainId, cancellationToken) => partition.LookupAsync(version, grainId, cancellationToken),
+        grainId,
+        cancellationToken);
+
     public async Task<GrainAddress?> Register(GrainAddress address) => await InvokeAsync(
         address.GrainId,
-        static (partition, version, address, cancellationToken) => partition.RegisterAsync(version, address, null),
+        static (partition, version, address, cancellationToken) => partition.RegisterAsync(version, address, null, cancellationToken),
         address,
         CancellationToken.None);
+
+    public async Task<GrainAddress?> Register(GrainAddress address, CancellationToken cancellationToken) => await InvokeAsync(
+        address.GrainId,
+        static (partition, version, address, cancellationToken) => partition.RegisterAsync(version, address, null, cancellationToken),
+        address,
+        cancellationToken);
 
     public async Task Unregister(GrainAddress address) => await InvokeAsync(
         address.GrainId,
-        static (partition, version, address, cancellationToken) => partition.DeregisterAsync(version, address),
+        static (partition, version, address, cancellationToken) => partition.DeregisterAsync(version, address, cancellationToken),
         address,
         CancellationToken.None);
 
+    public async Task Unregister(GrainAddress address, CancellationToken cancellationToken) => await InvokeAsync(
+        address.GrainId,
+        static (partition, version, address, cancellationToken) => partition.DeregisterAsync(version, address, cancellationToken),
+        address,
+        cancellationToken);
+
     public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) => await InvokeAsync(
         address.GrainId,
-        static (partition, version, state, cancellationToken) => partition.RegisterAsync(version, state.Address, state.PreviousAddress),
+        static (partition, version, state, cancellationToken) => partition.RegisterAsync(version, state.Address, state.PreviousAddress, cancellationToken),
         (Address: address, PreviousAddress: previousAddress),
         CancellationToken.None);
 
+    public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress, CancellationToken cancellationToken) => await InvokeAsync(
+        address.GrainId,
+        static (partition, version, state, cancellationToken) => partition.RegisterAsync(version, state.Address, state.PreviousAddress, cancellationToken),
+        (Address: address, PreviousAddress: previousAddress),
+        cancellationToken);
+
     public Task UnregisterSilos(List<SiloAddress> siloAddresses) => Task.CompletedTask;
+
+    public Task UnregisterSilos(List<SiloAddress> siloAddresses, CancellationToken cancellationToken) => Task.CompletedTask;
 
     private async Task<TResult> InvokeAsync<TState, TResult>(
         GrainId grainId,
@@ -198,17 +224,17 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         }
     }
 
-    public async ValueTask<Immutable<List<GrainAddress>>> RecoverRegisteredActivations(MembershipVersion membershipVersion, RingRange range, SiloAddress siloAddress, int partitionIndex)
+    public async ValueTask<Immutable<List<GrainAddress>>> RecoverRegisteredActivations(MembershipVersion membershipVersion, RingRange range, SiloAddress siloAddress, int partitionIndex, CancellationToken cancellationToken)
     {
         foreach (var partition in _partitions)
         {
             partition.OnRecoveringPartition(membershipVersion, range, siloAddress, partitionIndex).Ignore();
         }
 
-        return await GetRegisteredActivations(membershipVersion, range, false);
+        return await GetRegisteredActivations(membershipVersion, range, false, cancellationToken);
     }
 
-    public async ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRange range, bool isValidation)
+    public async ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRange range, bool isValidation, CancellationToken cancellationToken)
     {
         if (!isValidation)
         {
@@ -408,7 +434,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         var view = _membershipService.CurrentView;
         if (view.TryGetOwner(grainId, out var owner, out var partitionReference) && Silo.Equals(owner))
         {
-            var result = await partitionReference.LookupAsync(view.Version, grainId);
+            var result = await partitionReference.LookupAsync(view.Version, grainId, CancellationToken.None);
             if (result.TryGetResult(view.Version, out var address))
             {
                 return address;

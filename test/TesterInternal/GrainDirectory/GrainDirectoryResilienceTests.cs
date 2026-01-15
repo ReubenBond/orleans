@@ -101,7 +101,7 @@ public sealed class GrainDirectoryResilienceTests
                             for (var partitionIndex = 0; partitionIndex < DirectoryMembershipSnapshot.PartitionsPerSilo; partitionIndex++)
                             {
                                 var replica = ((IInternalGrainFactory)client).GetSystemTarget<IGrainDirectoryTestHooks>(GrainDirectoryPartition.CreateGrainId(address, partitionIndex).GrainId);
-                                integrityChecks.Add(replica.CheckIntegrityAsync().AsTask());
+                                integrityChecks.Add(replica.CheckIntegrityAsync(CancellationToken.None).AsTask());
                             }
                         }
 
