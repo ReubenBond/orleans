@@ -10,7 +10,7 @@ using Orleans.Runtime.GrainDirectory;
 
 namespace Orleans.Runtime
 {
-    internal sealed partial class Catalog : SystemTarget, ICatalog, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed partial class Catalog : SystemTarget, ICatalog, ILifecycleParticipant<ISiloLifecycle>, ISiloStatusListener
     {
         private readonly SiloAddress _siloAddress;
         private readonly ActivationCollector activationCollector;
@@ -302,6 +302,14 @@ namespace Orleans.Runtime
             });
         }
 
+        void ISiloStatusListener.SiloStatusChangeNotification(SiloAddress updatedSilo, SiloStatus status)
+        {
+            if (status == SiloStatus.Dead)
+            {
+                this.RuntimeClient.BreakOutstandingMessagesToSilo(updatedSilo);
+            }
+        }
+
         // TODO move this logic in the LocalGrainDirectory
         internal void OnSiloStatusChange(ILocalGrainDirectory directory, SiloAddress updatedSilo, SiloStatus status)
         {
@@ -313,10 +321,6 @@ namespace Orleans.Runtime
             // thus it will only deliver a "remove" notification for a given silo once to us. Therefore, we need to react the fist time we are notified.
             // We may review the directory behavior in the future and treat ShuttingDown differently ("drain only") and then this code will have to change a well.
             if (!status.IsTerminating()) return;
-            if (status == SiloStatus.Dead)
-            {
-                this.RuntimeClient.BreakOutstandingMessagesToSilo(updatedSilo);
-            }
 
             var activationsToShutdown = new List<IGrainContext>();
             try
@@ -374,6 +378,7 @@ namespace Orleans.Runtime
         {
             // Do nothing, just ensure that this instance is created so that it can register itself in the activation directory.
             _siloStatusOracle = serviceProvider.GetRequiredService<ISiloStatusOracle>();
+            _siloStatusOracle.SubscribeToSiloStatusEvents(this);
         }
 
         private readonly struct SiloAddressLogValue(SiloAddress silo)
@@ -430,6 +435,5 @@ namespace Orleans.Runtime
             Message = "Failed to unregister non-existent activation {Address}"
         )]
         private partial void LogFailedToUnregisterNonExistingActivation(GrainAddress address, Exception exception);
-
     }
 }
