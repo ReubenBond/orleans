@@ -10,7 +10,7 @@ namespace Orleans.Configuration.Internal
     /// used when registering a service via <see cref="ServiceCollectionExtensions.AddFromExisting"/>.
     /// This allows service registrations to be identified and removed later based on their implementation type.
     /// </summary>
-    public sealed class TaggedServiceDescriptor : ServiceDescriptor
+    internal sealed class TaggedServiceDescriptor : ServiceDescriptor
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="TaggedServiceDescriptor"/> class.
