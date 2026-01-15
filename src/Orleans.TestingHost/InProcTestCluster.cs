@@ -89,6 +89,13 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         InProcessTestClusterOptions options,
         ITestClusterPortAllocator portAllocator)
     {
+        if (options.UseTestClusterGrainDirectory && !options.UseTestClusterMembership)
+        {
+            throw new ArgumentException(
+                $"{nameof(options.UseTestClusterGrainDirectory)} requires {nameof(options.UseTestClusterMembership)} to be enabled.",
+                nameof(options));
+        }
+
         Options = options;
         PortAllocator = portAllocator;
         _membershipTable = new(options.ClusterId);
@@ -624,6 +631,10 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 if (Options.UseTestClusterMembership)
                 {
                     siloBuilder.Services.AddSingleton<IMembershipTable>(_membershipTable);
+                }
+
+                if (Options.UseTestClusterMembership && Options.UseTestClusterGrainDirectory)
+                {
                     siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (_, _) => _grainDirectory);
                 }
 

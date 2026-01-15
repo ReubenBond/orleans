@@ -115,6 +115,10 @@ public sealed class GrainDirectoryMigrationTests(ITestOutputHelper output) : IAs
     {
         // Start with OLD silos using legacy LocalGrainDirectory (default)
         var builder = new InProcessTestClusterBuilder(2);
+
+        // Disable the shared in-memory grain directory so each silo uses its own grain directory
+        builder.Options.UseTestClusterGrainDirectory = false;
+
         builder.ConfigureSilo((options, siloBuilder) =>
         {
             siloBuilder.Configure<SiloMessagingOptions>(o =>
