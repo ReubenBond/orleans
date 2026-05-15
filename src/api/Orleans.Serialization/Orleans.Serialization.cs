@@ -1292,9 +1292,11 @@ namespace Orleans.Serialization.Cloning
             where T : class { throw null; }
     }
 
-    public sealed partial class CopyContextPool
+    public sealed partial class CopyContextPool : System.IDisposable
     {
         public CopyContextPool(Serializers.CodecProvider codecProvider) { }
+
+        public void Dispose() { }
 
         public CopyContext GetContext() { throw null; }
     }
@@ -3817,11 +3819,13 @@ namespace Orleans.Serialization.Session
         public void Reset() { }
     }
 
-    public sealed partial class SerializerSessionPool
+    public sealed partial class SerializerSessionPool : System.IDisposable
     {
         public SerializerSessionPool(TypeSystem.TypeCodec typeCodec, WellKnownTypeCollection wellKnownTypes, Serializers.CodecProvider codecProvider) { }
 
         public Serializers.CodecProvider CodecProvider { get { throw null; } }
+
+        public void Dispose() { }
 
         public SerializerSession GetSession() { throw null; }
     }
