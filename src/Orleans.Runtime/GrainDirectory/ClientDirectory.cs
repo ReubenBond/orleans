@@ -522,7 +522,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     {
         lifecycle.Subscribe(
             nameof(ClientDirectory),
-            ServiceLifecycleStage.RuntimeGrainServices,
+            ServiceLifecycleStage.BecomeActive,
             ct =>
             {
                 this.RunOrQueueTask(() => _runTask = this.Run()).Ignore();
