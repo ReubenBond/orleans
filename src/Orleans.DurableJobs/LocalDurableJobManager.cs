@@ -81,6 +81,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             LogSchedulingJob(_logger, request.JobName, request.Target, request.DueTime);
 
             var shardKey = GetWritableShardKey(request);
+            DurableJobsInstruments.OnStripeAssigned(shardKey.Stripe);
 
             while (true)
             {

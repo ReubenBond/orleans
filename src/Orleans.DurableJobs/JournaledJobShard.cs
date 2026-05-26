@@ -256,6 +256,7 @@ internal sealed class JournaledJobShard : IJobShard
                         await LingerForMoreMutationsAsync(batch).ConfigureAwait(false);
                         DequeueConsecutiveMutations(batch);
                     }
+                    DurableJobsInstruments.OnShardPendingDepth(batch.Count);
                     await ProcessMutationBatchAsync(batch).ConfigureAwait(false);
                     batch.Clear();
                 }
@@ -355,7 +356,18 @@ internal sealed class JournaledJobShard : IJobShard
                 return;
             }
 
-            if (!await _shardManager.IsShardOwnedByLocalSiloAsync(Id, _shutdownCancellation.Token).ConfigureAwait(false))
+            var ownershipStartTimestamp = Stopwatch.GetTimestamp();
+            bool isOwned;
+            try
+            {
+                isOwned = await _shardManager.IsShardOwnedByLocalSiloAsync(Id, _shutdownCancellation.Token).ConfigureAwait(false);
+            }
+            finally
+            {
+                DurableJobsInstruments.OnOwnershipCheck(Stopwatch.GetElapsedTime(ownershipStartTimestamp));
+            }
+
+            if (!isOwned)
             {
                 foreach (var operation in startedOperations)
                 {
@@ -364,6 +376,8 @@ internal sealed class JournaledJobShard : IJobShard
 
                 return;
             }
+
+            var pendingBytesBeforeApply = _stateManager.PendingWriteByteCount;
 
             foreach (var operation in startedOperations)
             {
@@ -383,6 +397,13 @@ internal sealed class JournaledJobShard : IJobShard
             if (appliedOperations.Count == 0)
             {
                 return;
+            }
+
+            var pendingBytesAfterApply = _stateManager.PendingWriteByteCount;
+            DurableJobsInstruments.OnShardBatch(appliedOperations.Count);
+            if (pendingBytesBeforeApply >= 0 && pendingBytesAfterApply >= pendingBytesBeforeApply)
+            {
+                DurableJobsInstruments.OnShardBatchBytes(pendingBytesAfterApply - pendingBytesBeforeApply);
             }
 
             try
