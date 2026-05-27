@@ -41,14 +41,16 @@ public static class DurableJobsExtensions
         services.AddSingleton<LocalDurableJobManager>();
         services.AddFromExisting<ILocalDurableJobManager, LocalDurableJobManager>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalDurableJobManager>();
+        services.AddSingleton(sp => new DurableJobReceiverExtensionShared(
+            sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>(),
+            sp.GetRequiredService<IOptions<DurableJobsOptions>>(),
+            sp.GetService<TimeProvider>()));
         services.AddKeyedTransient<IGrainExtension>(typeof(IDurableJobReceiverExtension), (sp, _) =>
         {
             var grainContextAccessor = sp.GetRequiredService<IGrainContextAccessor>();
             return new DurableJobReceiverExtension(
                 grainContextAccessor.GrainContext,
-                sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>(),
-                sp.GetService<TimeProvider>() ?? TimeProvider.System,
-                sp.GetRequiredService<IOptions<DurableJobsOptions>>());
+                sp.GetRequiredService<DurableJobReceiverExtensionShared>());
         });
     }
 

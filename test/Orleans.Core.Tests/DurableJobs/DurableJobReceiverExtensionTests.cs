@@ -113,11 +113,11 @@ public class DurableJobReceiverExtensionTests
         var grainContext = Substitute.For<IGrainContext>();
         grainContext.GrainInstance.Returns(handler);
         grainContext.GrainId.Returns(GrainId.Create("test", "grain-1"));
-        return new DurableJobReceiverExtension(
-            grainContext,
+        var shared = new DurableJobReceiverExtensionShared(
             NullLogger<DurableJobReceiverExtension>.Instance,
-            TimeProvider.System,
-            Options.Create(new DurableJobsOptions { JobStatusPollInterval = jobStatusPollInterval ?? TimeSpan.FromSeconds(1) }));
+            Options.Create(new DurableJobsOptions { JobStatusPollInterval = jobStatusPollInterval ?? TimeSpan.FromSeconds(1) }),
+            TimeProvider.System);
+        return new DurableJobReceiverExtension(grainContext, shared);
     }
 
     private static IJobRunContext CreateJobContext(string runId, string jobId = "job-1", int dequeueCount = 1)

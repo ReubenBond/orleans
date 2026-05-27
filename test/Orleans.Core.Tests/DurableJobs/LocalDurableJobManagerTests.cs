@@ -664,11 +664,11 @@ public class LocalDurableJobManagerTests
         var grainContext = Substitute.For<IGrainContext>();
         grainContext.GrainInstance.Returns(handler);
         grainContext.GrainId.Returns(GrainId.Create("test", "target"));
-        var extension = new DurableJobReceiverExtension(
-            grainContext,
+        var shared = new DurableJobReceiverExtensionShared(
             NullLogger<DurableJobReceiverExtension>.Instance,
-            timeProvider,
-            Options.Create(new DurableJobsOptions()));
+            Options.Create(new DurableJobsOptions()),
+            timeProvider);
+        var extension = new DurableJobReceiverExtension(grainContext, shared);
         var grainFactory = Substitute.For<IInternalGrainFactory>();
         grainFactory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
         return (grainFactory, handledJob, () => Volatile.Read(ref handleCount));
