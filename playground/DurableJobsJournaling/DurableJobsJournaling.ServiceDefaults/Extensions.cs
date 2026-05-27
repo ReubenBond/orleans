@@ -89,7 +89,8 @@ public static class Extensions
                     .AddView("orleans-journaling-storage-operation-bytes", CreateStorageOperationByteHistogramConfiguration())
                     .AddView("orleans-journaling-azure-blob-operation-duration", CreateLatencyHistogramConfiguration())
                     .AddView("orleans-durablejobs-storage-batch-size", CreateBatchSizeHistogramConfiguration());
-            })
+            });
+        /*
             .WithTracing(tracing =>
             {
                 if (builder.Environment.IsDevelopment())
@@ -113,6 +114,7 @@ public static class Extensions
                     })
                     .AddHttpClientInstrumentation();
             });
+        */
 
         builder.AddOpenTelemetryExporters();
 
