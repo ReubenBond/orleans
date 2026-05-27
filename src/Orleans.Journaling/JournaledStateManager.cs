@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
+using Orleans.Diagnostics;
 using Orleans.Serialization.Buffers;
 using Orleans.Runtime.Internal;
 using Orleans.Storage;
@@ -196,6 +197,19 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                         ? default
                         : _shared.TimeProvider.GetElapsedTime(workItem.EnqueuedTimestamp, processingTimestamp);
                     var recordQueueDuration = workItem is DeleteStateWorkItem;
+                    Activity? storageActivity = queueOperation is null
+                        ? null
+                        : ActivitySources.StorageGrainSource.StartActivity(
+                            $"journal {queueOperation}",
+                            ActivityKind.Internal,
+                            workItem.TraceParent,
+                            tags: null,
+                            links: workItem.TraceLinks);
+                    if (storageActivity is not null)
+                    {
+                        storageActivity.SetTag(ActivityTagKeys.JournalStorageOperation, queueOperation);
+                    }
+
                     try
                     {
                         // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
@@ -460,6 +474,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             JournalingInstruments.OnStorageOperationQueued(queueOperation, queueDuration, succeeded: true);
                         }
 
+                        storageActivity?.SetStatus(ActivityStatusCode.Ok);
                         workItem.SetResult();
                     }
                     catch (Exception exception)
@@ -469,11 +484,27 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             JournalingInstruments.OnStorageOperationQueued(queueOperation, queueDuration, succeeded: false);
                         }
 
+                        if (storageActivity is not null)
+                        {
+                            storageActivity.SetStatus(ActivityStatusCode.Error, exception.Message);
+                            if (storageActivity.IsAllDataRequested)
+                            {
+                                storageActivity.SetTag(ActivityTagKeys.ExceptionType, exception.GetType().FullName);
+                                storageActivity.SetTag(ActivityTagKeys.ExceptionMessage, exception.Message);
+                                storageActivity.SetTag(ActivityTagKeys.ExceptionStacktrace, exception.ToString());
+                                storageActivity.SetTag(ActivityTagKeys.ExceptionEscaped, true);
+                            }
+                        }
+
                         workItem.SetException(exception);
                         if (IsRecoverySignal(exception))
                         {
                             needsRecovery = true;
                         }
+                    }
+                    finally
+                    {
+                        storageActivity?.Dispose();
                     }
                 }
             }
@@ -853,12 +884,14 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                 continue;
             }
 
+            workItem.RecordTraceContext();
             didEnqueue = false;
             return workItem.Task;
         }
 
         var newWorkItem = new TWorkItem();
         newWorkItem.EnqueuedTimestamp = _shared.TimeProvider.GetTimestamp();
+        newWorkItem.RecordTraceContext();
         _workQueue.Enqueue(newWorkItem);
         didEnqueue = true;
         return newWorkItem.Task;
@@ -923,7 +956,13 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     private abstract class WorkItem : TaskCompletionSource
     {
+        private List<ActivityLink>? _links;
+
         public long EnqueuedTimestamp { get; set; }
+
+        public ActivityContext TraceParent { get; private set; }
+
+        public IReadOnlyList<ActivityLink>? TraceLinks => _links;
 
         protected WorkItem() : base(TaskCreationOptions.RunContinuationsAsynchronously)
         {
@@ -933,6 +972,48 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         {
         }
 
+        public void RecordTraceContext()
+        {
+            var current = Activity.Current;
+            if (current is null || current.IdFormat != ActivityIdFormat.W3C)
+            {
+                return;
+            }
+
+            var context = current.Context;
+            if (TraceParent == default)
+            {
+                TraceParent = context;
+                return;
+            }
+
+            if (context == TraceParent)
+            {
+                return;
+            }
+
+            const int MaxLinks = 64;
+            if (_links is null)
+            {
+                _links = new List<ActivityLink>();
+            }
+            else if (_links.Count >= MaxLinks)
+            {
+                return;
+            }
+            else
+            {
+                for (var i = 0; i < _links.Count; i++)
+                {
+                    if (_links[i].Context == context)
+                    {
+                        return;
+                    }
+                }
+            }
+
+            _links.Add(new ActivityLink(context));
+        }
     }
 
     private static string? GetStorageQueueOperation(WorkItem workItem) =>

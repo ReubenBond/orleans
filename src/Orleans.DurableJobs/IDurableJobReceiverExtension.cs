@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -82,10 +83,12 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
     {
         var startTimestamp = _timeProvider.GetTimestamp();
         DurableJobsInstruments.OnHandlerExecutionStarted();
+        using var activity = DurableJobsDiagnostics.StartHandlerActivity(context.Job, context.DequeueCount, context.RunId);
         try
         {
             await handler.ExecuteJobAsync(context, cancellationToken);
             DurableJobsInstruments.OnHandlerExecutionCompleted(_timeProvider.GetElapsedTime(startTimestamp));
+            activity?.SetStatus(ActivityStatusCode.Ok);
             return DurableJobRunResult.Completed;
         }
         catch (OperationCanceledException)
@@ -96,6 +99,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         catch (Exception exception)
         {
             DurableJobsInstruments.OnHandlerExecutionFailed(_timeProvider.GetElapsedTime(startTimestamp));
+            DurableJobsDiagnostics.SetError(activity, exception);
             LogErrorExecutingDurableJob(exception, context.Job.Id, _grain.GrainId);
             return DurableJobRunResult.Failed(exception);
         }
