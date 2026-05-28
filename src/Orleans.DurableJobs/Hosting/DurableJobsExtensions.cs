@@ -9,6 +9,7 @@ using Orleans.Runtime;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
+using Orleans.Configuration;
 
 namespace Orleans.Hosting;
 
@@ -44,6 +45,7 @@ public static class DurableJobsExtensions
         services.AddSingleton(sp => new DurableJobReceiverExtensionShared(
             sp.GetRequiredService<ILogger<DurableJobReceiverExtension>>(),
             sp.GetRequiredService<IOptions<DurableJobsOptions>>(),
+            sp.GetRequiredService<IOptions<SiloMessagingOptions>>(),
             sp.GetService<TimeProvider>()));
         services.AddKeyedTransient<IGrainExtension>(typeof(IDurableJobReceiverExtension), (sp, _) =>
         {

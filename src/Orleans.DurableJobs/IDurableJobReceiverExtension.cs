@@ -59,7 +59,7 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
 
         Debug.Assert(stateRef is not null);
         state = stateRef;
-        return GetJobStatus(key, context, state);
+        return GetJobStatusAsync(key, context, state, newJob: !exists);
     }
 
     private Task<DurableJobRunResult> StartJob(IJobRunContext context, CancellationToken cancellationToken)
@@ -96,11 +96,18 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         }
     }
 
-    private ValueTask<DurableJobRunResult> GetJobStatus((string JobId, int DequeueCount) key, IJobRunContext context, JobAttemptState state)
+    private ValueTask<DurableJobRunResult> GetJobStatusAsync((string JobId, int DequeueCount) key, IJobRunContext context, JobAttemptState state, bool newJob)
     {
         // Cancellation is cooperative: only terminal task state is authoritative for job outcome.
         if (!state.Task.IsCompleted)
         {
+            if (newJob)
+            {
+                // For the first attempt, to reduce RPC, we wait for the polling interval or half the response timeout for the task to complete.
+                // This saves a back-and-forth for the common case where a job completes quickly.
+                return LongPollGetJobStatusAsync(key, context, state);
+            }
+
             return new(DurableJobRunResult.PollAfter(_shared.Options.JobStatusPollInterval));
         }
 
@@ -119,6 +126,33 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
         }
 
         return ValueTask.FromCanceled<DurableJobRunResult>(new CancellationToken(canceled: true));
+
+        async ValueTask<DurableJobRunResult> LongPollGetJobStatusAsync((string JobId, int DequeueCount) key, IJobRunContext context, JobAttemptState state)
+        {
+            if (!state.Task.IsCompleted)
+            {
+                using var cts = new CancellationTokenSource();
+                var longPollDuration = TimeSpan.FromTicks(Math.Min(_shared.MessagingOptions.ResponseTimeout.Divide(2).Ticks, _shared.Options.JobStatusPollInterval.Ticks));
+                await Task.WhenAny(Task.Delay(longPollDuration, cts.Token), state.Task);
+
+                if (!state.Task.IsCompleted)
+                {
+                    return DurableJobRunResult.PollAfter(_shared.Options.JobStatusPollInterval);
+                }
+            }
+
+            RecordCompletedJobAttempt(key, state);
+
+            if (state.Task.IsFaulted)
+            {
+                var ex = state.Task.Exception!.InnerException ?? state.Task.Exception;
+                LogErrorExecutingDurableJob(_shared.Logger, ex, context.Job.Id, _grain.GrainId);
+                return DurableJobRunResult.Failed(ex);
+            }
+
+            // Completed successfully or canceled.
+            return await state.Task;
+        }
     }
 
     private void RecordCompletedJobAttempt((string JobId, int DequeueCount) key, JobAttemptState state)

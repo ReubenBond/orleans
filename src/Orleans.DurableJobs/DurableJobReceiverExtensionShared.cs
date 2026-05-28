@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Hosting;
 
 namespace Orleans.DurableJobs;
@@ -15,12 +16,14 @@ internal sealed class DurableJobReceiverExtensionShared
     public DurableJobReceiverExtensionShared(
         ILogger<DurableJobReceiverExtension> logger,
         IOptions<DurableJobsOptions> options,
+        IOptions<SiloMessagingOptions> messagingOptions,
         TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(options);
 
         Logger = logger;
+        MessagingOptions = messagingOptions.Value;
         Options = options.Value;
         TimeProvider = timeProvider ?? TimeProvider.System;
     }
@@ -29,6 +32,8 @@ internal sealed class DurableJobReceiverExtensionShared
     /// Gets the logger used by every <see cref="DurableJobReceiverExtension"/> instance on the silo.
     /// </summary>
     public ILogger<DurableJobReceiverExtension> Logger { get; }
+
+    public SiloMessagingOptions MessagingOptions { get; }
 
     /// <summary>
     /// Gets the time provider used by every <see cref="DurableJobReceiverExtension"/> instance on the silo.

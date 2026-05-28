@@ -667,6 +667,7 @@ public class LocalDurableJobManagerTests
         var shared = new DurableJobReceiverExtensionShared(
             NullLogger<DurableJobReceiverExtension>.Instance,
             Options.Create(new DurableJobsOptions()),
+            Options.Create(new SiloMessagingOptions()),
             timeProvider);
         var extension = new DurableJobReceiverExtension(grainContext, shared);
         var grainFactory = Substitute.For<IInternalGrainFactory>();

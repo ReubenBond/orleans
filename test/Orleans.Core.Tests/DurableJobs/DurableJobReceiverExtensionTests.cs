@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
+using Orleans.Configuration;
 using Orleans.DurableJobs;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -116,6 +117,7 @@ public class DurableJobReceiverExtensionTests
         var shared = new DurableJobReceiverExtensionShared(
             NullLogger<DurableJobReceiverExtension>.Instance,
             Options.Create(new DurableJobsOptions { JobStatusPollInterval = jobStatusPollInterval ?? TimeSpan.FromSeconds(1) }),
+            Options.Create(new SiloMessagingOptions()),
             TimeProvider.System);
         return new DurableJobReceiverExtension(grainContext, shared);
     }
