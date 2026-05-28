@@ -1,11 +1,6 @@
 using Azure.Storage.Blobs;
-using DurableJobsJournaling.Abstractions;
 using DurableJobsJournaling.Silo;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
 using Orleans.Dashboard;
-using Orleans.Hosting;
 using Orleans.Journaling;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,6 +16,7 @@ builder.UseOrleans(siloBuilder =>
 {
 #pragma warning disable ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
     siloBuilder
+        .AddDashboard()
         .AddActivityPropagation()
         .AddIncomingGrainCallFilter<GrainRequestMetricsFilter>()
         .AddDistributedGrainDirectory()
@@ -36,7 +32,7 @@ builder.UseOrleans(siloBuilder =>
         {
             options.ShardDuration = TimeSpan.FromMinutes(2);
             options.ShardActivationBufferPeriod = TimeSpan.FromSeconds(30);
-            options.ShardStripeCount = 1;
+            options.ShardStripeCount = 2;
             options.JobStatusPollInterval = TimeSpan.FromMilliseconds(100);
             options.MaxConcurrentJobsPerSilo = 8196;
             options.ConcurrencySlowStartEnabled = true;
@@ -57,5 +53,6 @@ builder.Services.AddOptions<AzureBlobJournalStorageOptions>()
 
 var app = builder.Build();
 app.MapDefaultEndpoints();
+app.MapOrleansDashboard();
 
 await app.RunAsync();
