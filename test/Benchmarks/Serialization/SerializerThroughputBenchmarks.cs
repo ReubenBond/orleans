@@ -4,6 +4,7 @@ using Benchmarks.Serialization.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
+using System.Diagnostics;
 
 namespace Benchmarks.Serialization;
 
@@ -70,6 +71,41 @@ public class SerializerThroughputBenchmarks
 
     [Benchmark]
     public SerializerBenchmarkPayload DeepCopy() => _copier.Copy(_value);
+
+    public static void Profile(string operation, TimeSpan duration)
+    {
+        var benchmark = new SerializerThroughputBenchmarks { ItemCount = 256 };
+        benchmark.Setup();
+
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+            long operations = 0;
+            long checksum = 0;
+            while (stopwatch.Elapsed < duration)
+            {
+                for (var i = 0; i < 1_024; i++)
+                {
+                    checksum += operation switch
+                    {
+                        "serialize" => benchmark.SerializeWithSession(),
+                        "deserialize" => benchmark.DeserializeWithSession().Items.Length,
+                        "roundtrip" => benchmark.RoundTripWithSession().Items.Length,
+                        "copy" => benchmark.DeepCopy().Items.Length,
+                        _ => throw new ArgumentException($"Unknown serializer profile operation: {operation}", nameof(operation)),
+                    };
+                }
+
+                operations += 1_024;
+            }
+
+            Console.WriteLine($"{operation}: {operations:N0} operations in {stopwatch.Elapsed.TotalSeconds:F2}s; checksum={checksum}");
+        }
+        finally
+        {
+            benchmark.Cleanup();
+        }
+    }
 
     private static SerializerBenchmarkPayload CreatePayload(int itemCount)
     {

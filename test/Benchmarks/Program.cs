@@ -341,6 +341,11 @@ internal class Program
         {
             _ = BenchmarkRunner.Run<SerializerThroughputBenchmarks>(args: args);
         },
+        ["Serializer.Profile"] = args =>
+        {
+            var operation = args.FirstOrDefault()?.ToLowerInvariant() ?? "serialize";
+            SerializerThroughputBenchmarks.Profile(operation, TimeSpan.FromSeconds(15));
+        },
         ["suite"] = args =>
         {
             _ = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);

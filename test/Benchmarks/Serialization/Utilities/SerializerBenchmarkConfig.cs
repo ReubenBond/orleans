@@ -20,12 +20,15 @@ internal sealed class SerializerBenchmarkConfig : ManualConfig
             printSource: true,
             exportGithubMarkdown: true,
             exportCombinedDisassemblyReport: true)));
-        AddHardwareCounters(
-            HardwareCounter.BranchInstructions,
-            HardwareCounter.BranchMispredictions,
-            HardwareCounter.CacheMisses,
-            HardwareCounter.InstructionRetired,
-            HardwareCounter.TotalCycles);
+        if (string.Equals(Environment.GetEnvironmentVariable("ORLEANS_BENCHMARK_HARDWARE_COUNTERS"), "1", StringComparison.Ordinal))
+        {
+            AddHardwareCounters(
+                HardwareCounter.BranchInstructions,
+                HardwareCounter.BranchMispredictions,
+                HardwareCounter.CacheMisses,
+                HardwareCounter.InstructionRetired,
+                HardwareCounter.TotalCycles);
+        }
         AddJob(Job.ShortRun
             .WithRuntime(CoreRuntime.Core10_0)
             .WithId(".NET 10"));

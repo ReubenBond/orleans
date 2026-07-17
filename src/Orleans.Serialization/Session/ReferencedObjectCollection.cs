@@ -18,6 +18,8 @@ namespace Orleans.Serialization.Session
     /// </summary>
     public sealed class ReferencedObjectCollection
     {
+        private const int MaxRetainedOverflowCapacity = 1_024;
+
         private struct ReferencePair
         {
             public ReferencePair(uint id, object @object)
@@ -312,8 +314,25 @@ namespace Orleans.Serialization.Session
             _objectToReferenceCount = 0;
             CurrentReferenceId = 0;
 
-            _referenceToObjectOverflow = null;
-            _objectToReferenceOverflow = null;
+            ResetOverflow(ref _referenceToObjectOverflow);
+            ResetOverflow(ref _objectToReferenceOverflow);
+        }
+
+        private static void ResetOverflow<TKey, TValue>(ref Dictionary<TKey, TValue> overflow)
+        {
+            if (overflow is null)
+            {
+                return;
+            }
+
+            if (overflow.EnsureCapacity(0) <= MaxRetainedOverflowCapacity)
+            {
+                overflow.Clear();
+            }
+            else
+            {
+                overflow = null;
+            }
         }
     }
 }
