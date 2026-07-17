@@ -288,13 +288,29 @@ namespace Orleans.Serialization.Session
         /// Copies the reference table.
         /// </summary>
         /// <returns>A copy of the reference table.</returns>
-        public Dictionary<uint, object> CopyReferenceTable() => _referenceToObject.Take(ReferenceToObjectCount).ToDictionary(r => r.Id, r => r.Object);
+        public Dictionary<uint, object> CopyReferenceTable()
+        {
+            if (_referenceToObjectOverflow is { } overflow)
+            {
+                return new(overflow);
+            }
+
+            return _referenceToObject.Take(ReferenceToObjectCount).ToDictionary(r => r.Id, r => r.Object);
+        }
 
         /// <summary>
         /// Copies the identifier table.
         /// </summary>
         /// <returns>A copy of the identifier table.</returns>
-        public Dictionary<object, uint> CopyIdTable() => _objectToReference.Take(_objectToReferenceCount).ToDictionary(r => r.Object, r => r.Id);
+        public Dictionary<object, uint> CopyIdTable()
+        {
+            if (_objectToReferenceOverflow is { } overflow)
+            {
+                return new(overflow, ReferenceEqualsComparer.Default);
+            }
+
+            return _objectToReference.Take(_objectToReferenceCount).ToDictionary(r => r.Object, r => r.Id, ReferenceEqualsComparer.Default);
+        }
 
         /// <summary>
         /// Gets or sets the current reference identifier.

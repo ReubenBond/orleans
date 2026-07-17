@@ -26,8 +26,33 @@ public sealed class ReferencedObjectCollectionTests
 
         Assert.True(allAdded);
         Assert.Equal(0, allocated);
+        var idTable = references.CopyIdTable();
+        Assert.Equal(values.Length, idTable.Count);
+        Assert.Equal(129U, idTable[values[128]]);
         Assert.True(references.GetOrAddReference(values[128], out var reference));
         Assert.Equal(129U, reference);
+    }
+
+    [Fact]
+    public void CopyReferenceTableIncludesReusedOverflowStorage()
+    {
+        var references = new ReferencedObjectCollection();
+        var values = new object[256];
+        for (var i = 0; i < values.Length; i++)
+        {
+            values[i] = new object();
+            references.RecordReferenceField(values[i]);
+        }
+
+        references.Reset();
+        for (var i = 0; i < values.Length; i++)
+        {
+            references.RecordReferenceField(values[i]);
+        }
+
+        var referenceTable = references.CopyReferenceTable();
+        Assert.Equal(values.Length, referenceTable.Count);
+        Assert.Same(values[128], referenceTable[129]);
     }
 
     private static bool AddReferences(ReferencedObjectCollection references, object[] values)
