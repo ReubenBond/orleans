@@ -750,6 +750,34 @@ namespace Orleans.Serialization.UnitTests
         public override string ToString() => $"{nameof(_intField)}: {_intField}, {nameof(IntProperty)}: {IntProperty}";
     }
 
+#if NET8_0_OR_GREATER
+    public interface IExplicitSerializableValue
+    {
+        int Value { get; set; }
+    }
+
+    [GenerateSerializer]
+    [SuppressMessage("Usage", "ORLEANS0004:Add missing serialization attributes", Justification = "Value exposes the explicitly serialized property for assertions")]
+    public sealed class ExplicitSerializableValue : IExplicitSerializableValue
+    {
+        private int _value;
+
+        public ExplicitSerializableValue(int value)
+        {
+            _value = value;
+        }
+
+        [Id(0)]
+        int IExplicitSerializableValue.Value
+        {
+            get => _value;
+            set => _value = value;
+        }
+
+        public int Value => _value;
+    }
+#endif
+
     [GenerateSerializer]
     public struct ImmutableStruct
     {

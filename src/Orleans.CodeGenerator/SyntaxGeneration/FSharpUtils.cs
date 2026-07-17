@@ -224,6 +224,7 @@ internal static class FSharpUtilities
                     TypeSyntax,
                     _field.Name,
                     SetterFieldName,
+                    _field.Name,
                     _libraryTypes,
                     GeneratedAccessorKind.Delegate,
                     setter: true);
@@ -335,6 +336,7 @@ internal static class FSharpUtilities
                     TypeSyntax,
                     FieldName,
                     SetterFieldName,
+                    FieldName,
                     _libraryTypes,
                     GeneratedAccessorKind.Delegate,
                     setter: true);

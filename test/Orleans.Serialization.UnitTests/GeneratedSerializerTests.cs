@@ -375,6 +375,19 @@ public class GeneratedSerializerTests : IDisposable
         Assert.Equal(0, result.UnmarkedProperty);
     }
 
+#if NET8_0_OR_GREATER
+    [Fact]
+    public void GeneratedSerializersRoundTripAndCopyExplicitInterfaceProperty()
+    {
+        var original = new ExplicitSerializableValue(42);
+        var result = RoundTripThroughCodec(original);
+        var copy = _serviceProvider.GetRequiredService<DeepCopier<ExplicitSerializableValue>>().Copy(original);
+
+        Assert.Equal(original.Value, result.Value);
+        Assert.Equal(original.Value, copy.Value);
+    }
+#endif
+
     [Fact]
     public void GeneratedSerializersRoundTripThroughSerializer_ImmutableStruct()
     {

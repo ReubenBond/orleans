@@ -174,13 +174,6 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             : SingletonSeparatedList(receiver);
 
         var unsafeAccessorKind = accessor.Kind == GeneratedAccessorKind.Field ? "Field" : "Method";
-        var targetName = accessor.Kind switch
-        {
-            GeneratedAccessorKind.PropertyGetter => $"get_{accessor.FieldName}",
-            GeneratedAccessorKind.PropertySetter => $"set_{accessor.FieldName}",
-            _ => accessor.FieldName,
-        };
-
         return MethodDeclaration(returnType, accessor.AccessorName)
             .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ExternKeyword), Token(SyntaxKind.StaticKeyword))
             .AddAttributeLists(AttributeList(SingletonSeparatedList(
@@ -191,7 +184,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                                 SyntaxKind.SimpleMemberAccessExpression,
                                 IdentifierName("System.Runtime.CompilerServices.UnsafeAccessorKind"),
                                 IdentifierName(unsafeAccessorKind))),
-                        AttributeArgument(targetName.GetLiteralExpression())
+                        AttributeArgument(accessor.TargetName.GetLiteralExpression())
                             .WithNameEquals(NameEquals("Name"))))))
             .WithParameterList(ParameterList(parameters))
             .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
@@ -1103,12 +1096,14 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         TypeSyntax fieldType,
         string fieldName,
         string accessorName,
+        string targetName,
         bool containingTypeIsValueType,
         GeneratedAccessorKind kind,
         ExpressionSyntax? initializationSyntax = null) : GeneratedFieldDescription(fieldType, fieldName)
     {
         public override bool IsInjected => false;
         public readonly string AccessorName = accessorName;
+        public readonly string TargetName = targetName;
         public readonly TypeSyntax ContainingType = containingType;
         public readonly bool ContainingTypeIsValueType = containingTypeIsValueType;
         public readonly GeneratedAccessorKind Kind = kind;
@@ -1402,10 +1397,13 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         public FieldAccessorDescription? GetGetterFieldDescription()
         {
             if (IsGettableField || IsGettableProperty) return null;
-            var unsafeAccessorKind = CanUseUnsafeAccessor
+            var unsafeAccessorKind = CanUseUnsafeAccessor && (Field is not null || Property?.GetMethod is not null)
                 ? Field is not null ? GeneratedAccessorKind.Field : GeneratedAccessorKind.PropertyGetter
                 : GeneratedAccessorKind.Delegate;
-            return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, GetterFieldName, LibraryTypes, unsafeAccessorKind, setter: false);
+            var targetName = unsafeAccessorKind == GeneratedAccessorKind.PropertyGetter
+                ? Property!.GetMethod!.MetadataName
+                : MemberName;
+            return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, GetterFieldName, targetName, LibraryTypes, unsafeAccessorKind, setter: false);
         }
 
         public FieldAccessorDescription? GetSetterFieldDescription()
@@ -1416,10 +1414,13 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                 return null;
             }
 
-            var unsafeAccessorKind = CanUseUnsafeAccessor
+            var unsafeAccessorKind = CanUseUnsafeAccessor && (Field is not null || Property?.SetMethod is not null)
                 ? Field is not null ? GeneratedAccessorKind.Field : GeneratedAccessorKind.PropertySetter
                 : GeneratedAccessorKind.Delegate;
-            return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, SetterAccessorName, LibraryTypes, unsafeAccessorKind, setter: true);
+            var targetName = unsafeAccessorKind == GeneratedAccessorKind.PropertySetter
+                ? Property!.SetMethod!.MetadataName
+                : MemberName;
+            return GetFieldAccessor(ContainingType, TypeSyntax, MemberName, SetterAccessorName, targetName, LibraryTypes, unsafeAccessorKind, setter: true);
         }
 
         public static FieldAccessorDescription GetFieldAccessor(
@@ -1427,6 +1428,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             TypeSyntax fieldType,
             string fieldName,
             string accessorName,
+            string targetName,
             LibraryTypes library,
             GeneratedAccessorKind kind,
             bool setter)
@@ -1435,7 +1437,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
             if (kind is not GeneratedAccessorKind.Delegate)
             {
-                return new(containingTypeSyntax, fieldType, fieldName, accessorName, containingType.IsValueType, kind);
+                return new(containingTypeSyntax, fieldType, fieldName, accessorName, targetName, containingType.IsValueType, kind);
             }
 
             var valueType = containingType.IsValueType;
@@ -1450,7 +1452,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                     .AddArgumentListArguments(Argument(TypeOfExpression(containingTypeSyntax)), Argument(fieldName.GetLiteralExpression())));
 
             // Existing case, accessor is the field in both cases
-            return new(containingTypeSyntax, delegateType, accessorName, accessorName, containingType.IsValueType, kind, accessorInvoke);
+            return new(containingTypeSyntax, delegateType, accessorName, accessorName, targetName, containingType.IsValueType, kind, accessorInvoke);
         }
 
         private static bool ContainsTypeParameter(ITypeSymbol type)

@@ -628,6 +628,63 @@ public class InterfaceCtorParam
 }");
 
     [Fact]
+    public async Task ExplicitInterfacePropertiesUseMetadataAccessorNames()
+    {
+        var code = """
+            using Orleans;
+
+            namespace TestProject;
+
+            public interface IValue
+            {
+                int Value { get; set; }
+            }
+
+            [GenerateSerializer]
+            public sealed class ExplicitValue : IValue
+            {
+                private int _value;
+
+                [Id(0)]
+                int IValue.Value
+                {
+                    get => _value;
+                    set => _value = value;
+                }
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        var generator = new OrleansSerializationSourceGenerator().AsSourceGenerator();
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators: [generator],
+            driverOptions: new GeneratorDriverOptions(default));
+        driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var generatorDiagnostics);
+        var result = driver.GetRunResult().Results.Single();
+
+        Assert.Empty(generatorDiagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(outputCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+
+        var serializerSource = Assert.Single(
+            result.GeneratedSources,
+            static source => source.HintName.Contains(".orleans.ser.", StringComparison.Ordinal)
+                && source.SourceText.ToString().Contains("Codec_ExplicitValue", StringComparison.Ordinal));
+        var accessorTargetNames = CSharpSyntaxTree.ParseText(serializerSource.SourceText)
+            .GetCompilationUnitRoot()
+            .DescendantNodes()
+            .OfType<AttributeArgumentSyntax>()
+            .Where(static argument => argument.NameEquals?.Name.Identifier.ValueText == "Name")
+            .Select(static argument => Assert.IsType<LiteralExpressionSyntax>(argument.Expression).Token.ValueText)
+            .ToArray();
+
+        Assert.Contains(accessorTargetNames, static name => name.EndsWith(".get_Value", StringComparison.Ordinal));
+        Assert.Contains(accessorTargetNames, static name => name.EndsWith(".set_Value", StringComparison.Ordinal));
+        Assert.DoesNotContain(accessorTargetNames, static name => name.Contains("get_IValue.Value", StringComparison.Ordinal));
+        Assert.DoesNotContain(accessorTargetNames, static name => name.Contains("set_IValue.Value", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public Task TestClassesWithGeneratedActivatorConstructorAnnotation() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
 
