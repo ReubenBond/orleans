@@ -1251,6 +1251,10 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
 
         private bool UseUnsafeFieldAccessor => CanUseUnsafeAccessor && Field is not null;
 
+        private bool CanUseUnsafePropertyAccessor =>
+            CanUseUnsafeAccessor
+            && !(ContainingType.IsValueType && Property is { ExplicitInterfaceImplementations.Length: > 0 });
+
         private string SetterAccessorName => UseUnsafeFieldAccessor && !IsGettableField && !IsGettableProperty ? GetterFieldName : SetterFieldName;
 
         /// <summary>
@@ -1362,7 +1366,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             // If the symbol itself is a property but is not settable, then error out, since we do not know how to set it value
             if (IsProperty
                 && !IsPrimaryConstructorParameter
-                && !(CanUseUnsafeAccessor && Property?.SetMethod is not null))
+                && !(CanUseUnsafePropertyAccessor && Property?.SetMethod is not null))
             {
                 Location? location = default;
                 if (Member.Symbol is IPropertySymbol prop && prop.SetMethod is { } setMethod)
@@ -1397,7 +1401,8 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         public FieldAccessorDescription? GetGetterFieldDescription()
         {
             if (IsGettableField || IsGettableProperty) return null;
-            var unsafeAccessorKind = CanUseUnsafeAccessor && (Field is not null || Property?.GetMethod is not null)
+            var canUseUnsafeAccessor = Field is not null ? CanUseUnsafeAccessor : CanUseUnsafePropertyAccessor;
+            var unsafeAccessorKind = canUseUnsafeAccessor && (Field is not null || Property?.GetMethod is not null)
                 ? Field is not null ? GeneratedAccessorKind.Field : GeneratedAccessorKind.PropertyGetter
                 : GeneratedAccessorKind.Delegate;
             var targetName = unsafeAccessorKind == GeneratedAccessorKind.PropertyGetter
@@ -1414,7 +1419,8 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                 return null;
             }
 
-            var unsafeAccessorKind = CanUseUnsafeAccessor && (Field is not null || Property?.SetMethod is not null)
+            var canUseUnsafeAccessor = Field is not null ? CanUseUnsafeAccessor : CanUseUnsafePropertyAccessor;
+            var unsafeAccessorKind = canUseUnsafeAccessor && (Field is not null || Property?.SetMethod is not null)
                 ? Field is not null ? GeneratedAccessorKind.Field : GeneratedAccessorKind.PropertySetter
                 : GeneratedAccessorKind.Delegate;
             var targetName = unsafeAccessorKind == GeneratedAccessorKind.PropertySetter

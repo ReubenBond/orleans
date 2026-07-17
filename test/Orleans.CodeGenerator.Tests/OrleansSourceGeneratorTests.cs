@@ -685,6 +685,39 @@ public class InterfaceCtorParam
     }
 
     [Fact]
+    public async Task ExplicitInterfacePropertiesOnStructEmitDiagnostic()
+    {
+        var code = """
+            using Orleans;
+
+            namespace TestProject;
+
+            public interface IValue
+            {
+                int Value { get; set; }
+            }
+
+            [GenerateSerializer]
+            public struct ExplicitValue : IValue
+            {
+                private int _value;
+
+                [Id(0)]
+                int IValue.Value
+                {
+                    get => _value;
+                    set => _value = value;
+                }
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        var result = RunSourceGenerator(compilation);
+
+        Assert.Contains(result.Diagnostics, static diagnostic => diagnostic.Id == DiagnosticRuleId.InaccessibleSetter);
+    }
+
+    [Fact]
     public Task TestClassesWithGeneratedActivatorConstructorAnnotation() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
 
