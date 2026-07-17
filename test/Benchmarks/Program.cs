@@ -339,7 +339,10 @@ internal class Program
         },
         ["Serializer"] = args =>
         {
-            _ = BenchmarkRunner.Run<SerializerThroughputBenchmarks>(args: args);
+            _ = BenchmarkSwitcher.FromTypes([
+                typeof(SerializerThroughputBenchmarks),
+                typeof(MemberAccessBenchmarks)
+            ]).Run(args);
         },
         ["Serializer.Profile"] = args =>
         {
