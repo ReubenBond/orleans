@@ -99,3 +99,69 @@ The final serialization trace still showed only 9 collections and 39 MB of proce
 | Round-trip with reused session | 256 items | 32.12 us / 88,176 B | 26.09 us / 28,624 B | 18.8% faster, 67.5% less allocation |
 
 These are same-machine BenchmarkDotNet `ShortRun` comparisons. Small-run confidence intervals are intentionally wider than publication-quality long runs; only changes which repeated across payload sizes and agreed with profiler evidence were retained.
+
+## Comprehensive .NET 10 rerun
+
+A complete rerun on 2026-07-17 compared the benchmark-only baseline commit
+`a6b479123c` (production code at `ad0ac273b0`) with the optimized commit
+`d4f98affde`. Both runs used .NET 10.0.10, BenchmarkDotNet 0.15.6, server GC,
+and the same Windows 11 Arm64 host.
+
+The rerun covered all 76 .NET 10 cases under `Benchmarks.Serialization`: 15
+realistic payload cases using `ShortRun` and 61 pre-existing cases using
+BenchmarkDotNet's default job. Unsupported hardware counters and disassembly
+diagnostics were disabled identically for both runs. The complete paired data,
+including confidence intervals, allocations, third-party control benchmarks,
+and every individual result, is in
+[`serializer-net10-comparison.csv`](serializer-net10-comparison.csv).
+
+Across the 37 Orleans-sensitive cases, the geometric-mean gross improvement
+was 15.9%. The 39 unchanged third-party control cases ran 6.6% faster in the
+optimized pass, indicating material run-to-run machine drift; normalizing the
+aggregate Orleans ratio by that control ratio yields an approximately 10.0%
+improvement. The representative payload suite improved by 24.0% gross on a
+geometric-mean basis.
+
+| Operation | Items | Baseline | Optimized | Time change | Baseline alloc | Optimized alloc |
+|---|---:|---:|---:|---:|---:|---:|
+| Serialize with session | 1 | 286.2 ns | 245.3 ns | 14.3% faster | 0 B | 0 B |
+| Serialize with session | 16 | 964.9 ns | 787.9 ns | 18.3% faster | 0 B | 0 B |
+| Serialize with session | 256 | 17.75 us | 9.78 us | 44.9% faster | 29,776 B | 0 B |
+| Serialize to array | 1 | 424.9 ns | 334.6 ns | 21.3% faster | 320 B | 320 B |
+| Serialize to array | 16 | 1.27 us | 925.2 ns | 27.1% faster | 664 B | 664 B |
+| Serialize to array | 256 | 16.30 us | 11.21 us | 31.2% faster | 37,288 B | 7,512 B |
+| Deserialize with session | 1 | 484.3 ns | 440.2 ns | 9.1% faster | 1,144 B | 1,144 B |
+| Deserialize with session | 16 | 1.90 us | 1.19 us | 37.4% faster | 2,704 B | 2,704 B |
+| Deserialize with session | 256 | 20.33 us | 13.26 us | 34.8% faster | 58,400 B | 28,624 B |
+| Round-trip with session | 1 | 870.6 ns | 705.8 ns | 18.9% faster | 1,144 B | 1,144 B |
+| Round-trip with session | 16 | 3.24 us | 2.23 us | 31.4% faster | 2,704 B | 2,704 B |
+| Round-trip with session | 256 | 36.25 us | 24.28 us | 33.0% faster | 88,176 B | 28,624 B |
+| Deep copy | 1 | 190.5 ns | 173.0 ns | 9.2% faster | 568 B | 568 B |
+| Deep copy | 16 | 548.0 ns | 534.2 ns | 2.5% faster | 1,408 B | 1,408 B |
+| Deep copy | 256 | 6.87 us | 6.05 us | 12.0% faster | 15,808 B | 15,808 B |
+
+The pre-existing Orleans benchmarks broadly corroborated the representative
+suite:
+
+| Suite | Orleans cases | Geometric-mean time change | Range |
+|---|---:|---:|---:|
+| Array deserialize comparison | 1 | 19.9% faster | 19.9% faster |
+| Array serialize comparison | 4 | 11.5% faster | 7.2-21.2% faster |
+| Class deserialize comparison | 1 | 46.5% faster | 46.5% faster |
+| Class serialize comparison | 1 | 7.1% faster | 7.1% faster |
+| Struct deserialize comparison | 1 | 29.3% faster | 29.3% faster |
+| Struct serialize comparison | 1 | 29.1% faster | 29.1% faster |
+| Complex type | 1 | 8.3% faster | 8.3% faster |
+| Mega graph | 2 | 10.2% faster | 9.7-10.6% faster |
+| Field header | 6 | 1.4% faster | 6.9% slower to 14.0% faster |
+| Copier | 4 | 4.5% slower | 0.9-7.7% slower |
+
+Mega-graph serialization allocation fell from 24.09 MB to 13.93 MB (42.2%)
+and deserialization allocation fell from 40.08 MB to 29.93 MB (25.3%).
+The sub-nanosecond field-header results are near BenchmarkDotNet's measurement
+floor, and the realistic suite's `ShortRun` confidence intervals remain wide.
+An apparent 111.9 KB allocation for `ArraySerializeBenchmark.OrleansSerialize`
+in the combined optimized run was a MemoryDiagnoser artifact: an isolated
+default-job rerun measured 18.688 us and 16.63 KB, matching the baseline
+allocation while retaining a 21.2% throughput improvement. The paired CSV uses
+that confirmed isolated result.
