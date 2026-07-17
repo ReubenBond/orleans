@@ -42,3 +42,16 @@ The baseline `pvanalyze` trace attributed 63.9% of sampled CPU time to `Dictiona
 | Deserialize with reused session | 20.24 us / 58,400 B | 16.43 us / 28,624 B | 19% faster, 51% less allocation |
 
 A second `pvanalyze` trace confirmed that `Dictionary.Resize` disappeared from the hot list. Collections fell from 5,175 to 9 and allocation traffic fell from 28,066 MB to 38 MB; the remaining trace allocation is process startup.
+
+## Iteration 2: one-byte varint fast paths
+
+Values below 128 previously used the general varint path: logarithm, division, shifting, a wide unaligned write, and the corresponding wide read and trailing-zero count. The writer and reader now branch directly to a single-byte operation for this dominant case.
+
+| Operation | Iteration 1 | Iteration 2 | Change |
+|---|---:|---:|---:|
+| Serialize, 1 item | 269 ns | 254 ns | 5.8% faster |
+| Serialize, 16 items | 962 ns | 900 ns | 6.4% faster |
+| Serialize, 256 items | 10.10 us | 9.83 us | 2.6% faster |
+| Deserialize, 1 item | 454 ns | 429 ns | 5.5% faster |
+| Deserialize, 16 items | 1.60 us | 1.47 us | 7.8% faster |
+| Deserialize, 256 items | 16.43 us | 13.22 us | 19.6% faster |

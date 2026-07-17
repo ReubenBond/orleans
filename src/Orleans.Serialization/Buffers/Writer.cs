@@ -443,6 +443,12 @@ namespace Orleans.Serialization.Buffers
         {
             Debug.Assert(value < 1 << 28);
 
+            if (value < 1 << 7)
+            {
+                WriteVarUInt7(value);
+                return;
+            }
+
             var neededBytes = (int)((uint)BitOperations.Log2(value) / 7);
 
             uint lower = ((value << 1) + 1) << neededBytes;
@@ -477,6 +483,12 @@ namespace Orleans.Serialization.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteVarUInt32(uint value)
         {
+            if (value < 1 << 7)
+            {
+                WriteVarUInt7(value);
+                return;
+            }
+
             var neededBytes = (int)((uint)BitOperations.Log2(value) / 7);
 
             ulong lower = (((ulong)value << 1) + 1) << neededBytes;
@@ -501,6 +513,12 @@ namespace Orleans.Serialization.Buffers
         internal void WriteVarUInt56(ulong value)
         {
             Debug.Assert(value < 1UL << 56);
+
+            if (value < 1 << 7)
+            {
+                WriteVarUInt7((uint)value);
+                return;
+            }
 
             var neededBytes = (int)((uint)BitOperations.Log2(value) / 7);
 
@@ -536,6 +554,12 @@ namespace Orleans.Serialization.Buffers
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteVarUInt64(ulong value)
         {
+            if (value < 1 << 7)
+            {
+                WriteVarUInt7((uint)value);
+                return;
+            }
+
             nuint pos = (uint)_bufferPos;
             // Since this method writes a ulong plus a ushort worth of bytes unconditionally, ensure that there is sufficient space.
             if ((uint)pos + sizeof(ulong) + sizeof(ushort) <= (uint)_currentSpan.Length)

@@ -987,6 +987,15 @@ namespace Orleans.Serialization.Buffers
             if (IsReadOnlySequenceInput || IsSpanInput || IsBufferSliceInput || IsArcBufferInput)
             {
                 var pos = _bufferPos;
+                if ((uint)pos < (uint)_currentSpan.Length)
+                {
+                    var firstByte = _currentSpan[pos];
+                    if ((firstByte & 1) != 0)
+                    {
+                        _bufferPos = pos + 1;
+                        return (uint)firstByte >> 1;
+                    }
+                }
 
                 if (!BitConverter.IsLittleEndian || pos + 8 > _currentSpan.Length)
                 {
@@ -1045,6 +1054,15 @@ namespace Orleans.Serialization.Buffers
             if (IsReadOnlySequenceInput || IsSpanInput || IsBufferSliceInput || IsArcBufferInput)
             {
                 var pos = _bufferPos;
+                if ((uint)pos < (uint)_currentSpan.Length)
+                {
+                    var firstByte = _currentSpan[pos];
+                    if ((firstByte & 1) != 0)
+                    {
+                        _bufferPos = pos + 1;
+                        return (ulong)firstByte >> 1;
+                    }
+                }
 
                 if (!BitConverter.IsLittleEndian || pos + 10 > _currentSpan.Length)
                 {
