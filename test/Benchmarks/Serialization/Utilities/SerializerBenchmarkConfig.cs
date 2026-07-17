@@ -29,9 +29,15 @@ internal sealed class SerializerBenchmarkConfig : ManualConfig
                 HardwareCounter.InstructionRetired,
                 HardwareCounter.TotalCycles);
         }
+#if NET10_0_OR_GREATER
         AddJob(Job.ShortRun
             .WithRuntime(CoreRuntime.Core10_0)
             .WithId(".NET 10"));
+#else
+        AddJob(Job.ShortRun
+            .WithRuntime(CoreRuntime.Core80)
+            .WithId(".NET 8"));
+#endif
         Options |= ConfigOptions.KeepBenchmarkFiles;
     }
 }

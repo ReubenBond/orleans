@@ -82,3 +82,20 @@ Reusing overflow dictionaries changes the inline table tradeoff. Reducing it fro
 | Deserialize, 256 items | 12.79 us | 12.49 us | 2.3% faster |
 
 The final serialization trace still showed only 9 collections and 39 MB of process-startup allocation. Dictionary resize and application allocation remained absent.
+
+## Final comparison
+
+| Operation | Payload | Baseline | Final | Change |
+|---|---:|---:|---:|---:|
+| Serialize with reused session | 1 item | 262 ns | 253 ns | 3.6% faster |
+| Serialize with reused session | 16 items | 964 ns | 786 ns | 18.5% faster |
+| Serialize with reused session | 256 items | 14.24 us / 29,776 B | 9.55 us / 0 B | 32.9% faster, allocation eliminated |
+| Serialize to array | 256 items | 14.71 us / 37,288 B | 10.94 us / 7,512 B | 25.6% faster, 79.9% less allocation |
+| Deserialize with reused session | 1 item | 452 ns | 416 ns | 7.9% faster |
+| Deserialize with reused session | 16 items | 1.58 us | 1.19 us | 24.6% faster |
+| Deserialize with reused session | 256 items | 20.24 us / 58,400 B | 12.49 us / 28,624 B | 38.3% faster, 51.0% less allocation |
+| Round-trip with reused session | 1 item | 762 ns | 723 ns | 5.1% faster |
+| Round-trip with reused session | 16 items | 2.66 us | 2.20 us | 17.1% faster |
+| Round-trip with reused session | 256 items | 32.12 us / 88,176 B | 26.09 us / 28,624 B | 18.8% faster, 67.5% less allocation |
+
+These are same-machine BenchmarkDotNet `ShortRun` comparisons. Small-run confidence intervals are intentionally wider than publication-quality long runs; only changes which repeated across payload sizes and agreed with profiler evidence were retained.
