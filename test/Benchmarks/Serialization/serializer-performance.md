@@ -61,3 +61,24 @@ Values below 128 previously used the general varint path: logarithm, division, s
 The deserialization trace attributed 26.6% of sampled CPU to the generated item reader. Generated codecs inline the numeric reader helpers, so their multi-case wire-type switches enlarge every generated read method. `uint` and `long` readers now keep the common varint branch inline and outline fixed-width, compatibility, and error cases, matching the existing `int` reader design.
 
 Focused deserialization measured 420 ns for 1 item and 12.79 us for 256 items, improving on iteration 2 by a further 2.2% and 3.2%, respectively. The 16-item short run was noisy and is excluded from the comparison.
+
+## Rejected: fused field-header/end checks
+
+A generated-code helper which combined `ReadFieldHeader` with the following end-marker check regressed 1-item and 256-item deserialization by approximately 5% on Arm64. The additional return/control-flow shape outweighed the redundant comparison it removed, so the experiment was reverted.
+
+## Rejected: branch-oriented field-header writes
+
+Replacing the embedded-field-id conditional value with an early common-case branch regressed serialization by 11% for 1 item, 7% for 16 items, and 3% for 256 items. The existing shape produces better branchless code, so the experiment was reverted.
+
+## Iteration 4: reduce the inline reference table
+
+Reusing overflow dictionaries changes the inline table tradeoff. Reducing it from 64 to 32 entries cuts quadratic identity scans for medium graphs and removes 1 KB from every serializer session's two preallocated reference tables.
+
+| Operation | Iteration 3 | Iteration 4 | Change |
+|---|---:|---:|---:|
+| Serialize, 16 items | 900 ns | 786 ns | 12.7% faster |
+| Deserialize, 16 items | 1.47 us | 1.19 us | 19.3% faster |
+| Serialize, 256 items | 9.83 us | 9.55 us | 2.9% faster |
+| Deserialize, 256 items | 12.79 us | 12.49 us | 2.3% faster |
+
+The final serialization trace still showed only 9 collections and 39 MB of process-startup allocation. Dictionary resize and application allocation remained absent.

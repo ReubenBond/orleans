@@ -18,6 +18,7 @@ namespace Orleans.Serialization.Session
     /// </summary>
     public sealed class ReferencedObjectCollection
     {
+        private const int InlineCapacity = 32;
         private const int MaxRetainedOverflowCapacity = 1_024;
 
         private struct ReferencePair
@@ -37,10 +38,10 @@ namespace Orleans.Serialization.Session
         /// </summary>
         /// <value>The reference to object count.</value>
         internal int ReferenceToObjectCount;
-        private readonly ReferencePair[] _referenceToObject = new ReferencePair[64];
+        private readonly ReferencePair[] _referenceToObject = new ReferencePair[InlineCapacity];
 
         private int _objectToReferenceCount;
-        private readonly ReferencePair[] _objectToReference = new ReferencePair[64];
+        private readonly ReferencePair[] _objectToReference = new ReferencePair[InlineCapacity];
 
         private Dictionary<uint, object> _referenceToObjectOverflow;
         private Dictionary<object, uint> _objectToReferenceOverflow;
