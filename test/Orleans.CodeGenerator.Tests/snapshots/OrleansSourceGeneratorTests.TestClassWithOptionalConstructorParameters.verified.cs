@@ -15,10 +15,10 @@ namespace OrleansCodeGen.TestProject
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.OptionalCtorParams);
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.OptionalCtorParams> _activator;
-        private static readonly global::System.Func<global::TestProject.OptionalCtorParams, int> getField0 = (global::System.Func<global::TestProject.OptionalCtorParams, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.OptionalCtorParams), "_x");
-        private static readonly global::System.Action<global::TestProject.OptionalCtorParams, int> setField0 = (global::System.Action<global::TestProject.OptionalCtorParams, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.OptionalCtorParams), "_x");
-        private static readonly global::System.Func<global::TestProject.OptionalCtorParams, string> getField1 = (global::System.Func<global::TestProject.OptionalCtorParams, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.OptionalCtorParams), "_y");
-        private static readonly global::System.Action<global::TestProject.OptionalCtorParams, string> setField1 = (global::System.Action<global::TestProject.OptionalCtorParams, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.OptionalCtorParams), "_y");
+        [System.Runtime.CompilerServices.UnsafeAccessor(System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_x")]
+        private extern static ref int getField0(global::TestProject.OptionalCtorParams instance);
+        [System.Runtime.CompilerServices.UnsafeAccessor(System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_y")]
+        private extern static ref string getField1(global::TestProject.OptionalCtorParams instance);
         public Codec_OptionalCtorParams(global::Orleans.Serialization.Activators.IActivator<global::TestProject.OptionalCtorParams> _activator)
         {
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
@@ -45,7 +45,7 @@ namespace OrleansCodeGen.TestProject
                 id += header.FieldIdDelta;
                 if (id == 0U)
                 {
-                    setField0(instance, global::Orleans.Serialization.Codecs.Int32Codec.ReadValue(ref reader, header));
+                    getField0(instance) = global::Orleans.Serialization.Codecs.Int32Codec.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                     if (header.IsEndBaseOrEndObject)
                         break;
@@ -54,7 +54,7 @@ namespace OrleansCodeGen.TestProject
 
                 if (id == 1U)
                 {
-                    setField1(instance, global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header));
+                    getField1(instance) = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
                     reader.ReadFieldHeader(ref header);
                 }
 
@@ -102,10 +102,10 @@ namespace OrleansCodeGen.TestProject
     public sealed class Copier_OptionalCtorParams : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.OptionalCtorParams>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.OptionalCtorParams>
     {
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.OptionalCtorParams> _activator;
-        private static readonly global::System.Func<global::TestProject.OptionalCtorParams, int> getField0 = (global::System.Func<global::TestProject.OptionalCtorParams, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.OptionalCtorParams), "_x");
-        private static readonly global::System.Action<global::TestProject.OptionalCtorParams, int> setField0 = (global::System.Action<global::TestProject.OptionalCtorParams, int>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.OptionalCtorParams), "_x");
-        private static readonly global::System.Func<global::TestProject.OptionalCtorParams, string> getField1 = (global::System.Func<global::TestProject.OptionalCtorParams, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetGetter(typeof(global::TestProject.OptionalCtorParams), "_y");
-        private static readonly global::System.Action<global::TestProject.OptionalCtorParams, string> setField1 = (global::System.Action<global::TestProject.OptionalCtorParams, string>)global::Orleans.Serialization.Utilities.FieldAccessor.GetReferenceSetter(typeof(global::TestProject.OptionalCtorParams), "_y");
+        [System.Runtime.CompilerServices.UnsafeAccessor(System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_x")]
+        private extern static ref int getField0(global::TestProject.OptionalCtorParams instance);
+        [System.Runtime.CompilerServices.UnsafeAccessor(System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "_y")]
+        private extern static ref string getField1(global::TestProject.OptionalCtorParams instance);
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public global::TestProject.OptionalCtorParams DeepCopy(global::TestProject.OptionalCtorParams original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -127,8 +127,8 @@ namespace OrleansCodeGen.TestProject
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void DeepCopy(global::TestProject.OptionalCtorParams input, global::TestProject.OptionalCtorParams output, global::Orleans.Serialization.Cloning.CopyContext context)
         {
-            setField0(output, getField0(input));
-            setField1(output, getField1(input));
+            getField0(output) = getField0(input);
+            getField1(output) = getField1(input);
         }
     }
 
