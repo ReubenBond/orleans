@@ -172,8 +172,24 @@ namespace Orleans.Serialization.Session
                 }
             }
 
+            if (_referenceToObjectOverflow is { } overflow)
+            {
+                var index = 0;
+                foreach (var entry in overflow)
+                {
+                    if (ReferenceEquals(entry.Value, value))
+                    {
+                        return index;
+                    }
+
+                    index++;
+                }
+            }
+
             return -1;
         }
+
+        internal bool HasReferenceToObjectOverflow => _referenceToObjectOverflow is not null;
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         private void CreateObjectToReferenceOverflow(object value)

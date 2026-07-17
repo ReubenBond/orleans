@@ -176,7 +176,11 @@ namespace Orleans.Serialization.Codecs
 
                 // Reset the session's reference id so that the deserialized objects overwrite the placeholder markers.
                 referencedObjects.CurrentReferenceId = reference - 1;
-                referencedObjects.ReferenceToObjectCount = referencedObjects.GetReferenceIndex(marker);
+                if (!referencedObjects.HasReferenceToObjectOverflow)
+                {
+                    referencedObjects.ReferenceToObjectCount = referencedObjects.GetReferenceIndex(marker);
+                }
+
                 return specificSerializer.ReadValue(ref referencedReader, marker.Field);
             }
             finally

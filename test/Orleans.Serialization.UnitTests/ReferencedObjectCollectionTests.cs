@@ -53,6 +53,7 @@ public sealed class ReferencedObjectCollectionTests
         var referenceTable = references.CopyReferenceTable();
         Assert.Equal(values.Length, referenceTable.Count);
         Assert.Same(values[128], referenceTable[129]);
+        Assert.Equal(128, references.GetReferenceIndex(values[128]));
     }
 
     private static bool AddReferences(ReferencedObjectCollection references, object[] values)
