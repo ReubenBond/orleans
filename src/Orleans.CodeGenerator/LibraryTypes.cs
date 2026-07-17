@@ -38,6 +38,7 @@ internal sealed class LibraryTypes
         IInvokable = Type("Orleans.Serialization.Invocation.IInvokable");
         InvokeMethodNameAttribute = Type("Orleans.InvokeMethodNameAttribute");
         RuntimeHelpers = Type("System.Runtime.CompilerServices.RuntimeHelpers");
+        UnsafeAccessorAttributeOrDefault = TypeOrDefault("System.Runtime.CompilerServices.UnsafeAccessorAttribute");
         InvokableCustomInitializerAttribute = Type("Orleans.InvokableCustomInitializerAttribute");
         DefaultInvokableBaseTypeAttribute = Type("Orleans.DefaultInvokableBaseTypeAttribute");
         GenerateCodeForDeclaringAssemblyAttribute = Type("Orleans.GenerateCodeForDeclaringAssemblyAttribute");
@@ -307,6 +308,7 @@ internal sealed class LibraryTypes
     public INamedTypeSymbol? FSharpCompilationMappingAttributeOrDefault { get; private set; }
     public INamedTypeSymbol? FSharpSourceConstructFlagsOrDefault { get; private set; }
     public INamedTypeSymbol RuntimeHelpers { get; private set; }
+    public INamedTypeSymbol? UnsafeAccessorAttributeOrDefault { get; private set; }
 
     public LanguageVersion? LanguageVersion { get; private set; }
 

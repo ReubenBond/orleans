@@ -219,7 +219,14 @@ internal static class FSharpUtilities
             public FieldAccessorDescription? GetGetterFieldDescription() => null;
 
             public FieldAccessorDescription? GetSetterFieldDescription()
-                => SerializableMember.GetFieldAccessor(ContainingType, TypeSyntax, _field.Name, SetterFieldName, _libraryTypes, true);
+                => SerializableMember.GetFieldAccessor(
+                    ContainingType,
+                    TypeSyntax,
+                    _field.Name,
+                    SetterFieldName,
+                    _libraryTypes,
+                    GeneratedAccessorKind.Delegate,
+                    setter: true);
         }
     }
 
@@ -323,7 +330,14 @@ internal static class FSharpUtilities
             public FieldAccessorDescription? GetGetterFieldDescription() => null;
 
             public FieldAccessorDescription? GetSetterFieldDescription()
-                => SerializableMember.GetFieldAccessor(ContainingType, TypeSyntax, FieldName, SetterFieldName, _libraryTypes, true);
+                => SerializableMember.GetFieldAccessor(
+                    ContainingType,
+                    TypeSyntax,
+                    FieldName,
+                    SetterFieldName,
+                    _libraryTypes,
+                    GeneratedAccessorKind.Delegate,
+                    setter: true);
         }
     }
 }
