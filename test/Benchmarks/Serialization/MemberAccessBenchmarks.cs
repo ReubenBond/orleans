@@ -18,6 +18,7 @@ public class MemberAccessBenchmarks
     private ServiceProvider _serviceProvider;
     private BenchmarkState<PublicMutableMemberPayload> _publicMutable;
     private BenchmarkState<PrivateFieldMemberPayload> _privateFields;
+    private BenchmarkState<PrivatePropertyMemberPayload> _privateProperties;
     private BenchmarkState<InitOnlyMemberPayload> _initOnly;
     private BenchmarkState<GetOnlyMemberPayload> _getOnly;
 
@@ -33,6 +34,7 @@ public class MemberAccessBenchmarks
 
         _publicMutable = new(_serviceProvider, CreateItems(ItemCount, PublicMutableMemberPayload.Create));
         _privateFields = new(_serviceProvider, CreateItems(ItemCount, PrivateFieldMemberPayload.Create));
+        _privateProperties = new(_serviceProvider, CreateItems(ItemCount, PrivatePropertyMemberPayload.Create));
         _initOnly = new(_serviceProvider, CreateItems(ItemCount, InitOnlyMemberPayload.Create));
         _getOnly = new(_serviceProvider, CreateItems(ItemCount, GetOnlyMemberPayload.Create));
     }
@@ -42,6 +44,7 @@ public class MemberAccessBenchmarks
     {
         _publicMutable.Dispose();
         _privateFields.Dispose();
+        _privateProperties.Dispose();
         _initOnly.Dispose();
         _getOnly.Dispose();
         _serviceProvider.Dispose();
@@ -54,6 +57,10 @@ public class MemberAccessBenchmarks
     [Benchmark]
     [BenchmarkCategory("Serialize")]
     public int SerializePrivateFields() => _privateFields.Serialize();
+
+    [Benchmark]
+    [BenchmarkCategory("Serialize")]
+    public int SerializePrivateProperties() => _privateProperties.Serialize();
 
     [Benchmark]
     [BenchmarkCategory("Serialize")]
@@ -73,6 +80,10 @@ public class MemberAccessBenchmarks
 
     [Benchmark]
     [BenchmarkCategory("Deserialize")]
+    public PrivatePropertyMemberPayload[] DeserializePrivateProperties() => _privateProperties.Deserialize();
+
+    [Benchmark]
+    [BenchmarkCategory("Deserialize")]
     public InitOnlyMemberPayload[] DeserializeInitOnly() => _initOnly.Deserialize();
 
     [Benchmark]
@@ -86,6 +97,10 @@ public class MemberAccessBenchmarks
     [Benchmark]
     [BenchmarkCategory("DeepCopy")]
     public PrivateFieldMemberPayload[] DeepCopyPrivateFields() => _privateFields.DeepCopy();
+
+    [Benchmark]
+    [BenchmarkCategory("DeepCopy")]
+    public PrivatePropertyMemberPayload[] DeepCopyPrivateProperties() => _privateProperties.DeepCopy();
 
     [Benchmark]
     [BenchmarkCategory("DeepCopy")]
@@ -113,10 +128,12 @@ public class MemberAccessBenchmarks
                     {
                         "copy-public" => benchmark.DeepCopyPublicMutable().Length,
                         "copy-private" => benchmark.DeepCopyPrivateFields().Length,
+                        "copy-private-properties" => benchmark.DeepCopyPrivateProperties().Length,
                         "copy-init" => benchmark.DeepCopyInitOnly().Length,
                         "copy-get" => benchmark.DeepCopyGetOnly().Length,
                         "deserialize-public" => benchmark.DeserializePublicMutable().Length,
                         "deserialize-private" => benchmark.DeserializePrivateFields().Length,
+                        "deserialize-private-properties" => benchmark.DeserializePrivateProperties().Length,
                         "deserialize-init" => benchmark.DeserializeInitOnly().Length,
                         "deserialize-get" => benchmark.DeserializeGetOnly().Length,
                         _ => throw new ArgumentException($"Unknown member-access profile operation: {operation}", nameof(operation)),

@@ -81,6 +81,31 @@ public sealed class PrivateFieldMemberPayload
 }
 
 [GenerateSerializer]
+public sealed class PrivatePropertyMemberPayload
+{
+    [Id(0)] private Guid Id { get; set; }
+    [Id(1)] private long Sequence { get; set; }
+    [Id(2)] private int Attempts { get; set; }
+    [Id(3)] private bool IsEnabled { get; set; }
+    [Id(4)] private double Amount { get; set; }
+    [Id(5)] private DateTime Timestamp { get; set; }
+    [Id(6)] private string Name { get; set; }
+    [Id(7)] private byte Status { get; set; }
+
+    public static PrivatePropertyMemberPayload Create() => new()
+    {
+        Id = MemberAccessBenchmarkValues.Id,
+        Sequence = MemberAccessBenchmarkValues.Sequence,
+        Attempts = MemberAccessBenchmarkValues.Attempts,
+        IsEnabled = MemberAccessBenchmarkValues.IsEnabled,
+        Amount = MemberAccessBenchmarkValues.Amount,
+        Timestamp = MemberAccessBenchmarkValues.Timestamp,
+        Name = MemberAccessBenchmarkValues.Name,
+        Status = MemberAccessBenchmarkValues.Status,
+    };
+}
+
+[GenerateSerializer]
 public sealed class InitOnlyMemberPayload
 {
     [Id(0)] public Guid Id { get; init; }
