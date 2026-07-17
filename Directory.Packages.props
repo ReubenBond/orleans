@@ -132,6 +132,7 @@
     <PackageVersion Update="Aspire.Hosting.Redis" Version="13.2.4" />
     <PackageVersion Update="Aspire.StackExchange.Redis" Version="13.2.4" />
     <PackageVersion Update="BenchmarkDotNet" Version="0.15.6" />
+    <PackageVersion Update="BenchmarkDotNet.Diagnostics.Windows" Version="0.15.6" />
     <PackageVersion Update="FSharp.Core" Version="10.0.103" />
     <PackageVersion Update="Microsoft.AspNetCore.Connections.Abstractions" Version="10.0.3" />
     <PackageVersion Update="Microsoft.CodeAnalysis.Common" Version="5.0.0" />

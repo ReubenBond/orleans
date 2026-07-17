@@ -5,6 +5,7 @@ using Benchmarks.MapReduce;
 using Benchmarks.Ping;
 using Benchmarks.Transactions;
 using Benchmarks.GrainStorage;
+using Benchmarks.Serialization;
 
 namespace Benchmarks;
 
@@ -335,6 +336,10 @@ internal class Program
                 typeof(DurableListJournalBenchmarks),
                 typeof(DurableCommandReaderBenchmarks)
             ]).Run(args);
+        },
+        ["Serializer"] = args =>
+        {
+            _ = BenchmarkRunner.Run<SerializerThroughputBenchmarks>(args: args);
         },
         ["suite"] = args =>
         {
