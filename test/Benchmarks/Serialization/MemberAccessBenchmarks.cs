@@ -4,6 +4,7 @@ using Benchmarks.Serialization.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
+using System.Diagnostics;
 
 namespace Benchmarks.Serialization;
 
@@ -93,6 +94,45 @@ public class MemberAccessBenchmarks
     [Benchmark]
     [BenchmarkCategory("DeepCopy")]
     public GetOnlyMemberPayload[] DeepCopyGetOnly() => _getOnly.DeepCopy();
+
+    public static void Profile(string operation, TimeSpan duration)
+    {
+        var benchmark = new MemberAccessBenchmarks { ItemCount = 256 };
+        benchmark.Setup();
+
+        try
+        {
+            var stopwatch = Stopwatch.StartNew();
+            long operations = 0;
+            long checksum = 0;
+            while (stopwatch.Elapsed < duration)
+            {
+                for (var i = 0; i < 1_024; i++)
+                {
+                    checksum += operation switch
+                    {
+                        "copy-public" => benchmark.DeepCopyPublicMutable().Length,
+                        "copy-private" => benchmark.DeepCopyPrivateFields().Length,
+                        "copy-init" => benchmark.DeepCopyInitOnly().Length,
+                        "copy-get" => benchmark.DeepCopyGetOnly().Length,
+                        "deserialize-public" => benchmark.DeserializePublicMutable().Length,
+                        "deserialize-private" => benchmark.DeserializePrivateFields().Length,
+                        "deserialize-init" => benchmark.DeserializeInitOnly().Length,
+                        "deserialize-get" => benchmark.DeserializeGetOnly().Length,
+                        _ => throw new ArgumentException($"Unknown member-access profile operation: {operation}", nameof(operation)),
+                    };
+                }
+
+                operations += 1_024;
+            }
+
+            Console.WriteLine($"{operation}: {operations:N0} operations in {stopwatch.Elapsed.TotalSeconds:F2}s; checksum={checksum}");
+        }
+        finally
+        {
+            benchmark.Cleanup();
+        }
+    }
 
     private static T[] CreateItems<T>(int count, Func<T> factory)
     {

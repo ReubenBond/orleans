@@ -349,6 +349,11 @@ internal class Program
             var operation = args.FirstOrDefault()?.ToLowerInvariant() ?? "serialize";
             SerializerThroughputBenchmarks.Profile(operation, TimeSpan.FromSeconds(15));
         },
+        ["Serializer.MemberAccess.Profile"] = args =>
+        {
+            var operation = args.FirstOrDefault()?.ToLowerInvariant() ?? "copy-private";
+            MemberAccessBenchmarks.Profile(operation, TimeSpan.FromSeconds(15));
+        },
         ["suite"] = args =>
         {
             _ = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
