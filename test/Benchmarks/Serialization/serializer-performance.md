@@ -55,3 +55,9 @@ Values below 128 previously used the general varint path: logarithm, division, s
 | Deserialize, 1 item | 454 ns | 429 ns | 5.5% faster |
 | Deserialize, 16 items | 1.60 us | 1.47 us | 7.8% faster |
 | Deserialize, 256 items | 16.43 us | 13.22 us | 19.6% faster |
+
+## Iteration 3: outline uncommon numeric wire formats
+
+The deserialization trace attributed 26.6% of sampled CPU to the generated item reader. Generated codecs inline the numeric reader helpers, so their multi-case wire-type switches enlarge every generated read method. `uint` and `long` readers now keep the common varint branch inline and outline fixed-width, compatibility, and error cases, matching the existing `int` reader design.
+
+Focused deserialization measured 420 ns for 1 item and 12.79 us for 256 items, improving on iteration 2 by a further 2.2% and 3.2%, respectively. The 16-item short run was noisy and is excluded from the comparison.

@@ -109,9 +109,19 @@ namespace Orleans.Serialization.Buffers
         /// <param name="wireType">The wire type.</param>
         /// <returns>A variable-width integer.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static uint ReadUInt32<TInput>(this ref Reader<TInput> reader, WireType wireType) => wireType switch
+        public static uint ReadUInt32<TInput>(this ref Reader<TInput> reader, WireType wireType)
         {
-            WireType.VarInt => reader.ReadVarUInt32(),
+            if (wireType == WireType.VarInt)
+            {
+                return reader.ReadVarUInt32();
+            }
+
+            return ReadUInt32Slower(ref reader, wireType);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static uint ReadUInt32Slower<TInput>(this ref Reader<TInput> reader, WireType wireType) => wireType switch
+        {
             WireType.Fixed32 => reader.ReadUInt32(),
             WireType.Fixed64 => checked((uint)reader.ReadUInt64()),
 #if NET7_0_OR_GREATER
@@ -214,9 +224,19 @@ namespace Orleans.Serialization.Buffers
         /// <param name="wireType">The wire type.</param>
         /// <returns>A variable-width integer.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static long ReadInt64<TInput>(this ref Reader<TInput> reader, WireType wireType) => wireType switch
+        public static long ReadInt64<TInput>(this ref Reader<TInput> reader, WireType wireType)
         {
-            WireType.VarInt => reader.ReadVarInt64(),
+            if (wireType == WireType.VarInt)
+            {
+                return reader.ReadVarInt64();
+            }
+
+            return ReadInt64Slower(ref reader, wireType);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static long ReadInt64Slower<TInput>(this ref Reader<TInput> reader, WireType wireType) => wireType switch
+        {
             WireType.Fixed32 => reader.ReadInt32(),
             WireType.Fixed64 => reader.ReadInt64(),
 #if NET7_0_OR_GREATER
