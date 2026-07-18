@@ -287,30 +287,46 @@ namespace Orleans.Runtime.Messaging
                     var buffer = readResult.Buffer;
                     if (buffer.Length >= requiredBytes)
                     {
-                        do
+                        MessageHandler handler = default;
+                        try
                         {
-                            Message message = default;
-                            try
+                            do
                             {
-                                int headerLength, bodyLength;
-                                (requiredBytes, headerLength, bodyLength) = serializer.TryRead(ref buffer, out message);
-                                if (requiredBytes == 0)
+                                Message message = default;
+                                try
                                 {
-                                    Debug.Assert(message is not null);
-                                    RecordMessageReceive(message, bodyLength + headerLength, headerLength);
-                                    var handler = MessageHandlerPool.Get();
-                                    handler.Set(message, this);
-                                    ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
+                                    int headerLength, bodyLength;
+                                    (requiredBytes, headerLength, bodyLength) = serializer.TryRead(ref buffer, out message);
+                                    if (requiredBytes == 0)
+                                    {
+                                        Debug.Assert(message is not null);
+                                        RecordMessageReceive(message, bodyLength + headerLength, headerLength);
+                                        handler ??= MessageHandlerPool.Get();
+                                        if (!handler.TryAdd(message, this))
+                                        {
+                                            ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
+                                            handler = MessageHandlerPool.Get();
+                                            var added = handler.TryAdd(message, this);
+                                            Debug.Assert(added);
+                                        }
+                                    }
                                 }
-                            }
-                            catch (Exception exception)
-                            {
-                                if (!HandleReceiveMessageFailure(message, exception))
+                                catch (Exception exception)
                                 {
-                                    throw;
-                                }   
+                                    if (!HandleReceiveMessageFailure(message, exception))
+                                    {
+                                        throw;
+                                    }
+                                }
+                            } while (requiredBytes == 0);
+                        }
+                        finally
+                        {
+                            if (handler is not null)
+                            {
+                                ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
                             }
-                        } while (requiredBytes == 0);
+                        }
                     }
 
                     if (readResult.IsCanceled || readResult.IsCompleted)
@@ -528,25 +544,44 @@ namespace Orleans.Runtime.Messaging
 
         private sealed class MessageHandler : IThreadPoolWorkItem
         {
-            private Message message;
+            private const int MaxBatchSize = 8;
+            private readonly Message[] messages = new Message[MaxBatchSize];
             private Connection connection;
+            private int count;
 
-            public void Set(Message m, Connection c)
+            public bool TryAdd(Message message, Connection connection)
             {
-                this.message = m;
-                this.connection = c;
+                if (count == MaxBatchSize)
+                {
+                    return false;
+                }
+
+                this.connection ??= connection;
+                Debug.Assert(ReferenceEquals(this.connection, connection));
+                messages[count++] = message;
+                return true;
             }
 
             public void Execute()
             {
-                this.connection.OnReceivedMessage(this.message);
-                MessageHandlerPool.Return(this);
+                try
+                {
+                    for (var i = 0; i < count; i++)
+                    {
+                        connection.OnReceivedMessage(messages[i]);
+                    }
+                }
+                finally
+                {
+                    MessageHandlerPool.Return(this);
+                }
             }
 
             public void Reset()
             {
-                this.message = null;
+                Array.Clear(messages, 0, count);
                 this.connection = null;
+                count = 0;
             }
         }
 
