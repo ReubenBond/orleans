@@ -22,16 +22,16 @@ over explanations inferred only from elapsed time.
 
 ## pvanalyze first
 
-Use [ReubenBond/pvanalyze](https://github.com/ReubenBond/pvanalyze) as the default trace-analysis
-front end. It accepts EventPipe traces from `dotnet-trace` (`.nettrace`) and ETW traces from
-PerfView (`.etl`, `.etl.zip`, and `.etlx`). It covers the routine PerfView analysis workflows in a
+Use [ReubenBond/pvanalyze](https://github.com/ReubenBond/pvanalyze) as the default trace collection
+and analysis front end. It collects EventPipe traces natively and accepts ETW traces from PerfView
+(`.etl`, `.etl.zip`, and `.etlx`). It covers the routine PerfView analysis workflows in a
 scriptable CLI: CPU and thread-time stacks, async activities, call trees, allocations, GC and
 DATAS, JIT statistics, exceptions, arbitrary events, and hardware-counter events.
 
-Use `dotnet-trace` or PerfView only to **collect the events needed for the question**. Analyze the
-result with pvanalyze before opening a GUI or introducing another tool. PerfView remains the
-preferred Windows collector for ETW thread-time and hardware-counter traces; pvanalyze should be
-the first tool used to inspect those traces.
+Use `pvanalyze collect` or PerfView to **collect only the events needed for the question**.
+Collecting EventPipe data directly avoids an unnecessary `dotnet-trace` intermediary. PerfView
+remains the preferred Windows collector for ETW thread-time and hardware-counter traces;
+pvanalyze should be the first tool used to inspect every trace.
 
 ### Install or build
 
@@ -82,7 +82,7 @@ pvanalyze clean target.etl.zip
 
 | Question | Collector | Capture | Primary pvanalyze commands |
 | --- | --- | --- | --- |
-| Managed CPU hotspots, cross-platform | `dotnet-trace` | `dotnet-sampled-thread-time` | `cpustacks`, `calltree` |
+| Managed CPU hotspots, cross-platform | `pvanalyze collect` | `cpu` | `cpustacks`, `calltree` |
 | Windows CPU hotspots | PerfView | Default CPU collection | `cpustacks --stack-source cpu` |
 | Blocking or off-CPU time | PerfView | `/ThreadTime` | `stacks --stack-source threadtime` |
 | Async request/activity latency | PerfView | `/ThreadTime` plus application providers | `stacks`/`calltree --stack-source activity` |
@@ -118,32 +118,28 @@ environment variables beside each trace.
 
 ## Cross-platform EventPipe collection
 
-Install `dotnet-trace` only if it is not already available:
+Use pvanalyze itself to attach to a warmed process or launch a built workload. Give the outer
+command a hard timeout in addition to pvanalyze's fixed collection duration:
 
 ```powershell
-dotnet tool install --global dotnet-trace
-```
+pvanalyze collect --process-id <pid> --profile cpu `
+  --duration-seconds 15 --output target.nettrace
 
-Attach to a warmed process, or launch the built workload under collection:
-
-```powershell
-dotnet-trace collect --process-id <pid> --profile dotnet-sampled-thread-time `
-  --duration 00:00:00:15 --output target.nettrace
-
-dotnet-trace collect --profile dotnet-sampled-thread-time `
-  --duration 00:00:00:30 --output target.nettrace -- `
+pvanalyze collect --profile cpu --duration-seconds 30 `
+  --output target.nettrace -- `
   dotnet test\Benchmarks\bin\Release\net10.0\Benchmarks.dll <profile-command>
 ```
 
 For allocation sampling:
 
 ```powershell
-dotnet-trace collect --profile gc-verbose `
-  --duration 00:00:00:30 --output allocations.nettrace -- `
+pvanalyze collect --profile gc-verbose --duration-seconds 30 `
+  --output allocations.nettrace -- `
   dotnet test\Benchmarks\bin\Release\net10.0\Benchmarks.dll <profile-command>
 
 # Equivalent targeted provider when a custom profile is preferable.
-dotnet-trace collect --providers "Microsoft-Windows-DotNETRuntime:0x200001:5" `
+pvanalyze collect --profile none `
+  --providers "Microsoft-Windows-DotNETRuntime:0x8003:5" `
   --output allocations.nettrace -- dotnet <application>.dll
 ```
 
@@ -151,7 +147,7 @@ For .NET 9+ DATAS decisions, enable DATAS and collect its verbose GC events:
 
 ```powershell
 $env:DOTNET_GCDynamicAdaptationMode = "1"
-dotnet-trace collect -p <pid> `
+pvanalyze collect --process-id <pid> --profile none `
   --providers "Microsoft-Windows-DotNETRuntime:0x4C14FCCBD:5" `
   --output datas.nettrace
 ```
