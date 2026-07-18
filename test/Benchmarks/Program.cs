@@ -224,6 +224,21 @@ internal class Program
             benchmark.RunAsync().GetAwaiter().GetResult();
             benchmark.ShutdownAsync().GetAwaiter().GetResult();
         },
+        ["AdaptivePing_SiloToSilo_Profile"] = args =>
+        {
+            var duration = TimeSpan.FromSeconds(args.Length > 0 ? int.Parse(args[0]) : 15);
+            var concurrency = args.Length > 1 ? int.Parse(args[1]) : 225;
+            var benchmark = new AdaptivePingBenchmark(AdaptivePingBenchmark.BenchmarkMode.SiloToSilo, numSilos: 2);
+            try
+            {
+                benchmark.RunFixedAsync(concurrency, TimeSpan.FromSeconds(5), duration).GetAwaiter().GetResult();
+            }
+            finally
+            {
+                benchmark.ShutdownAsync().GetAwaiter().GetResult();
+                benchmark.Dispose();
+            }
+        },
         ["AdaptivePing_All"] = _ =>
         {
             AdaptivePingBenchmark.RunAllScenariosAsync().GetAwaiter().GetResult();

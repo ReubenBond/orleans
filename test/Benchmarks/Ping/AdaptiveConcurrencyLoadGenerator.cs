@@ -158,6 +158,24 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
         }
     }
 
+    public async Task<double> RunFixedAsync(CancellationToken cancellationToken = default)
+    {
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        Console.WriteLine($"Starting fixed load generator with concurrency: {_currentConcurrency}");
+        Console.WriteLine($"Warmup duration: {_warmupDuration.TotalSeconds}s, Measurement duration: {_measurementInterval.TotalSeconds}s, Sample interval: {GetEffectiveSampleInterval(_measurementInterval).TotalMilliseconds:N0}ms");
+        Console.WriteLine();
+
+        await RunPhaseAsync(_warmupDuration, isWarmup: true);
+        GC.Collect();
+
+        var measurement = await RunPhaseAsync(_measurementInterval, isWarmup: false);
+        _bestConcurrency = _currentConcurrency;
+        _bestThroughput = measurement.Throughput;
+        _bestMeasurement = measurement;
+        return measurement.Throughput;
+    }
+
     private async Task<Measurement> RunPhaseAsync(TimeSpan duration, bool isWarmup)
     {
         _completedBlocks = Channel.CreateUnbounded<WorkBlock>(

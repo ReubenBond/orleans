@@ -189,6 +189,30 @@ public class AdaptivePingBenchmark : IDisposable
         Console.WriteLine($"\nFinal best: {BestConcurrency} concurrency @ {BestThroughput:N0}/s");
     }
 
+    public async Task RunFixedAsync(int concurrency, TimeSpan warmupDuration, TimeSpan duration)
+    {
+        var grainFactory = GetGrainFactory();
+        var loadGenerator = new AdaptiveConcurrencyLoadGenerator<IPingGrain>(
+            issueRequest: g => g.Run(),
+            getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId),
+            requestsPerBlock: DefaultRequestsPerBlock,
+            warmupDuration: warmupDuration,
+            measurementInterval: duration,
+            minConcurrency: concurrency,
+            maxConcurrency: concurrency,
+            initialConcurrency: concurrency,
+            maxStableRounds: 0,
+            initialStepSize: 1,
+            sampleInterval: DefaultSampleInterval,
+            minimumRelativeImprovement: DefaultMinimumRelativeImprovement);
+
+        await loadGenerator.RunFixedAsync(_cts.Token);
+        BestConcurrency = loadGenerator.BestConcurrency;
+        BestThroughput = loadGenerator.BestThroughput;
+
+        Console.WriteLine($"\nFixed result: {BestConcurrency} concurrency @ {BestThroughput:N0}/s");
+    }
+
     public async Task ShutdownAsync()
     {
         if (_clientHost != null)
