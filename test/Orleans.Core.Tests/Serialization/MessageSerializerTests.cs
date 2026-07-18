@@ -201,6 +201,31 @@ namespace UnitTests.Serialization
             Assert.Equal(expected, MessageSerializer.GetRequestContextInitialCapacity(size));
         }
 
+        [Fact, TestCategory("BVT"), TestCategory("Serialization")]
+        public void CachingIdSpanCodec_DirectCacheCollision_RoundTrips()
+        {
+            var values = Enumerable.Range(0, 100)
+                .Select(static value => IdSpan.Create($"value-{value}"))
+                .GroupBy(static value => value.GetHashCode() & 7)
+                .First(static group => group.Count() > 1)
+                .Take(2)
+                .ToArray();
+            var codec = new CachingIdSpanCodec();
+
+            foreach (var expected in new[] { values[0], values[1], values[0] })
+            {
+                var output = new ArrayBufferWriter<byte>();
+                using var writeSession = _serializerSessionPool.GetSession();
+                var writer = Writer.Create(output, writeSession);
+                codec.WriteRaw(ref writer, expected);
+                writer.Commit();
+
+                using var readSession = _serializerSessionPool.GetSession();
+                var reader = Reader.Create(output.WrittenSpan, readSession);
+                Assert.Equal(expected, codec.ReadRaw(ref reader));
+            }
+        }
+
         [Fact, TestCategory("Functional"), TestCategory("Serialization")]
         public void Message_RequestContextBeyondInitialCapacity_RoundTrips()
         {
