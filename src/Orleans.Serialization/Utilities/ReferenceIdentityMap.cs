@@ -72,6 +72,68 @@ internal sealed class ReferenceIdentityMap<TValue>
         bucket.EntryIndex = entryIndex;
     }
 
+    /// <summary>
+    /// Gets the value associated with the specified key if it is present, otherwise adds
+    /// <paramref name="valueToAdd"/> for the key. Performs the lookup and insertion in a single pass.
+    /// </summary>
+    /// <returns><see langword="true"/> if the key was already present (with <paramref name="value"/> set to the
+    /// existing value), <see langword="false"/> if the key was added.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool GetOrAdd(object key, TValue valueToAdd, out TValue value)
+    {
+        if (_count == _entries.Length)
+        {
+            Resize();
+        }
+
+        var hashCode = RuntimeHelpers.GetHashCode(key);
+        ref var bucket = ref _buckets[hashCode & (_buckets.Length - 1)];
+        var next = -1;
+        if (bucket.Generation == _generation)
+        {
+            next = bucket.EntryIndex;
+            for (var index = next; index >= 0; index = _entries[index].Next)
+            {
+                ref var existing = ref _entries[index];
+                if (existing.HashCode == hashCode && ReferenceEquals(existing.Key, key))
+                {
+                    value = existing.Value;
+                    return true;
+                }
+            }
+        }
+
+        var entryIndex = _count++;
+        _entries[entryIndex] = new Entry
+        {
+            HashCode = hashCode,
+            Next = next,
+            Key = key,
+            Value = valueToAdd,
+        };
+        bucket.Generation = _generation;
+        bucket.EntryIndex = entryIndex;
+        value = valueToAdd;
+        return false;
+    }
+
+    /// <summary>
+    /// Gets the number of live entries.
+    /// </summary>
+    public int Count => _count;
+
+    /// <summary>
+    /// Enumerates the live key/value pairs into the provided action.
+    /// </summary>
+    public void ForEach<TState>(TState state, Action<TState, object, TValue> action)
+    {
+        for (var i = 0; i < _count; i++)
+        {
+            ref var entry = ref _entries[i];
+            action(state, entry.Key!, entry.Value);
+        }
+    }
+
     public void Reset()
     {
         for (var i = 0; i < _count; i++)
