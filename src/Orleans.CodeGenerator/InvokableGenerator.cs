@@ -146,6 +146,7 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
                 GenerateGetArgumentMethod(method, fieldDescriptions),
                 GenerateSetArgumentMethod(method, fieldDescriptions),
                 GenerateInvokeInnerMethod(method, fieldDescriptions, targetField),
+                GenerateInvokeMethod(method, baseClassType, fieldDescriptions, targetField),
                 GenerateGetCancellationTokenMethod(method, fieldDescriptions),
                 GenerateTryCancelMethod(method, fieldDescriptions),
                 GenerateIsCancellableProperty(method));
@@ -532,13 +533,86 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)));
     }
 
+    private MemberDeclarationSyntax? GenerateInvokeMethod(
+        InvokableMethodDescription method,
+        INamedTypeSymbol baseClassType,
+        List<InvokerFieldDescription> fields,
+        TargetFieldDescription target)
+    {
+        if (!baseClassType.HasAttribute(LibraryTypes.GenerateInvokableMethodAttribute))
+        {
+            return null;
+        }
+
+        var methodCall = GetMethodCall(method, fields, target);
+        var responseValueTaskType = LibraryTypes.ValueTask_1.Construct(LibraryTypes.Response).ToTypeSyntax();
+        var responseType = LibraryTypes.Response.ToTypeSyntax();
+        var fromException = InvocationExpression(
+            responseType.Member("FromException"),
+            ArgumentList(SingletonSeparatedList(Argument(IdentifierName("exception")))));
+
+        List<StatementSyntax> body;
+        if (method.Method.ReturnsVoid)
+        {
+            body =
+            [
+                ExpressionStatement(methodCall),
+                ReturnStatement(
+                    ObjectCreationExpression(responseValueTaskType)
+                        .WithArgumentList(
+                            ArgumentList(
+                                SingletonSeparatedList(
+                                    Argument(responseType.Member("Completed"))))))
+            ];
+        }
+        else
+        {
+            body =
+            [
+                ReturnStatement(
+                    InvocationExpression(
+                        IdentifierName("WrapResponse"),
+                        ArgumentList(SingletonSeparatedList(Argument(methodCall)))))
+            ];
+        }
+
+        var catchClause = CatchClause()
+            .WithDeclaration(
+                CatchDeclaration(LibraryTypes.Exception.ToTypeSyntax())
+                    .WithIdentifier(Identifier("exception")))
+            .WithBlock(
+                Block(
+                    ReturnStatement(
+                        ObjectCreationExpression(responseValueTaskType)
+                            .WithArgumentList(
+                                ArgumentList(
+                                    SingletonSeparatedList(
+                                        Argument(fromException)))))));
+
+        return MethodDeclaration(responseValueTaskType, "Invoke")
+            .WithParameterList(ParameterList())
+            .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
+            .WithBody(Block(TryStatement(Block(body), SingletonList(catchClause), null)));
+    }
+
     private static MemberDeclarationSyntax GenerateInvokeInnerMethod(
         InvokableMethodDescription method,
         List<InvokerFieldDescription> fields,
         TargetFieldDescription target)
     {
-        var resultTask = IdentifierName("resultTask");
+        var methodCall = GetMethodCall(method, fields, target);
+        return MethodDeclaration(method.Method.ReturnType.ToTypeSyntax(method.TypeParameterSubstitutions), "InvokeInner")
+            .WithParameterList(ParameterList())
+            .WithExpressionBody(ArrowExpressionClause(methodCall))
+            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
+            .WithModifiers(TokenList(Token(SyntaxKind.ProtectedKeyword), Token(SyntaxKind.OverrideKeyword)));
+    }
 
+    private static InvocationExpressionSyntax GetMethodCall(
+        InvokableMethodDescription method,
+        List<InvokerFieldDescription> fields,
+        TargetFieldDescription target)
+    {
         // C# var resultTask = this.target.{Method}({params});
         var args = SeparatedList(
             fields.OfType<MethodParameterFieldDescription>()
@@ -561,11 +635,7 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             methodCall = IdentifierName(target.FieldName).Member(method.Method.Name);
         }
 
-        return MethodDeclaration(method.Method.ReturnType.ToTypeSyntax(method.TypeParameterSubstitutions), "InvokeInner")
-            .WithParameterList(ParameterList())
-            .WithExpressionBody(ArrowExpressionClause(InvocationExpression(methodCall, ArgumentList(args))))
-            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
-            .WithModifiers(TokenList(Token(SyntaxKind.ProtectedKeyword), Token(SyntaxKind.OverrideKeyword)));
+        return InvocationExpression(methodCall, ArgumentList(args));
     }
 
     private static MemberDeclarationSyntax GenerateDisposeMethod(

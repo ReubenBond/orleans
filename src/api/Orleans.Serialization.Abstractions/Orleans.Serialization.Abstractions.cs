@@ -73,6 +73,11 @@ namespace Orleans
         PublicProperties = 1
     }
 
+    [System.AttributeUsage(System.AttributeTargets.Class, Inherited = false)]
+    public sealed partial class GenerateInvokableMethodAttribute : System.Attribute
+    {
+    }
+
     [System.AttributeUsage(System.AttributeTargets.Interface, AllowMultiple = true)]
     public sealed partial class GenerateMethodSerializersAttribute : System.Attribute
     {

@@ -28,6 +28,7 @@ internal sealed class LibraryTypes
         MethodInfo = Type("System.Reflection.MethodInfo");
         Func_2 = Type("System.Func`2");
         GenerateMethodSerializersAttribute = Type("Orleans.GenerateMethodSerializersAttribute");
+        GenerateInvokableMethodAttribute = Type("Orleans.GenerateInvokableMethodAttribute");
         GenerateSerializerAttribute = Type("Orleans.GenerateSerializerAttribute");
         SerializationCallbacksAttribute = Type("Orleans.SerializationCallbacksAttribute");
         IActivator_1 = Type("Orleans.Serialization.Activators.IActivator`1");
@@ -46,6 +47,7 @@ internal sealed class LibraryTypes
         ReturnValueProxyAttribute = Type("Orleans.Invocation.ReturnValueProxyAttribute");
         RegisterSerializerAttribute = Type("Orleans.RegisterSerializerAttribute");
         ResponseTimeoutAttribute = Type("Orleans.ResponseTimeoutAttribute");
+        Response = Type("Orleans.Serialization.Invocation.Response");
         GeneratedActivatorConstructorAttribute = Type("Orleans.GeneratedActivatorConstructorAttribute");
         SerializerTransparentAttribute = Type("Orleans.SerializerTransparentAttribute");
         RegisterActivatorAttribute = Type("Orleans.RegisterActivatorAttribute");
@@ -211,6 +213,7 @@ internal sealed class LibraryTypes
     public INamedTypeSymbol Func_2 { get; private set; }
     public INamedTypeSymbol CompoundTypeAliasAttribute { get; private set; }
     public INamedTypeSymbol GenerateMethodSerializersAttribute { get; private set; }
+    public INamedTypeSymbol GenerateInvokableMethodAttribute { get; private set; }
     public INamedTypeSymbol GenerateSerializerAttribute { get; private set; }
     public INamedTypeSymbol IActivator_1 { get; private set; }
     public INamedTypeSymbol IBufferWriter { get; private set; }
@@ -250,6 +253,7 @@ internal sealed class LibraryTypes
     public INamedTypeSymbol RegisterCopierAttribute { get; private set; }
     public INamedTypeSymbol RegisterSerializerAttribute { get; private set; }
     public INamedTypeSymbol ResponseTimeoutAttribute { get; private set; }
+    public INamedTypeSymbol Response { get; private set; }
     public INamedTypeSymbol RegisterConverterAttribute { get; private set; }
     public INamedTypeSymbol RegisterActivatorAttribute { get; private set; }
     public INamedTypeSymbol UseActivatorAttribute { get; private set; }

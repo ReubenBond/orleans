@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
@@ -608,25 +609,31 @@ namespace Orleans.Runtime
     /// Base class for requests for methods which return <see cref="ValueTask"/>.
     /// </summary>
     [SerializerTransparent]
+    [GenerateInvokableMethod]
     public abstract class Request : RequestBase
     {
-        public sealed override ValueTask<Response> Invoke()
+        public override ValueTask<Response> Invoke()
         {
             try
             {
-                var resultTask = InvokeInner();
-                if (resultTask.IsCompleted)
-                {
-                    resultTask.GetAwaiter().GetResult();
-                    return new ValueTask<Response>(Response.Completed);
-                }
-
-                return CompleteInvokeAsync(resultTask);
+                return WrapResponse(InvokeInner());
             }
             catch (Exception exception)
             {
                 return new ValueTask<Response>(Response.FromException(exception));
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static ValueTask<Response> WrapResponse(ValueTask resultTask)
+        {
+            if (resultTask.IsCompleted)
+            {
+                resultTask.GetAwaiter().GetResult();
+                return new ValueTask<Response>(Response.Completed);
+            }
+
+            return CompleteInvokeAsync(resultTask);
         }
 
         private static async ValueTask<Response> CompleteInvokeAsync(ValueTask resultTask)
@@ -653,25 +660,31 @@ namespace Orleans.Runtime
     /// The underlying result type.
     /// </typeparam>
     [SerializerTransparent]
+    [GenerateInvokableMethod]
     public abstract class Request<TResult> : RequestBase
     {
         /// <inheritdoc/>
-        public sealed override ValueTask<Response> Invoke()
+        public override ValueTask<Response> Invoke()
         {
             try
             {
-                var resultTask = InvokeInner();
-                if (resultTask.IsCompleted)
-                {
-                    return new ValueTask<Response>(Response.FromResult(resultTask.Result));
-                }
-
-                return CompleteInvokeAsync(resultTask);
+                return WrapResponse(InvokeInner());
             }
             catch (Exception exception)
             {
                 return new ValueTask<Response>(Response.FromException(exception));
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static ValueTask<Response> WrapResponse(ValueTask<TResult> resultTask)
+        {
+            if (resultTask.IsCompleted)
+            {
+                return new ValueTask<Response>(Response.FromResult(resultTask.Result));
+            }
+
+            return CompleteInvokeAsync(resultTask);
         }
 
         private static async ValueTask<Response> CompleteInvokeAsync(ValueTask<TResult> resultTask)
@@ -701,25 +714,31 @@ namespace Orleans.Runtime
     /// The underlying result type.
     /// </typeparam>
     [SerializerTransparent]
+    [GenerateInvokableMethod]
     public abstract class TaskRequest<TResult> : RequestBase
     {
         /// <inheritdoc/>
-        public sealed override ValueTask<Response> Invoke()
+        public override ValueTask<Response> Invoke()
         {
             try
             {
-                var resultTask = InvokeInner();
-                if (resultTask.IsCompleted)
-                {
-                    return new ValueTask<Response>(Response.FromResult(resultTask.GetAwaiter().GetResult()));
-                }
-
-                return CompleteInvokeAsync(resultTask);
+                return WrapResponse(InvokeInner());
             }
             catch (Exception exception)
             {
                 return new ValueTask<Response>(Response.FromException(exception));
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static ValueTask<Response> WrapResponse(Task<TResult> resultTask)
+        {
+            if (resultTask.IsCompleted)
+            {
+                return new ValueTask<Response>(Response.FromResult(resultTask.GetAwaiter().GetResult()));
+            }
+
+            return CompleteInvokeAsync(resultTask);
         }
 
         private static async ValueTask<Response> CompleteInvokeAsync(Task<TResult> resultTask)
@@ -746,26 +765,32 @@ namespace Orleans.Runtime
     /// Base class for requests for methods which return <see cref="ValueTask"/>.
     /// </summary>
     [SerializerTransparent]
+    [GenerateInvokableMethod]
     public abstract class TaskRequest : RequestBase
     {
         /// <inheritdoc/>
-        public sealed override ValueTask<Response> Invoke()
+        public override ValueTask<Response> Invoke()
         {
             try
             {
-                var resultTask = InvokeInner();
-                if (resultTask.IsCompleted)
-                {
-                    resultTask.GetAwaiter().GetResult();
-                    return new ValueTask<Response>(Response.Completed);
-                }
-
-                return CompleteInvokeAsync(resultTask);
+                return WrapResponse(InvokeInner());
             }
             catch (Exception exception)
             {
                 return new ValueTask<Response>(Response.FromException(exception));
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static ValueTask<Response> WrapResponse(Task resultTask)
+        {
+            if (resultTask.IsCompleted)
+            {
+                resultTask.GetAwaiter().GetResult();
+                return new ValueTask<Response>(Response.Completed);
+            }
+
+            return CompleteInvokeAsync(resultTask);
         }
 
         private static async ValueTask<Response> CompleteInvokeAsync(Task resultTask)
@@ -792,6 +817,7 @@ namespace Orleans.Runtime
     /// Base class for requests for void-returning methods.
     /// </summary>
     [SerializerTransparent]
+    [GenerateInvokableMethod]
     public abstract class VoidRequest : RequestBase
     {
         protected VoidRequest()
@@ -801,7 +827,7 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
-        public sealed override ValueTask<Response> Invoke()
+        public override ValueTask<Response> Invoke()
         {
             try
             {

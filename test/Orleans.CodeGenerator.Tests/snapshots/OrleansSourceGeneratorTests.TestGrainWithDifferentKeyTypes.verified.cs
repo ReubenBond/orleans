@@ -29,6 +29,17 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<global::System.Guid> InvokeInner() => _target.GetGuidValue();
+        public override global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> Invoke()
+        {
+            try
+            {
+                return WrapResponse(_target.GetGuidValue());
+            }
+            catch (global::System.Exception exception)
+            {
+                return new global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response>(global::Orleans.Serialization.Invocation.Response.FromException(exception));
+            }
+        }
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -64,6 +75,17 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<string> InvokeInner() => _target.GetStringKey();
+        public override global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> Invoke()
+        {
+            try
+            {
+                return WrapResponse(_target.GetStringKey());
+            }
+            catch (global::System.Exception exception)
+            {
+                return new global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response>(global::Orleans.Serialization.Invocation.Response.FromException(exception));
+            }
+        }
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -99,6 +121,17 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<global::System.Tuple<global::System.Guid, string>> InvokeInner() => _target.GetGuidAndStringKey();
+        public override global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> Invoke()
+        {
+            try
+            {
+                return WrapResponse(_target.GetGuidAndStringKey());
+            }
+            catch (global::System.Exception exception)
+            {
+                return new global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response>(global::Orleans.Serialization.Invocation.Response.FromException(exception));
+            }
+        }
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -134,6 +167,17 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<global::System.Tuple<long, string>> InvokeInner() => _target.GetIntegerAndStringKey();
+        public override global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> Invoke()
+        {
+            try
+            {
+                return WrapResponse(_target.GetIntegerAndStringKey());
+            }
+            catch (global::System.Exception exception)
+            {
+                return new global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response>(global::Orleans.Serialization.Invocation.Response.FromException(exception));
+            }
+        }
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]

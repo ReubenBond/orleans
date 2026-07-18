@@ -86,6 +86,18 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<global::TestProject.ComplexData> InvokeInner() => _target.ProcessData(arg0, arg1, arg2, arg3);
+        public override global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> Invoke()
+        {
+            try
+            {
+                return WrapResponse(_target.ProcessData(arg0, arg1, arg2, arg3));
+            }
+            catch (global::System.Exception exception)
+            {
+                return new global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response>(global::Orleans.Serialization.Invocation.Response.FromException(exception));
+            }
+        }
+
         public override global::System.Threading.CancellationToken GetCancellationToken() => arg3;
         public override bool TryCancel()
         {

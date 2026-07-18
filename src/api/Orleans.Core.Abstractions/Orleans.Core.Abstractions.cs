@@ -2839,12 +2839,14 @@ namespace Orleans.Runtime
     {
     }
 
+    [GenerateInvokableMethod]
     [SerializerTransparent]
     public abstract partial class Request : RequestBase
     {
-        public sealed override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke() { throw null; }
+        public override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke() { throw null; }
 
         protected abstract System.Threading.Tasks.ValueTask InvokeInner();
+        protected static System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> WrapResponse(System.Threading.Tasks.ValueTask resultTask) { throw null; }
     }
 
     [SuppressReferenceTracking]
@@ -2910,12 +2912,14 @@ namespace Orleans.Runtime
         }
     }
 
+    [GenerateInvokableMethod]
     [SerializerTransparent]
     public abstract partial class Request<TResult> : RequestBase
     {
-        public sealed override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke() { throw null; }
+        public override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke() { throw null; }
 
         protected abstract System.Threading.Tasks.ValueTask<TResult> InvokeInner();
+        protected static System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> WrapResponse(System.Threading.Tasks.ValueTask<TResult> resultTask) { throw null; }
     }
 
     [GenerateSerializer]
@@ -3078,20 +3082,24 @@ namespace Orleans.Runtime
         public override bool IsUsingGrainDirectory { get { throw null; } }
     }
 
+    [GenerateInvokableMethod]
     [SerializerTransparent]
     public abstract partial class TaskRequest : RequestBase
     {
-        public sealed override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke() { throw null; }
+        public override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke() { throw null; }
 
         protected abstract System.Threading.Tasks.Task InvokeInner();
+        protected static System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> WrapResponse(System.Threading.Tasks.Task resultTask) { throw null; }
     }
 
+    [GenerateInvokableMethod]
     [SerializerTransparent]
     public abstract partial class TaskRequest<TResult> : RequestBase
     {
-        public sealed override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke() { throw null; }
+        public override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke() { throw null; }
 
         protected abstract System.Threading.Tasks.Task<TResult> InvokeInner();
+        protected static System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> WrapResponse(System.Threading.Tasks.Task<TResult> resultTask) { throw null; }
     }
 
     [GenerateSerializer]
@@ -3192,10 +3200,11 @@ namespace Orleans.Runtime
         public static System.Net.IPEndPoint? ToIPEndPoint(this System.Uri uri) { throw null; }
     }
 
+    [GenerateInvokableMethod]
     [SerializerTransparent]
     public abstract partial class VoidRequest : RequestBase
     {
-        public sealed override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke() { throw null; }
+        public override System.Threading.Tasks.ValueTask<Orleans.Serialization.Invocation.Response> Invoke() { throw null; }
 
         protected abstract void InvokeInner();
     }

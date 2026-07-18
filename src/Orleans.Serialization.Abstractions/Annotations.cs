@@ -229,6 +229,14 @@ namespace Orleans
     }
 
     /// <summary>
+    /// Indicates that the source generator should emit the invocation method directly on generated invokable types which derive from the annotated type.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class, Inherited = false)]
+    public sealed class GenerateInvokableMethodAttribute : Attribute
+    {
+    }
+
+    /// <summary>
     /// Applied to method attributes on invokable interfaces to specify the name of the method to call to get a completion source which is submitted to the submit method and eventually returned to the caller.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class)]

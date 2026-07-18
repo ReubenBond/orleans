@@ -56,6 +56,17 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<string> InvokeInner() => _target.MethodA(arg0);
+        public override global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> Invoke()
+        {
+            try
+            {
+                return WrapResponse(_target.MethodA(arg0));
+            }
+            catch (global::System.Exception exception)
+            {
+                return new global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response>(global::Orleans.Serialization.Invocation.Response.FromException(exception));
+            }
+        }
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -119,6 +130,17 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<string> InvokeInner() => _target.MethodB(arg0);
+        public override global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> Invoke()
+        {
+            try
+            {
+                return WrapResponse(_target.MethodB(arg0));
+            }
+            catch (global::System.Exception exception)
+            {
+                return new global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response>(global::Orleans.Serialization.Invocation.Response.FromException(exception));
+            }
+        }
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
