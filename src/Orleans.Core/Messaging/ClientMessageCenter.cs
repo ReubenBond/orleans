@@ -160,14 +160,21 @@ namespace Orleans.Messaging
 
         public void DispatchLocalMessage(Message message)
         {
-            var handler = this.messageHandler;
-            if (handler is null)
+            try
             {
-                ThrowNullMessageHandler();
+                var handler = this.messageHandler;
+                if (handler is null)
+                {
+                    ThrowNullMessageHandler();
+                }
+                else
+                {
+                    handler(message);
+                }
             }
-            else
+            finally
             {
-                handler(message);
+                messageFactory.Release(message);
             }
 
             static void ThrowNullMessageHandler() => throw new InvalidOperationException("MessageCenter does not have a message handler set");

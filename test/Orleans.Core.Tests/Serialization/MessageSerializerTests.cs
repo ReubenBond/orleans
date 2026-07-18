@@ -80,6 +80,7 @@ namespace UnitTests.Serialization
             Assert.Equal(nextRequest.Id, reused.Id);
             Assert.Equal(nextRequest.SendingGrain, reused.TargetGrain);
             Assert.Equal(nextRequest.TargetGrain, reused.SendingGrain);
+            messageFactory.Release(reused);
         }
 
         [Fact, TestCategory("Functional")]

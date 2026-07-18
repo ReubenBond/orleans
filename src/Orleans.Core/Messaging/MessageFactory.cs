@@ -60,6 +60,7 @@ namespace Orleans.Runtime
         public Message CreateResponseMessage(Message request)
         {
             var response = _messagePool.Get();
+            response.IsPooled = true;
             response.IsSystemMessage = request.IsSystemMessage;
             response.Direction = Message.Directions.Response;
             response.Id = request.Id;
@@ -79,6 +80,11 @@ namespace Orleans.Runtime
 
         internal void Release(Message message)
         {
+            if (!message.IsPooled)
+            {
+                return;
+            }
+
             message.Reset();
             _messagePool.Return(message);
         }

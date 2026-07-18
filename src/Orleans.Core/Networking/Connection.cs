@@ -391,6 +391,8 @@ namespace Orleans.Runtime.Messaging
                         {
                             throw;
                         }
+
+                        _ = inflight.Remove(message);
                     }
 
                     var flushResult = await output.FlushAsync();
@@ -534,6 +536,7 @@ namespace Orleans.Runtime.Messaging
                     message);
 
                 MessagingInstrumentation.OnDroppedSentMessage(message);
+                MessageFactory.Release(message);
             }
 
             return true;

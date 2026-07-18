@@ -16,6 +16,9 @@ namespace Orleans.Runtime
         [NonSerialized]
         private short _retryCount;
 
+        [NonSerialized]
+        private bool _isPooled;
+
         public CoarseStopwatch _timeToExpiry;
 
         public object? BodyObject { get; set; }
@@ -53,6 +56,7 @@ namespace Orleans.Runtime
             _interfaceVersion = 0;
             _interfaceType = default;
             _cacheInvalidationHeader = null;
+            _isPooled = false;
         }
 
         [GenerateSerializer]
@@ -102,6 +106,12 @@ namespace Orleans.Runtime
         {
             get => _retryCount;
             set => _retryCount = value;
+        }
+
+        internal bool IsPooled
+        {
+            get => _isPooled;
+            set => _isPooled = value;
         }
 
         public bool HasCacheInvalidationHeader => CacheInvalidationHeader is { Count: > 0 };

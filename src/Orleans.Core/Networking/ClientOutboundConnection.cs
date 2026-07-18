@@ -160,6 +160,7 @@ namespace Orleans.Runtime.Messaging
             {
                 LogInformationClientIsDroppingMessage(this.Log, msg, reason);
                 MessagingInstrumentation.OnDroppedSentMessage(msg);
+                MessageFactory.Release(msg);
             }
         }
 

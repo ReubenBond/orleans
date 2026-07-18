@@ -177,6 +177,7 @@ namespace Orleans.Runtime.Messaging
             {
                 LogSiloDroppingMessage(this.Log, this.myAddress, msg, reason);
                 MessagingInstrumentation.OnDroppedSentMessage(msg);
+                MessageFactory.Release(msg);
             }
         }
 

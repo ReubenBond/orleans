@@ -281,6 +281,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 this.MessagingTrace.OnSiloDropSendingMessage(this.LocalSiloAddress, msg, reason);
+                MessageFactory.Release(msg);
             }
         }
 

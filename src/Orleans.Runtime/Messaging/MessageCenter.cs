@@ -594,6 +594,7 @@ namespace Orleans.Runtime.Messaging
                 // Do not send reject a rejection locally, it will create a stack overflow
                 _messagingInstruments.OnDroppedSentMessage(msg);
                 LogDebugDroppingRejection(log, msg);
+                messageFactory.Release(msg);
             }
             else
             {
