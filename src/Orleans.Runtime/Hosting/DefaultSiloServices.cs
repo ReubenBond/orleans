@@ -337,6 +337,8 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterManifestProvider>();
             services.AddSingleton<ClusterManifestDisseminationNamespace>();
             services.AddFromExisting<IDisseminationNamespace, ClusterManifestDisseminationNamespace>();
+            services.AddSingleton<GrainManifestDisseminationNamespace>();
+            services.AddFromExisting<IDisseminationNamespace, GrainManifestDisseminationNamespace>();
             services.AddSingleton<ClusterManifestSystemTarget>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterManifestSystemTarget>();
 

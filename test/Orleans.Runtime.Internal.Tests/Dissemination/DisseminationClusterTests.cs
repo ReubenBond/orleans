@@ -8,6 +8,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Dissemination;
+using Orleans.Runtime.MembershipService.SiloMetadata;
 using Orleans.TestingHost;
 using Xunit;
 
@@ -93,9 +94,13 @@ public sealed class DisseminationClusterTests
     public async Task ClusterManifestsAreDisseminatedAndAppliedAcrossRealCluster()
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(120));
-        var observer = new ValueApplyObserver(DisseminationNamespaceNames.ClusterManifest, targetDistinctSilos: 2);
-        using var subscription = DisseminationEvents.Listener.Subscribe(
-            observer,
+        var referenceObserver = new ValueApplyObserver(DisseminationNamespaceNames.ClusterManifest, targetDistinctSilos: 2);
+        var contentObserver = new ValueApplyObserver(DisseminationNamespaceNames.GrainManifest, targetDistinctSilos: 2);
+        using var referenceSubscription = DisseminationEvents.Listener.Subscribe(
+            referenceObserver,
+            static name => name == "Dissemination.ValueApply");
+        using var contentSubscription = DisseminationEvents.Listener.Subscribe(
+            contentObserver,
             static name => name == "Dissemination.ValueApply");
 
         var builder = new InProcessTestClusterBuilder(3);
@@ -108,11 +113,46 @@ public sealed class DisseminationClusterTests
         await using var cluster = builder.Build();
         await cluster.DeployAsync();
         await cluster.WaitForLivenessToStabilizeAsync();
+        await Task.WhenAll(referenceObserver.Reached, contentObserver.Reached).WaitAsync(cancellation.Token);
+
+        Assert.True(
+            referenceObserver.AppliedSilos.Count >= 2,
+            "Expected cluster manifest references to be applied on at least 2 distinct silos, but saw: "
+                + string.Join(", ", referenceObserver.AppliedSilos.Select(static silo => silo.ToString())));
+        Assert.True(
+            contentObserver.AppliedSilos.Count >= 2,
+            "Expected grain manifest content to be applied on at least 2 distinct silos, but saw: "
+                + string.Join(", ", contentObserver.AppliedSilos.Select(static silo => silo.ToString())));
+    }
+
+    [Fact]
+    public async Task SiloMetadataIsDisseminatedAndAppliedAcrossRealCluster()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+        var observer = new ValueApplyObserver(DisseminationNamespaceNames.SiloMetadata, targetDistinctSilos: 2);
+        using var subscription = DisseminationEvents.Listener.Subscribe(
+            observer,
+            static name => name == "Dissemination.ValueApply");
+
+        var builder = new InProcessTestClusterBuilder(3);
+        builder.ConfigureSilo((_, siloBuilder) =>
+        {
+            siloBuilder.UseSiloMetadata(new Dictionary<string, string>
+            {
+                ["region"] = "west",
+            });
+            siloBuilder.Configure<DisseminationOptions>(options => options.Enabled = true);
+            siloBuilder.Configure<SiloMessagingOptions>(options => options.SiloMetadataDissemination.Enabled = true);
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+        await cluster.WaitForLivenessToStabilizeAsync();
         await observer.Reached.WaitAsync(cancellation.Token);
 
         Assert.True(
             observer.AppliedSilos.Count >= 2,
-            "Expected cluster manifests to be applied on at least 2 distinct silos, but saw: "
+            "Expected silo metadata to be applied on at least 2 distinct silos, but saw: "
                 + string.Join(", ", observer.AppliedSilos.Select(static silo => silo.ToString())));
     }
 
@@ -141,7 +181,7 @@ public sealed class DisseminationClusterTests
         {
             if (value.Value is not DisseminationValueEvent evt
                 || evt.Namespace != expectedNamespace
-                || evt.Result != DisseminationApplyResult.Applied.ToString()
+                || evt.Result is not (nameof(DisseminationApplyResult.Applied) or nameof(DisseminationApplyResult.Duplicate))
                 || evt.PayloadBytes <= 0)
             {
                 return;

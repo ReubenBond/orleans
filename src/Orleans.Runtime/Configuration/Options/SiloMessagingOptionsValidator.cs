@@ -20,9 +20,17 @@ namespace Orleans.Configuration
                 return result;
             }
 
-            return DisseminationNamespaceOptionsValidator.Validate(
+            result = DisseminationNamespaceOptionsValidator.Validate(
                 $"{nameof(SiloMessagingOptions)}.{nameof(SiloMessagingOptions.ClusterManifestDissemination)}",
                 options.ClusterManifestDissemination);
+            if (result.Failed)
+            {
+                return result;
+            }
+
+            return DisseminationNamespaceOptionsValidator.Validate(
+                $"{nameof(SiloMessagingOptions)}.{nameof(SiloMessagingOptions.SiloMetadataDissemination)}",
+                options.SiloMetadataDissemination);
         }
     }
 }

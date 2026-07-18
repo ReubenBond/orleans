@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Metadata;
@@ -7,26 +8,24 @@ namespace Orleans.Runtime.Dissemination;
 
 internal interface IClusterManifestDisseminationParticipant
 {
-    ClusterManifestDisseminationSnapshot GetManifestForDissemination();
+    ImmutableDictionary<SiloAddress, ManifestHash> GetManifestReferencesForDissemination();
 
-    DisseminationApplyResult ApplyDisseminatedManifest(ClusterManifestUpdate update);
+    ImmutableDictionary<ManifestHash, GrainManifest> GetManifestContentsForDissemination();
+
+    DisseminationApplyResult ApplyDisseminatedManifestReference(SiloAddress siloAddress, ManifestHash manifestHash);
+
+    DisseminationApplyResult ApplyDisseminatedManifestContent(ManifestHash manifestHash, GrainManifest manifest);
 }
 
-internal readonly record struct ClusterManifestDisseminationSnapshot(
-    ClusterManifest Manifest,
-    bool IncludesAllActiveServers);
-
-// Cluster manifests form a single monotonically-versioned stream. Full retained snapshots provide
-// universal repair while same-version fingerprints reconcile independently assembled partial views.
+// A silo's manifest is immutable for its generation, so each address owns one version-1 content reference.
 internal sealed class ClusterManifestDisseminationNamespace(
     IClusterManifestDisseminationParticipant clusterManifestProvider,
     IOptions<SiloMessagingOptions> options,
     Serializer serializer) : IDisseminationNamespace
 {
-    private const int MaxSnapshotHistory = 32;
-    private readonly object _historyLock = new();
-    private readonly SortedDictionary<long, ClusterManifestDisseminationSnapshot> _snapshotHistory = [];
-    private readonly Dictionary<long, ReadOnlyMemory<byte>> _snapshotPayloads = [];
+    private const long ManifestVersion = 1;
+    private readonly object _cacheLock = new();
+    private readonly Dictionary<SiloAddress, (ManifestHash Hash, ReadOnlyMemory<byte> Payload)> _cachedValues = [];
 
     public DisseminationNamespace Name => DisseminationNamespaceNames.ClusterManifest;
 
@@ -36,182 +35,273 @@ internal sealed class ClusterManifestDisseminationNamespace(
     {
         get
         {
-            var snapshot = clusterManifestProvider.GetManifestForDissemination();
-            RememberSnapshot(snapshot);
-            var version = GetDisseminationVersion(snapshot.Manifest.Version);
-            if (version > 0)
+            var references = clusterManifestProvider.GetManifestReferencesForDissemination();
+            PruneCache(references.Keys);
+            foreach (var siloAddress in references.Keys)
             {
-                yield return new DigestEntry(
-                    DisseminationKey.Default,
-                    version,
-                    GetFingerprint(snapshot.Manifest));
+                yield return new DigestEntry(siloAddress, ManifestVersion);
             }
         }
     }
 
     public async ValueTask<bool> PublishAsync(
         IDisseminationService disseminationService,
-        MajorMinorVersion version,
+        SiloAddress siloAddress,
         CancellationToken cancellationToken)
     {
-        var snapshot = clusterManifestProvider.GetManifestForDissemination();
-        if (snapshot.Manifest.Version != version)
+        if (!clusterManifestProvider.GetManifestReferencesForDissemination().ContainsKey(siloAddress))
         {
             return false;
         }
 
-        RememberSnapshot(snapshot);
-        return await disseminationService.Publish(
-            this,
-            DisseminationKey.Default,
-            GetDisseminationVersion(version),
-            cancellationToken);
+        return await disseminationService.Publish(this, siloAddress, ManifestVersion, cancellationToken);
     }
 
     public long GetVersion(DisseminationKey key) =>
-        key == DisseminationKey.Default
-            ? GetDisseminationVersion(clusterManifestProvider.GetManifestForDissemination().Manifest.Version)
+        key.Value is SiloAddress siloAddress
+        && clusterManifestProvider.GetManifestReferencesForDissemination().ContainsKey(siloAddress)
+            ? ManifestVersion
             : 0;
 
     public DisseminationRepairResult CreateRepair(in DisseminationRepairRequest request)
     {
-        if (request.Key != DisseminationKey.Default)
+        if (request.Key.Value is not SiloAddress siloAddress
+            || !clusterManifestProvider.GetManifestReferencesForDissemination().TryGetValue(siloAddress, out var manifestHash))
         {
             return DisseminationRepairResult.Unavailable(version: 0);
         }
 
-        lock (_historyLock)
+        if (request.ToVersion is { } targetVersion && targetVersion != ManifestVersion)
         {
-            var current = clusterManifestProvider.GetManifestForDissemination();
-            RememberSnapshotUnsafe(current);
-            var currentVersion = GetDisseminationVersion(current.Manifest.Version);
-            var targetVersion = request.ToVersion ?? currentVersion;
-            if (targetVersion <= 0
-                || targetVersion > currentVersion
-                || !_snapshotHistory.TryGetValue(targetVersion, out var target))
-            {
-                return DisseminationRepairResult.Unavailable(currentVersion);
-            }
-
-            if (request.FromVersion is { } peerVersion && peerVersion > targetVersion)
-            {
-                return DisseminationRepairResult.Current(targetVersion);
-            }
-
-            if (request.MaxItemCount <= 0)
-            {
-                return DisseminationRepairResult.InsufficientCapacity(targetVersion);
-            }
-
-            var value = CreateSnapshotValue(targetVersion, target);
-            return value.Payload.Length <= request.MaxPayloadBytes
-                && value.Payload.Length <= request.MaxBatchBytes
-                    ? DisseminationRepairResult.Produced(targetVersion, [value])
-                    : DisseminationRepairResult.InsufficientCapacity(targetVersion);
+            return DisseminationRepairResult.Unavailable(ManifestVersion);
         }
+
+        if (request.FromVersion is { } peerVersion && peerVersion >= ManifestVersion)
+        {
+            return DisseminationRepairResult.Current(ManifestVersion);
+        }
+
+        if (request.MaxItemCount <= 0)
+        {
+            return DisseminationRepairResult.InsufficientCapacity(ManifestVersion);
+        }
+
+        var value = CreateValue(siloAddress, manifestHash);
+        return value.Payload.Length <= request.MaxPayloadBytes
+            && value.Payload.Length <= request.MaxBatchBytes
+                ? DisseminationRepairResult.Produced(ManifestVersion, [value])
+                : DisseminationRepairResult.InsufficientCapacity(ManifestVersion);
     }
 
     public ValueTask<DisseminationApplyResult> ApplyValueAsync(
         DisseminationValue value,
         CancellationToken cancellationToken)
     {
-        if (value.Key != DisseminationKey.Default || value.FromVersion != 0)
+        if (value.Key.Value is not SiloAddress siloAddress
+            || value.FromVersion != 0
+            || value.ToVersion != ManifestVersion)
         {
             return ValueTask.FromResult(DisseminationApplyResult.Rejected);
         }
 
-        var update = serializer.Deserialize<ClusterManifestUpdate>(value.Payload);
-        if (value.ToVersion != GetDisseminationVersion(update.Version))
+        var reference = serializer.Deserialize<ClusterManifestReference>(value.Payload);
+        if (string.IsNullOrEmpty(reference.ManifestHash.Value))
         {
             return ValueTask.FromResult(DisseminationApplyResult.Rejected);
         }
 
-        var result = clusterManifestProvider.ApplyDisseminatedManifest(update);
+        var result = clusterManifestProvider.ApplyDisseminatedManifestReference(siloAddress, reference.ManifestHash);
         if (result is DisseminationApplyResult.Applied or DisseminationApplyResult.Duplicate)
         {
-            RememberSnapshot(clusterManifestProvider.GetManifestForDissemination());
+            CacheValue(siloAddress, reference.ManifestHash, value.Payload);
         }
 
         return ValueTask.FromResult(result);
     }
 
-    private DisseminationValue CreateSnapshotValue(
-        long version,
-        ClusterManifestDisseminationSnapshot snapshot)
+    private DisseminationValue CreateValue(SiloAddress siloAddress, ManifestHash manifestHash)
     {
-        if (!_snapshotPayloads.TryGetValue(version, out var payload))
+        lock (_cacheLock)
         {
-            payload = serializer.SerializeToArray(new ClusterManifestUpdate(
-                snapshot.Manifest.Version,
-                snapshot.Manifest.Silos,
-                snapshot.IncludesAllActiveServers));
-            _snapshotPayloads.Add(version, payload);
-        }
-
-        return new DisseminationValue(DisseminationKey.Default, fromVersion: 0, version, payload);
-    }
-
-    private void RememberSnapshot(ClusterManifestDisseminationSnapshot snapshot)
-    {
-        lock (_historyLock)
-        {
-            RememberSnapshotUnsafe(snapshot);
-        }
-    }
-
-    private void RememberSnapshotUnsafe(ClusterManifestDisseminationSnapshot snapshot)
-    {
-        var version = GetDisseminationVersion(snapshot.Manifest.Version);
-        if (version <= 0)
-        {
-            return;
-        }
-
-        if (_snapshotHistory.TryGetValue(version, out var previous)
-            && GetFingerprint(previous.Manifest) != GetFingerprint(snapshot.Manifest))
-        {
-            _snapshotPayloads.Remove(version);
-        }
-
-        _snapshotHistory[version] = snapshot;
-        while (_snapshotHistory.Count > MaxSnapshotHistory)
-        {
-            var removedVersion = _snapshotHistory.Keys.First();
-            _snapshotHistory.Remove(removedVersion);
-            _snapshotPayloads.Remove(removedVersion);
-        }
-    }
-
-    private static long GetDisseminationVersion(MajorMinorVersion version)
-    {
-        if (version.Major < 0)
-        {
-            return 0;
-        }
-
-        if (version.Major == long.MaxValue)
-        {
-            throw new InvalidOperationException($"Cluster manifest version {version} exceeds the dissemination version range.");
-        }
-
-        // Minor versions are local progress counters and cannot be globally ordered across silos.
-        return version.Major + 1;
-    }
-
-    private static long GetFingerprint(ClusterManifest manifest)
-    {
-        const ulong offset = 14695981039346656037;
-        const ulong prime = 1099511628211;
-        var hash = offset;
-        foreach (var entry in manifest.Silos.OrderBy(static entry => entry.Key))
-        {
-            hash = unchecked((hash ^ (uint)entry.Key.GetConsistentHashCode()) * prime);
-            foreach (var character in ManifestHashCalculator.ComputeHash(entry.Value).Value)
+            if (!_cachedValues.TryGetValue(siloAddress, out var cached) || cached.Hash != manifestHash)
             {
-                hash = unchecked((hash ^ character) * prime);
+                cached = (manifestHash, serializer.SerializeToArray(new ClusterManifestReference(manifestHash)));
+                _cachedValues[siloAddress] = cached;
+            }
+
+            return new DisseminationValue(siloAddress, fromVersion: 0, ManifestVersion, cached.Payload);
+        }
+    }
+
+    private void CacheValue(SiloAddress siloAddress, ManifestHash manifestHash, ReadOnlyMemory<byte> payload)
+    {
+        lock (_cacheLock)
+        {
+            _cachedValues[siloAddress] = (manifestHash, payload);
+        }
+    }
+
+    private void PruneCache(IEnumerable<SiloAddress> currentSilos)
+    {
+        var current = currentSilos.ToHashSet();
+        lock (_cacheLock)
+        {
+            foreach (var siloAddress in _cachedValues.Keys.Where(key => !current.Contains(key)).ToArray())
+            {
+                _cachedValues.Remove(siloAddress);
             }
         }
-
-        return unchecked((long)hash);
     }
 }
+
+// Manifest bodies are immutable and addressed by their canonical hash, so every distinct body is one version-1 value.
+internal sealed class GrainManifestDisseminationNamespace(
+    IClusterManifestDisseminationParticipant clusterManifestProvider,
+    IOptions<SiloMessagingOptions> options,
+    Serializer serializer) : IDisseminationNamespace
+{
+    private const long ManifestVersion = 1;
+    private readonly object _cacheLock = new();
+    private readonly Dictionary<ManifestHash, ReadOnlyMemory<byte>> _cachedValues = [];
+
+    public DisseminationNamespace Name => DisseminationNamespaceNames.GrainManifest;
+
+    public DisseminationNamespaceOptions Options => options.Value.ClusterManifestDissemination;
+
+    public IEnumerable<DigestEntry> Digests
+    {
+        get
+        {
+            var contents = clusterManifestProvider.GetManifestContentsForDissemination();
+            PruneCache(contents.Keys);
+            foreach (var manifestHash in contents.Keys)
+            {
+                yield return new DigestEntry(manifestHash.Value, ManifestVersion);
+            }
+        }
+    }
+
+    public async ValueTask<bool> PublishAsync(
+        IDisseminationService disseminationService,
+        ManifestHash manifestHash,
+        CancellationToken cancellationToken)
+    {
+        if (!clusterManifestProvider.GetManifestContentsForDissemination().ContainsKey(manifestHash))
+        {
+            return false;
+        }
+
+        return await disseminationService.Publish(this, manifestHash.Value, ManifestVersion, cancellationToken);
+    }
+
+    public long GetVersion(DisseminationKey key) =>
+        key.Value is string hash
+        && clusterManifestProvider.GetManifestContentsForDissemination().ContainsKey(new ManifestHash(hash))
+            ? ManifestVersion
+            : 0;
+
+    public DisseminationRepairResult CreateRepair(in DisseminationRepairRequest request)
+    {
+        if (request.Key.Value is not string hashValue)
+        {
+            return DisseminationRepairResult.Unavailable(version: 0);
+        }
+
+        var manifestHash = new ManifestHash(hashValue);
+        if (!clusterManifestProvider.GetManifestContentsForDissemination().TryGetValue(manifestHash, out var manifest))
+        {
+            return DisseminationRepairResult.Unavailable(version: 0);
+        }
+
+        if (request.ToVersion is { } targetVersion && targetVersion != ManifestVersion)
+        {
+            return DisseminationRepairResult.Unavailable(ManifestVersion);
+        }
+
+        if (request.FromVersion is { } peerVersion && peerVersion >= ManifestVersion)
+        {
+            return DisseminationRepairResult.Current(ManifestVersion);
+        }
+
+        if (request.MaxItemCount <= 0)
+        {
+            return DisseminationRepairResult.InsufficientCapacity(ManifestVersion);
+        }
+
+        var value = CreateValue(manifestHash, manifest);
+        return value.Payload.Length <= request.MaxPayloadBytes
+            && value.Payload.Length <= request.MaxBatchBytes
+                ? DisseminationRepairResult.Produced(ManifestVersion, [value])
+                : DisseminationRepairResult.InsufficientCapacity(ManifestVersion);
+    }
+
+    public ValueTask<DisseminationApplyResult> ApplyValueAsync(
+        DisseminationValue value,
+        CancellationToken cancellationToken)
+    {
+        if (value.Key.Value is not string hashValue
+            || value.FromVersion != 0
+            || value.ToVersion != ManifestVersion)
+        {
+            return ValueTask.FromResult(DisseminationApplyResult.Rejected);
+        }
+
+        var content = serializer.Deserialize<ClusterManifestContent>(value.Payload);
+        var manifestHash = new ManifestHash(hashValue);
+        if (content.ManifestHash != manifestHash
+            || ManifestHashCalculator.ComputeHash(content.Manifest) != manifestHash)
+        {
+            return ValueTask.FromResult(DisseminationApplyResult.Rejected);
+        }
+
+        var result = clusterManifestProvider.ApplyDisseminatedManifestContent(manifestHash, content.Manifest);
+        if (result is DisseminationApplyResult.Applied or DisseminationApplyResult.Duplicate)
+        {
+            CacheValue(manifestHash, value.Payload);
+        }
+
+        return ValueTask.FromResult(result);
+    }
+
+    private DisseminationValue CreateValue(ManifestHash manifestHash, GrainManifest manifest)
+    {
+        lock (_cacheLock)
+        {
+            if (!_cachedValues.TryGetValue(manifestHash, out var payload))
+            {
+                payload = serializer.SerializeToArray(new ClusterManifestContent(manifestHash, manifest));
+                _cachedValues[manifestHash] = payload;
+            }
+
+            return new DisseminationValue(manifestHash.Value, fromVersion: 0, ManifestVersion, payload);
+        }
+    }
+
+    private void CacheValue(ManifestHash manifestHash, ReadOnlyMemory<byte> payload)
+    {
+        lock (_cacheLock)
+        {
+            _cachedValues[manifestHash] = payload;
+        }
+    }
+
+    private void PruneCache(IEnumerable<ManifestHash> currentHashes)
+    {
+        var current = currentHashes.ToHashSet();
+        lock (_cacheLock)
+        {
+            foreach (var manifestHash in _cachedValues.Keys.Where(key => !current.Contains(key)).ToArray())
+            {
+                _cachedValues.Remove(manifestHash);
+            }
+        }
+    }
+}
+
+[GenerateSerializer, Immutable]
+internal sealed record ClusterManifestReference([property: Id(0)] ManifestHash ManifestHash);
+
+[GenerateSerializer, Immutable]
+internal sealed record ClusterManifestContent(
+    [property: Id(0)] ManifestHash ManifestHash,
+    [property: Id(1)] GrainManifest Manifest);
