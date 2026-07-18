@@ -52,15 +52,16 @@ dotnet run --project test\Benchmarks\Benchmarks.csproj -c Release -f net10.0 -- 
 
 | Operation | Items | Before | After | Change |
 |---|---:|---:|---:|---:|
-| Deep copy | 1 | 165.8 ns | 152.5 ns | -8.0% |
-| Deep copy | 16 | 485.3 ns | 429.1 ns | -11.6% |
-| Deep copy | 256 | 6,066.1 ns | 5,225.0 ns | -13.9% |
+| Deep copy | 1 | 165.8 ns | 157.7 ns | -4.9% |
+| Deep copy | 16 | 485.3 ns | 440.9 ns | -9.1% |
+| Deep copy | 256 | 6,066.1 ns | 5,189.9 ns | -14.4% |
 | Serialize with session | 16 | 790.1 ns | 795.2 ns | +0.6% |
 | Deserialize with session | 256 | 12,541.8 ns | 12,453.8 ns | -0.7% |
 
 Allocations were unchanged. The 256-item serialize control moved +2.6% with higher variance and
 the other controls moved in both directions, so no serialization or deserialization change is
-attributed to this deep-copy-only implementation.
+attributed to this deep-copy-only implementation. The deep-copy rows are from a final
+committed-code rerun filtered to those three cases; the control rows are from the full paired run.
 
 In a sustained 256-item deep-copy profile, throughput increased from 2,416,640 to 2,779,136
 operations per 15 seconds (+15.0%). `CopyContextPool.Return` dropped to 1.25% of sampled CPU and
@@ -72,6 +73,8 @@ Artifacts:
   `Artifacts\Benchmarks\Serializer\Benchmarks.Serialization.SerializerThroughputBenchmarks-20260717-194205.log`
 - Optimized log:
   `Artifacts\Benchmarks\Serializer\Benchmarks.Serialization.SerializerThroughputBenchmarks-20260717-202803.log`
+- Final committed-code deep-copy log:
+  `Artifacts\Benchmarks\Serializer\Benchmarks.Serialization.SerializerThroughputBenchmarks-20260717-210102.log`
 - Baseline trace:
   `Artifacts\Benchmarks\Serializer\traces\generic-dispatch-copy-baseline.nettrace`
 - Optimized trace:
