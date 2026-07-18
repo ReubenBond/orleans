@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -8,6 +9,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
 using Orleans.Internal;
 using Orleans.Metadata;
@@ -16,8 +19,9 @@ using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime.Metadata
 {
-    internal partial class ClusterManifestProvider : IClusterManifestProvider, IAsyncDisposable, IDisposable, ILifecycleParticipant<ISiloLifecycle>
+    internal partial class ClusterManifestProvider : IClusterManifestProvider, IClusterManifestDisseminationParticipant, IAsyncDisposable, IDisposable, ILifecycleParticipant<ISiloLifecycle>
     {
+        private const int MaxUnreferencedManifestCacheEntries = 32;
         private readonly SiloAddress _localSiloAddress;
         private readonly ILogger<ClusterManifestProvider> _logger;
         private readonly IServiceProvider _services;
@@ -33,7 +37,13 @@ namespace Orleans.Runtime.Metadata
         private ClusterManifest _current;
         private IInternalGrainFactory? _grainFactory;
         private Task? _runTask;
-        private readonly Dictionary<ManifestHash, GrainManifest> _manifestCache = new();
+        private readonly ConcurrentDictionary<ManifestHash, GrainManifest> _manifestCache = new();
+        private readonly Queue<ManifestHash> _manifestCacheOrder = new();
+        private readonly object _manifestCacheLock = new();
+        private readonly ConcurrentDictionary<SiloAddress, ManifestHash> _manifestReferences = new();
+        private readonly ManifestHash _localManifestHash;
+        private long _lastManifestDisseminationMembershipVersion = -1;
+        private long _manifestFetchDeferralDeadline;
 
         public ClusterManifestProvider(
             ILocalSiloDetails localSiloDetails,
@@ -49,7 +59,8 @@ namespace Orleans.Runtime.Metadata
             _clusterMembershipService = clusterMembershipService;
             _fatalErrorHandler = fatalErrorHandler;
             LocalGrainManifest = siloManifestProvider.SiloManifest;
-            _manifestCache[ManifestHashCalculator.ComputeHash(LocalGrainManifest)] = LocalGrainManifest;
+            _localManifestHash = ManifestHashCalculator.ComputeHash(LocalGrainManifest);
+            TryCacheManifest(_localManifestHash, LocalGrainManifest, out _);
             _current = CreateClusterManifest(
                 MajorMinorVersion.MinValue,
                 ImmutableDictionary<SiloAddress, GrainManifest>.Empty);
@@ -89,6 +100,7 @@ namespace Orleans.Runtime.Metadata
                     synchronizedSilos = synchronizedSilos.Add(_localSiloAddress, LocalGrainManifest);
                 }
 
+                SynchronizeManifestReferences(synchronizedSilos, clusterMembership);
                 var version = new MajorMinorVersion(membershipVersion, 0);
                 var updated = CreateClusterManifest(version, synchronizedSilos);
                 TryPublishManifest(updated);
@@ -166,6 +178,8 @@ namespace Orleans.Runtime.Metadata
                 return true;
             }
 
+            await TryPublishLocalManifestViaDissemination();
+
             var builder = existingManifest.Silos.ToBuilder();
             var modified = false;
 
@@ -188,6 +202,15 @@ namespace Orleans.Runtime.Metadata
                 }
 
                 missingSilos.Add(siloAddress);
+            }
+
+            if (missingSilos.Count == 0)
+            {
+                _manifestFetchDeferralDeadline = 0;
+            }
+            else if (ShouldDeferManifestFetch())
+            {
+                return false;
             }
 
             if (missingSilos.Count > 1 && await TryFillMissingManifestsFromPeers(clusterMembership, existingManifest.Version, builder, missingSilos))
@@ -235,7 +258,9 @@ namespace Orleans.Runtime.Metadata
                     if (result.Value is not null)
                     {
                         modified = true;
-                        _manifestCache[ManifestHashCalculator.ComputeHash(result.Value)] = result.Value;
+                        var manifestHash = ManifestHashCalculator.ComputeHash(result.Value);
+                        TryCacheManifest(manifestHash, result.Value, out _);
+                        _manifestReferences[result.Key] = manifestHash;
                         builder[result.Key] = result.Value;
                     }
                     else
@@ -246,43 +271,164 @@ namespace Orleans.Runtime.Metadata
             }
 
             // Regardless of success or failure, update the manifest if it has been modified.
-            var version = new MajorMinorVersion(clusterMembership.Version.Value, existingManifest.Version.Minor + 1);
             if (modified)
             {
-                var silos = builder.ToImmutable();
-                PruneManifestCache(silos);
-                var manifest = CreateClusterManifest(version, silos);
-                var publishSuccess = TryPublishManifest(manifest);
+                MajorMinorVersion publishedVersion;
+                bool publishSuccess;
+                lock (_currentLock)
+                {
+                    var current = _current;
+                    foreach (var entry in current.Silos)
+                    {
+                        if (clusterMembership.GetSiloStatus(entry.Key) == SiloStatus.Active)
+                        {
+                            builder[entry.Key] = entry.Value;
+                        }
+                    }
+
+                    var silos = RemoveNonActiveSilos(builder.ToImmutable(), clusterMembership);
+                    SynchronizeManifestReferences(silos, clusterMembership);
+                    var version = new MajorMinorVersion(
+                        clusterMembership.Version.Value,
+                        Math.Max(existingManifest.Version.Minor, current.Version.Minor) + 1);
+                    var manifest = CreateClusterManifest(version, silos);
+                    publishSuccess = TryPublishManifest(manifest);
+                    publishedVersion = manifest.Version;
+                }
+
                 return publishSuccess && fetchSuccess;
             }
             return fetchSuccess;
         }
 
-        private void PruneManifestCache(ImmutableDictionary<SiloAddress, GrainManifest> silos)
+        private bool ShouldDeferManifestFetch()
         {
-            // The cache only accelerates hash lookups for manifests currently in use, so drop entries that no
-            // longer correspond to any silo in the cluster manifest. The local manifest is always retained.
-            // Recomputing the live hashes is skipped until the cache has actually outgrown the live set.
-            if (_manifestCache.Count <= silos.Count + 1)
+            var globalOptions = _services.GetService<IOptionsMonitor<DisseminationOptions>>();
+            var referenceNamespace = _services.GetService<ClusterManifestDisseminationNamespace>();
+            var contentNamespace = _services.GetService<GrainManifestDisseminationNamespace>();
+            if (globalOptions?.CurrentValue.Enabled is not true
+                || referenceNamespace?.Options.Enabled is not true
+                || contentNamespace?.Options.Enabled is not true)
+            {
+                _manifestFetchDeferralDeadline = 0;
+                return false;
+            }
+
+            var now = Stopwatch.GetTimestamp();
+            if (_manifestFetchDeferralDeadline == 0)
+            {
+                _manifestFetchDeferralDeadline = now + (5 * Stopwatch.Frequency);
+            }
+
+            return now < _manifestFetchDeferralDeadline;
+        }
+
+        private async Task TryPublishLocalManifestViaDissemination()
+        {
+            var membership = _clusterMembershipService.CurrentSnapshot;
+            if (_lastManifestDisseminationMembershipVersion >= membership.Version.Value
+                || membership.GetSiloStatus(_localSiloAddress) != SiloStatus.Active)
             {
                 return;
             }
 
-            var live = new HashSet<ManifestHash>(silos.Count + 1)
+            var globalOptions = _services.GetService<IOptionsMonitor<DisseminationOptions>>();
+            var disseminationService = _services.GetService<IDisseminationService>();
+            var referenceNamespace = _services.GetService<ClusterManifestDisseminationNamespace>();
+            var contentNamespace = _services.GetService<GrainManifestDisseminationNamespace>();
+            if (globalOptions?.CurrentValue.Enabled is not true
+                || disseminationService is null
+                || referenceNamespace?.Options.Enabled is not true
+                || contentNamespace?.Options.Enabled is not true)
             {
-                ManifestHashCalculator.ComputeHash(LocalGrainManifest),
-            };
-
-            foreach (var manifest in silos.Values)
-            {
-                live.Add(ManifestHashCalculator.ComputeHash(manifest));
+                return;
             }
 
-            foreach (var hash in _manifestCache.Keys.ToArray())
+            try
             {
-                if (!live.Contains(hash))
+                _manifestReferences[_localSiloAddress] = _localManifestHash;
+                if (await contentNamespace.PublishAsync(disseminationService, _localManifestHash, _shutdownCts.Token)
+                    && await referenceNamespace.PublishAsync(disseminationService, _localSiloAddress, _shutdownCts.Token))
                 {
-                    _manifestCache.Remove(hash);
+                    _lastManifestDisseminationMembershipVersion = membership.Version.Value;
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException || !_shutdownCts.IsCancellationRequested)
+            {
+                LogDebugClusterManifestDisseminationFailed(exception);
+            }
+        }
+
+        private void SynchronizeManifestReferences(
+            ImmutableDictionary<SiloAddress, GrainManifest> silos,
+            ClusterMembershipSnapshot clusterMembership)
+        {
+            foreach (var entry in silos)
+            {
+                var manifestHash = ManifestHashCalculator.ComputeHash(entry.Value);
+                TryCacheManifest(manifestHash, entry.Value, out _);
+                _manifestReferences[entry.Key] = manifestHash;
+            }
+
+            foreach (var siloAddress in _manifestReferences.Keys)
+            {
+                if (clusterMembership.GetSiloStatus(siloAddress) != SiloStatus.Active)
+                {
+                    _manifestReferences.TryRemove(siloAddress, out _);
+                }
+            }
+
+            PruneManifestCache(clusterMembership);
+        }
+
+        private bool TryCacheManifest(ManifestHash manifestHash, GrainManifest manifest, out bool added)
+        {
+            lock (_manifestCacheLock)
+            {
+                if (_manifestCache.TryGetValue(manifestHash, out var existing))
+                {
+                    added = false;
+                    return existing.Equals(manifest);
+                }
+
+                _manifestCache[manifestHash] = manifest;
+                _manifestCacheOrder.Enqueue(manifestHash);
+                added = true;
+                return true;
+            }
+        }
+
+        private void PruneManifestCache(ClusterMembershipSnapshot clusterMembership)
+        {
+            var liveHashes = new HashSet<ManifestHash>
+            {
+                _localManifestHash,
+            };
+            foreach (var reference in _manifestReferences)
+            {
+                if (clusterMembership.GetSiloStatus(reference.Key) == SiloStatus.Active)
+                {
+                    liveHashes.Add(reference.Value);
+                }
+            }
+
+            lock (_manifestCacheLock)
+            {
+                var unreferencedCount = _manifestCache.Keys.Count(hash => !liveHashes.Contains(hash));
+                var entriesToInspect = _manifestCacheOrder.Count;
+                while (unreferencedCount > MaxUnreferencedManifestCacheEntries && entriesToInspect-- > 0)
+                {
+                    var manifestHash = _manifestCacheOrder.Dequeue();
+                    if (liveHashes.Contains(manifestHash))
+                    {
+                        _manifestCacheOrder.Enqueue(manifestHash);
+                        continue;
+                    }
+
+                    if (_manifestCache.TryRemove(manifestHash, out _))
+                    {
+                        unreferencedCount--;
+                    }
                 }
             }
         }
@@ -335,7 +481,8 @@ namespace Orleans.Runtime.Metadata
                             continue;
                         }
 
-                        _manifestCache[expectedHash] = manifest;
+                        TryCacheManifest(expectedHash, manifest, out _);
+                        _manifestReferences[silo] = expectedHash;
                         builder[silo] = manifest;
                         missing.Remove(silo);
                         modified = true;
@@ -361,6 +508,7 @@ namespace Orleans.Runtime.Metadata
                 if (summary.SiloManifestHashes.TryGetValue(silo, out var hash)
                     && _manifestCache.TryGetValue(hash, out var cached))
                 {
+                    _manifestReferences[silo] = hash;
                     builder[silo] = cached;
                     missing.Remove(silo);
                     modified = true;
@@ -384,6 +532,161 @@ namespace Orleans.Runtime.Metadata
             }
 
             return publishSuccess;
+        }
+
+        ImmutableDictionary<SiloAddress, ManifestHash> IClusterManifestDisseminationParticipant.GetManifestReferencesForDissemination()
+        {
+            var current = Current;
+            var membership = _clusterMembershipService.CurrentSnapshot;
+            SynchronizeManifestReferences(current.Silos, membership);
+            var builder = ImmutableDictionary.CreateBuilder<SiloAddress, ManifestHash>();
+            foreach (var entry in _manifestReferences)
+            {
+                if (membership.GetSiloStatus(entry.Key) == SiloStatus.Active)
+                {
+                    builder[entry.Key] = entry.Value;
+                }
+            }
+
+            return builder.ToImmutable();
+        }
+
+        ImmutableDictionary<ManifestHash, GrainManifest> IClusterManifestDisseminationParticipant.GetManifestContentsForDissemination() =>
+            _manifestCache.ToImmutableDictionary();
+
+        DisseminationApplyResult IClusterManifestDisseminationParticipant.ApplyDisseminatedManifestReference(
+            SiloAddress siloAddress,
+            ManifestHash manifestHash)
+        {
+            var clusterMembership = _clusterMembershipService.CurrentSnapshot;
+            if (clusterMembership.GetSiloStatus(siloAddress) != SiloStatus.Active)
+            {
+                return DisseminationApplyResult.Rejected;
+            }
+
+            if (_manifestReferences.TryGetValue(siloAddress, out var existingHash))
+            {
+                if (existingHash != manifestHash)
+                {
+                    return DisseminationApplyResult.Rejected;
+                }
+
+                return TryApplyManifestReference(siloAddress, manifestHash, referenceAdded: false);
+            }
+
+            if (!_manifestReferences.TryAdd(siloAddress, manifestHash))
+            {
+                return ((IClusterManifestDisseminationParticipant)this)
+                    .ApplyDisseminatedManifestReference(siloAddress, manifestHash);
+            }
+
+            return TryApplyManifestReference(siloAddress, manifestHash, referenceAdded: true);
+        }
+
+        DisseminationApplyResult IClusterManifestDisseminationParticipant.ApplyDisseminatedManifestContent(
+            ManifestHash manifestHash,
+            GrainManifest manifest)
+        {
+            if (ManifestHashCalculator.ComputeHash(manifest) != manifestHash)
+            {
+                return DisseminationApplyResult.Rejected;
+            }
+
+            if (!TryCacheManifest(manifestHash, manifest, out var contentAdded))
+            {
+                return DisseminationApplyResult.Rejected;
+            }
+
+            return TryApplyManifestContent(manifestHash, manifest, contentAdded);
+        }
+
+        private DisseminationApplyResult TryApplyManifestReference(
+            SiloAddress siloAddress,
+            ManifestHash manifestHash,
+            bool referenceAdded)
+        {
+            if (!_manifestCache.TryGetValue(manifestHash, out var manifest))
+            {
+                return referenceAdded
+                    ? DisseminationApplyResult.Applied
+                    : DisseminationApplyResult.Duplicate;
+            }
+
+            var clusterMembership = _clusterMembershipService.CurrentSnapshot;
+            lock (_currentLock)
+            {
+                var current = EnsureValidManifestForCurrentMembership(clusterMembership);
+                if (clusterMembership.GetSiloStatus(siloAddress) != SiloStatus.Active)
+                {
+                    _manifestReferences.TryRemove(siloAddress, out _);
+                    return DisseminationApplyResult.Rejected;
+                }
+
+                if (current.Silos.TryGetValue(siloAddress, out var currentManifest))
+                {
+                    return ManifestHashCalculator.ComputeHash(currentManifest) == manifestHash
+                        ? DisseminationApplyResult.Duplicate
+                        : DisseminationApplyResult.Rejected;
+                }
+
+                var updated = CreateClusterManifest(
+                    new MajorMinorVersion(
+                        clusterMembership.Version.Value,
+                        current.Version.Minor + 1),
+                    current.Silos.Add(siloAddress, manifest));
+                return TryPublishManifest(updated)
+                    ? DisseminationApplyResult.Applied
+                    : DisseminationApplyResult.Rejected;
+            }
+        }
+
+        private DisseminationApplyResult TryApplyManifestContent(
+            ManifestHash manifestHash,
+            GrainManifest manifest,
+            bool contentAdded)
+        {
+            var clusterMembership = _clusterMembershipService.CurrentSnapshot;
+            lock (_currentLock)
+            {
+                var current = EnsureValidManifestForCurrentMembership(clusterMembership);
+                var silos = current.Silos.ToBuilder();
+                var modified = false;
+                foreach (var reference in _manifestReferences)
+                {
+                    if (reference.Value != manifestHash
+                        || clusterMembership.GetSiloStatus(reference.Key) != SiloStatus.Active)
+                    {
+                        continue;
+                    }
+
+                    if (silos.TryGetValue(reference.Key, out var existing))
+                    {
+                        if (ManifestHashCalculator.ComputeHash(existing) != manifestHash)
+                        {
+                            return DisseminationApplyResult.Rejected;
+                        }
+
+                        continue;
+                    }
+
+                    silos.Add(reference.Key, manifest);
+                    modified = true;
+                }
+
+                if (!modified)
+                {
+                    return contentAdded
+                        ? DisseminationApplyResult.Applied
+                        : DisseminationApplyResult.Duplicate;
+                }
+
+                var updated = CreateClusterManifest(
+                    new MajorMinorVersion(clusterMembership.Version.Value, current.Version.Minor + 1),
+                    silos.ToImmutable());
+                return TryPublishManifest(updated)
+                    ? DisseminationApplyResult.Applied
+                    : DisseminationApplyResult.Rejected;
+            }
         }
 
         private static ImmutableDictionary<SiloAddress, GrainManifest> RemoveNonActiveSilos(
@@ -413,13 +716,15 @@ namespace Orleans.Runtime.Metadata
                 var hash = await remoteManifestProvider.GetSiloManifestHash().AsTask().WaitAsync(_shutdownCts.Token);
                 if (_manifestCache.TryGetValue(hash, out var cached))
                 {
+                    _manifestReferences[siloAddress] = hash;
                     return cached;
                 }
 
                 var manifest = await remoteManifestProvider.GetSiloManifestByHash(hash).AsTask().WaitAsync(_shutdownCts.Token);
                 if (manifest is not null && ManifestHashCalculator.ComputeHash(manifest) == hash)
                 {
-                    _manifestCache[hash] = manifest;
+                    TryCacheManifest(hash, manifest, out _);
+                    _manifestReferences[siloAddress] = hash;
                     return manifest;
                 }
             }
@@ -428,7 +733,11 @@ namespace Orleans.Runtime.Metadata
                 LogDebugErrorRetrievingSiloManifestByHash(exception, siloAddress);
             }
             var legacyManifestProvider = _grainFactory!.GetSystemTarget<ISiloManifestSystemTarget>(Constants.ManifestProviderType, siloAddress);
-            return await legacyManifestProvider.GetSiloManifest().AsTask().WaitAsync(_shutdownCts.Token);
+            var legacyManifest = await legacyManifestProvider.GetSiloManifest().AsTask().WaitAsync(_shutdownCts.Token);
+            var legacyHash = ManifestHashCalculator.ComputeHash(legacyManifest);
+            TryCacheManifest(legacyHash, legacyManifest, out _);
+            _manifestReferences[siloAddress] = legacyHash;
+            return legacyManifest;
         }
 
         [MemberNotNull(nameof(_runTask))]
@@ -504,6 +813,12 @@ namespace Orleans.Runtime.Metadata
             Message = "Error retrieving cluster manifest from peer {SiloAddress}. Falling back to direct manifest fetch."
         )]
         private partial void LogDebugErrorRetrievingClusterManifestFromPeer(Exception exception, SiloAddress siloAddress);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Error disseminating the local cluster manifest. Falling back to direct manifest fetches."
+        )]
+        private partial void LogDebugClusterManifestDisseminationFailed(Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

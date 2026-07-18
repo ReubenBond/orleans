@@ -89,6 +89,41 @@ public sealed class DisseminationClusterTests
                 + string.Join(", ", observer.AppliedSilos.Select(static silo => silo.ToString())));
     }
 
+    [Fact]
+    public async Task ClusterManifestsAreDisseminatedAndAppliedAcrossRealCluster()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+        var referenceObserver = new ValueApplyObserver(DisseminationNamespaceNames.ClusterManifest, targetDistinctSilos: 2);
+        var contentObserver = new ValueApplyObserver(DisseminationNamespaceNames.GrainManifest, targetDistinctSilos: 2);
+        using var referenceSubscription = DisseminationEvents.Listener.Subscribe(
+            referenceObserver,
+            static name => name == "Dissemination.ValueApply");
+        using var contentSubscription = DisseminationEvents.Listener.Subscribe(
+            contentObserver,
+            static name => name == "Dissemination.ValueApply");
+
+        var builder = new InProcessTestClusterBuilder(3);
+        builder.ConfigureSilo((_, siloBuilder) =>
+        {
+            siloBuilder.Configure<DisseminationOptions>(options => options.Enabled = true);
+            siloBuilder.Configure<SiloMessagingOptions>(options => options.ClusterManifestDissemination.Enabled = true);
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+        await cluster.WaitForLivenessToStabilizeAsync();
+        await Task.WhenAll(referenceObserver.Reached, contentObserver.Reached).WaitAsync(cancellation.Token);
+
+        Assert.True(
+            referenceObserver.AppliedSilos.Count >= 2,
+            "Expected cluster manifest references to be applied on at least 2 distinct silos, but saw: "
+                + string.Join(", ", referenceObserver.AppliedSilos.Select(static silo => silo.ToString())));
+        Assert.True(
+            contentObserver.AppliedSilos.Count >= 2,
+            "Expected grain manifest content to be applied on at least 2 distinct silos, but saw: "
+                + string.Join(", ", contentObserver.AppliedSilos.Select(static silo => silo.ToString())));
+    }
+
     private sealed class ValueApplyObserver(
         DisseminationNamespace expectedNamespace,
         int targetDistinctSilos) : IObserver<KeyValuePair<string, object?>>
@@ -114,7 +149,7 @@ public sealed class DisseminationClusterTests
         {
             if (value.Value is not DisseminationValueEvent evt
                 || evt.Namespace != expectedNamespace
-                || evt.Result != DisseminationApplyResult.Applied.ToString()
+                || evt.Result is not (nameof(DisseminationApplyResult.Applied) or nameof(DisseminationApplyResult.Duplicate))
                 || evt.PayloadBytes <= 0)
             {
                 return;

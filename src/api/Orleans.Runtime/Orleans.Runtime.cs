@@ -286,6 +286,8 @@ namespace Orleans.Configuration
 
         public System.TimeSpan ClientRegistrationRefresh { get { throw null; } set { } }
 
+        public Orleans.Configuration.DisseminationNamespaceOptions ClusterManifestDissemination { get { throw null; } set { } }
+
         public int GatewaySenderQueues { get { throw null; } set { } }
 
         public System.TimeSpan GrainWorkloadAnalysisPeriod { get { throw null; } set { } }

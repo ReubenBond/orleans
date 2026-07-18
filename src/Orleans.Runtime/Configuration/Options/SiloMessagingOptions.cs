@@ -54,6 +54,15 @@ namespace Orleans.Configuration
         };
 
         /// <summary>
+        /// Gets or sets dissemination options for cluster manifests.
+        /// </summary>
+        public DisseminationNamespaceOptions ClusterManifestDissemination { get; set; } = new()
+        {
+            ExpectedUpdateCadence = TimeSpan.FromSeconds(30),
+            Priority = DisseminationPriority.High,
+        };
+
+        /// <summary>
         /// The default value for <see cref="ClientRegistrationRefresh"/>.
         /// </summary>
         public static readonly TimeSpan DEFAULT_CLIENT_REGISTRATION_REFRESH = TimeSpan.FromMinutes(5);
