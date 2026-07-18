@@ -213,6 +213,57 @@ public class AdaptivePingBenchmark : IDisposable
         Console.WriteLine($"\nFixed result: {BestConcurrency} concurrency @ {BestThroughput:N0}/s");
     }
 
+    public async Task RunFixedAsync(
+        int concurrency,
+        TimeSpan warmupDuration,
+        TimeSpan measurementDuration,
+        int iterations)
+    {
+        if (iterations <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(iterations));
+        }
+
+        var grainFactory = GetGrainFactory();
+        var loadGenerator = new FixedConcurrencyLoadGenerator<IPingGrain>(
+            concurrency,
+            issueRequest: static grain => grain.Run(),
+            getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId));
+
+        Console.WriteLine($"=== Fixed Ping Benchmark: {Description} ===");
+        Console.WriteLine($"Process: {Environment.ProcessId}");
+        Console.WriteLine($"Runtime: {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
+        Console.WriteLine($"Architecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}");
+        Console.WriteLine($"Concurrency: {concurrency}");
+        Console.WriteLine($"Warmup: {warmupDuration.TotalSeconds:F1}s");
+        Console.WriteLine($"Measurement: {iterations} x {measurementDuration.TotalSeconds:F1}s");
+        Console.WriteLine();
+
+        await loadGenerator.WarmupAsync(warmupDuration);
+        Console.WriteLine("Warmup complete");
+
+        var results = new FixedConcurrencyLoadResult[iterations];
+        for (var i = 0; i < results.Length; i++)
+        {
+            results[i] = await loadGenerator.RunAsync(measurementDuration);
+            var result = results[i];
+            Console.WriteLine(
+                $"Iteration {i + 1}: {result.Throughput:N0}/s, {result.Completed:N0} calls, " +
+                $"{result.AllocatedBytesPerOperation:N1} B/op, " +
+                $"GC {result.Gen0Collections}/{result.Gen1Collections}/{result.Gen2Collections}");
+        }
+
+        var mean = results.Average(static result => result.Throughput);
+        var variance = results.Length > 1
+            ? results.Sum(result => Math.Pow(result.Throughput - mean, 2)) / (results.Length - 1)
+            : 0;
+        var allocatedBytesPerOperation = results.Average(static result => result.AllocatedBytesPerOperation);
+        Console.WriteLine();
+        Console.WriteLine($"Mean: {mean:N0}/s");
+        Console.WriteLine($"StdDev: {Math.Sqrt(variance):N0}/s ({Math.Sqrt(variance) / mean:P2})");
+        Console.WriteLine($"Allocated: {allocatedBytesPerOperation:N1} B/op");
+    }
+
     public async Task ShutdownAsync()
     {
         if (_clientHost != null)

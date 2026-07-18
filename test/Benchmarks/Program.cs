@@ -239,6 +239,35 @@ internal class Program
                 benchmark.Dispose();
             }
         },
+        ["FixedPing"] = args =>
+        {
+            var mode = args.ElementAtOrDefault(0)?.ToLowerInvariant() switch
+            {
+                "local" => AdaptivePingBenchmark.BenchmarkMode.HostedClient,
+                null or "silo-to-silo" => AdaptivePingBenchmark.BenchmarkMode.SiloToSilo,
+                var value => throw new ArgumentException($"Unknown mode '{value}'. Expected 'silo-to-silo' or 'local'.")
+            };
+            var numSilos = mode is AdaptivePingBenchmark.BenchmarkMode.SiloToSilo ? 2 : 1;
+            var concurrency = int.TryParse(args.ElementAtOrDefault(1), out var parsedConcurrency) ? parsedConcurrency : 100;
+            var warmupSeconds = double.TryParse(args.ElementAtOrDefault(2), out var parsedWarmup) ? parsedWarmup : 5;
+            var measurementSeconds = double.TryParse(args.ElementAtOrDefault(3), out var parsedMeasurement) ? parsedMeasurement : 10;
+            var iterations = int.TryParse(args.ElementAtOrDefault(4), out var parsedIterations) ? parsedIterations : 5;
+
+            var benchmark = new AdaptivePingBenchmark(mode, numSilos);
+            try
+            {
+                benchmark.RunFixedAsync(
+                    concurrency,
+                    TimeSpan.FromSeconds(warmupSeconds),
+                    TimeSpan.FromSeconds(measurementSeconds),
+                    iterations).GetAwaiter().GetResult();
+            }
+            finally
+            {
+                benchmark.ShutdownAsync().GetAwaiter().GetResult();
+                benchmark.Dispose();
+            }
+        },
         ["AdaptivePing_All"] = _ =>
         {
             AdaptivePingBenchmark.RunAllScenariosAsync().GetAwaiter().GetResult();
