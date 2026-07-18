@@ -83,7 +83,7 @@ internal sealed class ReferenceIdentityMap<TValue>
         _count = 0;
         if (_generation == int.MaxValue)
         {
-            Array.Clear(_buckets);
+            Array.Clear(_buckets, 0, _buckets.Length);
             _generation = 1;
         }
         else
