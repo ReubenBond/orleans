@@ -197,7 +197,7 @@ namespace Orleans.Serialization.Cloning
     /// <param name="onDisposed">The action to call when this context is disposed.</param>
     public sealed class CopyContext(CodecProvider codecProvider, Action<CopyContext> onDisposed) : IDisposable
     {
-        private readonly Dictionary<object, object> _copies = new(ReferenceEqualsComparer.Default);
+        private readonly ReferenceIdentityMap<object> _copies = new();
         private readonly CodecProvider _copierProvider = codecProvider;
         private readonly Action<CopyContext> _onDisposed = onDisposed;
 
@@ -233,13 +233,14 @@ namespace Orleans.Serialization.Cloning
         /// <param name="copy">The copy of <paramref name="original"/>.</param>
         public void RecordCopy(object original, object copy)
         {
-            _copies[original] = copy;
+            ArgumentNullException.ThrowIfNull(original);
+            _copies.Set(original, copy);
         }
 
         /// <summary>
         /// Resets this instance.
         /// </summary>
-        public void Reset() => _copies.Clear();
+        public void Reset() => _copies.Reset();
 
         /// <summary>
         /// Copies the provided value.

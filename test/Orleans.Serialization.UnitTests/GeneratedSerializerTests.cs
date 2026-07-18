@@ -1,4 +1,5 @@
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
@@ -630,6 +631,47 @@ public class GeneratedSerializerTests : IDisposable
 
         Assert.Equal(original, result);
         Assert.Same(result[0], result[1]);
+    }
+
+    [Fact]
+    public void DuplicateReferencesDeepCopyTargetJustOnce()
+    {
+        var sharedObject = new MyValue(1);
+        var original = new object[] { sharedObject, sharedObject };
+
+        var result = Copy(original);
+
+        Assert.NotSame(original, result);
+        Assert.NotSame(sharedObject, result[0]);
+        Assert.Same(result[0], result[1]);
+    }
+
+    [Fact]
+    public void CopyContextResetClearsRecordedCopies()
+    {
+        var contextPool = _serviceProvider.GetRequiredService<CopyContextPool>();
+        var originals = Enumerable.Range(0, 256).Select(static _ => new object()).ToArray();
+        var copies = Enumerable.Range(0, originals.Length).Select(static _ => new object()).ToArray();
+
+        using var context = contextPool.GetContext();
+        for (var i = 0; i < originals.Length; i++)
+        {
+            context.RecordCopy(originals[i], copies[i]);
+            Assert.True(context.TryGetCopy(originals[i], out object result));
+            Assert.Same(copies[i], result);
+        }
+
+        var replacement = new object();
+        context.RecordCopy(originals[0], replacement);
+        Assert.True(context.TryGetCopy(originals[0], out object updated));
+        Assert.Same(replacement, updated);
+        Assert.Throws<ArgumentNullException>(() => context.RecordCopy(null, replacement));
+
+        context.Reset();
+        foreach (var original in originals)
+        {
+            Assert.False(context.TryGetCopy(original, out object _));
+        }
     }
 
     [Fact]
