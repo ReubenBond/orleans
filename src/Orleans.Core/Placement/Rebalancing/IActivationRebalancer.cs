@@ -11,7 +11,6 @@ public interface IActivationRebalancer
 {
     /// <summary>
     /// Returns the rebalancing report.
-    /// <para>The report can lag behind if you choose a session cycle period less than <see cref="IActivationRebalancerMonitor.WorkerReportPeriod"/>.</para>
     /// </summary>
     /// <param name="force">If set to <see langword="true"/> returns the most current report.</param>
     /// <remarks>Using <paramref name="force"/> incurs an asynchronous operation.</remarks>

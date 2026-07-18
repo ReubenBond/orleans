@@ -16,6 +16,42 @@ public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper
     private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(15);
 
     [Fact]
+    public async Task Reports_Should_Be_Available_On_Every_Silo()
+    {
+        var subscriptions = Cluster.GetActiveSilos()
+            .Select(silo =>
+            {
+                var rebalancer = Cluster.GetSiloServiceProvider(silo.SiloAddress).GetRequiredService<IActivationRebalancer>();
+                var listener = new Listener();
+                rebalancer.SubscribeToReports(listener);
+                return (Rebalancer: rebalancer, Listener: listener);
+            })
+            .ToArray();
+
+        try
+        {
+            var reports = subscriptions
+                .Select(subscription => subscription.Listener.WaitForReportAsync(
+                    subscription.Listener.Snapshot.ReportCount,
+                    report => report.Status == RebalancerStatus.Suspended,
+                    "a cluster-wide suspended report"))
+                .ToArray();
+
+            await subscriptions[0].Rebalancer.SuspendRebalancing();
+            var received = await Task.WhenAll(reports);
+
+            Assert.Single(received.Select(report => report.Host).Distinct());
+        }
+        finally
+        {
+            foreach (var (rebalancer, listener) in subscriptions)
+            {
+                rebalancer.UnsubscribeFromReports(listener);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Rebalancer_Should_Be_Controllable_And_Report_To_Listeners()
     {
         var serviceProvider = Cluster.GetSiloServiceProvider();

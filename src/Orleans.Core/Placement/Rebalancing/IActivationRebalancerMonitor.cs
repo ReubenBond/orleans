@@ -8,12 +8,12 @@ namespace Orleans.Placement.Rebalancing;
 internal interface IActivationRebalancerMonitor : ISystemTarget, IActivationRebalancer
 {
     /// <summary>
-    /// The period on which the <see cref="IActivationRebalancerWorker"/> must report back to the monitor.
+    /// The period on which the <see cref="IActivationRebalancerWorker"/> must heartbeat to the designated monitor.
     /// </summary>
-    public static readonly TimeSpan WorkerReportPeriod = TimeSpan.FromSeconds(30);
+    public static readonly TimeSpan WorkerHeartbeatPeriod = TimeSpan.FromSeconds(30);
 
     /// <summary>
-    /// Invoked periodically by the <see cref="IActivationRebalancerWorker"/>.
+    /// Invoked periodically by the <see cref="IActivationRebalancerWorker"/> on the designated monitor.
     /// </summary>
-    [Alias("Report")] Task Report(RebalancingReport report);
+    [Alias("Heartbeat")] Task Heartbeat();
 }

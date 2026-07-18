@@ -10,6 +10,15 @@ namespace Orleans.Configuration;
 public sealed class ActivationRebalancerOptions
 {
     /// <summary>
+    /// Gets or sets dissemination options for rebalancing reports.
+    /// </summary>
+    public DisseminationNamespaceOptions ReportDissemination { get; set; } = new()
+    {
+        ExpectedUpdateCadence = TimeSpan.FromSeconds(30),
+        Priority = DisseminationPriority.High,
+    };
+
+    /// <summary>
     /// The due time for the rebalancer to start the very first session.
     /// </summary>
     public TimeSpan RebalancerDueTime { get; set; } = DEFAULT_REBALANCER_DUE_TIME;
@@ -190,6 +199,14 @@ internal sealed class ActivationRebalancerOptionsValidator(
         if (_options.ScaledEntropyDeviationActivationThreshold < 1_000)
         {
             throw new OrleansConfigurationException($"{nameof(ActivationRebalancerOptions.ScaledEntropyDeviationActivationThreshold)} must be greater than or equal to 1000");
+        }
+
+        var disseminationResult = DisseminationNamespaceOptionsValidator.Validate(
+            $"{nameof(ActivationRebalancerOptions)}.{nameof(ActivationRebalancerOptions.ReportDissemination)}",
+            _options.ReportDissemination);
+        if (disseminationResult.Failed)
+        {
+            throw new OrleansConfigurationException(disseminationResult.FailureMessage);
         }
     }
 }

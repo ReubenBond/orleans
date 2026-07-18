@@ -8,6 +8,11 @@ namespace Orleans.Placement.Rebalancing;
 internal interface IActivationRebalancerWorker : IGrainWithIntegerKey
 {
     /// <summary>
+    /// Confirms that the worker is active.
+    /// </summary>
+    [AlwaysInterleave, Alias("Ping")] Task Ping();
+
+    /// <summary>
     /// Returns the most recent rebalancing report.
     /// </summary>
     /// <remarks>Acts also as a way to wake up the rebalancer, if its deactivated.</remarks>

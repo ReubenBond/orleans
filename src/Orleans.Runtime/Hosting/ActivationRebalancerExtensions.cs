@@ -4,6 +4,7 @@ using Orleans.Runtime;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Configuration.Internal;
 using Orleans.Placement.Rebalancing;
+using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.Placement.Rebalancing;
 
 namespace Orleans.Hosting;
@@ -38,8 +39,13 @@ public static class ActivationRebalancerExtensions
     {
         services.AddSingleton<ActivationRebalancerMonitor>();
         services.AddFromExisting<IActivationRebalancer, ActivationRebalancerMonitor>();
+        services.AddFromExisting<IActivationRebalancerReportReceiver, ActivationRebalancerMonitor>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationRebalancerMonitor>();
+        services.AddSingleton<ActivationRebalancerReportDisseminationNamespace>();
+        services.AddFromExisting<IDisseminationNamespace, ActivationRebalancerReportDisseminationNamespace>();
         services.AddTransient<IConfigurationValidator, ActivationRebalancerOptionsValidator>();
+        services.Configure<DisseminationOptions>(options => options.Enabled = true);
+        services.Configure<ActivationRebalancerOptions>(options => options.ReportDissemination.Enabled = true);
         
         services.AddSingleton<TProvider>();
         services.AddFromExisting<IFailedSessionBackoffProvider, TProvider>();

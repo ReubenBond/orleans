@@ -12,6 +12,7 @@ using Orleans.Configuration;
 using Orleans.Placement;
 using Orleans.Placement.Rebalancing;
 using Orleans.Runtime.Diagnostics;
+using Orleans.Runtime.Dissemination;
 
 
 namespace Orleans.Runtime.Placement.Rebalancing;
@@ -26,7 +27,9 @@ internal sealed partial class ActivationRebalancerWorker(
     IInternalGrainFactory grainFactory,
     ILocalSiloDetails localSiloDetails,
     IOptions<ActivationRebalancerOptions> options,
-    IFailedSessionBackoffProvider backoffProvider)
+    IFailedSessionBackoffProvider backoffProvider,
+    ActivationRebalancerReportDisseminationNamespace reportDissemination,
+    IDisseminationService disseminationService)
         : Grain, IActivationRebalancerWorker, ISiloStatisticsChangeListener, IGrainMigrationParticipant
 {
     private readonly record struct ResourceStatistics(long MemoryUsage, int ActivationCount);
@@ -67,7 +70,7 @@ internal sealed partial class ActivationRebalancerWorker(
     private long _suspendedUntilTs;
     private IGrainTimer? _sessionTimer;
     private IGrainTimer? _triggerTimer;
-    private IGrainTimer? _monitorTimer;
+    private IGrainTimer? _heartbeatTimer;
 
     private readonly ActivationRebalancerOptions _options = options.Value;
     private readonly Dictionary<SiloAddress, ResourceStatistics> _siloStatistics = [];
@@ -80,12 +83,12 @@ internal sealed partial class ActivationRebalancerWorker(
         _ => null
     };
 
-    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        _monitorTimer = this.RegisterGrainTimer(ReportAllMonitors, new()
+        _heartbeatTimer = this.RegisterGrainTimer(SendHeartbeat, new()
         {
             DueTime = TimeSpan.Zero,
-            Period = IActivationRebalancerMonitor.WorkerReportPeriod,
+            Period = IActivationRebalancerMonitor.WorkerHeartbeatPeriod,
         });
 
         _triggerTimer = this.RegisterGrainTimer(TriggerRebalancing, new()
@@ -98,8 +101,7 @@ internal sealed partial class ActivationRebalancerWorker(
         LogScheduledToStart(_options.RebalancerDueTime);
 
         loadPublisher.SubscribeToStatisticsChangeEvents(this);
-
-        return Task.CompletedTask;
+        await PublishReport(cancellationToken);
     }
 
     public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
@@ -158,12 +160,14 @@ internal sealed partial class ActivationRebalancerWorker(
             => _siloStatistics[address] = new(statistics.EnvironmentStatistics.FilteredMemoryUsageBytes, statistics.ActivationCount));
     }
 
+    public Task Ping() => Task.CompletedTask;
+
     public ValueTask<RebalancingReport> GetReport() => new(BuildReport());
 
     public async Task ResumeRebalancing()
     {
         StartSession();
-        await ReportAllMonitors(CancellationToken.None);
+        await PublishReport(CancellationToken.None);
     }
 
     public async Task SuspendRebalancing(TimeSpan? duration)
@@ -179,22 +183,33 @@ internal sealed partial class ActivationRebalancerWorker(
             LogSuspended();
         }
 
-        await ReportAllMonitors(CancellationToken.None);
+        await PublishReport(CancellationToken.None);
     }
 
-    private async Task ReportAllMonitors(CancellationToken cancellationToken)
+    private Task SendHeartbeat(CancellationToken cancellationToken)
     {
-        var tasks = new List<Task>();
-        var report = BuildReport();
-       
-        foreach (var silo in siloStatusOracle.GetActiveSilos())
+        var activeSilos = siloStatusOracle.GetActiveSilos();
+        if (activeSilos.Length == 0)
         {
-            tasks.Add(grainFactory.GetSystemTarget<IActivationRebalancerMonitor>
-                (Constants.ActivationRebalancerMonitorType, silo).Report(report));
+            return Task.CompletedTask;
         }
 
-        await Task.WhenAll(tasks).WaitAsync(cancellationToken);
+        var designatedMonitor = activeSilos[0];
+        for (var i = 1; i < activeSilos.Length; i++)
+        {
+            if (activeSilos[i].CompareTo(designatedMonitor) < 0)
+            {
+                designatedMonitor = activeSilos[i];
+            }
+        }
+
+        return grainFactory.GetSystemTarget<IActivationRebalancerMonitor>(
+            Constants.ActivationRebalancerMonitorType,
+            designatedMonitor).Heartbeat().WaitAsync(cancellationToken);
     }
+
+    private async Task PublishReport(CancellationToken cancellationToken) =>
+        await reportDissemination.PublishAsync(disseminationService, BuildReport(), cancellationToken);
 
     private RebalancingReport BuildReport()
     {
@@ -210,20 +225,20 @@ internal sealed partial class ActivationRebalancerWorker(
         };
     }
 
-    private Task TriggerRebalancing()
+    private async Task TriggerRebalancing()
     {
         if (_sessionTimer != null) 
         {
-            return Task.CompletedTask;
+            return;
         }
 
         if (RemainingSuspensionDuration.HasValue)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         StartSession();
-        return Task.CompletedTask;
+        await PublishReport(CancellationToken.None);
     }
 
     private async Task RunRebalancingCycle(CancellationToken cancellationToken)
@@ -260,6 +275,7 @@ internal sealed partial class ActivationRebalancerWorker(
             cycleStopwatch.Stop();
             ActivationRebalancerEvents.EmitCycleStop(localSiloDetails.SiloAddress, cycleNumber, activationsMigrated, _entropyDeviation, cycleStopwatch.Elapsed, sessionCompleted: false);
             StopSession(StopReason.SessionStagnated);
+            await PublishReport(cancellationToken);
 
             return;
         }
@@ -280,6 +296,7 @@ internal sealed partial class ActivationRebalancerWorker(
             cycleStopwatch.Stop();
             ActivationRebalancerEvents.EmitCycleStop(localSiloDetails.SiloAddress, cycleNumber, activationsMigrated, entropyDeviation, cycleStopwatch.Elapsed, sessionCompleted: true);
             StopSession(StopReason.SessionCompleted);
+            await PublishReport(cancellationToken);
 
             return;
         }
@@ -305,6 +322,7 @@ internal sealed partial class ActivationRebalancerWorker(
             _previousEntropy = currentEntropy;
             cycleStopwatch.Stop();
             ActivationRebalancerEvents.EmitCycleStop(localSiloDetails.SiloAddress, cycleNumber, activationsMigrated, entropyDeviation, cycleStopwatch.Elapsed, sessionCompleted: false);
+            await PublishReport(cancellationToken);
 
             return;
         }
@@ -376,6 +394,7 @@ internal sealed partial class ActivationRebalancerWorker(
         _previousEntropy = currentEntropy;
         cycleStopwatch.Stop();
         ActivationRebalancerEvents.EmitCycleStop(localSiloDetails.SiloAddress, cycleNumber, activationsMigrated, entropyDeviation, cycleStopwatch.Elapsed, sessionCompleted: false);
+        await PublishReport(cancellationToken);
     }
 
     private void UpdateStatistics(SiloAddress lowSilo, SiloAddress highSilo, int delta)

@@ -2,18 +2,24 @@ using System;
 using Orleans.Runtime.Placement.Repartitioning;
 using System.Threading.Tasks;
 using Orleans.Placement.Rebalancing;
-using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Threading;
+using Orleans.Internal;
+using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.Scheduler;
 
 #nullable enable
 
 namespace Orleans.Runtime.Placement.Rebalancing;
 
-internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActivationRebalancerMonitor, ILifecycleParticipant<ISiloLifecycle>
+internal sealed partial class ActivationRebalancerMonitor :
+    SystemTarget,
+    IActivationRebalancerMonitor,
+    IActivationRebalancerReportReceiver,
+    ILifecycleParticipant<ISiloLifecycle>
 {
+    private readonly object _lock = new();
     private IGrainTimer? _monitorTimer;
     private RebalancingReport _latestReport;
     private long _lastHeartbeatTimestamp;
@@ -21,15 +27,19 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     private readonly TimeProvider _timeProvider;
     private readonly ActivationDirectory _activationDirectory;
     private readonly IActivationRebalancerWorker _rebalancerGrain;
+    private readonly ISiloStatusOracle _siloStatusOracle;
+    private readonly SiloAddress _localSilo;
     private readonly ILogger<ActivationRebalancerMonitor> _logger;
     private readonly List<IActivationRebalancerReportListener> _statusListeners = [];
 
-    // Check on the worker with double the period the worker reports to me.
-    private readonly static TimeSpan TimerPeriod = 2 * IActivationRebalancerMonitor.WorkerReportPeriod;
+    // Check on the worker with double the period the worker heartbeats to the designated monitor.
+    private readonly static TimeSpan TimerPeriod = 2 * IActivationRebalancerMonitor.WorkerHeartbeatPeriod;
 
     public ActivationRebalancerMonitor(
         TimeProvider timeProvider,
         ActivationDirectory activationDirectory,
+        ISiloStatusOracle siloStatusOracle,
+        ILocalSiloDetails localSiloDetails,
         ILoggerFactory loggerFactory,
         IGrainFactory grainFactory,
         SystemTargetShared shared)
@@ -37,6 +47,8 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     {
         _timeProvider = timeProvider;
         _activationDirectory = activationDirectory;
+        _siloStatusOracle = siloStatusOracle;
+        _localSilo = localSiloDetails.SiloAddress;
         _logger = loggerFactory.CreateLogger<ActivationRebalancerMonitor>();
         _rebalancerGrain = grainFactory.GetGrain<IActivationRebalancerWorker>(0);
         _lastHeartbeatTimestamp = _timeProvider.GetTimestamp();
@@ -73,17 +85,30 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
         {
             _monitorTimer = RegisterGrainTimer(async ct =>
             {
-                var elapsedSinceHeartbeat = _timeProvider.GetElapsedTime(_lastHeartbeatTimestamp);
-                var shouldFetchReport = SiloAddress.Zero.Equals(_latestReport.Host) ||
-                    elapsedSinceHeartbeat >= IActivationRebalancerMonitor.WorkerReportPeriod;
-
-                if (shouldFetchReport)
+                long lastHeartbeatTimestamp;
+                RebalancingReport latestReport;
+                lock (_lock)
                 {
-                    LogStartingRebalancer(elapsedSinceHeartbeat, IActivationRebalancerMonitor.WorkerReportPeriod);
+                    lastHeartbeatTimestamp = _lastHeartbeatTimestamp;
+                    latestReport = _latestReport;
+                }
 
+                var elapsedSinceHeartbeat = _timeProvider.GetElapsedTime(lastHeartbeatTimestamp);
+                var needsInitialReport = SiloAddress.Zero.Equals(latestReport.Host);
+                var shouldCheckWorker = IsDesignatedMonitor()
+                    && elapsedSinceHeartbeat >= IActivationRebalancerMonitor.WorkerHeartbeatPeriod;
+
+                if (needsInitialReport)
+                {
                     try
                     {
-                        _latestReport = await _rebalancerGrain.GetReport().AsTask().WaitAsync(ct);
+                        var report = await _rebalancerGrain.GetReport().AsTask().WaitAsync(ct);
+                        lock (_lock)
+                        {
+                            _lastHeartbeatTimestamp = _timeProvider.GetTimestamp();
+                        }
+
+                        ReceiveReportCore(report);
                     }
                     catch (OperationCanceledException oce) when (oce.CancellationToken == ct) { }
                     catch (Exception ex)
@@ -91,6 +116,26 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
                         // This is to avoid crashing the silo due to issues like membership being
                         // full with dead silos after an ungraceful shutdown.
                         LogRebalancerReportFailed(ex);
+                    }
+                }
+                else if (shouldCheckWorker)
+                {
+                    LogStartingRebalancer(elapsedSinceHeartbeat, IActivationRebalancerMonitor.WorkerHeartbeatPeriod);
+
+                    try
+                    {
+                        await _rebalancerGrain.Ping().WaitAsync(ct);
+                        lock (_lock)
+                        {
+                            _lastHeartbeatTimestamp = _timeProvider.GetTimestamp();
+                        }
+                    }
+                    catch (OperationCanceledException oce) when (oce.CancellationToken == ct) { }
+                    catch (Exception ex)
+                    {
+                        // This is to avoid crashing the silo due to issues like membership being
+                        // full with dead silos after an ungraceful shutdown.
+                        LogRebalancerWorkerCheckFailed(ex);
                     }
                 }
 
@@ -104,7 +149,13 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
     {
         await this.RunOrQueueTask(() =>
         {
-            if (_latestReport is { } report && Silo.IsSameLogicalSilo(report.Host))
+            RebalancingReport report;
+            lock (_lock)
+            {
+                report = _latestReport;
+            }
+
+            if (Silo.IsSameLogicalSilo(report.Host))
             {
                 if (_activationDirectory.FindTarget(_rebalancerGrain.GetGrainId()) is { } activation)
                 {
@@ -118,32 +169,104 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
         });
     }
 
-    public Task ResumeRebalancing() => _rebalancerGrain.ResumeRebalancing();
-    public Task SuspendRebalancing(TimeSpan? duration) => _rebalancerGrain.SuspendRebalancing(duration);
+    public async Task ResumeRebalancing()
+    {
+        await _rebalancerGrain.ResumeRebalancing();
+        await RefreshReport(notifyListeners: true);
+    }
+
+    public async Task SuspendRebalancing(TimeSpan? duration)
+    {
+        await _rebalancerGrain.SuspendRebalancing(duration);
+        await RefreshReport(notifyListeners: true);
+    }
 
     public async ValueTask<RebalancingReport> GetRebalancingReport(bool force = false)
     {
         if (force)
         {
-            try
-            {
-                _latestReport = await _rebalancerGrain.GetReport();
-            }
-            catch (Exception ex)
-            {
-                LogRebalancerReportFailed(ex);
-            }
+            await RefreshReport(notifyListeners: false);
         }
 
-        return _latestReport;
+        lock (_lock)
+        {
+            return _latestReport;
+        }
     }
 
-    public Task Report(RebalancingReport report)
+    public Task Heartbeat()
     {
-        _latestReport = report;
-        _lastHeartbeatTimestamp = _timeProvider.GetTimestamp();
+        lock (_lock)
+        {
+            _lastHeartbeatTimestamp = _timeProvider.GetTimestamp();
+        }
 
-        foreach (var listener in _statusListeners)
+        return Task.CompletedTask;
+    }
+
+    void IActivationRebalancerReportReceiver.ReceiveReport(RebalancingReport report) =>
+        this.RunOrQueueTask(() =>
+        {
+            ReceiveReportCore(report);
+            return Task.CompletedTask;
+        }).Ignore();
+
+    public void SubscribeToReports(IActivationRebalancerReportListener listener)
+    {
+        lock (_lock)
+        {
+            if (!_statusListeners.Contains(listener))
+            {
+                _statusListeners.Add(listener);
+            }
+        }
+    }
+
+    public void UnsubscribeFromReports(IActivationRebalancerReportListener listener)
+    {
+        lock (_lock)
+        {
+            _statusListeners.Remove(listener);
+        }
+    }
+
+    private async Task RefreshReport(bool notifyListeners)
+    {
+        try
+        {
+            var report = await _rebalancerGrain.GetReport();
+            if (notifyListeners)
+            {
+                await this.RunOrQueueTask(() =>
+                {
+                    ReceiveReportCore(report);
+                    return Task.CompletedTask;
+                });
+            }
+            else
+            {
+                lock (_lock)
+                {
+                    _latestReport = report;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogRebalancerReportFailed(ex);
+        }
+    }
+
+    private void ReceiveReportCore(RebalancingReport report)
+    {
+        IActivationRebalancerReportListener[] listeners;
+        lock (_lock)
+        {
+            _latestReport = report;
+            listeners = [.. _statusListeners];
+        }
+
+        foreach (var listener in listeners)
         {
             try
             {
@@ -154,24 +277,31 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
                 LogErrorWhileNotifyingListener(ex);
             }
         }
-
-        return Task.CompletedTask;
     }
 
-    public void SubscribeToReports(IActivationRebalancerReportListener listener)
+    private bool IsDesignatedMonitor()
     {
-        if (!_statusListeners.Contains(listener))
+        var activeSilos = _siloStatusOracle.GetActiveSilos();
+        if (activeSilos.Length == 0)
         {
-            _statusListeners.Add(listener);
+            return false;
         }
-    }
 
-    public void UnsubscribeFromReports(IActivationRebalancerReportListener listener) =>
-        _statusListeners.Remove(listener);
+        var designatedMonitor = activeSilos[0];
+        for (var i = 1; i < activeSilos.Length; i++)
+        {
+            if (activeSilos[i].CompareTo(designatedMonitor) < 0)
+            {
+                designatedMonitor = activeSilos[i];
+            }
+        }
+
+        return _localSilo.Equals(designatedMonitor);
+    }
 
     [LoggerMessage(
         Level = LogLevel.Trace,
-        Message = "I have not received a report from the activation rebalancer for the last {Duration} which is more than the " +
+        Message = "I have not received a heartbeat from the activation rebalancer for the last {Duration} which is more than the " +
         "allowed interval {Period}. I will now try to wake it up with the assumption that it has has been stopped ungracefully."
     )]
     private partial void LogStartingRebalancer(TimeSpan duration, TimeSpan period);
@@ -194,4 +324,10 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
         Message = "An unexpected error occurred while trying to a grab report from the rebalancer."
     )]
     private partial void LogRebalancerReportFailed(Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "An unexpected error occurred while checking the activation rebalancer worker."
+    )]
+    private partial void LogRebalancerWorkerCheckFailed(Exception exception);
 }

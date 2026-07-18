@@ -71,6 +71,8 @@ namespace Orleans.Configuration
 
         public System.TimeSpan RebalancerDueTime { get { throw null; } set { } }
 
+        public Orleans.Configuration.DisseminationNamespaceOptions ReportDissemination { get { throw null; } set { } }
+
         public bool ScaleAllowedEntropyDeviation { get { throw null; } set { } }
 
         public int ScaledEntropyDeviationActivationThreshold { get { throw null; } set { } }
