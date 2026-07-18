@@ -41,6 +41,47 @@ namespace UnitTests.Serialization
             _grainAddressCodec = fixture.Services.GetRequiredService<IFieldCodec<GrainAddress>>();
         }
 
+        [Fact, TestCategory("BVT")]
+        public void ResponseMessagePool_ClearsState()
+        {
+            var request = new Message
+            {
+                Direction = Message.Directions.Request,
+                Id = new CorrelationId(1),
+                SendingGrain = GrainId.Create("sender", "first"),
+                TargetGrain = GrainId.Create("target", "first"),
+            };
+            var response = messageFactory.CreateResponseMessage(request);
+            response.BodyObject = new object();
+            response.Result = Message.ResponseTypes.Error;
+            response.RetryCount = 3;
+            response.InterfaceType = new GrainInterfaceType("interface");
+            response.InterfaceVersion = 7;
+            response.RequestContextData = new Dictionary<string, object> { ["key"] = "value" };
+
+            messageFactory.Release(response);
+
+            var nextRequest = new Message
+            {
+                Direction = Message.Directions.Request,
+                Id = new CorrelationId(2),
+                SendingGrain = GrainId.Create("sender", "second"),
+                TargetGrain = GrainId.Create("target", "second"),
+            };
+            var reused = messageFactory.CreateResponseMessage(nextRequest);
+
+            Assert.Same(response, reused);
+            Assert.Null(reused.BodyObject);
+            Assert.Equal(Message.ResponseTypes.None, reused.Result);
+            Assert.Equal(0, reused.RetryCount);
+            Assert.True(reused.InterfaceType.IsDefault);
+            Assert.Equal(0, reused.InterfaceVersion);
+            Assert.Null(reused.RequestContextData);
+            Assert.Equal(nextRequest.Id, reused.Id);
+            Assert.Equal(nextRequest.SendingGrain, reused.TargetGrain);
+            Assert.Equal(nextRequest.TargetGrain, reused.SendingGrain);
+        }
+
         [Fact, TestCategory("Functional")]
         public async Task MessageTest_TtlUpdatedOnAccess()
         {

@@ -38,6 +38,23 @@ namespace Orleans.Runtime
 
         public PackedHeaders Headers { get => _headers; set => _headers = value; }
 
+        internal void Reset()
+        {
+            _retryCount = 0;
+            _timeToExpiry = default;
+            BodyObject = null;
+            _headers = default;
+            _id = default;
+            _requestContextData = null;
+            _targetSilo = null;
+            _targetGrain = default;
+            _sendingSilo = null;
+            _sendingGrain = default;
+            _interfaceVersion = 0;
+            _interfaceType = default;
+            _cacheInvalidationHeader = null;
+        }
+
         [GenerateSerializer]
         public enum Directions : byte
         {

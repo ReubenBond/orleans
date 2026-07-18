@@ -378,8 +378,8 @@ namespace Orleans.Runtime.Messaging
                     {
                         while (inflight.Count < inflight.Capacity && reader.TryRead(out message) && this.PrepareMessageForSend(message))
                         {
-                            inflight.Add(message);
                             var (headerLength, bodyLength) = serializer.Write(output, message);
+                            inflight.Add(message);
                             RecordMessageSend(message, headerLength + bodyLength, headerLength);
                             messageObserver?.Invoke(message);
                             message = null;
@@ -397,6 +397,14 @@ namespace Orleans.Runtime.Messaging
                     if (flushResult.IsCompleted || flushResult.IsCanceled)
                     {
                         break;
+                    }
+
+                    foreach (var sentMessage in inflight)
+                    {
+                        if (sentMessage.Direction is Message.Directions.Response)
+                        {
+                            MessageFactory.Release(sentMessage);
+                        }
                     }
 
                     inflight.Clear();

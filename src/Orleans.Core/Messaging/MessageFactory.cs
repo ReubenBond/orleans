@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.ObjectPool;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 
@@ -18,6 +19,9 @@ namespace Orleans.Runtime
         private readonly DeepCopier _deepCopier;
         private readonly ILogger _logger;
         private readonly MessagingTrace _messagingTrace;
+        private readonly ObjectPool<Message> _messagePool = new DefaultObjectPool<Message>(
+            new DefaultPooledObjectPolicy<Message>(),
+            maximumRetained: 1024);
 
         public MessageFactory(DeepCopier deepCopier, ILogger<MessageFactory> logger, MessagingTrace messagingTrace)
         {
@@ -55,24 +59,28 @@ namespace Orleans.Runtime
 
         public Message CreateResponseMessage(Message request)
         {
-            var response = new Message
-            {
-                IsSystemMessage = request.IsSystemMessage,
-                Direction = Message.Directions.Response,
-                Id = request.Id,
-                IsReadOnly = request.IsReadOnly,
-                IsAlwaysInterleave = request.IsAlwaysInterleave,
-                TargetSilo = request.SendingSilo,
-                TargetGrain = request.SendingGrain,
-                SendingSilo = request.TargetSilo,
-                SendingGrain = request.TargetGrain,
-                CacheInvalidationHeader = request.CacheInvalidationHeader,
-                TimeToLive = request.TimeToLive,
-                RequestContextData = RequestContextExtensions.Export(_deepCopier),
-            };
+            var response = _messagePool.Get();
+            response.IsSystemMessage = request.IsSystemMessage;
+            response.Direction = Message.Directions.Response;
+            response.Id = request.Id;
+            response.IsReadOnly = request.IsReadOnly;
+            response.IsAlwaysInterleave = request.IsAlwaysInterleave;
+            response.TargetSilo = request.SendingSilo;
+            response.TargetGrain = request.SendingGrain;
+            response.SendingSilo = request.TargetSilo;
+            response.SendingGrain = request.TargetGrain;
+            response.CacheInvalidationHeader = request.CacheInvalidationHeader;
+            response.TimeToLive = request.TimeToLive;
+            response.RequestContextData = RequestContextExtensions.Export(_deepCopier);
 
             _messagingTrace.OnCreateMessage(response);
             return response;
+        }
+
+        internal void Release(Message message)
+        {
+            message.Reset();
+            _messagePool.Return(message);
         }
 
         public Message CreateRejectionResponse(Message request, Message.RejectionTypes type, string info, Exception ex = null)
