@@ -8,7 +8,6 @@ using System.Linq;
 using System.Reflection.Metadata;
 #endif
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 #nullable disable
 namespace Orleans.Serialization.Session
@@ -19,7 +18,6 @@ namespace Orleans.Serialization.Session
     public sealed class ReferencedObjectCollection
     {
         private const int InlineCapacity = 32;
-        private const int MaxRetainedOverflowCapacity = 1_024;
 
         private struct ReferencePair
         {
@@ -40,11 +38,9 @@ namespace Orleans.Serialization.Session
         internal int ReferenceToObjectCount;
         private readonly ReferencePair[] _referenceToObject = new ReferencePair[InlineCapacity];
 
-        private int _objectToReferenceCount;
-        private readonly ReferencePair[] _objectToReference = new ReferencePair[InlineCapacity];
-
-        private Dictionary<uint, object> _referenceToObjectOverflow;
-        private Dictionary<object, uint> _objectToReferenceOverflow;
+        private readonly ReferenceIdMap _referenceToObjectMap = new();
+        private bool _hasReferenceToObjectOverflow;
+        private readonly ReferenceIdentityMap<uint> _objectToReferenceMap = new();
         private uint _currentReferenceId;
 
         /// <summary>
@@ -61,7 +57,7 @@ namespace Orleans.Serialization.Session
                     return refs[i].Object;
             }
 
-            if (_referenceToObjectOverflow is { } overflow && overflow.TryGetValue(reference, out var value))
+            if (_hasReferenceToObjectOverflow && _referenceToObjectMap.TryGetValue(reference, out var value))
                 return value;
 
             return null;
@@ -94,60 +90,7 @@ namespace Orleans.Serialization.Session
                 return true;
             }
 
-            var objects = _objectToReference.AsSpan(0, _objectToReferenceCount);
-            for (int i = 0; i < objects.Length; ++i)
-            {
-                if (objects[i].Object == value)
-                {
-                    reference = objects[i].Id;
-                    return true;
-                }
-            }
-
-            if (_objectToReferenceOverflow is { } overflow)
-            {
-#if NET6_0_OR_GREATER
-                ref var refValue = ref CollectionsMarshal.GetValueRefOrAddDefault(overflow, value, out var exists);
-                if (exists)
-                {
-                    reference = refValue;
-                    return true;
-                }
-
-                refValue = nextReference;
-                Unsafe.SkipInit(out reference);
-                return false;
-#else
-                if (overflow.TryGetValue(value, out var existing))
-                {
-                    reference = existing;
-                    return true;
-                }
-                else
-                {
-                    overflow[value] = nextReference;
-                    Unsafe.SkipInit(out reference);
-                    return false;
-                }
-#endif
-            }
-
-            // Add the reference.
-            var objectsArray = _objectToReference;
-            var objectsCount = _objectToReferenceCount;
-            if ((uint)objectsCount < (uint)objectsArray.Length)
-            {
-                _objectToReferenceCount = objectsCount + 1;
-                objectsArray[objectsCount].Id = nextReference;
-                objectsArray[objectsCount].Object = value;
-            }
-            else
-            {
-                CreateObjectToReferenceOverflow(value);
-            }
-
-            Unsafe.SkipInit(out reference);
-            return false;
+            return _objectToReferenceMap.GetOrAdd(value, nextReference, out reference);
         }
 
         /// <summary>
@@ -172,49 +115,21 @@ namespace Orleans.Serialization.Session
                 }
             }
 
-            if (_referenceToObjectOverflow is { } overflow)
+            if (_hasReferenceToObjectOverflow)
             {
-                var index = 0;
-                foreach (var entry in overflow)
-                {
-                    if (ReferenceEquals(entry.Value, value))
-                    {
-                        return index;
-                    }
-
-                    index++;
-                }
+                return _referenceToObjectMap.IndexOfValue(value);
             }
 
             return -1;
         }
 
-        internal bool HasReferenceToObjectOverflow => _referenceToObjectOverflow is not null;
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        private void CreateObjectToReferenceOverflow(object value)
-        {
-            var result = new Dictionary<object, uint>(_objectToReferenceCount * 2, ReferenceEqualsComparer.Default);
-            var objects = _objectToReference;
-            for (var i = 0; i < objects.Length; i++)
-            {
-                var record = objects[i];
-                result[record.Object] = record.Id;
-                objects[i] = default;
-            }
-
-            result[value] = _currentReferenceId;
-
-            _objectToReferenceCount = 0;
-            _objectToReferenceOverflow = result;
-        }
+        internal bool HasReferenceToObjectOverflow => _hasReferenceToObjectOverflow;
 
         private void AddToReferences(object value, uint reference)
         {
-            if (_referenceToObjectOverflow is { } overflow)
+            if (_hasReferenceToObjectOverflow)
             {
-#if NET6_0_OR_GREATER
-                ref var refValue = ref CollectionsMarshal.GetValueRefOrAddDefault(overflow, reference, out var exists);
+                ref var refValue = ref _referenceToObjectMap.GetValueRefOrAddDefault(reference, out var exists);
                 if (exists && value is not UnknownFieldMarker && refValue is not UnknownFieldMarker)
                 {
                     // Unknown field markers can be replaced once the type is known.
@@ -222,15 +137,6 @@ namespace Orleans.Serialization.Session
                 }
 
                 refValue = value;
-#else
-                if (overflow.TryGetValue(reference, out var existing) && value is not UnknownFieldMarker && existing is not UnknownFieldMarker)
-                {
-                    // Unknown field markers can be replaced once the type is known.
-                    ThrowReferenceExistsException(reference);
-                }
-
-                overflow[reference] = value;
-#endif
             }
             else
             {
@@ -260,17 +166,17 @@ namespace Orleans.Serialization.Session
             [MethodImpl(MethodImplOptions.NoInlining)]
             void CreateReferenceToObjectOverflow()
             {
-                var result = new Dictionary<uint, object>(ReferenceToObjectCount * 2);
+                var map = _referenceToObjectMap;
                 var refs = _referenceToObject.AsSpan(0, ReferenceToObjectCount);
                 for (var i = 0; i < refs.Length; i++)
                 {
                     var record = refs[i];
-                    result[record.Id] = record.Object;
+                    map.GetValueRefOrAddDefault(record.Id, out _) = record.Object;
                     refs[i] = default;
                 }
 
                 ReferenceToObjectCount = 0;
-                _referenceToObjectOverflow = result;
+                _hasReferenceToObjectOverflow = true;
             }
         }
 
@@ -306,9 +212,11 @@ namespace Orleans.Serialization.Session
         /// <returns>A copy of the reference table.</returns>
         public Dictionary<uint, object> CopyReferenceTable()
         {
-            if (_referenceToObjectOverflow is { } overflow)
+            if (_hasReferenceToObjectOverflow)
             {
-                return new(overflow);
+                var result = new Dictionary<uint, object>(_referenceToObjectMap.Count);
+                _referenceToObjectMap.ForEach(result, static (state, key, value) => state[key] = value);
+                return result;
             }
 
             return _referenceToObject.Take(ReferenceToObjectCount).ToDictionary(r => r.Id, r => r.Object);
@@ -320,12 +228,9 @@ namespace Orleans.Serialization.Session
         /// <returns>A copy of the identifier table.</returns>
         public Dictionary<object, uint> CopyIdTable()
         {
-            if (_objectToReferenceOverflow is { } overflow)
-            {
-                return new(overflow, ReferenceEqualsComparer.Default);
-            }
-
-            return _objectToReference.Take(_objectToReferenceCount).ToDictionary(r => r.Object, r => r.Id, ReferenceEqualsComparer.Default);
+            var result = new Dictionary<object, uint>(_objectToReferenceMap.Count, ReferenceEqualsComparer.Default);
+            _objectToReferenceMap.ForEach(result, static (state, key, value) => state[key] = value);
+            return result;
         }
 
         /// <summary>
@@ -341,30 +246,14 @@ namespace Orleans.Serialization.Session
         public void Reset()
         {
             _referenceToObject.AsSpan(0, ReferenceToObjectCount).Clear();
-            _objectToReference.AsSpan(0, _objectToReferenceCount).Clear();
 
             ReferenceToObjectCount = 0;
-            _objectToReferenceCount = 0;
             CurrentReferenceId = 0;
 
-            ResetOverflow(ref _referenceToObjectOverflow);
-            ResetOverflow(ref _objectToReferenceOverflow);
-        }
-
-        private static void ResetOverflow<TKey, TValue>(ref Dictionary<TKey, TValue> overflow)
-        {
-            if (overflow is null)
+            _objectToReferenceMap.Reset();
+            if (_hasReferenceToObjectOverflow)
             {
-                return;
-            }
-
-            if (overflow.EnsureCapacity(0) <= MaxRetainedOverflowCapacity)
-            {
-                overflow.Clear();
-            }
-            else
-            {
-                overflow = null;
+                _referenceToObjectMap.Reset();
             }
         }
     }
