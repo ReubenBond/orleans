@@ -233,10 +233,14 @@ namespace Orleans.Serialization.Cloning
         /// <param name="copy">The copy of <paramref name="original"/>.</param>
         public void RecordCopy(object original, object copy)
         {
+#if NET6_0_OR_GREATER
+            ArgumentNullException.ThrowIfNull(original);
+#else
             if (original is null)
             {
                 throw new ArgumentNullException(nameof(original));
             }
+#endif
 
             _copies.Set(original, copy);
         }
