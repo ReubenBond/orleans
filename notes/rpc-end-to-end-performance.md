@@ -132,3 +132,39 @@ observed when collecting CPU stacks with EventPipe on Windows ARM64.
 The remaining dominant managed costs are message serialization/deserialization,
 callback bookkeeping, and request/message allocation. They require broader
 protocol or ownership changes than the retained connection-local optimizations.
+
+## Follow-up from the complete branch
+
+A follow-up on `perf/optimize-end-to-end-silo-calls` measured the complete branch,
+including reference-table reset and response-envelope pooling, at **880,101
+calls/s** with 3.72% run standard deviation and 961.7 B/call. The unchanged
+hosted-client control measured 4,025,150 calls/s with 4.64% standard deviation.
+
+PerfView collected a 44.38-second ETW trace with 166,971 CPU samples, 532,658
+PMC samples, and zero lost events. The measurement window attributed the largest
+Orleans-exclusive costs to:
+
+- `MessageSerializer.Write`: 3,392 ms
+- `MessageSerializer.TryRead`: 2,446 ms
+- `MessageCenter.SendMessage`: 1,439 ms
+- `CachingIdSpanCodec.ReadRaw`: 1,269 ms
+- `CachingSiloAddressCodec.WriteRaw`: 1,224 ms
+- `CachingSiloAddressCodec.ReadRaw`: 1,058 ms
+- callback dictionary removal/addition: 864 ms / 397 ms
+
+The PMC capture includes branch instructions, branch mispredictions, data-cache
+misses, retired instructions, and cycles. The events are retained but are not
+converted into normalized per-call rates, so no counter-based improvement is
+claimed.
+
+Two follow-up experiments were rejected:
+
+| Experiment | Result |
+|---|---|
+| Replace the ID-span reader dictionary and time-based maintenance with a bounded direct-mapped cache | 878,677 calls/s, versus 880,101/s baseline; noise |
+| Key inside-silo callbacks only by correlation ID, removing the redundant grain ID from dictionary nodes | 872,360 calls/s; median moved from 862k/s to 854k/s |
+
+Both experiments and their tests were removed. The trace and summaries are under
+`Artifacts\Benchmarks\Rpc\next`. The pvanalyze fork gained native EventPipe
+collection in [ReubenBond/pvanalyze#4](https://github.com/ReubenBond/pvanalyze/pull/4);
+PerfView remains the collector used for Windows ETW CPU and hardware-counter data.
