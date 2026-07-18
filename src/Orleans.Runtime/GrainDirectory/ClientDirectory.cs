@@ -4,10 +4,12 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
 
@@ -19,16 +21,14 @@ namespace Orleans.Runtime.GrainDirectory;
 /// <remarks>
 /// <see cref="ClientDirectory"/> maintains routing information for all known clients and offers consumers the ability to lookup
 /// clients by their <see cref="GrainId"/>.
-/// To accomplish this, <see cref="ClientDirectory"/> monitors locally connected clients and cluster membership changes. In addition,
-/// known routes are periodically shared with remote silos in a ring-fashion. Each silo will push updates to the next silo in the ring.
-/// When a silo receives an update, it incorporates it into its routing table. If the update caused a change in the routing table, then
-/// the silo will propagate its updates routing table to the next silo. This process continues until all silos converge.
+/// To accomplish this, <see cref="ClientDirectory"/> monitors locally connected clients and cluster membership changes. Known routes
+/// are disseminated efficiently across the cluster, with the legacy ring-based protocol retained as a fallback.
 /// Each <see cref="ClientDirectory"/> maintains an internal version number which represents its view of the locally connected clients.
-/// This version number is propagated around the ring during updates and is used to determine when a remote silo's set of locally connected clients
-/// has updated.
+/// This version is used to determine when a remote silo's set of locally connected clients has changed and to produce delta updates.
 /// The process of removing defunct clients is left to the <see cref="IConnectedClientCollection"/> implementation on each silo.
 /// </remarks>
-internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirectory, IRemoteClientDirectory, ILifecycleParticipant<ISiloLifecycle>
+internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirectory, IRemoteClientDirectory,
+    IClientDirectoryDisseminationParticipant, ILifecycleParticipant<ISiloLifecycle>
 {
     private readonly SimpleConsistentRingProvider _consistentRing;
     private readonly IInternalGrainFactory _grainFactory;
@@ -37,6 +37,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     private readonly SiloAddress _localSilo;
     private readonly IClusterMembershipService _clusterMembershipService;
     private readonly SiloMessagingOptions _messagingOptions;
+    private readonly IServiceProvider _serviceProvider;
     private readonly CancellationTokenSource _shutdownCts = new();
 #if NET9_0_OR_GREATER
     private readonly Lock _lockObj = new();
@@ -51,6 +52,9 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     private long _observedConnectedClientsVersion = -1;
     private long _localVersion = 1;
     private IRemoteClientDirectory[] _remoteDirectories = Array.Empty<IRemoteClientDirectory>();
+    private long _disseminatedLocalVersion;
+    private long _legacyUpdateVersion;
+    private long _publishedLegacyUpdateVersion;
     private ImmutableHashSet<GrainId> _localClients = ImmutableHashSet<GrainId>.Empty;
     private ImmutableDictionary<GrainId, List<GrainAddress>> _currentSnapshot = ImmutableDictionary<GrainId, List<GrainAddress>>.Empty;
     private ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)> _table = ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>.Empty;
@@ -68,6 +72,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         IClusterMembershipService clusterMembershipService,
         IAsyncTimerFactory timerFactory,
         IConnectedClientCollection connectedClients,
+        IServiceProvider serviceProvider,
         SystemTargetShared shared)
         : base(Constants.ClientDirectoryType, shared)
     {
@@ -76,6 +81,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         _localSilo = siloDetails.SiloAddress;
         _clusterMembershipService = clusterMembershipService;
         _messagingOptions = messagingOptions.Value;
+        _serviceProvider = serviceProvider;
         _logger = loggerFactory.CreateLogger<ClientDirectory>();
         _refreshTimer = timerFactory.Create(_messagingOptions.ClientRegistrationRefresh, "ClientDirectory.RefreshTimer");
         _connectedClients = connectedClients;
@@ -112,7 +118,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
                     // If updates were found, update our view
                     if (delta is not null && delta.Count > 0)
                     {
-                        UpdateRoutingTable(delta);
+                        UpdateRoutingTableFromLegacy(delta);
                     }
                 }
                 catch (Exception exception) when (attemptsRemaining > 0)
@@ -178,7 +184,7 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
     public Task OnUpdateClientRoutes(ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)> update)
     {
-        UpdateRoutingTable(update);
+        UpdateRoutingTableFromLegacy(update);
         if (ShouldPublish())
         {
             LogDebugClientTableUpdated();
@@ -190,6 +196,17 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         }
 
         return Task.CompletedTask;
+    }
+
+    private void UpdateRoutingTableFromLegacy(
+        ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)> update)
+    {
+        var previousTable = _table;
+        UpdateRoutingTable(update);
+        if (!ReferenceEquals(previousTable, _table))
+        {
+            Interlocked.Increment(ref _legacyUpdateVersion);
+        }
     }
 
     public Task<ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>> GetClientRoutes(ImmutableDictionary<SiloAddress, long> knownRoutes)
@@ -402,11 +419,18 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
     private bool ShouldPublish()
     {
         EnsureRefreshed();
+        var disseminationEnabled = IsDisseminationEnabled();
         lock (_lockObj)
         {
             if (_nextPublishTask is Task task && !task.IsCompleted)
             {
                 return false;
+            }
+
+            if (disseminationEnabled)
+            {
+                return _localVersion > _disseminatedLocalVersion
+                    || Volatile.Read(ref _legacyUpdateVersion) > Volatile.Read(ref _publishedLegacyUpdateVersion);
             }
 
             if (!ReferenceEquals(_table, _publishedTable))
@@ -441,6 +465,38 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
     private async Task PublishUpdates()
     {
+        EnsureRefreshed();
+        var disseminationEnabled = IsDisseminationEnabled();
+        var localVersion = _localVersion;
+        var legacyUpdateVersion = Volatile.Read(ref _legacyUpdateVersion);
+        var disseminationFailed = false;
+        if (disseminationEnabled)
+        {
+            if (localVersion > _disseminatedLocalVersion)
+            {
+                if (await TryPublishViaDissemination(localVersion))
+                {
+                    _disseminatedLocalVersion = Math.Max(_disseminatedLocalVersion, localVersion);
+                }
+                else
+                {
+                    disseminationFailed = true;
+                }
+            }
+
+            if (!disseminationFailed
+                && legacyUpdateVersion <= Volatile.Read(ref _publishedLegacyUpdateVersion))
+            {
+                _nextPublishTask = null;
+                if (ShouldPublish())
+                {
+                    _schedulePublishUpdate();
+                }
+
+                return;
+            }
+        }
+
         // Publish clients to the next two silos in the ring
         var successor = _consistentRing.Successor;
         if (successor is null)
@@ -506,8 +562,15 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
 
             LogDebugSuccessfullyPublishedRoutes(successor);
 
+            if (legacyUpdateVersion > Volatile.Read(ref _publishedLegacyUpdateVersion))
+            {
+                Volatile.Write(ref _publishedLegacyUpdateVersion, legacyUpdateVersion);
+            }
+
             _nextPublishTask = null;
-            if (ShouldPublish())
+            var updateArrivedDuringPublish = _localVersion > localVersion
+                || Volatile.Read(ref _legacyUpdateVersion) > legacyUpdateVersion;
+            if ((!disseminationFailed || updateArrivedDuringPublish) && ShouldPublish())
             {
                 _schedulePublishUpdate();
             }
@@ -515,6 +578,92 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         catch (Exception exception)
         {
             LogErrorPublishingClientRoutingTableToSilo(exception, successor);
+        }
+    }
+
+    private bool IsDisseminationEnabled()
+    {
+        var globalOptions = _serviceProvider.GetService<IOptionsMonitor<DisseminationOptions>>();
+        var disseminationNamespace = _serviceProvider.GetService<ClientDirectoryDisseminationNamespace>();
+        return globalOptions?.CurrentValue.Enabled is true
+            && disseminationNamespace?.Options.Enabled is true;
+    }
+
+    private async Task<bool> TryPublishViaDissemination(long version)
+    {
+        try
+        {
+            var disseminationService = _serviceProvider.GetService<IDisseminationService>();
+            var disseminationNamespace = _serviceProvider.GetService<ClientDirectoryDisseminationNamespace>();
+            if (disseminationService is null || disseminationNamespace is null)
+            {
+                return false;
+            }
+
+            return await disseminationNamespace.PublishAsync(
+                disseminationService,
+                _localSilo,
+                version,
+                _shutdownCts.Token);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !_shutdownCts.IsCancellationRequested)
+        {
+            LogDebugClientDirectoryDisseminationFailed(exception);
+            return false;
+        }
+    }
+
+    ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId> ConnectedClients, long Version)>
+        IClientDirectoryDisseminationParticipant.GetRoutesForDissemination()
+    {
+        EnsureRefreshed();
+        lock (_lockObj)
+        {
+            return _table;
+        }
+    }
+
+    DisseminationApplyResult IClientDirectoryDisseminationParticipant.ApplyDisseminatedRoute(
+        SiloAddress siloAddress,
+        long? expectedVersion,
+        ClientDirectoryRoute route)
+    {
+        lock (_lockObj)
+        {
+            if (siloAddress.Equals(_localSilo)
+                || _clusterMembershipService.CurrentSnapshot.GetSiloStatus(siloAddress).IsTerminating())
+            {
+                return DisseminationApplyResult.Rejected;
+            }
+
+            if (_table.TryGetValue(siloAddress, out var current))
+            {
+                if (route.Version < current.Version)
+                {
+                    return DisseminationApplyResult.Obsolete;
+                }
+
+                if (route.Version == current.Version)
+                {
+                    return current.ConnectedClients.SetEquals(route.ConnectedClients)
+                        ? DisseminationApplyResult.Duplicate
+                        : DisseminationApplyResult.Rejected;
+                }
+
+                if (expectedVersion is { } version && current.Version != version)
+                {
+                    return DisseminationApplyResult.Rejected;
+                }
+            }
+            else if (expectedVersion is not null)
+            {
+                return DisseminationApplyResult.Rejected;
+            }
+
+            UpdateRoutingTable(ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty.Add(
+                siloAddress,
+                (route.ConnectedClients, route.Version)));
+            return DisseminationApplyResult.Applied;
         }
     }
 
@@ -561,6 +710,12 @@ internal sealed partial class ClientDirectory : SystemTarget, ILocalClientDirect
         Message = "Exception calling remote client directory"
     )]
     private partial void LogErrorCallingRemoteClientDirectory(Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Client directory dissemination failed. Falling back to legacy ring propagation."
+    )]
+    private partial void LogDebugClientDirectoryDisseminationFailed(Exception exception);
 
     [LoggerMessage(
         EventId = 0,

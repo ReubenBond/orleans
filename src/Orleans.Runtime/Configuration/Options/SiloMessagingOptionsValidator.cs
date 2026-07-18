@@ -12,7 +12,9 @@ namespace Orleans.Configuration
                 return ValidateOptionsResult.Fail($"Value for {nameof(SiloMessagingOptions)}.{nameof(SiloMessagingOptions.MaxForwardCount)} must not be greater than 255.");
             }
 
-            return ValidateOptionsResult.Success;
+            return DisseminationNamespaceOptionsValidator.Validate(
+                $"{nameof(SiloMessagingOptions)}.{nameof(SiloMessagingOptions.ClientDirectoryDissemination)}",
+                options.ClientDirectoryDissemination);
         }
     }
 }

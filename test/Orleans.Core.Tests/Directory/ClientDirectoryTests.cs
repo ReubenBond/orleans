@@ -10,9 +10,11 @@ using NSubstitute;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Scheduler;
+using Orleans.Serialization;
 using UnitTests.Directory;
 using Xunit;
 
@@ -31,6 +33,7 @@ namespace NonSilo.Tests.Directory
         private readonly DelegateAsyncTimerFactory _timerFactory;
         private readonly MockClusterMembershipService _clusterMembershipService;
         private readonly IInternalGrainFactory _grainFactory;
+        private readonly IServiceProvider _serviceProvider;
         private readonly ClientDirectory _directory;
         private readonly ClientDirectory.TestAccessor _testAccessor;
         private readonly IConnectedClientCollection _connectedClientCollection;
@@ -73,6 +76,7 @@ namespace NonSilo.Tests.Directory
             _grainFactory = Substitute.For<IInternalGrainFactory>();
             _grainFactory.GetSystemTarget<IRemoteClientDirectory>(default, default)
                 .ReturnsForAnyArgs(info => _remoteDirectories.GetOrAdd(info.ArgAt<SiloAddress>(1), k => Substitute.For<IRemoteClientDirectory>()));
+            _serviceProvider = Substitute.For<IServiceProvider>();
             var systemTargetShared = new SystemTargetShared(
                 runtimeClient: null!,
                 localSiloDetails: _localSiloDetails,
@@ -94,6 +98,7 @@ namespace NonSilo.Tests.Directory
                 clusterMembershipService: _clusterMembershipService,
                 timerFactory: _timerFactory,
                 connectedClients: _connectedClientCollection,
+                serviceProvider: _serviceProvider,
                 shared: systemTargetShared);
             _testAccessor = new ClientDirectory.TestAccessor(_directory);
 
@@ -401,6 +406,71 @@ namespace NonSilo.Tests.Directory
             Assert.Equal(1, totalUpdateCalls[0]);
         }
 
+        [Fact]
+        public async Task PublishesClientRouteDeltasViaDissemination()
+        {
+            using var serializerServices = new ServiceCollection().AddSerializer().BuildServiceProvider();
+            var serializer = serializerServices.GetRequiredService<Serializer>();
+            var globalOptions = Substitute.For<IOptionsMonitor<DisseminationOptions>>();
+            globalOptions.CurrentValue.Returns(new DisseminationOptions { Enabled = true });
+            _messagingOptions.Value.ClientDirectoryDissemination.Enabled = true;
+            var disseminationNamespace = new ClientDirectoryDisseminationNamespace(
+                (IClientDirectoryDisseminationParticipant)_directory,
+                _messagingOptions,
+                serializer);
+            var disseminationService = new FakeDisseminationService();
+            _serviceProvider.GetService(typeof(IOptionsMonitor<DisseminationOptions>)).Returns(globalOptions);
+            _serviceProvider.GetService(typeof(ClientDirectoryDisseminationNamespace)).Returns(disseminationNamespace);
+            _serviceProvider.GetService(typeof(IDisseminationService)).Returns(disseminationService);
+            var originalClients = Enumerable.Range(0, 32).Select(index => Client($"client-{index}")).ToList();
+            SetLocalClients(originalClients);
+
+            await _testAccessor.PublishUpdates();
+
+            var first = Assert.Single(disseminationService.Values);
+            Assert.Equal((0, 2), (first.FromVersion, first.ToVersion));
+            Assert.NotNull(serializer.Deserialize<ClientDirectoryRouteUpdate>(first.Payload).Snapshot);
+
+            var removedClient = originalClients[0];
+            var addedClient = Client("added");
+            var updatedClients = originalClients.Skip(1).Append(addedClient).ToList();
+            SetLocalClients(updatedClients);
+
+            await _testAccessor.PublishUpdates();
+
+            Assert.Equal(2, disseminationService.Values.Count);
+            var second = disseminationService.Values[1];
+            Assert.Equal((2, 3), (second.FromVersion, second.ToVersion));
+            var delta = Assert.IsType<ClientDirectoryRouteDelta>(
+                serializer.Deserialize<ClientDirectoryRouteUpdate>(second.Payload).Delta);
+            Assert.Equal(addedClient, Assert.Single(delta.AddedClients));
+            Assert.Equal(removedClient, Assert.Single(delta.RemovedClients));
+            Assert.Empty(_remoteDirectories);
+
+            var scheduledLegacyForward = false;
+            _testAccessor.SchedulePublishUpdate = () => scheduledLegacyForward = true;
+            var remoteSilo = Silo("127.0.0.1:222@100");
+            _clusterMembershipService.UpdateSiloStatus(remoteSilo, SiloStatus.Active, "remote-silo");
+            await _directory.OnUpdateClientRoutes(
+                ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty.Add(
+                    remoteSilo,
+                    (ImmutableHashSet.Create(Client("remote")), 2)));
+            Assert.True(scheduledLegacyForward);
+
+            scheduledLegacyForward = false;
+            var pulledSilo = Silo("127.0.0.1:333@100");
+            var pulledClient = Client("pulled");
+            _clusterMembershipService.UpdateSiloStatus(pulledSilo, SiloStatus.Active, "pulled-silo");
+            _remoteDirectories.GetOrAdd(pulledSilo, Substitute.For<IRemoteClientDirectory>())
+                .GetClientRoutes(default)
+                .ReturnsForAnyArgs(
+                    ImmutableDictionary<SiloAddress, (ImmutableHashSet<GrainId>, long)>.Empty.Add(
+                        pulledSilo,
+                        (ImmutableHashSet.Create(pulledClient), 2)));
+            Assert.Single(await _directory.Lookup(pulledClient));
+            Assert.True(scheduledLegacyForward);
+        }
+
         private static SiloAddress Silo(string value) => SiloAddress.FromParsableString(value);
 
         private static GrainId Client(string id) => ClientGrainId.Create(id).GrainId;
@@ -411,6 +481,32 @@ namespace NonSilo.Tests.Directory
             _connectedClientCollection.GetConnectedClientIds().ReturnsForAnyArgs(_ => clients);
             _connectedClientCollection.Version.ReturnsForAnyArgs(_ => clientCollectionVersion);
             return clientCollectionVersion;
+        }
+
+        private sealed class FakeDisseminationService : IDisseminationService
+        {
+            private long? _knownVersion;
+
+            public List<DisseminationValue> Values { get; } = [];
+
+            public ValueTask<bool> Publish(
+                IDisseminationNamespace disseminationNamespace,
+                DisseminationKey key,
+                long version,
+                CancellationToken cancellationToken)
+            {
+                var repair = disseminationNamespace.CreateRepair(new DisseminationRepairRequest(
+                    key,
+                    _knownVersion,
+                    version,
+                    maxItemCount: 1,
+                    maxBatchBytes: 1024 * 1024,
+                    maxPayloadBytes: disseminationNamespace.Options.MaxPayloadBytes));
+                Assert.Equal(DisseminationRepairStatus.Produced, repair.Status);
+                Values.AddRange(repair.Values);
+                _knownVersion = repair.Version;
+                return ValueTask.FromResult(true);
+            }
         }
     }
 }

@@ -46,6 +46,14 @@ namespace Orleans.Configuration
         public TimeSpan ClientRegistrationRefresh { get; set; } = DEFAULT_CLIENT_REGISTRATION_REFRESH;
 
         /// <summary>
+        /// Gets or sets dissemination options for client directory routes.
+        /// </summary>
+        public DisseminationNamespaceOptions ClientDirectoryDissemination { get; set; } = new()
+        {
+            ExpectedUpdateCadence = TimeSpan.FromSeconds(30),
+        };
+
+        /// <summary>
         /// The default value for <see cref="ClientRegistrationRefresh"/>.
         /// </summary>
         public static readonly TimeSpan DEFAULT_CLIENT_REGISTRATION_REFRESH = TimeSpan.FromMinutes(5);

@@ -282,6 +282,8 @@ namespace Orleans.Configuration
 
         public System.TimeSpan ClientGatewayShutdownNotificationTimeout { get { throw null; } set { } }
 
+        public Orleans.Configuration.DisseminationNamespaceOptions ClientDirectoryDissemination { get { throw null; } set { } }
+
         public System.TimeSpan ClientRegistrationRefresh { get { throw null; } set { } }
 
         public int GatewaySenderQueues { get { throw null; } set { } }

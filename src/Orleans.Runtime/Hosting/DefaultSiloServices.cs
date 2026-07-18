@@ -212,7 +212,10 @@ namespace Orleans.Hosting
 
             services.TryAddSingleton<ClientDirectory>();
             services.AddFromExisting<ILocalClientDirectory, ClientDirectory>();
+            services.AddFromExisting<IClientDirectoryDisseminationParticipant, ClientDirectory>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClientDirectory>();
+            services.AddSingleton<ClientDirectoryDisseminationNamespace>();
+            services.AddFromExisting<IDisseminationNamespace, ClientDirectoryDisseminationNamespace>();
 
             services.TryAddSingleton<SiloProviderRuntime>();
             services.TryAddFromExisting<IProviderRuntime, SiloProviderRuntime>();

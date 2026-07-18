@@ -29,7 +29,7 @@ public sealed class DisseminationClusterTests
 
         // Observe membership updates that were applied on remote silos; require at least two distinct silos
         // to prove that updates propagated across the cluster rather than only being applied locally.
-        var observer = new ValueApplyObserver(targetDistinctSilos: 2);
+        var observer = new ValueApplyObserver(DisseminationNamespaceNames.Membership, targetDistinctSilos: 2);
         using var subscription = DisseminationEvents.Listener.Subscribe(
             observer,
             static name => name == "Dissemination.ValueApply");
@@ -58,7 +58,40 @@ public sealed class DisseminationClusterTests
                 + string.Join(", ", observer.AppliedSilos.Select(static silo => silo.ToString())));
     }
 
-    private sealed class ValueApplyObserver(int targetDistinctSilos) : IObserver<KeyValuePair<string, object?>>
+    [Fact]
+    public async Task ClientRoutesAreDisseminatedAndAppliedAcrossRealCluster()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+        var observer = new ValueApplyObserver(DisseminationNamespaceNames.ClientDirectory, targetDistinctSilos: 2);
+        using var subscription = DisseminationEvents.Listener.Subscribe(
+            observer,
+            static name => name == "Dissemination.ValueApply");
+
+        var builder = new InProcessTestClusterBuilder(3);
+        builder.ConfigureSilo((_, siloBuilder) =>
+        {
+            siloBuilder.Configure<DisseminationOptions>(options => options.Enabled = true);
+            siloBuilder.Configure<SiloMessagingOptions>(options =>
+            {
+                options.ClientRegistrationRefresh = TimeSpan.FromMilliseconds(50);
+                options.ClientDirectoryDissemination.Enabled = true;
+            });
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+        await cluster.WaitForLivenessToStabilizeAsync();
+        await observer.Reached.WaitAsync(cancellation.Token);
+
+        Assert.True(
+            observer.AppliedSilos.Count >= 2,
+            "Expected client routes to be applied on at least 2 distinct silos, but saw: "
+                + string.Join(", ", observer.AppliedSilos.Select(static silo => silo.ToString())));
+    }
+
+    private sealed class ValueApplyObserver(
+        DisseminationNamespace expectedNamespace,
+        int targetDistinctSilos) : IObserver<KeyValuePair<string, object?>>
     {
         private readonly object _lock = new();
         private readonly HashSet<SiloAddress> _appliedSilos = [];
@@ -80,7 +113,7 @@ public sealed class DisseminationClusterTests
         public void OnNext(KeyValuePair<string, object?> value)
         {
             if (value.Value is not DisseminationValueEvent evt
-                || evt.Namespace != DisseminationNamespaceNames.Membership
+                || evt.Namespace != expectedNamespace
                 || evt.Result != DisseminationApplyResult.Applied.ToString()
                 || evt.PayloadBytes <= 0)
             {
