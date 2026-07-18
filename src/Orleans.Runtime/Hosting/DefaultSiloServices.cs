@@ -333,7 +333,10 @@ namespace Orleans.Hosting
             services.AddSingleton<IGrainPropertiesProvider, ImplementedInterfaceProvider>();
             services.AddSingleton<ClusterManifestProvider>();
             services.AddFromExisting<IClusterManifestProvider, ClusterManifestProvider>();
+            services.AddFromExisting<IClusterManifestDisseminationParticipant, ClusterManifestProvider>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterManifestProvider>();
+            services.AddSingleton<ClusterManifestDisseminationNamespace>();
+            services.AddFromExisting<IDisseminationNamespace, ClusterManifestDisseminationNamespace>();
             services.AddSingleton<ClusterManifestSystemTarget>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterManifestSystemTarget>();
 

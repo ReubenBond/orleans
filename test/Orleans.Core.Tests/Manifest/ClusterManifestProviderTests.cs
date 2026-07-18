@@ -13,6 +13,7 @@ using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Metadata;
 using Orleans.Runtime;
+using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.Metadata;
 using Orleans.Runtime.Utilities;
 using Orleans.Runtime.Versions;
@@ -153,6 +154,68 @@ public class ClusterManifestProviderTests
             await lifecycle.OnStop();
             membership.Dispose();
         }
+    }
+
+    [Fact]
+    public void DisseminatedManifest_IsMergedIntoCurrentClusterManifest()
+    {
+        var localSilo = CreateSiloAddress(11111, 1);
+        var remoteSilo = CreateSiloAddress(11112, 1);
+        var otherSilo = CreateSiloAddress(11113, 1);
+        using var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
+            1,
+            (localSilo, SiloStatus.Active),
+            (remoteSilo, SiloStatus.Active),
+            (otherSilo, SiloStatus.Active)));
+        var remoteManifest = CreateGrainManifest();
+        var provider = CreateClusterManifestProvider(
+            localSilo,
+            membership,
+            CreateGrainFactory(remoteSilo, remoteManifest));
+        var participant = (IClusterManifestDisseminationParticipant)provider;
+
+        var result = participant.ApplyDisseminatedManifest(new ClusterManifestUpdate(
+            new MajorMinorVersion(1, 2),
+            ImmutableDictionary<SiloAddress, GrainManifest>.Empty.Add(remoteSilo, remoteManifest),
+            includesAllActiveServers: false));
+
+        Assert.Equal(DisseminationApplyResult.Applied, result);
+        Assert.Equal(new MajorMinorVersion(1, 3), provider.Current.Version);
+        Assert.Equal(remoteManifest, provider.Current.Silos[remoteSilo]);
+
+        result = participant.ApplyDisseminatedManifest(new ClusterManifestUpdate(
+            new MajorMinorVersion(1, 1),
+            ImmutableDictionary<SiloAddress, GrainManifest>.Empty.Add(otherSilo, remoteManifest),
+            includesAllActiveServers: false));
+
+        Assert.Equal(DisseminationApplyResult.Applied, result);
+        Assert.Equal(new MajorMinorVersion(1, 4), provider.Current.Version);
+        Assert.Equal(remoteManifest, provider.Current.Silos[otherSilo]);
+    }
+
+    [Fact]
+    public void DisseminatedManifest_AheadOfMembershipIsRejected()
+    {
+        var localSilo = CreateSiloAddress(11111, 1);
+        var remoteSilo = CreateSiloAddress(11112, 1);
+        using var membership = new TestClusterMembershipService(CreateMembershipSnapshot(
+            1,
+            (localSilo, SiloStatus.Active),
+            (remoteSilo, SiloStatus.Active)));
+        var remoteManifest = CreateGrainManifest();
+        var provider = CreateClusterManifestProvider(
+            localSilo,
+            membership,
+            CreateGrainFactory(remoteSilo, remoteManifest));
+        var participant = (IClusterManifestDisseminationParticipant)provider;
+
+        var result = participant.ApplyDisseminatedManifest(new ClusterManifestUpdate(
+            new MajorMinorVersion(2, 0),
+            ImmutableDictionary<SiloAddress, GrainManifest>.Empty.Add(remoteSilo, remoteManifest),
+            includesAllActiveServers: false));
+
+        Assert.Equal(DisseminationApplyResult.Rejected, result);
+        Assert.DoesNotContain(remoteSilo, provider.Current.Silos);
     }
 
     [Fact]
