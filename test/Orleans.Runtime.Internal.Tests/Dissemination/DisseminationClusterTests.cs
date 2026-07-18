@@ -8,6 +8,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Dissemination;
+using Orleans.Runtime.MembershipService.SiloMetadata;
 using Orleans.TestingHost;
 using Xunit;
 
@@ -89,9 +90,44 @@ public sealed class DisseminationClusterTests
                 + string.Join(", ", observer.AppliedSilos.Select(static silo => silo.ToString())));
     }
 
+    [Fact]
+    public async Task SiloMetadataIsDisseminatedAndAppliedAcrossRealCluster()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+        var observer = new ValueApplyObserver(
+            DisseminationNamespaceNames.SiloMetadata,
+            targetDistinctSilos: 2,
+            acceptDuplicates: true);
+        using var subscription = DisseminationEvents.Listener.Subscribe(
+            observer,
+            static name => name == "Dissemination.ValueApply");
+
+        var builder = new InProcessTestClusterBuilder(3);
+        builder.ConfigureSilo((_, siloBuilder) =>
+        {
+            siloBuilder.UseSiloMetadata(new Dictionary<string, string>
+            {
+                ["region"] = "west",
+            });
+            siloBuilder.Configure<DisseminationOptions>(options => options.Enabled = true);
+            siloBuilder.Configure<SiloMessagingOptions>(options => options.SiloMetadataDissemination.Enabled = true);
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+        await cluster.WaitForLivenessToStabilizeAsync();
+        await observer.Reached.WaitAsync(cancellation.Token);
+
+        Assert.True(
+            observer.AppliedSilos.Count >= 2,
+            "Expected silo metadata to be applied on at least 2 distinct silos, but saw: "
+                + string.Join(", ", observer.AppliedSilos.Select(static silo => silo.ToString())));
+    }
+
     private sealed class ValueApplyObserver(
         DisseminationNamespace expectedNamespace,
-        int targetDistinctSilos) : IObserver<KeyValuePair<string, object?>>
+        int targetDistinctSilos,
+        bool acceptDuplicates = false) : IObserver<KeyValuePair<string, object?>>
     {
         private readonly object _lock = new();
         private readonly HashSet<SiloAddress> _appliedSilos = [];
@@ -115,6 +151,7 @@ public sealed class DisseminationClusterTests
             if (value.Value is not DisseminationValueEvent evt
                 || evt.Namespace != expectedNamespace
                 || evt.Result != DisseminationApplyResult.Applied.ToString()
+                    && (!acceptDuplicates || evt.Result != DisseminationApplyResult.Duplicate.ToString())
                 || evt.PayloadBytes <= 0)
             {
                 return;

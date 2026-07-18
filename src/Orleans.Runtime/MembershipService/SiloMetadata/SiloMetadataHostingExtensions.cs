@@ -1,9 +1,11 @@
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration.Internal;
 using Orleans.Hosting;
 using Orleans.Placement;
+using Orleans.Runtime.Dissemination;
 using Orleans.Runtime.Placement.Filtering;
 
 namespace Orleans.Runtime.MembershipService.SiloMetadata;
@@ -73,16 +75,22 @@ public static class SiloMetadataHostingExtensions
                 .AddOptionsWithValidateOnStart<SiloMetadata>()
                 .Configure(m => m.AddMetadata(metadata));
 
-            services.AddSingleton<SiloMetadataSystemTarget>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloMetadataSystemTarget>();
-            services.AddSingleton<SiloMetadataCache>();
-            services.AddFromExisting<ISiloMetadataCache, SiloMetadataCache>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloMetadataCache>();
-            services.AddSingleton<ISiloMetadataClient, SiloMetadataClient>();
+            if (!services.Any(service => service.ServiceType == typeof(SiloMetadataCache)))
+            {
+                services.AddSingleton<SiloMetadataSystemTarget>();
+                services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloMetadataSystemTarget>();
+                services.AddSingleton<SiloMetadataCache>();
+                services.AddFromExisting<ISiloMetadataCache, SiloMetadataCache>();
+                services.AddFromExisting<ISiloMetadataDisseminationParticipant, SiloMetadataCache>();
+                services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloMetadataCache>();
+                services.AddSingleton<ISiloMetadataClient, SiloMetadataClient>();
+                services.AddSingleton<SiloMetadataDisseminationNamespace>();
+                services.AddFromExisting<IDisseminationNamespace, SiloMetadataDisseminationNamespace>();
 
-            // Placement filters
-            services.AddPlacementFilter<PreferredMatchSiloMetadataPlacementFilterStrategy, PreferredMatchSiloMetadataPlacementFilterDirector>(ServiceLifetime.Transient);
-            services.AddPlacementFilter<RequiredMatchSiloMetadataPlacementFilterStrategy, RequiredMatchSiloMetadataPlacementFilterDirector>(ServiceLifetime.Transient);
+                // Placement filters
+                services.AddPlacementFilter<PreferredMatchSiloMetadataPlacementFilterStrategy, PreferredMatchSiloMetadataPlacementFilterDirector>(ServiceLifetime.Transient);
+                services.AddPlacementFilter<RequiredMatchSiloMetadataPlacementFilterStrategy, RequiredMatchSiloMetadataPlacementFilterDirector>(ServiceLifetime.Transient);
+            }
         });
         return builder;
     }

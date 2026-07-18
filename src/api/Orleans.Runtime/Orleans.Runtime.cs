@@ -309,6 +309,8 @@ namespace Orleans.Configuration
         [System.Obsolete("Unused, will be removed in a future version.")]
         public System.TimeSpan ShutdownRerouteTimeout { get { throw null; } set { } }
 
+        public Orleans.Configuration.DisseminationNamespaceOptions SiloMetadataDissemination { get { throw null; } set { } }
+
         public int SiloSenderQueues { get { throw null; } set { } }
 
         public System.TimeSpan SystemResponseTimeout { get { throw null; } set { } }
