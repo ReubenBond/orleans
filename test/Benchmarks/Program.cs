@@ -5,6 +5,7 @@ using Benchmarks.MapReduce;
 using Benchmarks.Ping;
 using Benchmarks.Transactions;
 using Benchmarks.GrainStorage;
+using Benchmarks.Rpc;
 using Benchmarks.Serialization;
 
 namespace Benchmarks;
@@ -353,6 +354,11 @@ internal class Program
         {
             var operation = args.FirstOrDefault()?.ToLowerInvariant() ?? "copy-private";
             MemberAccessBenchmarks.Profile(operation, TimeSpan.FromSeconds(15));
+        },
+        ["Rpc.Profile"] = args =>
+        {
+            var operation = args.FirstOrDefault()?.ToLowerInvariant() ?? "monomorphic";
+            RpcInvocationBenchmarks.Profile(operation, TimeSpan.FromSeconds(15));
         },
         ["suite"] = args =>
         {

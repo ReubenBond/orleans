@@ -40,6 +40,37 @@ public class RpcInvocationBenchmarks
         ];
     }
 
+    public static void Profile(string operation, TimeSpan duration)
+    {
+        var benchmark = new RpcInvocationBenchmarks { InvocationCount = 256 };
+        benchmark.Setup();
+        try
+        {
+            Func<int> invoke = operation switch
+            {
+                "monomorphic" => benchmark.MonomorphicValueTask,
+                "polymorphic" => benchmark.PolymorphicValueTask,
+                "task" => benchmark.MonomorphicTask,
+                "control" => benchmark.DirectValueTaskControl,
+                _ => throw new ArgumentException($"Unknown RPC profile operation '{operation}'.", nameof(operation)),
+            };
+
+            var stopAt = DateTime.UtcNow + duration;
+            var invocations = 0L;
+            while (DateTime.UtcNow < stopAt)
+            {
+                _ = invoke();
+                invocations += benchmark.InvocationCount;
+            }
+
+            Console.WriteLine($"{operation}: {invocations:N0} invocations in {duration.TotalSeconds:N0} seconds");
+        }
+        finally
+        {
+            benchmark.Cleanup();
+        }
+    }
+
     [GlobalCleanup]
     public void Cleanup()
     {
