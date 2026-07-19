@@ -32,7 +32,7 @@ namespace Orleans.Runtime
         private readonly ILogger invokeExceptionLogger;
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
-        private readonly ConcurrentDictionary<(GrainId, CorrelationId), CallbackData> callbacks;
+        private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
         private readonly SharedCallbackData sharedCallbackData;
         private readonly SharedCallbackData systemSharedCallbackData;
@@ -74,7 +74,7 @@ namespace Orleans.Runtime
             this._applicationRequestInstruments = new(orleansInstruments);
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
-            this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>();
+            this.callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
             this.messageFactory = messageFactory;
             this.ConcreteGrainFactory = new GrainFactory(this, referenceActivator, interfaceIdResolver, interfaceToTypeResolver);
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
@@ -88,7 +88,7 @@ namespace Orleans.Runtime
 
             var callbackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
+                msg => this.UnregisterCallback(msg.Id),
                 callbackDataLogger,
                 this.messagingOptions.ResponseTimeout,
                 this.messagingOptions.CancelRequestOnTimeout,
@@ -96,7 +96,7 @@ namespace Orleans.Runtime
                 cancellationManager: null);
 
             this.systemSharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
+                msg => this.UnregisterCallback(msg.Id),
                 callbackDataLogger,
                 this.messagingOptions.SystemResponseTimeout,
                 cancelOnTimeout: false,
@@ -178,7 +178,7 @@ namespace Orleans.Runtime
 
                 // Register a callback for the request.
                 var callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
-                callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
+                callbacks.TryAdd(message.Id, callbackData);
                 callbackData.SubscribeForCancellation(cancellationToken);
             }
             else
@@ -207,9 +207,9 @@ namespace Orleans.Runtime
         /// <summary>
         /// UnRegister a callback.
         /// </summary>
-        private void UnregisterCallback(GrainId grainId, CorrelationId correlationId)
+        private void UnregisterCallback(CorrelationId correlationId)
         {
-            callbacks.TryRemove((grainId, correlationId), out _);
+            callbacks.TryRemove(correlationId, out _);
         }
 
         public void SniffIncomingMessage(Message message)
@@ -437,7 +437,7 @@ namespace Orleans.Runtime
 
         private void ProcessResponseCallback(Message message)
         {
-            if (callbacks.TryRemove((message.TargetGrain, message.Id), out var callbackData))
+            if (callbacks.TryRemove(message.Id, out var callbackData))
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
@@ -452,7 +452,7 @@ namespace Orleans.Runtime
         private void ProcessStatusResponse(Message message)
         {
             var status = (StatusResponse)message.BodyObject;
-            callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
+            callbacks.TryGetValue(message.Id, out var callback);
             var request = callback?.Message;
             if (request is not null)
             {
