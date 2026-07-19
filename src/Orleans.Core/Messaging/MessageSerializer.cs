@@ -60,10 +60,7 @@ namespace Orleans.Runtime.Messaging
                 return (FramingLength, 0, 0);
             }
 
-            Span<byte> lengthBytes = stackalloc byte[FramingLength];
-            input.Slice(input.Start, FramingLength).CopyTo(lengthBytes);
-            var headerLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes);
-            var bodyLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes[4..]);
+            ReadFrameLengths(input, out var headerLength, out var bodyLength);
 
             // Check lengths
             ThrowIfLengthsInvalid(headerLength, bodyLength);
@@ -208,6 +205,15 @@ namespace Orleans.Runtime.Messaging
                 _bufferWriter.Reset();
                 _serializationSession.Reset();
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void ReadFrameLengths(in ReadOnlySequence<byte> input, out int headerLength, out int bodyLength)
+        {
+            Span<byte> lengthBytes = stackalloc byte[FramingLength];
+            input.Slice(input.Start, FramingLength).CopyTo(lengthBytes);
+            headerLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes);
+            bodyLength = BinaryPrimitives.ReadInt32LittleEndian(lengthBytes[4..]);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
