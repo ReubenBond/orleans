@@ -10,14 +10,17 @@ background activity. CPU and hardware-counter profiles remain useful at
 saturation, but they cannot identify which asynchronous handoff delayed a
 single call.
 
-This plan adds low-overhead, deterministically sampled point events for the
-request/response path, extends pvanalyze to reconstruct calls and aggregate
-phase durations, separates the two silos into independently controllable
-processes, and defines a repeatable host-quiescence procedure.
+This plan adds profiling-build support for both exact and sampled
+request/response traces, extends pvanalyze to reconstruct calls and aggregate
+phase/queue durations, separates the two silos into independently controllable
+processes, and defines a repeatable host-quiescence procedure. Exact mode must
+be able to follow one selected call through a saturated system while all other
+calls continue generating normal load.
 
 The instrumentation must:
 
-- be disabled by default with a nearly free `EventSource.IsEnabled` branch;
+- be absent from normal binaries behind `ORLEANS_PROFILING`;
+- support an exact selected trace as well as deterministic population sampling;
 - preserve the message wire format;
 - make the same sampling decision independently on both silos;
 - correlate request and response events across processes;
@@ -26,19 +29,24 @@ The instrumentation must:
 - distinguish exact wall-clock phase timing from sampled CPU attribution; and
 - include an unchanged control which quantifies instrumentation overhead.
 
-## Why point events instead of per-call activities
+## Hybrid activity and point-event design
 
 Orleans already has `DiagnosticListener` message events in
 `MessagingEvents`, but those calls are compiled out unless `MESSAGING_TRACE`
 is defined. The existing EventSources in `EventSourceEvents.cs` emit events
 without message identity, so they cannot reconstruct a call.
 
-Creating and propagating an `Activity` for every sampled call would add more
-state and lifecycle behavior to the path being measured. Propagating a new
-activity identifier would also alter request context or the wire protocol.
-Instead, a dedicated EventSource should emit fixed-schema point events keyed
-by the existing 64-bit `Message.Id`. Requests and their responses already
-carry the same correlation ID over the wire.
+Do not create an `Activity` for every sampled call. Use the existing W3C
+activity propagation only for exact trace selection: the benchmark creates one
+probe root activity, the existing outgoing/incoming activity filters propagate
+that trace through request context, and profiling code recognizes its trace ID.
+All detailed phase and queue boundaries remain fixed-schema EventSource point
+events. This avoids creating activity objects for background load while still
+reusing Orleans' established cross-silo diagnostic context.
+
+Population sampling continues to use the existing 64-bit `Message.Id`.
+Requests and their responses already carry the same correlation ID over the
+wire.
 
 Use an explicit key consisting of:
 
@@ -52,25 +60,76 @@ so one-process and split-process traces can both be analyzed. A compact port
 and generation pair is preferable to an allocated address string. pvanalyze
 must warn if the selected identity is not unique in the trace.
 
-Activity IDs can remain available for optional CPU/activity-stack attribution,
-but they should not be the primary causal key.
+For exact mode, use `(activity trace ID, origin silo, correlation ID)` as the
+key. For sampled mode, use `(origin silo, correlation ID)`. Existing activity IDs can attribute CPU/thread-time only for phases which
+execute inside the client/server activity context. Transport, inbound dispatch,
+and continuation phases run outside that ambient activity; correlate their
+events and CPU intervals using the explicit trace-ID/correlation payload
+instead of claiming full-chain ActivityId coverage.
 
-## Sampling
+## Trace selection modes
 
-### Deterministic decision
+### Exact activity-selected trace
+
+The benchmark should create a W3C root `Activity` for one probe call while the
+normal fixed-concurrency workers continue running. Install a benchmark
+`ActivityListener` which samples Orleans client/server activities only when
+their parent trace ID matches that probe. Normal background calls therefore do
+not allocate Orleans activities, but the opt-in filters still execute
+`StartActivity`/propagator checks. The profiling-disabled control measures that
+cost.
+
+The profiling benchmark must call `AddActivityPropagation` on both silo
+builders; this facility is opt-in today. Install the same selective listener in
+the driver and target processes before either host starts.
+
+The existing outgoing filter already injects traceparent when the selective
+listener creates the probe child activity, so no filter behavior change should
+be required initially. The incoming filter extracts the W3C parent and creates
+a server activity when the target listener requests it.
+
+At message creation, copy the selected `ActivityTraceId` into profiling-only,
+non-serialized `Message` fields. Immediately after remote `TryRead`, inspect
+the deserialized `Message.RequestContextData` dictionary for traceparent and the
+exact marker, then cache the parsed ID in those fields before emitting
+`FrameDecoded` or queue markers. Ambient `RequestContext` is not imported until
+later invocation dispatch and is too late for transport phases. Perform this
+lookup only in a profiling build while the provider is enabled, and quantify
+its per-frame overhead. Copy the cached ID from request to response in
+`MessageFactory.CreateResponseMessage`. This does not change the wire format:
+traceparent already travels through Orleans request context.
+
+Set a profiling-only request-context marker such as
+`orleans.profiling.exact=true` around the probe. Require both that marker and a
+valid W3C trace ID before enabling exact events. This prevents unrelated
+application activities from being traced. Remove/restore the marker in a
+`finally` block after issuing the probe.
+
+Represent the 128-bit trace ID as two primitive `ulong` values in EventSource
+payloads. Exact mode emits every phase for the selected trace regardless of
+sample rate. pvanalyze must report an error if more than one unrelated root
+matches an exact selector.
+
+The benchmark prints the selected trace ID before issuing the probe and records
+the background concurrency, throughput, queue depths, and probe latency. Probe
+calls must use the same connection, target grain population, and runtime path
+as background calls; a dedicated idle connection would hide the load effect.
+
+### Deterministic population sampling
 
 Sampling must be derived from the correlation ID rather than local mutable
 state. Every process then makes the same decision without adding a sampled bit
 to the message:
 
 ```text
-sample = Mix64((ulong)correlationId) & (sampleRate - 1) == 0
+sample = (Mix64((ulong)correlationId) & (sampleRate - 1)) == 0
 ```
 
 `sampleRate` must be a power of two. Use a stable integer mixer so sequential
 IDs remain uniformly distributed. The EventSource should parse a
 `SampleRate` provider argument in `OnEventCommand` and publish the resulting
-mask through a volatile field.
+mask through a volatile field. Reserve `0` to disable population sampling while
+still allowing exact activity-selected traces.
 
 Do not rely on that argument until the collectors can demonstrably deliver it.
 The current pvanalyze `CollectCommand.CreateProviders` accepts only
@@ -103,10 +162,12 @@ its paired-run noise. Event loss must remain zero.
 The call-site shape should be:
 
 ```csharp
+#if ORLEANS_PROFILING
 if (RpcCallEventSource.Log.IsEnabled() && RpcCallEventSource.Log.IsSampled(message.Id))
 {
     RpcCallEventSource.Log.Phase(message, RpcCallPhase.RequestTransportQueued);
 }
+#endif
 ```
 
 `IsSampled` and the disabled check should inline. The event payload should use
@@ -114,16 +175,96 @@ primitive values only. Do not store a trace flag on `Message`: that increases
 the hot object size even when tracing is disabled and creates reset/ownership
 requirements for pooled messages.
 
+Exact selection is checked before deterministic sampling:
+
+```csharp
+#if ORLEANS_PROFILING
+if (RpcCallEventSource.Log.ShouldTrace(message))
+{
+    RpcCallEventSource.Log.Phase(message, RpcCallPhase.RequestTransportQueued);
+}
+#endif
+```
+
+`ShouldTrace` returns true for the configured exact activity trace ID or the
+correlation-ID sample predicate.
+
+## Compile-time isolation
+
+Use a dedicated symbol such as `ORLEANS_PROFILING`, not the standard `TRACE`
+symbol which normal .NET builds commonly define. Add an opt-in MSBuild property
+which applies the symbol consistently to Orleans source projects, generated
+code, and benchmarks:
+
+```xml
+<PropertyGroup Condition="'$(OrleansProfiling)' == 'true'">
+  <DefineConstants>$(DefineConstants);ORLEANS_PROFILING</DefineConstants>
+</PropertyGroup>
+```
+
+Wrap all of the following in `#if ORLEANS_PROFILING`:
+
+- the profiling EventSource and phase/resource enums;
+- profiling-only `Message` trace-ID fields and reset/copy logic;
+- trace context on response completion sources;
+- continuation wrappers;
+- timestamp reads, depth reads, and phase calls;
+- exact-probe listener, request-context extraction, and message propagation; and
+- benchmark commands which require tracing.
+
+Normal builds must contain no profiling field, branch, timestamp read, queue
+depth read, or EventSource call. A `[Conditional]` helper is useful for leaf
+calls, but it is not sufficient for added object fields or argument
+preparation; use preprocessor guards at those sites.
+
+Produce separate output directories:
+
+```powershell
+dotnet build test\Benchmarks\Benchmarks.csproj -c Release -f net10.0 `
+  -p:OrleansProfiling=false --artifacts-path Artifacts\Build\normal
+
+dotnet build test\Benchmarks\Benchmarks.csproj -c Release -f net10.0 `
+  -p:OrleansProfiling=true --artifacts-path Artifacts\Build\profiling
+```
+
+Use three controls:
+
+1. normal binary;
+2. profiling binary with provider disabled and no exact selector; and
+3. profiling binary tracing one exact probe under load.
+
+The normal binary is authoritative for final latency/throughput comparisons.
+The second comparison measures compile-time profiling scaffolding cost; the
+third measures active exact-trace cost. Do not compare an optimized normal
+binary only against an instrumented baseline.
+
+The existing `MESSAGING_TRACE` conditional DiagnosticListener support can be
+enabled by the profiling build if useful, but it is not a replacement for the
+allocation-free correlated EventSource schema.
+
 ## Event schema
 
-Add an internal EventSource named `Microsoft-Orleans-RpcLatency`, preferably in
-`src\Orleans.Core\Diagnostics\RpcCallEventSource.cs`.
+Add the allocation-free primitive EventSource named
+`Microsoft-Orleans-RpcLatency` to
+`src\Orleans.Serialization.Abstractions\Diagnostics\RpcCallEventSource.cs`.
+Both `Orleans.Serialization` completion sources and Orleans.Core need to emit
+through the same provider, and Orleans.Serialization cannot reference
+Orleans.Core. Put `RpcCallPhase`, resource enums, and a primitive `WritePhase`
+API beside the provider under `#if ORLEANS_PROFILING`. If cross-assembly access
+is required, add profiling-conditional `InternalsVisibleTo` entries for
+Orleans.Serialization and Orleans.Core instead of expanding the public API.
+
+Add `src\Orleans.Core\Diagnostics\RpcCallTrace.cs` as the facade which converts
+`Message`, silo, connection, retry, forwarding, queue, and batch state into the
+primitive emitter arguments. This keeps `Message` dependencies out of the
+serialization layer and guarantees one EventSource instance per process.
 
 Use one stable `Phase` event instead of one event ID per phase. Its payload
 should contain:
 
 | Field | Type | Purpose |
 | --- | --- | --- |
+| `traceIdHigh` / `traceIdLow` | `ulong` | Exact W3C probe identity, or zero for correlation-only samples |
 | `correlationId` | `long` | Existing `Message.Id` |
 | `originSiloPort` | `int` | Stable origin component |
 | `originSiloGeneration` | `int` | Disambiguates restarts |
@@ -131,6 +272,7 @@ should contain:
 | `localSiloGeneration` | `int` | Disambiguates restarts |
 | `direction` | `byte` | Request, response, or one-way |
 | `phase` | `byte` | Stable `RpcCallPhase` value |
+| `selectionMode` | `byte` | Exact activity trace or deterministic sample |
 | `resourceKind` | `byte` | Connection send, inbound dispatch, activation, continuation, or other queue |
 | `resourceId` | `long` | Stable per-process identity for the specific queue/resource |
 | `queueDepth` | `int` | Queue depth observed at this boundary, or `-1` if unavailable |
@@ -193,6 +335,11 @@ and index. Do the same when a `MessageHandler` is queued: all messages share
 `DispatchStart`. This separates ThreadPool queue wait from head-of-line time
 behind earlier messages in the same inbound batch.
 
+Add profiling-only accessors for the private `MessageHandler` count/messages
+needed to emit batch markers. Widen `Message.RetryCount` (`short`) and packed
+`ForwardCount` (`byte`) to the event payload's `int` fields without changing
+their runtime storage or accepted ranges.
+
 `FrameDecoded` alone combines socket arrival and deserialization. To separate
 them without parsing the correlation ID twice, capture a timestamp before
 `TryRead` only while the provider is enabled. After decoding reveals the ID,
@@ -205,13 +352,14 @@ control to quantify that cost.
 To measure the final ThreadPool continuation queue, extend
 `IResponseCompletionSource` with an optional primitive trace context which
 `InsideRuntimeClient.SendRequest` sets after creating the message. For sampled
-calls, `ResponseCompletionSource.OnCompleted` stores the original continuation
-and state in the pooled completion source and registers one static wrapper with
-`ManualResetValueTaskSourceCore`. Emit `CompletionSignaled` immediately before
-setting the result and `ContinuationStart` in the wrapper before invoking the
-original continuation. Clear all trace and continuation fields in `Reset`.
-Unsampled calls retain the existing direct registration path and allocate
-nothing.
+calls, both `ResponseCompletionSource` and `ResponseCompletionSource<TResult>`
+store the original continuation and state in the pooled completion source and
+register one static wrapper with `ManualResetValueTaskSourceCore`. Emit
+`CompletionSignaled` immediately before setting the result and
+`ContinuationStart` in the wrapper before invoking the original continuation,
+using the primitive EventSource in Orleans.Serialization.Abstractions. Clear all
+trace and continuation fields in both `Reset` implementations. Unsampled calls
+retain the existing direct registration path and allocate nothing.
 
 ## Derived durations
 
@@ -341,6 +489,19 @@ mode as the control, but add a split-process profile mode under
    readiness, sets process affinity and priority, collects the ETW process tree,
    and shuts both down by a cooperative cancellation signal.
 
+Add a `--trace-probes` option to the fixed driver. During the measurement
+window it should choose randomized offsets, create a new W3C root activity,
+print its trace ID, and issue one probe call through the same grain/connection
+set used by background workers. Only one exact probe is active at a time. Start
+with one probe per process run; later runs can trace multiple probes with
+distinct IDs if each chain remains unambiguous.
+
+The load generator continues reporting aggregate background throughput and
+latency while the exact probe records its own observed latency. This allows the
+timeline to explain whether a slow call waited in the connection channel,
+ThreadPool dispatch, activation queue, continuation queue, or transport while
+the system was busy.
+
 Do not use fixed sleeps as readiness. Use a named pipe, loopback control socket,
 or readiness file created atomically after cluster membership and a warmup call
 succeed. Preserve the existing one-process `FixedPing` command so every
@@ -373,6 +534,9 @@ Command options:
 
 - `--pid` and `--process` filters;
 - `--process-role` and `--origin-silo` filters;
+- `--trace-id <w3c-id>` for one exact probe;
+- `--correlation-id <id>` for a known sampled call;
+- `--timeline` for an ordered single-call chain;
 - `--from` and `--to`;
 - `--measurement-window`;
 - `--successful-only` (default true);
@@ -431,6 +595,31 @@ caller-continuation      12018   2.6us  1.9us  4.8us   14us  71us  contextual
 For a selected queue, add wait-by-depth and wait-by-batch-index tables plus
 caller/callee-style links to the preceding and following phases.
 
+Exact timeline output should resemble:
+
+```text
+Trace 4bf92f3577b34da6a3ce929d0e0e4736  Correlation 7A1D...
+
+ +0.000us  driver  T18  RequestCreated          depth=-
+ +1.420us  driver  T18  TransportQueued         send-queue=3
+ +4.870us  driver  T09  SerializeStart          waited=3.450us
+ +8.210us  driver  T09  FlushStop               batch=8 index=5
++18.640us  target  T14  FrameDecoded            decode=1.170us
++22.100us  target  T14  DispatchQueued          batch=6 index=2
++27.920us  target  T21  DispatchBatchStart      tp-wait=5.820us
++29.310us  target  T21  DispatchStart           head-of-line=1.390us
++34.880us  target  T07  ActivationQueued        depth=11
++46.260us  target  T07  InvocationStart         waited=11.380us
+...
++91.400us  driver  T16  CompletionSignaled
++97.750us  driver  T23  ContinuationStart       tp-wait=6.350us
+```
+
+Include process, thread, processor, queue/resource identity, depth, batch
+position, delta from the prior event, cumulative time, and the derived queue or
+execution interval. When thread-time data is present, annotate context-switch
+state during a queue interval without replacing the explicit elapsed duration.
+
 When `--with-cpu` is requested, reuse TraceEvent's Start/Stop activity
 machinery only for CPU attribution. Wall-clock phase durations come from the
 explicit phase markers. Label CPU-only results as sampled attribution, never
@@ -457,7 +646,7 @@ Add synthetic trace/event tests for:
 
 ## Deferred active causal profiling
 
-The sampled causal chain is the immediate implementation target. Active
+The exact and sampled causal chain is the immediate implementation target. Active
 Coz-style virtual-speedup experiments are explicitly deferred until phase
 timing is accurate, low-overhead, and able to identify a stable candidate.
 
@@ -717,7 +906,29 @@ Relevant Microsoft references:
 
 ## Capture workflow
 
-Build first and launch binaries directly. For a one-process EventPipe trace:
+Build first and launch binaries directly. For one exact probe under saturated
+background load:
+
+```powershell
+$pv = "C:\dev\pvanalyze\bin\Release\net10.0\pvanalyze.dll"
+
+dotnet build test\Benchmarks\Benchmarks.csproj -c Release -f net10.0 `
+  -p:OrleansProfiling=true --artifacts-path Artifacts\Build\profiling
+
+$env:ORLEANS_RPC_TRACE_SAMPLE_RATE = "0"
+$profilingDll = "<profiling artifacts path>\Benchmarks.dll"
+
+C:\tools\PerfView.exe /AcceptEULA /NoGui /ThreadTime `
+  /Providers:*Microsoft-Orleans-RpcLatency `
+  /DataFile:Artifacts\Benchmarks\Rpc\phases\exact-under-load.etl `
+  run dotnet $profilingDll FixedPing silo-to-silo 225 5 30 1 --trace-probes 1
+
+dotnet $pv info Artifacts\Benchmarks\Rpc\phases\exact-under-load.etl
+dotnet $pv phases Artifacts\Benchmarks\Rpc\phases\exact-under-load.etl `
+  --trace-id <trace-id-printed-by-benchmark> --timeline --queues
+```
+
+For a one-process sampled EventPipe trace:
 
 ```powershell
 $pv = "C:\dev\pvanalyze\bin\Release\net10.0\pvanalyze.dll"
@@ -760,27 +971,33 @@ providers in one capture changes the timing being measured.
 
 Before using phase data for optimization:
 
-1. Verify that disabled instrumentation does not move latency, throughput, or
-   allocation.
-2. Verify collector argument delivery and fail a test when two processes
+1. Verify by reflection/IL inspection that the normal build contains no
+   profiling EventSource, fields, continuation wrapper, or call sites.
+2. Compare normal and profiling-provider-disabled binaries for latency,
+   throughput, allocation, and generated code.
+3. Trace one exact probe under saturation and verify that background throughput
+   and latency remain within the profiling-disabled control's movement.
+4. Verify collector argument delivery and fail a test when two processes
    report different effective sample rates.
-3. Assert allocation-free event emission after warmup.
-4. Compare enabled-zero-sample and each sample rate against the unchanged
+5. Assert allocation-free event emission after warmup.
+6. Compare enabled-zero-sample and each sample rate against the unchanged
    control.
-5. Require zero lost events and report phase completeness.
-6. Confirm per-call derived phase and queue durations reconcile with that
+7. Require zero lost events and report phase completeness.
+8. Require every exact trace to contain one unambiguous request/response chain
+   from `RequestCreated` through `ContinuationStart`.
+9. Confirm per-call derived phase and queue durations reconcile with that
    call's runtime end-to-end duration; percentiles must not be summed across
    independent distributions.
-7. Compare runtime end-to-end timing with the driver's latency histogram.
-8. Confirm request/response correlation across separate PIDs.
-9. Deliberately inject a delay at one phase and verify that only the expected
+10. Compare runtime end-to-end timing with the driver's probe latency.
+11. Confirm activity trace and request/response correlation across separate PIDs.
+12. Deliberately inject a delay at one phase and verify that only the expected
    derived duration moves.
-10. Deliberately delay each queue consumer and verify that the corresponding
+13. Deliberately delay each queue consumer and verify that the corresponding
     queue residency moves by the injected amount.
-11. Validate `L = lambda * W` against observed queue depth for synthetic queues.
-12. Run local delivery, one-hop, forwarded, retried, rejected, and truncated
+14. Validate `L = lambda * W` against observed queue depth for synthetic queues.
+15. Run local delivery, one-hop, forwarded, retried, rejected, and truncated
     samples through the analyzer.
-13. Run concurrency one, intermediate loads, and the saturation guard.
+16. Run concurrency one, intermediate loads, and the saturation guard.
 
 Retain an optimization only when the targeted phase moves by more than the
 paired control variation, end-to-end latency improves, and saturated throughput
@@ -788,18 +1005,25 @@ does not regress materially.
 
 ## Implementation order
 
-1. Add the EventSource, phase enum, deterministic sampler, and unit tests.
-2. Instrument connection send, inbound batch/ThreadPool, and activation queues
+1. Add the `OrleansProfiling` MSBuild property and normal-build absence tests.
+2. Add exact probe activity selection, profiling-only `Message` fields, and
+   propagation/copy/reset tests.
+3. Add the EventSource, phase/resource enums, deterministic sampler, and
+   allocation tests.
+4. Instrument connection send, inbound batch/ThreadPool, and activation queues
    plus the surrounding execution phases.
-3. Carry sampled trace context into `ResponseCompletionSource` and instrument
-   continuation signal/start without changing the unsampled path.
-4. Add one-process benchmark measurement markers and intermediate-concurrency
-   cases.
-5. Implement `pvanalyze phases --queues` with correlation, diagnostics,
+5. Carry profiling trace context into both response completion source types and
+   instrument continuation signal/start without changing normal or unsampled
+   paths.
+6. Add one-process exact-probe, measurement-marker, and
+   intermediate-concurrency benchmark cases.
+7. Implement `pvanalyze phases --timeline --queues` with exact-trace filters,
+   correlation, diagnostics,
    per-call reconciliation, and JSON output.
-6. Validate sampling overhead, queue depth, and injected observational delays.
-7. Add the split-process benchmark, shared QPC orchestration, and quiescence
+8. Validate compile-time/runtime overhead, queue depth, and injected
+   observational delays.
+9. Add the split-process benchmark, shared QPC orchestration, and quiescence
    harness.
-8. Establish the quiesced observational baseline.
-9. Resume runtime optimization using the largest stable phase/queue durations and
+10. Establish the quiesced observational baseline.
+11. Resume runtime optimization using the largest stable phase/queue durations and
    validate each change with paired end-to-end measurements.
