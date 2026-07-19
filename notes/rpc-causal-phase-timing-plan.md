@@ -131,6 +131,9 @@ should contain:
 | `localSiloGeneration` | `int` | Disambiguates restarts |
 | `direction` | `byte` | Request, response, or one-way |
 | `phase` | `byte` | Stable `RpcCallPhase` value |
+| `resourceKind` | `byte` | Connection send, inbound dispatch, activation, continuation, or other queue |
+| `resourceId` | `long` | Stable per-process identity for the specific queue/resource |
+| `queueDepth` | `int` | Queue depth observed at this boundary, or `-1` if unavailable |
 | `retryCount` | `int` | Detects resend attempts |
 | `forwardCount` | `int` | Detects legitimate forwarded hops |
 | `batchSize` | `int` | Shared flush/dispatch batch size |
@@ -168,7 +171,9 @@ The first implementation should instrument these boundaries:
 | `FlushStart` | before `PipeWriter.FlushAsync` | Current batch submitted for flush |
 | `FlushStop` | after the flush completes | Batch was accepted by the transport |
 | `FrameDecoded` | `Connection.ProcessIncoming` after `MessageSerializer.TryRead` | Header/body decode completed |
+| `DispatchBuffered` | `MessageHandler.TryAdd` after adding the message | Message entered an inbound batch |
 | `DispatchQueued` | when the populated `MessageHandler` is queued | Decoded batch is waiting for ThreadPool dispatch |
+| `DispatchBatchStart` | `MessageHandler.Execute` entry | ThreadPool began executing the inbound batch |
 | `DispatchStart` | `MessageHandler.Execute` immediately before each `OnReceivedMessage` | Per-message inbound handoff started |
 | `RuntimeReceived` | `MessageCenter.ReceiveMessage` entry | Silo routing began |
 | `ActivationQueued` | `ActivationData.ReceiveRequest` after `_waitingRequests.Add` | Request entered the activation queue |
@@ -176,15 +181,17 @@ The first implementation should instrument these boundaries:
 | `InvocationStop` | `InsideRuntimeClient.Invoke` after the invokable completes | Grain result is available |
 | `ResponseCreated` | `MessageCenter.SendResponse` after creating the response | Response entered the outbound runtime path |
 | `CallbackStart` | `InsideRuntimeClient.ProcessResponseCallback` | Correlated callback was removed |
-| `CallbackComplete` | `CallbackData.DoCallback` after `ResponseCallback` | Response source was resolved |
+| `CompletionSignaled` | response completion source immediately before `SetResult` | Continuation became runnable |
+| `ContinuationStart` | wrapped `IValueTaskSource.OnCompleted` continuation | Await continuation began executing |
+| `CallbackComplete` | `CallbackData.DoCallback` after `ResponseCallback` | Runtime callback processing completed |
 
 Transport phases apply to both request and response directions. For a batch,
 emit `FlushStart` and `FlushStop` for every sampled message in `inflight`; all
 messages in the batch legitimately share those timestamps. Include batch size
 and index. Do the same when a `MessageHandler` is queued: all messages share
-`DispatchQueued`, while each gets its own `DispatchStart`. The resulting delta
-intentionally includes ThreadPool queue delay plus head-of-line time behind
-earlier messages in the same inbound batch.
+`DispatchQueued` and `DispatchBatchStart`, while each gets its own
+`DispatchStart`. This separates ThreadPool queue wait from head-of-line time
+behind earlier messages in the same inbound batch.
 
 `FrameDecoded` alone combines socket arrival and deserialization. To separate
 them without parsing the correlation ID twice, capture a timestamp before
@@ -195,12 +202,16 @@ The analyzer can subtract decode time from the cross-process
 `FlushStop -> FrameDecoded` interval. Measure the enabled-but-zero-sample
 control to quantify that cost.
 
-The initial terminal boundary is `CallbackComplete`, not the user continuation
-after `await`. `ResponseCompletionSource` lives in the serialization assembly
-and does not currently know the Orleans correlation ID. If phase totals leave
-an unexplained gap versus benchmark-observed latency, add a second-stage design
-which carries an optional primitive trace key into the completion source and
-emits from `GetResult`; do not add that coupling preemptively.
+To measure the final ThreadPool continuation queue, extend
+`IResponseCompletionSource` with an optional primitive trace context which
+`InsideRuntimeClient.SendRequest` sets after creating the message. For sampled
+calls, `ResponseCompletionSource.OnCompleted` stores the original continuation
+and state in the pooled completion source and registers one static wrapper with
+`ManualResetValueTaskSourceCore`. Emit `CompletionSignaled` immediately before
+setting the result and `ContinuationStart` in the wrapper before invoking the
+original continuation. Clear all trace and continuation fields in `Reset`.
+Unsampled calls retain the existing direct registration path and allocate
+nothing.
 
 ## Derived durations
 
@@ -214,7 +225,9 @@ pvanalyze should calculate at least:
 | Request serialization | request `SerializeStart` | request `SerializeStop` |
 | Request flush wait | request `SerializeStop` | request `FlushStop` |
 | Request wire and receive | request `FlushStop` | request `FrameDecoded` minus decode duration |
-| Request inbound dispatch queue | request `FrameDecoded` | request `DispatchStart` |
+| Request inbound batch formation | request `DispatchBuffered` | request `DispatchQueued` |
+| Request ThreadPool queue | request `DispatchQueued` | request `DispatchBatchStart` |
+| Request batch head-of-line | request `DispatchBatchStart` | request `DispatchStart` |
 | Connection callback | request `DispatchStart` | request `RuntimeReceived` |
 | Target routing/activation lookup | request `RuntimeReceived` | `ActivationQueued` |
 | Activation queue | `ActivationQueued` | `InvocationStart` |
@@ -224,16 +237,75 @@ pvanalyze should calculate at least:
 | Response serialization | response `SerializeStart` | response `SerializeStop` |
 | Response flush wait | response `SerializeStop` | response `FlushStop` |
 | Response wire and receive | response `FlushStop` | response `FrameDecoded` minus decode duration |
-| Response inbound dispatch queue | response `FrameDecoded` | response `DispatchStart` |
+| Response inbound batch formation | response `DispatchBuffered` | response `DispatchQueued` |
+| Response ThreadPool queue | response `DispatchQueued` | response `DispatchBatchStart` |
+| Response batch head-of-line | response `DispatchBatchStart` | response `DispatchStart` |
 | Response connection callback | response `DispatchStart` | response `RuntimeReceived` |
 | Response runtime routing | response `RuntimeReceived` | `CallbackStart` |
-| Callback resolution | `CallbackStart` | `CallbackComplete` |
-| Runtime end-to-end | `RequestCreated` | `CallbackComplete` |
+| Callback resolution | `CallbackStart` | `CompletionSignaled` |
+| Caller continuation queue | `CompletionSignaled` | `ContinuationStart` |
+| Runtime end-to-end | `RequestCreated` | `ContinuationStart` |
 
 For same-machine ETW, timestamps share the system QPC and cross-process deltas
 are valid. A single EventPipe trace is valid for the current one-process
 benchmark. Independent EventPipe traces from split processes must not be merged
 unless pvanalyze implements explicit clock synchronization.
+
+## Queue residency and cost model
+
+Queue wait must be a first-class result. A queue marker pair should identify
+the logical queue, the specific queue instance, observed depth, batch position,
+and the same call correlation key as the surrounding phases.
+
+Instrument these queues:
+
+| Queue/resource | Enqueue | Dequeue/start | Depth source |
+| --- | --- | --- | --- |
+| Request connection send channel | request `TransportQueued` | request `SerializeStart` | `outgoingMessages.Reader.Count` when supported |
+| Response connection send channel | response `TransportQueued` | response `SerializeStart` | same |
+| Pipe/socket backpressure | `FlushStart` | `FlushStop` | in-flight batch size and pipe flush state |
+| Inbound batch formation | `DispatchBuffered` | `DispatchQueued` | `MessageHandler.Count` |
+| Inbound ThreadPool work item | `DispatchQueued` | `DispatchBatchStart` | global `ThreadPool.PendingWorkItemCount` as an approximation |
+| Inbound batch head-of-line | `DispatchBatchStart` | per-message `DispatchStart` | batch index and size |
+| Activation waiting requests | `ActivationQueued` | `InvocationStart` | `_waitingRequests.Count` under the existing lock |
+| Caller continuation | `CompletionSignaled` | `ContinuationStart` | global pending work count as an approximation |
+
+The connection send channel and activation queue have exact per-resource
+residency. ThreadPool depth is process-global, so label it as contextual rather
+than the depth of the Orleans work item queue. Queue wait is still exact because
+the sampled work item's enqueue and execution timestamps are correlated.
+
+`FlushStart -> FlushStop` is backpressure observed by Orleans, not proof of time
+inside the kernel socket send queue. The residual
+`FlushStop -> FrameDecoded` combines transport buffering, loopback/TCP, socket
+receive, and decode. If that residual dominates, add targeted ETW TCP/socket
+events and a transport batch ID before calling it a kernel/network queue cost.
+
+For every queue, pvanalyze should report:
+
+- arrivals and completed waits;
+- mean, p50, p90, p99, p99.9, and max wait;
+- mean and maximum observed depth;
+- wait grouped by enqueue depth;
+- batch-size and batch-index distributions;
+- head-of-line time by batch index;
+- fraction of end-to-end latency attributable to the queue per sampled call;
+- correlation between queue wait and end-to-end latency; and
+- missing enqueue/dequeue and queue-instance collision counts.
+
+Also calculate the queueing identity `L = lambda * W` using sampled arrival rate
+and mean wait, then compare the inferred mean queue length with observed depth.
+Large disagreement indicates biased sampling, missing events, or a depth value
+whose scope was misunderstood.
+
+Do not sum independently computed p99 queue times. For each sampled call,
+calculate its own queue-time sum and compare that distribution with its
+end-to-end duration. Report medians and tails from those per-call totals.
+
+The benchmark matrix should include concurrency 1, the throughput optimum, and
+several intermediate values. Queueing costs which disappear at concurrency 1
+but grow sharply with load are capacity effects, while a stable queue delay at
+concurrency 1 is a handoff/scheduler cost.
 
 ## Retries, forwarding, and incomplete calls
 
@@ -306,6 +378,8 @@ Command options:
 - `--successful-only` (default true);
 - `--include-incomplete`;
 - `--min-completeness`;
+- `--queues` to include queue-residency and depth analysis;
+- `--queue <kind>` to restrict queue output;
 - `--format text|json`; and
 - optional `--with-cpu` to add sampled CPU attribution.
 
@@ -313,9 +387,10 @@ Implementation surfaces in `C:\dev\pvanalyze`:
 
 - register the command in `Program.cs`;
 - add `Commands\LatencyCommand.cs`;
-- add response DTOs and JSON metadata in `Models.cs`;
+- add phase and `QueueProfileEntry` DTOs plus JSON metadata in `Models.cs`;
 - extend `TraceCapabilities.cs` to recognize the Orleans provider/schema;
-- put reusable correlation and aggregation logic in `TraceAnalyzer.cs`; and
+- put reusable correlation logic in `TraceAnalyzer.cs`;
+- add queue residency/depth aggregation in `QueueAnalyzer.cs`;
 - extend `Commands\CollectCommand.cs` to preserve EventPipe provider arguments;
 - document ETW/EventPipe examples in `README.md`.
 
@@ -342,6 +417,20 @@ arguments, trace loss count, sampled-call count, estimated source-call count,
 sampling rate, warnings, and percentile method. Use a consistent percentile
 definition and test boundary cases.
 
+Text output should include a dedicated queue table:
+
+```text
+Queue                    Count   Mean    P50    P90    P99    Max   MeanDepth
+request-connection       12031   1.8us  1.2us  2.9us  8.1us  41us  0.4
+request-threadpool       12028   3.7us  2.8us  6.4us   15us  83us  contextual
+request-activation       12022   0.9us  0.2us  1.1us   12us  95us  0.2
+response-connection      12020   1.5us  1.0us  2.5us  6.9us  38us  0.3
+caller-continuation      12018   2.6us  1.9us  4.8us   14us  71us  contextual
+```
+
+For a selected queue, add wait-by-depth and wait-by-batch-index tables plus
+caller/callee-style links to the preceding and following phases.
+
 When `--with-cpu` is requested, reuse TraceEvent's Start/Stop activity
 machinery only for CPU attribution. Wall-clock phase durations come from the
 explicit phase markers. Label CPU-only results as sampled attribution, never
@@ -355,6 +444,9 @@ Add synthetic trace/event tests for:
 - deterministic sample identity;
 - all normal phase deltas;
 - shared flush timestamps for a batch;
+- connection, ThreadPool, activation, and continuation queue residency;
+- queue depth, batch size/index, and head-of-line aggregation;
+- per-call queue-time totals and `L = lambda * W` consistency;
 - retries and forwarding;
 - missing, duplicate, and out-of-order events;
 - window truncation with a start before `--from`;
@@ -676,16 +768,19 @@ Before using phase data for optimization:
 4. Compare enabled-zero-sample and each sample rate against the unchanged
    control.
 5. Require zero lost events and report phase completeness.
-6. Confirm the sum of median derived phases is consistent with median runtime
-   end-to-end duration; percentiles must not be summed across independent
-   distributions.
+6. Confirm per-call derived phase and queue durations reconcile with that
+   call's runtime end-to-end duration; percentiles must not be summed across
+   independent distributions.
 7. Compare runtime end-to-end timing with the driver's latency histogram.
 8. Confirm request/response correlation across separate PIDs.
 9. Deliberately inject a delay at one phase and verify that only the expected
    derived duration moves.
-10. Run local delivery, one-hop, forwarded, retried, rejected, and truncated
+10. Deliberately delay each queue consumer and verify that the corresponding
+    queue residency moves by the injected amount.
+11. Validate `L = lambda * W` against observed queue depth for synthetic queues.
+12. Run local delivery, one-hop, forwarded, retried, rejected, and truncated
     samples through the analyzer.
-11. Run both concurrency one and saturation guards.
+13. Run concurrency one, intermediate loads, and the saturation guard.
 
 Retain an optimization only when the targeted phase moves by more than the
 paired control variation, end-to-end latency improves, and saturated throughput
@@ -694,11 +789,17 @@ does not regress materially.
 ## Implementation order
 
 1. Add the EventSource, phase enum, deterministic sampler, and unit tests.
-2. Instrument the one-process benchmark path and add measurement markers.
-3. Implement `pvanalyze phases` with correlation, diagnostics, and JSON output.
-4. Validate sampling overhead and injected observational delays.
-5. Add the split-process benchmark, shared QPC orchestration, and quiescence
+2. Instrument connection send, inbound batch/ThreadPool, and activation queues
+   plus the surrounding execution phases.
+3. Carry sampled trace context into `ResponseCompletionSource` and instrument
+   continuation signal/start without changing the unsampled path.
+4. Add one-process benchmark measurement markers and intermediate-concurrency
+   cases.
+5. Implement `pvanalyze phases --queues` with correlation, diagnostics,
+   per-call reconciliation, and JSON output.
+6. Validate sampling overhead, queue depth, and injected observational delays.
+7. Add the split-process benchmark, shared QPC orchestration, and quiescence
    harness.
-6. Establish the quiesced observational baseline.
-7. Resume runtime optimization using the largest stable phase durations and
+8. Establish the quiesced observational baseline.
+9. Resume runtime optimization using the largest stable phase/queue durations and
    validate each change with paired end-to-end measurements.
