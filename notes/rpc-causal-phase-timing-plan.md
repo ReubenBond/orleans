@@ -1,4 +1,4 @@
-# RPC causal phase timing plan
+# RPC causal chain timing plan
 
 ## Purpose
 
@@ -13,10 +13,7 @@ single call.
 This plan adds low-overhead, deterministically sampled point events for the
 request/response path, extends pvanalyze to reconstruct calls and aggregate
 phase durations, separates the two silos into independently controllable
-processes, and defines a repeatable host-quiescence procedure. It also adds
-active causal profiling based on Coz: randomized virtual-speedup experiments
-and progress points which test whether optimizing a phase would improve
-end-to-end latency or throughput.
+processes, and defines a repeatable host-quiescence procedure.
 
 The instrumentation must:
 
@@ -27,8 +24,6 @@ The instrumentation must:
 - avoid allocating an `Activity`, string, or state object per call;
 - report incomplete and ambiguous samples instead of silently repairing them;
 - distinguish exact wall-clock phase timing from sampled CPU attribution; and
-- distinguish validated virtual-speedup predictions from slowdown sensitivity;
-  and
 - include an unchanged control which quantifies instrumentation overhead.
 
 ## Why point events instead of per-call activities
@@ -87,7 +82,7 @@ the driver and target before process startup and treat provider arguments only
 as an override.
 
 Publish a safe sample-none mask before configuration is complete. Include the
-effective sample rate in every phase event. pvanalyze must reject a causal
+effective sample rate in every phase event. pvanalyze must reject a phase
 report if participating processes disagree on the rate instead of quietly
 producing mostly incomplete pairs.
 
@@ -368,338 +363,18 @@ Add synthetic trace/event tests for:
 - JSON/text schema; and
 - ETW versus EventPipe event projection.
 
-## Causal profiling capability
-
-The phase trace should support active causal experiments modeled on
-[Coz](https://cacm.acm.org/research/coz/) in addition to passive attribution.
-The key distinction is:
-
-- `pvanalyze phases` answers **where elapsed time was observed**; and
-- `pvanalyze causal` answers **whether making a selected phase relatively
-  faster changes an end-to-end progress metric**.
-
-Coz implements a virtual speedup by allowing the thread executing selected code
-to advance while delaying all other threads by the corresponding amount. It
-then measures throughput or latency progress points over randomized experiment
-windows. A hot phase with a flat causal curve is not worth optimizing; a phase
-with a steep positive curve is on the critical path; a negative curve can
-indicate contention.
-
-### Scope of valid causal claims
-
-Classic Coz is thread-centric and samples on-CPU source lines. Orleans calls
-move among ThreadPool threads, release threads at `await`, and cross processes.
-The first implementation must not claim that every named wall-clock phase can
-be virtually sped up with Coz's exact semantics.
-
-Classify phases into three groups:
-
-| Class | Examples | Supported experiment |
-| --- | --- | --- |
-| Synchronous local execution | serialization, deserialization, routing, callback lookup | Coz-style virtual speedup |
-| Logical scheduler execution | activation turns and grain continuations | Not eligible until per-continuation on-CPU spans and wake-credit semantics exist |
-| Waiting/external time | network transit, flush wait, activation queue wait, arbitrary grain awaits | Randomized slowdown sensitivity or observation only |
-
-For waiting/external phases, pvanalyze must label a positive-delay experiment
-as `slowdown-sensitivity`. It may estimate a local derivative near zero, but it
-must not invert that result into a claimed speedup unless a synthetic benchmark
-demonstrates symmetry and linearity over the reported range.
-
-### Cooperative virtual time
-
-Use Coz's global/local pause-counter model with Orleans logical participants
-instead of enumerating activations on every phase hit.
-
-Each benchmark process registers participants for:
-
-- each connection input loop;
-- each connection output loop;
-- each activation scheduler/work group;
-- hosted-client callback dispatch; and
-- any other scheduler which can make progress independently during the
-  selected experiment.
-
-The experiment state contains a global virtual-time epoch. Each participant
-stores the epoch it has already observed.
-
-When participant `P` completes an eligible selected phase with duration `D`
-and virtual speedup fraction `s`:
-
-1. Compute `credit = s * D`.
-2. Atomically advance the global virtual-time epoch by `credit`.
-3. Advance `P`'s local epoch by the same credit, so `P` does not pause for its
-   own selected work.
-4. Other participants compare their local epoch with the global epoch at the
-   next safe point, pause for the difference, and then catch up.
-
-Coz treats suspension reasons differently. A participant blocked on external
-I/O accumulates debt and applies it after resume; paying while no progress was
-possible would have no effect. A participant waiting for another participant
-through a lock, signal, queue, or task continuation can instead receive credit
-from the participant which wakes it. Orleans must classify safe points
-accordingly:
-
-- connection socket/pipe waits use I/O debt semantics;
-- activation work signals, channel wakeups, task continuations, and locks use
-  synchronization-credit semantics; and
-- producers reconcile their own debt before blocking or waking another
-  participant, then transfer the appropriate observed epoch to the consumer.
-
-Do not treat every `await` as I/O. A newly created participant inherits the
-creating participant's observed epoch when there is a causal parent; otherwise
-it starts at the current global epoch.
-
-Use a shared, versioned memory-mapped control block so the epoch is common to
-the driver and target processes on the same machine. The block must contain
-cache-line-aligned atomics for:
-
-- schema/version and session ID;
-- experiment ID, selected phase, mode, and speedup basis points;
-- absolute QPC start/end timestamps;
-- global virtual-time epoch;
-- throughput progress count;
-- latency begin/end counts and in-flight-area accumulator;
-- requested/applied/overshoot pause totals;
-- skipped checkpoints, debt-cap hits, and participant count; and
-- emergency-disable state.
-
-An aligned cross-process `Interlocked` update must be covered by a native
-integration test. Do not use this design across machines: independent QPC
-domains and network coordination invalidate the shared-epoch model.
-
-### Safe points and pause application
-
-Participants check debt only where pausing cannot leave a lock held or corrupt
-protocol state:
-
-- before processing the next connection message/batch;
-- before an activation dequeues the next runnable turn;
-- before hosted-client callback dispatch; and
-- before blocking, waking, or handing work to another participant when needed
-  to preserve Coz's delay-credit semantics.
-
-Never pause while holding an activation, callback-dictionary, connection, pipe,
-or message-queue lock.
-
-The first prototype should accumulate small credits into a configurable delay
-quantum instead of issuing a timer operation for every phase hit. Use a
-high-resolution waitable timer for the coarse portion and a short calibrated
-spin only for the final sub-quantum tail. Record requested and actual pause
-duration. Exclude an experiment when timer overshoot exceeds its configured
-limit.
-
-Blocking ThreadPool workers can cause hill-climbing to inject replacement
-threads, defeating the experiment. Record worker count, pending work, and
-starvation events. The physical-worker prototype is a feasibility probe, not a
-trusted profiler: start with short windows and small credits, and exclude
-windows where worker count changes materially. Trust throughput curves only
-after scheduler-level delay can postpone logical dequeue without blocking or
-spinning a physical ThreadPool worker.
-
-Crediting the full `s * D` only after phase completion is also a lump-sum
-approximation to Coz's continuous sampled pauses. Require known critical-path,
-off-critical-path, and contention synthetic tests to match predictions before
-using a real phase curve. If they do not, reduce the delay quantum or add
-checkpoints within the phase.
-
-The effective experiment duration is:
-
-```text
-effective duration = wall duration - change in global virtual-time epoch
-```
-
-It is not the sum of every participant's physical waits, since those waits are
-conceptually concurrent copies of the same virtual-time debt. Record physical
-wait totals only as a validity diagnostic.
-
-### Randomized experiment controller
-
-Add a benchmark-side controller rather than a production system grain for the
-first implementation. It owns the shared control block and:
-
-1. waits until warmup and JIT activity finish;
-2. randomly selects an eligible phase;
-3. chooses 0% speedup with 50% probability and otherwise chooses uniformly
-   from configured non-zero levels;
-4. publishes a future QPC start and end time, then waits for both processes to
-   acknowledge the exact experiment tuple;
-5. snapshots progress counters and runs the window;
-6. records virtual time, physical pause diagnostics, GC/JIT/thread-pool state,
-   and progress deltas;
-7. runs a cool-off interval long enough for all participants to catch up; and
-8. repeats without adapting phase selection based on earlier results.
-
-Randomize both phase and speedup. Every phase requires its own 0% windows so
-phase-specific instrumentation/checkpoint overhead is represented in the
-baseline. Require a minimum number of progress points and completed windows per
-speedup. Do not shorten or prioritize experiments based on promising early
-results.
-
-### Progress points
-
-Use end-to-end progress, not grain execution alone:
-
-- Throughput progress point: `CallbackComplete` on the calling silo.
-- Latency begin: `RequestCreated`.
-- Latency end: `CallbackComplete`.
-
-The shared control block increments progress counters without emitting an event
-per call. At experiment end, emit one summary snapshot.
-
-For latency, pvanalyze should integrate the in-flight count over the experiment
-window on the virtual timeline and apply Little's Law:
-
-```text
-virtual time   = wall time - global virtual-time epoch
-virtual area   = integral of in-flight count over virtual time
-mean in-flight = virtual area / effective duration
-arrival rate   = latency begins / effective duration
-mean latency   = mean in-flight / arrival rate
-               = virtual area / latency begins
-```
-
-Exclude unstable windows where in-flight count trends upward or begin/end
-imbalance does not settle during cool-off. Compare the estimate with directly
-sampled `RequestCreated -> CallbackComplete` durations from the observational
-trace. The first causal milestone is throughput-only; latency curves remain
-disabled until virtual-time integration matches direct latency in synthetic
-and end-to-end tests.
-
-Causal curves require concurrent progress to delay. They describe the measured
-concurrent workload, typically the saturated guard, and must not be presented
-as predictors of single-flight latency. Single-flight changes still require
-observational phase evidence and paired direct latency measurements.
-
-### Causal experiment events
-
-Add a companion allocation-free EventSource named
-`Microsoft-Orleans-CausalProfiling`. It emits rare control/summary events:
-
-| Event | Required data |
-| --- | --- |
-| `SessionStarted` | schema, session ID, QPC frequency, process/silo identity, control-block name |
-| `ExperimentStarted` | experiment ID, phase, mode, speedup, start/end QPC, delay quantum |
-| `ExperimentEnded` | progress deltas, virtual-time delta, requested/applied/overshoot pauses, validity counters |
-| `ExperimentAborted` | reason and diagnostics |
-| `ParticipantSummary` | participant kind/count, checkpoints, debt, skipped/capped pauses |
-
-Use `WriteEventCore` with primitive payloads. Fine-grained phase hits remain in
-`Microsoft-Orleans-RpcLatency`; do not emit a causal event for every progress
-point or pause.
-
-### Slowdown-sensitivity experiments
-
-For phases which cannot satisfy virtual-speedup semantics, randomly add a small
-positive delay to the selected phase while leaving other participants
-unchanged. Compare treatment windows with phase-specific zero-delay windows.
-Report:
-
-- added delay distribution;
-- throughput and latency response;
-- local derivative and confidence interval; and
-- non-linearity across delay levels.
-
-This is a valid causal statement about the effect of slowing the phase under
-the measured workload. It is not automatically a prediction of the benefit
-from speeding the phase up.
-
-### pvanalyze causal command
-
-Add:
-
-```powershell
-pvanalyze causal trace.etl `
-  --progress callback-complete `
-  --format text
-
-pvanalyze causal trace.etl --format json --output causal.json
-```
-
-Implementation surfaces:
-
-- `Commands\CausalProfileCommand.cs` for CLI and output;
-- `CausalProfileAnalyzer.cs` for experiment reconstruction and estimators;
-- `Models.cs` for session, experiment, curve, confidence, and warning DTOs;
-- `TraceCapabilities.cs` for provider/schema detection;
-- `Program.cs` for command registration; and
-- `CollectCommand.cs` for a minimal causal provider profile and provider
-  arguments.
-
-Group experiments by `(phase, mode, speedup)`. Pool progress visits and
-effective duration only after validating each window. Compute:
-
-```text
-baseline rate = sum(progress visits at 0%) / sum(effective duration at 0%)
-treatment rate = sum(progress visits at s) / sum(effective duration at s)
-program speedup = treatment rate / baseline rate - 1
-```
-
-For latency, use the in-flight integral above. Report each curve point with
-experiment count, progress count, confidence interval, excluded-window count,
-and reasons. Rank virtual-speedup phases using the near-zero slope and show the
-full curve; a single large-speedup point is insufficient. Negative slopes are
-contention indicators, not automatic optimization prescriptions.
-
-Use bootstrap confidence intervals over experiment windows and retain raw
-window results in JSON. Randomization is the basis for causal attribution;
-regression does not repair non-random experiment order.
-
-### Causal validity checks
-
-Exclude or flag windows with:
-
-- mismatched experiment tuples or QPC boundaries across processes;
-- process restart, control-block version mismatch, or missing acknowledgement;
-- event loss or incomplete progress snapshots;
-- JIT during the selected phase;
-- Gen2 GC or excessive GC pause;
-- non-stationary arrival/progress rate;
-- unstable in-flight population;
-- too few progress points;
-- low participant concurrency for a virtual-speedup experiment;
-- ThreadPool worker growth/starvation during pause injection;
-- pause overshoot or capped debt above threshold;
-- participant checkpoint coverage below threshold; or
-- affinity, power policy, or collector configuration changes.
-
-Causal output must state its scope. A validated cooperative virtual-speedup
-curve supports a prediction for the named phase under the measured workload.
-An observational phase, network wait, or positive-delay experiment does not.
-Until the non-blocking scheduler implementation and synthetic prediction gates
-pass, label output `experimental-feasibility` and suppress optimization
-recommendations.
-
-### Causal profiling tests
-
-Add synthetic and end-to-end tests for:
-
-- the global/local epoch algorithm with two and many participants;
-- current-participant credit and suspended-participant catch-up;
-- cross-process aligned atomics and shared QPC experiment boundaries;
-- participant creation and emergency disable;
-- no pauses while locks are held;
-- delay quantum accumulation, overshoot, caps, and cool-off;
-- exact effective-duration calculation from global virtual time;
-- randomized phase/speedup selection with phase-specific 0% baselines;
-- throughput and Little's Law latency estimators;
-- virtual-time rather than wall-time in-flight integration;
-- I/O debt accumulation and synchronization-wait credit transfer;
-- exclusion of GC, JIT, starvation, unstable, and mismatched windows;
-- a synthetic known critical path with a positive curve;
-- an off-critical-path phase with a flat curve;
-- a contention case with a negative curve;
-- a known real optimization whose measured gain matches the prediction; and
-- slowdown-sensitivity output which is never mislabeled as virtual speedup.
-
-The first milestone should support one synchronous target phase (for example
-request serialization) and one throughput progress point. Expand to scheduler
-participants only after the synthetic prediction test passes.
-
-Causal profiling references:
-
-- [Coz: Finding Code that Counts with Causal Profiling](https://cacm.acm.org/research/coz/)
-- [Coz SOSP paper](https://arxiv.org/abs/1608.03676)
-- [Coz implementation](https://github.com/plasma-umass/coz)
+## Deferred active causal profiling
+
+The sampled causal chain is the immediate implementation target. Active
+Coz-style virtual-speedup experiments are explicitly deferred until phase
+timing is accurate, low-overhead, and able to identify a stable candidate.
+
+The phase schema should remain extensible enough to support future randomized
+experiments and end-to-end progress points, but the first implementation does
+not need shared virtual time, pause injection, a causal experiment controller,
+or a `pvanalyze causal` command. If passive timing later proves insufficient,
+revisit [Coz](https://cacm.acm.org/research/coz/) as a separate design with
+synthetic validation for .NET async and cross-process semantics.
 
 ## Windows system quiescence
 
@@ -724,7 +399,7 @@ Use two separately labeled configurations:
    policy. This is the result used for product claims.
 2. **Diagnostic mode:** the same setup plus disjoint source/target process
    affinity and High process priority. This reduces migration and contention
-   enough to identify causal phases, but it is not a production-representative
+   enough to identify phase boundaries, but it is not a production-representative
    throughput result.
 
 ### Reversible power-policy setup
@@ -879,7 +554,7 @@ Defender process exclusion requires explicit approval, must be removed in
 
 Loopback traffic does not require disabling the physical NIC. Windows Filtering
 Platform and security filter drivers can still affect loopback, so record them
-as part of the environment and investigate only if causal timing places the
+as part of the environment and investigate only if chain timing places the
 delay in the wire/receive phase.
 
 ### Collector and counter hygiene
@@ -983,25 +658,6 @@ dotnet $pv phases Artifacts\Benchmarks\Rpc\phases\split.etl `
   --output Artifacts\Benchmarks\Rpc\phases\split-phases.json
 ```
 
-The proposed causal benchmark harness owns the shared control block and launches
-the split processes. Capture both providers in one ETW clock domain:
-
-```powershell
-$env:ORLEANS_RPC_TRACE_SAMPLE_RATE = "4096"
-$env:ORLEANS_CAUSAL_PROFILE = "1"
-
-C:\tools\PerfView.exe /AcceptEULA /NoGui `
-  /Providers:*Microsoft-Orleans-RpcLatency,*Microsoft-Orleans-CausalProfiling `
-  /DataFile:Artifacts\Benchmarks\Rpc\causal\experiments.etl `
-  run dotnet test\Benchmarks\bin\Release\net10.0\Benchmarks.dll `
-  CausalFixedPing --concurrency 225 --duration 300
-
-dotnet $pv info Artifacts\Benchmarks\Rpc\causal\experiments.etl
-dotnet $pv causal Artifacts\Benchmarks\Rpc\causal\experiments.etl `
-  --progress callback-complete --format json `
-  --output Artifacts\Benchmarks\Rpc\causal\profile.json
-```
-
 The exact command and provider syntax must be validated during implementation;
 the current pvanalyze provider parser does not yet preserve provider arguments.
 
@@ -1030,10 +686,6 @@ Before using phase data for optimization:
 10. Run local delivery, one-hop, forwarded, retried, rejected, and truncated
     samples through the analyzer.
 11. Run both concurrency one and saturation guards.
-12. Validate a causal curve against a synthetic phase with a known real
-    optimization before trusting predictions on production phases.
-13. Require virtual-speedup output to pass participant coverage, pause
-    overshoot, worker-count, and cross-process synchronization checks.
 
 Retain an optimization only when the targeted phase moves by more than the
 paired control variation, end-to-end latency improves, and saturated throughput
@@ -1048,14 +700,5 @@ does not regress materially.
 5. Add the split-process benchmark, shared QPC orchestration, and quiescence
    harness.
 6. Establish the quiesced observational baseline.
-7. Implement the shared virtual-time control block and one synchronous
-   connection participant.
-8. Implement one eligible phase (request serialization) and the
-   `CallbackComplete` throughput progress point.
-9. Implement `pvanalyze causal` and validate its prediction against a synthetic
-   known optimization.
-10. Add activation-scheduler participants and only then expand the eligible
-    virtual-speedup phase set.
-11. Add separately labeled slowdown-sensitivity experiments for waiting phases.
-12. Resume runtime optimization using phases whose causal curves clear the
-    confidence and validity thresholds.
+7. Resume runtime optimization using the largest stable phase durations and
+   validate each change with paired end-to-end measurements.
