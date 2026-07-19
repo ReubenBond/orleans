@@ -168,3 +168,50 @@ Both experiments and their tests were removed. The trace and summaries are under
 `Artifacts\Benchmarks\Rpc\next`. The pvanalyze fork gained native EventPipe
 collection in [ReubenBond/pvanalyze#4](https://github.com/ReubenBond/pvanalyze/pull/4);
 PerfView remains the collector used for Windows ETW CPU and hardware-counter data.
+
+## Latency-focused follow-up
+
+A subsequent pass used `FixedPing` with one outstanding call as the latency
+workload and 225 outstanding calls as the throughput guard. Each side was built
+in a separate worktree at the same parent commit. Comparisons used balanced,
+alternating `B,O,O,B,B,O,O,B` order after a 5-second warmup.
+
+Single-flight results varied from approximately 22,000 to 36,000 calls/s as the
+machine changed frequency and thermal state. The unchanged hosted-client
+control varied by 3.7% in the initial long run. Changes near that movement were
+treated as noise rather than retained.
+
+The single-flight EventPipe trace contained 47,959 CPU samples and was dominated
+by socket send/receive, ThreadPool waits, and parked-thread frames. PerfView
+thread-time collection recorded 8.6 million context switches, but the current
+`pvanalyze` build could not restrict thread-time stacks to the benchmark process,
+so all-process blocked-time totals were not used for attribution. The useful
+latency hypothesis was therefore the ThreadPool handoff between frame decoding
+and message dispatch.
+
+PerfView also collected branch instructions, branch mispredictions, data-cache
+misses, retired instructions, and cycles at saturation. The baseline trace
+contains 477,170 CPU samples and 958,315 PMC samples; the last candidate trace
+contains 471,948 CPU samples and 949,557 PMC samples. Both have zero lost events.
+The current PMCSample event projection does not identify the source counter, so
+normalized cache and branch rates could not be calculated and no counter-rate
+improvement is claimed.
+
+No runtime change from this pass was retained:
+
+| Experiment | Result |
+| --- | --- |
+| Pool generated invokables on the receiving side | Reduced sampled allocation, but saturated median throughput fell 1.7% and latency was mixed |
+| Inline every response when its frame exhausted the current buffer | Improved single-flight median by about 9%, but reduced saturated median throughput by 5.4% |
+| Inline every single-frame dispatch, including requests | Regressed saturated throughput and caused a hosted-client control timeout |
+| Rate-gate inline responses using time between completed reads | Initially measured -2.2% latency and +3.7% saturated median, but review showed that processing time could be misclassified as idle time |
+| Gate on actual `ReadAsync` wait time | Corrected the classification issue, but the paired single-flight median regressed 7.5% |
+| Gate on time between response dispatches | Preserved saturated throughput, but the 0.9% latency movement was below control variation |
+| Gate isolated requests and responses | Paired single-flight median regressed 1.8% |
+| Queue inbound batches globally instead of worker-locally | Paired single-flight median regressed 6.3% |
+
+The parent branch's batched inbound dispatch remains the best measured policy:
+it removes the dominant high-load queueing cost without a speculative low-load
+special case. Artifacts are under `Artifacts\Benchmarks\Rpc\latency`; paired
+logs are grouped by experiment prefix and the hardware-counter captures use the
+`baseline-20260718-161215-*` and `final-20260718-175010-*` prefixes.
