@@ -41,7 +41,8 @@ internal sealed partial class ActivationData :
     IGrainCallCancellationExtension,
     ICallChainReentrantGrainContext,
     IAsyncDisposable,
-    IDisposable
+    IDisposable,
+    IMessageReceiver
 {
     private const string GrainAddressMigrationContextKey = "sys.addr";
     private readonly GrainTypeSharedContext _shared;
@@ -764,7 +765,7 @@ internal sealed partial class ActivationData :
                     }
 
                     var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, diagnostics);
-                    messageCenter.SendMessage(response);
+                    messageCenter.SendMessage(response, receiverCache: null);
                 }
             }
 
@@ -789,7 +790,7 @@ internal sealed partial class ActivationData :
                     };
 
                     var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, messageDiagnostics);
-                    messageCenter.SendMessage(response);
+                    messageCenter.SendMessage(response, receiverCache: null);
                 }
             }
 
@@ -813,7 +814,7 @@ internal sealed partial class ActivationData :
                     };
 
                     var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: false, isWaiting: true, messageDiagnostics);
-                    messageCenter.SendMessage(response);
+                    messageCenter.SendMessage(response, receiverCache: null);
                 }
 
                 queueLength++;
@@ -2332,6 +2333,15 @@ internal sealed partial class ActivationData :
     )]
     private static partial void LogErrorCancellationCallbackFailed(ILogger logger, Exception exception);
 
+    public void ReceiveMessage(Message message, IMessageReceiverCache cache)
+    {
+        if (!IsValid)
+        {
+            cache.CompareExchangeMessageReceiver(value: null, comparand: this);
+        }
+
+        ReceiveMessage(message);
+    }
     #endregion
 
     /// <summary>

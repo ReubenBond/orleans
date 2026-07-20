@@ -256,7 +256,7 @@ namespace Orleans
             OrleansOutsideRuntimeClientEvent.Instance.SendResponse(message);
             message.BodyObject = response;
 
-            MessageCenter.SendMessage(message);
+            MessageCenter.SendMessage(message, receiverCache: request);
         }
 
         public void SendRequest(GrainReference target, IInvokable request, IResponseCompletionSource context, InvokeMethodOptions options)
@@ -273,11 +273,21 @@ namespace Orleans
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
             message.SendingGrain = CurrentActivationAddress.GrainId;
             message.TargetGrain = targetGrainId;
+            IMessageDestinationCache targetCache = target;
 
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 // If the silo isn't be supplied, it will be filled in by the sender to be the gateway silo
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
+                targetCache = null;
+            }
+            else if (!oneWay)
+            {
+                message.TargetSilo = targetCache.TargetSilo;
+            }
+            else
+            {
+                targetCache = null;
             }
 
             if (this.clientMessagingOptions.DropExpiredMessages && message.IsExpirableMessage())
@@ -289,7 +299,7 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(this.sharedCallbackData, context, message, _applicationRequestInstruments);
+                var callbackData = new CallbackData(this.sharedCallbackData, context, message, _applicationRequestInstruments, targetCache);
                 callbackData.SubscribeForCancellation(cancellationToken);
                 callbacks.TryAdd(message.Id, callbackData);
             }
@@ -299,7 +309,7 @@ namespace Orleans
             }
 
             LogSendingMessage(logger, message);
-            MessageCenter.SendMessage(message);
+            MessageCenter.SendMessage(message, receiverCache: targetCache);
         }
 
         public void ReceiveResponse(Message response)
@@ -315,6 +325,7 @@ namespace Orleans
                 var request = callback?.Message;
                 if (request is not null)
                 {
+                    callback.UpdateTarget(response);
                     callback.OnStatusUpdate(status);
                     if (status.Diagnostics != null && status.Diagnostics.Count > 0)
                     {
@@ -348,6 +359,7 @@ namespace Orleans
                 // We need to import the RequestContext here as well.
                 // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
                 // RequestContextExtensions.Import(response.RequestContextData);
+                callbackData.UpdateTarget(response);
                 callbackData.DoCallback(response);
             }
             else

@@ -10,6 +10,31 @@ namespace UnitTests.Messaging;
 
 public class MessageTests
 {
+    [Fact, TestCategory("BVT")]
+    public void Reset_ClearsMessageReceiver()
+    {
+        var message = new Message();
+        var receiver = new object();
+        Assert.True(message.CompareExchangeMessageReceiver(receiver, comparand: null));
+
+        message.Reset();
+
+        Assert.Null(message.MessageReceiver);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void CompareExchangeMessageReceiver_DoesNotClearNewerReceiver()
+    {
+        var message = new Message();
+        var oldReceiver = new object();
+        var newReceiver = new object();
+        Assert.True(message.CompareExchangeMessageReceiver(oldReceiver, comparand: null));
+        Assert.True(message.CompareExchangeMessageReceiver(newReceiver, comparand: oldReceiver));
+
+        Assert.False(message.CompareExchangeMessageReceiver(value: null, comparand: oldReceiver));
+        Assert.Same(newReceiver, message.MessageReceiver);
+    }
+
 #if ORLEANS_PROFILING
     [Fact, TestCategory("BVT")]
     public void RpcTrace_ExtractsExactTraceAndResetClearsIt()

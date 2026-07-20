@@ -7,7 +7,7 @@ using System.Threading;
 namespace Orleans.Runtime
 {
     [Id(101)]
-    internal sealed class Message : ISpanFormattable
+    internal sealed class Message : ISpanFormattable, IMessageReceiverCache
     {
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
@@ -47,6 +47,9 @@ namespace Orleans.Runtime
 
         public List<GrainAddressCacheUpdate>? _cacheInvalidationHeader;
 
+        [NonSerialized]
+        private object? _messageReceiver;
+
         public PackedHeaders Headers { get => _headers; set => _headers = value; }
 
         internal void Reset()
@@ -64,6 +67,7 @@ namespace Orleans.Runtime
             _interfaceVersion = 0;
             _interfaceType = default;
             _cacheInvalidationHeader = null;
+            _messageReceiver = null;
             _isPooled = false;
 #if ORLEANS_PROFILING
             RpcTraceIdHigh = 0;
@@ -305,6 +309,12 @@ namespace Orleans.Runtime
                 _headers.SetFlag(MessageFlags.HasInterfaceType, !value.IsDefault);
             }
         }
+
+        // This is the receiver of the reply to this message.
+        public object? MessageReceiver => Volatile.Read(ref _messageReceiver);
+
+        public bool CompareExchangeMessageReceiver(object? value, object? comparand)
+            => ReferenceEquals(Interlocked.CompareExchange(ref _messageReceiver, value, comparand), comparand);
 
         public bool IsExpirableMessage()
         {

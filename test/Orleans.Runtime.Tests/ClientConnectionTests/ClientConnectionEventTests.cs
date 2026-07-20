@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
+using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -11,6 +13,43 @@ namespace Tester;
 /// </summary>
 public class ClientConnectionEventTests
 {
+    [Fact, TestCategory("SlowBVT")]
+    public async Task CachedGatewayConnection_ReroutesAfterDisconnect()
+    {
+        var lostGateway = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var builder = new InProcessTestClusterBuilder();
+        builder.ConfigureClient(client =>
+        {
+            client.Configure<GatewayOptions>(options => options.GatewayListRefreshPeriod = TimeSpan.FromSeconds(0.5));
+            client.AddGatewayCountChangedHandler((_, args) =>
+            {
+                if (args.NumberOfConnectedGateways == 1)
+                {
+                    lostGateway.TrySetResult();
+                }
+            });
+        });
+
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        var grain = cluster.Client.GetGrain<ITestGrain>(Random.Shared.Next());
+        await grain.SetLabel("before");
+        var destinationCache = (IMessageDestinationCache)(GrainReference)grain;
+        var originalReceiver = Assert.IsType<ClientOutboundConnection>(destinationCache.MessageReceiver);
+        var originalGateway = originalReceiver.RemoteSiloAddress;
+        var stoppedSilo = Assert.Single(cluster.Silos, silo => silo.GatewayAddress.Endpoint.Equals(originalGateway.Endpoint));
+
+        await stoppedSilo.StopSiloAsync(stopGracefully: true);
+        await lostGateway.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        await grain.SetLabel("after").WaitAsync(TimeSpan.FromSeconds(20));
+        await grain.GetRuntimeInstanceId().WaitAsync(TimeSpan.FromSeconds(20));
+
+        var newReceiver = Assert.IsType<ClientOutboundConnection>(destinationCache.MessageReceiver);
+        Assert.NotSame(originalReceiver, newReceiver);
+        Assert.NotEqual(originalGateway.Endpoint, newReceiver.RemoteSiloAddress.Endpoint);
+    }
+
     [Fact, TestCategory("SlowBVT")]
     public async Task EventSendWhenDisconnectedFromCluster()
     {

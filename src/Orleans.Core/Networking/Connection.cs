@@ -20,7 +20,7 @@ using Orleans.Serialization.Diagnostics;
 #nullable disable
 namespace Orleans.Runtime.Messaging
 {
-    internal abstract partial class Connection
+    internal abstract partial class Connection : IMessageReceiver
     {
         private static readonly Func<ConnectionContext, Task> OnConnectedDelegate = context => OnConnectedAsync(context);
         private static readonly Action<object> OnConnectionClosedDelegate = state => ((Connection)state).OnTransportConnectionClosed();
@@ -289,6 +289,8 @@ namespace Orleans.Runtime.Messaging
         protected abstract void OnReceivedMessage(Message message);
         protected abstract void OnSendMessageFailure(Message message, string error);
 
+        protected virtual bool ShouldSetMessageReceiver(Message message) => true;
+
         private async Task ProcessIncoming()
         {
             await Task.Yield();
@@ -332,6 +334,11 @@ namespace Orleans.Runtime.Messaging
                                                 durationTicks: Stopwatch.GetTimestamp() - decodeStart);
                                         }
 #endif
+                                        if (ShouldSetMessageReceiver(message))
+                                        {
+                                            message.CompareExchangeMessageReceiver(this, comparand: null);
+                                        }
+
                                         RecordMessageReceive(message, bodyLength + headerLength, headerLength);
                                         handler ??= MessageHandlerPool.Get();
                                         if (!handler.TryAdd(message, this))
@@ -635,6 +642,18 @@ namespace Orleans.Runtime.Messaging
             }
 
             return true;
+        }
+
+        public virtual void ReceiveMessage(Message message, IMessageReceiverCache cache)
+        {
+            if (!IsValid)
+            {
+                cache.CompareExchangeMessageReceiver(value: null, comparand: this);
+                RetryMessage(message);
+                return;
+            }
+
+            Send(message);
         }
 
         private sealed class MessageHandlerPoolPolicy : PooledObjectPolicy<MessageHandler>

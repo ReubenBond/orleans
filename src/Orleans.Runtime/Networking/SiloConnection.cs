@@ -105,7 +105,7 @@ namespace Orleans.Runtime.Messaging
             // information, so a null target silo is OK.
             if (msg.TargetSilo == null || msg.TargetSilo.Matches(this.LocalSiloAddress))
             {
-                messageCenter.ReceiveMessage(msg);
+                messageCenter.ReceiveMessage(msg, targetCache: null);
                 return;
             }
 
@@ -113,7 +113,7 @@ namespace Orleans.Runtime.Messaging
             {
                 // If the message is for some other silo altogether, then we need to forward it.
                 LogTraceForwardingMessage(this.Log, msg.Id, msg.SendingSilo!, msg.TargetSilo);
-                messageCenter.SendMessage(msg);
+                messageCenter.SendMessage(msg, receiverCache: null);
                 return;
             }
 
@@ -259,6 +259,20 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
+        protected override bool ShouldSetMessageReceiver(Message message)
+        {
+            if (message.Direction is Message.Directions.Request or Message.Directions.OneWay
+                && message.SendingSilo is { } sendingSilo
+                && this.RemoteSiloAddress is { } remoteSiloAddress
+                && !remoteSiloAddress.Matches(sendingSilo))
+            {
+                // Avoid caching the previous-hop connection for forwarded messages.
+                return false;
+            }
+
+            return true;
+        }
+
         public void FailMessage(Message msg, string reason)
         {
             if (msg.IsPing())
@@ -295,7 +309,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 ++msg.RetryCount;
-                this.messageCenter.SendMessage(msg);
+                this.messageCenter.SendMessage(msg, receiverCache: null);
             }
             else
             {
@@ -307,6 +321,21 @@ namespace Orleans.Runtime.Messaging
                 reason.Append("Msg is: ").Append(msg);
                 FailMessage(msg, reason.ToString());
             }
+        }
+
+        public override void ReceiveMessage(Message message, IMessageReceiverCache cache)
+        {
+            if (message.TargetSilo is { } targetSilo
+                && this.RemoteSiloAddress is { } remoteSiloAddress
+                && !remoteSiloAddress.Matches(targetSilo))
+            {
+                cache.CompareExchangeMessageReceiver(value: null, comparand: this);
+                this.messageCenter.SendMessage(message, receiverCache: null);
+                return;
+            }
+
+            message.TargetSilo ??= this.RemoteSiloAddress;
+            base.ReceiveMessage(message, cache);
         }
 
         [LoggerMessage(

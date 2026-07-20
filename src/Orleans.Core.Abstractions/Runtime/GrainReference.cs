@@ -254,7 +254,7 @@ namespace Orleans.Runtime
     [DefaultInvokableBaseType(typeof(Task), typeof(TaskRequest))]
     [DefaultInvokableBaseType(typeof(void), typeof(VoidRequest))]
     [DefaultInvokableBaseType(typeof(IAsyncEnumerable<>), typeof(AsyncEnumerableRequest<>))]
-    public class GrainReference : IAddressable, IEquatable<GrainReference>, ISpanFormattable
+    public class GrainReference : IAddressable, IEquatable<GrainReference>, ISpanFormattable, IMessageDestinationCache
     {
         /// <summary>
         /// The grain reference functionality which is shared by all grain references of a given type.
@@ -267,6 +267,39 @@ namespace Orleans.Runtime
         /// </summary>
         [NonSerialized]
         private readonly IdSpan _key;
+
+        [NonSerialized]
+        private WeakReference<object>? _messageReceiver;
+
+        [NonSerialized]
+        private SiloAddress? _targetSilo;
+
+        object? IMessageReceiverCache.MessageReceiver
+            => Volatile.Read(ref _messageReceiver) is { } receiver && receiver.TryGetTarget(out var target) ? target : null;
+
+        bool IMessageReceiverCache.CompareExchangeMessageReceiver(object? value, object? comparand)
+        {
+            while (true)
+            {
+                var current = Volatile.Read(ref _messageReceiver);
+                var currentTarget = current is not null && current.TryGetTarget(out var target) ? target : null;
+                if (!ReferenceEquals(currentTarget, comparand))
+                {
+                    return false;
+                }
+
+                var replacement = value is null ? null : new WeakReference<object>(value);
+                if (ReferenceEquals(Interlocked.CompareExchange(ref _messageReceiver, replacement, current), current))
+                {
+                    return true;
+                }
+            }
+        }
+
+        SiloAddress? IMessageDestinationCache.TargetSilo => Volatile.Read(ref _targetSilo);
+
+        bool IMessageDestinationCache.CompareExchangeTargetSilo(SiloAddress? value, SiloAddress? comparand)
+            => ReferenceEquals(Interlocked.CompareExchange(ref _targetSilo, value, comparand), comparand);
 
         /// <summary>
         /// Gets the grain reference functionality which is shared by all grain references of a given type.

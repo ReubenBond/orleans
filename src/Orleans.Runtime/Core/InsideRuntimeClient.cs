@@ -142,6 +142,7 @@ namespace Orleans.Runtime
                 message.SendingSilo = MySilo;
 
             IGrainContext sendingActivation = RuntimeContext.Current;
+            message.CompareExchangeMessageReceiver(sendingActivation ?? HostedClient, comparand: null);
 
             if (sendingActivation == null)
             {
@@ -157,11 +158,13 @@ namespace Orleans.Runtime
             var targetGrainId = target.GrainId;
             message.TargetGrain = targetGrainId;
             SharedCallbackData sharedData;
+            IMessageDestinationCache targetCache = target;
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
                 message.IsSystemMessage = true;
                 sharedData = this.systemSharedCallbackData;
+                targetCache = null;
             }
             else
             {
@@ -174,12 +177,21 @@ namespace Orleans.Runtime
             }
 
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
+            if (oneWay)
+            {
+                targetCache = null;
+            }
+            else if (targetCache is not null)
+            {
+                message.TargetSilo = targetCache.TargetSilo;
+            }
+
             if (!oneWay)
             {
                 Debug.Assert(context is not null);
 
                 // Register a callback for the request.
-                var callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
+                var callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments, targetCache);
                 callbacks.TryAdd(message.Id, callbackData);
                 callbackData.SubscribeForCancellation(cancellationToken);
 #if ORLEANS_PROFILING
@@ -196,7 +208,15 @@ namespace Orleans.Runtime
             }
 
             this.messagingTrace.OnSendRequest(message);
-            this.MessageCenter.AddressAndSendMessage(message);
+
+            if (targetCache?.MessageReceiver is IMessageReceiver receiver)
+            {
+                receiver.ReceiveMessage(message, targetCache);
+            }
+            else
+            {
+                this.MessageCenter.AddressAndSendMessage(message, targetCache);
+            }
         }
 
         public void SendResponse(Message request, Response response)
@@ -413,7 +433,7 @@ namespace Orleans.Runtime
                 {
                     // gatewayed message - gateway back to sender
                     LogTraceNoCallbackForRejection(this.logger, message);
-                    this.MessageCenter.AddressAndSendMessage(message);
+                    this.MessageCenter.AddressAndSendMessage(message, targetCache: null);
                     return;
                 }
 
@@ -436,6 +456,11 @@ namespace Orleans.Runtime
                         break;
                     case Message.RejectionTypes.CacheInvalidation when message.HasCacheInvalidationHeader:
                         // The message targeted an invalid (eg, defunct) activation and this response serves only to invalidate this silo's activation cache.
+                        if (callbacks.TryGetValue(message.Id, out var callback))
+                        {
+                            callback.UpdateTarget(message);
+                        }
+
                         return;
                     default:
                         LogErrorUnsupportedRejectionType(this.logger, rejection.RejectionType);
@@ -454,6 +479,7 @@ namespace Orleans.Runtime
         {
             if (callbacks.TryRemove(message.Id, out var callbackData))
             {
+                callbackData.UpdateTarget(message);
 #if ORLEANS_PROFILING
                 if (RpcCallTrace.ShouldTrace(message))
                 {
@@ -483,6 +509,7 @@ namespace Orleans.Runtime
             var request = callback?.Message;
             if (request is not null)
             {
+                callback.UpdateTarget(message);
                 callback.OnStatusUpdate(status);
                 if (status.Diagnostics is { Count: > 0 })
                 {

@@ -11,6 +11,8 @@ namespace Orleans.Runtime
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
+        private readonly IMessageDestinationCache? _destinationCache;
+        private readonly SiloAddress? _destinationSiloAtSend;
         private int completed;
         private StatusResponse? lastKnownStatus;
         private ValueStopwatch stopwatch;
@@ -20,18 +22,23 @@ namespace Orleans.Runtime
             SharedCallbackData shared,
             IResponseCompletionSource ctx,
             Message msg,
-            ApplicationRequestInstruments applicationRequestInstruments)
+            ApplicationRequestInstruments applicationRequestInstruments,
+            IMessageDestinationCache? destinationCache = null)
         {
             this.shared = shared;
             this.context = ctx;
             this.Message = msg;
             _applicationRequestInstruments = applicationRequestInstruments;
+            _destinationCache = destinationCache;
+            _destinationSiloAtSend = destinationCache?.TargetSilo;
             this.stopwatch = ValueStopwatch.StartNew();
         }
 
         public Message Message { get; } // might hold metadata used by response pipeline
 
         public bool IsCompleted => this.completed == 1;
+
+        public void UpdateTarget(Message response) => MessageDestinationCache.Update(_destinationCache, _destinationSiloAtSend, Message, response);
 
         public void SubscribeForCancellation(CancellationToken cancellationToken)
         {

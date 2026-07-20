@@ -112,6 +112,36 @@ namespace DefaultCluster.Tests.General
             }
         }
 
+        [Fact, TestCategory("BVT")]
+        public async Task DirectedGrainMigration_UpdatesMessageDestinationCache()
+        {
+            var grainFactory = ((InProcessSiloHandle)Fixture.HostedCluster.Primary).ServiceProvider.GetRequiredService<IGrainFactory>();
+            var grain = grainFactory.GetGrain<IMigrationTestGrain>(GetRandomGrainId());
+            var destinationCache = (IMessageDestinationCache)(GrainReference)grain;
+            var originalAddress = await grain.GetGrainAddress();
+            Assert.NotNull(destinationCache.MessageReceiver);
+            Assert.NotNull(destinationCache.TargetSilo);
+            Assert.True(destinationCache.TargetSilo.Matches(originalAddress.SiloAddress));
+
+            var targetHost = Fixture.HostedCluster.GetActiveSilos().Select(s => s.SiloAddress).First(address => address != originalAddress.SiloAddress);
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
+            await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
+
+            GrainAddress newAddress;
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            do
+            {
+                cts.Token.ThrowIfCancellationRequested();
+                newAddress = await grain.GetGrainAddress();
+            } while (newAddress.ActivationId == originalAddress.ActivationId);
+
+            Assert.Equal(targetHost, newAddress.SiloAddress);
+            Assert.True(destinationCache.TargetSilo.Matches(targetHost));
+
+            await grain.GetState();
+            Assert.NotNull(destinationCache.MessageReceiver);
+        }
+
         /// <summary>
         /// Tests that multiple grains can be migrated simultaneously.
         /// </summary>

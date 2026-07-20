@@ -180,11 +180,17 @@ namespace Orleans.Messaging
             static void ThrowNullMessageHandler() => throw new InvalidOperationException("MessageCenter does not have a message handler set");
         }
 
-        public void SendMessage(Message msg)
+        public void SendMessage(Message msg, IMessageReceiverCache receiverCache)
         {
             if (!Running)
             {
                 LogNotRunning(msg);
+                return;
+            }
+
+            if (receiverCache?.MessageReceiver is IMessageReceiver receiver)
+            {
+                receiver.ReceiveMessage(msg, receiverCache);
                 return;
             }
 
@@ -195,13 +201,15 @@ namespace Orleans.Messaging
                 if (connection is null) return;
 
                 connection.Send(msg);
+                receiverCache?.CompareExchangeMessageReceiver(connection, comparand: null);
+
                 LogSendingMessage(msg, connection.RemoteEndPoint);
             }
             else
             {
-                _ = SendAsync(connectionTask, msg);
+                _ = SendAsync(connectionTask, msg, receiverCache);
 
-                async Task SendAsync(ValueTask<Connection> task, Message message)
+                async Task SendAsync(ValueTask<Connection> task, Message message, IMessageReceiverCache targetCache)
                 {
                     try
                     {
@@ -211,6 +219,7 @@ namespace Orleans.Messaging
                         if (connection is null) return;
 
                         connection.Send(message);
+                        targetCache?.CompareExchangeMessageReceiver(connection, comparand: null);
 
                         LogSendingMessage(message, connection.RemoteEndPoint);
                     }
@@ -221,7 +230,7 @@ namespace Orleans.Messaging
                             ++message.RetryCount;
 
                             _ = Task.Factory.StartNew(
-                                state => this.SendMessage((Message)state),
+                                state => this.SendMessage((Message)state, targetCache),
                                 message,
                                 CancellationToken.None,
                                 TaskCreationOptions.DenyChildAttach,
