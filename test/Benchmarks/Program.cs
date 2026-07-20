@@ -252,6 +252,16 @@ internal class Program
             var warmupSeconds = double.TryParse(args.ElementAtOrDefault(2), out var parsedWarmup) ? parsedWarmup : 5;
             var measurementSeconds = double.TryParse(args.ElementAtOrDefault(3), out var parsedMeasurement) ? parsedMeasurement : 10;
             var iterations = int.TryParse(args.ElementAtOrDefault(4), out var parsedIterations) ? parsedIterations : 5;
+            var traceProbes = 0;
+            for (var i = 5; i < args.Length; i++)
+            {
+                if (string.Equals(args[i], "--trace-probes", StringComparison.OrdinalIgnoreCase)
+                    && i + 1 < args.Length
+                    && int.TryParse(args[++i], out var parsedTraceProbes))
+                {
+                    traceProbes = parsedTraceProbes;
+                }
+            }
 
             var benchmark = new AdaptivePingBenchmark(mode, numSilos);
             try
@@ -260,7 +270,8 @@ internal class Program
                     concurrency,
                     TimeSpan.FromSeconds(warmupSeconds),
                     TimeSpan.FromSeconds(measurementSeconds),
-                    iterations).GetAwaiter().GetResult();
+                    iterations,
+                    traceProbes).GetAwaiter().GetResult();
             }
             finally
             {
@@ -268,6 +279,30 @@ internal class Program
                 benchmark.Dispose();
             }
         },
+#if ORLEANS_PROFILING
+        ["FixedPingTarget"] = args =>
+        {
+            var sessionId = args.ElementAtOrDefault(0) ?? throw new ArgumentException("A session id is required.");
+            var readyFile = args.ElementAtOrDefault(1) ?? throw new ArgumentException("A readiness file path is required.");
+            SplitProcessPingBenchmark.RunTargetAsync(sessionId, readyFile).GetAwaiter().GetResult();
+        },
+        ["FixedPingDriver"] = args =>
+        {
+            var sessionId = args.ElementAtOrDefault(0) ?? throw new ArgumentException("A session id is required.");
+            var concurrency = int.TryParse(args.ElementAtOrDefault(1), out var parsedConcurrency) ? parsedConcurrency : 100;
+            var warmupSeconds = double.TryParse(args.ElementAtOrDefault(2), out var parsedWarmup) ? parsedWarmup : 5;
+            var measurementSeconds = double.TryParse(args.ElementAtOrDefault(3), out var parsedMeasurement) ? parsedMeasurement : 10;
+            var iterations = int.TryParse(args.ElementAtOrDefault(4), out var parsedIterations) ? parsedIterations : 1;
+            var traceProbes = int.TryParse(args.ElementAtOrDefault(5), out var parsedTraceProbes) ? parsedTraceProbes : 1;
+            SplitProcessPingBenchmark.RunDriverAsync(
+                sessionId,
+                concurrency,
+                TimeSpan.FromSeconds(warmupSeconds),
+                TimeSpan.FromSeconds(measurementSeconds),
+                iterations,
+                traceProbes).GetAwaiter().GetResult();
+        },
+#endif
         ["AdaptivePing_All"] = _ =>
         {
             AdaptivePingBenchmark.RunAllScenariosAsync().GetAwaiter().GetResult();

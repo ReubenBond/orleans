@@ -10,6 +10,9 @@ using Orleans.Placement.Repartitioning;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.Invocation;
+#if ORLEANS_PROFILING
+using Orleans.Serialization.Diagnostics;
+#endif
 
 namespace Orleans.Runtime.Messaging
 {
@@ -196,6 +199,12 @@ namespace Orleans.Runtime.Messaging
                 {
                     if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection))
                     {
+#if ORLEANS_PROFILING
+                        if (msg.Direction is not Message.Directions.Response && RpcCallTrace.ShouldTrace(msg))
+                        {
+                            RpcCallTrace.Write(msg, RpcCallPhase.RequestAddressingComplete, _siloAddress);
+                        }
+#endif
                         existingConnection.Send(msg);
                         return;
                     }
@@ -216,6 +225,12 @@ namespace Orleans.Runtime.Messaging
                         if (connectionTask.IsCompletedSuccessfully)
                         {
                             var sender = connectionTask.Result;
+#if ORLEANS_PROFILING
+                            if (msg.Direction is not Message.Directions.Response && RpcCallTrace.ShouldTrace(msg))
+                            {
+                                RpcCallTrace.Write(msg, RpcCallPhase.RequestAddressingComplete, _siloAddress);
+                            }
+#endif
                             sender.Send(msg);
                         }
                         else
@@ -227,6 +242,12 @@ namespace Orleans.Runtime.Messaging
                                 try
                                 {
                                     var sender = await connectionTask;
+#if ORLEANS_PROFILING
+                                    if (msg.Direction is not Message.Directions.Response && RpcCallTrace.ShouldTrace(msg))
+                                    {
+                                        RpcCallTrace.Write(msg, RpcCallPhase.RequestAddressingComplete, messageCenter._siloAddress);
+                                    }
+#endif
                                     sender.Send(msg);
                                 }
                                 catch (Exception exception)
@@ -502,6 +523,12 @@ namespace Orleans.Runtime.Messaging
             // create the response
             var message = this.messageFactory.CreateResponseMessage(request);
             message.BodyObject = response;
+#if ORLEANS_PROFILING
+            if (RpcCallTrace.ShouldTrace(message))
+            {
+                RpcCallTrace.Write(message, RpcCallPhase.ResponseCreated, _siloAddress);
+            }
+#endif
 
             if (message.TargetGrain.IsSystemTarget())
             {
@@ -514,6 +541,12 @@ namespace Orleans.Runtime.Messaging
         public void ReceiveMessage(Message msg)
         {
             Debug.Assert(!msg.IsLocalOnly);
+#if ORLEANS_PROFILING
+            if (RpcCallTrace.ShouldTrace(msg))
+            {
+                RpcCallTrace.Write(msg, RpcCallPhase.RuntimeReceived, _siloAddress);
+            }
+#endif
             try
             {
                 this.messagingTrace.OnIncomingMessageAgentReceiveMessage(msg);

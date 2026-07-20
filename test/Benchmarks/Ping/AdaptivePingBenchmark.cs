@@ -4,6 +4,10 @@ using BenchmarkGrains.Ping;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Configuration;
+#if ORLEANS_PROFILING
+using System.Diagnostics;
+using Orleans.Runtime;
+#endif
 
 namespace Benchmarks.Ping;
 
@@ -36,6 +40,9 @@ public class AdaptivePingBenchmark : IDisposable
     private const double DefaultMinimumRelativeImprovement = 0.005;
     private static readonly TimeSpan DefaultMeasurementInterval = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan DefaultSampleInterval = TimeSpan.FromMilliseconds(250);
+#if ORLEANS_PROFILING
+    private static readonly RpcProbeTracing ProbeTracing = new();
+#endif
 
     public string Description { get; }
     public int BestConcurrency { get; private set; }
@@ -75,6 +82,9 @@ public class AdaptivePingBenchmark : IDisposable
                     siloPort: 11111 + i,
                     gatewayPort: 30000 + i,
                     primarySiloEndpoint: primary);
+#if ORLEANS_PROFILING
+                siloBuilder.AddActivityPropagation();
+#endif
 
                 // For SiloToSilo mode: remove grains from primary silo to force cross-silo calls
                 if (i == 0 && grainsOnSecondariesOnly)
@@ -99,6 +109,9 @@ public class AdaptivePingBenchmark : IDisposable
         {
             var hostBuilder = new HostBuilder().UseOrleansClient((ctx, clientBuilder) =>
             {
+#if ORLEANS_PROFILING
+                clientBuilder.AddActivityPropagation();
+#endif
                 if (numSilos == 1)
                 {
                     clientBuilder.UseLocalhostClustering();
@@ -128,6 +141,9 @@ public class AdaptivePingBenchmark : IDisposable
             Console.WriteLine("\nShutdown requested...");
             _cts.Cancel();
         };
+#if ORLEANS_PROFILING
+        RpcCallTrace.WriteBenchmarkPhase(1, 1);
+#endif
     }
 
     /// <summary>
@@ -217,7 +233,8 @@ public class AdaptivePingBenchmark : IDisposable
         int concurrency,
         TimeSpan warmupDuration,
         TimeSpan measurementDuration,
-        int iterations)
+        int iterations,
+        int traceProbes = 0)
     {
         if (iterations <= 0)
         {
@@ -225,10 +242,16 @@ public class AdaptivePingBenchmark : IDisposable
         }
 
         var grainFactory = GetGrainFactory();
+#if ORLEANS_PROFILING
+        const bool recordLatency = true;
+#else
+        const bool recordLatency = false;
+#endif
         var loadGenerator = new FixedConcurrencyLoadGenerator<IPingGrain>(
             concurrency,
             issueRequest: static grain => grain.Run(),
-            getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId));
+            getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId),
+            recordLatency: recordLatency);
 
         Console.WriteLine($"=== Fixed Ping Benchmark: {Description} ===");
         Console.WriteLine($"Process: {Environment.ProcessId}");
@@ -239,18 +262,40 @@ public class AdaptivePingBenchmark : IDisposable
         Console.WriteLine($"Measurement: {iterations} x {measurementDuration.TotalSeconds:F1}s");
         Console.WriteLine();
 
+#if ORLEANS_PROFILING
+        RpcCallTrace.WriteBenchmarkPhase(2, 1);
+#endif
         await loadGenerator.WarmupAsync(warmupDuration);
+#if ORLEANS_PROFILING
+        RpcCallTrace.WriteBenchmarkPhase(3, 1);
+#endif
         Console.WriteLine("Warmup complete");
 
         var results = new FixedConcurrencyLoadResult[iterations];
         for (var i = 0; i < results.Length; i++)
         {
+#if ORLEANS_PROFILING
+            RpcCallTrace.WriteBenchmarkPhase(4, 1);
+            results[i] = await loadGenerator.RunAsync(
+                measurementDuration,
+                traceProbes > 0 ? () => RunTraceProbesAsync(grainFactory, concurrency, traceProbes) : null);
+            RpcCallTrace.WriteBenchmarkPhase(5, 1);
+#else
             results[i] = await loadGenerator.RunAsync(measurementDuration);
+#endif
             var result = results[i];
             Console.WriteLine(
                 $"Iteration {i + 1}: {result.Throughput:N0}/s, {result.Completed:N0} calls, " +
                 $"{result.AllocatedBytesPerOperation:N1} B/op, " +
-                $"GC {result.Gen0Collections}/{result.Gen1Collections}/{result.Gen2Collections}");
+                $"GC {result.Gen0Collections}/{result.Gen1Collections}/{result.Gen2Collections}"
+#if ORLEANS_PROFILING
+                + ", " +
+                $"latency mean/p50/p90/p99/p99.9/max " +
+                $"{result.Latency.MeanMicroseconds:F2}/{result.Latency.GetPercentileMicroseconds(50):F2}/" +
+                $"{result.Latency.GetPercentileMicroseconds(90):F2}/{result.Latency.GetPercentileMicroseconds(99):F2}/" +
+                $"{result.Latency.GetPercentileMicroseconds(99.9):F2}/{result.Latency.MaxMicroseconds:F2} us"
+#endif
+                );
         }
 
         var mean = results.Average(static result => result.Throughput);
@@ -266,6 +311,9 @@ public class AdaptivePingBenchmark : IDisposable
 
     public async Task ShutdownAsync()
     {
+#if ORLEANS_PROFILING
+        RpcCallTrace.WriteBenchmarkPhase(6, 1);
+#endif
         if (_clientHost != null)
         {
             await _clientHost.StopAsync();
@@ -285,6 +333,81 @@ public class AdaptivePingBenchmark : IDisposable
                 host.Dispose();
         }
     }
+
+#if ORLEANS_PROFILING
+    internal static async Task RunTraceProbesAsync(IGrainFactory grainFactory, int concurrency, int traceProbes)
+    {
+        for (var i = 0; i < traceProbes; i++)
+        {
+            var grainId = Random.Shared.Next(Math.Max(1, concurrency));
+            var grain = grainFactory.GetGrain<IPingGrain>(grainId);
+            using var probe = ProbeTracing.Begin();
+            var previousMarker = RequestContext.Get(RpcCallTrace.ExactTraceMarker);
+            RequestContext.Set(RpcCallTrace.ExactTraceMarker, true);
+            Console.WriteLine($"Trace probe {i + 1}: {probe.TraceId}");
+
+            var start = Stopwatch.GetTimestamp();
+            try
+            {
+                await grain.Run();
+                Console.WriteLine($"Trace probe {i + 1} latency: {Stopwatch.GetElapsedTime(start).TotalMicroseconds:F2} us");
+            }
+            finally
+            {
+                if (previousMarker is null)
+                {
+                    RequestContext.Remove(RpcCallTrace.ExactTraceMarker);
+                }
+                else
+                {
+                    RequestContext.Set(RpcCallTrace.ExactTraceMarker, previousMarker);
+                }
+            }
+        }
+    }
+
+    internal sealed class RpcProbeTracing : IDisposable
+    {
+        private readonly ActivityListener _listener;
+        private ActivityTraceId _selectedTraceId;
+
+        public RpcProbeTracing()
+        {
+            _listener = new ActivityListener
+            {
+                ShouldListenTo = static source => source.Name.StartsWith("Microsoft.Orleans.", StringComparison.Ordinal),
+                Sample = Sample,
+                SampleUsingParentId = static (ref ActivityCreationOptions<string> _) => ActivitySamplingResult.None,
+            };
+            ActivitySource.AddActivityListener(_listener);
+        }
+
+        public Probe Begin()
+        {
+            var activity = new Activity("Orleans.RpcProbe").SetIdFormat(ActivityIdFormat.W3C).Start();
+            _selectedTraceId = activity.TraceId;
+            return new(this, activity);
+        }
+
+        public void Dispose() => _listener.Dispose();
+
+        private ActivitySamplingResult Sample(ref ActivityCreationOptions<ActivityContext> options) =>
+            options.Parent.TraceId == _selectedTraceId || RequestContext.Get(RpcCallTrace.ExactTraceMarker) is true
+                ? ActivitySamplingResult.PropagationData
+                : ActivitySamplingResult.None;
+
+        public sealed class Probe(RpcProbeTracing owner, Activity activity) : IDisposable
+        {
+            public ActivityTraceId TraceId => activity.TraceId;
+
+            public void Dispose()
+            {
+                owner._selectedTraceId = default;
+                activity.Stop();
+            }
+        }
+    }
+#endif
 
     public void Dispose()
     {

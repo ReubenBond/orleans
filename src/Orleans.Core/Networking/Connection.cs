@@ -13,6 +13,9 @@ using Microsoft.Extensions.ObjectPool;
 using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Serialization.Invocation;
+#if ORLEANS_PROFILING
+using Orleans.Serialization.Diagnostics;
+#endif
 
 #nullable disable
 namespace Orleans.Runtime.Messaging
@@ -257,7 +260,23 @@ namespace Orleans.Runtime.Messaging
         public virtual void Send(Message message)
         {
             Debug.Assert(!message.IsLocalOnly);
-            if (!this.outgoingMessageWriter.TryWrite(message))
+            if (this.outgoingMessageWriter.TryWrite(message))
+            {
+#if ORLEANS_PROFILING
+                if (RpcCallTrace.ShouldTrace(message))
+                {
+                    var reader = outgoingMessages.Reader;
+                    RpcCallTrace.Write(
+                        message,
+                        RpcCallPhase.TransportQueued,
+                        message.SendingSilo,
+                        RpcCallResourceKind.ConnectionSend,
+                        RpcCallTrace.GetResourceId(this),
+                        reader.CanCount ? reader.Count : -1);
+                }
+#endif
+            }
+            else
             {
                 this.RerouteMessage(message);
             }
@@ -296,14 +315,30 @@ namespace Orleans.Runtime.Messaging
                                 try
                                 {
                                     int headerLength, bodyLength;
+#if ORLEANS_PROFILING
+                                    var decodeStart = RpcCallTrace.IsEnabled ? Stopwatch.GetTimestamp() : 0;
+#endif
                                     (requiredBytes, headerLength, bodyLength) = serializer.TryRead(ref buffer, out message);
                                     if (requiredBytes == 0)
                                     {
                                         Debug.Assert(message is not null);
+#if ORLEANS_PROFILING
+                                        if (RpcCallTrace.ShouldTrace(message))
+                                        {
+                                            RpcCallTrace.Write(
+                                                message,
+                                                RpcCallPhase.FrameDecoded,
+                                                message.TargetSilo,
+                                                durationTicks: Stopwatch.GetTimestamp() - decodeStart);
+                                        }
+#endif
                                         RecordMessageReceive(message, bodyLength + headerLength, headerLength);
                                         handler ??= MessageHandlerPool.Get();
                                         if (!handler.TryAdd(message, this))
                                         {
+#if ORLEANS_PROFILING
+                                            handler.EmitQueued();
+#endif
                                             ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
                                             handler = MessageHandlerPool.Get();
                                             var added = handler.TryAdd(message, this);
@@ -324,6 +359,9 @@ namespace Orleans.Runtime.Messaging
                         {
                             if (handler is not null)
                             {
+#if ORLEANS_PROFILING
+                                handler.EmitQueued();
+#endif
                                 ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
                             }
                         }
@@ -378,7 +416,30 @@ namespace Orleans.Runtime.Messaging
                     {
                         while (inflight.Count < inflight.Capacity && reader.TryRead(out message) && this.PrepareMessageForSend(message))
                         {
+#if ORLEANS_PROFILING
+                            if (RpcCallTrace.ShouldTrace(message))
+                            {
+                                RpcCallTrace.Write(
+                                    message,
+                                    RpcCallPhase.SerializeStart,
+                                    message.SendingSilo,
+                                    RpcCallResourceKind.ConnectionSend,
+                                    RpcCallTrace.GetResourceId(this));
+                            }
+#endif
                             var (headerLength, bodyLength) = serializer.Write(output, message);
+#if ORLEANS_PROFILING
+                            if (RpcCallTrace.ShouldTrace(message))
+                            {
+                                RpcCallTrace.Write(
+                                    message,
+                                    RpcCallPhase.SerializeStop,
+                                    message.SendingSilo,
+                                    RpcCallResourceKind.ConnectionSend,
+                                    RpcCallTrace.GetResourceId(this),
+                                    detail: headerLength + bodyLength);
+                            }
+#endif
                             inflight.Add(message);
                             RecordMessageSend(message, headerLength + bodyLength, headerLength);
                             messageObserver?.Invoke(message);
@@ -395,7 +456,41 @@ namespace Orleans.Runtime.Messaging
                         _ = inflight.Remove(message);
                     }
 
+#if ORLEANS_PROFILING
+                    for (var i = 0; i < inflight.Count; i++)
+                    {
+                        var pendingMessage = inflight[i];
+                        if (RpcCallTrace.ShouldTrace(pendingMessage))
+                        {
+                            RpcCallTrace.Write(
+                                pendingMessage,
+                                RpcCallPhase.FlushStart,
+                                pendingMessage.SendingSilo,
+                                RpcCallResourceKind.PipeFlush,
+                                RpcCallTrace.GetResourceId(this),
+                                batchSize: inflight.Count,
+                                batchIndex: i);
+                        }
+                    }
+#endif
                     var flushResult = await output.FlushAsync();
+#if ORLEANS_PROFILING
+                    for (var i = 0; i < inflight.Count; i++)
+                    {
+                        var pendingMessage = inflight[i];
+                        if (RpcCallTrace.ShouldTrace(pendingMessage))
+                        {
+                            RpcCallTrace.Write(
+                                pendingMessage,
+                                RpcCallPhase.FlushStop,
+                                pendingMessage.SendingSilo,
+                                RpcCallResourceKind.PipeFlush,
+                                RpcCallTrace.GetResourceId(this),
+                                batchSize: inflight.Count,
+                                batchIndex: i);
+                        }
+                    }
+#endif
                     if (flushResult.IsCompleted || flushResult.IsCanceled)
                     {
                         break;
@@ -570,6 +665,20 @@ namespace Orleans.Runtime.Messaging
                 this.connection ??= connection;
                 Debug.Assert(ReferenceEquals(this.connection, connection));
                 messages[count++] = message;
+#if ORLEANS_PROFILING
+                if (RpcCallTrace.ShouldTrace(message))
+                {
+                    RpcCallTrace.Write(
+                        message,
+                        RpcCallPhase.DispatchBuffered,
+                        message.TargetSilo,
+                        RpcCallResourceKind.InboundDispatch,
+                        RpcCallTrace.GetResourceId(this),
+                        count,
+                        batchSize: count,
+                        batchIndex: count - 1);
+                }
+#endif
                 return true;
             }
 
@@ -577,8 +686,39 @@ namespace Orleans.Runtime.Messaging
             {
                 try
                 {
+#if ORLEANS_PROFILING
                     for (var i = 0; i < count; i++)
                     {
+                        var message = messages[i];
+                        if (RpcCallTrace.ShouldTrace(message))
+                        {
+                            RpcCallTrace.Write(
+                                message,
+                                RpcCallPhase.DispatchBatchStart,
+                                message.TargetSilo,
+                                RpcCallResourceKind.InboundDispatch,
+                                RpcCallTrace.GetResourceId(this),
+                                RpcCallEventSource.PendingWorkItemCount,
+                                count,
+                                i);
+                        }
+                    }
+#endif
+                    for (var i = 0; i < count; i++)
+                    {
+#if ORLEANS_PROFILING
+                        if (RpcCallTrace.ShouldTrace(messages[i]))
+                        {
+                            RpcCallTrace.Write(
+                                messages[i],
+                                RpcCallPhase.DispatchStart,
+                                messages[i].TargetSilo,
+                                RpcCallResourceKind.InboundDispatch,
+                                RpcCallTrace.GetResourceId(this),
+                                batchSize: count,
+                                batchIndex: i);
+                        }
+#endif
                         connection.OnReceivedMessage(messages[i]);
                     }
                 }
@@ -587,6 +727,28 @@ namespace Orleans.Runtime.Messaging
                     MessageHandlerPool.Return(this);
                 }
             }
+
+#if ORLEANS_PROFILING
+            public void EmitQueued()
+            {
+                for (var i = 0; i < count; i++)
+                {
+                    var message = messages[i];
+                    if (RpcCallTrace.ShouldTrace(message))
+                    {
+                        RpcCallTrace.Write(
+                            message,
+                            RpcCallPhase.DispatchQueued,
+                            message.TargetSilo,
+                            RpcCallResourceKind.InboundDispatch,
+                            RpcCallTrace.GetResourceId(this),
+                            RpcCallEventSource.PendingWorkItemCount,
+                            count,
+                            i);
+                    }
+                }
+            }
+#endif
 
             public void Reset()
             {

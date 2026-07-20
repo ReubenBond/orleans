@@ -15,5 +15,12 @@ namespace Orleans.Serialization.Invocation
         /// Sets the result to the default value.
         /// </summary>
         void Complete(); 
+
+#if ORLEANS_PROFILING
+        /// <summary>
+        /// Sets the trace context used to measure asynchronous continuation scheduling.
+        /// </summary>
+        void SetRpcTraceContext(Orleans.Serialization.Diagnostics.RpcCallTraceContext context);
+#endif
     }
 }

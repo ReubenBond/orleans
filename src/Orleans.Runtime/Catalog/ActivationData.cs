@@ -16,6 +16,9 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
+#if ORLEANS_PROFILING
+using Orleans.Serialization.Diagnostics;
+#endif
 using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
 
@@ -1434,6 +1437,17 @@ internal sealed partial class ActivationData :
     {
         _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedOk(message);
         _shared.InternalRuntime.MessagingTrace.OnScheduleMessage(message);
+#if ORLEANS_PROFILING
+        if (RpcCallTrace.ShouldTrace(message))
+        {
+            RpcCallTrace.Write(
+                message,
+                RpcCallPhase.InvocationStart,
+                message.TargetSilo,
+                RpcCallResourceKind.Activation,
+                RpcCallTrace.GetResourceId(this));
+        }
+#endif
 
         try
         {
@@ -1557,6 +1571,18 @@ internal sealed partial class ActivationData :
         lock (this)
         {
             _waitingRequests.Add((message, CoarseStopwatch.StartNew()));
+#if ORLEANS_PROFILING
+            if (RpcCallTrace.ShouldTrace(message))
+            {
+                RpcCallTrace.Write(
+                    message,
+                    RpcCallPhase.ActivationQueued,
+                    message.TargetSilo,
+                    RpcCallResourceKind.Activation,
+                    RpcCallTrace.GetResourceId(this),
+                    _waitingRequests.Count);
+            }
+#endif
         }
 
         _workSignal.Signal();

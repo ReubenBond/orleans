@@ -17,6 +17,9 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
+#if ORLEANS_PROFILING
+using Orleans.Serialization.Diagnostics;
+#endif
 using Orleans.Storage;
 using static Orleans.Internal.StandardExtensions;
 
@@ -180,6 +183,13 @@ namespace Orleans.Runtime
                 var callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
                 callbacks.TryAdd(message.Id, callbackData);
                 callbackData.SubscribeForCancellation(cancellationToken);
+#if ORLEANS_PROFILING
+                if (RpcCallTrace.ShouldTrace(message))
+                {
+                    context.SetRpcTraceContext(RpcCallTrace.CreateContext(message, message.SendingSilo));
+                    RpcCallTrace.Write(message, RpcCallPhase.RequestCreated, message.SendingSilo);
+                }
+#endif
             }
             else
             {
@@ -332,6 +342,12 @@ namespace Orleans.Runtime
 
                 if (message.Direction != Message.Directions.OneWay)
                 {
+#if ORLEANS_PROFILING
+                    if (RpcCallTrace.ShouldTrace(message))
+                    {
+                        RpcCallTrace.Write(message, RpcCallPhase.InvocationStop, message.TargetSilo);
+                    }
+#endif
                     SafeSendResponse(message, response);
                 }
 
@@ -439,9 +455,21 @@ namespace Orleans.Runtime
         {
             if (callbacks.TryRemove(message.Id, out var callbackData))
             {
+#if ORLEANS_PROFILING
+                if (RpcCallTrace.ShouldTrace(message))
+                {
+                    RpcCallTrace.Write(message, RpcCallPhase.CallbackStart, message.TargetSilo);
+                }
+#endif
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
                 callbackData.DoCallback(message);
+#if ORLEANS_PROFILING
+                if (RpcCallTrace.ShouldTrace(message))
+                {
+                    RpcCallTrace.Write(message, RpcCallPhase.CallbackComplete, message.TargetSilo);
+                }
+#endif
             }
             else
             {

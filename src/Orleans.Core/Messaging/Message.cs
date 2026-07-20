@@ -19,6 +19,14 @@ namespace Orleans.Runtime
         [NonSerialized]
         private bool _isPooled;
 
+#if ORLEANS_PROFILING
+        [NonSerialized]
+        internal ulong RpcTraceIdHigh;
+
+        [NonSerialized]
+        internal ulong RpcTraceIdLow;
+#endif
+
         public CoarseStopwatch _timeToExpiry;
 
         public object? BodyObject { get; set; }
@@ -57,6 +65,10 @@ namespace Orleans.Runtime
             _interfaceType = default;
             _cacheInvalidationHeader = null;
             _isPooled = false;
+#if ORLEANS_PROFILING
+            RpcTraceIdHigh = 0;
+            RpcTraceIdLow = 0;
+#endif
         }
 
         [GenerateSerializer]

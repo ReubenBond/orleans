@@ -2,6 +2,9 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
+#if ORLEANS_PROFILING
+using Orleans.Serialization.Diagnostics;
+#endif
 
 #nullable disable
 namespace Orleans.Serialization.Invocation
@@ -14,6 +17,12 @@ namespace Orleans.Serialization.Invocation
         // This source is pooled and GetResult returns it to the pool. Continuations must not run inline from SetResult/SetException,
         // or they can reset/reuse this instance before completion unwinds.
         private ManualResetValueTaskSourceCore<Response> _core = new() { RunContinuationsAsynchronously = true };
+#if ORLEANS_PROFILING
+        private static readonly Action<object> TracedContinuation = static state => ((ResponseCompletionSource)state).InvokeContinuation();
+        private RpcCallTraceContext _traceContext;
+        private Action<object> _continuation;
+        private object _continuationState;
+#endif
 
         /// <summary>
         /// Returns this instance as a <see cref="ValueTask{Response}"/>.
@@ -31,13 +40,30 @@ namespace Orleans.Serialization.Invocation
         public ValueTaskSourceStatus GetStatus(short token) => _core.GetStatus(token);
 
         /// <inheritdoc/>
-        public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags) => _core.OnCompleted(continuation, state, token, flags);
+        public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags)
+        {
+#if ORLEANS_PROFILING
+            if (_traceContext.CorrelationId != 0)
+            {
+                _continuation = continuation;
+                _continuationState = state;
+                _core.OnCompleted(TracedContinuation, this, token, flags);
+                return;
+            }
+#endif
+            _core.OnCompleted(continuation, state, token, flags);
+        }
 
         /// <summary>
         /// Resets this instance.
         /// </summary>
         public void Reset()
         {
+#if ORLEANS_PROFILING
+            _traceContext = default;
+            _continuation = null;
+            _continuationState = null;
+#endif
             _core.Reset();
             ResponseCompletionSourcePool.Return(this);
         }
@@ -46,7 +72,13 @@ namespace Orleans.Serialization.Invocation
         /// Completes this instance with an exception.
         /// </summary>
         /// <param name="exception">The exception.</param>
-        public void SetException(Exception exception) => _core.SetException(exception);
+        public void SetException(Exception exception)
+        {
+#if ORLEANS_PROFILING
+            SignalCompletion();
+#endif
+            _core.SetException(exception);
+        }
 
         /// <summary>
         /// Completes this instance with a result.
@@ -56,13 +88,46 @@ namespace Orleans.Serialization.Invocation
         {
             if (result.Exception is not { } exception)
             {
+#if ORLEANS_PROFILING
+                SignalCompletion();
+#endif
                 _core.SetResult(result);
             }
             else
             {
-                _core.SetException(exception);
+                SetException(exception);
             }
         }
+
+#if ORLEANS_PROFILING
+        public void SetRpcTraceContext(RpcCallTraceContext context) => _traceContext = context;
+
+        private void SignalCompletion()
+        {
+            if (_traceContext.CorrelationId != 0)
+            {
+                RpcCallEventSource.Log.WritePhase(
+                    _traceContext,
+                    RpcCallPhase.CompletionSignaled,
+                    RpcCallResourceKind.Continuation,
+                    RuntimeHelpers.GetHashCode(this),
+                    queueDepth: RpcCallEventSource.PendingWorkItemCount);
+            }
+        }
+
+        private void InvokeContinuation()
+        {
+            var continuation = _continuation;
+            var state = _continuationState;
+            RpcCallEventSource.Log.WritePhase(
+                _traceContext,
+                RpcCallPhase.ContinuationStart,
+                RpcCallResourceKind.Continuation,
+                RuntimeHelpers.GetHashCode(this),
+                queueDepth: RpcCallEventSource.PendingWorkItemCount);
+            continuation(state);
+        }
+#endif
 
         /// <summary>
         /// Completes this instance with a result.
@@ -119,6 +184,12 @@ namespace Orleans.Serialization.Invocation
         // This source is pooled and GetResult returns it to the pool. Continuations must not run inline from SetResult/SetException,
         // or they can reset/reuse this instance before completion unwinds.
         private ManualResetValueTaskSourceCore<TResult> _core = new() { RunContinuationsAsynchronously = true };
+#if ORLEANS_PROFILING
+        private static readonly Action<object> TracedContinuation = static state => ((ResponseCompletionSource<TResult>)state).InvokeContinuation();
+        private RpcCallTraceContext _traceContext;
+        private Action<object> _continuation;
+        private object _continuationState;
+#endif
 
         /// <summary>
         /// Returns this instance as a <see cref="ValueTask{Response}"/>.
@@ -136,13 +207,30 @@ namespace Orleans.Serialization.Invocation
         public ValueTaskSourceStatus GetStatus(short token) => _core.GetStatus(token);
 
         /// <inheritdoc/>
-        public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags) => _core.OnCompleted(continuation, state, token, flags);
+        public void OnCompleted(Action<object> continuation, object state, short token, ValueTaskSourceOnCompletedFlags flags)
+        {
+#if ORLEANS_PROFILING
+            if (_traceContext.CorrelationId != 0)
+            {
+                _continuation = continuation;
+                _continuationState = state;
+                _core.OnCompleted(TracedContinuation, this, token, flags);
+                return;
+            }
+#endif
+            _core.OnCompleted(continuation, state, token, flags);
+        }
 
         /// <summary>
         /// Resets this instance.
         /// </summary>
         public void Reset()
         {
+#if ORLEANS_PROFILING
+            _traceContext = default;
+            _continuation = null;
+            _continuationState = null;
+#endif
             _core.Reset();
             ResponseCompletionSourcePool.Return(this);
         }
@@ -151,13 +239,55 @@ namespace Orleans.Serialization.Invocation
         /// Completes this instance with an exception.
         /// </summary>
         /// <param name="exception">The exception.</param>
-        public void SetException(Exception exception) => _core.SetException(exception);
+        public void SetException(Exception exception)
+        {
+#if ORLEANS_PROFILING
+            SignalCompletion();
+#endif
+            _core.SetException(exception);
+        }
 
         /// <summary>
         /// Completes this instance with a result.
         /// </summary>
         /// <param name="result">The result.</param>
-        public void SetResult(TResult result) => _core.SetResult(result);
+        public void SetResult(TResult result)
+        {
+#if ORLEANS_PROFILING
+            SignalCompletion();
+#endif
+            _core.SetResult(result);
+        }
+
+#if ORLEANS_PROFILING
+        public void SetRpcTraceContext(RpcCallTraceContext context) => _traceContext = context;
+
+        private void SignalCompletion()
+        {
+            if (_traceContext.CorrelationId != 0)
+            {
+                RpcCallEventSource.Log.WritePhase(
+                    _traceContext,
+                    RpcCallPhase.CompletionSignaled,
+                    RpcCallResourceKind.Continuation,
+                    RuntimeHelpers.GetHashCode(this),
+                    queueDepth: RpcCallEventSource.PendingWorkItemCount);
+            }
+        }
+
+        private void InvokeContinuation()
+        {
+            var continuation = _continuation;
+            var state = _continuationState;
+            RpcCallEventSource.Log.WritePhase(
+                _traceContext,
+                RpcCallPhase.ContinuationStart,
+                RpcCallResourceKind.Continuation,
+                RuntimeHelpers.GetHashCode(this),
+                queueDepth: RpcCallEventSource.PendingWorkItemCount);
+            continuation(state);
+        }
+#endif
 
         /// <inheritdoc/>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

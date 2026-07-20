@@ -73,6 +73,14 @@ namespace Orleans.Runtime
             response.CacheInvalidationHeader = request.CacheInvalidationHeader;
             response.TimeToLive = request.TimeToLive;
             response.RequestContextData = RequestContextExtensions.Export(_deepCopier);
+#if ORLEANS_PROFILING
+            if (RpcCallTrace.IsEnabled)
+            {
+                RpcCallTrace.EnsureExactTrace(request);
+            }
+            response.RpcTraceIdHigh = request.RpcTraceIdHigh;
+            response.RpcTraceIdLow = request.RpcTraceIdLow;
+#endif
 
             _messagingTrace.OnCreateMessage(response);
             return response;
