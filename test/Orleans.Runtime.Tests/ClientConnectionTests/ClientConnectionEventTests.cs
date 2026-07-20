@@ -13,6 +13,36 @@ namespace Tester;
 /// </summary>
 public class ClientConnectionEventTests
 {
+    [Fact, TestCategory("BVT")]
+    public async Task ClientCachesOnlyActiveGrainDestinations()
+    {
+        var builder = new InProcessTestClusterBuilder();
+        await using var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        var grain = cluster.Client.GetGrain<IGuidTestGrain>(Guid.NewGuid());
+        var grainSilo = await grain.GetSiloAddress();
+        var destinationCache = (IMessageDestinationCache)(GrainReference)grain;
+        Assert.True(destinationCache.TargetSilo.Matches(grainSilo));
+
+        var gateway = ((InProcessSiloHandle)cluster.Silos[0])
+            .ServiceProvider
+            .GetRequiredService<MessageCenter>()
+            .Gateway;
+        var message = new Message
+        {
+            TargetGrain = grain.GetGrainId(),
+            TargetSilo = grainSilo,
+        };
+        Assert.Equal(grainSilo, gateway.TryToReroute(message));
+
+        message.TargetSilo = SiloAddress.New(grainSilo.Endpoint, grainSilo.Generation + 1);
+        Assert.Null(gateway.TryToReroute(message));
+
+        message.TargetSilo = cluster.Silos[1].GatewayAddress;
+        Assert.Null(gateway.TryToReroute(message));
+    }
+
     [Fact, TestCategory("SlowBVT")]
     public async Task CachedGatewayConnection_ReroutesAfterDisconnect()
     {

@@ -241,14 +241,15 @@ internal class Program
         },
         ["FixedPing"] = args =>
         {
-            var mode = args.ElementAtOrDefault(0)?.ToLowerInvariant() switch
+            var (mode, numSilos) = args.ElementAtOrDefault(0)?.ToLowerInvariant() switch
             {
-                "local" => AdaptivePingBenchmark.BenchmarkMode.HostedClient,
-                "client-to-silo" => AdaptivePingBenchmark.BenchmarkMode.ExternalClient,
-                null or "silo-to-silo" => AdaptivePingBenchmark.BenchmarkMode.SiloToSilo,
-                var value => throw new ArgumentException($"Unknown mode '{value}'. Expected 'silo-to-silo', 'client-to-silo', or 'local'.")
+                "local" => (AdaptivePingBenchmark.BenchmarkMode.HostedClient, 1),
+                "client-to-silo" => (AdaptivePingBenchmark.BenchmarkMode.ExternalClient, 1),
+                "client-to-two-silos" => (AdaptivePingBenchmark.BenchmarkMode.ExternalClient, 2),
+                null or "silo-to-silo" => (AdaptivePingBenchmark.BenchmarkMode.SiloToSilo, 2),
+                var value => throw new ArgumentException(
+                    $"Unknown mode '{value}'. Expected 'silo-to-silo', 'client-to-silo', 'client-to-two-silos', or 'local'.")
             };
-            var numSilos = mode is AdaptivePingBenchmark.BenchmarkMode.SiloToSilo ? 2 : 1;
             var concurrency = int.TryParse(args.ElementAtOrDefault(1), out var parsedConcurrency) ? parsedConcurrency : 100;
             var warmupSeconds = double.TryParse(args.ElementAtOrDefault(2), out var parsedWarmup) ? parsedWarmup : 5;
             var measurementSeconds = double.TryParse(args.ElementAtOrDefault(3), out var parsedMeasurement) ? parsedMeasurement : 10;

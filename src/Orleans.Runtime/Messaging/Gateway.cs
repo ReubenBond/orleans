@@ -33,6 +33,7 @@ namespace Orleans.Runtime.Messaging
         private readonly ClientsReplyRoutingCache clientsReplyRoutingCache;
         private readonly MessageCenter messageCenter;
         private readonly MessagingInstruments _messagingInstruments;
+        private readonly ISiloStatusOracle _siloStatusOracle;
 
         private readonly ILogger logger;
         private readonly ILoggerFactory loggerFactory;
@@ -43,6 +44,7 @@ namespace Orleans.Runtime.Messaging
         public Gateway(
             MessageCenter messageCenter,
             ILocalSiloDetails siloDetails,
+            ISiloStatusOracle siloStatusOracle,
             ILoggerFactory loggerFactory,
             IOptions<SiloMessagingOptions> options,
             IAsyncTimerFactory timerFactory,
@@ -59,6 +61,7 @@ namespace Orleans.Runtime.Messaging
             clientsReplyRoutingCache = new ClientsReplyRoutingCache(messagingOptions.ResponseTimeout);
             this.siloAddress = siloDetails.SiloAddress;
             this.gatewayAddress = siloDetails.GatewayAddress;
+            _siloStatusOracle = siloStatusOracle;
             this.GatewayInstruments = new(orleansInstruments);
             this.gatewayMaintenanceTimer = timerFactory.Create(messagingOptions.ClientDropTimeout, nameof(PerformGatewayMaintenance), timeProvider);
             this.gatewayMaintenanceTask = Task.Run(PerformGatewayMaintenance);
@@ -190,6 +193,15 @@ namespace Orleans.Runtime.Messaging
             if (msg.TargetGrain.IsSystemTarget() && !IsTargetingLocalGateway(msg.TargetSilo))
             {
                 return msg.TargetSilo;
+            }
+
+            // A client can reuse the silo address from a previous response. Only trust an exact,
+            // active membership entry so stale generations and gateway addresses use placement.
+            if (!msg.TargetGrain.IsClient()
+                && msg.TargetSilo is { } targetSilo
+                && _siloStatusOracle.GetApproximateSiloStatus(targetSilo) is SiloStatus.Active)
+            {
+                return targetSilo;
             }
 
             // for responses from ClientAddressableObject to ClientGrain try to use clientsReplyRoutingCache for sending replies directly back.
@@ -396,13 +408,6 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 msg.TargetSilo = null;
-
-                // Override the SendingSilo only if the sending grain is not
-                // a system target
-                if (!msg.SendingGrain.IsSystemTarget())
-                {
-                    msg.SendingSilo = _gateway.gatewayAddress;
-                }
 
                 var connection = Volatile.Read(ref _connection);
                 if (connection is null || !TrySend(connection, msg))
