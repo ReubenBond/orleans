@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -26,7 +25,7 @@ namespace Orleans
         private readonly ILogger logger;
         private readonly ClientMessagingOptions clientMessagingOptions;
 
-        private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
+        private readonly CallbackRegistry<CallbackData> callbacks;
         private InvokableObjectManager localObjects;
         private bool disposing;
         private bool disposed;
@@ -84,7 +83,7 @@ namespace Orleans
             this.loggerFactory = loggerFactory;
             this.messagingTrace = messagingTrace;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
-            callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
+            callbacks = new CallbackRegistry<CallbackData>(static callback => callback.Message.Id);
             this.clientMessagingOptions = clientMessagingOptions.Value;
             var period = Max(
                 TimeSpan.FromMilliseconds(1),
@@ -344,9 +343,7 @@ namespace Orleans
                 return;
             }
 
-            CallbackData callbackData;
-            var found = callbacks.TryRemove(response.Id, out callbackData);
-            if (found)
+            if (callbacks.TryRemove(response.Id, out var callbackData))
             {
                 // We need to import the RequestContext here as well.
                 // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
@@ -429,18 +426,18 @@ namespace Orleans
 
         public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
         {
-            foreach (var callback in callbacks)
+            foreach (var callback in callbacks.GetValues())
             {
-                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
+                if (deadSilo.Equals(callback.Message.TargetSilo))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    callback.OnTargetSiloFail();
                 }
             }
         }
 
         private void BreakOutstandingMessages()
         {
-            foreach (var (_, callback) in callbacks)
+            foreach (var callback in callbacks.GetValues())
             {
                 try
                 {
@@ -454,7 +451,7 @@ namespace Orleans
         }
 
         public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
-            => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
+            => this.callbacks.GetValues().Count(c => c.Message.InterfaceType == grainInterfaceType);
 
         /// <inheritdoc />
         public void NotifyClusterConnectionLost()
@@ -498,7 +495,7 @@ namespace Orleans
                 try
                 {
                     var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
-                    foreach (var (_, callback) in callbacks)
+                    foreach (var callback in callbacks.GetValues())
                     {
                         if (callback.IsCompleted)
                         {

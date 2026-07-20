@@ -11,8 +11,10 @@ public class CallbackKeyBenchmarks
     private const int OperationCount = 256;
     private readonly ConcurrentDictionary<(GrainId, CorrelationId), object> _compoundCallbacks = new();
     private readonly ConcurrentDictionary<CorrelationId, object> _correlationCallbacks = new();
+    private readonly CallbackRegistry<RegistryValue> _callbackRegistry = new(static value => value.Key);
     private readonly (GrainId, CorrelationId)[] _compoundKeys = new (GrainId, CorrelationId)[OperationCount];
     private readonly CorrelationId[] _correlationKeys = new CorrelationId[OperationCount];
+    private readonly RegistryValue[] _registryValues = new RegistryValue[OperationCount];
     private readonly object _value = new();
 
     [GlobalSetup]
@@ -24,6 +26,7 @@ public class CallbackKeyBenchmarks
             var correlationId = new CorrelationId(i);
             _compoundKeys[i] = (grainId, correlationId);
             _correlationKeys[i] = correlationId;
+            _registryValues[i] = new(correlationId);
         }
     }
 
@@ -52,4 +55,19 @@ public class CallbackKeyBenchmarks
 
         return removed;
     }
+
+    [Benchmark]
+    public int CallbackRegistry()
+    {
+        var removed = 0;
+        foreach (var value in _registryValues)
+        {
+            _callbackRegistry.TryAdd(value.Key, value);
+            removed += _callbackRegistry.TryRemove(value.Key, out _) ? 1 : 0;
+        }
+
+        return removed;
+    }
+
+    private sealed record RegistryValue(CorrelationId Key);
 }

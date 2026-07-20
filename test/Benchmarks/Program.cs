@@ -244,8 +244,9 @@ internal class Program
             var mode = args.ElementAtOrDefault(0)?.ToLowerInvariant() switch
             {
                 "local" => AdaptivePingBenchmark.BenchmarkMode.HostedClient,
+                "client-to-silo" => AdaptivePingBenchmark.BenchmarkMode.ExternalClient,
                 null or "silo-to-silo" => AdaptivePingBenchmark.BenchmarkMode.SiloToSilo,
-                var value => throw new ArgumentException($"Unknown mode '{value}'. Expected 'silo-to-silo' or 'local'.")
+                var value => throw new ArgumentException($"Unknown mode '{value}'. Expected 'silo-to-silo', 'client-to-silo', or 'local'.")
             };
             var numSilos = mode is AdaptivePingBenchmark.BenchmarkMode.SiloToSilo ? 2 : 1;
             var concurrency = int.TryParse(args.ElementAtOrDefault(1), out var parsedConcurrency) ? parsedConcurrency : 100;
