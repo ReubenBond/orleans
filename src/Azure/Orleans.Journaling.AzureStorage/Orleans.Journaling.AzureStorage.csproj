@@ -1,7 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <PackageId>Microsoft.Orleans.Journaling.AzureStorage</PackageId>
+    <Title>Microsoft Orleans Journaling provider for Azure Storage</Title>
+    <Description>Azure Storage support for Microsoft Orleans Journaling.</Description>
+    <PackageTags>$(PackageTags) Persistence State Machines</PackageTags>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>

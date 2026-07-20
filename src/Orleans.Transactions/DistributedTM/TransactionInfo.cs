@@ -16,7 +16,7 @@ namespace Orleans.Transactions
             this.joined = new ConcurrentQueue<TransactionInfo>();
         }
 
-        public TransactionInfo(Guid id, DateTime timeStamp, DateTime priority, bool readOnly = false) : this()
+        public TransactionInfo(Guid id, DateTime timeStamp, DateTime priority, bool readOnly) : this()
         {
             this.TransactionId = id;
             this.IsReadOnly = readOnly;

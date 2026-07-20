@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,7 +19,7 @@ public interface IDurableTaskCompletionSource<T>
     bool TrySetResult(T value);
 }
 
-[DebuggerDisplay("Status = {Status}")]
+[DebuggerDisplay("Status = {_status}")]
 internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IDurableStateMachine
 {
     private const byte SupportedVersion = 0;
