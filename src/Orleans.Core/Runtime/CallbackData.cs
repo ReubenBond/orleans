@@ -40,6 +40,9 @@ namespace Orleans.Runtime
 
         public void UpdateTarget(Message response) => MessageDestinationCache.Update(_destinationCache, _destinationSiloAtSend, Message, response);
 
+        public void UpdateTargetForLocalResponse(SiloAddress respondingSilo) =>
+            MessageDestinationCache.UpdateLocalResponse(_destinationCache, _destinationSiloAtSend, Message, respondingSilo);
+
         public void SubscribeForCancellation(CancellationToken cancellationToken)
         {
             if (!cancellationToken.CanBeCanceled)
@@ -207,19 +210,33 @@ namespace Orleans.Runtime
             ResponseCallback(response, this.context);
         }
 
+        public void DoCallback(Response response)
+        {
+            if (Interlocked.CompareExchange(ref this.completed, 1, 0) != 0)
+            {
+                return;
+            }
+
+            OrleansCallBackDataEvent.Instance.DoCallback(this.Message);
+
+            this.stopwatch.Stop();
+            _cancellationTokenRegistration.Dispose();
+            _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
+            ResponseCallback(response, this.context);
+        }
+
         private static void ResponseCallback(Message message, IResponseCompletionSource context)
         {
+            var body = message.BodyObject;
+            if (body is Response response)
+            {
+                ResponseCallback(response, context);
+                return;
+            }
+
             try
             {
-                var body = message.BodyObject;
-                if (body is Response response)
-                {
-                    context.Complete(response);
-                }
-                else
-                {
-                    HandleRejectionResponse(context, body as RejectionResponse);
-                }
+                HandleRejectionResponse(context, body as RejectionResponse);
             }
             catch (Exception exc)
             {
@@ -240,6 +257,18 @@ namespace Orleans.Runtime
                 }
 
                 context.Complete(Response.FromException(exception));
+            }
+        }
+
+        private static void ResponseCallback(Response response, IResponseCompletionSource context)
+        {
+            try
+            {
+                context.Complete(response);
+            }
+            catch (Exception exc)
+            {
+                context.Complete(Response.FromException(exc));
             }
         }
 

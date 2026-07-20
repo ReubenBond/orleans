@@ -53,6 +53,21 @@ internal static class RpcCallTrace
             durationTicks);
     }
 
+    internal static void WriteResponse(Message request, RpcCallPhase phase, SiloAddress localSilo)
+    {
+        var context = CreateContext(request, localSilo) with { Direction = (byte)Message.Directions.Response };
+        RpcCallEventSource.Log.WritePhase(
+            context,
+            phase,
+            RpcCallResourceKind.None,
+            resourceId: 0,
+            queueDepth: -1,
+            batchSize: 0,
+            batchIndex: -1,
+            detail: 0,
+            durationTicks: 0);
+    }
+
     internal static RpcCallTraceContext CreateContext(Message message, SiloAddress? localSilo)
     {
         EnsureExactTrace(message);

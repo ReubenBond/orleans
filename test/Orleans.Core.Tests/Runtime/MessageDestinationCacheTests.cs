@@ -55,6 +55,20 @@ public class MessageDestinationCacheTests
     }
 
     [Fact]
+    public void SuccessfulLocalResponse_CachesRespondingSilo()
+    {
+        var receiver = new object();
+        var cache = new TestMessageDestinationCache(receiver, targetSilo: null);
+        var request = CreateRequest(targetSilo: null);
+        var respondingSilo = CreateSilo(1);
+
+        MessageDestinationCache.UpdateLocalResponse(cache, expectedSilo: null, request, respondingSilo);
+
+        Assert.Same(respondingSilo, cache.TargetSilo);
+        Assert.Same(receiver, cache.MessageReceiver);
+    }
+
+    [Fact]
     public void CacheInvalidation_ReplacesTargetAndClearsReceiver()
     {
         var oldSilo = CreateSilo(1);
@@ -68,6 +82,23 @@ public class MessageDestinationCacheTests
             CreateAddress(request.TargetGrain, newSilo));
 
         MessageDestinationCache.Update(cache, oldSilo, request, response);
+
+        Assert.Same(newSilo, cache.TargetSilo);
+        Assert.Null(cache.MessageReceiver);
+    }
+
+    [Fact]
+    public void LocalResponseCacheInvalidation_ReplacesTargetAndClearsReceiver()
+    {
+        var oldSilo = CreateSilo(1);
+        var newSilo = CreateSilo(2);
+        var cache = new TestMessageDestinationCache(new object(), oldSilo);
+        var request = CreateRequest(oldSilo);
+        request.AddToCacheInvalidationHeader(
+            CreateAddress(request.TargetGrain, oldSilo),
+            CreateAddress(request.TargetGrain, newSilo));
+
+        MessageDestinationCache.UpdateLocalResponse(cache, oldSilo, request, oldSilo);
 
         Assert.Same(newSilo, cache.TargetSilo);
         Assert.Null(cache.MessageReceiver);

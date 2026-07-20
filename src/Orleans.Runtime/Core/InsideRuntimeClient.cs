@@ -230,7 +230,43 @@ namespace Orleans.Runtime
                 return;
             }
 
+            if (request.MessageReceiver is HostedClient
+                && request.TargetSilo is { } targetSilo
+                && targetSilo.Matches(MySilo))
+            {
+                CompleteHostedClientResponse(request, response, targetSilo);
+                return;
+            }
+
             this.MessageCenter.SendResponse(request, response);
+        }
+
+        private void CompleteHostedClientResponse(Message request, Response response, SiloAddress respondingSilo)
+        {
+            OrleansInsideRuntimeClientEvent.Instance.ReceiveResponse(request);
+
+            if (!callbacks.TryRemove(request.Id, out var callbackData))
+            {
+                LogDebugNoCallbackForResponse(this.logger, request);
+                return;
+            }
+
+            callbackData.UpdateTargetForLocalResponse(respondingSilo);
+#if ORLEANS_PROFILING
+            if (RpcCallTrace.ShouldTrace(request))
+            {
+                RpcCallTrace.WriteResponse(request, RpcCallPhase.ResponseCreated, respondingSilo);
+                RpcCallTrace.WriteResponse(request, RpcCallPhase.RuntimeReceived, respondingSilo);
+                RpcCallTrace.WriteResponse(request, RpcCallPhase.CallbackStart, respondingSilo);
+            }
+#endif
+            callbackData.DoCallback(response);
+#if ORLEANS_PROFILING
+            if (RpcCallTrace.ShouldTrace(request))
+            {
+                RpcCallTrace.WriteResponse(request, RpcCallPhase.CallbackComplete, respondingSilo);
+            }
+#endif
         }
 
         /// <summary>

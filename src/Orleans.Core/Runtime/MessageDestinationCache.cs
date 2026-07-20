@@ -40,13 +40,44 @@ internal static class MessageDestinationCache
         }
     }
 
+    public static void UpdateLocalResponse(
+        IMessageDestinationCache? cache,
+        SiloAddress? expectedSilo,
+        Message request,
+        SiloAddress respondingSilo)
+    {
+        if (cache is null)
+        {
+            return;
+        }
+
+        if (TryGetCacheUpdate(request, request.CacheInvalidationHeader, expectedSilo, out var updatedSilo))
+        {
+            if (cache.CompareExchangeTargetSilo(updatedSilo, expectedSilo))
+            {
+                ClearMessageReceiver(cache);
+            }
+
+            return;
+        }
+
+        cache.CompareExchangeTargetSilo(respondingSilo, expectedSilo);
+    }
+
     private static bool TryGetCacheUpdate(
         Message request,
         Message response,
         SiloAddress? expectedSilo,
+        out SiloAddress? targetSilo) =>
+        TryGetCacheUpdate(request, response.CacheInvalidationHeader, expectedSilo, out targetSilo);
+
+    private static bool TryGetCacheUpdate(
+        Message request,
+        List<GrainAddressCacheUpdate>? updates,
+        SiloAddress? expectedSilo,
         out SiloAddress? targetSilo)
     {
-        if (response.CacheInvalidationHeader is { } updates)
+        if (updates is not null)
         {
             lock (updates)
             {

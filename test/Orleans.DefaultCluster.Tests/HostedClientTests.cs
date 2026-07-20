@@ -95,6 +95,15 @@ namespace DefaultCluster.Tests.General
             Assert.Equal(23, val);
         }
 
+        [Fact]
+        public async Task HostedClient_GrainExceptionTest()
+        {
+            var client = _host.Services.GetRequiredService<IClusterClient>();
+            var grain = client.GetGrain<IExceptionGrain>(Random.Shared.NextInt64());
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => grain.ThrowsInvalidOperationException());
+        }
+
         /// <summary>
         /// Tests timeout behavior for grain calls from a hosted client.
         /// Verifies that response timeouts are properly enforced and that
