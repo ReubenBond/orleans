@@ -346,7 +346,7 @@ namespace Orleans.Runtime.Messaging
 #if ORLEANS_PROFILING
                                             handler.EmitQueued();
 #endif
-                                            ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
+                                            ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: false);
                                             handler = MessageHandlerPool.Get();
                                             var added = handler.TryAdd(message, this);
                                             Debug.Assert(added);
@@ -369,7 +369,7 @@ namespace Orleans.Runtime.Messaging
 #if ORLEANS_PROFILING
                                 handler.EmitQueued();
 #endif
-                                ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: true);
+                                ThreadPool.UnsafeQueueUserWorkItem(handler, preferLocal: false);
                             }
                         }
                     }
