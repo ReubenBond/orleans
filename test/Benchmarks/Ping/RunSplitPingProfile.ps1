@@ -7,6 +7,7 @@ param(
     [double] $MeasurementSeconds = 30,
     [int] $Iterations = 1,
     [int] $TraceProbes = 1,
+    [int] $GrainCount = 0,
     [int64] $DriverAffinity = 0,
     [int64] $TargetAffinity = 0,
     [ValidateSet("Normal", "AboveNormal", "High")]
@@ -65,7 +66,8 @@ try
             $WarmupSeconds,
             $MeasurementSeconds,
             $Iterations,
-            $TraceProbes) `
+            $TraceProbes,
+            $GrainCount) `
         -RedirectStandardOutput $driverOut `
         -RedirectStandardError $driverErr `
         -PassThru

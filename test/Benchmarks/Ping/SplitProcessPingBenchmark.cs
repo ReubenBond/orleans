@@ -57,8 +57,14 @@ internal static class SplitProcessPingBenchmark
         TimeSpan warmupDuration,
         TimeSpan measurementDuration,
         int iterations,
-        int traceProbes)
+        int traceProbes,
+        int grainCount)
     {
+        if (grainCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(grainCount));
+        }
+
         await using var controlPipe = new NamedPipeClientStream(
             ".",
             GetPipeName(sessionId),
@@ -86,10 +92,11 @@ internal static class SplitProcessPingBenchmark
 
             var grainFactory = host.Services.GetRequiredService<IGrainFactory>();
             await WaitForReadyAsync(grainFactory);
+            var effectiveGrainCount = grainCount > 0 ? grainCount : concurrency;
             var loadGenerator = new FixedConcurrencyLoadGenerator<IPingGrain>(
                 concurrency,
                 issueRequest: static grain => grain.Run(),
-                getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId),
+                getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId % effectiveGrainCount),
                 recordLatency: true);
 
             RpcCallTrace.WriteBenchmarkPhase(2, 1);
@@ -102,7 +109,7 @@ internal static class SplitProcessPingBenchmark
                 var result = await loadGenerator.RunAsync(
                     measurementDuration,
                     traceProbes > 0
-                        ? () => AdaptivePingBenchmark.RunTraceProbesAsync(grainFactory, concurrency, traceProbes)
+                        ? () => AdaptivePingBenchmark.RunTraceProbesAsync(grainFactory, effectiveGrainCount, traceProbes)
                         : null);
                 RpcCallTrace.WriteBenchmarkPhase(5, 1);
 

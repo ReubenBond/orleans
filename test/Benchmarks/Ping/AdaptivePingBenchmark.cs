@@ -234,14 +234,21 @@ public class AdaptivePingBenchmark : IDisposable
         TimeSpan warmupDuration,
         TimeSpan measurementDuration,
         int iterations,
-        int traceProbes = 0)
+        int traceProbes = 0,
+        int grainCount = 0)
     {
         if (iterations <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(iterations));
         }
 
+        if (grainCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(grainCount));
+        }
+
         var grainFactory = GetGrainFactory();
+        var effectiveGrainCount = grainCount > 0 ? grainCount : concurrency;
 #if ORLEANS_PROFILING
         const bool recordLatency = true;
 #else
@@ -250,7 +257,7 @@ public class AdaptivePingBenchmark : IDisposable
         var loadGenerator = new FixedConcurrencyLoadGenerator<IPingGrain>(
             concurrency,
             issueRequest: static grain => grain.Run(),
-            getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId),
+            getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId % effectiveGrainCount),
             recordLatency: recordLatency);
 
         Console.WriteLine($"=== Fixed Ping Benchmark: {Description} ===");
@@ -258,6 +265,7 @@ public class AdaptivePingBenchmark : IDisposable
         Console.WriteLine($"Runtime: {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
         Console.WriteLine($"Architecture: {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}");
         Console.WriteLine($"Concurrency: {concurrency}");
+        Console.WriteLine($"Grains: {effectiveGrainCount}");
         Console.WriteLine($"Warmup: {warmupDuration.TotalSeconds:F1}s");
         Console.WriteLine($"Measurement: {iterations} x {measurementDuration.TotalSeconds:F1}s");
         Console.WriteLine();
@@ -278,7 +286,7 @@ public class AdaptivePingBenchmark : IDisposable
             RpcCallTrace.WriteBenchmarkPhase(4, 1);
             results[i] = await loadGenerator.RunAsync(
                 measurementDuration,
-                traceProbes > 0 ? () => RunTraceProbesAsync(grainFactory, concurrency, traceProbes) : null);
+                traceProbes > 0 ? () => RunTraceProbesAsync(grainFactory, effectiveGrainCount, traceProbes) : null);
             RpcCallTrace.WriteBenchmarkPhase(5, 1);
 #else
             results[i] = await loadGenerator.RunAsync(measurementDuration);

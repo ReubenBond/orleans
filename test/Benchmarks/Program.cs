@@ -255,6 +255,7 @@ internal class Program
             var measurementSeconds = double.TryParse(args.ElementAtOrDefault(3), out var parsedMeasurement) ? parsedMeasurement : 10;
             var iterations = int.TryParse(args.ElementAtOrDefault(4), out var parsedIterations) ? parsedIterations : 5;
             var traceProbes = 0;
+            var grainCount = 0;
             for (var i = 5; i < args.Length; i++)
             {
                 if (string.Equals(args[i], "--trace-probes", StringComparison.OrdinalIgnoreCase)
@@ -262,6 +263,12 @@ internal class Program
                     && int.TryParse(args[++i], out var parsedTraceProbes))
                 {
                     traceProbes = parsedTraceProbes;
+                }
+                else if (string.Equals(args[i], "--grain-count", StringComparison.OrdinalIgnoreCase)
+                    && i + 1 < args.Length
+                    && int.TryParse(args[++i], out var parsedGrainCount))
+                {
+                    grainCount = parsedGrainCount;
                 }
             }
 
@@ -273,7 +280,8 @@ internal class Program
                     TimeSpan.FromSeconds(warmupSeconds),
                     TimeSpan.FromSeconds(measurementSeconds),
                     iterations,
-                    traceProbes).GetAwaiter().GetResult();
+                    traceProbes,
+                    grainCount).GetAwaiter().GetResult();
             }
             finally
             {
@@ -296,13 +304,15 @@ internal class Program
             var measurementSeconds = double.TryParse(args.ElementAtOrDefault(3), out var parsedMeasurement) ? parsedMeasurement : 10;
             var iterations = int.TryParse(args.ElementAtOrDefault(4), out var parsedIterations) ? parsedIterations : 1;
             var traceProbes = int.TryParse(args.ElementAtOrDefault(5), out var parsedTraceProbes) ? parsedTraceProbes : 1;
+            var grainCount = int.TryParse(args.ElementAtOrDefault(6), out var parsedGrainCount) ? parsedGrainCount : 0;
             SplitProcessPingBenchmark.RunDriverAsync(
                 sessionId,
                 concurrency,
                 TimeSpan.FromSeconds(warmupSeconds),
                 TimeSpan.FromSeconds(measurementSeconds),
                 iterations,
-                traceProbes).GetAwaiter().GetResult();
+                traceProbes,
+                grainCount).GetAwaiter().GetResult();
         },
 #endif
         ["AdaptivePing_All"] = _ =>
