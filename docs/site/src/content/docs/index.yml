@@ -243,4 +243,4 @@ additionalContent:
 
 
     # footer (optional)
-    footer: "Are you interested in contributing to the .NET docs? For more information, see our [contributor guide](/contribute/dotnet/dotnet-contribute)."
+    footer: "Are you interested in contributing to the .NET docs? For more information, see our [contributor guide](https://learn.microsoft.com/contribute/content/dotnet/dotnet-contribute)."

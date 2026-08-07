@@ -24,7 +24,7 @@ Orleans provides several NuGet packages for different scenarios. When building a
 For information on installing NuGet packages, see the following options:
 
 - [.NET CLI: dotnet package add](../../core/tools/dotnet-package-add.md)
-- [Ways to install a NuGet package](/nuget/consume-packages/overview-and-workflow#ways-to-install-a-nuget-package)
+- [Ways to install a NuGet package](https://learn.microsoft.com/nuget/consume-packages/overview-and-workflow#ways-to-install-a-nuget-package)
 
 :::zone-end
 
