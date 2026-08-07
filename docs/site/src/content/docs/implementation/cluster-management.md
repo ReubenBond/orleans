@@ -26,7 +26,7 @@ With these defaults, typical failure detection time is approximately 15 seconds.
 
 ### Configuration
 
-You can configure membership protocol settings using `ClusterMembershipOptions`:
+You can configure membership protocol settings using <xref:Orleans.Configuration.ClusterMembershipOptions>:
 
 ```csharp
 siloBuilder.Configure<ClusterMembershipOptions>(options =>
@@ -52,8 +52,8 @@ siloBuilder.Configure<ClusterMembershipOptions>(options =>
 
 In most cases, the default settings are appropriate. However, you might consider adjustments in these scenarios:
 
-- **High-latency networks**: Increase `ProbeTimeout` if your silos are distributed across regions with high network latency.
-- **Critical availability requirements**: Decrease `DeathVoteExpirationTimeout` for faster failure detection, but be cautious of false positives.
+- **High-latency networks**: Increase <xref:Orleans.Configuration.ClusterMembershipOptions.ProbeTimeout> if your silos are distributed across regions with high network latency.
+- **Critical availability requirements**: Decrease <xref:Orleans.Configuration.ClusterMembershipOptions.DeathVoteExpirationTimeout> for faster failure detection, but be cautious of false positives.
 
 :::zone-end
 
@@ -131,10 +131,10 @@ The <xref:Orleans.Clustering.Redis.RedisClusteringOptions> class provides the fo
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `ConfigurationOptions` | `ConfigurationOptions` | The StackExchange.Redis client configuration. Required. |
-| `EntryExpiry` | `TimeSpan?` | Optional expiration time for entries. Only set this for ephemeral environments like testing. Default is `null`. |
-| `CreateMultiplexer` | `Func<RedisClusteringOptions, Task<IConnectionMultiplexer>>` | Custom factory for creating the Redis connection multiplexer. |
-| `CreateRedisKey` | `Func<ClusterOptions, RedisKey>` | Custom function to generate the Redis key for the membership table. Default format is `{ServiceId}/members/{ClusterId}`. |
+| <xref:Orleans.Clustering.Redis.RedisClusteringOptions.ConfigurationOptions> | `ConfigurationOptions` | The StackExchange.Redis client configuration. Required. |
+| <xref:Orleans.Clustering.Redis.RedisClusteringOptions.EntryExpiry> | `TimeSpan?` | Optional expiration time for entries. Only set this for ephemeral environments like testing. Default is `null`. |
+| <xref:Orleans.Clustering.Redis.RedisClusteringOptions.CreateMultiplexer> | `Func<RedisClusteringOptions, Task<IConnectionMultiplexer>>` | Custom factory for creating the Redis connection multiplexer. |
+| <xref:Orleans.Clustering.Redis.RedisClusteringOptions.CreateRedisKey> | `Func<ClusterOptions, RedisKey>` | Custom function to generate the Redis key for the membership table. Default format is `{ServiceId}/members/{ClusterId}`. |
 
 > [!IMPORTANT]
 > Implementations of the `IMembershipTable` interface must use a durable data store. For example, if you are using Redis, ensure that persistence is explicitly enabled. Volatile configurations may result in cluster unavailability.
@@ -315,8 +315,8 @@ The <xref:Orleans.Clustering.Cassandra.Hosting.CassandraClusteringOptions> class
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `UseCassandraTtl` | `bool` | `false` | When `true`, configures time-to-live for membership table rows in Cassandra, allowing defunct silo cleanup even if the cluster is no longer running. Uses `DefunctSiloExpiration` from `ClusterMembershipOptions`. |
-| `InitializeRetryMaxDelay` | <xref:System.TimeSpan> | 20 seconds | The maximum delay between retries when encountering contention during initialization. This is typically needed with large numbers of silos connecting simultaneously to multi-datacenter Cassandra clusters. |
+| <xref:Orleans.Clustering.Cassandra.Hosting.CassandraClusteringOptions.UseCassandraTtl> | `bool` | `false` | When `true`, configures time-to-live for membership table rows in Cassandra, allowing defunct silo cleanup even if the cluster is no longer running. Uses <xref:Orleans.Configuration.ClusterMembershipOptions.DefunctSiloExpiration>. |
+| <xref:Orleans.Clustering.Cassandra.Hosting.CassandraClusteringOptions.InitializeRetryMaxDelay> | <xref:System.TimeSpan> | 20 seconds | The maximum delay between retries when encountering contention during initialization. This is typically needed with large numbers of silos connecting simultaneously to multi-datacenter Cassandra clusters. |
 
 #### When to use Cassandra clustering
 
@@ -365,17 +365,17 @@ siloBuilder.UseCosmosClustering(options =>
 });
 ```
 
-The <xref:Orleans.Clustering.Cosmos.CosmosClusteringOptions> class inherits from `CosmosOptions` and provides the following configuration options:
+The <xref:Orleans.Clustering.Cosmos.CosmosClusteringOptions> class inherits from <xref:Orleans.Clustering.Cosmos.CosmosOptions> and provides the following configuration options:
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `DatabaseName` | `string` | `"Orleans"` | The name of the Cosmos DB database. |
-| `ContainerName` | `string` | `"OrleansCluster"` | The name of the container for cluster membership data. |
-| `IsResourceCreationEnabled` | `bool` | `false` | When `true`, automatically creates the database and container if they don't exist. |
-| `DatabaseThroughput` | `int?` | `null` | The provisioned throughput for the database. If `null`, uses serverless mode. |
-| `ContainerThroughputProperties` | `ThroughputProperties?` | `null` | The throughput properties for the container. |
-| `ClientOptions` | `CosmosClientOptions` | `new()` | The options passed to the Cosmos DB client. |
-| `CleanResourcesOnInitialization` | `bool` | `false` | Deletes the database on initialization. **Only for testing.** |
+| <xref:Orleans.Clustering.Cosmos.CosmosOptions.DatabaseName> | `string` | `"Orleans"` | The name of the Cosmos DB database. |
+| <xref:Orleans.Clustering.Cosmos.CosmosOptions.ContainerName> | `string` | `"OrleansCluster"` | The name of the container for cluster membership data. |
+| <xref:Orleans.Clustering.Cosmos.CosmosOptions.IsResourceCreationEnabled> | `bool` | `false` | When `true`, automatically creates the database and container if they don't exist. |
+| <xref:Orleans.Clustering.Cosmos.CosmosOptions.DatabaseThroughput> | `int?` | `null` | The provisioned throughput for the database. If `null`, uses serverless mode. |
+| <xref:Orleans.Clustering.Cosmos.CosmosOptions.ContainerThroughputProperties> | `ThroughputProperties?` | `null` | The throughput properties for the container. |
+| <xref:Orleans.Clustering.Cosmos.CosmosOptions.ClientOptions> | `CosmosClientOptions` | `new()` | The options passed to the Cosmos DB client. |
+| <xref:Orleans.Clustering.Cosmos.CosmosOptions.CleanResourcesOnInitialization> | `bool` | `false` | Deletes the database on initialization. **Only for testing.** |
 
 #### When to use Cosmos DB clustering
 
@@ -386,7 +386,7 @@ Consider Azure Cosmos DB for clustering when:
 - You want a fully managed, serverless option with automatic scaling
 - You need low-latency reads and writes with guaranteed SLAs
 
-For Orleans clients, use `UseCosmosGatewayListProvider` to configure gateway discovery:
+For Orleans clients, use <xref:Orleans.Hosting.HostingExtensions.UseCosmosGatewayListProvider*> to configure gateway discovery:
 
 ```csharp
 builder.UseOrleansClient(clientBuilder =>
@@ -500,7 +500,7 @@ In addition to `IMembershipTable`, each silo participates in a fully distributed
 
     1. **Diagnostics**: Provides system administrators a simple way to check cluster liveness and determine when a silo was last active. The timestamp is by default updated every 30 seconds.
 
-    1. **Disaster recovery**: If a silo hasn't updated its timestamp for several periods (configured via `NumMissedTableIAmAliveLimit`, default: 3), new silos ignore it during startup connectivity checks. This allows the cluster to recover from scenarios where silos crashed without proper cleanup.
+    1. **Disaster recovery**: If a silo hasn't updated its timestamp for several periods (configured via <xref:Orleans.Configuration.ClusterMembershipOptions.NumMissedTableIAmAliveLimit>, default: 3), new silos ignore it during startup connectivity checks. This allows the cluster to recover from scenarios where silos crashed without proper cleanup.
 
 ### Membership table
 
