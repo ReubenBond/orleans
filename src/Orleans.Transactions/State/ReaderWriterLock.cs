@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.Diagnostics;
 
 namespace Orleans.Transactions.State
 {
@@ -92,7 +93,7 @@ namespace Orleans.Transactions.State
                         {
                             foreach (var r in conflicts)
                             {
-                                cleanup.Add(Rollback(r, true));
+                                cleanup.Add(Rollback(r, true, TransactionDiagnosticEvents.LockBreakReason.Conflict));
                                 rollbacksOccurred = true;
                             }
                         }
@@ -196,7 +197,7 @@ namespace Orleans.Transactions.State
             else if (record.NumberReads != accessCount.Reads
                    || record.NumberWrites != accessCount.Writes)
             {
-                await Rollback(transactionId, true);
+                await Rollback(transactionId, true, TransactionDiagnosticEvents.LockBreakReason.ValidationFailure);
                 return (TransactionalStatus.LockValidationFailed, record);
             }
             else
@@ -215,20 +216,27 @@ namespace Orleans.Transactions.State
             return this.currentGroup!.TryGetValue(transactionId, out record);
         }
 
-        public Task AbortExecutingTransactions(Exception? exception)
+        public Task AbortExecutingTransactions(
+            Exception? exception,
+            TransactionDiagnosticEvents.LockBreakReason reason = TransactionDiagnosticEvents.LockBreakReason.TransactionAbort)
         {
             if (currentGroup != null)
             {
-                Task[] pending = currentGroup.Select(g => BreakLock(g.Key, g.Value, exception)).ToArray();
+                Task[] pending = currentGroup.Select(g => BreakLock(g.Key, g.Value, exception, reason)).ToArray();
                 currentGroup.Reset();
                 return Task.WhenAll(pending);
             }
             return Task.CompletedTask;
         }
 
-        private Task BreakLock(Guid transactionId, TransactionRecord<TState> entry, Exception? exception)
+        private Task BreakLock(
+            Guid transactionId,
+            TransactionRecord<TState> entry,
+            Exception? exception,
+            TransactionDiagnosticEvents.LockBreakReason reason)
         {
             LogTraceBreakLock(transactionId);
+            TransactionDiagnosticEvents.EmitLockBroken(queue.Resource, transactionId, reason);
             return this.queue.NotifyOfAbort(entry, TransactionalStatus.BrokenLock, exception);
         }
 
@@ -254,7 +262,7 @@ namespace Orleans.Transactions.State
 
         public void Rollback(Guid guid) => currentGroup?.Remove(guid);
 
-        public Task Rollback(Guid guid, bool notify)
+        public Task Rollback(Guid guid, bool notify, TransactionDiagnosticEvents.LockBreakReason reason)
         {
             // no-op if the transaction never happened or already rolled back
             if (currentGroup == null || !currentGroup.Remove(guid, out var record))
@@ -263,7 +271,13 @@ namespace Orleans.Transactions.State
             }
 
             // notify remote listeners
-            return notify ? queue.NotifyOfAbort(record, TransactionalStatus.BrokenLock, exception: null) : Task.CompletedTask;
+            if (!notify)
+            {
+                return Task.CompletedTask;
+            }
+
+            TransactionDiagnosticEvents.EmitLockBroken(queue.Resource, guid, reason);
+            return queue.NotifyOfAbort(record, TransactionalStatus.BrokenLock, exception: null);
         }
 
         private async Task LockWork()
@@ -304,7 +318,17 @@ namespace Orleans.Transactions.State
                                 // the lock group has timed out.
                                 TimeSpan late = now - currentGroup.Deadline.Value;
                                 LogTraceBreakLockTimeout(new(currentGroup.Keys), Math.Floor(late.TotalMilliseconds));
-                                await AbortExecutingTransactions(exception: null);
+                                foreach (var transactionId in currentGroup.Keys)
+                                {
+                                    TransactionDiagnosticEvents.EmitLockExpired(
+                                        queue.Resource,
+                                        transactionId,
+                                        currentGroup.Deadline.Value,
+                                        now);
+                                }
+                                await AbortExecutingTransactions(
+                                    exception: null,
+                                    reason: TransactionDiagnosticEvents.LockBreakReason.Expired);
                                 lockWorker.Notify();
                             }
                             else

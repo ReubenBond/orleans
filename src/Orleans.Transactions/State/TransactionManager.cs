@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.Diagnostics;
 
 namespace Orleans.Transactions.State
 {
@@ -35,6 +36,15 @@ namespace Orleans.Transactions.State
             else
             {
                 this.queue.Clock.Merge(record.Timestamp);
+                if (record.WaitCount > 0)
+                {
+                    TransactionDiagnosticEvents.EmitTransactionManagerWaitingForPrepared(
+                        this.queue.Resource,
+                        transactionId,
+                        timeStamp,
+                        record.WaitCount,
+                        record.WaitingSince + this.queue.PrepareTimeout);
+                }
             }
 
             this.queue.RWLock.Notify();
@@ -43,7 +53,7 @@ namespace Orleans.Transactions.State
 
         public Task Prepared(Guid transactionId, DateTime timeStamp, ParticipantId resource, TransactionalStatus status)
         {
-            return this.queue.NotifyOfPrepared(transactionId, timeStamp, status);
+            return this.queue.NotifyOfPrepared(transactionId, timeStamp, resource, status);
         }
 
         public async Task Ping(Guid transactionId, DateTime timeStamp, ParticipantId resource)

@@ -47,6 +47,8 @@ namespace Orleans.Transactions.State
         private long stableSequenceNumber;
         public ReadWriteLock<TState> RWLock { get; }
         public CausalClock Clock { get; }
+        internal ParticipantId Resource => resource;
+        internal TimeSpan PrepareTimeout => options.PrepareTimeout;
 
         public TransactionQueue(
             IOptions<TransactionalStateOptions> options,
@@ -134,6 +136,11 @@ namespace Orleans.Transactions.State
                             {
                                 LogTracePersisted(record);
                                 record.PrepareIsPersisted = true;
+                                TransactionDiagnosticEvents.EmitRemotePreparePersisted(
+                                    resource,
+                                    record.TransactionId,
+                                    record.Timestamp,
+                                    record.TransactionManager);
 
                                 if (behindRemoteEntryBySameTM)
                                 {
@@ -143,6 +150,12 @@ namespace Orleans.Transactions.State
                                           .Prepared(record.TransactionManager.Name, record.TransactionId, record.Timestamp, this.resource, TransactionalStatus.Ok)
                                           .Ignore();
                                     record.LastSent = DateTime.UtcNow;
+                                    TransactionDiagnosticEvents.EmitRemotePreparedSent(
+                                        resource,
+                                        record.TransactionId,
+                                        record.Timestamp,
+                                        record.TransactionManager,
+                                        record.LastSent.Value);
                                 }
                             });
                             break;
@@ -162,7 +175,7 @@ namespace Orleans.Transactions.State
             }
         }
 
-        public async Task NotifyOfPrepared(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
+        public async Task NotifyOfPrepared(Guid transactionId, DateTime timeStamp, ParticipantId participant, TransactionalStatus status)
         {
             var pos = commitQueue.Find(transactionId, timeStamp);
             LogTraceNotifyOfPrepared(transactionId, new(timeStamp), status);
@@ -180,11 +193,25 @@ namespace Orleans.Transactions.State
                 if (status == TransactionalStatus.Ok)
                 {
                     localEntry.WaitCount--;
+                    TransactionDiagnosticEvents.EmitPreparedReceived(
+                        resource,
+                        transactionId,
+                        timeStamp,
+                        participant,
+                        status,
+                        localEntry.WaitCount);
 
                     storageWorker.Notify();
                 }
                 else
                 {
+                    TransactionDiagnosticEvents.EmitPreparedReceived(
+                        resource,
+                        transactionId,
+                        timeStamp,
+                        participant,
+                        status,
+                        localEntry.WaitCount);
                     await AbortCommits(status, pos);
 
                     this.RWLock.Notify();
@@ -205,6 +232,14 @@ namespace Orleans.Transactions.State
                 {
                     info.Status = status;
                 }
+
+                TransactionDiagnosticEvents.EmitPreparedReceived(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    participant,
+                    status,
+                    remainingCount: null);
 
                 // TODO fix memory leak if corresponding commit messages never arrive
             }
@@ -426,6 +461,7 @@ namespace Orleans.Transactions.State
 
         private async Task Restore()
         {
+            TransactionDiagnosticEvents.EmitQueueRestoreStarted(resource);
             TransactionalStorageLoadResponse<TState> loadresponse = await storage.Load();
 
             this.storageBatch = new StorageBatch<TState>(loadresponse);
@@ -439,17 +475,19 @@ namespace Orleans.Transactions.State
             this.Clock.Merge(storageBatch.MetaData.TimeStamp);
 
             // resume prepared transactions (not TM)
+            var recoveredPendingCount = 0;
             foreach (var pr in loadresponse.PendingStates.OrderBy(ps => ps.TimeStamp))
             {
                 if (pr.SequenceId > loadresponse.CommittedSequenceId && pr.TransactionManager.Reference != null)
                 {
                     LogDebugRecoverTwoPhaseCommit(pr.TransactionId);
                     ParticipantId tm = pr.TransactionManager;
+                    var transactionId = Guid.Parse(pr.TransactionId);
 
                     commitQueue.Add(new TransactionRecord<TState>()
                     {
                         Role = CommitRole.RemoteCommit,
-                        TransactionId = Guid.Parse(pr.TransactionId),
+                        TransactionId = transactionId,
                         Timestamp = pr.TimeStamp,
                         State = pr.State,
                         SequenceNumber = pr.SequenceId,
@@ -460,6 +498,14 @@ namespace Orleans.Transactions.State
                         NumberWrites = 1 // was a writing transaction
                     });
                     this.stableSequenceNumber = pr.SequenceId;
+                    recoveredPendingCount++;
+
+                    TransactionDiagnosticEvents.EmitRemoteRecoveryPingScheduled(
+                        resource,
+                        transactionId,
+                        pr.TimeStamp,
+                        tm,
+                        DateTime.UtcNow);
                 }
             }
 
@@ -469,6 +515,12 @@ namespace Orleans.Transactions.State
                 LogDebugRecoverCommitConfirmation(kvp.Key);
                 this.confirmationWorker.Add(kvp.Key, kvp.Value.Timestamp, kvp.Value.WriteParticipants);
             }
+
+            TransactionDiagnosticEvents.EmitQueueRestoreCompleted(
+                resource,
+                loadresponse.CommittedSequenceId,
+                recoveredPendingCount,
+                storageBatch.MetaData.CommitRecords.Count);
 
             // check for work
             this.storageWorker.Notify();
@@ -566,6 +618,10 @@ namespace Orleans.Transactions.State
                             if (exception is InconsistentStateException)
                             {
                                 status = TransactionalStatus.StorageConflict;
+                                TransactionDiagnosticEvents.EmitStorageConflictDetected(
+                                    resource,
+                                    writeAttempted,
+                                    commitQueue.Count);
                                 LogWarningReloadFromStorageTriggeredByETagMismatch(exception);
                             }
                             else
@@ -621,7 +677,18 @@ namespace Orleans.Transactions.State
 
             async Task AbortAndRestoreCore(TransactionalStatus status, Exception? exception, bool storageOutcomeInDoubt)
             {
-                List<Task> pending = [RWLock.AbortExecutingTransactions(exception)];
+                TransactionDiagnosticEvents.EmitAbortAndRestoreStarted(
+                    resource,
+                    status,
+                    storageOutcomeInDoubt,
+                    commitQueue.Count);
+
+                List<Task> pending =
+                [
+                    RWLock.AbortExecutingTransactions(
+                        exception,
+                        TransactionDiagnosticEvents.LockBreakReason.StorageRecovery)
+                ];
                 this.RWLock.AbortQueuedTransactions();
 
                 foreach (var entry in commitQueue.Elements)
@@ -648,6 +715,7 @@ namespace Orleans.Transactions.State
                     this.deactivate();
                 }
                 await this.Restore();
+                TransactionDiagnosticEvents.EmitAbortAndRestoreCompleted(resource, status, storageOutcomeInDoubt);
             }
         }
 
@@ -693,6 +761,12 @@ namespace Orleans.Transactions.State
                             // check for timeout periodically
                             if (bottom.WaitingSince + this.options.PrepareTimeout <= now)
                             {
+                                TransactionDiagnosticEvents.EmitPrepareTimedOut(
+                                    resource,
+                                    bottom.TransactionId,
+                                    bottom.Timestamp,
+                                    bottom.WaitCount,
+                                    bottom.WaitingSince + this.options.PrepareTimeout);
                                 await AbortCommits(TransactionalStatus.PrepareTimeout);
                                 this.RWLock.Notify();
                             }
@@ -713,6 +787,12 @@ namespace Orleans.Transactions.State
                                       .Ignore();
 
                                 bottom.LastSent = now;
+                                TransactionDiagnosticEvents.EmitRemotePreparedSent(
+                                    resource,
+                                    bottom.TransactionId,
+                                    bottom.Timestamp,
+                                    bottom.TransactionManager,
+                                    now);
 
                                 LogTraceSentPrepared(bottom);
 
@@ -722,7 +802,14 @@ namespace Orleans.Transactions.State
                                 }
                                 else
                                 {
-                                    storageWorker.Notify(bottom.LastSent.Value + this.options.RemoteTransactionPingFrequency);
+                                    var scheduledAt = bottom.LastSent.Value + this.options.RemoteTransactionPingFrequency;
+                                    TransactionDiagnosticEvents.EmitRemoteRecoveryPingScheduled(
+                                        resource,
+                                        bottom.TransactionId,
+                                        bottom.Timestamp,
+                                        bottom.TransactionManager,
+                                        scheduledAt);
+                                    storageWorker.Notify(scheduledAt);
                                 }
                             }
                             else if (!bottom.IsReadOnly && bottom.LastSent.HasValue)
@@ -735,6 +822,20 @@ namespace Orleans.Transactions.State
                                     bottom.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
                                           .Ping(bottom.TransactionManager.Name, bottom.TransactionId, bottom.Timestamp, resource).Ignore();
                                     bottom.LastSent = now;
+                                    TransactionDiagnosticEvents.EmitRemoteRecoveryPingSent(
+                                        resource,
+                                        bottom.TransactionId,
+                                        bottom.Timestamp,
+                                        bottom.TransactionManager,
+                                        now);
+
+                                    var scheduledAt = bottom.LastSent.Value + this.options.RemoteTransactionPingFrequency;
+                                    TransactionDiagnosticEvents.EmitRemoteRecoveryPingScheduled(
+                                        resource,
+                                        bottom.TransactionId,
+                                        bottom.Timestamp,
+                                        bottom.TransactionManager,
+                                        scheduledAt);
                                 }
                                 storageWorker.Notify(bottom.LastSent.Value + this.options.RemoteTransactionPingFrequency);
                             }
@@ -849,7 +950,9 @@ namespace Orleans.Transactions.State
             }
             commitQueue.RemoveFromBack(commitQueue.Count - from);
 
-            pending.Add(this.RWLock.AbortExecutingTransactions(exception: null));
+            pending.Add(this.RWLock.AbortExecutingTransactions(
+                exception: null,
+                reason: TransactionDiagnosticEvents.LockBreakReason.TransactionAbort));
             await Task.WhenAll(pending);
         }
 
