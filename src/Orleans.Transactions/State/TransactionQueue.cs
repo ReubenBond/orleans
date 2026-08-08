@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -307,6 +308,27 @@ namespace Orleans.Transactions.State
                 case CommitRole.LocalCommit:
                     {
                         LogTraceAborting(status, entry);
+                        var fanOutDiagnosticsEnabled = AreCancelFanOutEventsEnabled();
+                        var targetCount = 0;
+                        var selfTargetCount = 0;
+                        var fanOutStartedAt = 0L;
+                        if (fanOutDiagnosticsEnabled)
+                        {
+                            (targetCount, selfTargetCount) = CountCancelTargets(entry.WriteParticipants);
+                            if (targetCount > 0)
+                            {
+                                TransactionDiagnosticEvents.EmitCancelFanOutStarted(
+                                    resource,
+                                    entry.TransactionId,
+                                    entry.Timestamp,
+                                    status,
+                                    targetCount,
+                                    selfTargetCount,
+                                    diagnosticIdentity);
+                                fanOutStartedAt = Stopwatch.GetTimestamp();
+                            }
+                        }
+
                         try
                         {
                             // tell remote participants
@@ -318,9 +340,36 @@ namespace Orleans.Transactions.State
                                     entry.Timestamp,
                                     status,
                                     TransactionDiagnosticEvents.CancelReason.TransactionAbort)));
+
+                            if (fanOutDiagnosticsEnabled && targetCount > 0)
+                            {
+                                TransactionDiagnosticEvents.EmitCancelFanOutCompleted(
+                                    resource,
+                                    entry.TransactionId,
+                                    entry.Timestamp,
+                                    status,
+                                    targetCount,
+                                    selfTargetCount,
+                                    Stopwatch.GetElapsedTime(fanOutStartedAt),
+                                    diagnosticIdentity);
+                            }
                         }
                         catch(Exception ex)
                         {
+                            if (fanOutDiagnosticsEnabled && targetCount > 0)
+                            {
+                                TransactionDiagnosticEvents.EmitCancelFanOutFailed(
+                                    resource,
+                                    entry.TransactionId,
+                                    entry.Timestamp,
+                                    status,
+                                    targetCount,
+                                    selfTargetCount,
+                                    Stopwatch.GetElapsedTime(fanOutStartedAt),
+                                    ex,
+                                    diagnosticIdentity);
+                            }
+
                             LogWarningFailedToNotifyAllTransactionParticipantsOfCancellation(entry.TransactionId, new(entry.Timestamp), status, ex);
                         }
 
@@ -933,6 +982,32 @@ namespace Orleans.Transactions.State
                     diagnosticIdentity);
                 throw;
             }
+        }
+
+        private static bool AreCancelFanOutEventsEnabled()
+            => TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.CancelFanOutStarted))
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.CancelFanOutCompleted))
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.CancelFanOutFailed));
+
+        private (int TargetCount, int SelfTargetCount) CountCancelTargets(List<ParticipantId> participants)
+        {
+            var targetCount = 0;
+            var selfTargetCount = 0;
+            foreach (var participant in participants)
+            {
+                if (participant.Equals(resource))
+                {
+                    continue;
+                }
+
+                targetCount++;
+                if (participant.Reference.GrainId == resource.Reference.GrainId)
+                {
+                    selfTargetCount++;
+                }
+            }
+
+            return (targetCount, selfTargetCount);
         }
 
         private void CompleteInDoubtEntryLocally(TransactionRecord<TState> entry, TransactionalStatus status, Exception? exception)

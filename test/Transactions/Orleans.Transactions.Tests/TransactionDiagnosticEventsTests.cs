@@ -26,6 +26,7 @@ public class TransactionDiagnosticEventsTests
         var observedAt = deadline.AddMilliseconds(25);
         var sentAt = timeStamp.AddSeconds(1);
         var scheduledAt = sentAt.AddSeconds(60);
+        var fanOutDuration = TimeSpan.FromSeconds(30);
         var transactionIds = ImmutableArray.Create(transactionId);
         var conflictException = new InconsistentStateException(
             "DynamoDB transactional state storage conflict.",
@@ -86,7 +87,12 @@ public class TransactionDiagnosticEventsTests
             queuedTransactionCount: transactionIds.Length,
             exception: loadException,
             transactionIds: transactionIds);
-        TransactionDiagnosticEvents.EmitLockExpired(resource, transactionId, deadline, observedAt);
+        TransactionDiagnosticEvents.EmitLockExpired(
+            resource,
+            transactionId,
+            deadline,
+            observedAt,
+            TransactionDiagnosticEvents.LockExpirationKind.HeldLock);
         TransactionDiagnosticEvents.EmitLockBroken(
             resource,
             transactionId,
@@ -139,6 +145,30 @@ public class TransactionDiagnosticEventsTests
             TransactionalStatus.PresumedAbort,
             TransactionDiagnosticEvents.CancelReason.RecoveryPing,
             timeoutException);
+        TransactionDiagnosticEvents.EmitCancelFanOutStarted(
+            resource,
+            transactionId,
+            timeStamp,
+            TransactionalStatus.BrokenLock,
+            targetCount: 2,
+            selfTargetCount: 1);
+        TransactionDiagnosticEvents.EmitCancelFanOutCompleted(
+            resource,
+            transactionId,
+            timeStamp,
+            TransactionalStatus.BrokenLock,
+            targetCount: 2,
+            selfTargetCount: 1,
+            duration: fanOutDuration);
+        TransactionDiagnosticEvents.EmitCancelFanOutFailed(
+            resource,
+            transactionId,
+            timeStamp,
+            TransactionalStatus.BrokenLock,
+            targetCount: 2,
+            selfTargetCount: 1,
+            duration: fanOutDuration,
+            exception: timeoutException);
         TransactionDiagnosticEvents.EmitReadyWaitStarted(resource, transactionId);
         TransactionDiagnosticEvents.EmitReadyWaitFailed(resource, transactionId, timeoutException);
         TransactionDiagnosticEvents.EmitReadyWaitCompleted(resource, transactionId, recoveredAfterFailure: true);
@@ -212,6 +242,7 @@ public class TransactionDiagnosticEventsTests
         Assert.Equal(transactionId, expired.TransactionId);
         Assert.Equal(deadline, expired.Deadline);
         Assert.Equal(observedAt, expired.ObservedAt);
+        Assert.Equal(TransactionDiagnosticEvents.LockExpirationKind.HeldLock, expired.Kind);
 
         var broken = observer.Single<TransactionDiagnosticEvents.LockBroken>(resource);
         Assert.Equal(TransactionDiagnosticEvents.LockBreakReason.Expired, broken.Reason);
@@ -266,6 +297,21 @@ public class TransactionDiagnosticEventsTests
         Assert.True(cancelFailed.IsSelf);
         Assert.Equal(typeof(TimeoutException).FullName, cancelFailed.ExceptionType);
         Assert.Equal(timeoutException.Message, cancelFailed.ExceptionMessage);
+
+        var fanOutStarted = observer.Single<TransactionDiagnosticEvents.CancelFanOutStarted>(resource);
+        Assert.Equal(2, fanOutStarted.TargetCount);
+        Assert.Equal(1, fanOutStarted.SelfTargetCount);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionPhase.CancelFanOut, fanOutStarted.Phase);
+
+        var fanOutCompleted = observer.Single<TransactionDiagnosticEvents.CancelFanOutCompleted>(resource);
+        Assert.Equal(fanOutDuration, fanOutCompleted.Duration);
+        Assert.Equal(
+            TransactionDiagnosticEvents.TransactionProtocolRole.LocalTransactionManager,
+            fanOutCompleted.ProtocolRole);
+
+        var fanOutFailed = observer.Single<TransactionDiagnosticEvents.CancelFanOutFailed>(resource);
+        Assert.Equal(fanOutDuration, fanOutFailed.Duration);
+        Assert.Equal(timeoutException.Message, fanOutFailed.ExceptionMessage);
 
         Assert.Equal(
             transactionId,

@@ -46,6 +46,7 @@ internal static class TransactionDiagnosticEvents
         Deactivation,
         Cancel,
         Confirm,
+        CancelFanOut,
         ReadyWait,
     }
 
@@ -229,11 +230,19 @@ internal static class TransactionDiagnosticEvents
         ParticipantId resource,
         Guid transactionId,
         DateTime deadline,
-        DateTime observedAt) : TransactionDiagnosticEvent(resource)
+        DateTime observedAt,
+        LockExpirationKind kind) : TransactionDiagnosticEvent(resource)
     {
         public readonly Guid TransactionId = transactionId;
         public readonly DateTime Deadline = deadline;
         public readonly DateTime ObservedAt = observedAt;
+        public readonly LockExpirationKind Kind = kind;
+    }
+
+    internal enum LockExpirationKind
+    {
+        HeldLock,
+        QueuedWaiter,
     }
 
     internal enum LockBreakReason
@@ -362,6 +371,55 @@ internal static class TransactionDiagnosticEvents
         string exceptionType,
         string exceptionMessage) : CancelSendEvent(resource, transactionId, timeStamp, target, isSelf, status, reason)
     {
+        public readonly string ExceptionType = exceptionType;
+        public readonly string ExceptionMessage = exceptionMessage;
+    }
+
+    internal abstract class CancelFanOutEvent(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        TransactionalStatus status,
+        int targetCount,
+        int selfTargetCount) : TransactionEvent(resource, transactionId, timeStamp)
+    {
+        public readonly TransactionalStatus Status = status;
+        public readonly int TargetCount = targetCount;
+        public readonly int SelfTargetCount = selfTargetCount;
+    }
+
+    internal sealed class CancelFanOutStarted(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        TransactionalStatus status,
+        int targetCount,
+        int selfTargetCount) : CancelFanOutEvent(resource, transactionId, timeStamp, status, targetCount, selfTargetCount);
+
+    internal sealed class CancelFanOutCompleted(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        TransactionalStatus status,
+        int targetCount,
+        int selfTargetCount,
+        TimeSpan duration) : CancelFanOutEvent(resource, transactionId, timeStamp, status, targetCount, selfTargetCount)
+    {
+        public readonly TimeSpan Duration = duration;
+    }
+
+    internal sealed class CancelFanOutFailed(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        TransactionalStatus status,
+        int targetCount,
+        int selfTargetCount,
+        TimeSpan duration,
+        string exceptionType,
+        string exceptionMessage) : CancelFanOutEvent(resource, transactionId, timeStamp, status, targetCount, selfTargetCount)
+    {
+        public readonly TimeSpan Duration = duration;
         public readonly string ExceptionType = exceptionType;
         public readonly string ExceptionMessage = exceptionMessage;
     }
@@ -665,13 +723,14 @@ internal static class TransactionDiagnosticEvents
         Guid transactionId,
         DateTime deadline,
         DateTime observedAt,
+        LockExpirationKind kind,
         TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(LockExpired)))
         {
             Write(
                 nameof(LockExpired),
-                new LockExpired(resource, transactionId, deadline, observedAt),
+                new LockExpired(resource, transactionId, deadline, observedAt, kind),
                 identity,
                 TransactionProtocolRole.Unknown,
                 TransactionPhase.Lock);
@@ -847,6 +906,85 @@ internal static class TransactionDiagnosticEvents
                 identity,
                 TransactionProtocolRole.LocalTransactionManager,
                 TransactionPhase.Cancel);
+        }
+    }
+
+    internal static void EmitCancelFanOutStarted(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        TransactionalStatus status,
+        int targetCount,
+        int selfTargetCount,
+        TransactionDiagnosticIdentity identity = default)
+    {
+        if (Listener.IsEnabled(nameof(CancelFanOutStarted)))
+        {
+            Write(
+                nameof(CancelFanOutStarted),
+                new CancelFanOutStarted(resource, transactionId, timeStamp, status, targetCount, selfTargetCount),
+                identity,
+                TransactionProtocolRole.LocalTransactionManager,
+                TransactionPhase.CancelFanOut);
+        }
+    }
+
+    internal static void EmitCancelFanOutCompleted(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        TransactionalStatus status,
+        int targetCount,
+        int selfTargetCount,
+        TimeSpan duration,
+        TransactionDiagnosticIdentity identity = default)
+    {
+        if (Listener.IsEnabled(nameof(CancelFanOutCompleted)))
+        {
+            Write(
+                nameof(CancelFanOutCompleted),
+                new CancelFanOutCompleted(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    status,
+                    targetCount,
+                    selfTargetCount,
+                    duration),
+                identity,
+                TransactionProtocolRole.LocalTransactionManager,
+                TransactionPhase.CancelFanOut);
+        }
+    }
+
+    internal static void EmitCancelFanOutFailed(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        TransactionalStatus status,
+        int targetCount,
+        int selfTargetCount,
+        TimeSpan duration,
+        Exception exception,
+        TransactionDiagnosticIdentity identity = default)
+    {
+        if (Listener.IsEnabled(nameof(CancelFanOutFailed)))
+        {
+            Write(
+                nameof(CancelFanOutFailed),
+                new CancelFanOutFailed(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    status,
+                    targetCount,
+                    selfTargetCount,
+                    duration,
+                    exception.GetType().FullName ?? exception.GetType().Name,
+                    exception.Message),
+                identity,
+                TransactionProtocolRole.LocalTransactionManager,
+                TransactionPhase.CancelFanOut);
         }
     }
 

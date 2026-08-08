@@ -243,6 +243,9 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
             TransactionDiagnosticEvents.CancelSendStarted => RecoveryTransitionKind.CancelSendStarted,
             TransactionDiagnosticEvents.CancelSendCompleted => RecoveryTransitionKind.CancelSendCompleted,
             TransactionDiagnosticEvents.CancelSendFailed => RecoveryTransitionKind.CancelSendFailed,
+            TransactionDiagnosticEvents.CancelFanOutStarted => RecoveryTransitionKind.CancelFanOutStarted,
+            TransactionDiagnosticEvents.CancelFanOutCompleted => RecoveryTransitionKind.CancelFanOutCompleted,
+            TransactionDiagnosticEvents.CancelFanOutFailed => RecoveryTransitionKind.CancelFanOutFailed,
             TransactionDiagnosticEvents.ReadyWaitStarted => RecoveryTransitionKind.ReadyWaitStarted,
             TransactionDiagnosticEvents.ReadyWaitCompleted => RecoveryTransitionKind.ReadyWaitCompleted,
             TransactionDiagnosticEvents.ReadyWaitFailed => RecoveryTransitionKind.ReadyWaitFailed,
@@ -251,6 +254,7 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
             TransactionDiagnosticEvents.AbortAndRestoreCompleted => RecoveryTransitionKind.AbortAndRestoreCompleted,
             TransactionDiagnosticEvents.QueueRestoreCompleted => RecoveryTransitionKind.QueueRestoreCompleted,
             TransactionDiagnosticEvents.QueueRestoreFailed => RecoveryTransitionKind.QueueRestoreFailed,
+            TransactionDiagnosticEvents.LockExpired => RecoveryTransitionKind.LockExpired,
             TransactionDiagnosticEvents.LockBroken => RecoveryTransitionKind.LockBroken,
             _ => (RecoveryTransitionKind?)null,
         };
@@ -288,6 +292,14 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
             TransactionDiagnosticEvents.CancelSendFailed cancel =>
                 $"{cancel.Status}, target={cancel.Target.Name}, isSelf={cancel.IsSelf}, reason={cancel.Reason}, "
                 + $"exception={cancel.ExceptionType}",
+            TransactionDiagnosticEvents.CancelFanOutStarted fanOut =>
+                $"{fanOut.Status}, targets={fanOut.TargetCount}, selfTargets={fanOut.SelfTargetCount}",
+            TransactionDiagnosticEvents.CancelFanOutCompleted fanOut =>
+                $"{fanOut.Status}, targets={fanOut.TargetCount}, selfTargets={fanOut.SelfTargetCount}, "
+                + $"duration={fanOut.Duration}",
+            TransactionDiagnosticEvents.CancelFanOutFailed fanOut =>
+                $"{fanOut.Status}, targets={fanOut.TargetCount}, selfTargets={fanOut.SelfTargetCount}, "
+                + $"duration={fanOut.Duration}, exception={fanOut.ExceptionType}",
             TransactionDiagnosticEvents.ReadyWaitStarted => "started",
             TransactionDiagnosticEvents.ReadyWaitCompleted ready =>
                 $"recoveredAfterFailure={ready.RecoveredAfterFailure}",
@@ -303,6 +315,8 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
                 $"pending={restored.RecoveredPendingCount}, commits={restored.RecoveredCommitCount}",
             TransactionDiagnosticEvents.QueueRestoreFailed failed =>
                 $"storageConflict={failed.StorageConflict}, exception={failed.ExceptionType}",
+            TransactionDiagnosticEvents.LockExpired expired =>
+                $"{expired.Kind}, deadline={expired.Deadline:O}, observedAt={expired.ObservedAt:O}",
             TransactionDiagnosticEvents.LockBroken broken => broken.Reason.ToString(),
             _ => null,
         };
@@ -364,6 +378,9 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
         CancelSendStarted,
         CancelSendCompleted,
         CancelSendFailed,
+        CancelFanOutStarted,
+        CancelFanOutCompleted,
+        CancelFanOutFailed,
         ReadyWaitStarted,
         ReadyWaitCompleted,
         ReadyWaitFailed,
@@ -372,6 +389,7 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
         AbortAndRestoreCompleted,
         QueueRestoreCompleted,
         QueueRestoreFailed,
+        LockExpired,
         LockBroken,
     }
 

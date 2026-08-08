@@ -333,6 +333,7 @@ namespace Orleans.Transactions.State
                                         transactionId,
                                         currentGroup.Deadline.Value,
                                         now,
+                                        TransactionDiagnosticEvents.LockExpirationKind.HeldLock,
                                         queue.DiagnosticIdentity);
                                 }
                                 await AbortExecutingTransactions(
@@ -370,6 +371,13 @@ namespace Orleans.Transactions.State
                             {
                                 if (now > kvp.Value.Deadline)
                                 {
+                                    TransactionDiagnosticEvents.EmitLockExpired(
+                                        queue.Resource,
+                                        kvp.Key,
+                                        kvp.Value.Deadline,
+                                        now,
+                                        TransactionDiagnosticEvents.LockExpirationKind.QueuedWaiter,
+                                        queue.DiagnosticIdentity);
                                     currentGroup.Remove(kvp.Key);
                                     LogTraceExpireLockWaiter(kvp.Key);
                                 }
