@@ -42,6 +42,37 @@ namespace Orleans.Transactions.DynamoDB.Tests
         {
         }
 
+        [Fact]
+        public override Task StoreWithoutChanges() => base.StoreWithoutChanges();
+
+        [Fact]
+        public override async Task WrongEtags()
+        {
+            var storage = await this.stateStorageFactory();
+            var empty = await storage.Load();
+
+            await Assert.ThrowsAsync<ArgumentException>(() => storage.Store(
+                "wrong-etag",
+                empty.Metadata,
+                [],
+                commitUpTo: null,
+                abortAfter: null));
+
+            var etag = await storage.Store(empty.ETag, empty.Metadata, [], commitUpTo: null, abortAfter: null);
+
+            await Assert.ThrowsAsync<ArgumentException>(() => storage.Store(
+                null,
+                empty.Metadata,
+                [],
+                commitUpTo: null,
+                abortAfter: null));
+
+            var durable = await storage.Load();
+            Assert.Equal(etag, durable.ETag);
+            Assert.Equal(0, durable.CommittedSequenceId);
+            Assert.Empty(durable.PendingStates);
+        }
+
         private static async Task<ITransactionalStateStorage<TestState>> StateStorageFactory(TestFixture fixture)
         {
             var storage = await InitTableAsync(NullLogger.Instance);
@@ -210,6 +241,42 @@ namespace Orleans.Transactions.DynamoDB.Tests
             Assert.Equal(winnerETag, durableWinner.ETag);
             Assert.Equal(2, durableWinner.CommittedSequenceId);
             Assert.Equal(21, durableWinner.CommittedState.State);
+        }
+
+        [Fact]
+        public async Task Store_DuplicateSequenceInSingleBatch_IsRejectedAndRequiresLoad()
+        {
+            var partitionKey = $"{partition}-{Guid.NewGuid():N}";
+            var logger = new RecordingLogger();
+            var (storage, _) = await CreateStoragePairAsync(partitionKey, logger);
+            var empty = await storage.Load();
+
+            var exception = await Assert.ThrowsAsync<AmazonDynamoDBException>(() => storage.Store(
+                empty.ETag,
+                empty.Metadata,
+                [CreatePendingState(1, 10), CreatePendingState(1, 20)],
+                commitUpTo: 1,
+                abortAfter: null));
+
+            Assert.Equal("ValidationException", exception.ErrorCode);
+            Assert.Contains("multiple operations on one item", exception.Message, StringComparison.OrdinalIgnoreCase);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => storage.Store(
+                empty.ETag,
+                empty.Metadata,
+                [CreatePendingState(1, 30)],
+                commitUpTo: 1,
+                abortAfter: null));
+
+            var restored = await storage.Load();
+            var recoveredETag = await storage.Store(
+                restored.ETag,
+                restored.Metadata,
+                [CreatePendingState(1, 40)],
+                commitUpTo: 1,
+                abortAfter: null);
+            var recovered = await storage.Load();
+            Assert.Equal(recoveredETag, recovered.ETag);
+            Assert.Equal(40, recovered.CommittedState.State);
         }
 
         private static async Task<(
