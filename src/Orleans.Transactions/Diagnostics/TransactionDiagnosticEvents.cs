@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
@@ -115,17 +116,37 @@ internal static class TransactionDiagnosticEvents
         public readonly DateTime SentAt = sentAt;
     }
 
-    internal sealed class QueueRestoreStarted(ParticipantId resource) : TransactionDiagnosticEvent(resource);
+    internal sealed class QueueRestoreStarted(
+        ParticipantId resource,
+        ImmutableArray<Guid> transactionIds) : TransactionDiagnosticEvent(resource)
+    {
+        public readonly ImmutableArray<Guid> TransactionIds = transactionIds;
+    }
 
     internal sealed class QueueRestoreCompleted(
         ParticipantId resource,
         long committedSequence,
         int recoveredPendingCount,
-        int recoveredCommitCount) : TransactionDiagnosticEvent(resource)
+        int recoveredCommitCount,
+        ImmutableArray<Guid> transactionIds) : TransactionDiagnosticEvent(resource)
     {
         public readonly long CommittedSequence = committedSequence;
         public readonly int RecoveredPendingCount = recoveredPendingCount;
         public readonly int RecoveredCommitCount = recoveredCommitCount;
+        public readonly ImmutableArray<Guid> TransactionIds = transactionIds;
+    }
+
+    internal sealed class QueueRestoreFailed(
+        ParticipantId resource,
+        string exceptionType,
+        string exceptionMessage,
+        bool storageConflict,
+        ImmutableArray<Guid> transactionIds) : TransactionDiagnosticEvent(resource)
+    {
+        public readonly string ExceptionType = exceptionType;
+        public readonly string ExceptionMessage = exceptionMessage;
+        public readonly bool StorageConflict = storageConflict;
+        public readonly ImmutableArray<Guid> TransactionIds = transactionIds;
     }
 
     internal sealed class LockExpired(
@@ -157,33 +178,51 @@ internal static class TransactionDiagnosticEvents
         public readonly LockBreakReason Reason = reason;
     }
 
+    internal enum StorageOperation
+    {
+        Load,
+        Store,
+    }
+
     internal sealed class StorageConflictDetected(
         ParticipantId resource,
+        StorageOperation operation,
         bool storageOutcomeInDoubt,
-        int queuedTransactionCount) : TransactionDiagnosticEvent(resource)
+        int queuedTransactionCount,
+        string exceptionType,
+        string exceptionMessage,
+        ImmutableArray<Guid> transactionIds) : TransactionDiagnosticEvent(resource)
     {
+        public readonly StorageOperation Operation = operation;
         public readonly bool StorageOutcomeInDoubt = storageOutcomeInDoubt;
         public readonly int QueuedTransactionCount = queuedTransactionCount;
+        public readonly string ExceptionType = exceptionType;
+        public readonly string ExceptionMessage = exceptionMessage;
+        public readonly ImmutableArray<Guid> TransactionIds = transactionIds;
     }
 
     internal sealed class AbortAndRestoreStarted(
         ParticipantId resource,
         TransactionalStatus status,
         bool storageOutcomeInDoubt,
-        int queuedTransactionCount) : TransactionDiagnosticEvent(resource)
+        int queuedTransactionCount,
+        ImmutableArray<Guid> transactionIds) : TransactionDiagnosticEvent(resource)
     {
         public readonly TransactionalStatus Status = status;
         public readonly bool StorageOutcomeInDoubt = storageOutcomeInDoubt;
         public readonly int QueuedTransactionCount = queuedTransactionCount;
+        public readonly ImmutableArray<Guid> TransactionIds = transactionIds;
     }
 
     internal sealed class AbortAndRestoreCompleted(
         ParticipantId resource,
         TransactionalStatus status,
-        bool storageOutcomeInDoubt) : TransactionDiagnosticEvent(resource)
+        bool storageOutcomeInDoubt,
+        ImmutableArray<Guid> transactionIds) : TransactionDiagnosticEvent(resource)
     {
         public readonly TransactionalStatus Status = status;
         public readonly bool StorageOutcomeInDoubt = storageOutcomeInDoubt;
+        public readonly ImmutableArray<Guid> TransactionIds = transactionIds;
     }
 
     internal static void EmitStorageWriteCompleted(ParticipantId resource, string? eTag, int batchSize, int commitCount)
@@ -306,11 +345,11 @@ internal static class TransactionDiagnosticEvents
         }
     }
 
-    internal static void EmitQueueRestoreStarted(ParticipantId resource)
+    internal static void EmitQueueRestoreStarted(ParticipantId resource, ImmutableArray<Guid> transactionIds)
     {
         if (Listener.IsEnabled(nameof(QueueRestoreStarted)))
         {
-            Write(nameof(QueueRestoreStarted), new QueueRestoreStarted(resource));
+            Write(nameof(QueueRestoreStarted), new QueueRestoreStarted(resource, transactionIds));
         }
     }
 
@@ -318,13 +357,38 @@ internal static class TransactionDiagnosticEvents
         ParticipantId resource,
         long committedSequence,
         int recoveredPendingCount,
-        int recoveredCommitCount)
+        int recoveredCommitCount,
+        ImmutableArray<Guid> transactionIds)
     {
         if (Listener.IsEnabled(nameof(QueueRestoreCompleted)))
         {
             Write(
                 nameof(QueueRestoreCompleted),
-                new QueueRestoreCompleted(resource, committedSequence, recoveredPendingCount, recoveredCommitCount));
+                new QueueRestoreCompleted(
+                    resource,
+                    committedSequence,
+                    recoveredPendingCount,
+                    recoveredCommitCount,
+                    transactionIds));
+        }
+    }
+
+    internal static void EmitQueueRestoreFailed(
+        ParticipantId resource,
+        Exception exception,
+        bool storageConflict,
+        ImmutableArray<Guid> transactionIds)
+    {
+        if (Listener.IsEnabled(nameof(QueueRestoreFailed)))
+        {
+            Write(
+                nameof(QueueRestoreFailed),
+                new QueueRestoreFailed(
+                    resource,
+                    exception.GetType().FullName ?? exception.GetType().Name,
+                    exception.Message,
+                    storageConflict,
+                    transactionIds));
         }
     }
 
@@ -350,14 +414,24 @@ internal static class TransactionDiagnosticEvents
 
     internal static void EmitStorageConflictDetected(
         ParticipantId resource,
+        StorageOperation operation,
         bool storageOutcomeInDoubt,
-        int queuedTransactionCount)
+        int queuedTransactionCount,
+        Exception exception,
+        ImmutableArray<Guid> transactionIds)
     {
         if (Listener.IsEnabled(nameof(StorageConflictDetected)))
         {
             Write(
                 nameof(StorageConflictDetected),
-                new StorageConflictDetected(resource, storageOutcomeInDoubt, queuedTransactionCount));
+                new StorageConflictDetected(
+                    resource,
+                    operation,
+                    storageOutcomeInDoubt,
+                    queuedTransactionCount,
+                    exception.GetType().FullName ?? exception.GetType().Name,
+                    exception.Message,
+                    transactionIds));
         }
     }
 
@@ -365,28 +439,32 @@ internal static class TransactionDiagnosticEvents
         ParticipantId resource,
         TransactionalStatus status,
         bool storageOutcomeInDoubt,
-        int queuedTransactionCount)
+        int queuedTransactionCount,
+        ImmutableArray<Guid> transactionIds)
     {
         if (Listener.IsEnabled(nameof(AbortAndRestoreStarted)))
         {
             Write(
                 nameof(AbortAndRestoreStarted),
-                new AbortAndRestoreStarted(resource, status, storageOutcomeInDoubt, queuedTransactionCount));
+                new AbortAndRestoreStarted(resource, status, storageOutcomeInDoubt, queuedTransactionCount, transactionIds));
         }
     }
 
     internal static void EmitAbortAndRestoreCompleted(
         ParticipantId resource,
         TransactionalStatus status,
-        bool storageOutcomeInDoubt)
+        bool storageOutcomeInDoubt,
+        ImmutableArray<Guid> transactionIds)
     {
         if (Listener.IsEnabled(nameof(AbortAndRestoreCompleted)))
         {
             Write(
                 nameof(AbortAndRestoreCompleted),
-                new AbortAndRestoreCompleted(resource, status, storageOutcomeInDoubt));
+                new AbortAndRestoreCompleted(resource, status, storageOutcomeInDoubt, transactionIds));
         }
     }
+
+    internal static bool IsEnabled(string eventName) => Listener.IsEnabled(eventName);
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void Write(string eventName, TransactionDiagnosticEvent evt)

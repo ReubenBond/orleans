@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -459,10 +460,37 @@ namespace Orleans.Transactions.State
             }
         }
 
-        private async Task Restore()
+        private async Task Restore(ImmutableArray<Guid> transactionIds = default)
         {
-            TransactionDiagnosticEvents.EmitQueueRestoreStarted(resource);
-            TransactionalStorageLoadResponse<TState> loadresponse = await storage.Load();
+            if (transactionIds.IsDefault)
+            {
+                transactionIds = ImmutableArray<Guid>.Empty;
+            }
+
+            TransactionDiagnosticEvents.EmitQueueRestoreStarted(resource, transactionIds);
+
+            TransactionalStorageLoadResponse<TState> loadresponse;
+            try
+            {
+                loadresponse = await storage.Load();
+            }
+            catch (Exception exception)
+            {
+                var storageConflict = exception is InconsistentStateException;
+                if (storageConflict)
+                {
+                    TransactionDiagnosticEvents.EmitStorageConflictDetected(
+                        resource,
+                        TransactionDiagnosticEvents.StorageOperation.Load,
+                        storageOutcomeInDoubt: false,
+                        queuedTransactionCount: transactionIds.Length,
+                        exception: exception,
+                        transactionIds: transactionIds);
+                }
+
+                TransactionDiagnosticEvents.EmitQueueRestoreFailed(resource, exception, storageConflict, transactionIds);
+                throw;
+            }
 
             this.storageBatch = new StorageBatch<TState>(loadresponse);
 
@@ -520,7 +548,8 @@ namespace Orleans.Transactions.State
                 resource,
                 loadresponse.CommittedSequenceId,
                 recoveredPendingCount,
-                storageBatch.MetaData.CommitRecords.Count);
+                storageBatch.MetaData.CommitRecords.Count,
+                transactionIds);
 
             // check for work
             this.storageWorker.Notify();
@@ -618,10 +647,17 @@ namespace Orleans.Transactions.State
                             if (exception is InconsistentStateException)
                             {
                                 status = TransactionalStatus.StorageConflict;
+                                var transactionIds = TransactionDiagnosticEvents.IsEnabled(
+                                    nameof(TransactionDiagnosticEvents.StorageConflictDetected))
+                                    ? CaptureTransactionIds()
+                                    : ImmutableArray<Guid>.Empty;
                                 TransactionDiagnosticEvents.EmitStorageConflictDetected(
                                     resource,
+                                    TransactionDiagnosticEvents.StorageOperation.Store,
                                     writeAttempted,
-                                    commitQueue.Count);
+                                    commitQueue.Count,
+                                    exception,
+                                    transactionIds);
                                 LogWarningReloadFromStorageTriggeredByETagMismatch(exception);
                             }
                             else
@@ -677,11 +713,15 @@ namespace Orleans.Transactions.State
 
             async Task AbortAndRestoreCore(TransactionalStatus status, Exception? exception, bool storageOutcomeInDoubt)
             {
+                var transactionIds = AreRecoveryCorrelationEventsEnabled()
+                    ? CaptureTransactionIds()
+                    : ImmutableArray<Guid>.Empty;
                 TransactionDiagnosticEvents.EmitAbortAndRestoreStarted(
                     resource,
                     status,
                     storageOutcomeInDoubt,
-                    commitQueue.Count);
+                    commitQueue.Count,
+                    transactionIds);
 
                 List<Task> pending =
                 [
@@ -714,9 +754,37 @@ namespace Orleans.Transactions.State
                     LogDebugStorageWorkerTriggeringGrainDeactivation();
                     this.deactivate();
                 }
-                await this.Restore();
-                TransactionDiagnosticEvents.EmitAbortAndRestoreCompleted(resource, status, storageOutcomeInDoubt);
+                await this.Restore(transactionIds);
+                TransactionDiagnosticEvents.EmitAbortAndRestoreCompleted(
+                    resource,
+                    status,
+                    storageOutcomeInDoubt,
+                    transactionIds);
             }
+        }
+
+        private static bool AreRecoveryCorrelationEventsEnabled()
+            => TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.AbortAndRestoreStarted))
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.AbortAndRestoreCompleted))
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.QueueRestoreStarted))
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.QueueRestoreCompleted))
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.QueueRestoreFailed))
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.StorageConflictDetected));
+
+        private ImmutableArray<Guid> CaptureTransactionIds()
+        {
+            if (commitQueue.Count == 0)
+            {
+                return ImmutableArray<Guid>.Empty;
+            }
+
+            var result = ImmutableArray.CreateBuilder<Guid>(commitQueue.Count);
+            for (var i = 0; i < commitQueue.Count; i++)
+            {
+                result.Add(commitQueue[i].TransactionId);
+            }
+
+            return result.MoveToImmutable();
         }
 
         private void CompleteInDoubtEntryLocally(TransactionRecord<TState> entry, TransactionalStatus status, Exception? exception)
