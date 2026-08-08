@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Amazon.DynamoDBv2.Model;
 using Microsoft.Extensions.Logging;
@@ -411,15 +410,12 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
         }
         catch (Exception exc)
         {
-            var sb = new StringBuilder();
-            sb.AppendFormat("Unable to convert from storage format GrainStateEntity.Data={0}", entity.State);
-
+            var message = $"Unable to convert from storage format GrainStateEntity.Data={entity.State}";
             if (dataValue is not null)
             {
-                sb.Append($"Data Value={dataValue} Type={dataValue.GetType()}");
+                message += $"Data Value={dataValue} Type={dataValue.GetType()}";
             }
 
-            var message = sb.ToString();
             LogError(logger, message);
             throw new AggregateException(message, exc);
         }
@@ -625,27 +621,28 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
 
         private string GetConflictMessage(TransactionCanceledException exception, Put keyPut)
         {
-            var result = new StringBuilder("DynamoDB transactional state storage conflict. PartitionKey=")
-                .Append(key.PartitionKey)
-                .Append('.');
+            var operations = new string[this.operations.Count + 1];
 
             for (var index = 0; index < this.operations.Count; index++)
             {
-                AppendOperationDiagnostic(result, index, this.operations[index].Item, this.operations[index].RowKey, "Data", exception);
+                operations[index] = FormatOperationDiagnostic(
+                    index,
+                    this.operations[index].Item,
+                    this.operations[index].RowKey,
+                    "Data",
+                    exception);
             }
 
-            AppendOperationDiagnostic(
-                result,
+            operations[^1] = FormatOperationDiagnostic(
                 this.operations.Count,
                 new TransactWriteItem { Put = keyPut },
                 key.RowKey,
                 "KeySynchronizer",
                 exception);
-            return result.ToString();
+            return $"DynamoDB transactional state storage conflict. PartitionKey={key.PartitionKey}. {string.Join(' ', operations)}";
         }
 
-        private static void AppendOperationDiagnostic(
-            StringBuilder result,
+        private static string FormatOperationDiagnostic(
             int index,
             TransactWriteItem operation,
             string rowKey,
@@ -658,33 +655,17 @@ public partial class DynamoDBTransactionalStateStorage<TState> : ITransactionalS
             var reason = exception.CancellationReasons is { Count: > 0 } reasons && index < reasons.Count
                 ? reasons[index]
                 : null;
-
-            result.Append(" TransactWriteItems[")
-                .Append(index)
-                .Append("] Operation=")
-                .Append(operationType)
-                .Append(" Role=")
-                .Append(role)
-                .Append(" RowKey=")
-                .Append(rowKey);
-
-            if (!string.IsNullOrEmpty(conditionExpression))
-            {
-                result.Append(" Condition=").Append(conditionExpression);
-            }
-
-            if (expressionAttributeValues?.TryGetValue(
-                    DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS,
-                    out var expectedETag) is true)
-            {
-                result.Append(" ExpectedETag=").Append(expectedETag.N);
-            }
-
-            result.Append(" CancellationReasonCode=")
-                .Append(reason?.Code ?? "Unavailable")
-                .Append(" CancellationReasonMessage=")
-                .Append(reason?.Message ?? "Unavailable")
-                .Append('.');
+            var condition = string.IsNullOrEmpty(conditionExpression)
+                ? string.Empty
+                : $" Condition={conditionExpression}";
+            var expectedETag = expressionAttributeValues?.TryGetValue(
+                DynamoDBTransactionalStateConstants.CURRENT_ETAG_ALIAS,
+                out var value) is true
+                    ? $" ExpectedETag={value.N}"
+                    : string.Empty;
+            return $"TransactWriteItems[{index}] Operation={operationType} Role={role} RowKey={rowKey}"
+                + $"{condition}{expectedETag} CancellationReasonCode={reason?.Code ?? "Unavailable"}"
+                + $" CancellationReasonMessage={reason?.Message ?? "Unavailable"}.";
         }
 
         private static bool IsStorageConflict(TransactionCanceledException exception)
