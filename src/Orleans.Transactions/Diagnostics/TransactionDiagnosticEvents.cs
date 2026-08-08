@@ -500,7 +500,7 @@ internal static class TransactionDiagnosticEvents
         DateTime deadline,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(TransactionManagerWaitingForPrepared)))
+        if (IsEnabled(nameof(TransactionManagerWaitingForPrepared)))
         {
             Write(
                 nameof(TransactionManagerWaitingForPrepared),
@@ -520,7 +520,7 @@ internal static class TransactionDiagnosticEvents
         int? remainingCount,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(PreparedReceived)))
+        if (IsEnabled(nameof(PreparedReceived)))
         {
             Write(
                 nameof(PreparedReceived),
@@ -539,7 +539,7 @@ internal static class TransactionDiagnosticEvents
         DateTime deadline,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(PrepareTimedOut)))
+        if (IsEnabled(nameof(PrepareTimedOut)))
         {
             Write(
                 nameof(PrepareTimedOut),
@@ -557,7 +557,7 @@ internal static class TransactionDiagnosticEvents
         ParticipantId transactionManager,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(RemotePreparePersisted)))
+        if (IsEnabled(nameof(RemotePreparePersisted)))
         {
             Write(
                 nameof(RemotePreparePersisted),
@@ -576,7 +576,7 @@ internal static class TransactionDiagnosticEvents
         DateTime sentAt,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(RemotePreparedSent)))
+        if (IsEnabled(nameof(RemotePreparedSent)))
         {
             Write(
                 nameof(RemotePreparedSent),
@@ -595,7 +595,7 @@ internal static class TransactionDiagnosticEvents
         DateTime scheduledAt,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(RemoteRecoveryPingScheduled)))
+        if (IsEnabled(nameof(RemoteRecoveryPingScheduled)))
         {
             Write(
                 nameof(RemoteRecoveryPingScheduled),
@@ -614,7 +614,7 @@ internal static class TransactionDiagnosticEvents
         DateTime sentAt,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(RemoteRecoveryPingSent)))
+        if (IsEnabled(nameof(RemoteRecoveryPingSent)))
         {
             Write(
                 nameof(RemoteRecoveryPingSent),
@@ -634,7 +634,7 @@ internal static class TransactionDiagnosticEvents
         bool succeeded,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(TransactionCancelCompleted)))
+        if (IsEnabled(nameof(TransactionCancelCompleted)))
         {
             Write(
                 nameof(TransactionCancelCompleted),
@@ -654,7 +654,7 @@ internal static class TransactionDiagnosticEvents
         bool succeeded,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(TransactionConfirmCompleted)))
+        if (IsEnabled(nameof(TransactionConfirmCompleted)))
         {
             Write(
                 nameof(TransactionConfirmCompleted),
@@ -672,7 +672,7 @@ internal static class TransactionDiagnosticEvents
         TransactionalStatus status,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(TransactionManagerAbortDecisionCompleted)))
+        if (IsEnabled(nameof(TransactionManagerAbortDecisionCompleted)))
         {
             Write(
                 nameof(TransactionManagerAbortDecisionCompleted),
@@ -688,7 +688,7 @@ internal static class TransactionDiagnosticEvents
         ImmutableArray<Guid> transactionIds,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(QueueRestoreStarted)))
+        if (IsEnabled(nameof(QueueRestoreStarted)))
         {
             Write(
                 nameof(QueueRestoreStarted),
@@ -707,7 +707,7 @@ internal static class TransactionDiagnosticEvents
         ImmutableArray<Guid> transactionIds,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(QueueRestoreCompleted)))
+        if (IsEnabled(nameof(QueueRestoreCompleted)))
         {
             Write(
                 nameof(QueueRestoreCompleted),
@@ -730,7 +730,7 @@ internal static class TransactionDiagnosticEvents
         ImmutableArray<Guid> transactionIds,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(QueueRestoreFailed)))
+        if (IsEnabled(nameof(QueueRestoreFailed)))
         {
             Write(
                 nameof(QueueRestoreFailed),
@@ -754,7 +754,7 @@ internal static class TransactionDiagnosticEvents
         LockExpirationKind kind,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(LockExpired)))
+        if (IsEnabled(nameof(LockExpired)))
         {
             Write(
                 nameof(LockExpired),
@@ -771,7 +771,7 @@ internal static class TransactionDiagnosticEvents
         LockBreakReason reason,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(LockBroken)))
+        if (IsEnabled(nameof(LockBroken)))
         {
             Write(
                 nameof(LockBroken),
@@ -791,7 +791,7 @@ internal static class TransactionDiagnosticEvents
         ImmutableArray<Guid> transactionIds,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(StorageConflictDetected)))
+        if (IsEnabled(nameof(StorageConflictDetected)))
         {
             Write(
                 nameof(StorageConflictDetected),
@@ -817,7 +817,7 @@ internal static class TransactionDiagnosticEvents
         ImmutableArray<Guid> transactionIds,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(AbortAndRestoreStarted)))
+        if (IsEnabled(nameof(AbortAndRestoreStarted)))
         {
             Write(
                 nameof(AbortAndRestoreStarted),
@@ -835,7 +835,7 @@ internal static class TransactionDiagnosticEvents
         ImmutableArray<Guid> transactionIds,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(AbortAndRestoreCompleted)))
+        if (IsEnabled(nameof(AbortAndRestoreCompleted)))
         {
             Write(
                 nameof(AbortAndRestoreCompleted),
@@ -853,7 +853,7 @@ internal static class TransactionDiagnosticEvents
         ImmutableArray<Guid> transactionIds,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(DeactivationRequested)))
+        if (IsEnabled(nameof(DeactivationRequested)))
         {
             Write(
                 nameof(DeactivationRequested),
@@ -874,7 +874,7 @@ internal static class TransactionDiagnosticEvents
         CancelReason reason,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(CancelSendStarted)))
+        if (IsEnabled(nameof(CancelSendStarted)))
         {
             Write(
                 nameof(CancelSendStarted),
@@ -895,7 +895,7 @@ internal static class TransactionDiagnosticEvents
         CancelReason reason,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(CancelSendCompleted)))
+        if (IsEnabled(nameof(CancelSendCompleted)))
         {
             Write(
                 nameof(CancelSendCompleted),
@@ -917,7 +917,7 @@ internal static class TransactionDiagnosticEvents
         Exception exception,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(CancelSendFailed)))
+        if (IsEnabled(nameof(CancelSendFailed)))
         {
             Write(
                 nameof(CancelSendFailed),
@@ -946,7 +946,7 @@ internal static class TransactionDiagnosticEvents
         int selfTargetCount,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(CancelFanOutStarted)))
+        if (IsEnabled(nameof(CancelFanOutStarted)))
         {
             Write(
                 nameof(CancelFanOutStarted),
@@ -967,7 +967,7 @@ internal static class TransactionDiagnosticEvents
         TimeSpan duration,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(CancelFanOutCompleted)))
+        if (IsEnabled(nameof(CancelFanOutCompleted)))
         {
             Write(
                 nameof(CancelFanOutCompleted),
@@ -996,7 +996,7 @@ internal static class TransactionDiagnosticEvents
         Exception exception,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(CancelFanOutFailed)))
+        if (IsEnabled(nameof(CancelFanOutFailed)))
         {
             Write(
                 nameof(CancelFanOutFailed),
@@ -1021,7 +1021,7 @@ internal static class TransactionDiagnosticEvents
         Guid? transactionId,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(ReadyWaitStarted)))
+        if (IsEnabled(nameof(ReadyWaitStarted)))
         {
             Write(
                 nameof(ReadyWaitStarted),
@@ -1038,7 +1038,7 @@ internal static class TransactionDiagnosticEvents
         bool recoveredAfterFailure,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(ReadyWaitCompleted)))
+        if (IsEnabled(nameof(ReadyWaitCompleted)))
         {
             Write(
                 nameof(ReadyWaitCompleted),
@@ -1055,7 +1055,7 @@ internal static class TransactionDiagnosticEvents
         Exception exception,
         TransactionDiagnosticIdentity identity = default)
     {
-        if (Listener.IsEnabled(nameof(ReadyWaitFailed)))
+        if (IsEnabled(nameof(ReadyWaitFailed)))
         {
             Write(
                 nameof(ReadyWaitFailed),
@@ -1070,7 +1070,18 @@ internal static class TransactionDiagnosticEvents
         }
     }
 
-    internal static bool IsEnabled(string eventName) => Listener.IsEnabled(eventName);
+    internal static bool IsEnabled(string eventName)
+    {
+        try
+        {
+            return Listener.IsEnabled(eventName);
+        }
+        catch
+        {
+            // Recovery diagnostics are observational and must not affect transaction processing.
+            return false;
+        }
+    }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void Write(

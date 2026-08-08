@@ -78,12 +78,13 @@ public class TestingUtilsTests
         var calls = 0;
 
         var exception = await Assert.ThrowsAsync<TimeoutException>(() => TestingUtils.WaitUntilAsync(
-            _ =>
+            async _ =>
             {
                 calls++;
-                return Task.FromResult(false);
+                await Task.Delay(TimeSpan.FromMilliseconds(100));
+                return false;
             },
-            TimeSpan.FromMilliseconds(50),
+            TimeSpan.FromMilliseconds(25),
             TimeSpan.FromSeconds(1)));
 
         Assert.Equal(1, calls);

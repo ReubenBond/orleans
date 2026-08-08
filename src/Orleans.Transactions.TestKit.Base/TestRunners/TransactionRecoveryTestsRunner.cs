@@ -234,7 +234,12 @@ namespace Orleans.Transactions.TestKit
                 $"Recovery phase=transaction-path-watchdog started. "
                 + $"watchdog={this.recoveryTimeout}, failureDetection={this.failureDetectionTimeout}, "
                 + $"remotePingFrequency={TransactionalStateOptions.DefaultRemoteTransactionPingFrequency}.");
-            var recovery = await RecoverTransactions(failedGroups, getIndex, this.recoveryTimeout, recoveryEvents);
+            var recovery = await RecoverTransactions(
+                failedGroups,
+                getIndex,
+                this.recoveryTimeout,
+                this.failureDetectionTimeout,
+                recoveryEvents);
             this.Log(
                 $"Recovery phase=transaction-path-probe completed, timestamp={DateTime.UtcNow:O}. Succeeded={recovery.Succeeded}, "
                 + $"lastProbeSucceeded={recovery.LastProbeSucceeded}, "
@@ -308,6 +313,7 @@ namespace Orleans.Transactions.TestKit
             List<ExpectedGrainActivity>[] transactionGroups,
             Func<int> getIndex,
             TimeSpan timeout,
+            TimeSpan cleanupTimeout,
             TransactionRecoveryEventObserver recoveryEvents)
         {
             var startedAt = Stopwatch.GetTimestamp();
@@ -356,10 +362,21 @@ namespace Orleans.Transactions.TestKit
                 }
                 catch (TimeoutException)
                 {
-                    await probeTask;
+                    var cleanup = await Task.WhenAny(probeTask, Task.Delay(cleanupTimeout));
+                    var cleanupSettled = ReferenceEquals(cleanup, probeTask);
+                    if (cleanupSettled)
+                    {
+                        await probeTask;
+                    }
+                    else
+                    {
+                        probeTask.Ignore();
+                    }
+
                     throw new TimeoutException(
                         $"Transaction recovery probe {attempts} did not settle before the {timeout} watchdog. "
-                        + $"Index={lastTransactionIndex}, groups={FormatGroups(groupsBeingProbed)}."
+                        + $"Index={lastTransactionIndex}, groups={FormatGroups(groupsBeingProbed)}, "
+                        + $"cleanupTimeout={cleanupTimeout}, cleanupSettled={cleanupSettled}."
                         + Environment.NewLine
                         + recoveryEvents.FormatTimeline());
                 }

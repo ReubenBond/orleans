@@ -365,6 +365,23 @@ public class TransactionDiagnosticEventsTests
     }
 
     [Fact]
+    public void RecoveryEventFilterExceptionsDoNotPropagate()
+    {
+        var resource = CreateParticipant("filter-fault-target", ParticipantId.Role.Resource);
+        var listener = Assert.IsType<DiagnosticListener>(
+            typeof(TransactionDiagnosticEvents)
+                .GetField("Listener", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+                .GetValue(null));
+        using var subscription = listener.Subscribe(
+            new RawDiagnosticObserver(),
+            static (_, _, _) => throw new InvalidOperationException("Filter fault"));
+
+        TransactionDiagnosticEvents.EmitQueueRestoreStarted(resource, ImmutableArray<Guid>.Empty);
+        Assert.Throws<InvalidOperationException>(
+            () => TransactionDiagnosticEvents.EmitStorageWriteCompleted(resource, "etag", 1, 1));
+    }
+
+    [Fact]
     public async Task RecoveryObserverFiltersEventsAndReturnsAlreadyObservedTransition()
     {
         var relevant = CreateParticipant("relevant", ParticipantId.Role.Resource);
@@ -566,5 +583,20 @@ public class TransactionDiagnosticEventsTests
 
         public void OnNext(TransactionDiagnosticEvents.TransactionDiagnosticEvent value)
             => throw new InvalidOperationException("Observer fault");
+    }
+
+    private sealed class RawDiagnosticObserver : IObserver<KeyValuePair<string, object?>>
+    {
+        public void OnCompleted()
+        {
+        }
+
+        public void OnError(Exception error)
+        {
+        }
+
+        public void OnNext(KeyValuePair<string, object?> value)
+        {
+        }
     }
 }
