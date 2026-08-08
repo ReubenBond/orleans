@@ -92,7 +92,7 @@ namespace Orleans.Transactions
         internal void RecordRemotePingSent(DateTime sentAt)
         {
             LastSent = sentAt;
-            if (IsRestoredRemoteCommit && RecoveryPingCount < int.MaxValue)
+            if (RecoveryPingCount < int.MaxValue)
             {
                 RecoveryPingCount++;
             }
@@ -100,7 +100,7 @@ namespace Orleans.Transactions
 
         private TimeSpan GetRemotePingDelay(TimeSpan pingFrequency)
         {
-            if (!IsRestoredRemoteCommit)
+            if (RecoveryPingCount == 0)
             {
                 return pingFrequency;
             }

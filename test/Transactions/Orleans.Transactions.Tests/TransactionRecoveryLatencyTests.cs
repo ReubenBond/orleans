@@ -38,7 +38,7 @@ public class TransactionRecoveryLatencyTests
     }
 
     [Fact]
-    public void FreshRemoteCommitRetainsFirstPingGrace()
+    public void FreshRemoteCommitRetainsFirstPingGraceThenUsesBoundedExponentialRetry()
     {
         var frequency = TransactionalStateOptions.DefaultRemoteTransactionPingFrequency;
         var sentAt = new DateTime(2026, 8, 8, 12, 0, 0, DateTimeKind.Utc);
@@ -50,9 +50,13 @@ public class TransactionRecoveryLatencyTests
 
         Assert.Equal(sentAt.AddSeconds(60), record.GetNextRemotePingAt(frequency));
 
-        record.RecordRemotePingSent(sentAt.Add(frequency));
-
-        Assert.Equal(sentAt.AddSeconds(120), record.GetNextRemotePingAt(frequency));
+        sentAt = sentAt.Add(frequency);
+        foreach (var expectedDelay in new[] { 1, 2, 4, 8, 16, 32, 60, 60 })
+        {
+            record.RecordRemotePingSent(sentAt);
+            Assert.Equal(sentAt.AddSeconds(expectedDelay), record.GetNextRemotePingAt(frequency));
+            sentAt = record.GetNextRemotePingAt(frequency);
+        }
     }
 
     [Fact]
