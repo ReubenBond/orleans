@@ -225,6 +225,100 @@ internal static class TransactionDiagnosticEvents
         public readonly ImmutableArray<Guid> TransactionIds = transactionIds;
     }
 
+    internal sealed class DeactivationRequested(
+        ParticipantId resource,
+        TransactionalStatus status,
+        int failureCount,
+        ImmutableArray<Guid> transactionIds) : TransactionDiagnosticEvent(resource)
+    {
+        public readonly TransactionalStatus Status = status;
+        public readonly int FailureCount = failureCount;
+        public readonly ImmutableArray<Guid> TransactionIds = transactionIds;
+    }
+
+    internal enum CancelReason
+    {
+        TransactionAbort,
+        RecoveryPing,
+    }
+
+    internal abstract class CancelSendEvent(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        ParticipantId target,
+        bool isSelf,
+        TransactionalStatus status,
+        CancelReason reason) : TransactionEvent(resource, transactionId, timeStamp)
+    {
+        public readonly ParticipantId Target = target;
+        public readonly bool IsSelf = isSelf;
+        public readonly TransactionalStatus Status = status;
+        public readonly CancelReason Reason = reason;
+    }
+
+    internal sealed class CancelSendStarted(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        ParticipantId target,
+        bool isSelf,
+        TransactionalStatus status,
+        CancelReason reason) : CancelSendEvent(resource, transactionId, timeStamp, target, isSelf, status, reason);
+
+    internal sealed class CancelSendCompleted(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        ParticipantId target,
+        bool isSelf,
+        TransactionalStatus status,
+        CancelReason reason) : CancelSendEvent(resource, transactionId, timeStamp, target, isSelf, status, reason);
+
+    internal sealed class CancelSendFailed(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        ParticipantId target,
+        bool isSelf,
+        TransactionalStatus status,
+        CancelReason reason,
+        string exceptionType,
+        string exceptionMessage) : CancelSendEvent(resource, transactionId, timeStamp, target, isSelf, status, reason)
+    {
+        public readonly string ExceptionType = exceptionType;
+        public readonly string ExceptionMessage = exceptionMessage;
+    }
+
+    internal abstract class ReadyWaitEvent(
+        ParticipantId resource,
+        Guid? transactionId) : TransactionDiagnosticEvent(resource)
+    {
+        public readonly Guid? TransactionId = transactionId;
+    }
+
+    internal sealed class ReadyWaitStarted(
+        ParticipantId resource,
+        Guid? transactionId) : ReadyWaitEvent(resource, transactionId);
+
+    internal sealed class ReadyWaitCompleted(
+        ParticipantId resource,
+        Guid? transactionId,
+        bool recoveredAfterFailure) : ReadyWaitEvent(resource, transactionId)
+    {
+        public readonly bool RecoveredAfterFailure = recoveredAfterFailure;
+    }
+
+    internal sealed class ReadyWaitFailed(
+        ParticipantId resource,
+        Guid? transactionId,
+        string exceptionType,
+        string exceptionMessage) : ReadyWaitEvent(resource, transactionId)
+    {
+        public readonly string ExceptionType = exceptionType;
+        public readonly string ExceptionMessage = exceptionMessage;
+    }
+
     internal static void EmitStorageWriteCompleted(ParticipantId resource, string? eTag, int batchSize, int commitCount)
     {
         if (!Listener.IsEnabled(nameof(StorageWriteCompleted)))
@@ -461,6 +555,116 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(AbortAndRestoreCompleted),
                 new AbortAndRestoreCompleted(resource, status, storageOutcomeInDoubt, transactionIds));
+        }
+    }
+
+    internal static void EmitDeactivationRequested(
+        ParticipantId resource,
+        TransactionalStatus status,
+        int failureCount,
+        ImmutableArray<Guid> transactionIds)
+    {
+        if (Listener.IsEnabled(nameof(DeactivationRequested)))
+        {
+            Write(
+                nameof(DeactivationRequested),
+                new DeactivationRequested(resource, status, failureCount, transactionIds));
+        }
+    }
+
+    internal static void EmitCancelSendStarted(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        ParticipantId target,
+        bool isSelf,
+        TransactionalStatus status,
+        CancelReason reason)
+    {
+        if (Listener.IsEnabled(nameof(CancelSendStarted)))
+        {
+            Write(
+                nameof(CancelSendStarted),
+                new CancelSendStarted(resource, transactionId, timeStamp, target, isSelf, status, reason));
+        }
+    }
+
+    internal static void EmitCancelSendCompleted(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        ParticipantId target,
+        bool isSelf,
+        TransactionalStatus status,
+        CancelReason reason)
+    {
+        if (Listener.IsEnabled(nameof(CancelSendCompleted)))
+        {
+            Write(
+                nameof(CancelSendCompleted),
+                new CancelSendCompleted(resource, transactionId, timeStamp, target, isSelf, status, reason));
+        }
+    }
+
+    internal static void EmitCancelSendFailed(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        ParticipantId target,
+        bool isSelf,
+        TransactionalStatus status,
+        CancelReason reason,
+        Exception exception)
+    {
+        if (Listener.IsEnabled(nameof(CancelSendFailed)))
+        {
+            Write(
+                nameof(CancelSendFailed),
+                new CancelSendFailed(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    target,
+                    isSelf,
+                    status,
+                    reason,
+                    exception.GetType().FullName ?? exception.GetType().Name,
+                    exception.Message));
+        }
+    }
+
+    internal static void EmitReadyWaitStarted(ParticipantId resource, Guid? transactionId)
+    {
+        if (Listener.IsEnabled(nameof(ReadyWaitStarted)))
+        {
+            Write(nameof(ReadyWaitStarted), new ReadyWaitStarted(resource, transactionId));
+        }
+    }
+
+    internal static void EmitReadyWaitCompleted(
+        ParticipantId resource,
+        Guid? transactionId,
+        bool recoveredAfterFailure)
+    {
+        if (Listener.IsEnabled(nameof(ReadyWaitCompleted)))
+        {
+            Write(
+                nameof(ReadyWaitCompleted),
+                new ReadyWaitCompleted(resource, transactionId, recoveredAfterFailure));
+        }
+    }
+
+    internal static void EmitReadyWaitFailed(ParticipantId resource, Guid? transactionId, Exception exception)
+    {
+        if (Listener.IsEnabled(nameof(ReadyWaitFailed)))
+        {
+            Write(
+                nameof(ReadyWaitFailed),
+                new ReadyWaitFailed(
+                    resource,
+                    transactionId,
+                    exception.GetType().FullName ?? exception.GetType().Name,
+                    exception.Message));
         }
     }
 

@@ -31,6 +31,7 @@ public class TransactionDiagnosticEventsTests
             "Could not load a consistent DynamoDB transactional state snapshot.",
             storedEtag: "1",
             currentEtag: "2");
+        var timeoutException = new TimeoutException("Cancel timed out.");
         var observer = new RecordingObserver();
 
         using var subscription = TransactionDiagnosticEvents.AllEvents.Subscribe(observer);
@@ -85,6 +86,39 @@ public class TransactionDiagnosticEventsTests
             TransactionalStatus.StorageConflict,
             storageOutcomeInDoubt: true,
             transactionIds: transactionIds);
+        TransactionDiagnosticEvents.EmitDeactivationRequested(
+            resource,
+            TransactionalStatus.StorageConflict,
+            failureCount: 1,
+            transactionIds);
+        TransactionDiagnosticEvents.EmitCancelSendStarted(
+            resource,
+            transactionId,
+            timeStamp,
+            participant,
+            isSelf: true,
+            TransactionalStatus.PresumedAbort,
+            TransactionDiagnosticEvents.CancelReason.RecoveryPing);
+        TransactionDiagnosticEvents.EmitCancelSendCompleted(
+            resource,
+            transactionId,
+            timeStamp,
+            participant,
+            isSelf: false,
+            TransactionalStatus.CascadingAbort,
+            TransactionDiagnosticEvents.CancelReason.TransactionAbort);
+        TransactionDiagnosticEvents.EmitCancelSendFailed(
+            resource,
+            transactionId,
+            timeStamp,
+            participant,
+            isSelf: true,
+            TransactionalStatus.PresumedAbort,
+            TransactionDiagnosticEvents.CancelReason.RecoveryPing,
+            timeoutException);
+        TransactionDiagnosticEvents.EmitReadyWaitStarted(resource, transactionId);
+        TransactionDiagnosticEvents.EmitReadyWaitFailed(resource, transactionId, timeoutException);
+        TransactionDiagnosticEvents.EmitReadyWaitCompleted(resource, transactionId, recoveredAfterFailure: true);
 
         var waiting = observer.Single<TransactionDiagnosticEvents.TransactionManagerWaitingForPrepared>(resource);
         Assert.Equal(transactionId, waiting.TransactionId);
@@ -156,6 +190,37 @@ public class TransactionDiagnosticEventsTests
         Assert.Equal(TransactionalStatus.StorageConflict, restoreCompleted.Status);
         Assert.True(restoreCompleted.StorageOutcomeInDoubt);
         Assert.Equal(transactionIds, restoreCompleted.TransactionIds);
+
+        var deactivation = observer.Single<TransactionDiagnosticEvents.DeactivationRequested>(resource);
+        Assert.Equal(TransactionalStatus.StorageConflict, deactivation.Status);
+        Assert.Equal(1, deactivation.FailureCount);
+        Assert.Equal(transactionIds, deactivation.TransactionIds);
+
+        var cancelStarted = observer.Single<TransactionDiagnosticEvents.CancelSendStarted>(resource);
+        Assert.Equal(transactionId, cancelStarted.TransactionId);
+        Assert.Equal(participant, cancelStarted.Target);
+        Assert.True(cancelStarted.IsSelf);
+        Assert.Equal(TransactionDiagnosticEvents.CancelReason.RecoveryPing, cancelStarted.Reason);
+
+        var cancelCompleted = observer.Single<TransactionDiagnosticEvents.CancelSendCompleted>(resource);
+        Assert.False(cancelCompleted.IsSelf);
+        Assert.Equal(TransactionalStatus.CascadingAbort, cancelCompleted.Status);
+        Assert.Equal(TransactionDiagnosticEvents.CancelReason.TransactionAbort, cancelCompleted.Reason);
+
+        var cancelFailed = observer.Single<TransactionDiagnosticEvents.CancelSendFailed>(resource);
+        Assert.True(cancelFailed.IsSelf);
+        Assert.Equal(typeof(TimeoutException).FullName, cancelFailed.ExceptionType);
+        Assert.Equal(timeoutException.Message, cancelFailed.ExceptionMessage);
+
+        Assert.Equal(
+            transactionId,
+            observer.Single<TransactionDiagnosticEvents.ReadyWaitStarted>(resource).TransactionId);
+        var readyFailed = observer.Single<TransactionDiagnosticEvents.ReadyWaitFailed>(resource);
+        Assert.Equal(transactionId, readyFailed.TransactionId);
+        Assert.Equal(timeoutException.Message, readyFailed.ExceptionMessage);
+        var readyCompleted = observer.Single<TransactionDiagnosticEvents.ReadyWaitCompleted>(resource);
+        Assert.Equal(transactionId, readyCompleted.TransactionId);
+        Assert.True(readyCompleted.RecoveredAfterFailure);
     }
 
     [Fact]

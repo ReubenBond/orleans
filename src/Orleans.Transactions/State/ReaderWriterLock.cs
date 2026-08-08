@@ -66,7 +66,7 @@ namespace Orleans.Transactions.State
             bool rollbacksOccurred = false;
             List<Task> cleanup = new List<Task>();
 
-            await this.queue.Ready();
+            await this.queue.Ready(transactionId);
 
             // search active transactions
             if (Find(transactionId, isRead && !exclusiveLock, out var group, out var record))

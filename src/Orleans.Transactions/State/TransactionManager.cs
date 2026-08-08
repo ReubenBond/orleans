@@ -58,7 +58,7 @@ namespace Orleans.Transactions.State
 
         public async Task Ping(Guid transactionId, DateTime timeStamp, ParticipantId resource)
         {
-            await this.queue.Ready();
+            await this.queue.Ready(transactionId);
             await this.queue.NotifyOfPing(transactionId, timeStamp, resource);
         }
     }

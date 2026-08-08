@@ -303,8 +303,12 @@ namespace Orleans.Transactions.State
                             // tell remote participants
                             await Task.WhenAll(entry.WriteParticipants
                                 .Where(p => !p.Equals(resource))
-                                .Select(p => p.Reference.AsReference<ITransactionalResourceExtension>()
-                                     .Cancel(p.Name, entry.TransactionId, entry.Timestamp, status)));
+                                .Select(p => SendCancel(
+                                    p,
+                                    entry.TransactionId,
+                                    entry.Timestamp,
+                                    status,
+                                    TransactionDiagnosticEvents.CancelReason.TransactionAbort)));
                         }
                         catch(Exception ex)
                         {
@@ -365,8 +369,12 @@ namespace Orleans.Transactions.State
                     LogTraceReceivedPingUnknown(transactionId);
 
                     // we never heard of this transaction - so it must have aborted
-                    await resource.Reference.AsReference<ITransactionalResourceExtension>()
-                            .Cancel(resource.Name, transactionId, timeStamp, TransactionalStatus.PresumedAbort);
+                    await SendCancel(
+                        resource,
+                        transactionId,
+                        timeStamp,
+                        TransactionalStatus.PresumedAbort,
+                        TransactionDiagnosticEvents.CancelReason.RecoveryPing);
                 }
             }
         }
@@ -438,25 +446,31 @@ namespace Orleans.Transactions.State
         /// Ensures queue is ready to process requests.
         /// </summary>
         /// <returns></returns>
-        public Task Ready()
+        public Task Ready(Guid? transactionId = null)
         {
             if (this.readyTask.IsCompletedSuccessfully)
             {
                 return readyTask;
             }
 
+            TransactionDiagnosticEvents.EmitReadyWaitStarted(resource, transactionId);
             return ReadyAsync();
             async Task ReadyAsync()
             {
+                var recoveredAfterFailure = false;
                 try
                 {
                     await readyTask;
                 }
                 catch (Exception exception)
                 {
+                    recoveredAfterFailure = true;
+                    TransactionDiagnosticEvents.EmitReadyWaitFailed(resource, transactionId, exception);
                     LogWarningExceptionInTransactionQueue(exception);
                     await AbortAndRestore(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: false);
                 }
+
+                TransactionDiagnosticEvents.EmitReadyWaitCompleted(resource, transactionId, recoveredAfterFailure);
             }
         }
 
@@ -749,9 +763,15 @@ namespace Orleans.Transactions.State
                 commitQueue.Clear();
 
                 await Task.WhenAll(pending);
-                if (++failCounter >= 10 || status == TransactionalStatus.StorageConflict)
+                var failureCount = ++failCounter;
+                if (failureCount >= 10 || status == TransactionalStatus.StorageConflict)
                 {
                     LogDebugStorageWorkerTriggeringGrainDeactivation();
+                    TransactionDiagnosticEvents.EmitDeactivationRequested(
+                        resource,
+                        status,
+                        failureCount,
+                        transactionIds);
                     this.deactivate();
                 }
                 await this.Restore(transactionIds);
@@ -769,7 +789,8 @@ namespace Orleans.Transactions.State
                 || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.QueueRestoreStarted))
                 || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.QueueRestoreCompleted))
                 || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.QueueRestoreFailed))
-                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.StorageConflictDetected));
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.StorageConflictDetected))
+                || TransactionDiagnosticEvents.IsEnabled(nameof(TransactionDiagnosticEvents.DeactivationRequested));
 
         private ImmutableArray<Guid> CaptureTransactionIds()
         {
@@ -785,6 +806,51 @@ namespace Orleans.Transactions.State
             }
 
             return result.MoveToImmutable();
+        }
+
+        private async Task SendCancel(
+            ParticipantId target,
+            Guid transactionId,
+            DateTime timeStamp,
+            TransactionalStatus status,
+            TransactionDiagnosticEvents.CancelReason reason)
+        {
+            var isSelf = target.Reference.GrainId == resource.Reference.GrainId;
+            TransactionDiagnosticEvents.EmitCancelSendStarted(
+                resource,
+                transactionId,
+                timeStamp,
+                target,
+                isSelf,
+                status,
+                reason);
+
+            try
+            {
+                await target.Reference.AsReference<ITransactionalResourceExtension>()
+                    .Cancel(target.Name, transactionId, timeStamp, status);
+                TransactionDiagnosticEvents.EmitCancelSendCompleted(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    target,
+                    isSelf,
+                    status,
+                    reason);
+            }
+            catch (Exception exception)
+            {
+                TransactionDiagnosticEvents.EmitCancelSendFailed(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    target,
+                    isSelf,
+                    status,
+                    reason,
+                    exception);
+                throw;
+            }
         }
 
         private void CompleteInDoubtEntryLocally(TransactionRecord<TState> entry, TransactionalStatus status, Exception? exception)
