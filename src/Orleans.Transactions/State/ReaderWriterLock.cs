@@ -236,7 +236,11 @@ namespace Orleans.Transactions.State
             TransactionDiagnosticEvents.LockBreakReason reason)
         {
             LogTraceBreakLock(transactionId);
-            TransactionDiagnosticEvents.EmitLockBroken(queue.Resource, transactionId, reason);
+            TransactionDiagnosticEvents.EmitLockBroken(
+                queue.Resource,
+                transactionId,
+                reason,
+                queue.DiagnosticIdentity);
             return this.queue.NotifyOfAbort(entry, TransactionalStatus.BrokenLock, exception);
         }
 
@@ -276,7 +280,11 @@ namespace Orleans.Transactions.State
                 return Task.CompletedTask;
             }
 
-            TransactionDiagnosticEvents.EmitLockBroken(queue.Resource, guid, reason);
+            TransactionDiagnosticEvents.EmitLockBroken(
+                queue.Resource,
+                guid,
+                reason,
+                queue.DiagnosticIdentity);
             return queue.NotifyOfAbort(record, TransactionalStatus.BrokenLock, exception: null);
         }
 
@@ -324,7 +332,8 @@ namespace Orleans.Transactions.State
                                         queue.Resource,
                                         transactionId,
                                         currentGroup.Deadline.Value,
-                                        now);
+                                        now,
+                                        queue.DiagnosticIdentity);
                                 }
                                 await AbortExecutingTransactions(
                                     exception: null,

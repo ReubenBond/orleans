@@ -43,7 +43,8 @@ namespace Orleans.Transactions.State
                         transactionId,
                         timeStamp,
                         record.WaitCount,
-                        record.WaitingSince + this.queue.PrepareTimeout);
+                        record.WaitingSince + this.queue.PrepareTimeout,
+                        this.queue.DiagnosticIdentity);
                 }
             }
 

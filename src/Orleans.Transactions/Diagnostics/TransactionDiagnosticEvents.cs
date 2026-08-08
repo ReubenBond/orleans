@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using Orleans.Runtime;
 
 namespace Orleans.Transactions.Diagnostics;
 
@@ -14,9 +15,23 @@ internal static class TransactionDiagnosticEvents
 
     internal static IObservable<TransactionDiagnosticEvent> AllEvents { get; } = new Observable();
 
+    internal readonly struct TransactionDiagnosticIdentity(SiloAddress? siloAddress, ActivationId activationId)
+    {
+        public readonly SiloAddress? SiloAddress = siloAddress;
+        public readonly ActivationId ActivationId = activationId;
+    }
+
     internal abstract class TransactionDiagnosticEvent(ParticipantId resource)
     {
         public readonly ParticipantId Resource = resource;
+        public SiloAddress? SiloAddress { get; private set; }
+        public ActivationId ActivationId { get; private set; }
+
+        internal void SetIdentity(TransactionDiagnosticIdentity identity)
+        {
+            SiloAddress = identity.SiloAddress;
+            ActivationId = identity.ActivationId;
+        }
     }
 
     internal sealed class StorageWriteCompleted(
@@ -319,20 +334,32 @@ internal static class TransactionDiagnosticEvents
         public readonly string ExceptionMessage = exceptionMessage;
     }
 
-    internal static void EmitStorageWriteCompleted(ParticipantId resource, string? eTag, int batchSize, int commitCount)
+    internal static void EmitStorageWriteCompleted(
+        ParticipantId resource,
+        string? eTag,
+        int batchSize,
+        int commitCount,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (!Listener.IsEnabled(nameof(StorageWriteCompleted)))
         {
             return;
         }
 
-        Emit(resource, eTag, batchSize, commitCount);
+        Emit(resource, eTag, batchSize, commitCount, identity);
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        static void Emit(ParticipantId resource, string? eTag, int batchSize, int commitCount)
+        static void Emit(
+            ParticipantId resource,
+            string? eTag,
+            int batchSize,
+            int commitCount,
+            TransactionDiagnosticIdentity identity)
         {
             // Observer exceptions intentionally propagate so tests can inject post-write faults.
-            Listener.Write(nameof(StorageWriteCompleted), new StorageWriteCompleted(resource, eTag, batchSize, commitCount));
+            var evt = new StorageWriteCompleted(resource, eTag, batchSize, commitCount);
+            evt.SetIdentity(identity);
+            Listener.Write(nameof(StorageWriteCompleted), evt);
         }
     }
 
@@ -341,13 +368,15 @@ internal static class TransactionDiagnosticEvents
         Guid transactionId,
         DateTime timeStamp,
         int waitCount,
-        DateTime deadline)
+        DateTime deadline,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(TransactionManagerWaitingForPrepared)))
         {
             Write(
                 nameof(TransactionManagerWaitingForPrepared),
-                new TransactionManagerWaitingForPrepared(resource, transactionId, timeStamp, waitCount, deadline));
+                new TransactionManagerWaitingForPrepared(resource, transactionId, timeStamp, waitCount, deadline),
+                identity);
         }
     }
 
@@ -357,13 +386,15 @@ internal static class TransactionDiagnosticEvents
         DateTime timeStamp,
         ParticipantId participant,
         TransactionalStatus status,
-        int? remainingCount)
+        int? remainingCount,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(PreparedReceived)))
         {
             Write(
                 nameof(PreparedReceived),
-                new PreparedReceived(resource, transactionId, timeStamp, participant, status, remainingCount));
+                new PreparedReceived(resource, transactionId, timeStamp, participant, status, remainingCount),
+                identity);
         }
     }
 
@@ -372,11 +403,15 @@ internal static class TransactionDiagnosticEvents
         Guid transactionId,
         DateTime timeStamp,
         int remainingCount,
-        DateTime deadline)
+        DateTime deadline,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(PrepareTimedOut)))
         {
-            Write(nameof(PrepareTimedOut), new PrepareTimedOut(resource, transactionId, timeStamp, remainingCount, deadline));
+            Write(
+                nameof(PrepareTimedOut),
+                new PrepareTimedOut(resource, transactionId, timeStamp, remainingCount, deadline),
+                identity);
         }
     }
 
@@ -384,13 +419,15 @@ internal static class TransactionDiagnosticEvents
         ParticipantId resource,
         Guid transactionId,
         DateTime timeStamp,
-        ParticipantId transactionManager)
+        ParticipantId transactionManager,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(RemotePreparePersisted)))
         {
             Write(
                 nameof(RemotePreparePersisted),
-                new RemotePreparePersisted(resource, transactionId, timeStamp, transactionManager));
+                new RemotePreparePersisted(resource, transactionId, timeStamp, transactionManager),
+                identity);
         }
     }
 
@@ -399,13 +436,15 @@ internal static class TransactionDiagnosticEvents
         Guid transactionId,
         DateTime timeStamp,
         ParticipantId transactionManager,
-        DateTime sentAt)
+        DateTime sentAt,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(RemotePreparedSent)))
         {
             Write(
                 nameof(RemotePreparedSent),
-                new RemotePreparedSent(resource, transactionId, timeStamp, transactionManager, sentAt));
+                new RemotePreparedSent(resource, transactionId, timeStamp, transactionManager, sentAt),
+                identity);
         }
     }
 
@@ -414,13 +453,15 @@ internal static class TransactionDiagnosticEvents
         Guid transactionId,
         DateTime timeStamp,
         ParticipantId transactionManager,
-        DateTime scheduledAt)
+        DateTime scheduledAt,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(RemoteRecoveryPingScheduled)))
         {
             Write(
                 nameof(RemoteRecoveryPingScheduled),
-                new RemoteRecoveryPingScheduled(resource, transactionId, timeStamp, transactionManager, scheduledAt));
+                new RemoteRecoveryPingScheduled(resource, transactionId, timeStamp, transactionManager, scheduledAt),
+                identity);
         }
     }
 
@@ -429,21 +470,26 @@ internal static class TransactionDiagnosticEvents
         Guid transactionId,
         DateTime timeStamp,
         ParticipantId transactionManager,
-        DateTime sentAt)
+        DateTime sentAt,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(RemoteRecoveryPingSent)))
         {
             Write(
                 nameof(RemoteRecoveryPingSent),
-                new RemoteRecoveryPingSent(resource, transactionId, timeStamp, transactionManager, sentAt));
+                new RemoteRecoveryPingSent(resource, transactionId, timeStamp, transactionManager, sentAt),
+                identity);
         }
     }
 
-    internal static void EmitQueueRestoreStarted(ParticipantId resource, ImmutableArray<Guid> transactionIds)
+    internal static void EmitQueueRestoreStarted(
+        ParticipantId resource,
+        ImmutableArray<Guid> transactionIds,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(QueueRestoreStarted)))
         {
-            Write(nameof(QueueRestoreStarted), new QueueRestoreStarted(resource, transactionIds));
+            Write(nameof(QueueRestoreStarted), new QueueRestoreStarted(resource, transactionIds), identity);
         }
     }
 
@@ -452,7 +498,8 @@ internal static class TransactionDiagnosticEvents
         long committedSequence,
         int recoveredPendingCount,
         int recoveredCommitCount,
-        ImmutableArray<Guid> transactionIds)
+        ImmutableArray<Guid> transactionIds,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(QueueRestoreCompleted)))
         {
@@ -463,7 +510,8 @@ internal static class TransactionDiagnosticEvents
                     committedSequence,
                     recoveredPendingCount,
                     recoveredCommitCount,
-                    transactionIds));
+                    transactionIds),
+                identity);
         }
     }
 
@@ -471,7 +519,8 @@ internal static class TransactionDiagnosticEvents
         ParticipantId resource,
         Exception exception,
         bool storageConflict,
-        ImmutableArray<Guid> transactionIds)
+        ImmutableArray<Guid> transactionIds,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(QueueRestoreFailed)))
         {
@@ -482,7 +531,8 @@ internal static class TransactionDiagnosticEvents
                     exception.GetType().FullName ?? exception.GetType().Name,
                     exception.Message,
                     storageConflict,
-                    transactionIds));
+                    transactionIds),
+                identity);
         }
     }
 
@@ -490,19 +540,24 @@ internal static class TransactionDiagnosticEvents
         ParticipantId resource,
         Guid transactionId,
         DateTime deadline,
-        DateTime observedAt)
+        DateTime observedAt,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(LockExpired)))
         {
-            Write(nameof(LockExpired), new LockExpired(resource, transactionId, deadline, observedAt));
+            Write(nameof(LockExpired), new LockExpired(resource, transactionId, deadline, observedAt), identity);
         }
     }
 
-    internal static void EmitLockBroken(ParticipantId resource, Guid transactionId, LockBreakReason reason)
+    internal static void EmitLockBroken(
+        ParticipantId resource,
+        Guid transactionId,
+        LockBreakReason reason,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(LockBroken)))
         {
-            Write(nameof(LockBroken), new LockBroken(resource, transactionId, reason));
+            Write(nameof(LockBroken), new LockBroken(resource, transactionId, reason), identity);
         }
     }
 
@@ -512,7 +567,8 @@ internal static class TransactionDiagnosticEvents
         bool storageOutcomeInDoubt,
         int queuedTransactionCount,
         Exception exception,
-        ImmutableArray<Guid> transactionIds)
+        ImmutableArray<Guid> transactionIds,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(StorageConflictDetected)))
         {
@@ -525,7 +581,8 @@ internal static class TransactionDiagnosticEvents
                     queuedTransactionCount,
                     exception.GetType().FullName ?? exception.GetType().Name,
                     exception.Message,
-                    transactionIds));
+                    transactionIds),
+                identity);
         }
     }
 
@@ -534,13 +591,15 @@ internal static class TransactionDiagnosticEvents
         TransactionalStatus status,
         bool storageOutcomeInDoubt,
         int queuedTransactionCount,
-        ImmutableArray<Guid> transactionIds)
+        ImmutableArray<Guid> transactionIds,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(AbortAndRestoreStarted)))
         {
             Write(
                 nameof(AbortAndRestoreStarted),
-                new AbortAndRestoreStarted(resource, status, storageOutcomeInDoubt, queuedTransactionCount, transactionIds));
+                new AbortAndRestoreStarted(resource, status, storageOutcomeInDoubt, queuedTransactionCount, transactionIds),
+                identity);
         }
     }
 
@@ -548,13 +607,15 @@ internal static class TransactionDiagnosticEvents
         ParticipantId resource,
         TransactionalStatus status,
         bool storageOutcomeInDoubt,
-        ImmutableArray<Guid> transactionIds)
+        ImmutableArray<Guid> transactionIds,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(AbortAndRestoreCompleted)))
         {
             Write(
                 nameof(AbortAndRestoreCompleted),
-                new AbortAndRestoreCompleted(resource, status, storageOutcomeInDoubt, transactionIds));
+                new AbortAndRestoreCompleted(resource, status, storageOutcomeInDoubt, transactionIds),
+                identity);
         }
     }
 
@@ -562,13 +623,15 @@ internal static class TransactionDiagnosticEvents
         ParticipantId resource,
         TransactionalStatus status,
         int failureCount,
-        ImmutableArray<Guid> transactionIds)
+        ImmutableArray<Guid> transactionIds,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(DeactivationRequested)))
         {
             Write(
                 nameof(DeactivationRequested),
-                new DeactivationRequested(resource, status, failureCount, transactionIds));
+                new DeactivationRequested(resource, status, failureCount, transactionIds),
+                identity);
         }
     }
 
@@ -579,13 +642,15 @@ internal static class TransactionDiagnosticEvents
         ParticipantId target,
         bool isSelf,
         TransactionalStatus status,
-        CancelReason reason)
+        CancelReason reason,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(CancelSendStarted)))
         {
             Write(
                 nameof(CancelSendStarted),
-                new CancelSendStarted(resource, transactionId, timeStamp, target, isSelf, status, reason));
+                new CancelSendStarted(resource, transactionId, timeStamp, target, isSelf, status, reason),
+                identity);
         }
     }
 
@@ -596,13 +661,15 @@ internal static class TransactionDiagnosticEvents
         ParticipantId target,
         bool isSelf,
         TransactionalStatus status,
-        CancelReason reason)
+        CancelReason reason,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(CancelSendCompleted)))
         {
             Write(
                 nameof(CancelSendCompleted),
-                new CancelSendCompleted(resource, transactionId, timeStamp, target, isSelf, status, reason));
+                new CancelSendCompleted(resource, transactionId, timeStamp, target, isSelf, status, reason),
+                identity);
         }
     }
 
@@ -614,7 +681,8 @@ internal static class TransactionDiagnosticEvents
         bool isSelf,
         TransactionalStatus status,
         CancelReason reason,
-        Exception exception)
+        Exception exception,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(CancelSendFailed)))
         {
@@ -629,32 +697,42 @@ internal static class TransactionDiagnosticEvents
                     status,
                     reason,
                     exception.GetType().FullName ?? exception.GetType().Name,
-                    exception.Message));
+                    exception.Message),
+                identity);
         }
     }
 
-    internal static void EmitReadyWaitStarted(ParticipantId resource, Guid? transactionId)
+    internal static void EmitReadyWaitStarted(
+        ParticipantId resource,
+        Guid? transactionId,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(ReadyWaitStarted)))
         {
-            Write(nameof(ReadyWaitStarted), new ReadyWaitStarted(resource, transactionId));
+            Write(nameof(ReadyWaitStarted), new ReadyWaitStarted(resource, transactionId), identity);
         }
     }
 
     internal static void EmitReadyWaitCompleted(
         ParticipantId resource,
         Guid? transactionId,
-        bool recoveredAfterFailure)
+        bool recoveredAfterFailure,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(ReadyWaitCompleted)))
         {
             Write(
                 nameof(ReadyWaitCompleted),
-                new ReadyWaitCompleted(resource, transactionId, recoveredAfterFailure));
+                new ReadyWaitCompleted(resource, transactionId, recoveredAfterFailure),
+                identity);
         }
     }
 
-    internal static void EmitReadyWaitFailed(ParticipantId resource, Guid? transactionId, Exception exception)
+    internal static void EmitReadyWaitFailed(
+        ParticipantId resource,
+        Guid? transactionId,
+        Exception exception,
+        TransactionDiagnosticIdentity identity = default)
     {
         if (Listener.IsEnabled(nameof(ReadyWaitFailed)))
         {
@@ -664,17 +742,22 @@ internal static class TransactionDiagnosticEvents
                     resource,
                     transactionId,
                     exception.GetType().FullName ?? exception.GetType().Name,
-                    exception.Message));
+                    exception.Message),
+                identity);
         }
     }
 
     internal static bool IsEnabled(string eventName) => Listener.IsEnabled(eventName);
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void Write(string eventName, TransactionDiagnosticEvent evt)
+    private static void Write(
+        string eventName,
+        TransactionDiagnosticEvent evt,
+        TransactionDiagnosticIdentity identity)
     {
         try
         {
+            evt.SetIdentity(identity);
             Listener.Write(eventName, evt);
         }
         catch (Exception)

@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Net;
+using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.Transactions.Diagnostics;
 using TestExtensions;
@@ -32,6 +34,9 @@ public class TransactionDiagnosticEventsTests
             storedEtag: "1",
             currentEtag: "2");
         var timeoutException = new TimeoutException("Cancel timed out.");
+        var siloAddress = SiloAddress.New(IPAddress.Loopback, 11_111, 7);
+        var activationId = ActivationId.NewId();
+        var identity = new TransactionDiagnosticEvents.TransactionDiagnosticIdentity(siloAddress, activationId);
         var observer = new RecordingObserver();
 
         using var subscription = TransactionDiagnosticEvents.AllEvents.Subscribe(observer);
@@ -49,7 +54,7 @@ public class TransactionDiagnosticEventsTests
         TransactionDiagnosticEvents.EmitRemotePreparedSent(resource, transactionId, timeStamp, manager, sentAt);
         TransactionDiagnosticEvents.EmitRemoteRecoveryPingScheduled(resource, transactionId, timeStamp, manager, scheduledAt);
         TransactionDiagnosticEvents.EmitRemoteRecoveryPingSent(resource, transactionId, timeStamp, manager, sentAt);
-        TransactionDiagnosticEvents.EmitQueueRestoreStarted(resource, transactionIds);
+        TransactionDiagnosticEvents.EmitQueueRestoreStarted(resource, transactionIds, identity);
         TransactionDiagnosticEvents.EmitQueueRestoreCompleted(resource, 42, 2, 3, transactionIds);
         TransactionDiagnosticEvents.EmitQueueRestoreFailed(
             resource,
@@ -119,6 +124,7 @@ public class TransactionDiagnosticEventsTests
         TransactionDiagnosticEvents.EmitReadyWaitStarted(resource, transactionId);
         TransactionDiagnosticEvents.EmitReadyWaitFailed(resource, transactionId, timeoutException);
         TransactionDiagnosticEvents.EmitReadyWaitCompleted(resource, transactionId, recoveredAfterFailure: true);
+        TransactionDiagnosticEvents.EmitStorageWriteCompleted(resource, "etag", 1, 1, identity);
 
         var waiting = observer.Single<TransactionDiagnosticEvents.TransactionManagerWaitingForPrepared>(resource);
         Assert.Equal(transactionId, waiting.TransactionId);
@@ -139,9 +145,10 @@ public class TransactionDiagnosticEventsTests
         Assert.Equal(sentAt, observer.Single<TransactionDiagnosticEvents.RemotePreparedSent>(resource).SentAt);
         Assert.Equal(scheduledAt, observer.Single<TransactionDiagnosticEvents.RemoteRecoveryPingScheduled>(resource).ScheduledAt);
         Assert.Equal(sentAt, observer.Single<TransactionDiagnosticEvents.RemoteRecoveryPingSent>(resource).SentAt);
-        Assert.Equal(
-            transactionIds,
-            observer.Single<TransactionDiagnosticEvents.QueueRestoreStarted>(resource).TransactionIds);
+        var restoreStartedEvent = observer.Single<TransactionDiagnosticEvents.QueueRestoreStarted>(resource);
+        Assert.Equal(transactionIds, restoreStartedEvent.TransactionIds);
+        Assert.Equal(siloAddress, restoreStartedEvent.SiloAddress);
+        Assert.Equal(activationId, restoreStartedEvent.ActivationId);
 
         var restored = observer.Single<TransactionDiagnosticEvents.QueueRestoreCompleted>(resource);
         Assert.Equal(42, restored.CommittedSequence);
@@ -221,6 +228,10 @@ public class TransactionDiagnosticEventsTests
         var readyCompleted = observer.Single<TransactionDiagnosticEvents.ReadyWaitCompleted>(resource);
         Assert.Equal(transactionId, readyCompleted.TransactionId);
         Assert.True(readyCompleted.RecoveredAfterFailure);
+
+        var storageWrite = observer.Single<TransactionDiagnosticEvents.StorageWriteCompleted>(resource);
+        Assert.Equal(siloAddress, storageWrite.SiloAddress);
+        Assert.Equal(activationId, storageWrite.ActivationId);
     }
 
     [Fact]

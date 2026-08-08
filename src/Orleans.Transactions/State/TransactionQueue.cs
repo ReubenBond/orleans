@@ -25,6 +25,7 @@ namespace Orleans.Transactions.State
         protected readonly ILogger logger;
         private readonly IActivationLifetime activationLifetime;
         private readonly ConfirmationWorker<TState> confirmationWorker;
+        private readonly TransactionDiagnosticEvents.TransactionDiagnosticIdentity diagnosticIdentity;
         private CommitQueue<TState> commitQueue;
         private Task readyTask;
 
@@ -50,6 +51,7 @@ namespace Orleans.Transactions.State
         public CausalClock Clock { get; }
         internal ParticipantId Resource => resource;
         internal TimeSpan PrepareTimeout => options.PrepareTimeout;
+        internal TransactionDiagnosticEvents.TransactionDiagnosticIdentity DiagnosticIdentity => diagnosticIdentity;
 
         public TransactionQueue(
             IOptions<TransactionalStateOptions> options,
@@ -59,7 +61,8 @@ namespace Orleans.Transactions.State
             IClock clock,
             ILogger logger,
             ITimerManager timerManager,
-            IActivationLifetime activationLifetime)
+            IActivationLifetime activationLifetime,
+            TransactionDiagnosticEvents.TransactionDiagnosticIdentity diagnosticIdentity)
         {
             this.options = options.Value;
             this.resource = resource;
@@ -68,6 +71,7 @@ namespace Orleans.Transactions.State
             this.Clock = new CausalClock(clock);
             this.logger = logger;
             this.activationLifetime = activationLifetime;
+            this.diagnosticIdentity = diagnosticIdentity;
             this.storageWorker = new BatchWorkerFromDelegate(StorageWork, this.activationLifetime.OnDeactivating);
             this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger, activationLifetime);
             this.confirmationWorker = new ConfirmationWorker<TState>(options, this.resource, this.storageWorker, () => this.storageBatch, this.logger, timerManager, activationLifetime);
@@ -141,7 +145,8 @@ namespace Orleans.Transactions.State
                                     resource,
                                     record.TransactionId,
                                     record.Timestamp,
-                                    record.TransactionManager);
+                                    record.TransactionManager,
+                                    identity: diagnosticIdentity);
 
                                 if (behindRemoteEntryBySameTM)
                                 {
@@ -156,7 +161,8 @@ namespace Orleans.Transactions.State
                                         record.TransactionId,
                                         record.Timestamp,
                                         record.TransactionManager,
-                                        record.LastSent.Value);
+                                        record.LastSent.Value,
+                                        identity: diagnosticIdentity);
                                 }
                             });
                             break;
@@ -200,7 +206,8 @@ namespace Orleans.Transactions.State
                         timeStamp,
                         participant,
                         status,
-                        localEntry.WaitCount);
+                        localEntry.WaitCount,
+                        identity: diagnosticIdentity);
 
                     storageWorker.Notify();
                 }
@@ -212,7 +219,8 @@ namespace Orleans.Transactions.State
                         timeStamp,
                         participant,
                         status,
-                        localEntry.WaitCount);
+                        localEntry.WaitCount,
+                        identity: diagnosticIdentity);
                     await AbortCommits(status, pos);
 
                     this.RWLock.Notify();
@@ -240,7 +248,8 @@ namespace Orleans.Transactions.State
                     timeStamp,
                     participant,
                     status,
-                    remainingCount: null);
+                    remainingCount: null,
+                    identity: diagnosticIdentity);
 
                 // TODO fix memory leak if corresponding commit messages never arrive
             }
@@ -453,7 +462,7 @@ namespace Orleans.Transactions.State
                 return readyTask;
             }
 
-            TransactionDiagnosticEvents.EmitReadyWaitStarted(resource, transactionId);
+            TransactionDiagnosticEvents.EmitReadyWaitStarted(resource, transactionId, diagnosticIdentity);
             return ReadyAsync();
             async Task ReadyAsync()
             {
@@ -465,12 +474,16 @@ namespace Orleans.Transactions.State
                 catch (Exception exception)
                 {
                     recoveredAfterFailure = true;
-                    TransactionDiagnosticEvents.EmitReadyWaitFailed(resource, transactionId, exception);
+                    TransactionDiagnosticEvents.EmitReadyWaitFailed(resource, transactionId, exception, diagnosticIdentity);
                     LogWarningExceptionInTransactionQueue(exception);
                     await AbortAndRestore(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: false);
                 }
 
-                TransactionDiagnosticEvents.EmitReadyWaitCompleted(resource, transactionId, recoveredAfterFailure);
+                TransactionDiagnosticEvents.EmitReadyWaitCompleted(
+                    resource,
+                    transactionId,
+                    recoveredAfterFailure,
+                    diagnosticIdentity);
             }
         }
 
@@ -481,7 +494,7 @@ namespace Orleans.Transactions.State
                 transactionIds = ImmutableArray<Guid>.Empty;
             }
 
-            TransactionDiagnosticEvents.EmitQueueRestoreStarted(resource, transactionIds);
+            TransactionDiagnosticEvents.EmitQueueRestoreStarted(resource, transactionIds, diagnosticIdentity);
 
             TransactionalStorageLoadResponse<TState> loadresponse;
             try
@@ -499,10 +512,16 @@ namespace Orleans.Transactions.State
                         storageOutcomeInDoubt: false,
                         queuedTransactionCount: transactionIds.Length,
                         exception: exception,
-                        transactionIds: transactionIds);
+                        transactionIds: transactionIds,
+                        identity: diagnosticIdentity);
                 }
 
-                TransactionDiagnosticEvents.EmitQueueRestoreFailed(resource, exception, storageConflict, transactionIds);
+                TransactionDiagnosticEvents.EmitQueueRestoreFailed(
+                    resource,
+                    exception,
+                    storageConflict,
+                    transactionIds,
+                    diagnosticIdentity);
                 throw;
             }
 
@@ -547,7 +566,8 @@ namespace Orleans.Transactions.State
                         transactionId,
                         pr.TimeStamp,
                         tm,
-                        DateTime.UtcNow);
+                        DateTime.UtcNow,
+                        identity: diagnosticIdentity);
                 }
             }
 
@@ -563,7 +583,8 @@ namespace Orleans.Transactions.State
                 loadresponse.CommittedSequenceId,
                 recoveredPendingCount,
                 storageBatch.MetaData.CommitRecords.Count,
-                transactionIds);
+                transactionIds,
+                diagnosticIdentity);
 
             // check for work
             this.storageWorker.Notify();
@@ -671,7 +692,8 @@ namespace Orleans.Transactions.State
                                     writeAttempted,
                                     commitQueue.Count,
                                     exception,
-                                    transactionIds);
+                                    transactionIds,
+                                    diagnosticIdentity);
                                 LogWarningReloadFromStorageTriggeredByETagMismatch(exception);
                             }
                             else
@@ -688,7 +710,8 @@ namespace Orleans.Transactions.State
                             this.resource,
                             this.storageBatch.ETag,
                             batchBeingSentToStorage.BatchSize,
-                            batchBeingSentToStorage.CommitCount);
+                            batchBeingSentToStorage.CommitCount,
+                            diagnosticIdentity);
                     }
 
                     if (committableEntries > 0)
@@ -735,7 +758,8 @@ namespace Orleans.Transactions.State
                     status,
                     storageOutcomeInDoubt,
                     commitQueue.Count,
-                    transactionIds);
+                    transactionIds,
+                    diagnosticIdentity);
 
                 List<Task> pending =
                 [
@@ -771,7 +795,8 @@ namespace Orleans.Transactions.State
                         resource,
                         status,
                         failureCount,
-                        transactionIds);
+                        transactionIds,
+                        diagnosticIdentity);
                     this.deactivate();
                 }
                 await this.Restore(transactionIds);
@@ -779,7 +804,8 @@ namespace Orleans.Transactions.State
                     resource,
                     status,
                     storageOutcomeInDoubt,
-                    transactionIds);
+                    transactionIds,
+                    diagnosticIdentity);
             }
         }
 
@@ -823,7 +849,8 @@ namespace Orleans.Transactions.State
                 target,
                 isSelf,
                 status,
-                reason);
+                reason,
+                diagnosticIdentity);
 
             try
             {
@@ -836,7 +863,8 @@ namespace Orleans.Transactions.State
                     target,
                     isSelf,
                     status,
-                    reason);
+                    reason,
+                    diagnosticIdentity);
             }
             catch (Exception exception)
             {
@@ -848,7 +876,8 @@ namespace Orleans.Transactions.State
                     isSelf,
                     status,
                     reason,
-                    exception);
+                    exception,
+                    diagnosticIdentity);
                 throw;
             }
         }
@@ -900,7 +929,8 @@ namespace Orleans.Transactions.State
                                     bottom.TransactionId,
                                     bottom.Timestamp,
                                     bottom.WaitCount,
-                                    bottom.WaitingSince + this.options.PrepareTimeout);
+                                    bottom.WaitingSince + this.options.PrepareTimeout,
+                                    diagnosticIdentity);
                                 await AbortCommits(TransactionalStatus.PrepareTimeout);
                                 this.RWLock.Notify();
                             }
@@ -926,7 +956,8 @@ namespace Orleans.Transactions.State
                                     bottom.TransactionId,
                                     bottom.Timestamp,
                                     bottom.TransactionManager,
-                                    now);
+                                    now,
+                                    diagnosticIdentity);
 
                                 LogTraceSentPrepared(bottom);
 
@@ -942,7 +973,8 @@ namespace Orleans.Transactions.State
                                         bottom.TransactionId,
                                         bottom.Timestamp,
                                         bottom.TransactionManager,
-                                        scheduledAt);
+                                        scheduledAt,
+                                        diagnosticIdentity);
                                     storageWorker.Notify(scheduledAt);
                                 }
                             }
@@ -961,7 +993,8 @@ namespace Orleans.Transactions.State
                                         bottom.TransactionId,
                                         bottom.Timestamp,
                                         bottom.TransactionManager,
-                                        now);
+                                        now,
+                                        diagnosticIdentity);
 
                                     var scheduledAt = bottom.LastSent.Value + this.options.RemoteTransactionPingFrequency;
                                     TransactionDiagnosticEvents.EmitRemoteRecoveryPingScheduled(
@@ -969,7 +1002,8 @@ namespace Orleans.Transactions.State
                                         bottom.TransactionId,
                                         bottom.Timestamp,
                                         bottom.TransactionManager,
-                                        scheduledAt);
+                                        scheduledAt,
+                                        diagnosticIdentity);
                                 }
                                 storageWorker.Notify(bottom.LastSent.Value + this.options.RemoteTransactionPingFrequency);
                             }
