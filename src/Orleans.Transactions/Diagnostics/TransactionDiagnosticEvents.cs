@@ -131,6 +131,32 @@ internal static class TransactionDiagnosticEvents
         public readonly DateTime SentAt = sentAt;
     }
 
+    internal sealed class TransactionCancelCompleted(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        TransactionalStatus status,
+        bool queueEntryFound,
+        bool succeeded) : TransactionEvent(resource, transactionId, timeStamp)
+    {
+        public readonly TransactionalStatus Status = status;
+        public readonly bool QueueEntryFound = queueEntryFound;
+        public readonly bool Succeeded = succeeded;
+    }
+
+    internal sealed class TransactionConfirmCompleted(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        TransactionalStatus status,
+        bool queueEntryFound,
+        bool succeeded) : TransactionEvent(resource, transactionId, timeStamp)
+    {
+        public readonly TransactionalStatus Status = status;
+        public readonly bool QueueEntryFound = queueEntryFound;
+        public readonly bool Succeeded = succeeded;
+    }
+
     internal sealed class QueueRestoreStarted(
         ParticipantId resource,
         ImmutableArray<Guid> transactionIds) : TransactionDiagnosticEvent(resource)
@@ -478,6 +504,42 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(RemoteRecoveryPingSent),
                 new RemoteRecoveryPingSent(resource, transactionId, timeStamp, transactionManager, sentAt),
+                identity);
+        }
+    }
+
+    internal static void EmitTransactionCancelCompleted(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        TransactionalStatus status,
+        bool queueEntryFound,
+        bool succeeded,
+        TransactionDiagnosticIdentity identity = default)
+    {
+        if (Listener.IsEnabled(nameof(TransactionCancelCompleted)))
+        {
+            Write(
+                nameof(TransactionCancelCompleted),
+                new TransactionCancelCompleted(resource, transactionId, timeStamp, status, queueEntryFound, succeeded),
+                identity);
+        }
+    }
+
+    internal static void EmitTransactionConfirmCompleted(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        TransactionalStatus status,
+        bool queueEntryFound,
+        bool succeeded,
+        TransactionDiagnosticIdentity identity = default)
+    {
+        if (Listener.IsEnabled(nameof(TransactionConfirmCompleted)))
+        {
+            Write(
+                nameof(TransactionConfirmCompleted),
+                new TransactionConfirmCompleted(resource, transactionId, timeStamp, status, queueEntryFound, succeeded),
                 identity);
         }
     }

@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime;
 using Orleans.TestingHost;
 using Orleans.Transactions.TestKit.Correctnesss;
 
@@ -18,8 +19,6 @@ namespace Orleans.Transactions.TestKit
     {
         private static readonly TimeSpan RecoveryTimeout = TimeSpan.FromSeconds(60);
         private static readonly TimeSpan FailureDetectionSchedulingMargin = TimeSpan.FromSeconds(15);
-        // reduce to or remove once we fix timeouts abort
-        private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(1);
 
         private readonly TestCluster testCluster;
         private readonly ILogger logger;
@@ -40,6 +39,7 @@ namespace Orleans.Transactions.TestKit
             }
             public Guid GrainId { get; }
             public ITransactionalBitArrayGrain Grain { get; }
+            public GrainId RuntimeGrainId => this.Grain.GetGrainId();
             public BitArrayState Expected { get; } = new BitArrayState();
             public BitArrayState Unambiguous { get; } = new BitArrayState();
             public List<BitArrayState> Actual { get; set; } = null!;
@@ -58,6 +58,8 @@ namespace Orleans.Transactions.TestKit
         }
 
         private sealed record TransactionFailure(int Index, Guid[] GrainIds, Exception Exception, long ObservedAt);
+
+        private sealed record InFlightBatch(int Index, int PendingCount);
 
         private sealed record RecoveryResult(
             bool Succeeded,
@@ -104,6 +106,7 @@ namespace Orleans.Transactions.TestKit
                 .GroupBy(v => v.index / 2)
                 .Select(g => g.Select(i => i.value).ToList())
                 .ToArray();
+            using var recoveryEvents = new TransactionRecoveryEventObserver(txGrains.Select(grain => grain.RuntimeGrainId));
             var txSucceedBeforeInterruption = await AllTxSucceed(transactionGroups, getIndex());
             txSucceedBeforeInterruption.Should().BeTrue();
             await ValidateResults(txGrains, transactionGroups);
@@ -111,8 +114,14 @@ namespace Orleans.Transactions.TestKit
             // have transactions in flight when silo goes down
             using var stopProducing = new CancellationTokenSource();
             var firstFailure = new TaskCompletionSource<TransactionFailure>(TaskCreationOptions.RunContinuationsAsynchronously);
-            Task producer = RunWhileSucceeding(transactionGroups, getIndex, stopProducing, firstFailure);
-            await Task.Delay(TimeSpan.FromSeconds(2));
+            var firstInFlightBatch = new TaskCompletionSource<InFlightBatch>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Task<List<ExpectedGrainActivity>[]?> producer = RunWhileSucceeding(
+                transactionGroups,
+                getIndex,
+                stopProducing,
+                firstFailure,
+                firstInFlightBatch);
+            var inFlightBatch = await firstInFlightBatch.Task.WaitAsync(this.failureDetectionTimeout);
 
             if (firstFailure.Task.IsCompleted)
             {
@@ -124,11 +133,16 @@ namespace Orleans.Transactions.TestKit
                     + $"Groups: {string.Join(":", prematureFailure.GrainIds)}. Exception: {prematureFailure.Exception.GetType().Name}.");
             }
 
+            var pendingAtShutdownRequest = inFlightBatch.PendingCount;
+            pendingAtShutdownRequest.Should().BeGreaterThan(
+                0,
+                "the silo failure must overlap an incomplete mutating transaction batch");
             var siloToTerminate = this.testCluster.Silos[Random.Shared.Next(this.testCluster.Silos.Count)];
             var shutdownMode = gracefulShutdown ? "graceful-stop" : "in-process-kill-shutdown";
             this.Log(
-                $"Recovery phase=silo-shutdown requested. Silo={siloToTerminate.SiloAddress} "
+                $"Recovery phase=silo-shutdown requested, timestamp={DateTime.UtcNow:O}. Silo={siloToTerminate.SiloAddress} "
                 + $"({siloToTerminate.Name}), mode={shutdownMode}. "
+                + $"inFlightIndex={inFlightBatch.Index}, pendingMutations={pendingAtShutdownRequest}. "
                 + "The in-process kill mode requests host shutdown through cancellation; it does not terminate a process.");
 
             var shutdownStartedAt = Stopwatch.GetTimestamp();
@@ -138,9 +152,8 @@ namespace Orleans.Transactions.TestKit
                 await this.testCluster.KillSiloAsync(siloToTerminate);
             var shutdownElapsed = Stopwatch.GetElapsedTime(shutdownStartedAt);
             this.Log(
-                $"Recovery phase=silo-shutdown completed. Silo={siloToTerminate.SiloAddress}, "
-                + $"mode={shutdownMode}, elapsed={shutdownElapsed}. "
-                + "Membership and directory convergence are not asserted by this phase.");
+                $"Recovery phase=silo-shutdown completed, timestamp={DateTime.UtcNow:O}. Silo={siloToTerminate.SiloAddress}, "
+                + $"mode={shutdownMode}, elapsed={shutdownElapsed}.");
 
             this.Log("Waiting for transactions to stop completing successfully");
             var failureDetectionStartedAt = Stopwatch.GetTimestamp();
@@ -154,10 +167,14 @@ namespace Orleans.Transactions.TestKit
             // Cancellation only prevents another batch from starting. Every transaction already in flight must settle
             // so that SetBit can record its durable outcome before validation.
             var producerDrainStartedAt = Stopwatch.GetTimestamp();
-            this.Log("Recovery phase=producer-drain started. No new transaction batches will be produced.");
-            await producer;
+            this.Log(
+                $"Recovery phase=producer-drain started, timestamp={DateTime.UtcNow:O}. "
+                + "No new transaction batches will be produced.");
+            var failedGroups = await producer;
             var producerDrainElapsed = Stopwatch.GetElapsedTime(producerDrainStartedAt);
-            this.Log($"Recovery phase=producer-drain completed. Elapsed={producerDrainElapsed}.");
+            this.Log(
+                $"Recovery phase=producer-drain completed, timestamp={DateTime.UtcNow:O}. "
+                + $"Elapsed={producerDrainElapsed}.");
 
             var interruption = firstFailure.Task.IsCompleted ? await firstFailure.Task : null;
             if (interruption is null)
@@ -169,7 +186,7 @@ namespace Orleans.Transactions.TestKit
                     + $"Performed {Volatile.Read(ref index)} transactions on each group.");
             }
 
-            if (interruption.ObservedAt < shutdownStartedAt)
+            if (TransactionRecoveryFailureObservation.IsPremature(interruption.ObservedAt, shutdownStartedAt))
             {
                 throw new InvalidOperationException(
                     $"A transaction failed before silo shutdown began. Index: {interruption.Index}. "
@@ -188,17 +205,32 @@ namespace Orleans.Transactions.TestKit
             var firstFailureAfterShutdownRequest = Stopwatch.GetElapsedTime(shutdownStartedAt, interruption.ObservedAt);
             var firstFailureRelativeToShutdownCompletion = Stopwatch.GetElapsedTime(failureDetectionStartedAt, interruption.ObservedAt);
             this.Log(
-                $"Recovery phase=transaction-terminal-failure observed. Index={interruption.Index}, "
+                $"Recovery phase=transaction-terminal-failure observed, timestamp={DateTime.UtcNow:O}. "
+                + $"Index={interruption.Index}, "
                 + $"grains={string.Join(":", interruption.GrainIds)}, "
                 + $"afterShutdownRequest={firstFailureAfterShutdownRequest}, "
                 + $"relativeToShutdownCompletion={firstFailureRelativeToShutdownCompletion}, "
                 + $"reportedAfterProducerDrain={producerDrainElapsed}, "
                 + $"exception={interruption.Exception.GetType().Name}: {interruption.Exception.Message}.");
 
-            this.Log($"Waiting for system to recover. Performed {Volatile.Read(ref index)} transactions on each group.");
-            var recovery = await RecoverTransactions(transactionGroups, getIndex, RecoveryTimeout, RetryDelay);
+            failedGroups.Should().NotBeNullOrEmpty(
+                "the drained producer must identify the transaction groups affected by the observed failure");
+            recoveryEvents.SetRelevantGrains(failedGroups!.SelectMany(group => group).Select(grain => grain.RuntimeGrainId));
+
+            var convergenceStartedAt = Stopwatch.GetTimestamp();
             this.Log(
-                $"Recovery phase=transaction-path-probe completed. Succeeded={recovery.Succeeded}, "
+                $"Recovery phase=membership-directory-convergence started, timestamp={DateTime.UtcNow:O}, "
+                + $"failedGroups={FormatGroups(failedGroups)}.");
+            await this.testCluster.WaitForLivenessToStabilizeAsync(didKill: !gracefulShutdown);
+            var convergenceElapsed = Stopwatch.GetElapsedTime(convergenceStartedAt);
+            this.Log(
+                $"Recovery phase=membership-directory-convergence completed, timestamp={DateTime.UtcNow:O}, "
+                + $"elapsed={convergenceElapsed}, failedGroups={FormatGroups(failedGroups)}.");
+
+            this.Log($"Waiting for system to recover. Performed {Volatile.Read(ref index)} transactions on each group.");
+            var recovery = await RecoverTransactions(failedGroups, getIndex, RecoveryTimeout, recoveryEvents);
+            this.Log(
+                $"Recovery phase=transaction-path-probe completed, timestamp={DateTime.UtcNow:O}. Succeeded={recovery.Succeeded}, "
                 + $"lastProbeSucceeded={recovery.LastProbeSucceeded}, "
                 + $"attempts={recovery.Attempts}, remainingGroups={recovery.RemainingGroupCount}, "
                 + $"lastIndex={recovery.LastTransactionIndex}, elapsed={recovery.Elapsed}. "
@@ -208,9 +240,14 @@ namespace Orleans.Transactions.TestKit
                 + $"the last probe succeeded={recovery.LastProbeSucceeded}, "
                 + $"remaining groups={recovery.RemainingGroupCount}, elapsed={recovery.Elapsed}");
 
-            this.Log($"Recovery completed. Performed {Volatile.Read(ref index)} transactions on each group. Validating results.");
+            this.Log(
+                $"Recovery phase=final-validation started, timestamp={DateTime.UtcNow:O}. "
+                + $"Performed {Volatile.Read(ref index)} transactions on each group.");
+            var validationStartedAt = Stopwatch.GetTimestamp();
             await ValidateResults(txGrains, transactionGroups);
-            this.Log("Recovery phase=test-complete. Transaction results validated.");
+            this.Log(
+                $"Recovery phase=final-validation completed, timestamp={DateTime.UtcNow:O}, "
+                + $"elapsed={Stopwatch.GetElapsedTime(validationStartedAt)}. Transaction results validated.");
         }
 
         private static Task WakeupGrains(List<ITransactionalBitArrayGrain> grains)
@@ -223,54 +260,111 @@ namespace Orleans.Transactions.TestKit
             return Task.WhenAll(tasks);
         }
 
-        private async Task RunWhileSucceeding(
+        private async Task<List<ExpectedGrainActivity>[]?> RunWhileSucceeding(
             List<ExpectedGrainActivity>[] transactionGroups,
             Func<int> getIndex,
             CancellationTokenSource stopProducing,
-            TaskCompletionSource<TransactionFailure> firstFailure)
+            TaskCompletionSource<TransactionFailure> firstFailure,
+            TaskCompletionSource<InFlightBatch> firstInFlightBatch)
         {
             while (!stopProducing.IsCancellationRequested)
             {
+                var transactionIndex = getIndex();
                 var failed = await RunAllTxReportFailed(
                     transactionGroups,
-                    getIndex(),
+                    transactionIndex,
                     failure =>
                     {
                         if (firstFailure.TrySetResult(failure))
                         {
                             stopProducing.Cancel();
                         }
+                    },
+                    tasks =>
+                    {
+                        var pendingCount = tasks.Count(task => !task.IsCompleted);
+                        if (pendingCount > 0)
+                        {
+                            firstInFlightBatch.TrySetResult(new(transactionIndex, pendingCount));
+                        }
                     });
 
                 if (failed is not null)
                 {
-                    return;
+                    return failed;
                 }
             }
+
+            return null;
         }
 
         private async Task<RecoveryResult> RecoverTransactions(
             List<ExpectedGrainActivity>[] transactionGroups,
             Func<int> getIndex,
             TimeSpan timeout,
-            TimeSpan retryDelay)
+            TransactionRecoveryEventObserver recoveryEvents)
         {
             var startedAt = Stopwatch.GetTimestamp();
+            var deadline = startedAt + (long)(timeout.TotalSeconds * Stopwatch.Frequency);
             var remainingGroups = transactionGroups;
             var attempts = 0;
             var lastTransactionIndex = -1;
+            var waitForTransitionAfter = recoveryEvents.LatestRelevantSequence;
+            var timelineLogCursor = 0L;
+            var probeRequiresTransition = false;
 
-            while (Stopwatch.GetElapsedTime(startedAt) < timeout)
+            while (Stopwatch.GetTimestamp() < deadline)
             {
+                if (probeRequiresTransition)
+                {
+                    var transition = await recoveryEvents.WaitForNextTransitionAsync(waitForTransitionAfter, deadline);
+                    waitForTransitionAfter = transition.Sequence;
+                    if (transition.Sequence > timelineLogCursor)
+                    {
+                        this.Log(
+                            $"Recovery phase=transaction-event, timestamp={DateTime.UtcNow:O}. "
+                            + TransactionRecoveryEventObserver.FormatTransition(transition).Trim());
+                        timelineLogCursor = transition.Sequence;
+                    }
+                }
+
+                if (Stopwatch.GetTimestamp() >= deadline)
+                {
+                    break;
+                }
+
                 lastTransactionIndex = getIndex();
                 attempts++;
                 var attemptStartedAt = Stopwatch.GetTimestamp();
-                var failedGroups = await RunAllTxReportFailed(remainingGroups, lastTransactionIndex);
+                var eventSequenceBeforeProbe = recoveryEvents.LatestRelevantSequence;
+                var groupsBeingProbed = remainingGroups;
+                this.Log(
+                    $"Recovery phase=transaction-probe started, timestamp={DateTime.UtcNow:O}, "
+                    + $"attempt={attempts}, index={lastTransactionIndex}, groups={FormatGroups(groupsBeingProbed)}.");
+                var probeTask = RunAllTxReportFailed(groupsBeingProbed, lastTransactionIndex);
+                List<ExpectedGrainActivity>[]? failedGroups;
+                try
+                {
+                    var now = Stopwatch.GetTimestamp();
+                    failedGroups = await probeTask.WaitAsync(Stopwatch.GetElapsedTime(now, deadline));
+                }
+                catch (TimeoutException)
+                {
+                    await probeTask;
+                    throw new TimeoutException(
+                        $"Transaction recovery probe {attempts} did not settle before the {timeout} watchdog. "
+                        + $"Index={lastTransactionIndex}, groups={FormatGroups(groupsBeingProbed)}."
+                        + Environment.NewLine
+                        + recoveryEvents.FormatTimeline());
+                }
+
                 var attemptElapsed = Stopwatch.GetElapsedTime(attemptStartedAt);
                 var elapsed = Stopwatch.GetElapsedTime(startedAt);
                 this.Log(
-                    $"Recovery phase=transaction-probe attempt={attempts}, index={lastTransactionIndex}, "
+                    $"Recovery phase=transaction-probe completed, timestamp={DateTime.UtcNow:O}, "
+                    + $"attempt={attempts}, index={lastTransactionIndex}, groups={FormatGroups(groupsBeingProbed)}, "
                     + $"succeeded={failedGroups is null}, attemptElapsed={attemptElapsed}, totalElapsed={elapsed}.");
+                LogNewTransitions(recoveryEvents, ref timelineLogCursor);
 
                 if (failedGroups is null)
                 {
@@ -284,15 +378,13 @@ namespace Orleans.Transactions.TestKit
                 }
 
                 remainingGroups = failedGroups;
-                if (elapsed >= timeout)
-                {
-                    break;
-                }
-
-                var delay = retryDelay < timeout - elapsed ? retryDelay : timeout - elapsed;
-                await Task.Delay(delay);
+                recoveryEvents.SetRelevantGrains(
+                    remainingGroups.SelectMany(group => group).Select(grain => grain.RuntimeGrainId));
+                waitForTransitionAfter = eventSequenceBeforeProbe;
+                probeRequiresTransition = true;
             }
 
+            LogNewTransitions(recoveryEvents, ref timelineLogCursor);
             return new RecoveryResult(
                 false,
                 false,
@@ -306,11 +398,26 @@ namespace Orleans.Transactions.TestKit
         private async Task<List<ExpectedGrainActivity>[]?> RunAllTxReportFailed(
             List<ExpectedGrainActivity>[] transactionGroups,
             int index,
-            Action<TransactionFailure>? onFailure = null)
+            Action<TransactionFailure>? onFailure = null,
+            Action<IReadOnlyList<Task>>? onStarted = null)
         {
             var pending = transactionGroups
                 .Select(group => (Task: SetBit(group, index), Group: group))
                 .ToList();
+            var failureObservers = onFailure is null
+                ? []
+                : pending
+                    .Select(item => TransactionRecoveryFailureObservation.ObserveAsync(
+                        item.Task,
+                        (exception, observedAt) => onFailure(
+                            new TransactionFailure(
+                                index,
+                                item.Group.Select(activity => activity.GrainId).ToArray(),
+                                exception,
+                                observedAt))))
+                    .ToArray();
+            onStarted?.Invoke(pending.Select(item => item.Task).ToArray());
+
             var failedGroups = new List<List<ExpectedGrainActivity>>();
             while (pending.Count > 0)
             {
@@ -323,17 +430,12 @@ namespace Orleans.Transactions.TestKit
                 {
                     await completed;
                 }
-                catch (Exception exception)
+                catch (Exception)
                 {
                     failedGroups.Add(transactionGroup);
-                    onFailure?.Invoke(
-                        new TransactionFailure(
-                            index,
-                            transactionGroup.Select(activity => activity.GrainId).ToArray(),
-                            exception,
-                            Stopwatch.GetTimestamp()));
                 }
             }
+            await Task.WhenAll(failureObservers);
 
             if (failedGroups.Count == 0)
             {
@@ -345,6 +447,25 @@ namespace Orleans.Transactions.TestKit
                 $"Some transactions failed. Index: {index}. {result.Length} out of {transactionGroups.Length} failed. "
                 + $"Failed groups: {string.Join(", ", result.Select(transactionGroup => string.Join(":", transactionGroup.Select(a => a.GrainId))))}");
             return result;
+        }
+
+        private static string FormatGroups(IEnumerable<List<ExpectedGrainActivity>> groups)
+            => string.Join(",", groups.Select(group => $"[{string.Join(":", group.Select(grain => grain.GrainId))}]"));
+
+        private void LogNewTransitions(TransactionRecoveryEventObserver observer, ref long cursor)
+        {
+            foreach (var transition in observer.GetTimeline())
+            {
+                if (transition.Sequence <= cursor)
+                {
+                    continue;
+                }
+
+                this.Log(
+                    $"Recovery phase=transaction-event, timestamp={DateTime.UtcNow:O}. "
+                    + TransactionRecoveryEventObserver.FormatTransition(transition).Trim());
+                cursor = transition.Sequence;
+            }
         }
 
         private async Task<bool> AllTxSucceed(List<ExpectedGrainActivity>[] transactionGroups, int index)

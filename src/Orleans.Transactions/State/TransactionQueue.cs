@@ -396,7 +396,17 @@ namespace Orleans.Transactions.State
             var pos = commitQueue.Find(transactionId, timeStamp);
 
             if (pos == -1)
+            {
+                TransactionDiagnosticEvents.EmitTransactionConfirmCompleted(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    TransactionalStatus.Ok,
+                    queueEntryFound: false,
+                    succeeded: true,
+                    identity: diagnosticIdentity);
                 return; // must have already been confirmed
+            }
 
             var remoteEntry = commitQueue[pos];
 
@@ -414,7 +424,27 @@ namespace Orleans.Transactions.State
 
             // now we wait for the batch to finish
 
-            await remoteEntry.ConfirmationResponsePromise.Task;
+            var confirmStatus = TransactionalStatus.Ok;
+            try
+            {
+                await remoteEntry.ConfirmationResponsePromise.Task;
+            }
+            catch
+            {
+                confirmStatus = TransactionalStatus.UnknownException;
+                throw;
+            }
+            finally
+            {
+                TransactionDiagnosticEvents.EmitTransactionConfirmCompleted(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    confirmStatus,
+                    queueEntryFound: true,
+                    succeeded: confirmStatus == TransactionalStatus.Ok,
+                    identity: diagnosticIdentity);
+            }
         }
 
         public async Task NotifyOfCancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
@@ -424,15 +454,38 @@ namespace Orleans.Transactions.State
             var pos = commitQueue.Find(transactionId, timeStamp);
 
             if (pos == -1)
+            {
+                TransactionDiagnosticEvents.EmitTransactionCancelCompleted(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    status,
+                    queueEntryFound: false,
+                    succeeded: true,
+                    identity: diagnosticIdentity);
                 return;
+            }
 
-            this.storageBatch.Cancel(commitQueue[pos].SequenceNumber);
-
-            await AbortCommits(status, pos);
-
-            storageWorker.Notify();
-
-            this.RWLock.Notify();
+            var succeeded = false;
+            try
+            {
+                this.storageBatch.Cancel(commitQueue[pos].SequenceNumber);
+                await AbortCommits(status, pos);
+                storageWorker.Notify();
+                this.RWLock.Notify();
+                succeeded = true;
+            }
+            finally
+            {
+                TransactionDiagnosticEvents.EmitTransactionCancelCompleted(
+                    resource,
+                    transactionId,
+                    timeStamp,
+                    status,
+                    queueEntryFound: true,
+                    succeeded,
+                    identity: diagnosticIdentity);
+            }
         }
 
         /// <summary>

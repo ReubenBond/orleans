@@ -1,9 +1,11 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Net;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.Transactions.Diagnostics;
+using Orleans.Transactions.TestKit;
 using TestExtensions;
 using Xunit;
 
@@ -54,6 +56,22 @@ public class TransactionDiagnosticEventsTests
         TransactionDiagnosticEvents.EmitRemotePreparedSent(resource, transactionId, timeStamp, manager, sentAt);
         TransactionDiagnosticEvents.EmitRemoteRecoveryPingScheduled(resource, transactionId, timeStamp, manager, scheduledAt);
         TransactionDiagnosticEvents.EmitRemoteRecoveryPingSent(resource, transactionId, timeStamp, manager, sentAt);
+        TransactionDiagnosticEvents.EmitTransactionCancelCompleted(
+            resource,
+            transactionId,
+            timeStamp,
+            TransactionalStatus.PresumedAbort,
+            queueEntryFound: true,
+            succeeded: true,
+            identity);
+        TransactionDiagnosticEvents.EmitTransactionConfirmCompleted(
+            resource,
+            transactionId,
+            timeStamp,
+            TransactionalStatus.UnknownException,
+            queueEntryFound: false,
+            succeeded: false,
+            identity);
         TransactionDiagnosticEvents.EmitQueueRestoreStarted(resource, transactionIds, identity);
         TransactionDiagnosticEvents.EmitQueueRestoreCompleted(resource, 42, 2, 3, transactionIds);
         TransactionDiagnosticEvents.EmitQueueRestoreFailed(
@@ -145,6 +163,23 @@ public class TransactionDiagnosticEventsTests
         Assert.Equal(sentAt, observer.Single<TransactionDiagnosticEvents.RemotePreparedSent>(resource).SentAt);
         Assert.Equal(scheduledAt, observer.Single<TransactionDiagnosticEvents.RemoteRecoveryPingScheduled>(resource).ScheduledAt);
         Assert.Equal(sentAt, observer.Single<TransactionDiagnosticEvents.RemoteRecoveryPingSent>(resource).SentAt);
+        var canceled = observer.Single<TransactionDiagnosticEvents.TransactionCancelCompleted>(resource);
+        Assert.Equal(transactionId, canceled.TransactionId);
+        Assert.Equal(timeStamp, canceled.TimeStamp);
+        Assert.Equal(TransactionalStatus.PresumedAbort, canceled.Status);
+        Assert.True(canceled.QueueEntryFound);
+        Assert.True(canceled.Succeeded);
+        Assert.Equal(siloAddress, canceled.SiloAddress);
+        Assert.Equal(activationId, canceled.ActivationId);
+        var confirmed = observer.Single<TransactionDiagnosticEvents.TransactionConfirmCompleted>(resource);
+        Assert.Equal(transactionId, confirmed.TransactionId);
+        Assert.Equal(timeStamp, confirmed.TimeStamp);
+        Assert.Equal(TransactionalStatus.UnknownException, confirmed.Status);
+        Assert.False(confirmed.QueueEntryFound);
+        Assert.False(confirmed.Succeeded);
+        Assert.Equal(siloAddress, confirmed.SiloAddress);
+        Assert.Equal(activationId, confirmed.ActivationId);
+
         var restoreStartedEvent = observer.Single<TransactionDiagnosticEvents.QueueRestoreStarted>(resource);
         Assert.Equal(transactionIds, restoreStartedEvent.TransactionIds);
         Assert.Equal(siloAddress, restoreStartedEvent.SiloAddress);
@@ -241,12 +276,173 @@ public class TransactionDiagnosticEventsTests
         using var subscription = TransactionDiagnosticEvents.AllEvents.Subscribe(new ThrowingObserver());
 
         TransactionDiagnosticEvents.EmitQueueRestoreStarted(resource, ImmutableArray<Guid>.Empty);
+        TransactionDiagnosticEvents.EmitTransactionCancelCompleted(
+            resource,
+            Guid.NewGuid(),
+            DateTime.UtcNow,
+            TransactionalStatus.PresumedAbort,
+            queueEntryFound: false,
+            succeeded: true);
 
         Assert.Throws<InvalidOperationException>(
             () => TransactionDiagnosticEvents.EmitStorageWriteCompleted(resource, "etag", 1, 1));
     }
 
+    [Fact]
+    public async Task RecoveryObserverFiltersEventsAndReturnsAlreadyObservedTransition()
+    {
+        var relevant = CreateParticipant("relevant", ParticipantId.Role.Resource);
+        var unrelated = CreateParticipant("unrelated", ParticipantId.Role.Resource);
+        var manager = CreateParticipant("manager", ParticipantId.Role.Manager);
+        var transactionId = Guid.NewGuid();
+        using var observer = new TransactionRecoveryEventObserver(resource => resource.Name == relevant.Name);
+
+        TransactionDiagnosticEvents.EmitRemotePreparePersisted(
+            unrelated,
+            Guid.NewGuid(),
+            DateTime.UtcNow,
+            manager);
+        TransactionDiagnosticEvents.EmitRemotePreparePersisted(
+            relevant,
+            transactionId,
+            DateTime.UtcNow,
+            manager);
+
+        var transition = await observer.WaitForNextTransitionAsync(0, GetDeadline(TimeSpan.FromSeconds(1)));
+
+        Assert.Equal(TransactionRecoveryEventObserver.RecoveryTransitionKind.RemotePreparePersisted, transition.Kind);
+        Assert.Equal(transactionId, transition.TransactionId);
+        Assert.Equal(relevant.Name, transition.ResourceName);
+        Assert.Single(observer.GetTimeline());
+    }
+
+    [Fact]
+    public async Task RecoveryObserverDoesNotMissEventBetweenStateCheckAndWait()
+    {
+        var resource = CreateParticipant("resource", ParticipantId.Role.Resource);
+        var manager = CreateParticipant("manager", ParticipantId.Role.Manager);
+        using var observer = new TransactionRecoveryEventObserver(candidate => candidate.Name == resource.Name);
+        var afterSequence = observer.LatestRelevantSequence;
+
+        TransactionDiagnosticEvents.EmitRemotePreparedSent(
+            resource,
+            Guid.NewGuid(),
+            DateTime.UtcNow,
+            manager,
+            DateTime.UtcNow);
+
+        var transition = await observer.WaitForNextTransitionAsync(
+            afterSequence,
+            GetDeadline(TimeSpan.FromSeconds(1)));
+
+        Assert.Equal(TransactionRecoveryEventObserver.RecoveryTransitionKind.RemotePreparedSent, transition.Kind);
+    }
+
+    [Fact]
+    public async Task RecoveryObserverHonorsCancellationAndDeadline()
+    {
+        using var observer = new TransactionRecoveryEventObserver(_ => true);
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => observer.WaitForNextTransitionAsync(
+                observer.LatestRelevantSequence,
+                GetDeadline(TimeSpan.FromSeconds(1)),
+                canceled.Token));
+
+        var timeout = await Assert.ThrowsAsync<TimeoutException>(
+            () => observer.WaitForNextTransitionAsync(
+                observer.LatestRelevantSequence,
+                GetDeadline(TimeSpan.FromMilliseconds(20))));
+        Assert.Contains("Transaction recovery timeline: <no relevant events>", timeout.Message);
+    }
+
+    [Fact]
+    public void RecoveryObserverTimelineIsMonotonicAndDiagnostic()
+    {
+        var resource = CreateParticipant("resource", ParticipantId.Role.Resource);
+        var transactionId = Guid.NewGuid();
+        var cohortTransactionId = Guid.NewGuid();
+        var transactionIds = ImmutableArray.Create(transactionId, cohortTransactionId);
+        var conflict = new InconsistentStateException("Load conflict", storedEtag: "1", currentEtag: "2");
+        var siloAddress = SiloAddress.New(IPAddress.Loopback, 22_222, 9);
+        var activationId = ActivationId.NewId();
+        var identity = new TransactionDiagnosticEvents.TransactionDiagnosticIdentity(siloAddress, activationId);
+        using var observer = new TransactionRecoveryEventObserver(candidate => candidate.Name == resource.Name);
+
+        TransactionDiagnosticEvents.EmitPrepareTimedOut(
+            resource,
+            transactionId,
+            DateTime.UtcNow,
+            remainingCount: 2,
+            DateTime.UtcNow,
+            identity);
+        TransactionDiagnosticEvents.EmitStorageConflictDetected(
+            resource,
+            TransactionDiagnosticEvents.StorageOperation.Load,
+            storageOutcomeInDoubt: false,
+            queuedTransactionCount: transactionIds.Length,
+            conflict,
+            transactionIds,
+            identity);
+        TransactionDiagnosticEvents.EmitQueueRestoreFailed(
+            resource,
+            conflict,
+            storageConflict: true,
+            transactionIds,
+            identity);
+        TransactionDiagnosticEvents.EmitTransactionCancelCompleted(
+            resource,
+            transactionId,
+            DateTime.UtcNow,
+            TransactionalStatus.PresumedAbort,
+            queueEntryFound: true,
+            succeeded: true,
+            identity);
+        TransactionDiagnosticEvents.EmitTransactionConfirmCompleted(
+            resource,
+            transactionId,
+            DateTime.UtcNow,
+            TransactionalStatus.Ok,
+            queueEntryFound: false,
+            succeeded: true,
+            identity);
+        TransactionDiagnosticEvents.EmitLockBroken(
+            resource,
+            transactionId,
+            TransactionDiagnosticEvents.LockBreakReason.Expired,
+            identity);
+
+        var timeline = observer.GetTimeline();
+        Assert.Collection(
+            timeline,
+            first => Assert.Equal(1, first.Sequence),
+            second => Assert.Equal(2, second.Sequence),
+            third => Assert.Equal(3, third.Sequence),
+            fourth => Assert.Equal(4, fourth.Sequence),
+            fifth => Assert.Equal(5, fifth.Sequence),
+            sixth => Assert.Equal(6, sixth.Sequence));
+        var diagnostics = observer.FormatTimeline();
+        Assert.Contains(transactionId.ToString(), diagnostics);
+        Assert.Contains(cohortTransactionId.ToString(), diagnostics);
+        Assert.Contains("resource=resource", diagnostics);
+        Assert.Contains("status=remaining=2", diagnostics);
+        Assert.Contains("operation=Load", diagnostics);
+        Assert.Contains("kind=QueueRestoreFailed", diagnostics);
+        Assert.Contains("kind=TransactionCancelCompleted", diagnostics);
+        Assert.Contains("PresumedAbort, queueEntryFound=True, succeeded=True", diagnostics);
+        Assert.Contains("kind=TransactionConfirmCompleted", diagnostics);
+        Assert.Contains("Ok, queueEntryFound=False, succeeded=True", diagnostics);
+        Assert.Contains("status=Expired", diagnostics);
+        Assert.Contains($"silo={siloAddress}", diagnostics);
+        Assert.Contains($"activation={activationId}", diagnostics);
+    }
+
     private static ParticipantId CreateParticipant(string name, ParticipantId.Role role) => new(name, null!, role);
+
+    private static long GetDeadline(TimeSpan timeout)
+        => Stopwatch.GetTimestamp() + (long)(timeout.TotalSeconds * Stopwatch.Frequency);
 
     private sealed class RecordingObserver : IObserver<TransactionDiagnosticEvents.TransactionDiagnosticEvent>
     {
