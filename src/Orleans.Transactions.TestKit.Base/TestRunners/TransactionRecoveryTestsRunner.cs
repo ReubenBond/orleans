@@ -17,12 +17,12 @@ namespace Orleans.Transactions.TestKit
 {
     public partial class TransactionRecoveryTestsRunner : TransactionTestRunnerBase
     {
-        private static readonly TimeSpan RecoveryTimeout = TimeSpan.FromSeconds(60);
         private static readonly TimeSpan FailureDetectionSchedulingMargin = TimeSpan.FromSeconds(15);
 
         private readonly TestCluster testCluster;
         private readonly ILogger logger;
         private readonly TimeSpan failureDetectionTimeout;
+        private readonly TimeSpan recoveryTimeout;
 
         protected void Log(string message)
         {
@@ -79,6 +79,8 @@ namespace Orleans.Transactions.TestKit
                 .Value
                 .ResponseTimeout;
             this.failureDetectionTimeout = responseTimeout + FailureDetectionSchedulingMargin;
+            this.recoveryTimeout =
+                this.failureDetectionTimeout + TransactionalStateOptions.DefaultRemoteTransactionPingFrequency;
         }
 
         public virtual Task TransactionWillRecoverAfterRandomSiloGracefulShutdown(string transactionTestGrainClassName, int concurrent)
@@ -228,7 +230,11 @@ namespace Orleans.Transactions.TestKit
                 + $"elapsed={convergenceElapsed}, failedGroups={FormatGroups(failedGroups)}.");
 
             this.Log($"Waiting for system to recover. Performed {Volatile.Read(ref index)} transactions on each group.");
-            var recovery = await RecoverTransactions(failedGroups, getIndex, RecoveryTimeout, recoveryEvents);
+            this.Log(
+                $"Recovery phase=transaction-path-watchdog started. "
+                + $"watchdog={this.recoveryTimeout}, failureDetection={this.failureDetectionTimeout}, "
+                + $"remotePingFrequency={TransactionalStateOptions.DefaultRemoteTransactionPingFrequency}.");
+            var recovery = await RecoverTransactions(failedGroups, getIndex, this.recoveryTimeout, recoveryEvents);
             this.Log(
                 $"Recovery phase=transaction-path-probe completed, timestamp={DateTime.UtcNow:O}. Succeeded={recovery.Succeeded}, "
                 + $"lastProbeSucceeded={recovery.LastProbeSucceeded}, "
@@ -236,7 +242,7 @@ namespace Orleans.Transactions.TestKit
                 + $"lastIndex={recovery.LastTransactionIndex}, elapsed={recovery.Elapsed}. "
                 + $"Performed {Volatile.Read(ref index)} transactions on each group.");
             recovery.Succeeded.Should().BeTrue(
-                $"transactions should recover within {RecoveryTimeout}; "
+                $"transactions should recover within {this.recoveryTimeout}; "
                 + $"the last probe succeeded={recovery.LastProbeSucceeded}, "
                 + $"remaining groups={recovery.RemainingGroupCount}, elapsed={recovery.Elapsed}");
 
