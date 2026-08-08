@@ -308,6 +308,8 @@ namespace Orleans.Transactions.State
                 case CommitRole.LocalCommit:
                     {
                         LogTraceAborting(status, entry);
+                        CompleteAbortDecision(entry, status, exception);
+
                         var fanOutDiagnosticsEnabled = AreCancelFanOutEventsEnabled();
                         var targetCount = 0;
                         var selfTargetCount = 0;
@@ -328,7 +330,6 @@ namespace Orleans.Transactions.State
                                 fanOutStartedAt = Stopwatch.GetTimestamp();
                             }
                         }
-
                         try
                         {
                             // tell remote participants
@@ -373,31 +374,12 @@ namespace Orleans.Transactions.State
                             LogWarningFailedToNotifyAllTransactionParticipantsOfCancellation(entry.TransactionId, new(entry.Timestamp), status, ex);
                         }
 
-                        // reply to transaction agent
-                        if (exception is not null)
-                        {
-                            entry.PromiseForTA.TrySetException(exception);
-                        }
-                        else
-                        {
-                            entry.PromiseForTA.TrySetResult(status);
-                        }
-
                         break;
                     }
                 case CommitRole.ReadOnly:
                     {
                         LogTraceAborting(status, entry);
-
-                        // reply to transaction agent
-                        if (exception is not null)
-                        {
-                            entry.PromiseForTA.TrySetException(exception);
-                        }
-                        else
-                        {
-                            entry.PromiseForTA.TrySetResult(status);
-                        }
+                        CompleteAbortDecision(entry, status, exception);
 
                         break;
                     }
@@ -406,6 +388,26 @@ namespace Orleans.Transactions.State
                         LogErrorImpossibleCase(entry.Role);
                         throw new NotSupportedException($"{entry.Role} is not a supported CommitRole.");
                     }
+            }
+        }
+
+        private void CompleteAbortDecision(
+            TransactionRecord<TState> entry,
+            TransactionalStatus status,
+            Exception? exception)
+        {
+            var completed = exception is not null
+                ? entry.PromiseForTA.TrySetException(exception)
+                : entry.PromiseForTA.TrySetResult(status);
+
+            if (completed)
+            {
+                TransactionDiagnosticEvents.EmitTransactionManagerAbortDecisionCompleted(
+                    resource,
+                    entry.TransactionId,
+                    entry.Timestamp,
+                    status,
+                    diagnosticIdentity);
             }
         }
 
@@ -657,6 +659,7 @@ namespace Orleans.Transactions.State
                         TransactionManager = tm,
                         PrepareIsPersisted = true,
                         LastSent = default(DateTime),
+                        IsRestoredRemoteCommit = true,
                         ConfirmationResponsePromise = null,
                         NumberWrites = 1 // was a writing transaction
                     });
@@ -936,7 +939,7 @@ namespace Orleans.Transactions.State
             return result.MoveToImmutable();
         }
 
-        private async Task SendCancel(
+        protected virtual async Task SendCancel(
             ParticipantId target,
             Guid transactionId,
             DateTime timeStamp,
@@ -1001,7 +1004,9 @@ namespace Orleans.Transactions.State
                 }
 
                 targetCount++;
-                if (participant.Reference.GrainId == resource.Reference.GrainId)
+                if (participant.Reference is not null
+                    && resource.Reference is not null
+                    && participant.Reference.GrainId == resource.Reference.GrainId)
                 {
                     selfTargetCount++;
                 }
@@ -1110,12 +1115,12 @@ namespace Orleans.Transactions.State
                             {
                                 // send ping messages periodically to reactivate crashed TMs
 
-                                if (bottom.LastSent + this.options.RemoteTransactionPingFrequency <= now)
+                                if (bottom.GetNextRemotePingAt(this.options.RemoteTransactionPingFrequency) <= now)
                                 {
                                     LogTraceSentPing(bottom);
                                     bottom.TransactionManager.Reference.AsReference<ITransactionManagerExtension>()
                                           .Ping(bottom.TransactionManager.Name, bottom.TransactionId, bottom.Timestamp, resource).Ignore();
-                                    bottom.LastSent = now;
+                                    bottom.RecordRemotePingSent(now);
                                     TransactionDiagnosticEvents.EmitRemoteRecoveryPingSent(
                                         resource,
                                         bottom.TransactionId,
@@ -1124,7 +1129,7 @@ namespace Orleans.Transactions.State
                                         now,
                                         diagnosticIdentity);
 
-                                    var scheduledAt = bottom.LastSent.Value + this.options.RemoteTransactionPingFrequency;
+                                    var scheduledAt = bottom.GetNextRemotePingAt(this.options.RemoteTransactionPingFrequency);
                                     TransactionDiagnosticEvents.EmitRemoteRecoveryPingScheduled(
                                         resource,
                                         bottom.TransactionId,
@@ -1133,7 +1138,7 @@ namespace Orleans.Transactions.State
                                         scheduledAt,
                                         diagnosticIdentity);
                                 }
-                                storageWorker.Notify(bottom.LastSent.Value + this.options.RemoteTransactionPingFrequency);
+                                storageWorker.Notify(bottom.GetNextRemotePingAt(this.options.RemoteTransactionPingFrequency));
                             }
 
                             break;

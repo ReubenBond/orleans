@@ -238,6 +238,7 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
             TransactionDiagnosticEvents.RemotePreparedSent => RecoveryTransitionKind.RemotePreparedSent,
             TransactionDiagnosticEvents.PrepareTimedOut => RecoveryTransitionKind.PrepareTimedOut,
             TransactionDiagnosticEvents.RemoteRecoveryPingSent => RecoveryTransitionKind.RemoteRecoveryPingSent,
+            TransactionDiagnosticEvents.TransactionManagerAbortDecisionCompleted => RecoveryTransitionKind.TransactionManagerAbortDecisionCompleted,
             TransactionDiagnosticEvents.TransactionCancelCompleted => RecoveryTransitionKind.TransactionCancelCompleted,
             TransactionDiagnosticEvents.TransactionConfirmCompleted => RecoveryTransitionKind.TransactionConfirmCompleted,
             TransactionDiagnosticEvents.CancelSendStarted => RecoveryTransitionKind.CancelSendStarted,
@@ -281,6 +282,7 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
         var status = evt switch
         {
             TransactionDiagnosticEvents.PrepareTimedOut timedOut => $"remaining={timedOut.RemainingCount}",
+            TransactionDiagnosticEvents.TransactionManagerAbortDecisionCompleted aborted => aborted.Status.ToString(),
             TransactionDiagnosticEvents.TransactionCancelCompleted canceled =>
                 $"{canceled.Status}, queueEntryFound={canceled.QueueEntryFound}, succeeded={canceled.Succeeded}",
             TransactionDiagnosticEvents.TransactionConfirmCompleted confirmed =>
@@ -373,6 +375,7 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
         RemotePreparedSent,
         PrepareTimedOut,
         RemoteRecoveryPingSent,
+        TransactionManagerAbortDecisionCompleted,
         TransactionCancelCompleted,
         TransactionConfirmCompleted,
         CancelSendStarted,

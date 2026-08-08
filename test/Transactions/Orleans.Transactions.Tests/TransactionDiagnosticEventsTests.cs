@@ -55,8 +55,14 @@ public class TransactionDiagnosticEventsTests
         TransactionDiagnosticEvents.EmitPrepareTimedOut(resource, transactionId, timeStamp, 1, deadline);
         TransactionDiagnosticEvents.EmitRemotePreparePersisted(resource, transactionId, timeStamp, manager);
         TransactionDiagnosticEvents.EmitRemotePreparedSent(resource, transactionId, timeStamp, manager, sentAt);
-        TransactionDiagnosticEvents.EmitRemoteRecoveryPingScheduled(resource, transactionId, timeStamp, manager, scheduledAt);
-        TransactionDiagnosticEvents.EmitRemoteRecoveryPingSent(resource, transactionId, timeStamp, manager, sentAt);
+        TransactionDiagnosticEvents.EmitRemoteRecoveryPingScheduled(resource, transactionId, timeStamp, manager, scheduledAt, identity);
+        TransactionDiagnosticEvents.EmitRemoteRecoveryPingSent(resource, transactionId, timeStamp, manager, sentAt, identity);
+        TransactionDiagnosticEvents.EmitTransactionManagerAbortDecisionCompleted(
+            resource,
+            transactionId,
+            timeStamp,
+            TransactionalStatus.PrepareTimeout,
+            identity);
         TransactionDiagnosticEvents.EmitTransactionCancelCompleted(
             resource,
             transactionId,
@@ -198,8 +204,17 @@ public class TransactionDiagnosticEventsTests
         Assert.Equal(TransactionDiagnosticEvents.TransactionProtocolRole.RemoteParticipant, preparePersisted.ProtocolRole);
         Assert.Equal(TransactionDiagnosticEvents.TransactionPhase.RemotePreparePersisted, preparePersisted.Phase);
         Assert.Equal(sentAt, observer.Single<TransactionDiagnosticEvents.RemotePreparedSent>(resource).SentAt);
-        Assert.Equal(scheduledAt, observer.Single<TransactionDiagnosticEvents.RemoteRecoveryPingScheduled>(resource).ScheduledAt);
-        Assert.Equal(sentAt, observer.Single<TransactionDiagnosticEvents.RemoteRecoveryPingSent>(resource).SentAt);
+        var pingScheduled = observer.Single<TransactionDiagnosticEvents.RemoteRecoveryPingScheduled>(resource);
+        Assert.Equal(scheduledAt, pingScheduled.ScheduledAt);
+        Assert.Equal(activationId, pingScheduled.ActivationId);
+        var pingSent = observer.Single<TransactionDiagnosticEvents.RemoteRecoveryPingSent>(resource);
+        Assert.Equal(sentAt, pingSent.SentAt);
+        Assert.Equal(activationId, pingSent.ActivationId);
+        var abortDecision = observer.Single<TransactionDiagnosticEvents.TransactionManagerAbortDecisionCompleted>(resource);
+        Assert.Equal(TransactionalStatus.PrepareTimeout, abortDecision.Status);
+        Assert.Equal(activationId, abortDecision.ActivationId);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionProtocolRole.LocalTransactionManager, abortDecision.ProtocolRole);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionPhase.AbortDecision, abortDecision.Phase);
         var canceled = observer.Single<TransactionDiagnosticEvents.TransactionCancelCompleted>(resource);
         Assert.Equal(transactionId, canceled.TransactionId);
         Assert.Equal(timeStamp, canceled.TimeStamp);
@@ -439,6 +454,12 @@ public class TransactionDiagnosticEventsTests
             remainingCount: 2,
             DateTime.UtcNow,
             identity);
+        TransactionDiagnosticEvents.EmitTransactionManagerAbortDecisionCompleted(
+            resource,
+            transactionId,
+            DateTime.UtcNow,
+            TransactionalStatus.PrepareTimeout,
+            identity);
         TransactionDiagnosticEvents.EmitStorageConflictDetected(
             resource,
             TransactionDiagnosticEvents.StorageOperation.Load,
@@ -483,12 +504,15 @@ public class TransactionDiagnosticEventsTests
             third => Assert.Equal(3, third.Sequence),
             fourth => Assert.Equal(4, fourth.Sequence),
             fifth => Assert.Equal(5, fifth.Sequence),
-            sixth => Assert.Equal(6, sixth.Sequence));
+            sixth => Assert.Equal(6, sixth.Sequence),
+            seventh => Assert.Equal(7, seventh.Sequence));
         var diagnostics = observer.FormatTimeline();
         Assert.Contains(transactionId.ToString(), diagnostics);
         Assert.Contains(cohortTransactionId.ToString(), diagnostics);
         Assert.Contains("resource=resource", diagnostics);
         Assert.Contains("status=remaining=2", diagnostics);
+        Assert.Contains("kind=TransactionManagerAbortDecisionCompleted", diagnostics);
+        Assert.Contains("status=PrepareTimeout", diagnostics);
         Assert.Contains("operation=Load", diagnostics);
         Assert.Contains("kind=QueueRestoreFailed", diagnostics);
         Assert.Contains("kind=TransactionCancelCompleted", diagnostics);

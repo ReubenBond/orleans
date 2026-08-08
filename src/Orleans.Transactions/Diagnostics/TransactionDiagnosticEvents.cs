@@ -47,6 +47,7 @@ internal static class TransactionDiagnosticEvents
         Cancel,
         Confirm,
         CancelFanOut,
+        AbortDecision,
         ReadyWait,
     }
 
@@ -191,6 +192,15 @@ internal static class TransactionDiagnosticEvents
         public readonly TransactionalStatus Status = status;
         public readonly bool QueueEntryFound = queueEntryFound;
         public readonly bool Succeeded = succeeded;
+    }
+
+    internal sealed class TransactionManagerAbortDecisionCompleted(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        TransactionalStatus status) : TransactionEvent(resource, transactionId, timeStamp)
+    {
+        public readonly TransactionalStatus Status = status;
     }
 
     internal sealed class QueueRestoreStarted(
@@ -652,6 +662,24 @@ internal static class TransactionDiagnosticEvents
                 identity,
                 TransactionProtocolRole.RemoteParticipant,
                 TransactionPhase.Confirm);
+        }
+    }
+
+    internal static void EmitTransactionManagerAbortDecisionCompleted(
+        ParticipantId resource,
+        Guid transactionId,
+        DateTime timeStamp,
+        TransactionalStatus status,
+        TransactionDiagnosticIdentity identity = default)
+    {
+        if (Listener.IsEnabled(nameof(TransactionManagerAbortDecisionCompleted)))
+        {
+            Write(
+                nameof(TransactionManagerAbortDecisionCompleted),
+                new TransactionManagerAbortDecisionCompleted(resource, transactionId, timeStamp, status),
+                identity,
+                TransactionProtocolRole.LocalTransactionManager,
+                TransactionPhase.AbortDecision);
         }
     }
 
