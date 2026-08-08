@@ -146,7 +146,8 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
         => $"  sequence={transition.Sequence}, observedAt={transition.ObservedAtUtc:O}, elapsed={transition.Elapsed}, "
             + $"kind={transition.Kind}, transactions={FormatTransactionIds(transition.TransactionIds)}, "
             + $"resource={transition.ResourceName}, grain={transition.GrainId?.ToString() ?? "<none>"}, "
-            + $"silo={transition.SiloAddress?.ToString() ?? "<none>"}, activation={transition.ActivationId}, "
+            + $"silo={transition.SiloAddress?.ToString() ?? "<none>"}, "
+            + $"activation={(transition.ActivationId.IsDefault ? "<none>" : transition.ActivationId.ToString())}, "
             + $"status={transition.Status ?? "<none>"}";
 
     public void Dispose()
