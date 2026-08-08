@@ -1,5 +1,7 @@
+using Amazon;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
+using Amazon.Runtime;
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -279,6 +281,78 @@ namespace Orleans.Transactions.DynamoDB.Tests
             Assert.Equal(40, recovered.CommittedState.State);
         }
 
+        [Fact]
+        public async Task TransactWriteItems_ExplicitClientRequestToken_ReplaysIdenticalRequest()
+        {
+            _ = await InitTableAsync(NullLogger.Instance);
+            using var client = CreateDynamoDBClient();
+            var partitionKey = $"{partition}-{Guid.NewGuid():N}";
+            var request = new TransactWriteItemsRequest
+            {
+                ClientRequestToken = Guid.NewGuid().ToString("N"),
+                TransactItems =
+                [
+                    new TransactWriteItem
+                    {
+                        Put = new Put
+                        {
+                            TableName = tableName,
+                            Item = new Dictionary<string, AttributeValue>
+                            {
+                                [DynamoDBTransactionalStateConstants.PARTITION_KEY_PROPERTY_NAME] = new AttributeValue { S = partitionKey },
+                                [DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME] = new AttributeValue { S = "idempotency" },
+                                ["Value"] = new AttributeValue { N = "1" }
+                            },
+                            ConditionExpression =
+                                $"attribute_not_exists({DynamoDBTransactionalStateConstants.PARTITION_KEY_PROPERTY_NAME}) AND attribute_not_exists({DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME})"
+                        }
+                    }
+                ]
+            };
+
+            await client.TransactWriteItemsAsync(request);
+            await client.TransactWriteItemsAsync(request);
+
+            var response = await client.GetItemAsync(new GetItemRequest
+            {
+                TableName = tableName,
+                ConsistentRead = true,
+                Key = new Dictionary<string, AttributeValue>
+                {
+                    [DynamoDBTransactionalStateConstants.PARTITION_KEY_PROPERTY_NAME] = new AttributeValue { S = partitionKey },
+                    [DynamoDBTransactionalStateConstants.ROW_KEY_PROPERTY_NAME] = new AttributeValue { S = "idempotency" }
+                }
+            });
+            Assert.Equal("1", response.Item["Value"].N);
+        }
+
+        [Fact]
+        public void TransactionConflictCancellation_IsNotClassifiedAsStorageConflict()
+        {
+            var batchOperation = typeof(DynamoDBTransactionalStateStorage<TestState>).GetNestedType(
+                "BatchOperation",
+                System.Reflection.BindingFlags.NonPublic);
+            if (batchOperation?.ContainsGenericParameters is true)
+            {
+                batchOperation = batchOperation.MakeGenericType(typeof(TestState));
+            }
+
+            var isStorageConflict = batchOperation?.GetMethod(
+                "IsStorageConflict",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+            Assert.NotNull(isStorageConflict);
+            var exception = new TransactionCanceledException("Transaction conflict")
+            {
+                CancellationReasons =
+                [
+                    new CancellationReason { Code = "TransactionConflict", Message = "Transaction is ongoing for the item" },
+                    new CancellationReason { Code = "TransactionConflict", Message = "Transaction is ongoing for the item" }
+                ]
+            };
+
+            Assert.False(Assert.IsType<bool>(isStorageConflict.Invoke(null, [exception])));
+        }
+
         private static async Task<(
             DynamoDBTransactionalStateStorage<TestState> Winner,
             DynamoDBTransactionalStateStorage<TestState> Loser)> CreateStoragePairAsync(
@@ -446,6 +520,26 @@ namespace Orleans.Transactions.DynamoDB.Tests
                 logger.LogError(exc, "Error creating CloudTableCreationClient");
                 throw;
             }
+        }
+
+        private static AmazonDynamoDBClient CreateDynamoDBClient()
+        {
+            var service = AWSTestConstants.DynamoDbService;
+            if (service.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                || service.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                return new AmazonDynamoDBClient(
+                    new BasicAWSCredentials("dummy", "dummyKey"),
+                    new AmazonDynamoDBConfig { ServiceURL = service });
+            }
+
+            var config = new AmazonDynamoDBConfig { RegionEndpoint = RegionEndpoint.GetBySystemName(service) };
+            return string.IsNullOrEmpty(AWSTestConstants.DynamoDbAccessKey)
+                || string.IsNullOrEmpty(AWSTestConstants.DynamoDbSecretKey)
+                    ? new AmazonDynamoDBClient(config)
+                    : new AmazonDynamoDBClient(
+                        new BasicAWSCredentials(AWSTestConstants.DynamoDbAccessKey, AWSTestConstants.DynamoDbSecretKey),
+                        config);
         }
 
         private sealed class RecordingLogger : ILogger<DynamoDBTransactionalStateStorage<TestState>>
