@@ -149,17 +149,24 @@ public class TransactionDiagnosticEventsTests
         Assert.Equal(timeStamp, waiting.TimeStamp);
         Assert.Equal(2, waiting.WaitCount);
         Assert.Equal(deadline, waiting.Deadline);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionProtocolRole.LocalTransactionManager, waiting.ProtocolRole);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionPhase.WaitingForRemotePrepares, waiting.Phase);
 
         var prepared = observer.Single<TransactionDiagnosticEvents.PreparedReceived>(resource);
         Assert.Equal(participant, prepared.Participant);
         Assert.Equal(TransactionalStatus.Ok, prepared.Status);
         Assert.Equal(1, prepared.RemainingCount);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionProtocolRole.LocalTransactionManager, prepared.ProtocolRole);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionPhase.PreparedCallback, prepared.Phase);
 
         var timedOut = observer.Single<TransactionDiagnosticEvents.PrepareTimedOut>(resource);
         Assert.Equal(1, timedOut.RemainingCount);
         Assert.Equal(deadline, timedOut.Deadline);
 
-        Assert.Equal(manager, observer.Single<TransactionDiagnosticEvents.RemotePreparePersisted>(resource).TransactionManager);
+        var preparePersisted = observer.Single<TransactionDiagnosticEvents.RemotePreparePersisted>(resource);
+        Assert.Equal(manager, preparePersisted.TransactionManager);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionProtocolRole.RemoteParticipant, preparePersisted.ProtocolRole);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionPhase.RemotePreparePersisted, preparePersisted.Phase);
         Assert.Equal(sentAt, observer.Single<TransactionDiagnosticEvents.RemotePreparedSent>(resource).SentAt);
         Assert.Equal(scheduledAt, observer.Single<TransactionDiagnosticEvents.RemoteRecoveryPingScheduled>(resource).ScheduledAt);
         Assert.Equal(sentAt, observer.Single<TransactionDiagnosticEvents.RemoteRecoveryPingSent>(resource).SentAt);
@@ -171,6 +178,8 @@ public class TransactionDiagnosticEventsTests
         Assert.True(canceled.Succeeded);
         Assert.Equal(siloAddress, canceled.SiloAddress);
         Assert.Equal(activationId, canceled.ActivationId);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionProtocolRole.RemoteParticipant, canceled.ProtocolRole);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionPhase.Cancel, canceled.Phase);
         var confirmed = observer.Single<TransactionDiagnosticEvents.TransactionConfirmCompleted>(resource);
         Assert.Equal(transactionId, confirmed.TransactionId);
         Assert.Equal(timeStamp, confirmed.TimeStamp);
@@ -179,6 +188,8 @@ public class TransactionDiagnosticEventsTests
         Assert.False(confirmed.Succeeded);
         Assert.Equal(siloAddress, confirmed.SiloAddress);
         Assert.Equal(activationId, confirmed.ActivationId);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionProtocolRole.RemoteParticipant, confirmed.ProtocolRole);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionPhase.Confirm, confirmed.Phase);
 
         var restoreStartedEvent = observer.Single<TransactionDiagnosticEvents.QueueRestoreStarted>(resource);
         Assert.Equal(transactionIds, restoreStartedEvent.TransactionIds);
@@ -243,6 +254,8 @@ public class TransactionDiagnosticEventsTests
         Assert.Equal(participant, cancelStarted.Target);
         Assert.True(cancelStarted.IsSelf);
         Assert.Equal(TransactionDiagnosticEvents.CancelReason.RecoveryPing, cancelStarted.Reason);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionProtocolRole.LocalTransactionManager, cancelStarted.ProtocolRole);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionPhase.Cancel, cancelStarted.Phase);
 
         var cancelCompleted = observer.Single<TransactionDiagnosticEvents.CancelSendCompleted>(resource);
         Assert.False(cancelCompleted.IsSelf);
@@ -267,6 +280,8 @@ public class TransactionDiagnosticEventsTests
         var storageWrite = observer.Single<TransactionDiagnosticEvents.StorageWriteCompleted>(resource);
         Assert.Equal(siloAddress, storageWrite.SiloAddress);
         Assert.Equal(activationId, storageWrite.ActivationId);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionProtocolRole.Unknown, storageWrite.ProtocolRole);
+        Assert.Equal(TransactionDiagnosticEvents.TransactionPhase.StorageWrite, storageWrite.Phase);
     }
 
     [Fact]
@@ -432,8 +447,10 @@ public class TransactionDiagnosticEventsTests
         Assert.Contains("kind=QueueRestoreFailed", diagnostics);
         Assert.Contains("kind=TransactionCancelCompleted", diagnostics);
         Assert.Contains("PresumedAbort, queueEntryFound=True, succeeded=True", diagnostics);
+        Assert.Contains("role=RemoteParticipant, phase=Cancel", diagnostics);
         Assert.Contains("kind=TransactionConfirmCompleted", diagnostics);
         Assert.Contains("Ok, queueEntryFound=False, succeeded=True", diagnostics);
+        Assert.Contains("role=RemoteParticipant, phase=Confirm", diagnostics);
         Assert.Contains("status=Expired", diagnostics);
         Assert.Contains($"silo={siloAddress}", diagnostics);
         Assert.Contains($"activation={activationId}", diagnostics);

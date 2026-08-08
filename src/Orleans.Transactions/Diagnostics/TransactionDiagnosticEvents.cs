@@ -21,16 +21,51 @@ internal static class TransactionDiagnosticEvents
         public readonly ActivationId ActivationId = activationId;
     }
 
+    internal enum TransactionProtocolRole
+    {
+        Unknown,
+        LocalTransactionManager,
+        RemoteParticipant,
+    }
+
+    internal enum TransactionPhase
+    {
+        Unknown,
+        StorageWrite,
+        WaitingForRemotePrepares,
+        PreparedCallback,
+        PrepareTimeout,
+        RemotePreparePersisted,
+        RemotePreparedSent,
+        RecoveryPingScheduled,
+        RecoveryPingSent,
+        QueueRestore,
+        Lock,
+        StorageConflict,
+        AbortAndRestore,
+        Deactivation,
+        Cancel,
+        Confirm,
+        ReadyWait,
+    }
+
     internal abstract class TransactionDiagnosticEvent(ParticipantId resource)
     {
         public readonly ParticipantId Resource = resource;
         public SiloAddress? SiloAddress { get; private set; }
         public ActivationId ActivationId { get; private set; }
+        public TransactionProtocolRole ProtocolRole { get; private set; }
+        public TransactionPhase Phase { get; private set; }
 
-        internal void SetIdentity(TransactionDiagnosticIdentity identity)
+        internal void SetContext(
+            TransactionDiagnosticIdentity identity,
+            TransactionProtocolRole protocolRole,
+            TransactionPhase phase)
         {
             SiloAddress = identity.SiloAddress;
             ActivationId = identity.ActivationId;
+            ProtocolRole = protocolRole;
+            Phase = phase;
         }
     }
 
@@ -384,7 +419,7 @@ internal static class TransactionDiagnosticEvents
         {
             // Observer exceptions intentionally propagate so tests can inject post-write faults.
             var evt = new StorageWriteCompleted(resource, eTag, batchSize, commitCount);
-            evt.SetIdentity(identity);
+            evt.SetContext(identity, TransactionProtocolRole.Unknown, TransactionPhase.StorageWrite);
             Listener.Write(nameof(StorageWriteCompleted), evt);
         }
     }
@@ -402,7 +437,9 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(TransactionManagerWaitingForPrepared),
                 new TransactionManagerWaitingForPrepared(resource, transactionId, timeStamp, waitCount, deadline),
-                identity);
+                identity,
+                TransactionProtocolRole.LocalTransactionManager,
+                TransactionPhase.WaitingForRemotePrepares);
         }
     }
 
@@ -420,7 +457,9 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(PreparedReceived),
                 new PreparedReceived(resource, transactionId, timeStamp, participant, status, remainingCount),
-                identity);
+                identity,
+                TransactionProtocolRole.LocalTransactionManager,
+                TransactionPhase.PreparedCallback);
         }
     }
 
@@ -437,7 +476,9 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(PrepareTimedOut),
                 new PrepareTimedOut(resource, transactionId, timeStamp, remainingCount, deadline),
-                identity);
+                identity,
+                TransactionProtocolRole.LocalTransactionManager,
+                TransactionPhase.PrepareTimeout);
         }
     }
 
@@ -453,7 +494,9 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(RemotePreparePersisted),
                 new RemotePreparePersisted(resource, transactionId, timeStamp, transactionManager),
-                identity);
+                identity,
+                TransactionProtocolRole.RemoteParticipant,
+                TransactionPhase.RemotePreparePersisted);
         }
     }
 
@@ -470,7 +513,9 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(RemotePreparedSent),
                 new RemotePreparedSent(resource, transactionId, timeStamp, transactionManager, sentAt),
-                identity);
+                identity,
+                TransactionProtocolRole.RemoteParticipant,
+                TransactionPhase.RemotePreparedSent);
         }
     }
 
@@ -487,7 +532,9 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(RemoteRecoveryPingScheduled),
                 new RemoteRecoveryPingScheduled(resource, transactionId, timeStamp, transactionManager, scheduledAt),
-                identity);
+                identity,
+                TransactionProtocolRole.RemoteParticipant,
+                TransactionPhase.RecoveryPingScheduled);
         }
     }
 
@@ -504,7 +551,9 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(RemoteRecoveryPingSent),
                 new RemoteRecoveryPingSent(resource, transactionId, timeStamp, transactionManager, sentAt),
-                identity);
+                identity,
+                TransactionProtocolRole.RemoteParticipant,
+                TransactionPhase.RecoveryPingSent);
         }
     }
 
@@ -522,7 +571,9 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(TransactionCancelCompleted),
                 new TransactionCancelCompleted(resource, transactionId, timeStamp, status, queueEntryFound, succeeded),
-                identity);
+                identity,
+                TransactionProtocolRole.RemoteParticipant,
+                TransactionPhase.Cancel);
         }
     }
 
@@ -540,7 +591,9 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(TransactionConfirmCompleted),
                 new TransactionConfirmCompleted(resource, transactionId, timeStamp, status, queueEntryFound, succeeded),
-                identity);
+                identity,
+                TransactionProtocolRole.RemoteParticipant,
+                TransactionPhase.Confirm);
         }
     }
 
@@ -551,7 +604,12 @@ internal static class TransactionDiagnosticEvents
     {
         if (Listener.IsEnabled(nameof(QueueRestoreStarted)))
         {
-            Write(nameof(QueueRestoreStarted), new QueueRestoreStarted(resource, transactionIds), identity);
+            Write(
+                nameof(QueueRestoreStarted),
+                new QueueRestoreStarted(resource, transactionIds),
+                identity,
+                TransactionProtocolRole.Unknown,
+                TransactionPhase.QueueRestore);
         }
     }
 
@@ -573,7 +631,9 @@ internal static class TransactionDiagnosticEvents
                     recoveredPendingCount,
                     recoveredCommitCount,
                     transactionIds),
-                identity);
+                identity,
+                TransactionProtocolRole.Unknown,
+                TransactionPhase.QueueRestore);
         }
     }
 
@@ -594,7 +654,9 @@ internal static class TransactionDiagnosticEvents
                     exception.Message,
                     storageConflict,
                     transactionIds),
-                identity);
+                identity,
+                TransactionProtocolRole.Unknown,
+                TransactionPhase.QueueRestore);
         }
     }
 
@@ -607,7 +669,12 @@ internal static class TransactionDiagnosticEvents
     {
         if (Listener.IsEnabled(nameof(LockExpired)))
         {
-            Write(nameof(LockExpired), new LockExpired(resource, transactionId, deadline, observedAt), identity);
+            Write(
+                nameof(LockExpired),
+                new LockExpired(resource, transactionId, deadline, observedAt),
+                identity,
+                TransactionProtocolRole.Unknown,
+                TransactionPhase.Lock);
         }
     }
 
@@ -619,7 +686,12 @@ internal static class TransactionDiagnosticEvents
     {
         if (Listener.IsEnabled(nameof(LockBroken)))
         {
-            Write(nameof(LockBroken), new LockBroken(resource, transactionId, reason), identity);
+            Write(
+                nameof(LockBroken),
+                new LockBroken(resource, transactionId, reason),
+                identity,
+                TransactionProtocolRole.Unknown,
+                TransactionPhase.Lock);
         }
     }
 
@@ -644,7 +716,9 @@ internal static class TransactionDiagnosticEvents
                     exception.GetType().FullName ?? exception.GetType().Name,
                     exception.Message,
                     transactionIds),
-                identity);
+                identity,
+                TransactionProtocolRole.Unknown,
+                TransactionPhase.StorageConflict);
         }
     }
 
@@ -661,7 +735,9 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(AbortAndRestoreStarted),
                 new AbortAndRestoreStarted(resource, status, storageOutcomeInDoubt, queuedTransactionCount, transactionIds),
-                identity);
+                identity,
+                TransactionProtocolRole.Unknown,
+                TransactionPhase.AbortAndRestore);
         }
     }
 
@@ -677,7 +753,9 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(AbortAndRestoreCompleted),
                 new AbortAndRestoreCompleted(resource, status, storageOutcomeInDoubt, transactionIds),
-                identity);
+                identity,
+                TransactionProtocolRole.Unknown,
+                TransactionPhase.AbortAndRestore);
         }
     }
 
@@ -693,7 +771,9 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(DeactivationRequested),
                 new DeactivationRequested(resource, status, failureCount, transactionIds),
-                identity);
+                identity,
+                TransactionProtocolRole.Unknown,
+                TransactionPhase.Deactivation);
         }
     }
 
@@ -712,7 +792,9 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(CancelSendStarted),
                 new CancelSendStarted(resource, transactionId, timeStamp, target, isSelf, status, reason),
-                identity);
+                identity,
+                TransactionProtocolRole.LocalTransactionManager,
+                TransactionPhase.Cancel);
         }
     }
 
@@ -731,7 +813,9 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(CancelSendCompleted),
                 new CancelSendCompleted(resource, transactionId, timeStamp, target, isSelf, status, reason),
-                identity);
+                identity,
+                TransactionProtocolRole.LocalTransactionManager,
+                TransactionPhase.Cancel);
         }
     }
 
@@ -760,7 +844,9 @@ internal static class TransactionDiagnosticEvents
                     reason,
                     exception.GetType().FullName ?? exception.GetType().Name,
                     exception.Message),
-                identity);
+                identity,
+                TransactionProtocolRole.LocalTransactionManager,
+                TransactionPhase.Cancel);
         }
     }
 
@@ -771,7 +857,12 @@ internal static class TransactionDiagnosticEvents
     {
         if (Listener.IsEnabled(nameof(ReadyWaitStarted)))
         {
-            Write(nameof(ReadyWaitStarted), new ReadyWaitStarted(resource, transactionId), identity);
+            Write(
+                nameof(ReadyWaitStarted),
+                new ReadyWaitStarted(resource, transactionId),
+                identity,
+                TransactionProtocolRole.Unknown,
+                TransactionPhase.ReadyWait);
         }
     }
 
@@ -786,7 +877,9 @@ internal static class TransactionDiagnosticEvents
             Write(
                 nameof(ReadyWaitCompleted),
                 new ReadyWaitCompleted(resource, transactionId, recoveredAfterFailure),
-                identity);
+                identity,
+                TransactionProtocolRole.Unknown,
+                TransactionPhase.ReadyWait);
         }
     }
 
@@ -805,7 +898,9 @@ internal static class TransactionDiagnosticEvents
                     transactionId,
                     exception.GetType().FullName ?? exception.GetType().Name,
                     exception.Message),
-                identity);
+                identity,
+                TransactionProtocolRole.Unknown,
+                TransactionPhase.ReadyWait);
         }
     }
 
@@ -815,11 +910,13 @@ internal static class TransactionDiagnosticEvents
     private static void Write(
         string eventName,
         TransactionDiagnosticEvent evt,
-        TransactionDiagnosticIdentity identity)
+        TransactionDiagnosticIdentity identity,
+        TransactionProtocolRole protocolRole,
+        TransactionPhase phase)
     {
         try
         {
-            evt.SetIdentity(identity);
+            evt.SetContext(identity, protocolRole, phase);
             Listener.Write(eventName, evt);
         }
         catch (Exception)

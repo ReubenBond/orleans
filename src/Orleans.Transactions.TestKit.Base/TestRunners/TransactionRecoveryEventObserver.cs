@@ -145,6 +145,7 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
     public static string FormatTransition(RecoveryTransition transition)
         => $"  sequence={transition.Sequence}, observedAt={transition.ObservedAtUtc:O}, elapsed={transition.Elapsed}, "
             + $"kind={transition.Kind}, transactions={FormatTransactionIds(transition.TransactionIds)}, "
+            + $"role={transition.ProtocolRole}, phase={transition.Phase}, "
             + $"resource={transition.ResourceName}, grain={transition.GrainId?.ToString() ?? "<none>"}, "
             + $"silo={transition.SiloAddress?.ToString() ?? "<none>"}, "
             + $"activation={(transition.ActivationId.IsDefault ? "<none>" : transition.ActivationId.ToString())}, "
@@ -312,6 +313,8 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
             elapsed,
             kind.Value,
             transactionIds,
+            evt.ProtocolRole,
+            evt.Phase,
             evt.Resource.Name,
             evt.Resource.Reference is null ? null : evt.Resource.Reference.GrainId,
             evt.SiloAddress,
@@ -378,6 +381,8 @@ internal sealed class TransactionRecoveryEventObserver : IObserver<TransactionDi
         TimeSpan Elapsed,
         RecoveryTransitionKind Kind,
         ImmutableArray<Guid> TransactionIds,
+        TransactionDiagnosticEvents.TransactionProtocolRole ProtocolRole,
+        TransactionDiagnosticEvents.TransactionPhase Phase,
         string ResourceName,
         GrainId? GrainId,
         SiloAddress? SiloAddress,
