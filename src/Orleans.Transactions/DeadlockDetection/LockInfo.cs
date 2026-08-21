@@ -6,10 +6,16 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.DeadlockDetection
 {
+    [GenerateSerializer]
     public readonly struct LockInfo
     {
+        [Id(0)]
         public readonly ParticipantId Resource;
+
+        [Id(1)]
         public readonly Guid TxId;
+
+        [Id(2)]
         public readonly bool IsWait;
 
         private LockInfo(ParticipantId resource, Guid txId, bool isWait)
@@ -53,7 +59,7 @@ namespace Orleans.Transactions.DeadlockDetection
         public static Task BreakLocks(this IEnumerable<LockInfo> locks)
         {
             var tasks = locks.Select(l =>
-                l.Resource.Reference.AsReference<ITransactionalResourceExtension>()
+                l.Resource.Reference.AsReference<IDeadlockResourceExtension>()
                     .BreakLocks(l.Resource.Name));
             return Task.WhenAll(tasks);
         }

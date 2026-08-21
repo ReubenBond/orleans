@@ -1,5 +1,6 @@
 using Orleans.Transactions;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.DeadlockDetection;
 
 namespace Orleans.Hosting;
 
@@ -14,6 +15,7 @@ public static class SiloBuilderExtensions
     {
         return builder.ConfigureServices(services => services.UseTransactionsWithSilo())
                       .AddGrainExtension<ITransactionManagerExtension, TransactionManagerExtension>()
-                      .AddGrainExtension<ITransactionalResourceExtension, TransactionalResourceExtension>();
+                      .AddGrainExtension<ITransactionalResourceExtension, TransactionalResourceExtension>()
+                      .AddGrainExtension<IDeadlockResourceExtension, TransactionalResourceExtension>();
     }
 }

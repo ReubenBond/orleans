@@ -4,11 +4,16 @@ using System.Threading.Tasks;
 
 namespace Orleans.Transactions
 {
-    [Serializable]
-    public class CollectLocksRequest
+    [GenerateSerializer]
+    public sealed class CollectLocksRequest
     {
-        public List<Guid> TransactionIds { get; set; }
+        [Id(0)]
+        public List<Guid> TransactionIds { get; set; } = [];
+
+        [Id(1)]
         public long? MaxVersion { get; set; }
+
+        [Id(2)]
         public Guid BatchId { get; set; }
     }
 

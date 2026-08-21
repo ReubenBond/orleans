@@ -3,13 +3,17 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 
 namespace Orleans.Transactions.DeadlockDetection
 {
-    internal class DeadlockDetectionLockObserver : SystemTarget, ITransactionalLockObserver, ILocalDeadlockDetector
+    internal class DeadlockDetectionLockObserver :
+        SystemTarget,
+        ITransactionalLockObserver,
+        ILocalDeadlockDetector,
+        ILifecycleParticipant<ISiloLifecycle>
     {
         private long currentVersion = 0L;
 
@@ -19,19 +23,30 @@ namespace Orleans.Transactions.DeadlockDetection
 
         private readonly IGrainFactory grainFactory;
 
-        private readonly IGrainRuntime runtime;
+        private readonly IDeadlockListener?[] deadlockListeners;
 
-        private readonly IDeadlockListener[] deadlockListeners;
+        private readonly TimeProvider timeProvider;
+        private readonly DeadlockDetectionOptions options;
 
-        public DeadlockDetectionLockObserver(IMessageCenter messageCenter, ILoggerFactory loggerFactory,
-            IGrainFactory grainFactory, IGrainRuntime runtime, IServiceProvider serviceProvider) :
-            base(Constants.LocalDeadlockDetectorId, messageCenter.MyAddress, loggerFactory)
+        internal static readonly GrainType GrainType = SystemTargetGrainId.CreateGrainType("txn.deadlock");
+
+        public DeadlockDetectionLockObserver(
+            SystemTargetShared shared,
+            IGrainFactory grainFactory,
+            IEnumerable<IDeadlockListener> deadlockListeners,
+            TimeProvider timeProvider,
+            IOptions<DeadlockDetectionOptions> options)
+            : base(GrainType, shared)
         {
-            this.logger = loggerFactory.CreateLogger<DeadlockDetectionLockObserver>();
+            this.logger = shared.LoggerFactory.CreateLogger<DeadlockDetectionLockObserver>();
             this.grainFactory = grainFactory;
-            this.runtime = runtime;
-            this.deadlockListeners = serviceProvider.GetServices<IDeadlockListener>().ToArray();
+            this.deadlockListeners = deadlockListeners.Cast<IDeadlockListener?>().ToArray();
+            this.timeProvider = timeProvider;
+            this.options = options.Value;
+            shared.ActivationDirectory.RecordNewTarget(this);
         }
+
+        public TimeSpan DetectionTimeout => this.options.DeadlockDetectionTimeout;
 
         public void OnResourceRequested(Guid transactionId, ParticipantId resourceId) =>
             this.lockTracker.TrackWait(resourceId, transactionId, this.currentVersion);
@@ -48,7 +63,7 @@ namespace Orleans.Transactions.DeadlockDetection
             // a try catch.
             try
             {
-                var startTime = DateTime.UtcNow;
+                var startTime = this.UtcNow;
                 var localGraph =
                     new WaitForGraph(this.lockTracker.GetLocks()).GetConnectedSubGraph(lockedBy, new[] {resource});
                 if (localGraph.DetectCycles(out var cycles))
@@ -56,7 +71,7 @@ namespace Orleans.Transactions.DeadlockDetection
                     var tasks = cycles.Select(async c =>
                     {
                         await c.BreakLocks();
-                        this.NotifyDeadlockListeners(startTime, DateTime.UtcNow, c);
+                        this.NotifyDeadlockListeners(startTime, this.UtcNow, c);
                     });
                     await Task.WhenAll(tasks);
                 }
@@ -67,7 +82,7 @@ namespace Orleans.Transactions.DeadlockDetection
                         Locks = localGraph.ToLockKeys(),
                         BatchId = null,
                         MaxVersion = null,
-                        SiloAddress = this.runtime.SiloAddress
+                        SiloAddress = this.Silo
                     });
                 }
             }
@@ -102,14 +117,14 @@ namespace Orleans.Transactions.DeadlockDetection
             long responseMaxVersion;
             if (request.MaxVersion == null)
             {
-                responseMaxVersion = this.IncrementMaxVersion();
+                responseMaxVersion = this.IncrementMaxVersion() - 1;
             }
             else
             {
                 responseMaxVersion = request.MaxVersion.Value;
             }
 
-            var snapshot = this.lockTracker.GetLocks(request.MaxVersion);
+            var snapshot = this.lockTracker.GetLocks(responseMaxVersion);
             var wfg = new WaitForGraph(snapshot).GetConnectedSubGraph(request.TransactionIds, Enumerable.Empty<ParticipantId>());
 
             await this.grainFactory.GetGrain<IDeadlockDetector>(0).CheckForDeadlocks(new CollectLocksResponse
@@ -117,8 +132,14 @@ namespace Orleans.Transactions.DeadlockDetection
                 BatchId = request.BatchId,
                 Locks = wfg.ToLockKeys(),
                 MaxVersion = responseMaxVersion,
-                SiloAddress = this.runtime.SiloAddress
+                SiloAddress = this.Silo
             });
+        }
+
+        private DateTime UtcNow => this.timeProvider.GetUtcNow().UtcDateTime;
+
+        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+        {
         }
 
     }

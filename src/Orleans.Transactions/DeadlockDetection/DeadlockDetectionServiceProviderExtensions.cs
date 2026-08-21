@@ -7,8 +7,12 @@ namespace Orleans.Transactions.DeadlockDetection
     public static class DeadlockDetectionServiceProviderExtensions
     {
         public static IServiceCollection UseTransactionalDeadlockDetection(this IServiceCollection serviceCollection) =>
-            serviceCollection.AddSingleton<ITransactionalLockObserver, DeadlockDetectionLockObserver>()
-                .AddSingleton<ILocalDeadlockDetector>(sp =>
-                    (DeadlockDetectionLockObserver)sp.GetRequiredService<ITransactionalLockObserver>());
+            serviceCollection
+                .AddOptions<DeadlockDetectionOptions>()
+                .Services
+                .AddSingleton<DeadlockDetectionLockObserver>()
+                .AddSingleton<ITransactionalLockObserver>(sp => sp.GetRequiredService<DeadlockDetectionLockObserver>())
+                .AddSingleton<ILocalDeadlockDetector>(sp => sp.GetRequiredService<DeadlockDetectionLockObserver>())
+                .AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(sp => sp.GetRequiredService<DeadlockDetectionLockObserver>());
     }
 }

@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.DeadlockDetection;
 using Orleans.Transactions.State;
 
 namespace Orleans.Transactions.TestKit
@@ -142,7 +143,7 @@ namespace Orleans.Transactions.TestKit
 
     }
 
-    internal partial class FaultInjectionTransactionalResource<TState> : ITransactionalResource
+    internal partial class FaultInjectionTransactionalResource<TState> : ITransactionalResource, IDeadlockBreakableTransactionalResource
         where TState : class, new()
     {
 
@@ -254,6 +255,12 @@ namespace Orleans.Transactions.TestKit
             }
         }
 
+        public async Task BreakLocks()
+        {
+            LogInformationBreakingLocks(this.logger, context.GrainInstance);
+            await this.tResource.BreakLocks();
+        }
+
         public async Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
         {
             LogInformationStartedPrepare(this.logger, context.GrainInstance, transactionId);
@@ -341,6 +348,12 @@ namespace Orleans.Transactions.TestKit
             Message = "Grain {GrainInstance} deactivating after transaction {TransactionId} Confirm"
         )]
         private static partial void LogInformationDeactivatingAfterConfirm(ILogger logger, object? grainInstance, Guid transactionId);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Grain {GrainInstance} was instructed to break its transaction locks"
+        )]
+        private static partial void LogInformationBreakingLocks(ILogger logger, object? grainInstance);
 
         [LoggerMessage(
             Level = LogLevel.Information,

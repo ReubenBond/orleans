@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.DeadlockDetection;
 using Orleans.Transactions.Diagnostics;
 
 namespace Orleans.Transactions.State
@@ -20,7 +21,7 @@ namespace Orleans.Transactions.State
         private readonly BatchWorker storageWorker;
         private readonly ILogger logger;
         private readonly IActivationLifetime activationLifetime;
-        private readonly ITransactionalLockObserver transactionalLockObserver;
+        private readonly ITransactionalLockObserver? transactionalLockObserver;
 
         // the linked list of lock groups
         // the head is the group that is currently holding the lock
@@ -67,7 +68,7 @@ namespace Orleans.Transactions.State
             BatchWorker storageWorker,
             ILogger logger,
             IActivationLifetime activationLifetime,
-            ITransactionalLockObserver transactionalLockObserver)
+            ITransactionalLockObserver? transactionalLockObserver)
         {
             this.options = options.Value;
             this.queue = queue;
@@ -149,7 +150,7 @@ namespace Orleans.Transactions.State
                 {
                     if (this.transactionalLockObserver != null)
                     {
-                        group.DeadlockDeadline = now + this.options.DeadlockDetectionThreshold;
+                        group.DeadlockDeadline = now + this.transactionalLockObserver.DetectionTimeout;
                     }
                 }
 
@@ -282,6 +283,7 @@ namespace Orleans.Transactions.State
             TransactionDiagnosticEvents.LockBreakReason reason)
         {
             LogTraceBreakLock(transactionId);
+            this.transactionalLockObserver?.OnResourceUnlocked(transactionId, this.queue.Resource);
             TransactionDiagnosticEvents.EmitLockBroken(
                 queue.Resource,
                 transactionId,
@@ -295,6 +297,11 @@ namespace Orleans.Transactions.State
             var pos = currentGroup?.Next;
             while (pos != null)
             {
+                foreach (var transactionId in pos.Keys)
+                {
+                    this.transactionalLockObserver?.OnResourceUnlocked(transactionId, this.queue.Resource);
+                }
+
                 if (pos.Tasks != null)
                 {
                     foreach (var t in pos.Tasks)
@@ -310,7 +317,13 @@ namespace Orleans.Transactions.State
                 currentGroup.Next = null;
         }
 
-        public void Rollback(Guid guid) => currentGroup?.Remove(guid);
+        public void Rollback(Guid guid)
+        {
+            if (currentGroup?.Remove(guid) == true)
+            {
+                this.transactionalLockObserver?.OnResourceUnlocked(guid, this.queue.Resource);
+            }
+        }
 
         public Task Rollback(Guid guid, bool notify, TransactionDiagnosticEvents.LockBreakReason reason)
         {
@@ -319,6 +332,8 @@ namespace Orleans.Transactions.State
             {
                 return Task.CompletedTask;
             }
+
+            this.transactionalLockObserver?.OnResourceUnlocked(guid, this.queue.Resource);
 
             // notify remote listeners
             if (!notify)
@@ -377,6 +392,10 @@ namespace Orleans.Transactions.State
                                     currentGroup.Keys).Ignore();
                                 // clear this so we don't get stuck forever.
                                 currentGroup.DeadlockDeadline = null;
+                                if (currentGroup.Deadline is { } deadline)
+                                {
+                                    this.lockWorker.Notify(deadline);
+                                }
                             }
                             else
                             {
@@ -438,6 +457,7 @@ namespace Orleans.Transactions.State
                             // discard expired waiters that have no chance to succeed
                             // because they have been waiting for the lock for a longer timespan than the
                             // total transaction timeout
+                            List<Guid>? expiredWaiters = null;
                             foreach (var kvp in currentGroup)
                             {
                                 if (now > kvp.Value.Deadline)
@@ -449,8 +469,21 @@ namespace Orleans.Transactions.State
                                         now,
                                         TransactionDiagnosticEvents.LockExpirationKind.QueuedWaiter,
                                         queue.DiagnosticIdentity);
-                                    currentGroup.Remove(kvp.Key);
-                                    LogTraceExpireLockWaiter(kvp.Key);
+                                    (expiredWaiters ??= []).Add(kvp.Key);
+                                }
+                                else
+                                {
+                                    this.transactionalLockObserver?.OnResourceLocked(kvp.Key, this.queue.Resource);
+                                }
+                            }
+
+                            if (expiredWaiters is not null)
+                            {
+                                foreach (var transactionId in expiredWaiters)
+                                {
+                                    currentGroup.Remove(transactionId);
+                                    this.transactionalLockObserver?.OnResourceUnlocked(transactionId, this.queue.Resource);
+                                    LogTraceExpireLockWaiter(transactionId);
                                 }
                             }
 
@@ -594,6 +627,7 @@ namespace Orleans.Transactions.State
                     single = kvp.Value;
 
                     currentGroup.Remove(single.TransactionId);
+                    this.transactionalLockObserver?.OnResourceUnlocked(single.TransactionId, this.queue.Resource);
                     LogDebugExitLock(single.TransactionId, new(single.Timestamp));
                     return true;
                 }
@@ -647,6 +681,7 @@ namespace Orleans.Transactions.State
                     for (int i = 0; i < multiple.Count; i++)
                     {
                         currentGroup.Remove(multiple[i].TransactionId);
+                        this.transactionalLockObserver?.OnResourceUnlocked(multiple[i].TransactionId, this.queue.Resource);
                         LogDebugExitLockProgress(i, multiple.Count, multiple[i].TransactionId, new(multiple[i].Timestamp));
                     }
 

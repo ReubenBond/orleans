@@ -5,7 +5,6 @@ using System.Text;
 using Orleans.Runtime;
 using Orleans.Transactions.DeadlockDetection;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Tests
 {
@@ -24,7 +23,7 @@ namespace Orleans.Transactions.Tests
         private static readonly IDictionary<string, Guid> txByKey = new Dictionary<string, Guid>();
         private static readonly IDictionary<Guid, string> keyByTx = new Dictionary<Guid, string>();
         // create a very fake participant id - we only need it to be unique up to k
-        private static ParticipantId Res(string k) => new ParticipantId(k, null, ParticipantId.Role.Resource);
+        private static ParticipantId Res(string k) => new ParticipantId(k, null!, ParticipantId.Role.Resource);
         private static Guid Tx(string k)
         {
             if (txByKey.TryGetValue(k, out var id))
@@ -55,7 +54,7 @@ namespace Orleans.Transactions.Tests
             var sb = new HashSet<LockInfo>(b);
             if (!sa.SetEquals(sb))
             {
-                Assert.False(true, $"expected {FormatCycle(sa)} to equal {FormatCycle(sb)}");
+                Assert.Fail($"expected {FormatCycle(sa)} to equal {FormatCycle(sb)}");
             }
         }
 
@@ -102,6 +101,8 @@ namespace Orleans.Transactions.Tests
             });
 
             Assert.True(graph.DetectCycles(out var cycles), "graph should have a cycle");
+            Assert.Single(cycles);
+            AssertSameLocks(graph.ToLockKeys(), cycles[0]);
             foreach (var cycle in cycles)
             {
                 this.output.WriteLine(FormatCycle(cycle));
@@ -120,6 +121,17 @@ namespace Orleans.Transactions.Tests
                 Lock("R1", "T2")
             });
             Assert.False(graph.DetectCycles(out var _), "graph should not have a cycle");
+        }
+
+        [Fact]
+        public void ConnectedSubGraphIgnoresUnknownNodes()
+        {
+            var graph = new WaitForGraph(new[] { Lock("0", "a") });
+            var subGraph = graph.GetConnectedSubGraph(
+                new[] { Guid.NewGuid() },
+                new[] { new ParticipantId("missing", null!, ParticipantId.Role.Resource) });
+
+            Assert.Empty(subGraph.ToLockKeys());
         }
     }
 }

@@ -4,10 +4,11 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.DeadlockDetection;
 
 namespace Orleans.Transactions
 {
-    public class TransactionalResourceExtension : ITransactionalResourceExtension
+    public class TransactionalResourceExtension : ITransactionalResourceExtension, IDeadlockResourceExtension
     {
         private readonly ResourceFactoryRegistry<ITransactionalResource> factories;
         private readonly Dictionary<string, ITransactionalResource> resources;
@@ -30,7 +31,7 @@ namespace Orleans.Transactions
 
         public Task BreakLocks(string resourceId)
         {
-            return GetResource(resourceId).BreakLocks();
+            return ((IDeadlockBreakableTransactionalResource)GetResource(resourceId)).BreakLocks();
         }
 
         public Task Cancel(string resourceId, Guid transactionId, DateTime timeStamp, TransactionalStatus status)

@@ -7,9 +7,11 @@ using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.TestKit.Base.Grains
 {
-    public class DelayedGrainState
+    [GenerateSerializer]
+    public sealed class DelayedGrainState
     {
-        public string Value { get; set; }
+        [Id(0)]
+        public string Value { get; set; } = string.Empty;
     }
 
     [Reentrant]

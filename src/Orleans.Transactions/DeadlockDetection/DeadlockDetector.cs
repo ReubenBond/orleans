@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -49,7 +50,7 @@ namespace Orleans.Transactions.DeadlockDetection
             public Guid Id { get; }
             public Dictionary<SiloAddress, SiloInfo> SiloInfos { get; }
 
-            public WaitForGraph WaitForGraph { get; set; }
+            public WaitForGraph? WaitForGraph { get; set; }
             public bool Changed { get; set; }
             public ISet<Guid> KnownTransactions { get; } = new HashSet<Guid>();
             public ISet<ParticipantId> KnownResources { get; } = new HashSet<ParticipantId>();
@@ -71,27 +72,30 @@ namespace Orleans.Transactions.DeadlockDetection
             public DateTime AnalysisStartTime { get; }
         }
 
-        private ISiloStatusOracle siloStatusOracle;
+        private readonly ISiloStatusOracle siloStatusOracle;
         private readonly ILogger<DeadlockDetector> logger;
         private readonly IDictionary<Guid, Batch> batches =
             new Dictionary<Guid, Batch>();
 
-        private IInternalGrainFactory internalGrainFactory;
-        private IDeadlockListener[] deadlockListeners;
+        private readonly IInternalGrainFactory internalGrainFactory;
+        private readonly IDeadlockListener?[] deadlockListeners;
         private readonly DeadlockDetectionOptions options;
+        private readonly TimeProvider timeProvider;
 
-        public DeadlockDetector(ILogger<DeadlockDetector> logger, IOptions<DeadlockDetectionOptions> options)
+        public DeadlockDetector(
+            ILogger<DeadlockDetector> logger,
+            IOptions<DeadlockDetectionOptions> options,
+            ISiloStatusOracle siloStatusOracle,
+            IServiceProvider serviceProvider,
+            IEnumerable<IDeadlockListener> deadlockListeners,
+            TimeProvider timeProvider)
         {
             this.logger = logger;
             this.options = options.Value;
-        }
-
-        public override async Task OnActivateAsync()
-        {
-            await base.OnActivateAsync();
-            this.siloStatusOracle = this.ServiceProvider.GetRequiredService<ISiloStatusOracle>();
-            this.internalGrainFactory = this.ServiceProvider.GetRequiredService<IInternalGrainFactory>();
-            this.deadlockListeners = this.ServiceProvider.GetServices<IDeadlockListener>().ToArray();
+            this.siloStatusOracle = siloStatusOracle;
+            this.internalGrainFactory = serviceProvider.GetRequiredService<IInternalGrainFactory>();
+            this.deadlockListeners = deadlockListeners.Cast<IDeadlockListener?>().ToArray();
+            this.timeProvider = timeProvider;
         }
 
         public async Task CheckForDeadlocks(CollectLocksResponse message)
@@ -103,9 +107,18 @@ namespace Orleans.Transactions.DeadlockDetection
             Batch batch;
             if (message.BatchId == null)
             {
-                if (this.StartNewBatch(message, out batch))
+                if (this.GetOrCreateBatch(message, out var candidateBatch, out var created) && candidateBatch is not null)
                 {
-                    this.batches[batch.Id] = batch;
+                    batch = candidateBatch;
+                    if (created)
+                    {
+                        this.batches[batch.Id] = batch;
+                        await this.UpdateBatch(batch, message);
+                    }
+                    else
+                    {
+                        await this.MergeLocks(batch, message, siloInfo: null);
+                    }
                 }
                 else
                 {
@@ -115,8 +128,10 @@ namespace Orleans.Transactions.DeadlockDetection
                     }
                     return;
                 }
+
+                return;
             }
-            else if(!this.batches.TryGetValue(message.BatchId.Value, out batch))
+            else if(!this.batches.TryGetValue(message.BatchId.Value, out var existingBatch))
             {
                 if (this.logger.IsEnabled(LogLevel.Trace))
                 {
@@ -124,18 +139,22 @@ namespace Orleans.Transactions.DeadlockDetection
                 }
                 return;
             }
+            else
+            {
+                batch = existingBatch;
+            }
 
             await this.UpdateBatch(batch, message);
         }
 
-        private bool StartNewBatch(CollectLocksResponse message, out Batch batch)
+        private bool GetOrCreateBatch(CollectLocksResponse message, out Batch? batch, out bool created)
         {
 
 
             // look for a batch that has transactions/resources overlapping those in this message
             // before starting a new one
-            var transactionsInMessage = message.Locks.Select(l => l.TxId).ToSet();
-            var resourcesInMessage = message.Locks.Select(l => l.Resource).ToSet();
+            var transactionsInMessage = new HashSet<Guid>(message.Locks.Select(l => l.TxId));
+            var resourcesInMessage = new HashSet<ParticipantId>(message.Locks.Select(l => l.Resource));
             foreach (var existingBatch in this.batches.Values)
             {
                 if (this.logger.IsEnabled(LogLevel.Trace))
@@ -152,6 +171,7 @@ namespace Orleans.Transactions.DeadlockDetection
                         this.logger.LogTrace("joining an existing batch with overlapping transactions");
                     }
                     batch = existingBatch;
+                    created = false;
                     return true;
                 }
             }
@@ -159,6 +179,7 @@ namespace Orleans.Transactions.DeadlockDetection
             if (this.batches.Count >= this.options.MaxConcurrentDeadlockAnalysis)
             {
                 batch = null;
+                created = false;
                 return false;
             }
 
@@ -166,35 +187,52 @@ namespace Orleans.Transactions.DeadlockDetection
             {
                 this.logger.LogTrace("No existing batches found - starting a new one");
             }
-            batch = new Batch(this.GetSiloAddresses(), DateTime.UtcNow);
+            batch = new Batch(this.GetSiloAddresses(), this.UtcNow);
+            created = true;
             return true;
         }
 
-        private Task UpdateBatch(Batch batch, CollectLocksResponse message)
+        private async Task UpdateBatch(Batch batch, CollectLocksResponse message)
         {
             if (!batch.SiloInfos.TryGetValue(message.SiloAddress, out var siloInfo))
             {
                 this.logger.LogWarning(
                     "Got a collect locks request for a silo that didn't exist when detection started: {SiloAddress}",
                     message.SiloAddress);
-                return Task.CompletedTask;
+                return;
             }
 
             if (siloInfo.Status == SiloStatus.Dead)
             {
                 this.logger.LogWarning("Silo {SiloAddress} responded {MsLate}ms late",
-                    message.SiloAddress, (DateTime.UtcNow - siloInfo.RequestDeadline).TotalMilliseconds);
+                    message.SiloAddress, (this.UtcNow - siloInfo.RequestDeadline).TotalMilliseconds);
+                return;
             }
-            else if (siloInfo.Status == SiloStatus.ReceivedLocks)
+
+            if (siloInfo.Status == SiloStatus.ReceivedLocks)
             {
                 this.logger.LogWarning("Silo {SiloAddress} sent locks twice", message.SiloAddress);
+                return;
             }
+
+            siloInfo.Status = SiloStatus.ReceivedLocks;
 
             if (message.MaxVersion != null)
             {
                 siloInfo.MaxVersion = Math.Max(message.MaxVersion.Value, siloInfo.MaxVersion.GetValueOrDefault(0));
             }
 
+            await this.MergeLocks(batch, message, siloInfo);
+            if (!this.batches.ContainsKey(batch.Id))
+            {
+                return;
+            }
+
+            await this.AdvanceBatch(batch);
+        }
+
+        private async Task MergeLocks(Batch batch, CollectLocksResponse message, SiloInfo? siloInfo)
+        {
             WaitForGraph updatedGraph;
             bool graphChanged;
             if (batch.WaitForGraph == null)
@@ -213,7 +251,8 @@ namespace Orleans.Transactions.DeadlockDetection
                 if (batch.WaitForGraph.DetectCycles(out var cycles))
                 {
                     var tasks = cycles.Select(c => this.BreakLocks(batch, c));
-                    return Task.WhenAll(tasks);
+                    await Task.WhenAll(tasks);
+                    return;
                 }
             }
 
@@ -226,60 +265,58 @@ namespace Orleans.Transactions.DeadlockDetection
 
                 batch.KnownResources.Add(lockInfo.Resource);
 
-                siloInfo.Grains.Add(lockInfo.Resource);
+                siloInfo?.Grains.Add(lockInfo.Resource);
             }
 
-            bool readyForMore = true;
+            return;
+        }
+
+        private Task AdvanceBatch(Batch batch)
+        {
+            var waitingForResponses = false;
             foreach (var silo in batch.SiloInfos.Values)
             {
-                if (silo.Status == SiloStatus.Dead || silo.Status == SiloStatus.ReceivedLocks)
+                if (silo.Status == SiloStatus.BeforeRequest)
                 {
-                    continue;
+                    this.RequestLocksFromSilo(batch, silo, batch.KnownTransactions);
                 }
 
-                readyForMore = false;
+                waitingForResponses |= silo.Status == SiloStatus.WaitingForLocks;
             }
 
-            if (readyForMore)
+            if (waitingForResponses)
             {
-                batch.RequestCount++;
-                if (batch.RequestCount >= this.options.MaxDeadlockRequests)
-                {
-                    this.EndBatch(batch, EndBatchReason.OutOfRequests);
-                    return Task.CompletedTask;
-                }
+                return Task.CompletedTask;
+            }
 
-                if (batch.NewTransactions.Count == 0)
-                {
-                    this.EndBatch(batch, EndBatchReason.Stable);
-                    return Task.CompletedTask;
-                }
+            batch.RequestCount++;
+            if (batch.RequestCount >= this.options.MaxDeadlockRequests)
+            {
+                this.EndBatch(batch, EndBatchReason.OutOfRequests);
+                return Task.CompletedTask;
+            }
 
-                var newTransactions = batch.NewTransactions.ToArray();
-                batch.NewTransactions.Clear();
-                foreach (var silo in batch.SiloInfos.Values)
-                {
-                    if (silo.Status != SiloStatus.Dead && silo.RequestDeadline < DateTime.UtcNow)
-                    {
-                        silo.Status = SiloStatus.Dead;
-                    }
-                    if (silo.Status == SiloStatus.Dead) continue;
+            if (batch.NewTransactions.Count == 0)
+            {
+                this.EndBatch(batch, EndBatchReason.Stable);
+                return Task.CompletedTask;
+            }
 
-                    silo.Status = SiloStatus.WaitingForLocks;
+            var newTransactions = batch.NewTransactions.ToArray();
+            batch.NewTransactions.Clear();
+            var requestedSilo = false;
+            foreach (var silo in batch.SiloInfos.Values)
+            {
+                if (silo.Status != SiloStatus.Dead)
+                {
+                    requestedSilo = true;
                     this.RequestLocksFromSilo(batch, silo, newTransactions);
                 }
             }
-            else
+
+            if (!requestedSilo)
             {
-                // make sure any silos in the BeforeRequests state go into the waiting for locks state
-                foreach (var silo in batch.SiloInfos.Values)
-                {
-                    if (silo.Status == SiloStatus.BeforeRequest)
-                    {
-                        // Send all known transactions, because we have no idea what we can learn from this silo
-                        this.RequestLocksFromSilo(batch, silo, batch.KnownTransactions);
-                    }
-                }
+                this.EndBatch(batch, EndBatchReason.OutOfRequests);
             }
 
             return Task.CompletedTask;
@@ -301,11 +338,11 @@ namespace Orleans.Transactions.DeadlockDetection
 
         private void NotifyDeadlockDetected(Batch batch, IEnumerable<LockInfo> cycle) =>
             this.RunListeners(l => l.DeadlockDetected(cycle, batch.AnalysisStartTime, false, batch.RequestCount,
-                DateTime.UtcNow - batch.AnalysisStartTime));
+                this.UtcNow - batch.AnalysisStartTime));
 
         private void NotifyDetectionFailed(Batch batch, EndBatchReason reason) =>
             this.RunListeners(l => l.DeadlockNotDetected(batch.AnalysisStartTime, batch.RequestCount,
-                DateTime.UtcNow - batch.AnalysisStartTime, reason == EndBatchReason.Stable));
+                this.UtcNow - batch.AnalysisStartTime, reason == EndBatchReason.Stable));
 
         private void RunListeners(Action<IDeadlockListener> action)
         {
@@ -330,16 +367,35 @@ namespace Orleans.Transactions.DeadlockDetection
         private void RequestLocksFromSilo(Batch batch, SiloInfo silo, IEnumerable<Guid> transactions)
         {
             silo.Status = SiloStatus.WaitingForLocks;
-            silo.RequestDeadline = DateTime.UtcNow + this.options.DeadlockRequestTimeout;
+            silo.RequestDeadline = this.UtcNow + this.options.DeadlockRequestTimeout;
+            this.MonitorRequestTimeout(batch.Id, silo.Address, silo.RequestDeadline).Ignore();
             var lockObserver =
                 this.internalGrainFactory.GetSystemTarget<ILocalDeadlockDetector>(
-                    Constants.LocalDeadlockDetectorId, silo.Address);
+                    DeadlockDetectionLockObserver.GrainType, silo.Address);
             lockObserver.CollectLocks(new CollectLocksRequest
             {
                 BatchId = batch.Id, MaxVersion = silo.MaxVersion, TransactionIds = transactions.ToList()
             }).Ignore();
         }
 
+        private async Task MonitorRequestTimeout(Guid batchId, SiloAddress siloAddress, DateTime requestDeadline)
+        {
+            await Task.Delay(this.options.DeadlockRequestTimeout, this.timeProvider, CancellationToken.None);
+
+            if (!this.batches.TryGetValue(batchId, out var batch)
+                || !batch.SiloInfos.TryGetValue(siloAddress, out var silo)
+                || silo.Status != SiloStatus.WaitingForLocks
+                || silo.RequestDeadline != requestDeadline)
+            {
+                return;
+            }
+
+            silo.Status = SiloStatus.Dead;
+            await this.AdvanceBatch(batch);
+        }
+
         private IEnumerable<SiloAddress> GetSiloAddresses() => this.siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
+
+        private DateTime UtcNow => this.timeProvider.GetUtcNow().UtcDateTime;
     }
 }

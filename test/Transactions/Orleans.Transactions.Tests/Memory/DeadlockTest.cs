@@ -12,7 +12,6 @@ using Orleans.Transactions.DeadlockDetection;
 using Orleans.Transactions.TestKit;
 using Orleans.Transactions.TestKit.Base.Grains;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace Orleans.Transactions.Tests.Memory
 {
@@ -53,9 +52,9 @@ namespace Orleans.Transactions.Tests.Memory
             builder.Options.InitialSilosCount = 5;
         }
 
-        public class DeadlockConfigurator : ISiloBuilderConfigurator
+        public class DeadlockConfigurator : ISiloConfigurator
         {
-            public void Configure(ISiloHostBuilder hostBuilder)
+            public void Configure(ISiloBuilder hostBuilder)
             {
                 hostBuilder
                     .ConfigureServices(
@@ -68,11 +67,8 @@ namespace Orleans.Transactions.Tests.Memory
 
     public class DeadlockTest : TransactionTestRunnerBase, IClassFixture<DeadlockFixture>
     {
-        private readonly IServiceProvider serviceProvider;
-
         public DeadlockTest(DeadlockFixture fixture, ITestOutputHelper output) : base(fixture.GrainFactory, output.WriteLine)
         {
-            this.serviceProvider = fixture.HostedCluster.ServiceProvider;
         }
 
         [Fact]
@@ -96,7 +92,14 @@ namespace Orleans.Transactions.Tests.Memory
 
             Assert.True(threw, "bad ordering should throw!");
 
-            var events = await this.grainFactory.GetGrain<IDeadlockEventCollector>(0).GetEvents();
+            var collector = this.grainFactory.GetGrain<IDeadlockEventCollector>(0);
+            IList<DeadlockEvent> events = [];
+            for (var attempt = 0; attempt < 50 && events.Count == 0; attempt++)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(100));
+                events = await collector.GetEvents();
+            }
+
             Assert.True(events.Count > 0, "should have received at least one event");
             Assert.True(events[0].Deadlocked, "should be deadlocked");
             var dns =new DeadlockNames();
@@ -105,7 +108,7 @@ namespace Orleans.Transactions.Tests.Memory
                 if (e.Deadlocked)
                 {
                     this.testOutput(
-                        $"At {e.StartTime.TimeOfDay:G} ({e.RequestCount}): {dns.Format(e.Locks)}");
+                        $"At {e.StartTime.TimeOfDay:G} ({e.RequestCount}): {dns.Format(e.Locks!)}");
                 }
                 else
                 {
@@ -140,16 +143,17 @@ namespace Orleans.Transactions.Tests.Memory
             private static string Name<TKey>(Dictionary<TKey, string> dict, TKey k, string prefix)
                 where TKey : struct
             {
-                string name;
                 if (k.Equals(default(TKey)))
                 {
-                    name = "BAD";
+                    return "BAD";
                 }
-                else if (!dict.TryGetValue(k, out  name))
+
+                if (dict.TryGetValue(k, out var name))
                 {
-                    name = dict[k] = prefix + dict.Count;
+                    return name;
                 }
-                return name;
+
+                return dict[k] = prefix + dict.Count;
             }
         }
 

@@ -41,6 +41,7 @@
     <InternalsVisibleTo Include="Orleans.Streaming.Tests" />
     <InternalsVisibleTo Include="Orleans.TestingHost" />
     <InternalsVisibleTo Include="Orleans.Testing.Reminders" />
+    <InternalsVisibleTo Include="Orleans.Transactions" />
     <InternalsVisibleTo Include="TestInternalGrains" />
   </ItemGroup>
 </Project>

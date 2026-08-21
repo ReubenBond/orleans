@@ -45,7 +45,7 @@ namespace Orleans.Transactions.DeadlockDetection
 
         private Dictionary<int, HashSet<int>> edges = new Dictionary<int, HashSet<int>>();
         private Dictionary<int, HashSet<int>> backEdges = new Dictionary<int, HashSet<int>>();
-        private Node[] nodes;
+        private Node[] nodes = [];
         private Dictionary<Guid, int> nodesByTx = new Dictionary<Guid, int>();
         private Dictionary<ParticipantId, int> nodesByRes = new Dictionary<ParticipantId, int>();
 
@@ -66,8 +66,26 @@ namespace Orleans.Transactions.DeadlockDetection
 
         public WaitForGraph GetConnectedSubGraph(IEnumerable<Guid> transactions, IEnumerable<ParticipantId> resources)
         {
-            var aroundNodes = transactions.Select(t => this.nodesByTx[t])
-                .Concat(resources.Select(r => this.nodesByRes[r]));
+            IEnumerable<int> GetNodeIds()
+            {
+                foreach (var transaction in transactions)
+                {
+                    if (this.nodesByTx.TryGetValue(transaction, out var nodeId))
+                    {
+                        yield return nodeId;
+                    }
+                }
+
+                foreach (var resource in resources)
+                {
+                    if (this.nodesByRes.TryGetValue(resource, out var nodeId))
+                    {
+                        yield return nodeId;
+                    }
+                }
+            }
+
+            var aroundNodes = GetNodeIds();
             var subGraph = this.GetConnectedSubGraph(aroundNodes);
             return this.CreateSubGraph(subGraph);
         }
@@ -130,6 +148,7 @@ namespace Orleans.Transactions.DeadlockDetection
         }
 
         private static bool AddToSet<K, T>(Dictionary<K, HashSet<T>> dict, K key, T value)
+            where K : notnull
         {
             if (!dict.TryGetValue(key, out var set))
             {
@@ -284,11 +303,11 @@ namespace Orleans.Transactions.DeadlockDetection
 
                 if (current.IsTransaction && next.IsResource)
                 {
-                    locks.Add(LockInfo.ForLock(next.ParticipantId, current.TransactionId));
+                    locks.Add(LockInfo.ForWait(next.ParticipantId, current.TransactionId));
                 }
                 else if (current.IsResource && next.IsTransaction)
                 {
-                    locks.Add(LockInfo.ForWait(current.ParticipantId, next.TransactionId));
+                    locks.Add(LockInfo.ForLock(current.ParticipantId, next.TransactionId));
                 }
             }
 
@@ -353,12 +372,77 @@ namespace Orleans.Transactions.DeadlockDetection
 
                     if (scc.Count > 1)
                     {
-                        cycles.Add(scc);
+                        cycles.AddRange(this.ExtractCycles(scc));
                     }
                 }
             }
 
             return cycles;
+        }
+
+        private IEnumerable<List<int>> ExtractCycles(IList<int> stronglyConnectedComponent)
+        {
+            var members = new HashSet<int>(stronglyConnectedComponent);
+            while (this.TryExtractCycle(members, out var cycle))
+            {
+                yield return cycle;
+                foreach (var node in cycle)
+                {
+                    if (this.nodes[node].IsTransaction)
+                    {
+                        members.Remove(node);
+                    }
+                }
+            }
+        }
+
+        private bool TryExtractCycle(HashSet<int> members, out List<int> cycle)
+        {
+            var states = new Dictionary<int, byte>();
+            var path = new List<int>();
+            List<int>? result = null;
+
+            bool Visit(int node)
+            {
+                states[node] = 1;
+                path.Add(node);
+
+                foreach (var next in this.GetEdges(node))
+                {
+                    if (members.Contains(next))
+                    {
+                        if (!states.TryGetValue(next, out var state))
+                        {
+                            if (Visit(next))
+                            {
+                                return true;
+                            }
+                        }
+                        else if (state == 1)
+                        {
+                            var cycleStart = path.LastIndexOf(next);
+                            result = path.GetRange(cycleStart, path.Count - cycleStart);
+                            return true;
+                        }
+                    }
+                }
+
+                path.RemoveAt(path.Count - 1);
+                states[node] = 2;
+                return false;
+            }
+
+            foreach (var node in members)
+            {
+                if (!states.ContainsKey(node) && Visit(node))
+                {
+                    cycle = result!;
+                    return true;
+                }
+            }
+
+            cycle = [];
+            return false;
         }
 
     }

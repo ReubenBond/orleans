@@ -35,9 +35,6 @@ namespace Orleans.Transactions.State
 
         private int failCounter;
 
-        // We have to expose this to the deadlock detection system.
-        internal ParticipantId Resource => this.resource;
-
         // collection tasks
         private readonly Dictionary<DateTime, PreparedMessages> unprocessedPreparedMessages;
         private class PreparedMessages
@@ -67,7 +64,8 @@ namespace Orleans.Transactions.State
             ILogger logger,
             ITimerManager timerManager,
             IActivationLifetime activationLifetime,
-            TransactionDiagnosticEvents.TransactionDiagnosticIdentity diagnosticIdentity)
+            TransactionDiagnosticEvents.TransactionDiagnosticIdentity diagnosticIdentity,
+            ITransactionalLockObserver? transactionalLockObserver = null)
         {
             this.options = options.Value;
             this.resource = resource;

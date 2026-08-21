@@ -22,8 +22,11 @@ namespace Orleans.Transactions.DeadlockDetection
             this.locksAndWaits.TryAdd(LockInfo.ForLock(lockedGrain, lockedByTx), version);
         }
 
-        public bool TrackExitLock(ParticipantId lockedGrain, Guid lockedByTx) =>
+        public void TrackExitLock(ParticipantId lockedGrain, Guid lockedByTx)
+        {
+            this.locksAndWaits.TryRemove(LockInfo.ForWait(lockedGrain, lockedByTx), out _);
             this.locksAndWaits.TryRemove(LockInfo.ForLock(lockedGrain, lockedByTx), out _);
+        }
 
         public void TrackWait(ParticipantId waitingForGrain, Guid waitingTx, long version) =>
             this.locksAndWaits.TryAdd(LockInfo.ForWait(waitingForGrain, waitingTx), version);

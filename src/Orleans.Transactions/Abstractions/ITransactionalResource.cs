@@ -51,10 +51,5 @@ namespace Orleans.Transactions.Abstractions
         /// <param name="timeStamp">The commit timestamp of the committed transaction</param>
         Task Confirm(Guid transactionId, DateTime timeStamp);
 
-        /// <summary>
-        /// Request sent from the IDeadlockDetector grain to instruct this participant to abort any transactions that
-        /// were in the lock
-        /// </summary>
-        Task BreakLocks();
     }
 }

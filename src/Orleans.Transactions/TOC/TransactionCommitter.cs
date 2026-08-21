@@ -8,6 +8,7 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.DeadlockDetection;
 using Orleans.Transactions.Diagnostics;
 using Orleans.Transactions.State;
 using Orleans.Transactions.TOC;
@@ -143,10 +144,12 @@ namespace Orleans.Transactions
                 logger,
                 timerManager,
                 this.activationLifetime,
-                diagnosticIdentity);
+                diagnosticIdentity,
+                this.context.ActivationServices.GetService<ITransactionalLockObserver>());
 
             // Add transaction manager factory to the grain context
             this.context.RegisterResourceFactory<ITransactionManager>(this.config.ServiceName, () => new TransactionManager<OperationState>(this.queue));
+            this.context.RegisterResourceFactory<ITransactionalResource>(this.config.ServiceName, () => new TransactionalResource<OperationState>(this.queue));
 
             // recover state
             await this.queue.NotifyOfRestore();

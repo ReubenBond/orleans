@@ -215,7 +215,8 @@ namespace Orleans.Transactions
                 logger,
                 timerManager,
                 this.activationLifetime,
-                diagnosticIdentity);
+                diagnosticIdentity,
+                this.context.ActivationServices.GetService<ITransactionalLockObserver>());
 
             setupResourceFactory(this.context, this.config.StateName, queue);
 

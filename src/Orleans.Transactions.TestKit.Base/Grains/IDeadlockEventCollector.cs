@@ -6,16 +6,29 @@ using Orleans.Transactions.DeadlockDetection;
 
 namespace Orleans.Transactions.TestKit.Base.Grains
 {
-    [Serializable]
+    [GenerateSerializer]
     [Immutable]
-    public class DeadlockEvent
+    public sealed class DeadlockEvent
     {
+        [Id(0)]
         public DateTime StartTime;
+
+        [Id(1)]
         public TimeSpan Duration;
+
+        [Id(2)]
         public bool Local;
+
+        [Id(3)]
         public int RequestCount;
+
+        [Id(4)]
         public bool IsDefinite;
-        public LockInfo[] Locks;
+
+        [Id(5)]
+        public LockInfo[]? Locks;
+
+        [Id(6)]
         public bool Deadlocked;
     }
 

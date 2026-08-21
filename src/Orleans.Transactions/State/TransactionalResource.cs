@@ -1,10 +1,11 @@
 using System;
 using System.Threading.Tasks;
 using Orleans.Transactions.Abstractions;
+using Orleans.Transactions.DeadlockDetection;
 
 namespace Orleans.Transactions.State
 {
-    internal class TransactionalResource<TState> : ITransactionalResource
+    internal class TransactionalResource<TState> : ITransactionalResource, IDeadlockBreakableTransactionalResource
                where TState : class, new()
     {
         private readonly TransactionQueue<TState> queue;
@@ -61,7 +62,7 @@ namespace Orleans.Transactions.State
         public async Task BreakLocks()
         {
             await this.queue.Ready();
-            await this.queue.RWLock.AbortExecutingTransactions();
+            await this.queue.RWLock.AbortExecutingTransactions(exception: null);
             this.queue.RWLock.Notify();
         }
 

@@ -8,12 +8,19 @@ namespace Orleans.Transactions.DeadlockDetection
     /// Sent from a silo to the deadlock detector grain to either initiate a deadlock detection (when BatchId is null)
     /// or in response to a CollectLocksRequest.
     /// </summary>
-    [Serializable]
-    public class CollectLocksResponse
+    [GenerateSerializer]
+    public sealed class CollectLocksResponse
     {
+        [Id(0)]
         public Guid? BatchId { get; set; }
+
+        [Id(1)]
         public long? MaxVersion { get; set; }
-        public SiloAddress SiloAddress { get; set; }
-        public IList<LockInfo> Locks { get; set; }
+
+        [Id(2)]
+        public SiloAddress SiloAddress { get; set; } = null!;
+
+        [Id(3)]
+        public IList<LockInfo> Locks { get; set; } = [];
     }
 }
