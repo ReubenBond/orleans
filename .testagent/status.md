@@ -45,7 +45,7 @@ dotnet test --project test/Transactions/Orleans.Transactions.Tests/Orleans.Trans
 total 15; succeeded 15; failed 0; skipped 0
 ```
 
-The equivalent `net8.0` run is repeated during final branch validation.
+The equivalent `net8.0` run passes 15/15.
 
 ```text
 dotnet test --project test/Transactions/Orleans.Transactions.Tests/Orleans.Transactions.Tests.csproj --framework net10.0 --filter-method "*DoesNotDetectNonCycles*" --minimum-expected-tests 1
