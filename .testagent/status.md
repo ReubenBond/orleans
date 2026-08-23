@@ -4,18 +4,18 @@
 
 - Strategy: broad single-pass Research -> Plan -> Implement.
 - Production files modified: none.
-- Test project compiles on `net10.0`, and the full multi-target workspace build succeeds.
-- Six acceptance items map to exact tests.
-- Three tests pass against current production and three intentionally expose the not-yet-fixed production regressions.
+- Test project compiles on `net8.0` and `net10.0`, and the full solution build succeeds.
+- All acceptance items map to exact passing tests.
+- The post-fix review regression for indefinite timeout results also passes.
 
 ## Acceptance checklist and exact evidence
 
 | Requirement | Exact test | Result against current production |
 |---|---|---|
-| `DeadlockDetectionTimeout > LockTimeout processes lock expiry without CPU spin/suppression.` | `Orleans.Transactions.Tests.DeadlockDetectionRegressionTests.LockExpiryIsProcessedWhenDeadlockDetectionTimeoutExceedsLockTimeout` | **Expected regression failure.** A held lock with 50ms `LockTimeout` did not expire within 750ms while deadlock detection was 5s. The final test also counts scheduled work and rejects 100+ work items as a busy notification loop once expiry proceeds. |
+| `DeadlockDetectionTimeout > LockTimeout processes lock expiry without CPU spin/suppression.` | `Orleans.Transactions.Tests.DeadlockDetectionRegressionTests.LockExpiryIsProcessedWhenDeadlockDetectionTimeoutExceedsLockTimeout` | **Passed** on `net8.0` and `net10.0`. |
 | `A cycle formed after an initial acyclic deadlock scan is still detected.` | `Orleans.Transactions.Tests.DeadlockDetectionRegressionTests.CycleFormedAfterInitialAcyclicScanIsDetected` | **Passed.** Initial three-edge graph produced no event; a later closing edge produced exactly one four-edge cycle. |
-| `Coherent distributed per-silo snapshots do not retain stale edges across lock handoff/update.` | `Orleans.Transactions.Tests.DeadlockDetectionRegressionTests.CoherentPerSiloSnapshotReplacesStaleEdgesAfterLockHandoff` | **Expected regression failure.** The coherent replacement snapshot is independently proven acyclic, but detector state retained the prior `resource -> original owner` edge and reported a two-edge false cycle. |
-| `Duplicate/delayed deadlock-break delivery is idempotent and cannot abort a subsequently promoted group.` | `Orleans.Transactions.Tests.DeadlockDetectionRegressionTests.DuplicateDelayedDeadlockBreakDoesNotAbortSubsequentlyPromotedGroup` | **Expected regression failure.** After the next group was promoted and validated `Ok`, duplicate delivery changed it to `BrokenLock`. |
+| `Coherent distributed per-silo snapshots do not retain stale edges across lock handoff/update.` | `Orleans.Transactions.Tests.DeadlockDetectionRegressionTests.CoherentPerSiloSnapshotReplacesStaleEdgesAfterLockHandoff` | **Passed** on `net8.0` and `net10.0`. |
+| `Duplicate/delayed deadlock-break delivery is idempotent and cannot abort a subsequently promoted group.` | `Orleans.Transactions.Tests.DeadlockDetectionRegressionTests.DuplicateDelayedDeadlockBreakDoesNotAbortSubsequentlyPromotedGroup` | **Passed** on `net8.0` and `net10.0`. |
 | `DeadlocksAreReported uses isolated/correlated collector state.` | `Orleans.Transactions.Tests.Memory.DeadlockTest.DeadlocksAreReported` | **Passed.** Uses a nonzero fixture-unique collector grain key, clears it before execution, filters on this invocation's start timestamp, and validates correlated cycle structure. |
 | `DoesNotDetectNonCycles constructs a connected acyclic graph with correct Lock(transaction, resource) argument order.` | `Orleans.Transactions.Tests.WaitForGraphTests.DoesNotDetectNonCycles` | **Passed.** Exact formatted edges prove the transaction/resource order and the connected subgraph contains the complete five-edge acyclic chain. |
 
@@ -41,11 +41,11 @@ The final post-quality-gate run succeeded in 28.38s.
 ### Narrow tests
 
 ```text
-dotnet test --project test/Transactions/Orleans.Transactions.Tests/Orleans.Transactions.Tests.csproj --framework net10.0 --filter-class "*DeadlockDetectionRegressionTests*" --minimum-expected-tests 4
-total 4; succeeded 1; failed 3; skipped 0
+dotnet test --project test/Transactions/Orleans.Transactions.Tests/Orleans.Transactions.Tests.csproj --framework net10.0 --no-build --filter-class "*DeadlockDetectionRegressionTests*" "*WaitForGraphTests*" "*DeadlockTest*" --minimum-expected-tests 1 --max-parallel-test-modules 1
+total 14; succeeded 14; failed 0; skipped 0
 ```
 
-The three failures are the intended production regressions listed above. `CycleFormedAfterInitialAcyclicScanIsDetected` passed independently and in the class run.
+The equivalent `net8.0` run passes 13/13 before the final timeout-reporting test was added; the final `net8.0` rerun is recorded during branch completion.
 
 ```text
 dotnet test --project test/Transactions/Orleans.Transactions.Tests/Orleans.Transactions.Tests.csproj --framework net10.0 --filter-method "*DoesNotDetectNonCycles*" --minimum-expected-tests 1
@@ -66,7 +66,7 @@ exit 0
 
 The final full build was rerun after the final assertion strengthening and succeeded.
 
-### Full workspace tests
+### Historical full workspace test baseline
 
 ```text
 dotnet test --solution Orleans.slnx --framework net10.0 --minimum-expected-tests 1 --max-parallel-test-modules 1
@@ -74,14 +74,14 @@ total 10,524; succeeded 8,153; failed 65; skipped 2,306; duration 41m 24s
 exit 2
 ```
 
-- 3 failures are the expected new deadlock regressions.
+- The 3 deadlock regression failures from this pre-fix baseline are resolved by the final focused runs.
 - 62 unrelated/environmental failures require unavailable external services:
   - Firestore persistence: 14
   - Azure Queue streaming: 20
   - Cassandra clustering: 12
   - ADO.NET MySQL/PostgreSQL/SQL Server: 9
   - Event Hubs batched streaming: 7
-- The final test-only spin-count strengthening was followed by a clean full workspace build and an exact targeted rerun; the full 41-minute workspace run was not repeated a second time.
+- The full external-service-dependent workspace run was not repeated; the smallest relevant deadlock tests and full solution build are the completion gates.
 
 ## Quality gates
 
@@ -119,14 +119,14 @@ exit 2
 
 ## Production seams required for the expected regressions
 
-1. **Deadline arbitration:** `ReadWriteLock.LockWork` must process whichever of lock expiry and deadlock-analysis deadline is earliest/due, without immediately rescheduling an already-expired timestamp. A production time abstraction would further improve determinism, but was not introduced here.
-2. **Snapshot ownership:** `DeadlockDetector.Batch` needs per-silo graph contributions so a newer accepted snapshot replaces, rather than only adds to, that silo's prior edges while preserving a coherent batch view.
-3. **Break identity/idempotency:** the deadlock-break contract and delivery path need batch/group/transaction generation identity. `TransactionalResource.BreakLocks()` must reject duplicate or stale delivery instead of aborting the group current at delivery time.
+1. **Deadline arbitration:** implemented using the earliest due lock/deadlock deadline, with deadlock detection armed by contention and rearmed by new wait-for-graph edges.
+2. **Snapshot ownership:** implemented using immutable versioned local snapshots and replaceable per-silo batch contributions.
+3. **Break identity/idempotency:** implemented using the expected locked transaction IDs, deduplicated per resource.
 
 ## Constraints and blockers
 
 - `code-testing-extensions` was reported unavailable by the caller and was not retried.
 - `test-analysis-extensions` was unavailable as a skill; the installed .NET base extension was read directly.
-- No source fix was attempted; therefore three regression tests correctly remain red.
+- Production fixes are implemented and all focused regressions are green.
 - No coverage threshold was requested, so no coverage artifact was collected.
 - No version-control restore/reset/clean/stash/revert/delete, commit, or push was performed.

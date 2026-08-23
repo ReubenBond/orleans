@@ -303,7 +303,9 @@ namespace Orleans.Transactions.DeadlockDetection
 
         private void NotifyDetectionFailed(Batch batch, EndBatchReason reason) =>
             this.RunListeners(l => l.DeadlockNotDetected(batch.AnalysisStartTime, batch.RequestCount,
-                this.UtcNow - batch.AnalysisStartTime, reason == EndBatchReason.Stable));
+                this.UtcNow - batch.AnalysisStartTime,
+                reason == EndBatchReason.Stable
+                && batch.SiloInfos.Values.All(static silo => silo.Status != SiloStatus.Dead)));
 
         private void RunListeners(Action<IDeadlockListener> action)
         {

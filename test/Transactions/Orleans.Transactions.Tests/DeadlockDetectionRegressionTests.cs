@@ -317,11 +317,48 @@ public class DeadlockDetectionRegressionTests
         }
     }
 
+    [Fact]
+    public async Task TimedOutSiloProducesIndefiniteNegativeResult()
+    {
+        var respondingSilo = SiloAddress.New(IPAddress.Loopback, 11_131, 1);
+        var timedOutSilo = SiloAddress.New(IPAddress.Loopback, 11_132, 2);
+        var (detector, localDetectors, listener) = CreateDetector(
+            TimeSpan.FromMilliseconds(50),
+            respondingSilo,
+            timedOutSilo);
+        var transaction = Guid.NewGuid();
+        var resource = CreateParticipant("timeout-resource");
+
+        await detector.CheckForDeadlocks(
+            Response(respondingSilo, batchId: null, [Lock(resource, transaction)]));
+
+        var request = Assert.Single(localDetectors[respondingSilo].Requests);
+        await detector.CheckForDeadlocks(
+            Response(respondingSilo, request.BatchId, [Lock(resource, transaction)]));
+
+        for (var attempt = 0; attempt < 50 && listener.NotDetectedCount == 0; attempt++)
+        {
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(10),
+                TestContext.Current.CancellationToken);
+        }
+
+        Assert.Equal(1, listener.NotDetectedCount);
+        Assert.Equal([false], listener.NotDetectedDefiniteness);
+    }
+
     private static (
         DeadlockDetector Detector,
         IReadOnlyDictionary<SiloAddress, RecordingLocalDeadlockDetector> LocalDetectors,
         RecordingDeadlockListener Listener)
         CreateDetector(params SiloAddress[] silos)
+        => CreateDetector(TimeSpan.FromSeconds(10), silos);
+
+    private static (
+        DeadlockDetector Detector,
+        IReadOnlyDictionary<SiloAddress, RecordingLocalDeadlockDetector> LocalDetectors,
+        RecordingDeadlockListener Listener)
+        CreateDetector(TimeSpan requestTimeout, params SiloAddress[] silos)
     {
         var statusOracle = Substitute.For<ISiloStatusOracle>();
         statusOracle.GetApproximateSiloStatuses(Arg.Any<bool>())
@@ -355,7 +392,7 @@ public class DeadlockDetectionRegressionTests
             NullLogger<DeadlockDetector>.Instance,
             Options.Create(new DeadlockDetectionOptions
             {
-                DeadlockRequestTimeout = TimeSpan.FromSeconds(10),
+                DeadlockRequestTimeout = requestTimeout,
                 MaxConcurrentDeadlockAnalysis = 3,
                 MaxDeadlockRequests = 5,
             }),
@@ -467,6 +504,7 @@ public class DeadlockDetectionRegressionTests
     {
         public List<LockInfo[]> DetectedCycles { get; } = [];
         public int NotDetectedCount { get; private set; }
+        public List<bool> NotDetectedDefiniteness { get; } = [];
 
         public void DeadlockDetected(
             IEnumerable<LockInfo> locks,
@@ -481,7 +519,10 @@ public class DeadlockDetectionRegressionTests
             int requestsMade,
             TimeSpan analysisDuration,
             bool isDefinite)
-            => NotDetectedCount++;
+        {
+            NotDetectedCount++;
+            NotDetectedDefiniteness.Add(isDefinite);
+        }
     }
 
     private sealed class RecordingLockObserver(TimeSpan detectionTimeout) : ITransactionalLockObserver
