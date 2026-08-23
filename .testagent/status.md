@@ -45,7 +45,7 @@ dotnet test --project test/Transactions/Orleans.Transactions.Tests/Orleans.Trans
 total 14; succeeded 14; failed 0; skipped 0
 ```
 
-The equivalent `net8.0` run passes 13/13 before the final timeout-reporting test was added; the final `net8.0` rerun is recorded during branch completion.
+The equivalent `net8.0` run passes 14/14.
 
 ```text
 dotnet test --project test/Transactions/Orleans.Transactions.Tests/Orleans.Transactions.Tests.csproj --framework net10.0 --filter-method "*DoesNotDetectNonCycles*" --minimum-expected-tests 1
@@ -60,11 +60,11 @@ total 1; succeeded 1; failed 0
 ### Full workspace build
 
 ```text
-dotnet build Orleans.slnx --no-incremental
-exit 0
+dotnet build Orleans.slnx -bl
+Build succeeded. 3 warnings, 0 errors.
 ```
 
-The final full build was rerun after the final assertion strengthening and succeeded.
+The warnings are the existing `Benchmarks.AdoNet` MSB3277 assembly-conflict warnings.
 
 ### Historical full workspace test baseline
 
