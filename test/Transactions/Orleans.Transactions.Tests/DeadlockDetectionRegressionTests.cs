@@ -117,6 +117,64 @@ public class DeadlockDetectionRegressionTests
     }
 
     [Fact]
+    public async Task EarlierDeadlockDeadlineIsProcessedBeforeExpiredLockDeadlineWhenWorkerIsLate()
+    {
+        var schedulerPair = new ConcurrentExclusiveSchedulerPair(
+            TaskScheduler.Default,
+            maxConcurrencyLevel: 1);
+        try
+        {
+            await Task.Factory.StartNew(
+                async () =>
+                {
+                    var resource = CreateParticipant("late-worker-resource");
+                    var lifetime = new TestActivationLifetime();
+                    var lockObserver = new RecordingLockObserver(TimeSpan.FromMilliseconds(50));
+                    var queue = CreateQueue(
+                        resource,
+                        lifetime,
+                        lockObserver,
+                        lockTimeout: TimeSpan.FromMilliseconds(100));
+
+                    try
+                    {
+                        await queue.RWLock.EnterLock(
+                            Guid.NewGuid(),
+                            DateTime.UtcNow,
+                            default,
+                            isRead: false,
+                            exclusiveLock: false,
+                            static () => 1);
+                        _ = queue.RWLock.EnterLock(
+                            Guid.NewGuid(),
+                            DateTime.UtcNow.AddTicks(1),
+                            default,
+                            isRead: false,
+                            exclusiveLock: false,
+                            static () => 2);
+
+                        Thread.Sleep(TimeSpan.FromMilliseconds(200));
+                        await lockObserver.WaitForDetectionCount(1);
+
+                        Assert.Equal(1, lockObserver.DetectionStartCount);
+                    }
+                    finally
+                    {
+                        lifetime.Cancel();
+                    }
+                },
+                CancellationToken.None,
+                TaskCreationOptions.None,
+                schedulerPair.ExclusiveScheduler).Unwrap();
+        }
+        finally
+        {
+            schedulerPair.Complete();
+            await schedulerPair.Completion;
+        }
+    }
+
+    [Fact]
     public async Task CycleFormedAfterInitialAcyclicScanIsDetected()
     {
         var silo = SiloAddress.New(IPAddress.Loopback, 11_111, 1);

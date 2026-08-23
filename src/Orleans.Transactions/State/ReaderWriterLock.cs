@@ -389,6 +389,14 @@ namespace Orleans.Transactions.State
                             lockWorker.Notify();
                             storageWorker.Notify();
                         }
+                        else if (currentGroup.DeadlockDeadline is { } deadlockDeadline
+                            && deadlockDeadline <= now
+                            && (currentGroup.Deadline is not { } scheduledLockDeadline || deadlockDeadline <= scheduledLockDeadline))
+                        {
+                            transactionalLockObserver?.StartDeadlockDetection(queue.Resource, currentGroup.Keys).Ignore();
+                            currentGroup.DeadlockDeadline = null;
+                            this.lockWorker.Notify();
+                        }
                         else if (currentGroup.Deadline is { } lockDeadline && lockDeadline <= now)
                         {
                             // the lock group has timed out.
@@ -408,15 +416,6 @@ namespace Orleans.Transactions.State
                                 exception: null,
                                 reason: TransactionDiagnosticEvents.LockBreakReason.Expired);
                             lockWorker.Notify();
-                        }
-                        else if (currentGroup.DeadlockDeadline is { } deadlockDeadline && deadlockDeadline <= now)
-                        {
-                            transactionalLockObserver?.StartDeadlockDetection(queue.Resource, currentGroup.Keys).Ignore();
-                            currentGroup.DeadlockDeadline = null;
-                            if (currentGroup.Deadline is { } deadline)
-                            {
-                                this.lockWorker.Notify(deadline);
-                            }
                         }
                         else if (currentGroup.NextDeadline is { } nextDeadline)
                         {
